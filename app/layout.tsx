@@ -1,6 +1,15 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Header from '@/components/Header'
+import { Suspense } from "react"
+
+export default function VocabLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div>Loading…</div>}>
+      {children}
+    </Suspense>
+  )
+}
 
 export const metadata: Metadata = {
   title: 'Mekuru Reading Companion',

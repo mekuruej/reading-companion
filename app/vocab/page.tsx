@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+export const dynamic = "force-dynamic";
+
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-// ----------------------------------------------------------
-// 🔧 Helper: get stroke count for each kanji
-// ----------------------------------------------------------
+/* ------------------------------------------
+   Stroke API helper
+------------------------------------------- */
 const KANJI_REGEX = /[\u3400-\u9FFF]/g
 
 async function getStrokeDataForWord(word: string) {
@@ -30,10 +32,21 @@ async function getStrokeDataForWord(word: string) {
   return results
 }
 
-// ----------------------------------------------------------
-// 📘 PAGE COMPONENT
-// ----------------------------------------------------------
-export default function VocabPage() {
+/* ------------------------------------------
+   Wrapper required by Next.js
+------------------------------------------- */
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <VocabPageContent />
+    </Suspense>
+  )
+}
+
+/* ------------------------------------------
+   REAL PAGE CONTENT
+------------------------------------------- */
+function VocabPageContent() {
   const searchParams = useSearchParams()
   const preselectedBook = searchParams.get('bookId') || ''
 
@@ -49,13 +62,14 @@ export default function VocabPage() {
   const [strokeData, setStrokeData] = useState<any[]>([])
   const [previewMode, setPreviewMode] = useState(false)
   const [message, setMessage] = useState('')
+
   const [vocab, setVocab] = useState<any[]>([])
   const [chapterNumber, setChapterNumber] = useState('')
   const [chapterName, setChapterName] = useState('')
 
-  // ----------------------------------------------------------
-  // 🌟 Auto-load saved chapter for this book
-  // ----------------------------------------------------------
+  /* ------------------------------------------
+     Load saved chapter from localStorage
+  ------------------------------------------- */
   useEffect(() => {
     if (!bookId) return
     const saved = localStorage.getItem(`chapter_${bookId}`)
@@ -66,23 +80,20 @@ export default function VocabPage() {
     }
   }, [bookId])
 
-  // ----------------------------------------------------------
-  // 🌟 Save chapter to localStorage whenever changed
-  // ----------------------------------------------------------
+  /* ------------------------------------------
+     Auto-save chapter to localStorage
+  ------------------------------------------- */
   useEffect(() => {
     if (!bookId) return
     localStorage.setItem(
       `chapter_${bookId}`,
-      JSON.stringify({
-        number: chapterNumber,
-        name: chapterName,
-      })
+      JSON.stringify({ number: chapterNumber, name: chapterName })
     )
   }, [chapterNumber, chapterName, bookId])
 
-  // ----------------------------------------------------------
-  // 📚 Load books
-  // ----------------------------------------------------------
+  /* ------------------------------------------
+     Load books
+  ------------------------------------------- */
   useEffect(() => {
     fetchBooks()
   }, [])
@@ -100,9 +111,9 @@ export default function VocabPage() {
     setBooks(data || [])
   }
 
-  // ----------------------------------------------------------
-  // 📘 Load vocab when book changes
-  // ----------------------------------------------------------
+  /* ------------------------------------------
+     Load vocab when book changes
+  ------------------------------------------- */
   useEffect(() => {
     if (bookId) fetchVocab()
   }, [bookId])
@@ -121,9 +132,9 @@ export default function VocabPage() {
     setVocab(data || [])
   }
 
-  // ----------------------------------------------------------
-  // 🔍 Step 1: Fetch Jisho preview
-  // ----------------------------------------------------------
+  /* ------------------------------------------
+     Fetch preview from Jisho
+  ------------------------------------------- */
   async function fetchPreview(e: React.FormEvent) {
     e.preventDefault()
     setPreviewMode(false)
@@ -154,21 +165,20 @@ export default function VocabPage() {
     }
   }
 
-  // ----------------------------------------------------------
-  // 💾 Step 2: Save word
-  // ----------------------------------------------------------
+  /* ------------------------------------------
+     Save word to DB
+  ------------------------------------------- */
   async function saveWord() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return alert('Please sign in first')
+    if (!user) return alert('Please sign in')
 
     const normalizedJlpt =
-      jlpt && jlpt.startsWith('jlpt-')
+      jlpt?.startsWith("jlpt-")
         ? jlpt
         : jlpt.toLowerCase().startsWith('n')
-          ? `jlpt-${jlpt.toLowerCase()}`
-          : 'Non-JLPT word'
+        ? `jlpt-${jlpt.toLowerCase()}`
+        : "Non-JLPT word"
 
-    // Auto-set book started date
     const selectedBook = books.find(b => b.id === bookId)
     if (selectedBook && !selectedBook.started_at) {
       const today = new Date().toISOString().split('T')[0]
@@ -201,8 +211,6 @@ export default function VocabPage() {
 
     setMessage('✅ Saved successfully!')
     setPreviewMode(false)
-
-    // Clear fields
     setWord('')
     setReading('')
     setMeaning('')
@@ -210,18 +218,17 @@ export default function VocabPage() {
     setIsCommon(false)
     setPage('')
     setStrokeData([])
-
     fetchVocab()
   }
 
-  // ----------------------------------------------------------
-  // 🎨 RENDER
-  // ----------------------------------------------------------
+  /* ------------------------------------------
+     RENDER
+  ------------------------------------------- */
   return (
     <main className="max-w-2xl mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-4">📝 Add Vocabulary</h1>
 
-      {/* FORM */}
+      {/* book selector */}
       <form onSubmit={fetchPreview} className="flex flex-col gap-3 mb-6">
         <select
           value={bookId}
@@ -251,7 +258,7 @@ export default function VocabPage() {
 
       {message && <p className="text-center text-sm mb-4">{message}</p>}
 
-      {/* PREVIEW */}
+      {/* preview */}
       {previewMode && (
         <div className="border p-4 rounded bg-gray-50 mb-6">
           <h2 className="font-semibold text-lg mb-2">Preview</h2>
@@ -259,23 +266,22 @@ export default function VocabPage() {
           <p className="text-xl font-bold">{word}（{reading}）</p>
           <p className="mb-2">{meaning}</p>
 
-          <div className="flex flex-wrap gap-2 mb-2">
-            <span className="px-2 bg-blue-100 text-blue-700 rounded text-xs">
-              {jlpt.startsWith('jlpt-') ? jlpt.replace('jlpt-', 'N').toUpperCase() : jlpt}
+          <div className="flex flex-wrap gap-2 mb-2 text-xs">
+            <span className="px-2 bg-blue-100 text-blue-700 rounded">
+              {jlpt.startsWith("jlpt-") ? jlpt.replace("jlpt-", "N").toUpperCase() : jlpt}
             </span>
 
-            <span className="px-2 bg-gray-100 text-gray-700 rounded text-xs">
+            <span className="px-2 bg-gray-100 text-gray-700 rounded">
               {isCommon ? 'Common' : 'Rare'}
             </span>
 
             {strokeData.length > 0 && (
-              <span className="px-2 bg-amber-100 text-amber-700 rounded text-xs">
+              <span className="px-2 bg-amber-100 text-amber-700 rounded">
                 {strokeData.map(s => `${s.char}:${s.strokes ?? '?'}`).join(' / ')} strokes
               </span>
             )}
           </div>
 
-          {/* Editable fields */}
           <input
             type="text"
             value={reading}
@@ -334,7 +340,10 @@ export default function VocabPage() {
 
       {/* VOCAB LIST */}
       <h2 className="text-xl font-medium mb-3">📘 Vocabulary</h2>
-      {!bookId && <p className="text-gray-500">Select a book to view vocab.</p>}
+
+      {!bookId && (
+        <p className="text-gray-500 mb-10">Select a book to view vocab.</p>
+      )}
 
       {bookId && (
         <ul className="space-y-2">
@@ -348,55 +357,46 @@ export default function VocabPage() {
 
             return (
               <li key={item.id} className="border p-3 rounded hover:bg-amber-50">
-                <div>
-                  <span className="font-semibold text-lg">{item.word}</span>
-                  {item.reading && <span className="text-gray-500 ml-2">({item.reading})</span>}
-                  <div className="text-sm mt-1">{item.meaning}</div>
+                <div className="text-lg font-semibold">{item.word}</div>
+                <div className="text-gray-600">{item.reading}</div>
+                <div>{item.meaning}</div>
 
-                  <div className="flex flex-wrap gap-2 mt-2 text-xs">
-
-                    {/* JLPT */}
-                    {item.jlpt && (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-                        {item.jlpt.startsWith("jlpt-")
-                          ? `N${item.jlpt.replace("jlpt-", "").replace("n", "")}`
-                          : item.jlpt}
-                      </span>
-                    )}
-
-                    {/* PAGE */}
-                    {item.page_number && (
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
-                        p. {item.page_number}
-                      </span>
-                    )}
-
-                    {/* CHAPTER NUMBER */}
-                    {item.chapter_number && (
-                      <span className="px-2 py-0.5 bg-pink-100 text-pink-700 rounded">
-                        Ch. {item.chapter_number}
-                      </span>
-                    )}
-
-                    {/* CHAPTER NAME */}
-                    {item.chapter_name && (
-                      <span className="px-2 py-0.5 bg-pink-50 text-pink-600 border border-pink-200 rounded">
-                        {item.chapter_name}
-                      </span>
-                    )}
-
-                    {/* COMMON */}
-                    <span className={`px-2 py-0.5 rounded ${item.is_common ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                      {item.is_common ? 'Common' : 'Rare'}
+                <div className="flex gap-2 flex-wrap mt-2 text-xs">
+                  {item.jlpt && (
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                      {item.jlpt.startsWith("jlpt-")
+                        ? `N${item.jlpt.replace("jlpt-", "").replace("n", "")}`
+                        : item.jlpt}
                     </span>
+                  )}
 
-                    {/* STROKES */}
-                    {displayStrokes && (
-                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
-                        {displayStrokes} strokes
-                      </span>
-                    )}
-                  </div>
+                  {item.page_number && (
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                      p.{item.page_number}
+                    </span>
+                  )}
+
+                  {item.chapter_number && (
+                    <span className="px-2 py-0.5 bg-pink-100 text-pink-700 rounded">
+                      Ch.{item.chapter_number}
+                    </span>
+                  )}
+
+                  {item.chapter_name && (
+                    <span className="px-2 py-0.5 bg-pink-50 text-pink-700 border border-pink-200 rounded">
+                      {item.chapter_name}
+                    </span>
+                  )}
+
+                  <span className={`px-2 py-0.5 rounded ${item.is_common ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                    {item.is_common ? 'Common' : 'Rare'}
+                  </span>
+
+                  {displayStrokes && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
+                      {displayStrokes} strokes
+                    </span>
+                  )}
                 </div>
               </li>
             )
