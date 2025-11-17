@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "../../lib/supabaseClient";
 
-// ----------------------------------------------------------
-// 🔧 Helper: get stroke count for each kanji
-// ----------------------------------------------------------
 const KANJI_REGEX = /[\u3400-\u9FFF]/g;
 
 async function getStrokeDataForWord(word: string) {
@@ -32,10 +29,7 @@ async function getStrokeDataForWord(word: string) {
   return results;
 }
 
-// ----------------------------------------------------------
-// 📘 PAGE CONTENT
-// ----------------------------------------------------------
-export default function VocabPageContent() {
+function InnerVocabPageContent() {
   const searchParams = useSearchParams();
   const preselectedBook = searchParams.get("bookId") || "";
 
@@ -55,9 +49,6 @@ export default function VocabPageContent() {
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterName, setChapterName] = useState("");
 
-  // ----------------------------------------------------------
-  // 🌟 Auto-load saved chapter for this book
-  // ----------------------------------------------------------
   useEffect(() => {
     if (!bookId) return;
     const saved = localStorage.getItem(`chapter_${bookId}`);
@@ -68,9 +59,6 @@ export default function VocabPageContent() {
     }
   }, [bookId]);
 
-  // ----------------------------------------------------------
-  // 🌟 Save chapter info to localStorage
-  // ----------------------------------------------------------
   useEffect(() => {
     if (!bookId) return;
     localStorage.setItem(
@@ -82,9 +70,6 @@ export default function VocabPageContent() {
     );
   }, [chapterNumber, chapterName, bookId]);
 
-  // ----------------------------------------------------------
-  // 📚 Load books
-  // ----------------------------------------------------------
   useEffect(() => {
     fetchBooks();
   }, []);
@@ -104,9 +89,6 @@ export default function VocabPageContent() {
     setBooks(data || []);
   }
 
-  // ----------------------------------------------------------
-  // 📘 Load vocab when book changes
-  // ----------------------------------------------------------
   useEffect(() => {
     if (bookId) fetchVocab();
   }, [bookId]);
@@ -127,16 +109,15 @@ export default function VocabPageContent() {
     setVocab(data || []);
   }
 
-  // ----------------------------------------------------------
-  // 🔍 Step 1: Fetch Jisho preview
-  // ----------------------------------------------------------
   async function fetchPreview(e: React.FormEvent) {
     e.preventDefault();
     setPreviewMode(false);
     setMessage("⏳ Fetching Jisho info...");
 
     try {
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
+      const res = await fetch(
+        `/api/jisho?keyword=${encodeURIComponent(word)}`
+      );
       if (!res.ok) throw new Error("Failed to fetch Jisho");
 
       const data = await res.json();
@@ -144,9 +125,7 @@ export default function VocabPageContent() {
 
       if (entry) {
         setReading(entry.japanese?.[0]?.reading || "");
-        setMeaning(
-          entry.senses?.[0]?.english_definitions?.join(", ") || ""
-        );
+        setMeaning(entry.senses?.[0]?.english_definitions?.join(", ") || "");
         setJlpt(entry.jlpt?.[0] || "Non-JLPT word");
         setIsCommon(entry.is_common || false);
       }
@@ -162,9 +141,6 @@ export default function VocabPageContent() {
     }
   }
 
-  // ----------------------------------------------------------
-  // 💾 Step 2: Save word
-  // ----------------------------------------------------------
   async function saveWord() {
     const {
       data: { user },
@@ -225,9 +201,6 @@ export default function VocabPageContent() {
     fetchVocab();
   }
 
-  // ----------------------------------------------------------
-  // 🎨 Render
-  // ----------------------------------------------------------
   return (
     <main className="max-w-2xl mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-4">📝 Add Vocabulary</h1>
@@ -261,9 +234,10 @@ export default function VocabPageContent() {
         </button>
       </form>
 
-      {message && <p className="text-center text-sm mb-4">{message}</p>}
+      {message && (
+        <p className="text-center text-sm mb-4">{message}</p>
+      )}
 
-      {/* PREVIEW */}
       {previewMode && (
         <div className="border p-4 rounded bg-gray-50 mb-6">
           <h2 className="font-semibold text-lg mb-2">Preview</h2>
@@ -294,7 +268,6 @@ export default function VocabPageContent() {
             )}
           </div>
 
-          {/* Editable fields */}
           <input
             type="text"
             value={reading}
@@ -351,7 +324,6 @@ export default function VocabPageContent() {
         </div>
       )}
 
-      {/* VOCAB LIST */}
       <h2 className="text-xl font-medium mb-3">📘 Vocabulary</h2>
       {!bookId && (
         <p className="text-gray-500">Select a book to view vocab.</p>
@@ -435,5 +407,12 @@ export default function VocabPageContent() {
         </ul>
       )}
     </main>
+  );
+}
+export default function VocabPageContent() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InnerVocabPageContent />
+    </Suspense>
   );
 }
