@@ -1,3 +1,4 @@
+// app/vocab/page.tsx
 import { Suspense } from "react";
 import VocabPageContent from "./VocabPageContent";
 

@@ -1,242 +1,757 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-const KANJI_REGEX = /[\u3400-\u9FFF]/g;
+import { WordCard } from "@/components/WordCard";
 
-async function getStrokeDataForWord(word: string) {
-  const kanji = word.match(KANJI_REGEX) || [];
-  const results: { char: string; strokes: number | null }[] = [];
-
-  for (const ch of kanji) {
-    try {
-      const r = await fetch(
-        `https://kanjiapi.dev/v1/kanji/${encodeURIComponent(ch)}`
-      );
-      if (r.ok) {
-        const data = await r.json();
-        results.push({ char: ch, strokes: data.stroke_count ?? null });
-      } else {
-        results.push({ char: ch, strokes: null });
-      }
-    } catch {
-      results.push({ char: ch, strokes: null });
-    }
-  }
-
-  return results;
-}
-
-type Props = {
-  preselectedBook: string;
+// BASE defaults — things not in the DB yet
+const DEFAULT_SETTINGS = {
+  learning_profile: "Advanced",
+  jlpt_level: "N1",
+  color_system: "rainbow",
+  include_green: true,
+  include_blue: true,
+  include_grey: true,
+  include_purple: true,
+  // we’ll override these from DB if they exist:
+  red_stages: 1,
+  orange_stages: 1,
+  yellow_stages: 1,
+  show_badge_numbers: true,
 };
 
-export default function VocabPageContent({ preselectedBook }: Props) {
+// -------------------------------------------------------------
+// Types
+// -------------------------------------------------------------
+type LearningSettingsRow = {
+  user_id: string;
+  learning_profile: "Beginner" | "Intermediate" | "Advanced" | "Custom";
+  red_stages: number;
+  orange_stages: number;
+  yellow_stages: number;
+  show_badge_numbers: boolean;
+  color_system: string;
+};
+
+// -------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------
+function normalizeJlpt(value: string | null | undefined): string {
+  if (!value) return "NON-JLPT";
+  const lower = String(value).toLowerCase();
+  if (lower.startsWith("n1")) return "N1";
+  if (lower.startsWith("n2")) return "N2";
+  if (lower.startsWith("n3")) return "N3";
+  if (lower.startsWith("n4")) return "N4";
+  if (lower.startsWith("n5")) return "N5";
+  return "NON-JLPT";
+}
+
+// -------------------------------------------------------------
+// Component
+// -------------------------------------------------------------
+export default function VocabPageContent() {
+  const searchParams = useSearchParams();
+  const preselectedBook = searchParams.get("bookId") || "";
+
   const [books, setBooks] = useState<any[]>([]);
-  const [bookId, setBookId] = useState(preselectedBook || "");
+  const [bookId, setBookId] = useState(preselectedBook);
 
-  const [word, setWord] = useState("");
-  const [reading, setReading] = useState("");
-  const [meaning, setMeaning] = useState("");
-  const [jlpt, setJlpt] = useState("");
-  const [isCommon, setIsCommon] = useState(false);
-  const [page, setPage] = useState("");
-  const [strokeData, setStrokeData] = useState<any[]>([]);
-  const [previewMode, setPreviewMode] = useState(false);
+  // resolve userBookId (user_books.id) for per-book lookup stats
+  const [userBookId, setUserBookId] = useState<string>("");
+
+  const [entries, setEntries] = useState<any[]>([]);
   const [message, setMessage] = useState("");
-  const [vocab, setVocab] = useState<any[]>([]);
-  const [chapterNumber, setChapterNumber] = useState("");
-  const [chapterName, setChapterName] = useState("");
 
-  // ----------------------------------------------------------
-  // 🌟 Auto-load saved chapter for this book
-  // ----------------------------------------------------------
+  // per-book lookup stats from user_book_words
+  const [bookLookupMap, setBookLookupMap] = useState<Record<string, { count: number; days: number }>>({});
+
+  // ------------------ JISHO PREVIEW STATE ---------------------
+  const [lookupWord, setLookupWord] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
+
+  const [previewReading, setPreviewReading] = useState("");
+  const [previewMeaning, setPreviewMeaning] = useState("");
+  const [previewJlpt, setPreviewJlpt] = useState("NON-JLPT");
+  const [previewIsCommon, setPreviewIsCommon] = useState(false);
+
+  const [previewPage, setPreviewPage] = useState("");
+  const [previewChapter, setPreviewChapter] = useState("");
+  const [isSavingPreview, setIsSavingPreview] = useState(false);
+
+  // ------------------ QUICK ADD STATE (no Jisho) --------------
+  const [newWord, setNewWord] = useState("");
+  const [newReading, setNewReading] = useState("");
+  const [newMeaning, setNewMeaning] = useState("");
+  const [isSavingQuick, setIsSavingQuick] = useState(false);
+
+  // ------------------ LEARNING SETTINGS FROM DB ---------------
+  const [learningSettings, setLearningSettings] = useState<LearningSettingsRow | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+  // -------------------------------------------------------------
+  // Load user’s books
+  // -------------------------------------------------------------
   useEffect(() => {
-    if (!bookId) return;
-    const saved = localStorage.getItem(`chapter_${bookId}`);
-    if (saved) {
-      const { number, name } = JSON.parse(saved);
-      setChapterNumber(number);
-      setChapterName(name);
+    async function loadBooks() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("books")
+        .select("id, title, started_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error loading books:", error);
+        return;
+      }
+
+      setBooks(data || []);
     }
-  }, [bookId]);
 
-  // ----------------------------------------------------------
-  // 🌟 Save chapter info to localStorage
-  // ----------------------------------------------------------
-  useEffect(() => {
-    if (!bookId) return;
-    localStorage.setItem(
-      `chapter_${bookId}`,
-      JSON.stringify({
-        number: chapterNumber,
-        name: chapterName,
-      })
-    );
-  }, [chapterNumber, chapterName, bookId]);
-
-  // ----------------------------------------------------------
-  // 📚 Load books
-  // ----------------------------------------------------------
-  useEffect(() => {
-    fetchBooks();
+    loadBooks();
   }, []);
 
-  async function fetchBooks() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+  const currentBook = books.find((b) => b.id === bookId);
 
-    const { data } = await supabase
-      .from("books")
-      .select("id, title, started_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    setBooks(data || []);
-  }
-
-  // ----------------------------------------------------------
-  // 📘 Load vocab when book changes
-  // ----------------------------------------------------------
+  // -------------------------------------------------------------
+  // Resolve userBookId (user_books.id) from selected books.id
+  // -------------------------------------------------------------
   useEffect(() => {
-    if (bookId) fetchVocab();
+    async function resolveUserBook() {
+      setUserBookId("");
+      setBookLookupMap({});
+
+      if (!bookId) return;
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("user_books")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("book_id", bookId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error resolving user_books:", error);
+        return;
+      }
+
+      if (data?.id) setUserBookId(data.id);
+    }
+
+    resolveUserBook();
   }, [bookId]);
 
-  async function fetchVocab() {
+  // -------------------------------------------------------------
+  // Load learning settings (same table as /profile/settings)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    async function loadSettings() {
+      setSettingsLoading(true);
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("Error getting user for settings:", userError);
+        setLearningSettings(null);
+        setSettingsLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_learning_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle(); // ✅ ok if no row
+
+      if (error) {
+        console.error("Error loading learning settings:", {
+          message: (error as any)?.message,
+          details: (error as any)?.details,
+          hint: (error as any)?.hint,
+          code: (error as any)?.code,
+          raw: error,
+        });
+        setLearningSettings(null);
+        setSettingsLoading(false);
+        return;
+      }
+
+      setLearningSettings((data as any) || null);
+      setSettingsLoading(false);
+    }
+
+    loadSettings();
+  }, []);
+
+  // -------------------------------------------------------------
+  // Reload vocab entries (dictionary + user_vocab_states + book_vocab)
+  // + per-book lookup counts from user_book_words
+  // -------------------------------------------------------------
+  async function reloadEntries() {
+    setMessage("");
+
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
-    if (!user) return;
 
-    const { data } = await supabase
-      .from("vocab")
-      .select("*")
-      .eq("book_id", bookId)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    if (userError) {
+      console.error("Error getting user:", userError);
+      setMessage("Error getting user.");
+      return;
+    }
 
-    setVocab(data || []);
+    if (!user || !bookId) {
+      setEntries([]);
+      setBookLookupMap({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("dictionary_entries")
+      .select(
+        `
+        id,
+        orthography,
+        reading,
+        meaning,
+        jlpt,
+        is_common,
+        is_katakana,
+        strokes,
+
+        book_vocab:book_vocab!book_vocab_word_id_fkey (
+          book_id
+        ),
+
+        user_vocab_states:user_vocab_states!user_vocab_states_word_id_fkey (
+          id,
+          user_id,
+          lookup_count,
+          reading_stage,
+          meaning_stage,
+          forgot_reading,
+          forgot_meaning,
+          updated_at
+        )
+      `
+      )
+      .eq("book_vocab.book_id", bookId)
+      .order("orthography", { ascending: true });
+
+    if (error) {
+      console.error("Error loading vocab entries:", error.message, error.details, error.hint);
+      setMessage("Error loading vocabulary.");
+      setEntries([]);
+      return;
+    }
+
+    setEntries(data || []);
+
+    // per-book lookup counts (from user_book_words)
+    if (!userBookId) {
+      setBookLookupMap({});
+      return;
+    }
+
+    const { data: stats, error: statsErr } = await supabase
+      .from("user_book_words")
+      .select("surface, seen_on")
+      .eq("user_book_id", userBookId);
+
+    if (statsErr) {
+      console.error("Error loading user_book_words stats:", statsErr);
+      setBookLookupMap({});
+      return;
+    }
+
+    const tmp: Record<string, { count: number; daysSet: Set<string> }> = {};
+
+    for (const row of stats ?? []) {
+      const key = String((row as any).surface ?? "").trim();
+      if (!key) continue;
+
+      if (!tmp[key]) tmp[key] = { count: 0, daysSet: new Set() };
+      tmp[key].count += 1;
+
+      const d = (row as any).seen_on;
+      if (d) tmp[key].daysSet.add(String(d));
+    }
+
+    const finalMap: Record<string, { count: number; days: number }> = {};
+    for (const [k, v] of Object.entries(tmp)) {
+      finalMap[k] = { count: v.count, days: v.daysSet.size };
+    }
+
+    setBookLookupMap(finalMap);
   }
 
-  // ----------------------------------------------------------
-  // 🔍 Step 1: Fetch Jisho preview
-  // ----------------------------------------------------------
-  async function fetchPreview(e: React.FormEvent) {
+  // -------------------------------------------------------------
+  // Local-only: toggle reading known (green/blue/grey helper)
+  // -------------------------------------------------------------
+  function toggleReadingKnown(entryId: string, existingState: any) {
+    setEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== entryId) return entry;
+
+        const currentState =
+          existingState ||
+          entry.user_vocab_states?.[0] || {
+            id: null,
+            user_id: null,
+            lookup_count: 0,
+            reading_stage: "learning",
+            meaning_stage: "learning",
+            forgot_reading: false,
+            forgot_meaning: false,
+            updated_at: "",
+          };
+
+        const newStage = currentState.reading_stage === "known" ? "learning" : "known";
+
+        const newState = {
+          ...currentState,
+          reading_stage: newStage,
+        };
+
+        return {
+          ...entry,
+          user_vocab_states: [newState],
+        };
+      })
+    );
+  }
+
+  // -------------------------------------------------------------
+  // Local-only: increment lookup count (+ button)
+  // -------------------------------------------------------------
+  function incrementLookup(entryId: string, existingState: any) {
+    setEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== entryId) return entry;
+
+        const currentState =
+          existingState ||
+          entry.user_vocab_states?.[0] || {
+            id: null,
+            user_id: null,
+            lookup_count: 0,
+            reading_stage: "learning",
+            meaning_stage: "learning",
+            forgot_reading: false,
+            forgot_meaning: false,
+            updated_at: "",
+          };
+
+        const newState = {
+          ...currentState,
+          lookup_count: (currentState.lookup_count || 0) + 1,
+        };
+
+        return {
+          ...entry,
+          user_vocab_states: [newState],
+        };
+      })
+    );
+  }
+
+  // -------------------------------------------------------------
+  // JISHO: Fetch Preview
+  // -------------------------------------------------------------
+  async function handleFetchPreview(e: FormEvent) {
     e.preventDefault();
-    setPreviewMode(false);
-    setMessage("⏳ Fetching Jisho info...");
+    setMessage("");
+
+    if (!bookId) {
+      setMessage("Please select a book first.");
+      return;
+    }
+
+    const word = lookupWord.trim();
+    if (!word) {
+      setMessage("Please enter a word to look up.");
+      return;
+    }
+
+    setPreviewLoading(true);
+    setPreviewVisible(false);
 
     try {
-      const res = await fetch(
-        `/api/jisho?keyword=${encodeURIComponent(word)}`
-      );
-      if (!res.ok) throw new Error("Failed to fetch Jisho");
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
+
+      if (!res.ok) {
+        console.error("Jisho error:", res.status);
+        setMessage("Error fetching info from Jisho.");
+        return;
+      }
 
       const data = await res.json();
       const entry = data?.data?.[0];
 
-      if (entry) {
-        setReading(entry.japanese?.[0]?.reading || "");
-        setMeaning(
-          entry.senses?.[0]?.english_definitions?.join(", ") || ""
-        );
-        setJlpt(entry.jlpt?.[0] || "Non-JLPT word");
-        setIsCommon(entry.is_common || false);
+      if (!entry) {
+        setMessage("No result found on Jisho.");
+        return;
       }
 
-      const strokes = await getStrokeDataForWord(word);
-      setStrokeData(strokes);
+      const reading = entry.japanese?.[0]?.reading || "";
+      const meanings = entry.senses?.[0]?.english_definitions || [];
+      const jlptRaw = entry.jlpt?.[0] || "";
+      const isCommon = !!entry.is_common;
 
-      setPreviewMode(true);
-      setMessage("Preview loaded!");
+      setPreviewReading(reading);
+      setPreviewMeaning(meanings.join(", "));
+      setPreviewJlpt(normalizeJlpt(jlptRaw));
+      setPreviewIsCommon(isCommon);
+
+      setPreviewVisible(true);
     } catch (err) {
-      console.error(err);
-      setMessage("❌ Error fetching preview.");
+      console.error("Error fetching from /api/jisho:", err);
+      setMessage("Error fetching info from Jisho.");
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
-  // ----------------------------------------------------------
-  // 💾 Step 2: Save word
-  // ----------------------------------------------------------
-  async function saveWord() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return alert("Please sign in first");
+  // -------------------------------------------------------------
+  // JISHO: Save from Preview into old schema
+  // -------------------------------------------------------------
+  async function handleSaveFromPreview() {
+    setMessage("");
 
-    const normalizedJlpt =
-      jlpt && jlpt.startsWith("jlpt-")
-        ? jlpt
-        : jlpt.toLowerCase().startsWith("n")
-        ? `jlpt-${jlpt.toLowerCase()}`
-        : "Non-JLPT word";
-
-    // Auto-set book started date
-    const selectedBook = books.find((b) => b.id === bookId);
-    if (selectedBook && !selectedBook.started_at) {
-      const today = new Date().toISOString().split("T")[0];
-      await supabase
-        .from("books")
-        .update({ started_at: today })
-        .eq("id", bookId);
-    }
-
-    const { error } = await supabase.from("vocab").insert([
-      {
-        book_id: bookId,
-        word,
-        reading,
-        meaning,
-        jlpt: normalizedJlpt,
-        is_common: isCommon,
-        page_number: page ? Number(page) : null,
-        chapter_number: chapterNumber ? Number(chapterNumber) : null,
-        chapter_name: chapterName || null,
-        strokes: strokeData,
-        color_stage: 0,
-        lookup_count: 1,
-        user_id: user.id,
-      },
-    ]);
-
-    if (error) {
-      console.error(error);
-      setMessage(`❌ Failed to save: ${error.message}`);
+    if (!bookId) {
+      setMessage("Please select a book first.");
       return;
     }
 
-    setMessage("✅ Saved successfully!");
-    setPreviewMode(false);
+    const word = lookupWord.trim();
+    if (!word) {
+      setMessage("Please enter a word.");
+      return;
+    }
 
-    // Clear fields
-    setWord("");
-    setReading("");
-    setMeaning("");
-    setJlpt("");
-    setIsCommon(false);
-    setPage("");
-    setStrokeData([]);
+    setIsSavingPreview(true);
 
-    fetchVocab();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error("Error getting user:", userError);
+      setMessage("Please sign in again.");
+      setIsSavingPreview(false);
+      return;
+    }
+
+    try {
+      const baseWord = word;
+      const baseReading = previewReading.trim() || null;
+
+      // 1) Check if dictionary entry already exists (same word + reading)
+      const { data: existingRows, error: existingError } = await supabase
+        .from("dictionary_entries")
+        .select("id")
+        .eq("orthography", baseWord)
+        .eq("reading", baseReading)
+        .limit(1);
+
+      if (existingError) {
+        console.error("Error checking existing dictionary entry:", existingError);
+        setMessage("Error checking existing entries.");
+        return;
+      }
+
+      let dictId: string;
+
+      if (existingRows && existingRows.length > 0) {
+        dictId = existingRows[0].id;
+      } else {
+        const meaningArray = previewMeaning
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
+        const { data: dictInsert, error: dictError } = await supabase
+          .from("dictionary_entries")
+          .insert({
+            orthography: baseWord,
+            reading: baseReading,
+            meaning: meaningArray.length > 0 ? meaningArray : null,
+            jlpt: previewJlpt === "NON-JLPT" ? null : previewJlpt,
+            is_common: previewIsCommon,
+            is_katakana: false,
+            strokes: null,
+          })
+          .select("id")
+          .single();
+
+        if (dictError || !dictInsert) {
+          console.error("Error inserting dictionary entry:", dictError);
+          setMessage("Error adding word.");
+          return;
+        }
+
+        dictId = dictInsert.id;
+      }
+
+      // 2) Ensure book_vocab row (link word to this book)
+      const pageNumberVal = previewPage ? Number(previewPage) : null;
+      const chapterVal =
+        previewChapter && !Number.isNaN(Number(previewChapter)) ? Number(previewChapter) : null;
+
+      const { error: bookVocabError } = await supabase.from("book_vocab").insert({
+        book_id: bookId,
+        word_id: dictId,
+        chapter: chapterVal,
+        page_number: pageNumberVal,
+      });
+
+      if (bookVocabError) {
+        if ((bookVocabError as any).code === "23505") {
+          console.warn("Book_vocab already linked; continuing.");
+        } else {
+          console.error("Error inserting book_vocab:", bookVocabError);
+          setMessage("Word created, but error linking to book.");
+          return;
+        }
+      }
+
+      // 3) Ensure user_vocab_states row
+      const { data: existingStateRows, error: existingStateError } = await supabase
+        .from("user_vocab_states")
+        .select("id, lookup_count")
+        .eq("user_id", user.id)
+        .eq("word_id", dictId)
+        .limit(1);
+
+      if (existingStateError) {
+        console.error("Error checking user_vocab_states:", existingStateError);
+        setMessage("Error saving your progress.");
+        return;
+      }
+
+      if (!existingStateRows || existingStateRows.length === 0) {
+        const { error: stateError } = await supabase.from("user_vocab_states").insert({
+          user_id: user.id,
+          word_id: dictId,
+          dictionary_entry_id: dictId,
+          lookup_count: 1,
+          reading_stage: "learning",
+          meaning_stage: "learning",
+          forgot_reading: false,
+          forgot_meaning: false,
+        });
+
+        if (stateError) {
+          console.error("Error inserting user_vocab_states:", stateError);
+          setMessage("Word added, but error saving your progress.");
+        } else {
+          setMessage("✅ Word added.");
+        }
+      } else {
+        setMessage("✅ Word linked to this book.");
+      }
+
+      setPreviewVisible(false);
+      setPreviewPage("");
+      setPreviewChapter("");
+
+      reloadEntries();
+    } finally {
+      setIsSavingPreview(false);
+    }
   }
 
-  // ----------------------------------------------------------
-  // 🎨 RENDER
-  // ----------------------------------------------------------
+  // -------------------------------------------------------------
+  // QUICK ADD (no Jisho, just manual)
+  // -------------------------------------------------------------
+  async function handleAddWordQuick(e: FormEvent) {
+    e.preventDefault();
+    setMessage("");
+
+    if (!bookId) {
+      setMessage("Please select a book first.");
+      return;
+    }
+
+    const word = newWord.trim();
+    if (!word) {
+      setMessage("Please enter a word.");
+      return;
+    }
+
+    setIsSavingQuick(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error("Error getting user:", userError);
+      setMessage("Please sign in again.");
+      setIsSavingQuick(false);
+      return;
+    }
+
+    try {
+      const baseWord = word;
+      const baseReading = newReading.trim() || null;
+
+      // 1) Check if dictionary entry exists
+      const { data: existingRows, error: existingError } = await supabase
+        .from("dictionary_entries")
+        .select("id")
+        .eq("orthography", baseWord)
+        .eq("reading", baseReading)
+        .limit(1);
+
+      if (existingError) {
+        console.error("Error checking existing dictionary entry:", existingError);
+        setMessage("Error checking existing entries.");
+        return;
+      }
+
+      let dictId: string;
+
+      if (existingRows && existingRows.length > 0) {
+        dictId = existingRows[0].id;
+      } else {
+        const meaningArray = newMeaning
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
+        const { data: dictInsert, error: dictError } = await supabase
+          .from("dictionary_entries")
+          .insert({
+            orthography: baseWord,
+            reading: baseReading,
+            meaning: meaningArray.length > 0 ? meaningArray : null,
+            jlpt: null,
+            is_common: null,
+            is_katakana: false,
+            strokes: null,
+          })
+          .select("id")
+          .single();
+
+        if (dictError || !dictInsert) {
+          console.error("Error inserting dictionary entry (quick):", dictError);
+          setMessage("Error adding word.");
+          return;
+        }
+
+        dictId = dictInsert.id;
+      }
+
+      // 2) Link to this book
+      const { error: bookVocabError } = await supabase.from("book_vocab").insert({
+        book_id: bookId,
+        word_id: dictId,
+        chapter: null,
+        page_number: null,
+      });
+
+      if (bookVocabError) {
+        if ((bookVocabError as any).code === "23505") {
+          console.warn("Book_vocab already linked (quick); continuing.");
+        } else {
+          console.error("Error inserting book_vocab (quick):", bookVocabError);
+          setMessage("Word created, but error linking to book.");
+          return;
+        }
+      }
+
+      // 3) Ensure user_vocab_state
+      const { data: existingStateRows, error: existingStateError } = await supabase
+        .from("user_vocab_states")
+        .select("id, lookup_count")
+        .eq("user_id", user.id)
+        .eq("word_id", dictId)
+        .limit(1);
+
+      if (existingStateError) {
+        console.error("Error checking user_vocab_states (quick):", existingStateError);
+        setMessage("Error saving your progress.");
+        return;
+      }
+
+      if (!existingStateRows || existingStateRows.length === 0) {
+        const { error: stateError } = await supabase.from("user_vocab_states").insert({
+          user_id: user.id,
+          word_id: dictId,
+          dictionary_entry_id: dictId,
+          lookup_count: 1,
+          reading_stage: "learning",
+          meaning_stage: "learning",
+          forgot_reading: false,
+          forgot_meaning: false,
+        });
+
+        if (stateError) {
+          console.error("Error inserting user_vocab_states (quick):", stateError);
+          setMessage("Word added, but error saving your progress.");
+        } else {
+          setMessage("✅ Word added (quick).");
+        }
+      } else {
+        setMessage("✅ Word linked to this book (quick).");
+      }
+
+      setNewWord("");
+      setNewReading("");
+      setNewMeaning("");
+
+      reloadEntries();
+    } finally {
+      setIsSavingQuick(false);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Load entries when book changes (or first render)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    reloadEntries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookId, userBookId]);
+
+  // -------------------------------------------------------------
+  // UI
+  // -------------------------------------------------------------
+  const mergedSettings = {
+    ...DEFAULT_SETTINGS,
+    ...(learningSettings || {}),
+  };
+
   return (
     <main className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-4">📝 Add Vocabulary</h1>
+      <h1 className="text-2xl font-semibold mb-4">📘 Vocabulary</h1>
 
-      {/* FORM */}
-      <form onSubmit={fetchPreview} className="flex flex-col gap-3 mb-6">
+      {/* Book Selector */}
+      <div className="mb-2">
         <select
           value={bookId}
           onChange={(e) => setBookId(e.target.value)}
-          className="border p-2 rounded"
-          required
+          className="border p-2 rounded w-full"
         >
           <option value="">Select a book…</option>
           {books.map((b) => (
@@ -245,202 +760,209 @@ export default function VocabPageContent({ preselectedBook }: Props) {
             </option>
           ))}
         </select>
+      </div>
+
+      {!settingsLoading && learningSettings && (
+        <p className="text-xs text-gray-500 mb-3">
+          Profile: {learningSettings.learning_profile} · Red/Orange/Yellow stages:{" "}
+          {learningSettings.red_stages}/{learningSettings.orange_stages}/{learningSettings.yellow_stages}
+        </p>
+      )}
+
+      {/* JISHO ADD FORM */}
+      <form onSubmit={handleFetchPreview} className="flex flex-col gap-2 mb-4 border rounded p-4 bg-white">
+        <h2 className="text-sm font-semibold mb-1">
+          Add with Jisho (Preview → Save)
+          {currentBook ? ` — “${currentBook.title}”` : ""}
+        </h2>
 
         <input
           type="text"
-          placeholder="Word"
-          value={word}
-          onChange={(e) => setWord(e.target.value)}
+          placeholder="Word to look up"
+          value={lookupWord}
+          onChange={(e) => setLookupWord(e.target.value)}
           className="border p-2 rounded"
-          required
         />
 
-        <button className="bg-amber-500 text-white py-2 rounded hover:bg-amber-600">
-          Fetch Info 🔍
+        <button
+          type="submit"
+          disabled={previewLoading || !bookId}
+          className={`mt-1 px-4 py-2 rounded text-white ${
+            !bookId || previewLoading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {bookId ? (previewLoading ? "Fetching…" : "Fetch from Jisho 🔍") : "Select a book first"}
         </button>
       </form>
 
-      {message && (
-        <p className="text-center text-sm mb-4">{message}</p>
-      )}
-
-      {/* PREVIEW */}
-      {previewMode && (
+      {/* JISHO PREVIEW BOX */}
+      {previewVisible && (
         <div className="border p-4 rounded bg-gray-50 mb-6">
-          <h2 className="font-semibold text-lg mb-2">Preview</h2>
+          <h3 className="font-semibold text-lg mb-2">Preview</h3>
 
           <p className="text-xl font-bold">
-            {word}（{reading}）
+            {lookupWord}
+            {previewReading && <span className="text-lg font-normal text-gray-600"> （{previewReading}）</span>}
           </p>
-          <p className="mb-2">{meaning}</p>
 
-          <div className="flex flex-wrap gap-2 mb-2">
-            <span className="px-2 bg-blue-100 text-blue-700 rounded text-xs">
-              {jlpt.startsWith("jlpt-")
-                ? jlpt.replace("jlpt-", "N").toUpperCase()
-                : jlpt}
-            </span>
+          <input
+            className="border p-2 rounded w-full mt-2 text-sm"
+            placeholder="Reading"
+            value={previewReading}
+            onChange={(e) => setPreviewReading(e.target.value)}
+          />
 
-            <span className="px-2 bg-gray-100 text-gray-700 rounded text-xs">
-              {isCommon ? "Common" : "Rare"}
-            </span>
+          <textarea
+            className="border p-2 rounded w-full mt-2 text-sm"
+            placeholder="Meaning(s), separated by commas"
+            rows={3}
+            value={previewMeaning}
+            onChange={(e) => setPreviewMeaning(e.target.value)}
+          />
 
-            {strokeData.length > 0 && (
-              <span className="px-2 bg-amber-100 text-amber-700 rounded text-xs">
-                {strokeData
-                  .map((s) => `${s.char}:${s.strokes ?? "?"}`)
-                  .join(" / ")}{" "}
-                strokes
-              </span>
-            )}
+          <div className="flex flex-wrap gap-2 mt-2 text-xs items-center">
+            <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">JLPT: {previewJlpt}</span>
+
+            <button
+              type="button"
+              onClick={() => setPreviewIsCommon((c) => !c)}
+              className={`px-2 py-1 rounded border ${
+                previewIsCommon
+                  ? "bg-green-100 text-green-700 border-green-300"
+                  : "bg-gray-100 text-gray-700 border-gray-300"
+              }`}
+            >
+              {previewIsCommon ? "Common" : "Rare"}
+            </button>
           </div>
 
-          {/* Editable fields */}
-          <input
-            type="text"
-            value={reading}
-            onChange={(e) => setReading(e.target.value)}
-            className="border p-2 rounded w-full mb-2"
-          />
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <input
+              type="number"
+              className="border p-2 rounded"
+              placeholder="Page (optional)"
+              value={previewPage}
+              onChange={(e) => setPreviewPage(e.target.value)}
+            />
+            <input
+              type="text"
+              className="border p-2 rounded"
+              placeholder="Chapter (number)"
+              value={previewChapter}
+              onChange={(e) => setPreviewChapter(e.target.value)}
+            />
+          </div>
 
-          <input
-            type="text"
-            value={meaning}
-            onChange={(e) => setMeaning(e.target.value)}
-            className="border p-2 rounded w-full mb-2"
-          />
-
-          <input
-            type="number"
-            value={page}
-            onChange={(e) => setPage(e.target.value)}
-            placeholder="Page number (optional)"
-            className="border p-2 rounded w-full mb-2"
-          />
-
-          <input
-            type="number"
-            value={chapterNumber}
-            onChange={(e) => setChapterNumber(e.target.value)}
-            placeholder="Chapter number (optional)"
-            className="border p-2 rounded w-full mb-2"
-          />
-
-          <input
-            type="text"
-            value={chapterName}
-            onChange={(e) => setChapterName(e.target.value)}
-            placeholder="Chapter name (optional)"
-            className="border p-2 rounded w-full mb-2"
-          />
-
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setPreviewMode(false)}
-              className="px-3 py-1 border rounded"
-            >
+          <div className="flex justify-end gap-2 mt-4">
+            <button type="button" onClick={() => setPreviewVisible(false)} className="px-3 py-1 border rounded text-sm">
               Cancel
             </button>
-
             <button
-              onClick={saveWord}
-              className="px-3 py-1 bg-amber-500 text-white rounded"
+              type="button"
+              onClick={handleSaveFromPreview}
+              disabled={isSavingPreview}
+              className={`px-3 py-1 rounded text-sm text-white ${
+                isSavingPreview ? "bg-amber-300 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600"
+              }`}
             >
-              Save to My Vocab
+              {isSavingPreview ? "Saving…" : "Save word"}
             </button>
           </div>
         </div>
       )}
 
+      {/* QUICK ADD (no Jisho) */}
+      <form onSubmit={handleAddWordQuick} className="flex flex-col gap-2 mb-6 border rounded p-4 bg-white">
+        <h2 className="text-sm font-semibold mb-1">
+          Quick Add (no Jisho)
+          {currentBook ? ` — “${currentBook.title}”` : ""}
+        </h2>
+
+        <input
+          type="text"
+          placeholder="Word"
+          value={newWord}
+          onChange={(e) => setNewWord(e.target.value)}
+          className="border p-2 rounded"
+          required
+        />
+        <input
+          type="text"
+          placeholder="Reading (optional)"
+          value={newReading}
+          onChange={(e) => setNewReading(e.target.value)}
+          className="border p-2 rounded"
+        />
+        <input
+          type="text"
+          placeholder="Meaning (optional, comma-separated)"
+          value={newMeaning}
+          onChange={(e) => setNewMeaning(e.target.value)}
+          className="border p-2 rounded"
+        />
+
+        <button
+          type="submit"
+          disabled={isSavingQuick || !bookId}
+          className={`mt-1 px-4 py-2 rounded text-white ${
+            !bookId || isSavingQuick ? "bg-gray-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+          }`}
+        >
+          {bookId ? (isSavingQuick ? "Saving…" : "Quick add") : "Select a book first"}
+        </button>
+      </form>
+
+      {message && <p className="text-sm mb-4">{message}</p>}
+
       {/* VOCAB LIST */}
-      <h2 className="text-xl font-medium mb-3">📘 Vocabulary</h2>
-      {!bookId && (
-        <p className="text-gray-500">Select a book to view vocab.</p>
-      )}
+      <div className="space-y-4 mt-2">
+        {entries.map((entry) => {
+          const dict = {
+            orthography: entry.orthography,
+            reading: entry.reading,
+            meaning: entry.meaning,
+            jlpt: normalizeJlpt(entry.jlpt),
+            is_common: entry.is_common,
+            is_katakana: entry.is_katakana,
+            strokes: entry.strokes,
+          };
 
-      {bookId && (
-        <ul className="space-y-2">
-          {vocab.map((item) => {
-            let displayStrokes = "";
-            if (Array.isArray(item.strokes)) {
-              displayStrokes = item.strokes
-                .map((s: any) => `${s.char}:${s.strokes ?? "?"}`)
-                .join(" / ");
-            }
+          const state =
+            entry.user_vocab_states?.[0] || {
+              id: null,
+              lookup_count: 0,
+              reading_stage: "learning",
+              meaning_stage: "learning",
+              forgot_reading: false,
+              forgot_meaning: false,
+              updated_at: "",
+            };
 
-            return (
-              <li
-                key={item.id}
-                className="border p-3 rounded hover:bg-amber-50"
-              >
-                <div>
-                  <span className="font-semibold text-lg">
-                    {item.word}
-                  </span>
-                  {item.reading && (
-                    <span className="text-gray-500 ml-2">
-                      ({item.reading})
-                    </span>
-                  )}
-                  <div className="text-sm mt-1">{item.meaning}</div>
+          const appearsIn = currentBook ? [currentBook.title] : [];
 
-                  <div className="flex flex-wrap gap-2 mt-2 text-xs">
-                    {/* JLPT */}
-                    {item.jlpt && (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-                        {item.jlpt.startsWith("jlpt-")
-                          ? `N${item.jlpt
-                              .replace("jlpt-", "")
-                              .replace("n", "")}`
-                          : item.jlpt}
-                      </span>
-                    )}
+          const inBook = bookLookupMap[String(entry.orthography ?? "").trim()];
 
-                    {/* PAGE */}
-                    {item.page_number && (
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
-                        p. {item.page_number}
-                      </span>
-                    )}
+          return (
+            <div key={entry.id}>
+              <WordCard
+                dict={dict}
+                state={state}
+                settings={mergedSettings}
+                appearsIn={appearsIn}
+                onIncrementLookup={() => incrementLookup(entry.id, state)}
+                onToggleReadingKnown={() => toggleReadingKnown(entry.id, state)}
+              />
 
-                    {/* CHAPTER NUMBER */}
-                    {item.chapter_number && (
-                      <span className="px-2 py-0.5 bg-pink-100 text-pink-700 rounded">
-                        Ch. {item.chapter_number}
-                      </span>
-                    )}
-
-                    {/* CHAPTER NAME */}
-                    {item.chapter_name && (
-                      <span className="px-2 py-0.5 bg-pink-50 text-pink-600 border border-pink-200 rounded">
-                        {item.chapter_name}
-                      </span>
-                    )}
-
-                    {/* COMMON */}
-                    <span
-                      className={`px-2 py-0.5 rounded ${
-                        item.is_common
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {item.is_common ? "Common" : "Rare"}
-                    </span>
-
-                    {/* STROKES */}
-                    {displayStrokes && (
-                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
-                        {displayStrokes} strokes
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+              {inBook ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  In this book: {inBook.count}×
+                  {inBook.days ? ` (${inBook.days} day${inBook.days === 1 ? "" : "s"})` : ""}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
     </main>
   );
 }
