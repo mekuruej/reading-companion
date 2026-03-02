@@ -835,7 +835,7 @@ export default function BookFlashcardsPage() {
                       else goToNextWord();
                     }
                   }}
-                  inputMode={needsKanaInput ? "kana" : "text"}
+                  inputMode="text"
                   lang={needsKanaInput ? "ja" : undefined}
                   autoCorrect="off"
                   autoCapitalize="none"
