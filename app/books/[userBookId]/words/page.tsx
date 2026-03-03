@@ -525,11 +525,11 @@ export default function BookWordsPage() {
 
         <div className="flex gap-2">
           <button
-            onClick={() => router.push(`/vocab?userBookId=${encodeURIComponent(userBookId)}`)}
-            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
-            + Add Vocab
-          </button>
+  onClick={() => router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)}
+  className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+>
+  + Add Vocab
+</button>
 
           <button
             onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
