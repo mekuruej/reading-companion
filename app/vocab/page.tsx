@@ -1,11 +1,5 @@
-// app/vocab/page.tsx
-import { Suspense } from "react";
-import VocabPageContent from "./VocabPageContent";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <VocabPageContent />
-    </Suspense>
-  );
+  redirect("/vocab/bulk");
 }

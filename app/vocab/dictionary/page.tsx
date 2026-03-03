@@ -100,7 +100,9 @@ export default function DictionaryPage() {
     }
   }
 
-  const chosenMeaning = meaningChoices[meaningChoiceIndex] ?? "";
+  // Always display the first meaning as the “default” (non-movable)
+  const defaultMeaning = meaningChoices[0] ?? "";
+  const hasMultipleMeanings = meaningChoices.length > 1;
 
   return (
     <main className="max-w-2xl mx-auto p-6">
@@ -174,40 +176,44 @@ export default function DictionaryPage() {
 
           {meaningChoices.length ? (
             <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">Meanings</div>
-                <div className="text-xs text-gray-500">
-                  {meaningChoiceIndex + 1}/{meaningChoices.length}
-                </div>
-              </div>
+              <div className="text-sm font-medium mb-2">Meaning</div>
 
-              <select
-                value={meaningChoiceIndex}
-                onChange={(e) => setMeaningChoiceIndex(Number(e.target.value))}
-                className="border p-2 rounded w-full mt-2 bg-white text-sm"
-              >
-                {meaningChoices.map((m, i) => (
-                  <option key={i} value={i}>
-                    {i + 1}: {m}
-                  </option>
-                ))}
-              </select>
+              {/* ✅ Default meaning is always the first meaning and is not changeable */}
+              <div className="p-3 rounded bg-gray-50 border text-sm">{defaultMeaning}</div>
 
-              <div className="mt-3 p-3 rounded bg-gray-50 border">
-                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Selected meaning</div>
-                <div className="text-sm">{chosenMeaning || "—"}</div>
-              </div>
+              {/* ✅ Dropdown is only for browsing other meanings */}
+              {hasMultipleMeanings ? (
+                <details className="mt-3 text-sm text-gray-600">
+                  <summary className="cursor-pointer select-none">Show other meanings</summary>
 
-              <details className="mt-3 text-sm text-gray-600">
-                <summary className="cursor-pointer select-none">Show all meanings</summary>
-                <ol className="list-decimal ml-5 mt-2 space-y-1">
-                  {meaningChoices.map((m, i) => (
-                    <li key={i} className={i === meaningChoiceIndex ? "font-medium text-gray-900" : ""}>
-                      {m}
-                    </li>
-                  ))}
-                </ol>
-              </details>
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="text-xs text-gray-500">Browse meanings</div>
+                    <div className="text-xs text-gray-500">
+                      {meaningChoiceIndex + 1}/{meaningChoices.length}
+                    </div>
+                  </div>
+
+                  <select
+                    value={meaningChoiceIndex}
+                    onChange={(e) => setMeaningChoiceIndex(Number(e.target.value))}
+                    className="border p-2 rounded w-full mt-2 bg-white text-sm"
+                  >
+                    {meaningChoices.map((m, i) => (
+                      <option key={i} value={i}>
+                        {i + 1}: {m}
+                      </option>
+                    ))}
+                  </select>
+
+                  <ol className="list-decimal ml-5 mt-3 space-y-1">
+                    {meaningChoices.map((m, i) => (
+                      <li key={i} className="text-gray-700">
+                        {m}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              ) : null}
             </div>
           ) : (
             <p className="mt-4 text-sm text-gray-600">No meanings returned for this entry.</p>

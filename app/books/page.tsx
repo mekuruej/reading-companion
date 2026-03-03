@@ -29,22 +29,40 @@ type StudentOption = {
 
 function UserBar() {
   const router = useRouter();
-  const [email, setEmail] = useState<string | null>(null);
+  const [label, setLabel] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
       const {
         data: { user },
+        error: userErr,
       } = await supabase.auth.getUser();
-      setEmail(user?.email ?? null);
+
+      if (userErr || !user) {
+        setLabel(null);
+        return;
+      }
+
+      // Try to show a privacy-friendly name instead of email
+      const { data: prof, error: profErr } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .single();
+
+      if (profErr) {
+        console.warn("UserBar: could not load profile display_name:", profErr);
+      }
+
+      setLabel(prof?.display_name || "Student");
     };
 
     loadUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setEmail(session?.user?.email ?? null);
+    } = supabase.auth.onAuthStateChange(() => {
+      loadUser();
     });
 
     return () => subscription.unsubscribe();
@@ -55,15 +73,12 @@ function UserBar() {
     router.push("/login");
   };
 
-  if (!email) return null;
+  if (!label) return null;
 
   return (
     <div className="flex justify-between items-center mb-4 text-sm text-gray-700">
-      <span>Logged in as: Student</span>
-      <button
-        onClick={handleLogout}
-        className="border px-2 py-1 rounded-md hover:bg-gray-100"
-      >
+      <span>Logged in as: {label}</span>
+      <button onClick={handleLogout} className="border px-2 py-1 rounded-md hover:bg-gray-100">
         Log out
       </button>
     </div>
@@ -85,7 +100,7 @@ export default function BooksPage() {
   const [finishingUserBookId, setFinishingUserBookId] = useState<string | null>(null);
   const [finishDate, setFinishDate] = useState("");
 
-  // ✅ NEW: start-date UI state
+  // ✅ start-date UI state
   const [startingUserBookId, setStartingUserBookId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
 
@@ -307,10 +322,7 @@ export default function BooksPage() {
   async function saveStartedDate(userBookId: string) {
     if (!startDate) return;
 
-    const { error } = await supabase
-      .from("user_books")
-      .update({ started_at: startDate })
-      .eq("id", userBookId);
+    const { error } = await supabase.from("user_books").update({ started_at: startDate }).eq("id", userBookId);
 
     if (error) {
       console.error("Error saving started date:", error);
@@ -327,10 +339,7 @@ export default function BooksPage() {
   async function saveFinishedDate(userBookId: string) {
     if (!finishDate) return;
 
-    const { error } = await supabase
-      .from("user_books")
-      .update({ finished_at: finishDate })
-      .eq("id", userBookId);
+    const { error } = await supabase.from("user_books").update({ finished_at: finishDate }).eq("id", userBookId);
 
     if (error) {
       console.error("Error saving finished date:", error);
@@ -353,7 +362,6 @@ export default function BooksPage() {
   const notStarted = validRows.filter((r) => !r.started_at && !r.finished_at);
   const finished = validRows.filter((r) => !!r.finished_at);
 
-  // Use your current grid preferences (more breakpoints + tighter gaps)
   const gridClass =
     "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-2 gap-y-3";
 
@@ -379,9 +387,7 @@ export default function BooksPage() {
           </div>
         </div>
 
-        <ul className={gridClass}>
-          {items.map((row) => renderBookCard(row))}
-        </ul>
+        <ul className={gridClass}>{items.map((row) => renderBookCard(row))}</ul>
       </section>
     );
   }
@@ -397,11 +403,7 @@ export default function BooksPage() {
       >
         <a href={`/books/${row.id}/words`} onClick={(e) => e.stopPropagation()} className="block">
           {book.cover_url ? (
-            <img
-              src={book.cover_url}
-              alt={`${book.title} cover`}
-              className="w-32 h-48 object-cover rounded-md shadow-md"
-            />
+            <img src={book.cover_url} alt={`${book.title} cover`} className="w-32 h-48 object-cover rounded-md shadow-md" />
           ) : (
             <div className="w-32 h-48 bg-gray-200 rounded-md mb-2 flex items-center justify-center text-gray-400 text-sm">
               No cover
@@ -422,7 +424,6 @@ export default function BooksPage() {
         {book.illustrator && <span className="text-gray-500 text-xs">絵：{book.illustrator}</span>}
 
         <div className="mt-1 text-[11px] text-gray-500 text-center">
-          {/* STARTED */}
           {row.started_at ? (
             <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
           ) : startingUserBookId === row.id ? (
@@ -471,7 +472,6 @@ export default function BooksPage() {
             </button>
           )}
 
-          {/* FINISHED */}
           {row.finished_at ? (
             <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
           ) : (
@@ -510,7 +510,6 @@ export default function BooksPage() {
                   </div>
                 </div>
               ) : (
-                // keep original behavior: can only finish once started
                 row.started_at && (
                   <button
                     onClick={(e) => {
@@ -576,7 +575,6 @@ export default function BooksPage() {
 
       <UserBar />
 
-      {/* Teacher dropdown */}
       <div className="mb-4 flex flex-col gap-2">
         <div className="text-sm text-gray-700">
           Viewing: <span className="font-medium">{viewingLabel}</span>
@@ -601,34 +599,17 @@ export default function BooksPage() {
       </div>
 
       {message ? (
-        <p className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"}`}>
-          {message}
-        </p>
+        <p className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"}`}>{message}</p>
       ) : null}
 
-      {/* ✅ Sections */}
-      <Section
-        title="Currently Reading"
-        subtitle="Started but not finished yet"
-        items={currentlyReading}
-      />
-      <Section
-        title="Want to Read"
-        subtitle="Not started yet"
-        items={notStarted}
-      />
-      <Section
-        title="Finished"
-        subtitle="Completed books"
-        items={finished}
-      />
+      <Section title="Currently Reading" subtitle="Started but not finished yet" items={currentlyReading} />
+      <Section title="Want to Read" subtitle="Not started yet" items={notStarted} />
+      <Section title="Finished" subtitle="Completed books" items={finished} />
 
-      {/* ✅ If there are literally zero books */}
       {validRows.length === 0 ? (
         <div className="text-sm text-gray-600 mt-8">No books yet — click “+ Add Book” to start.</div>
       ) : null}
 
-      {/* ✅ Floating Add button */}
       <button
         type="button"
         onClick={() => setShowAddModal(true)}
@@ -638,7 +619,6 @@ export default function BooksPage() {
         + Add Book
       </button>
 
-      {/* ✅ Modal */}
       {showAddModal ? (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white border shadow-xl p-5">
