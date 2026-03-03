@@ -59,7 +59,7 @@ function UserBar() {
 
   return (
     <div className="flex justify-between items-center mb-4 text-sm text-gray-700">
-      <span>Logged in as: {email}</span>
+      <span>Logged in as: Student</span>
       <button
         onClick={handleLogout}
         className="border px-2 py-1 rounded-md hover:bg-gray-100"
@@ -531,7 +531,7 @@ export default function BooksPage() {
         <a
           href={`/books/${row.id}/study`}
           onClick={(e) => e.stopPropagation()}
-          className="mt-2 text-[12px] px-3 py-1 bg-amber-500 text-white rounded hover:bg-amber-600 transition"
+          className="mt-2 text-[12px] px-3 py-1 bg-green-700 text-white rounded hover:bg-amber-600 transition"
         >
           Study
         </a>
