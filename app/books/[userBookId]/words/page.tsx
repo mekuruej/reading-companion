@@ -533,7 +533,7 @@ export default function BookWordsPage() {
 
           <button
             onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
-            className="px-3 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 text-sm"
+            className="px-3 py-2 bg-green-700 text-white rounded hover:bg-amber-600 text-sm"
           >
             Study
           </button>
@@ -604,13 +604,13 @@ export default function BookWordsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => openEdit(w)}
-                      className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
+                      className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => deleteWord(w)}
-                      className="px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-xs"
+                      className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
                     >
                       Delete
                     </button>
