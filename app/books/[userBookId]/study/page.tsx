@@ -43,7 +43,11 @@ function studySetLabel(s: StudySet) {
 }
 
 function reverseLabel(label: string) {
-  return label.split("→").map((x) => x.trim()).reverse().join(" → ");
+  return label
+    .split("→")
+    .map((x) => x.trim())
+    .reverse()
+    .join(" → ");
 }
 
 type WordRow = {
@@ -76,6 +80,10 @@ type Flashcard = {
 
   meaningChoices: string[];
   meaningChoiceIndex: number;
+
+  // ✅ repeats support
+  repeatKey: string;
+  repeatCount: number;
 };
 
 function normalizeJlpt(val: string | null | undefined) {
@@ -137,6 +145,10 @@ function asStringArray(val: any): string[] {
   return [];
 }
 
+function normalizeRepeatKey(surface: string) {
+  return (surface ?? "").trim();
+}
+
 export default function BookFlashcardsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
@@ -176,6 +188,9 @@ export default function BookFlashcardsPage() {
   const [jlptFilter, setJlptFilter] = useState("all");
   const [chapterFilter, setChapterFilter] = useState("all");
 
+  // ✅ Repeats filter
+  const [repeatsOnly, setRepeatsOnly] = useState(false);
+
   const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
 
   const [bookTitle, setBookTitle] = useState("");
@@ -201,6 +216,7 @@ export default function BookFlashcardsPage() {
       if (typeof parsed?.typeMode === "boolean") setTypeMode(parsed.typeMode);
       if (parsed?.jlptFilter) setJlptFilter(parsed.jlptFilter);
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
+      if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsKey]);
@@ -217,10 +233,21 @@ export default function BookFlashcardsPage() {
           typeMode,
           jlptFilter,
           chapterFilter,
+          repeatsOnly,
         })
       );
     } catch {}
-  }, [settingsKey, userBookId, studySet, reverseMode, randomMode, typeMode, jlptFilter, chapterFilter]);
+  }, [
+    settingsKey,
+    userBookId,
+    studySet,
+    reverseMode,
+    randomMode,
+    typeMode,
+    jlptFilter,
+    chapterFilter,
+    repeatsOnly,
+  ]);
 
   useEffect(() => {
     if (!isTwoStep && typeMode) {
@@ -299,13 +326,26 @@ export default function BookFlashcardsPage() {
 
         if (wErr) throw wErr;
 
+        // ✅ compute repeats (book-only) by surface
+        const repeatCounts = new Map<string, number>();
+        for (const w of words ?? []) {
+          const key = normalizeRepeatKey(w.surface);
+          if (!key) continue;
+          repeatCounts.set(key, (repeatCounts.get(key) ?? 0) + 1);
+        }
+
         const normalized: Flashcard[] = (words ?? []).map((w) => {
           const ch = chapterInfoFromRow(w);
 
           const meaningChoices = asStringArray((w as any).meaning_choices);
-          const idx = Number.isFinite(w.meaning_choice_index as any) ? (w.meaning_choice_index as number) : 0;
+          const idx = Number.isFinite(w.meaning_choice_index as any)
+            ? (w.meaning_choice_index as number)
+            : 0;
           const safeIdx = meaningChoices.length ? Math.max(0, Math.min(idx, meaningChoices.length - 1)) : 0;
           const chosenMeaning = meaningChoices.length ? meaningChoices[safeIdx] : (w.meaning ?? null);
+
+          const repeatKey = normalizeRepeatKey(w.surface);
+          const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;
 
           return {
             id: w.id,
@@ -318,6 +358,9 @@ export default function BookFlashcardsPage() {
             page_number: w.page_number ?? null,
             meaningChoices,
             meaningChoiceIndex: safeIdx,
+
+            repeatKey,
+            repeatCount,
           };
         });
 
@@ -373,6 +416,9 @@ export default function BookFlashcardsPage() {
 
     if (chapterFilter !== "all") result = result.filter((c) => c.chapterLabel === chapterFilter);
 
+    // ✅ repeats filter
+    if (repeatsOnly) result = result.filter((c) => (c.repeatCount ?? 1) >= 2);
+
     setFilteredCards(result);
     setIndex(0);
     setStepIndex(0);
@@ -380,7 +426,7 @@ export default function BookFlashcardsPage() {
     setChecked(null);
     setDefError(null);
     setShowDefPicker(false);
-  }, [cards, jlptFilter, chapterFilter]);
+  }, [cards, jlptFilter, chapterFilter, repeatsOnly]);
 
   // Hide definition picker when changing cards
   useEffect(() => {
@@ -498,11 +544,15 @@ export default function BookFlashcardsPage() {
       if (error) throw error;
 
       setCards((prev) =>
-        prev.map((x) => (x.id === c.id ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning } : x))
+        prev.map((x) =>
+          x.id === c.id ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning } : x
+        )
       );
 
       setFilteredCards((prev) =>
-        prev.map((x) => (x.id === c.id ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning } : x))
+        prev.map((x) =>
+          x.id === c.id ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning } : x
+        )
       );
 
       setAnswer("");
@@ -650,6 +700,9 @@ export default function BookFlashcardsPage() {
 
         <p className="text-sm text-gray-500">
           Step {stepIndex + 1}/{steps.length} • Card {index + 1}/{filteredCards.length}
+          {repeatsOnly ? (
+            <span className="ml-2 text-xs text-gray-500">• Repeats only</span>
+          ) : null}
         </p>
 
         <p className="mt-1 text-xs text-gray-500">Mode: {effectiveLabel}</p>
@@ -659,6 +712,10 @@ export default function BookFlashcardsPage() {
         ) : null}
 
         {card.page_number != null ? <p className="mt-1 text-xs text-gray-500">Page: {card.page_number}</p> : null}
+
+        {card.repeatCount >= 2 ? (
+          <p className="mt-1 text-xs text-gray-500">Repeats in this book: {card.repeatCount}</p>
+        ) : null}
 
         {/* ✅ Clean definition UI */}
         {showDefInfo ? (
@@ -772,6 +829,15 @@ export default function BookFlashcardsPage() {
           ))}
         </select>
 
+        {/* ✅ Repeats toggle */}
+        <label
+          className="flex items-center gap-2 mt-2 text-sm px-2 py-1 border rounded bg-white"
+          title="Show only words that appear 2+ times in this book"
+        >
+          <input type="checkbox" checked={repeatsOnly} onChange={() => setRepeatsOnly((v) => !v)} />
+          Repeats
+        </label>
+
         <label className="flex items-center gap-1 mt-2 text-sm">
           <input type="checkbox" checked={randomMode} onChange={() => setRandomMode(!randomMode)} />
           Random
@@ -851,22 +917,43 @@ export default function BookFlashcardsPage() {
                 />
 
                 {checked ? (
-                  <div className="mt-2 text-sm">
-                    {checked.ok ? <p className="text-green-700">✅ Correct!</p> : <p className="text-red-700">❌ Not quite.</p>}
-
-                    {answerField === "meaning" ? (
-                      <p className="mt-1 text-gray-700">
-                        Full meaning: <span className="font-medium">{checked.correct || "—"}</span>
-                      </p>
+                  <div className="mt-3 text-sm">
+                    {checked.ok ? (
+                      <p className="text-green-700">✅ Correct!</p>
                     ) : (
-                      <p className="mt-1 text-gray-700">
-                        Answer: <span className="font-medium">{checked.correct || "—"}</span>
-                      </p>
+                      <p className="text-red-700">❌ Not quite.</p>
                     )}
+
+                    {/* ✅ Always show FULL answer (word + reading + meaning), for wrong or right */}
+                    <div className="mt-2 border rounded p-3 bg-gray-50 text-left">
+                      <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Full answer</div>
+
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Kanji</div>
+                          <div className="text-base font-medium">{card.word || "—"}</div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Reading</div>
+                          <div className="text-base font-medium">{card.reading || "—"}</div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Meaning</div>
+                          <div className="text-base font-medium">{card.meaning || "—"}</div>
+                        </div>
+
+                        {/* optional: show repeats count inline */}
+                        {card.repeatCount >= 2 ? (
+                          <div className="text-xs text-slate-500">Repeats in this book: {card.repeatCount}</div>
+                        ) : null}
+                      </div>
+                    </div>
 
                     <button
                       type="button"
-                      className="mt-2 px-3 py-1 bg-gray-200 rounded"
+                      className="mt-3 px-3 py-1 bg-gray-200 rounded"
                       onClick={() => goToNextWord()}
                     >
                       Continue →

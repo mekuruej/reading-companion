@@ -538,7 +538,7 @@ export default function BookWordsPage() {
             <tr className="text-left">
               {/* ✅ NEW: repeats column */}
               <th className="p-2 w-8 text-center" title="How many times this word appears in this book">
-                Rep
+                Repeats
               </th>
               <th className="p-2 w-25">Word</th>
               <th className="p-2 w-25">Reading</th>
