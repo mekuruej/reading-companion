@@ -239,9 +239,7 @@ function CollocationsPanel({
                   <div className="min-w-0">
                     <div className="font-medium break-words">{r.collocation}</div>
                     {r.note ? <div className="text-sm text-gray-600 break-words mt-1">{r.note}</div> : null}
-                    <div className="text-xs text-gray-400 mt-1">
-                      {new Date(r.created_at).toLocaleString()}
-                    </div>
+                    <div className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleString()}</div>
                   </div>
 
                   <button
@@ -258,11 +256,6 @@ function CollocationsPanel({
           )}
         </div>
       </div>
-
-      <p className="mt-2 text-xs text-gray-500">
-        Tip: keep these short (2–5 words). This is safer than storing full book sentences, and it still captures
-        “how the word behaves” in the story.
-      </p>
     </section>
   );
 }
@@ -287,20 +280,14 @@ export default function WordDetailPage() {
 
   const [word, setWord] = useState<WordRow | null>(null);
 
-  // chosen meaning / definition support
   const [meaningChoices, setMeaningChoices] = useState<string[]>([]);
   const [meaningChoiceIndex, setMeaningChoiceIndex] = useState(0);
   const [defSaving, setDefSaving] = useState(false);
   const [defError, setDefError] = useState<string | null>(null);
 
-  // seen + counts
   const [repeatsInThisBook, setRepeatsInThisBook] = useState<number>(1);
   const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
   const totalLookupCount = seenInstances.length;
-
-  // example/audio placeholders (future)
-  const [exampleSentence, setExampleSentence] = useState<string | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   async function loadAll() {
     setLoading(true);
@@ -371,8 +358,8 @@ export default function WordDetailPage() {
       setWord(w);
 
       const choices = asStringArray((w as any).meaning_choices);
-      const idx = Number.isFinite(w.meaning_choice_index as any) ? (w.meaning_choice_index as number) : 0;
-      const safeIdx = choices.length ? Math.max(0, Math.min(idx, choices.length - 1)) : 0;
+      const idxRaw = Number.isFinite(w.meaning_choice_index as any) ? (w.meaning_choice_index as number) : 0;
+      const safeIdx = choices.length ? Math.max(0, Math.min(idxRaw, choices.length - 1)) : 0;
 
       setMeaningChoices(choices);
       setMeaningChoiceIndex(safeIdx);
@@ -387,8 +374,7 @@ export default function WordDetailPage() {
       if (rErr) throw rErr;
       setRepeatsInThisBook(repeatCount ?? 1);
 
-      // all seen instances across ALL your books (same surface)
-      // We join user_book_words -> user_books -> books, then filter user_books.user_id = current user
+      // All instances across your books (same surface)
       const { data: seen, error: sErr } = await supabase
         .from("user_book_words")
         .select(
@@ -432,10 +418,6 @@ export default function WordDetailPage() {
       }));
 
       setSeenInstances(normalizedSeen);
-
-      // placeholders for future assets (keep null for now)
-      setExampleSentence(null);
-      setAudioUrl(null);
       setDefError(null);
     } catch (e: any) {
       setErrorMsg(e?.message ?? "Failed to load word");
@@ -475,14 +457,7 @@ export default function WordDetailPage() {
       if (error) throw error;
 
       setMeaningChoiceIndex(safe);
-      setWord((prev) =>
-        prev ? { ...prev, meaning_choice_index: safe, meaning: chosen || prev.meaning } : prev
-      );
-
-      // also update the current entry in seenInstances (nice)
-      setSeenInstances((prev) =>
-        prev.map((x) => (x.id === word.id ? { ...x, meaning: chosen || x.meaning } : x))
-      );
+      setWord((prev) => (prev ? { ...prev, meaning_choice_index: safe, meaning: chosen || prev.meaning } : prev));
     } catch (e: any) {
       setDefError(e?.message ?? "Failed to change definition");
     } finally {
@@ -490,9 +465,6 @@ export default function WordDetailPage() {
     }
   }
 
-  // -------------------------------------------------------------
-  // UI states
-  // -------------------------------------------------------------
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
@@ -516,8 +488,8 @@ export default function WordDetailPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-red-700">{errorMsg ?? "Word not found."}</p>
-        <button onClick={() => router.push(`/books`)} className="px-4 py-2 bg-gray-200 rounded">
-          Back to Books
+        <button onClick={() => router.back()} className="px-4 py-2 bg-gray-200 rounded">
+          ← Back
         </button>
       </main>
     );
@@ -546,21 +518,21 @@ export default function WordDetailPage() {
 
         <div className="flex gap-2">
           <button
-            onClick={() => router.push(`/books/${userBookId}/flashcards`)}
+            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/flashcards`)}
             className="px-3 py-2 rounded bg-gray-200"
             title="Go to flashcards for this book"
           >
             Flashcards
           </button>
-          <button onClick={() => router.push(`/books`)} className="px-3 py-2 rounded bg-gray-100">
-            Back
+
+          <button onClick={() => router.back()} className="px-3 py-2 rounded bg-gray-100">
+            ← Back
           </button>
         </div>
       </div>
 
       {/* Main Card */}
       <section className="w-full max-w-3xl border rounded-2xl bg-white p-6 shadow-sm">
-        {/* Word / Reading */}
         <div className="flex flex-col gap-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -570,19 +542,6 @@ export default function WordDetailPage() {
                 {jlpt !== "NON-JLPT" ? <span className="mr-2">JLPT: {jlpt}</span> : null}
                 {word.is_common ? <span className="mr-2">Common</span> : null}
               </div>
-            </div>
-
-            {/* Audio (placeholder) */}
-            <div className="flex flex-col items-end gap-2 shrink-0">
-              <button
-                type="button"
-                disabled={!audioUrl}
-                className="px-3 py-2 rounded bg-gray-200 disabled:opacity-50"
-                title="Audio (coming soon)"
-              >
-                🔊 Play
-              </button>
-              <div className="text-xs text-gray-400">Audio: {audioUrl ? "ready" : "coming soon"}</div>
             </div>
           </div>
 
@@ -622,29 +581,8 @@ export default function WordDetailPage() {
             {defError ? <p className="mt-2 text-sm text-red-700">{defError}</p> : null}
           </div>
 
-          {/* Example sentence (placeholder) */}
-          <div className="mt-2 border rounded-xl p-4 bg-gray-50">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Example sentence</div>
-              <button
-                type="button"
-                disabled
-                className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
-                title="Generated examples coming soon"
-              >
-                Generate
-              </button>
-            </div>
-            <div className="mt-2 text-gray-600">
-              {exampleSentence ? exampleSentence : "Coming soon (generated examples)."}
-            </div>
-            <div className="mt-2 text-xs text-gray-400">
-              Note: we’ll keep this “safe” by generating examples (not storing book sentences).
-            </div>
-          </div>
-
-          {/* Seen / counts */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+          {/* Counts */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
             <div className="border rounded-xl p-3">
               <div className="text-xs text-gray-500">Repeats in this book</div>
               <div className="text-2xl font-semibold">{repeatsInThisBook}</div>
@@ -654,81 +592,16 @@ export default function WordDetailPage() {
               <div className="text-2xl font-semibold">{totalLookupCount}</div>
               <div className="text-xs text-gray-400 mt-1">Across all your books (same surface)</div>
             </div>
-            <div className="border rounded-xl p-3">
-              <div className="text-xs text-gray-500">Color</div>
-              <div className="text-2xl font-semibold text-gray-400">—</div>
-              <div className="text-xs text-gray-400 mt-1">Coming later</div>
-            </div>
           </div>
-        </div>
-      </section>
-
-      {/* Seen in which books (all) */}
-      <section className="w-full max-w-3xl mt-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">Seen in books</h2>
-          <span className="text-xs text-gray-500">{seenInstances.length} total</span>
-        </div>
-
-        <div className="border rounded-2xl bg-white p-4">
-          {seenInstances.length === 0 ? (
-            <p className="text-sm text-gray-500">No instances found.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {seenInstances.map((x) => {
-                const ch = chapterDisplay(x.chapter_number, x.chapter_name);
-                const isThis = x.id === word.id;
-
-                return (
-                  <li key={x.id} className="border rounded-xl p-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        {x.books_cover_url ? (
-                          <img src={x.books_cover_url} alt="" className="w-8 h-12 rounded shrink-0" />
-                        ) : null}
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">
-                            {x.books_title} {isThis ? <span className="text-xs text-gray-400">(this one)</span> : null}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            {ch !== "(none)" ? ch : null}
-                            {x.page_number != null ? ` • p. ${x.page_number}` : null}
-                            {x.created_at ? ` • added ${new Date(x.created_at).toLocaleDateString()}` : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-2 text-sm text-gray-700">
-                        <span className="font-medium">Reading:</span> {x.reading || "—"}
-                      </div>
-                      <div className="text-sm text-gray-700">
-                        <span className="font-medium">Meaning:</span> {x.meaning || "—"}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/books/${x.user_book_id}/words/${x.id}`)}
-                      className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 shrink-0"
-                      title="Open this instance"
-                    >
-                      Open →
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
         </div>
       </section>
 
       {/* Collocations */}
       <CollocationsPanel userBookId={userBookId} userBookWordId={word.id} />
 
-      {/* Footer actions */}
-      <div className="w-full max-w-3xl mt-8 flex flex-wrap gap-2 justify-between">
-        <button onClick={() => router.push(`/books/${userBookId}/flashcards`)} className="px-4 py-2 bg-gray-200 rounded">
-          ← Back to Flashcards
+      <div className="w-full max-w-3xl mt-8 flex justify-between">
+        <button onClick={() => router.back()} className="px-4 py-2 bg-gray-200 rounded">
+          ← Back
         </button>
         <button onClick={() => loadAll()} className="px-4 py-2 bg-gray-100 rounded">
           Refresh

@@ -4,9 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-// -------------------------------------------------------------
-// Types
-// -------------------------------------------------------------
 type WordRow = {
   id: string;
   user_book_id: string;
@@ -17,40 +14,41 @@ type WordRow = {
   is_common: boolean | null;
   page_number: number | null;
   chapter_number: number | null;
-  chapter_name: number | string | null;
+  chapter_name: string | null;
+  seen_on: string | null;
   created_at: string;
 
+  // ✅ definition support
   meaning_choices: any | null; // jsonb
   meaning_choice_index: number | null;
 };
 
-type SeenInstance = {
-  id: string; // user_book_words.id
-  user_book_id: string; // user_books.id
-  surface: string;
-  reading: string | null;
-  meaning: string | null;
-  page_number: number | null;
-  chapter_number: number | null;
-  chapter_name: string | null;
-  created_at: string;
-  books_title: string;
-  books_cover_url: string | null;
-};
+function normalizeJlpt(val: string | null | undefined) {
+  const v = (val ?? "").toUpperCase();
+  if (v === "N1" || v === "N2" || v === "N3" || v === "N4" || v === "N5") return v;
+  return "NON-JLPT";
+}
 
-type CollocationRow = {
-  id: string;
-  user_id: string;
-  user_book_word_id: string;
-  user_book_id: string;
-  collocation: string;
-  note: string | null;
-  created_at: string;
-};
+// For dropdown/search/filter: always use a single-line label
+function chapterDisplayParts(w: WordRow) {
+  const num = w.chapter_number;
+  const name = (w.chapter_name ?? "").trim();
 
-// -------------------------------------------------------------
-// Helpers
-// -------------------------------------------------------------
+  return {
+    num: num != null ? `Chapter ${num}:` : "",
+    name,
+    fallback:
+      num != null && name
+        ? `Chapter ${num}: ${name}`
+        : num != null
+        ? `Chapter ${num}`
+        : name
+        ? name
+        : "(none)",
+  };
+}
+
+// ✅ jsonb -> string[]
 function asStringArray(val: any): string[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.map((x) => String(x)).filter(Boolean);
@@ -63,438 +61,297 @@ function asStringArray(val: any): string[] {
   return [];
 }
 
-function normalizeJlpt(val: string | null | undefined) {
-  const v = (val ?? "").toUpperCase();
-  if (v === "N1" || v === "N2" || v === "N3" || v === "N4" || v === "N5") return v;
-  return "NON-JLPT";
-}
-
-function chapterDisplay(chNum: number | null, chName: string | null) {
-  const name = (chName ?? "").trim();
-  const num = chNum;
-
-  if (num != null && name) return `Chapter ${num}: ${name}`;
-  if (num != null) return `Chapter ${num}`;
-  if (name) return name;
-  return "(none)";
-}
-
-function normalizeCollocation(s: string) {
-  return (s ?? "").trim().replace(/[　]/g, " ").replace(/\s+/g, " ");
-}
-
-// -------------------------------------------------------------
-// Collocations Panel (manual add/delete)
-// -------------------------------------------------------------
-function CollocationsPanel({
-  userBookId,
-  userBookWordId,
-}: {
-  userBookId: string;
-  userBookWordId: string;
-}) {
-  const [rows, setRows] = useState<CollocationRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [value, setValue] = useState("");
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const canAdd = useMemo(() => normalizeCollocation(value).length > 0, [value]);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) {
-        setRows([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("user_word_collocations")
-        .select("id,user_id,user_book_word_id,user_book_id,collocation,note,created_at")
-        .eq("user_book_word_id", userBookWordId)
-        .eq("user_book_id", userBookId)
-        .order("created_at", { ascending: false })
-        .returns<CollocationRow[]>();
-
-      if (error) throw error;
-      setRows(data ?? []);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load collocations");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!userBookId || !userBookWordId) return;
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userBookId, userBookWordId]);
-
-  async function add() {
-    const coll = normalizeCollocation(value);
-    if (!coll) return;
-
-    setSaving(true);
-    setError(null);
-
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) throw new Error("You must be signed in.");
-
-      const payload = {
-        user_id: user.id,
-        user_book_word_id: userBookWordId,
-        user_book_id: userBookId,
-        collocation: coll,
-        note: note.trim() ? note.trim() : null,
-      };
-
-      const { error } = await supabase.from("user_word_collocations").insert(payload);
-      if (error) throw error;
-
-      setValue("");
-      setNote("");
-      await load();
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to add collocation");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function remove(id: string) {
-    setError(null);
-    try {
-      const { error } = await supabase.from("user_word_collocations").delete().eq("id", id);
-      if (error) throw error;
-      setRows((prev) => prev.filter((r) => r.id !== id));
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to delete collocation");
-    }
-  }
-
-  return (
-    <section className="w-full max-w-3xl mt-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold">Collocations</h2>
-        <span className="text-xs text-gray-500">{rows.length} saved</span>
-      </div>
-
-      <div className="border rounded-2xl p-4 bg-white">
-        <div className="flex flex-col gap-2">
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Add a collocation (e.g. 深い眠り / 〜を取り戻す)"
-            className="border rounded p-2 w-full"
-          />
-
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional note (where/nuance)"
-            className="border rounded p-2 w-full"
-          />
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={!canAdd || saving}
-              onClick={add}
-              className="px-3 py-2 rounded bg-gray-200 disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Add"}
-            </button>
-
-            <button
-              type="button"
-              onClick={load}
-              className="px-3 py-2 rounded bg-gray-100"
-              disabled={saving || loading}
-            >
-              Refresh
-            </button>
-          </div>
-
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        </div>
-
-        <div className="mt-4">
-          {loading ? (
-            <p className="text-sm text-gray-500">Loading…</p>
-          ) : rows.length === 0 ? (
-            <p className="text-sm text-gray-500">No collocations yet. Add the first one!</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-start justify-between gap-3 border rounded-xl p-3">
-                  <div className="min-w-0">
-                    <div className="font-medium break-words">{r.collocation}</div>
-                    {r.note ? <div className="text-sm text-gray-600 break-words mt-1">{r.note}</div> : null}
-                    <div className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleString()}</div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => remove(r.id)}
-                    className="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 shrink-0"
-                    title="Delete"
-                  >
-                    Delete
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      <p className="mt-2 text-xs text-gray-500">
-        Tip: keep these short (2–5 words). This is safer than storing full book sentences, and it still captures “how the
-        word behaves” in the story.
-      </p>
-    </section>
-  );
-}
-
-// -------------------------------------------------------------
-// Page
-// Route: app/books/[userBookId]/words/[wordId]/page.tsx
-// -------------------------------------------------------------
-export default function WordDetailPage() {
-  const params = useParams<{ userBookId: string; wordId: string }>();
+export default function BookWordsPage() {
+  const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
-  const wordId = params.wordId;
 
   const router = useRouter();
-
-  // ✅ go back to the book word list page (not /books)
-  const backToWordList = useMemo(
-    () => `/books/${encodeURIComponent(userBookId)}/words`,
-    [userBookId]
-  );
 
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [bookTitle, setBookTitle] = useState("");
-  const [bookCover, setBookCover] = useState<string | null>(null);
+  const [bookCover, setBookCover] = useState("");
 
-  const [word, setWord] = useState<WordRow | null>(null);
+  const [words, setWords] = useState<WordRow[]>([]);
+  const [query, setQuery] = useState("");
+  const [chapterFilter, setChapterFilter] = useState("all");
+  const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
 
-  // chosen meaning / definition support
-  const [meaningChoices, setMeaningChoices] = useState<string[]>([]);
-  const [meaningChoiceIndex, setMeaningChoiceIndex] = useState(0);
-  const [defSaving, setDefSaving] = useState(false);
-  const [defError, setDefError] = useState<string | null>(null);
+  // --- Edit modal state ---
+  const [editing, setEditing] = useState<WordRow | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
 
-  // seen + counts
-  const [repeatsInThisBook, setRepeatsInThisBook] = useState<number>(1);
-  const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
-  const totalLookupCount = seenInstances.length;
+  // Editable fields
+  const [editSurface, setEditSurface] = useState("");
+  const [editReading, setEditReading] = useState("");
+  const [editMeaning, setEditMeaning] = useState("");
+  const [editPage, setEditPage] = useState<string>("");
+  const [editChapterNum, setEditChapterNum] = useState<string>("");
+  const [editChapterName, setEditChapterName] = useState("");
 
-  // example/audio placeholders (future)
-  const [exampleSentence, setExampleSentence] = useState<string | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  // ✅ definition edit state
+  const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
+  const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number>(0);
 
-  async function loadAll() {
-    setLoading(true);
-    setErrorMsg(null);
-    setNeedsSignIn(false);
+  function openEdit(w: WordRow) {
+    setEditErr(null);
+    setEditing(w);
 
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
+    setEditSurface(w.surface ?? "");
+    setEditReading(w.reading ?? "");
+    setEditMeaning(w.meaning ?? "");
 
-      if (!user) {
-        setNeedsSignIn(true);
-        setWord(null);
-        setBookTitle("");
-        setBookCover(null);
-        return;
-      }
+    setEditPage(w.page_number != null ? String(w.page_number) : "");
+    setEditChapterNum(w.chapter_number != null ? String(w.chapter_number) : "");
+    setEditChapterName(w.chapter_name ?? "");
 
-      // verify book ownership + get book info
-      const { data: ub, error: ubErr } = await supabase
-        .from("user_books")
-        .select(
-          `
-          id,
-          user_id,
-          books:book_id (
-            title,
-            cover_url
-          )
-        `
-        )
-        .eq("id", userBookId)
-        .eq("user_id", user.id)
-        .single();
+    const choices = asStringArray((w as any).meaning_choices);
+    const idxRaw = Number.isFinite(w.meaning_choice_index as any) ? (w.meaning_choice_index as number) : 0;
+    const idx = choices.length ? Math.max(0, Math.min(idxRaw, choices.length - 1)) : 0;
 
-      if (ubErr) throw ubErr;
+    setEditMeaningChoices(choices);
+    setEditMeaningChoiceIndex(idx);
 
-      setBookTitle((ub as any)?.books?.title ?? "");
-      setBookCover((ub as any)?.books?.cover_url ?? null);
-
-      // load this word row
-      const { data: w, error: wErr } = await supabase
-        .from("user_book_words")
-        .select(
-          `
-          id,
-          user_book_id,
-          surface,
-          reading,
-          meaning,
-          jlpt,
-          is_common,
-          page_number,
-          chapter_number,
-          chapter_name,
-          created_at,
-          meaning_choices,
-          meaning_choice_index
-        `
-        )
-        .eq("id", wordId)
-        .eq("user_book_id", userBookId)
-        .single()
-        .returns<WordRow>();
-
-      if (wErr) throw wErr;
-
-      setWord(w);
-
-      const choices = asStringArray((w as any).meaning_choices);
-      const idx = Number.isFinite(w.meaning_choice_index as any) ? (w.meaning_choice_index as number) : 0;
-      const safeIdx = choices.length ? Math.max(0, Math.min(idx, choices.length - 1)) : 0;
-
-      setMeaningChoices(choices);
-      setMeaningChoiceIndex(safeIdx);
-
-      // repeats in THIS book (by surface)
-      const { count: repeatCount, error: rErr } = await supabase
-        .from("user_book_words")
-        .select("id", { count: "exact", head: true })
-        .eq("user_book_id", userBookId)
-        .eq("surface", w.surface);
-
-      if (rErr) throw rErr;
-      setRepeatsInThisBook(repeatCount ?? 1);
-
-      // all seen instances across ALL your books (same surface)
-      const { data: seen, error: sErr } = await supabase
-        .from("user_book_words")
-        .select(
-          `
-          id,
-          user_book_id,
-          surface,
-          reading,
-          meaning,
-          page_number,
-          chapter_number,
-          chapter_name,
-          created_at,
-          user_books!inner (
-            user_id,
-            books:book_id (
-              title,
-              cover_url
-            )
-          )
-        `
-        )
-        .eq("surface", w.surface)
-        .eq("user_books.user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (sErr) throw sErr;
-
-      const normalizedSeen: SeenInstance[] = (seen ?? []).map((row: any) => ({
-        id: row.id,
-        user_book_id: row.user_book_id,
-        surface: row.surface,
-        reading: row.reading ?? null,
-        meaning: row.meaning ?? null,
-        page_number: row.page_number ?? null,
-        chapter_number: row.chapter_number ?? null,
-        chapter_name: row.chapter_name ?? null,
-        created_at: row.created_at,
-        books_title: row.user_books?.books?.title ?? "(unknown book)",
-        books_cover_url: row.user_books?.books?.cover_url ?? null,
-      }));
-
-      setSeenInstances(normalizedSeen);
-
-      // placeholders for future assets (keep null for now)
-      setExampleSentence(null);
-      setAudioUrl(null);
-      setDefError(null);
-    } catch (e: any) {
-      setErrorMsg(e?.message ?? "Failed to load word");
-      setWord(null);
-      setSeenInstances([]);
-    } finally {
-      setLoading(false);
+    // If choices exist, make sure meaning matches selected choice (but don’t clobber custom meaning if blank)
+    if (choices.length && choices[idx]) {
+      setEditMeaning(choices[idx]);
     }
   }
 
-  useEffect(() => {
-    if (!userBookId || !wordId) return;
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userBookId, wordId]);
+  function closeEdit() {
+    setEditing(null);
+    setEditErr(null);
+    setEditSaving(false);
+  }
 
-  async function setDefinition(newIndex: number) {
-    if (!word) return;
-    if (!meaningChoices.length) return;
+  function parseNullableInt(s: string): number | null {
+    const t = (s ?? "").trim();
+    if (!t) return null;
+    const n = Number(t);
+    if (!Number.isFinite(n)) return null;
+    return Math.trunc(n);
+  }
 
-    const safe = Math.max(0, Math.min(newIndex, meaningChoices.length - 1));
-    const chosen = meaningChoices[safe] ?? "";
+  // ✅ change definition choice in modal and sync meaning field
+  function changeDefinition(newIndex: number) {
+    const choices = editMeaningChoices ?? [];
+    if (!choices.length) return;
 
-    setDefSaving(true);
-    setDefError(null);
+    const safe = Math.max(0, Math.min(newIndex, choices.length - 1));
+    setEditMeaningChoiceIndex(safe);
+
+    const chosen = choices[safe] ?? "";
+    if (chosen) setEditMeaning(chosen);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+
+    setEditSaving(true);
+    setEditErr(null);
+
+    const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
+
+    const patch: Partial<WordRow> & {
+      meaning_choices?: any;
+      meaning_choice_index?: number;
+    } = {
+      surface: editSurface.trim(),
+      reading: editReading.trim() ? editReading.trim() : null,
+      meaning: editMeaning.trim() ? editMeaning.trim() : null,
+      page_number: parseNullableInt(editPage),
+      chapter_number: parseNullableInt(editChapterNum),
+      chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
+    };
+
+    if (hasChoices) {
+      patch.meaning_choice_index = editMeaningChoiceIndex;
+      const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
+      if (chosen) patch.meaning = chosen;
+    }
 
     try {
       const { error } = await supabase
         .from("user_book_words")
-        .update({
-          meaning_choice_index: safe,
-          meaning: chosen || null,
-        })
-        .eq("id", word.id)
+        .update(patch)
+        .eq("id", editing.id)
         .eq("user_book_id", userBookId);
 
       if (error) throw error;
 
-      setMeaningChoiceIndex(safe);
-      setWord((prev) => (prev ? { ...prev, meaning_choice_index: safe, meaning: chosen || prev.meaning } : prev));
+      setWords((prev) =>
+        prev.map((w) =>
+          w.id === editing.id
+            ? ({
+                ...w,
+                ...patch,
+              } as WordRow)
+            : w
+        )
+      );
 
-      setSeenInstances((prev) => prev.map((x) => (x.id === word.id ? { ...x, meaning: chosen || x.meaning } : x)));
+      closeEdit();
     } catch (e: any) {
-      setDefError(e?.message ?? "Failed to change definition");
+      setEditErr(e?.message ?? "Failed to save changes");
     } finally {
-      setDefSaving(false);
+      setEditSaving(false);
     }
   }
 
-  // -------------------------------------------------------------
-  // UI states
-  // -------------------------------------------------------------
+  async function deleteWord(w: WordRow) {
+    const ok = window.confirm(`Delete "${w.surface}"? This cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      const { error } = await supabase.from("user_book_words").delete().eq("id", w.id).eq("user_book_id", userBookId);
+
+      if (error) throw error;
+
+      setWords((prev) => prev.filter((x) => x.id !== w.id));
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to delete word");
+    }
+  }
+
+  useEffect(() => {
+    if (!userBookId) return;
+
+    async function load() {
+      setLoading(true);
+      setErrorMsg(null);
+      setNeedsSignIn(false);
+
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth?.user;
+
+        if (!user) {
+          setNeedsSignIn(true);
+          setLoading(false);
+          return;
+        }
+
+        const { data: ub, error: ubErr } = await supabase
+          .from("user_books")
+          .select(
+            `
+            id,
+            books:book_id (
+              title,
+              cover_url
+            )
+          `
+          )
+          .eq("id", userBookId)
+          .single();
+
+        if (ubErr) throw ubErr;
+
+        setBookTitle((ub as any)?.books?.title ?? "");
+        setBookCover((ub as any)?.books?.cover_url ?? "");
+
+        const { data: rows, error: wErr } = await supabase
+          .from("user_book_words")
+          .select(
+            `
+            id,
+            user_book_id,
+            surface,
+            reading,
+            meaning,
+            jlpt,
+            is_common,
+            page_number,
+            chapter_number,
+            chapter_name,
+            seen_on,
+            created_at,
+            meaning_choices,
+            meaning_choice_index
+          `
+          )
+          .eq("user_book_id", userBookId)
+          .order("chapter_number", { ascending: true, nullsFirst: false })
+          .order("page_number", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .returns<WordRow[]>();
+
+        if (wErr) throw wErr;
+
+        const list = rows ?? [];
+        setWords(list);
+
+        const map = new Map<string, string>();
+        for (const w of list) {
+          const label = chapterDisplayParts(w).fallback;
+          map.set(label, label);
+        }
+
+        const opts = Array.from(map.values())
+          .filter(Boolean)
+          .map((label) => ({ value: label, label }));
+
+        opts.sort((a, b) => {
+          const anum = a.label.match(/Chapter\s+(\d+)/i)?.[1];
+          const bnum = b.label.match(/Chapter\s+(\d+)/i)?.[1];
+          if (anum && bnum) return Number(anum) - Number(bnum);
+          return a.label.localeCompare(b.label);
+        });
+
+        setChapterOptions(opts);
+      } catch (e: any) {
+        setErrorMsg(e?.message ?? "Failed to load words");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, [userBookId]);
+
+  // ✅ Repeats map (count same surface within this book)
+  const repeatCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const w of words) {
+      const key = (w.surface ?? "").trim();
+      if (!key) continue;
+      m.set(key, (m.get(key) ?? 0) + 1);
+    }
+    return m;
+  }, [words]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    return words.filter((w) => {
+      const ch = chapterDisplayParts(w).fallback;
+      if (chapterFilter !== "all" && ch !== chapterFilter) return false;
+
+      if (!q) return true;
+
+      const hay = [
+        w.surface,
+        w.reading ?? "",
+        w.meaning ?? "",
+        normalizeJlpt(w.jlpt),
+        ch,
+        w.page_number?.toString() ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return hay.includes(q);
+    });
+  }, [words, query, chapterFilter]);
+
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-lg text-gray-500">Loading word…</p>
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Loading words…</p>
       </main>
     );
   }
@@ -502,235 +359,301 @@ export default function WordDetailPage() {
   if (needsSignIn) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-gray-700">You need to sign in to view this word.</p>
-        <button onClick={() => router.push(`/books`)} className="px-4 py-2 bg-gray-200 rounded">
+        <p className="text-gray-700">You need to sign in.</p>
+        <button onClick={() => router.push("/login")} className="px-4 py-2 bg-gray-200 rounded">
+          Go to Login
+        </button>
+      </main>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
+        <p className="text-red-700">{errorMsg}</p>
+        <button onClick={() => router.push("/books")} className="px-4 py-2 bg-gray-200 rounded">
           Back to Books
         </button>
       </main>
     );
   }
 
-  if (errorMsg || !word) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-red-700">{errorMsg ?? "Word not found."}</p>
-        <button onClick={() => router.push(backToWordList)} className="px-4 py-2 bg-gray-200 rounded">
-          ← Back to Word List
-        </button>
-      </main>
-    );
-  }
-
-  const jlpt = normalizeJlpt(word.jlpt);
-  const chapter = chapterDisplay(word.chapter_number, (word as any).chapter_name ?? null);
-  const defTotal = meaningChoices.length;
-  const chosenMeaning = defTotal ? meaningChoices[meaningChoiceIndex] : (word.meaning ?? null);
-
   return (
-    <main className="min-h-screen flex flex-col items-center p-6">
-      {/* Header */}
-      <div className="w-full max-w-3xl flex items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
-          {bookCover ? <img src={bookCover} alt="" className="w-12 h-16 rounded shrink-0" /> : null}
-          <div className="min-w-0">
-            <div className="text-xs text-gray-500">From</div>
-            <div className="font-medium truncate">{bookTitle || "Book"}</div>
-            <div className="text-xs text-gray-500 truncate">
-              {chapter !== "(none)" ? chapter : null}
-              {word.page_number != null ? ` • p. ${word.page_number}` : null}
+    <main className="max-w-6xl mx-auto p-6">
+      {/* Edit Modal */}
+      {editing ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Edit word</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {editing.surface} • {editing.id}
+                </p>
+              </div>
+              <button onClick={closeEdit} className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">
+                ✕ Close
+              </button>
+            </div>
+
+            {editErr ? <p className="mt-3 text-sm text-red-700">{editErr}</p> : null}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-gray-600">Word</span>
+                <input
+                  value={editSurface}
+                  onChange={(e) => setEditSurface(e.target.value)}
+                  className="border p-2 rounded"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-gray-600">Reading</span>
+                <input
+                  value={editReading}
+                  onChange={(e) => setEditReading(e.target.value)}
+                  className="border p-2 rounded"
+                />
+              </label>
+
+              {editMeaningChoices.length > 1 ? (
+                <div className="sm:col-span-2 border rounded p-3 bg-gray-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs text-gray-600">
+                      Definition: <span className="font-medium">{editMeaningChoiceIndex + 1}</span>/
+                      {editMeaningChoices.length}
+                    </div>
+
+                    <select
+                      value={editMeaningChoiceIndex}
+                      onChange={(e) => changeDefinition(Number(e.target.value))}
+                      className="border p-1 rounded text-sm bg-white"
+                      title="Choose which dictionary definition to use"
+                    >
+                      {editMeaningChoices.map((_, i) => (
+                        <option key={i} value={i}>
+                          {i + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <details className="mt-2 text-xs text-gray-600">
+                    <summary className="cursor-pointer select-none">Show all definitions</summary>
+                    <ol className="list-decimal ml-5 mt-2 space-y-1">
+                      {editMeaningChoices.map((m, i) => (
+                        <li key={i} className={i === editMeaningChoiceIndex ? "font-medium text-gray-900" : ""}>
+                          {m}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                </div>
+              ) : null}
+
+              <label className="flex flex-col gap-1 sm:col-span-2">
+                <span className="text-xs text-gray-600">Meaning</span>
+                <textarea
+                  value={editMeaning}
+                  onChange={(e) => setEditMeaning(e.target.value)}
+                  className="border p-2 rounded min-h-[90px]"
+                />
+                {editMeaningChoices.length > 1 ? (
+                  <p className="text-[11px] text-gray-500">
+                    Tip: changing “Definition #” will overwrite Meaning to match that definition.
+                  </p>
+                ) : null}
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-gray-600">Chapter #</span>
+                <input
+                  value={editChapterNum}
+                  onChange={(e) => setEditChapterNum(e.target.value)}
+                  className="border p-2 rounded"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-gray-600">Chapter title</span>
+                <input
+                  value={editChapterName}
+                  onChange={(e) => setEditChapterName(e.target.value)}
+                  className="border p-2 rounded"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-gray-600">Page</span>
+                <input value={editPage} onChange={(e) => setEditPage(e.target.value)} className="border p-2 rounded" />
+              </label>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                onClick={closeEdit}
+                disabled={editSaving}
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving || !editSurface.trim()}
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50"
+              >
+                {editSaving ? "Saving…" : "Save"}
+              </button>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      <div className="flex items-center gap-3 mb-4">
+        {bookCover ? <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover" /> : null}
+
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold">{bookTitle || "Words"}</h1>
+          <p className="text-sm text-gray-500">
+            Total: {words.length} • Showing: {filtered.length}
+          </p>
         </div>
 
         <div className="flex gap-2">
           <button
-            onClick={() => router.push(`/books/${userBookId}/flashcards`)}
-            className="px-3 py-2 rounded bg-gray-200"
-            title="Go to flashcards for this book"
+            onClick={() => router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)}
+            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
-            Flashcards
+            + Add Vocab
           </button>
 
-          {/* ✅ Back now goes to /books/[userBookId]/words */}
-          <button onClick={() => router.push(backToWordList)} className="px-3 py-2 rounded bg-gray-100">
-            ← Word List
+          <button
+            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
+            className="px-3 py-2 bg-green-700 text-white rounded hover:bg-amber-600 text-sm"
+          >
+            Study
           </button>
         </div>
       </div>
 
-      {/* Main Card */}
-      <section className="w-full max-w-3xl border rounded-2xl bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Word</div>
-              <div className="text-4xl font-bold break-words">{word.surface}</div>
-              <div className="mt-2 text-sm text-gray-600">
-                {jlpt !== "NON-JLPT" ? <span className="mr-2">JLPT: {jlpt}</span> : null}
-                {word.is_common ? <span className="mr-2">Common</span> : null}
-              </div>
-            </div>
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search (word/reading/meaning/page/chapter)…"
+          className="border p-2 rounded w-full"
+        />
 
-            {/* Audio (placeholder) */}
-            <div className="flex flex-col items-end gap-2 shrink-0">
-              <button
-                type="button"
-                disabled={!audioUrl}
-                className="px-3 py-2 rounded bg-gray-200 disabled:opacity-50"
-                title="Audio (coming soon)"
-              >
-                🔊 Play
-              </button>
-              <div className="text-xs text-gray-400">Audio: {audioUrl ? "ready" : "coming soon"}</div>
-            </div>
-          </div>
+        <select
+          value={chapterFilter}
+          onChange={(e) => setChapterFilter(e.target.value)}
+          className="border p-2 rounded bg-white"
+        >
+          <option value="all">All chapters</option>
+          {chapterOptions.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-          <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">Reading</div>
-            <div className="text-2xl font-medium">{word.reading || "—"}</div>
-          </div>
+      <div className="overflow-x-auto border rounded bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr className="text-left">
+              {/* ✅ NEW: repeats column */}
+              <th className="p-2 w-8 text-center" title="How many times this word appears in this book">
+                Repeats
+              </th>
+              <th className="p-2 w-25">Word</th>
+              <th className="p-2 w-25">Reading</th>
+              <th className="p-2 w-60">Meaning</th>
+              <th className="p-2 w-30">Chapter</th>
+              <th className="p-2 w-10">Page</th>
+              <th className="p-2 w-20">JLPT</th>
+              <th className="p-2 w-24">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((w) => {
+              const rep = repeatCounts.get((w.surface ?? "").trim()) ?? 0;
 
-          {/* Definition */}
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Definition</div>
-              {defTotal > 1 ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">
-                    {meaningChoiceIndex + 1}/{defTotal}
-                  </span>
-                  <select
-                    value={meaningChoiceIndex}
-                    disabled={defSaving}
-                    onChange={(e) => setDefinition(Number(e.target.value))}
-                    className="border p-1 rounded text-xs bg-white"
-                    title="Choose which dictionary definition to use"
-                  >
-                    {meaningChoices.map((_, i) => (
-                      <option key={i} value={i}>
-                        {i + 1}
-                      </option>
-                    ))}
-                  </select>
-                  {defSaving ? <span className="text-xs text-gray-500">Saving…</span> : null}
-                </div>
-              ) : null}
-            </div>
+              return (
+                <tr key={w.id} className="border-t">
+                  {/* ✅ NEW: repeats cell */}
+                  <td className="p-2 text-center text-xs text-gray-600">{rep > 1 ? rep : ""}</td>
 
-            <div className="mt-2 text-lg">{chosenMeaning || "—"}</div>
-            {defError ? <p className="mt-2 text-sm text-red-700">{defError}</p> : null}
-          </div>
+                  <td className="p-2 font-medium">{w.surface}</td>
+                  <td className="p-2">{w.reading ?? "—"}</td>
+                  <td className="p-2">{w.meaning ?? "—"}</td>
 
-          {/* Example sentence (placeholder) */}
-          <div className="mt-2 border rounded-xl p-4 bg-gray-50">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Example sentence</div>
-              <button
-                type="button"
-                disabled
-                className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
-                title="Generated examples coming soon"
-              >
-                Generate
-              </button>
-            </div>
-            <div className="mt-2 text-gray-600">{exampleSentence ? exampleSentence : "Coming soon (generated examples)."}</div>
-            <div className="mt-2 text-xs text-gray-400">
-              Note: we’ll keep this “safe” by generating examples (not storing book sentences).
-            </div>
-          </div>
+                  <td className="p-2">
+                    {(() => {
+                      const ch = chapterDisplayParts(w);
+                      if (ch.num && ch.name) {
+                        return (
+                          <span className="leading-tight">
+                            <span className="block">{ch.num}</span>
+                            <span className="block text-gray-600">{ch.name}</span>
+                          </span>
+                        );
+                      }
+                      return ch.fallback;
+                    })()}
+                  </td>
 
-          {/* Seen / counts */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
-            <div className="border rounded-xl p-3">
-              <div className="text-xs text-gray-500">Repeats in this book</div>
-              <div className="text-2xl font-semibold">{repeatsInThisBook}</div>
-            </div>
-            <div className="border rounded-xl p-3">
-              <div className="text-xs text-gray-500">Total lookup count</div>
-              <div className="text-2xl font-semibold">{totalLookupCount}</div>
-              <div className="text-xs text-gray-400 mt-1">Across all your books (same surface)</div>
-            </div>
-            <div className="border rounded-xl p-3">
-              <div className="text-xs text-gray-500">Color</div>
-              <div className="text-2xl font-semibold text-gray-400">—</div>
-              <div className="text-xs text-gray-400 mt-1">Coming later</div>
-            </div>
-          </div>
-        </div>
-      </section>
+                  <td className="p-2">{w.page_number ?? "—"}</td>
+                  <td className="p-2">{normalizeJlpt(w.jlpt)}</td>
 
-      {/* Seen in which books (all) */}
-      <section className="w-full max-w-3xl mt-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">Seen in books</h2>
-          <span className="text-xs text-gray-500">{seenInstances.length} total</span>
-        </div>
+                  <td className="p-2">
+                    <div className="flex gap-2">
+                      {/* ✅ NEW: Open word card */}
+                      <button
+                        onClick={() =>
+                          router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
+                        }
+                        className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
+                        title="Open word card"
+                      >
+                        Open
+                      </button>
 
-        <div className="border rounded-2xl bg-white p-4">
-          {seenInstances.length === 0 ? (
-            <p className="text-sm text-gray-500">No instances found.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {seenInstances.map((x) => {
-                const ch = chapterDisplay(x.chapter_number, x.chapter_name);
-                const isThis = x.id === word.id;
+                      <button
+                        onClick={() => openEdit(w)}
+                        className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
+                      >
+                        Edit
+                      </button>
 
-                return (
-                  <li key={x.id} className="border rounded-xl p-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        {x.books_cover_url ? (
-                          <img src={x.books_cover_url} alt="" className="w-8 h-12 rounded shrink-0" />
-                        ) : null}
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">
-                            {x.books_title} {isThis ? <span className="text-xs text-gray-400">(this one)</span> : null}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            {ch !== "(none)" ? ch : null}
-                            {x.page_number != null ? ` • p. ${x.page_number}` : null}
-                            {x.created_at ? ` • added ${new Date(x.created_at).toLocaleDateString()}` : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-2 text-sm text-gray-700">
-                        <span className="font-medium">Reading:</span> {x.reading || "—"}
-                      </div>
-                      <div className="text-sm text-gray-700">
-                        <span className="font-medium">Meaning:</span> {x.meaning || "—"}
-                      </div>
+                      <button
+                        onClick={() => deleteWord(w)}
+                        className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+                      >
+                        Delete
+                      </button>
                     </div>
+                  </td>
+                </tr>
+              );
+            })}
 
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/books/${x.user_book_id}/words/${x.id}`)}
-                      className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 shrink-0"
-                      title="Open this instance"
-                    >
-                      Open →
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </section>
+            {filtered.length === 0 ? (
+              <tr>
+                {/* ✅ updated colSpan (now 8 -> 9) */}
+                <td className="p-4 text-gray-500" colSpan={9}>
+                  No words match your filters.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Collocations */}
-      <CollocationsPanel userBookId={userBookId} userBookWordId={word.id} />
-
-      {/* Footer actions */}
-      <div className="w-full max-w-3xl mt-8 flex flex-wrap gap-2 justify-between">
-        {/* ✅ Back now goes to /books/[userBookId]/words */}
-        <button onClick={() => router.push(backToWordList)} className="px-4 py-2 bg-gray-200 rounded">
-          ← Back to Word List
-        </button>
-
-        <button onClick={() => loadAll()} className="px-4 py-2 bg-gray-100 rounded">
-          Refresh
+      <div className="mt-4">
+        <button onClick={() => router.push("/books")} className="text-sm text-slate-600 hover:underline">
+          ← Back to Books
         </button>
       </div>
     </main>
