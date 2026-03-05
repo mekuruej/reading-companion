@@ -401,7 +401,7 @@ export default function BooksPage() {
         key={row.id}
         className="flex flex-col items-center p-2 rounded-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-200/40 cursor-pointer"
       >
-        <a href={`/books/${row.id}/words`} onClick={(e) => e.stopPropagation()} className="block">
+        <a href={`/books/${row.id}`} onClick={(e) => e.stopPropagation()} className="block">
           {book.cover_url ? (
             <img src={book.cover_url} alt={`${book.title} cover`} className="w-32 h-48 object-cover rounded-md shadow-md" />
           ) : (
@@ -412,10 +412,10 @@ export default function BooksPage() {
         </a>
 
         <a
-          href={`/books/${row.id}/words`}
-          onClick={(e) => e.stopPropagation()}
-          className="text-center font-medium text-sm underline hover:text-blue-700 mt-2"
-        >
+  href={`/books/${row.id}`}
+  onClick={(e) => e.stopPropagation()}
+  className="text-center font-medium text-sm underline hover:text-blue-700 mt-2"
+>
           {book.title}
         </a>
 
@@ -540,7 +540,7 @@ export default function BooksPage() {
           onClick={(e) => e.stopPropagation()}
           className="mt-1 text-[12px] px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
         >
-          View Words
+          View Vocab List
         </a>
 
         <a

@@ -48,6 +48,13 @@ function chapterDisplayParts(w: WordRow) {
   };
 }
 
+// ✅ stable key (doesn't depend on label formatting)
+function chapterKey(w: WordRow) {
+  const num = w.chapter_number != null ? String(w.chapter_number) : "";
+  const name = (w.chapter_name ?? "").trim();
+  return `${num}||${name}`;
+}
+
 // ✅ jsonb -> string[]
 function asStringArray(val: any): string[] {
   if (!val) return [];
@@ -59,6 +66,28 @@ function asStringArray(val: any): string[] {
     } catch {}
   }
   return [];
+}
+
+function normalizeText(val: string | null | undefined) {
+  return (val ?? "").trim();
+}
+
+// ✅ Repeats = same surface + same selected definition
+// - If meaning_choice_index exists AND there are meaning_choices, use IDX.
+// - Otherwise fall back to meaning text.
+function repeatKey(w: WordRow) {
+  const s = normalizeText(w.surface);
+  if (!s) return "";
+
+  const choices = asStringArray((w as any).meaning_choices);
+  const idx = w.meaning_choice_index;
+
+  if (choices.length > 0 && idx != null && Number.isFinite(idx)) {
+    return `${s}||IDX:${idx}`;
+  }
+
+  const m = normalizeText(w.meaning);
+  return `${s}||MEAN:${m}`;
 }
 
 export default function BookWordsPage() {
@@ -115,7 +144,6 @@ export default function BookWordsPage() {
     setEditMeaningChoices(choices);
     setEditMeaningChoiceIndex(idx);
 
-    // If choices exist, make sure meaning matches selected choice (but don’t clobber custom meaning if blank)
     if (choices.length && choices[idx]) {
       setEditMeaning(choices[idx]);
     }
@@ -135,7 +163,6 @@ export default function BookWordsPage() {
     return Math.trunc(n);
   }
 
-  // ✅ change definition choice in modal and sync meaning field
   function changeDefinition(newIndex: number) {
     const choices = editMeaningChoices ?? [];
     if (!choices.length) return;
@@ -207,9 +234,7 @@ export default function BookWordsPage() {
 
     try {
       const { error } = await supabase.from("user_book_words").delete().eq("id", w.id).eq("user_book_id", userBookId);
-
       if (error) throw error;
-
       setWords((prev) => prev.filter((x) => x.id !== w.id));
     } catch (e: any) {
       alert(e?.message ?? "Failed to delete word");
@@ -285,15 +310,13 @@ export default function BookWordsPage() {
         const list = rows ?? [];
         setWords(list);
 
-        const map = new Map<string, string>();
+        // ✅ options: stable value, pretty label
+        const optMap = new Map<string, string>(); // value -> label
         for (const w of list) {
-          const label = chapterDisplayParts(w).fallback;
-          map.set(label, label);
+          optMap.set(chapterKey(w), chapterDisplayParts(w).fallback);
         }
 
-        const opts = Array.from(map.values())
-          .filter(Boolean)
-          .map((label) => ({ value: label, label }));
+        const opts = Array.from(optMap.entries()).map(([value, label]) => ({ value, label }));
 
         opts.sort((a, b) => {
           const anum = a.label.match(/Chapter\s+(\d+)/i)?.[1];
@@ -313,11 +336,11 @@ export default function BookWordsPage() {
     load();
   }, [userBookId]);
 
-  // ✅ Repeats map (count same surface within this book)
+  // ✅ Repeats map (same surface + same selected definition)
   const repeatCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const w of words) {
-      const key = (w.surface ?? "").trim();
+      const key = repeatKey(w);
       if (!key) continue;
       m.set(key, (m.get(key) ?? 0) + 1);
     }
@@ -328,9 +351,10 @@ export default function BookWordsPage() {
     const q = query.trim().toLowerCase();
 
     return words.filter((w) => {
-      const ch = chapterDisplayParts(w).fallback;
-      if (chapterFilter !== "all" && ch !== chapterFilter) return false;
+      const chValue = chapterKey(w);
+      const chLabel = chapterDisplayParts(w).fallback;
 
+      if (chapterFilter !== "all" && chValue !== chapterFilter) return false;
       if (!q) return true;
 
       const hay = [
@@ -338,7 +362,7 @@ export default function BookWordsPage() {
         w.reading ?? "",
         w.meaning ?? "",
         normalizeJlpt(w.jlpt),
-        ch,
+        chLabel,
         w.page_number?.toString() ?? "",
       ]
         .join(" ")
@@ -401,28 +425,19 @@ export default function BookWordsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Word</span>
-                <input
-                  value={editSurface}
-                  onChange={(e) => setEditSurface(e.target.value)}
-                  className="border p-2 rounded"
-                />
+                <input value={editSurface} onChange={(e) => setEditSurface(e.target.value)} className="border p-2 rounded" />
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Reading</span>
-                <input
-                  value={editReading}
-                  onChange={(e) => setEditReading(e.target.value)}
-                  className="border p-2 rounded"
-                />
+                <input value={editReading} onChange={(e) => setEditReading(e.target.value)} className="border p-2 rounded" />
               </label>
 
               {editMeaningChoices.length > 1 ? (
                 <div className="sm:col-span-2 border rounded p-3 bg-gray-50">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs text-gray-600">
-                      Definition: <span className="font-medium">{editMeaningChoiceIndex + 1}</span>/
-                      {editMeaningChoices.length}
+                      Definition: <span className="font-medium">{editMeaningChoiceIndex + 1}</span>/{editMeaningChoices.length}
                     </div>
 
                     <select
@@ -454,34 +469,20 @@ export default function BookWordsPage() {
 
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-600">Meaning</span>
-                <textarea
-                  value={editMeaning}
-                  onChange={(e) => setEditMeaning(e.target.value)}
-                  className="border p-2 rounded min-h-[90px]"
-                />
+                <textarea value={editMeaning} onChange={(e) => setEditMeaning(e.target.value)} className="border p-2 rounded min-h-[90px]" />
                 {editMeaningChoices.length > 1 ? (
-                  <p className="text-[11px] text-gray-500">
-                    Tip: changing “Definition #” will overwrite Meaning to match that definition.
-                  </p>
+                  <p className="text-[11px] text-gray-500">Tip: changing “Definition #” will overwrite Meaning to match that definition.</p>
                 ) : null}
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Chapter #</span>
-                <input
-                  value={editChapterNum}
-                  onChange={(e) => setEditChapterNum(e.target.value)}
-                  className="border p-2 rounded"
-                />
+                <input value={editChapterNum} onChange={(e) => setEditChapterNum(e.target.value)} className="border p-2 rounded" />
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Chapter title</span>
-                <input
-                  value={editChapterName}
-                  onChange={(e) => setEditChapterName(e.target.value)}
-                  className="border p-2 rounded"
-                />
+                <input value={editChapterName} onChange={(e) => setEditChapterName(e.target.value)} className="border p-2 rounded" />
               </label>
 
               <label className="flex flex-col gap-1">
@@ -491,11 +492,7 @@ export default function BookWordsPage() {
             </div>
 
             <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                onClick={closeEdit}
-                disabled={editSaving}
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50"
-              >
+              <button onClick={closeEdit} disabled={editSaving} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50">
                 Cancel
               </button>
               <button
@@ -545,11 +542,7 @@ export default function BookWordsPage() {
           className="border p-2 rounded w-full"
         />
 
-        <select
-          value={chapterFilter}
-          onChange={(e) => setChapterFilter(e.target.value)}
-          className="border p-2 rounded bg-white"
-        >
+        <select value={chapterFilter} onChange={(e) => setChapterFilter(e.target.value)} className="border p-2 rounded bg-white">
           <option value="all">All chapters</option>
           {chapterOptions.map((c) => (
             <option key={c.value} value={c.value}>
@@ -563,8 +556,7 @@ export default function BookWordsPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left">
-              {/* ✅ NEW: repeats column */}
-              <th className="p-2 w-8 text-center" title="How many times this word appears in this book">
+              <th className="p-2 w-8 text-center" title="How many times this word appears in this book (same word + same definition)">
                 Repeats
               </th>
               <th className="p-2 w-25">Word</th>
@@ -576,13 +568,13 @@ export default function BookWordsPage() {
               <th className="p-2 w-24">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {filtered.map((w) => {
-              const rep = repeatCounts.get((w.surface ?? "").trim()) ?? 0;
+              const rep = repeatCounts.get(repeatKey(w)) ?? 0;
 
               return (
                 <tr key={w.id} className="border-t">
-                  {/* ✅ NEW: repeats cell */}
                   <td className="p-2 text-center text-xs text-gray-600">{rep > 1 ? rep : ""}</td>
 
                   <td className="p-2 font-medium">{w.surface}</td>
@@ -609,11 +601,8 @@ export default function BookWordsPage() {
 
                   <td className="p-2">
                     <div className="flex gap-2">
-                      {/* ✅ NEW: Open word card */}
                       <button
-                        onClick={() =>
-                          router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
-                        }
+                        onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)}
                         className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
                         title="Open word card"
                       >
@@ -641,8 +630,7 @@ export default function BookWordsPage() {
 
             {filtered.length === 0 ? (
               <tr>
-                {/* ✅ updated colSpan (now 8 -> 9) */}
-                <td className="p-4 text-gray-500" colSpan={9}>
+                <td className="p-4 text-gray-500" colSpan={8}>
                   No words match your filters.
                 </td>
               </tr>

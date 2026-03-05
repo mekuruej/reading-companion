@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 
 // -------------------------------------------------------------
@@ -96,6 +97,8 @@ type BulkItem = {
 // Main Component
 // -------------------------------------------------------------
 export default function BulkVocabPage() {
+  const router = useRouter();
+
   const [userBookId, setUserBookId] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -375,14 +378,19 @@ export default function BulkVocabPage() {
     });
   }
 
-  // ✅ NEW: Add More Words button should be next to Save All (top),
-  // and simply reset the form without scrolling.
+  // ✅ Add More Words: reset form
   function resetForMore() {
     setRawInput("");
     setItems([]);
     setPagePaste("");
     setMessage("");
     setSaveComplete(false);
+  }
+
+  // ✅ NEW: Go to vocab list (keep userBookId)
+  function goToVocabList() {
+    if (!userBookId) return;
+    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
   }
 
   // -------------------------------------------------------------
@@ -463,27 +471,34 @@ export default function BulkVocabPage() {
             </button>
           ) : null}
 
-          {/* ✅ NEW: Add More Words appears NEXT to Save All when saveComplete */}
+          {/* After save: Add More + Go to Vocab List */}
           {saveComplete ? (
-            <button
-              type="button"
-              onClick={resetForMore}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              title="Clear the preview and start a new batch"
-            >
-              ➕ Add More Words
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={resetForMore}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                title="Clear the preview and start a new batch"
+              >
+                ➕ Add More Words
+              </button>
+
+              <button
+                type="button"
+                onClick={goToVocabList}
+                className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+                title="Go to the vocab list for this book"
+              >
+                📄 Go to Vocab List
+              </button>
+            </>
           ) : null}
         </div>
       </form>
 
       {message ? (
         <div className="mb-4 text-sm">
-          {message.startsWith("❌") ? (
-            <p className="text-red-700">{message}</p>
-          ) : (
-            <p className="text-gray-700">{message}</p>
-          )}
+          {message.startsWith("❌") ? <p className="text-red-700">{message}</p> : <p className="text-gray-700">{message}</p>}
         </div>
       ) : null}
 
@@ -506,19 +521,11 @@ export default function BulkVocabPage() {
             />
 
             <div className="flex gap-2 mt-2">
-              <button
-                type="button"
-                onClick={applyPastedPages}
-                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
+              <button type="button" onClick={applyPastedPages} className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
                 Apply pages
               </button>
 
-              <button
-                type="button"
-                onClick={() => setPagePaste("")}
-                className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              >
+              <button type="button" onClick={() => setPagePaste("")} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">
                 Clear
               </button>
             </div>
@@ -626,9 +633,7 @@ export default function BulkVocabPage() {
                     type="button"
                     onClick={() => updateItem(idx, "isCommon", !i.isCommon)}
                     className={`px-2 py-1 rounded border ${
-                      i.isCommon
-                        ? "bg-green-100 text-green-700 border-green-300"
-                        : "bg-gray-100 text-gray-700 border-gray-300"
+                      i.isCommon ? "bg-green-100 text-green-700 border-green-300" : "bg-gray-100 text-gray-700 border-gray-300"
                     }`}
                   >
                     {i.isCommon ? "Common" : "Rare"}
