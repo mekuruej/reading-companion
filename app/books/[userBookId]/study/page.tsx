@@ -293,8 +293,7 @@ export default function BookFlashcardsPage() {
           `
           )
           .eq("id", userBookId)
-          .eq("user_id", user.id)
-          .single();
+.single();
 
         if (ubErr) throw ubErr;
 
