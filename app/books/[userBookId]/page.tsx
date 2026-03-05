@@ -12,17 +12,25 @@ type Book = {
   illustrator: string | null;
   cover_url: string | null;
 
-  // metadata (you added these)
+  // metadata
   genre: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
   isbn: string | null;
   isbn13: string | null;
+  publisher: string | null;
 
-  // people photos (optional but supported)
+  // people photos / logos
   author_image_url: string | null;
   translator_image_url: string | null;
   illustrator_image_url: string | null;
+  publisher_image_url: string | null;
+
+  // people readings
+  author_reading: string | null;
+  translator_reading: string | null;
+  illustrator_reading: string | null;
+  publisher_reading: string | null;
 
   // jsonb array of links
   related_links: any | null;
@@ -36,7 +44,19 @@ type UserBook = {
   notes: string | null;
   my_review: string | null;
 
+  // ratings + level snapshot
+  rating_overall: number | null; // 1-10
+  rating_recommend: number | null; // 1-10
+  rating_difficulty: number | null; // 1 hardest -> 10 easiest
+  reader_level: string | null; // N5/N4/N3/N2/N1
+  recommended_level: string | null; // N5/N4/N3/N2/N1
+
   books: Book | null;
+};
+
+type LookupRow = {
+  surface?: string | null;
+  meaning?: string | null;
 };
 
 function safeDate(s: string | null) {
@@ -62,7 +82,6 @@ function linksToText(links: any): string {
   if (!links) return "";
   if (!Array.isArray(links)) return "";
 
-  // Accept: [{label,url}, ...] OR ["https://...", ...]
   return links
     .map((x) => {
       if (typeof x === "string") return x;
@@ -78,7 +97,6 @@ function linksToText(links: any): string {
 }
 
 function parseLinks(text: string) {
-  // One per line. Optional "Label | https://..."
   const lines = text
     .split("\n")
     .map((l) => l.trim())
@@ -105,6 +123,19 @@ function displayLinkUrl(l: any) {
   return "";
 }
 
+function clampRating(n: number | null) {
+  if (n == null || Number.isNaN(n)) return null;
+  return Math.max(1, Math.min(10, n));
+}
+
+function stars10(value: number | null) {
+  if (!value) return "☆☆☆☆☆☆☆☆☆☆";
+  const v = Math.max(1, Math.min(10, value));
+  return "★".repeat(v) + "☆".repeat(10 - v);
+}
+
+const LEVEL_OPTIONS = ["N5", "N4", "N3", "N2", "N1"] as const;
+
 export default function BookInfoPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -117,23 +148,39 @@ export default function BookInfoPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // unique lookup count
+  const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
+
   // Drafts (user_books)
   const [startedAt, setStartedAt] = useState<string>("");
   const [finishedAt, setFinishedAt] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [myReview, setMyReview] = useState<string>("");
 
+  const [ratingOverall, setRatingOverall] = useState<string>("");
+  const [ratingRecommend, setRatingRecommend] = useState<string>("");
+  const [ratingDifficulty, setRatingDifficulty] = useState<string>(""); // 1 hardest, 10 easiest
+  const [readerLevel, setReaderLevel] = useState<string>("");
+  const [recommendedLevel, setRecommendedLevel] = useState<string>("");
+
   // Drafts (books)
   const [genre, setGenre] = useState<string>("");
   const [triggerWarnings, setTriggerWarnings] = useState<string>("");
-  const [pageCount, setPageCount] = useState<string>(""); // keep as string input
+  const [pageCount, setPageCount] = useState<string>("");
   const [isbn, setIsbn] = useState<string>("");
   const [isbn13, setIsbn13] = useState<string>("");
+  const [publisher, setPublisher] = useState<string>("");
+  const [publisherReading, setPublisherReading] = useState<string>("");
 
   const [coverUrl, setCoverUrl] = useState<string>("");
   const [authorImg, setAuthorImg] = useState<string>("");
   const [translatorImg, setTranslatorImg] = useState<string>("");
   const [illustratorImg, setIllustratorImg] = useState<string>("");
+  const [publisherImg, setPublisherImg] = useState<string>("");
+
+  const [authorReading, setAuthorReading] = useState<string>("");
+  const [translatorReading, setTranslatorReading] = useState<string>("");
+  const [illustratorReading, setIllustratorReading] = useState<string>("");
 
   const [linksText, setLinksText] = useState<string>("");
 
@@ -148,6 +195,32 @@ export default function BookInfoPage() {
   }, [started, finished]);
 
   const book = row?.books ?? null;
+
+  const loadUniqueLookupCount = async (id: string) => {
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .select("surface, meaning")
+      .eq("user_book_id", id);
+
+    if (error) {
+      console.error("Error loading lookup count:", error);
+      setUniqueLookupCount(null);
+      return;
+    }
+
+    const rows = (data ?? []) as LookupRow[];
+
+    // Deduplicate by same word + same definition
+    const set = new Set<string>();
+    for (const r of rows) {
+      const surface = (r.surface ?? "").trim();
+      const meaning = (r.meaning ?? "").trim();
+      if (!surface && !meaning) continue;
+      set.add(`${surface}|||${meaning}`);
+    }
+
+    setUniqueLookupCount(set.size);
+  };
 
   const load = async () => {
     if (!userBookId) return;
@@ -165,6 +238,11 @@ export default function BookInfoPage() {
         finished_at,
         notes,
         my_review,
+        rating_overall,
+        rating_recommend,
+        rating_difficulty,
+        reader_level,
+        recommended_level,
         books (
           id,
           title,
@@ -177,10 +255,16 @@ export default function BookInfoPage() {
           page_count,
           isbn,
           isbn13,
+          publisher,
+          publisher_reading,
+          publisher_image_url,
           related_links,
           author_image_url,
           translator_image_url,
-          illustrator_image_url
+          illustrator_image_url,
+          author_reading,
+          translator_reading,
+          illustrator_reading
         )
       `
       )
@@ -202,6 +286,11 @@ export default function BookInfoPage() {
     setFinishedAt(r.finished_at ? formatYmd(new Date(r.finished_at)) : "");
     setNotes(r.notes ?? "");
     setMyReview(r.my_review ?? "");
+    setRatingOverall(r.rating_overall != null ? String(r.rating_overall) : "");
+    setRatingRecommend(r.rating_recommend != null ? String(r.rating_recommend) : "");
+    setRatingDifficulty(r.rating_difficulty != null ? String(r.rating_difficulty) : "");
+    setReaderLevel(r.reader_level ?? "");
+    setRecommendedLevel(r.recommended_level ?? "");
 
     const b = r.books as Book | null;
     setGenre(b?.genre ?? "");
@@ -209,13 +298,22 @@ export default function BookInfoPage() {
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
+    setPublisher(b?.publisher ?? "");
+    setPublisherReading(b?.publisher_reading ?? "");
 
     setCoverUrl(b?.cover_url ?? "");
     setAuthorImg(b?.author_image_url ?? "");
     setTranslatorImg(b?.translator_image_url ?? "");
     setIllustratorImg(b?.illustrator_image_url ?? "");
+    setPublisherImg(b?.publisher_image_url ?? "");
+
+    setAuthorReading(b?.author_reading ?? "");
+    setTranslatorReading(b?.translator_reading ?? "");
+    setIllustratorReading(b?.illustrator_reading ?? "");
 
     setLinksText(linksToText(b?.related_links));
+
+    await loadUniqueLookupCount(r.id);
 
     setLoading(false);
   };
@@ -234,6 +332,11 @@ export default function BookInfoPage() {
     setFinishedAt(row.finished_at ? formatYmd(new Date(row.finished_at)) : "");
     setNotes(row.notes ?? "");
     setMyReview(row.my_review ?? "");
+    setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
+    setRatingRecommend(row.rating_recommend != null ? String(row.rating_recommend) : "");
+    setRatingDifficulty(row.rating_difficulty != null ? String(row.rating_difficulty) : "");
+    setReaderLevel(row.reader_level ?? "");
+    setRecommendedLevel(row.recommended_level ?? "");
 
     const b = row.books;
     setGenre(b?.genre ?? "");
@@ -241,11 +344,18 @@ export default function BookInfoPage() {
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
+    setPublisher(b?.publisher ?? "");
+    setPublisherReading(b?.publisher_reading ?? "");
 
     setCoverUrl(b?.cover_url ?? "");
     setAuthorImg(b?.author_image_url ?? "");
     setTranslatorImg(b?.translator_image_url ?? "");
     setIllustratorImg(b?.illustrator_image_url ?? "");
+    setPublisherImg(b?.publisher_image_url ?? "");
+
+    setAuthorReading(b?.author_reading ?? "");
+    setTranslatorReading(b?.translator_reading ?? "");
+    setIllustratorReading(b?.illustrator_reading ?? "");
 
     setLinksText(linksToText(b?.related_links));
   };
@@ -256,13 +366,18 @@ export default function BookInfoPage() {
     setSaving(true);
     setError(null);
 
-    // Normalize user_books dates: "" => null
+    // Normalize dates
     const started_at = startedAt.trim() ? startedAt.trim() : null;
     const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
 
     // Normalize page count
     const pc = pageCount.trim() ? Number(pageCount.trim()) : null;
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
+
+    // Normalize ratings (1-10 only)
+    const ro = ratingOverall.trim() ? clampRating(Number(ratingOverall.trim())) : null;
+    const rr = ratingRecommend.trim() ? clampRating(Number(ratingRecommend.trim())) : null;
+    const rd = ratingDifficulty.trim() ? clampRating(Number(ratingDifficulty.trim())) : null;
 
     const related_links = linksText.trim() ? parseLinks(linksText) : null;
 
@@ -271,8 +386,13 @@ export default function BookInfoPage() {
       .update({
         started_at,
         finished_at,
-        notes,
-        my_review: myReview,
+        notes: notes || null,
+        my_review: myReview || null,
+        rating_overall: ro,
+        rating_recommend: rr,
+        rating_difficulty: rd,
+        reader_level: readerLevel || null,
+        recommended_level: recommendedLevel || null,
       })
       .eq("id", row.id);
 
@@ -284,12 +404,19 @@ export default function BookInfoPage() {
         page_count,
         isbn: isbn || null,
         isbn13: isbn13 || null,
+        publisher: publisher || null,
+        publisher_reading: publisherReading || null,
+        publisher_image_url: publisherImg || null,
         related_links,
 
         cover_url: coverUrl || null,
         author_image_url: authorImg || null,
         translator_image_url: translatorImg || null,
         illustrator_image_url: illustratorImg || null,
+
+        author_reading: authorReading || null,
+        translator_reading: translatorReading || null,
+        illustrator_reading: illustratorReading || null,
       })
       .eq("id", row.books.id);
 
@@ -342,16 +469,33 @@ export default function BookInfoPage() {
             {book.author && (
               <div>
                 <span className="font-medium">Author:</span> {book.author}
+                {book.author_reading ? (
+                  <span className="text-gray-500">（{book.author_reading}）</span>
+                ) : null}
               </div>
             )}
             {book.translator && (
               <div>
                 <span className="font-medium">Translator:</span> {book.translator}
+                {book.translator_reading ? (
+                  <span className="text-gray-500">（{book.translator_reading}）</span>
+                ) : null}
               </div>
             )}
             {book.illustrator && (
               <div>
                 <span className="font-medium">Illustrator:</span> {book.illustrator}
+                {book.illustrator_reading ? (
+                  <span className="text-gray-500">（{book.illustrator_reading}）</span>
+                ) : null}
+              </div>
+            )}
+            {book.publisher && (
+              <div>
+                <span className="font-medium">Publisher:</span> {book.publisher}
+                {book.publisher_reading ? (
+                  <span className="text-gray-500">（{book.publisher_reading}）</span>
+                ) : null}
               </div>
             )}
           </div>
@@ -429,10 +573,10 @@ export default function BookInfoPage() {
               )}
             </div>
 
-            {book.cover_url ? (
+            {(editing ? coverUrl : book.cover_url) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={editing ? coverUrl : book.cover_url}
+                src={editing ? coverUrl : (book.cover_url ?? "")}
                 alt={`${book.title} cover`}
                 className="mt-3 w-full rounded-md border object-cover"
               />
@@ -445,39 +589,64 @@ export default function BookInfoPage() {
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium mb-3">People</div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <PersonRow
                 label="Author"
                 name={book.author}
+                reading={book.author_reading}
                 img={editing ? authorImg : book.author_image_url}
                 editing={editing}
                 imgValue={authorImg}
                 setImgValue={setAuthorImg}
+                readingValue={authorReading}
+                setReadingValue={setAuthorReading}
               />
+
               {(book.translator || book.translator_image_url || editing) && (
                 <PersonRow
                   label="Translator"
                   name={book.translator}
+                  reading={book.translator_reading}
                   img={editing ? translatorImg : book.translator_image_url}
                   editing={editing}
                   imgValue={translatorImg}
                   setImgValue={setTranslatorImg}
+                  readingValue={translatorReading}
+                  setReadingValue={setTranslatorReading}
                 />
               )}
+
               {(book.illustrator || book.illustrator_image_url || editing) && (
                 <PersonRow
                   label="Illustrator"
                   name={book.illustrator}
+                  reading={book.illustrator_reading}
                   img={editing ? illustratorImg : book.illustrator_image_url}
                   editing={editing}
                   imgValue={illustratorImg}
                   setImgValue={setIllustratorImg}
+                  readingValue={illustratorReading}
+                  setReadingValue={setIllustratorReading}
+                />
+              )}
+
+              {(book.publisher || book.publisher_image_url || editing) && (
+                <PersonRow
+                  label="Publisher"
+                  name={book.publisher}
+                  reading={book.publisher_reading}
+                  img={editing ? publisherImg : book.publisher_image_url}
+                  editing={editing}
+                  imgValue={publisherImg}
+                  setImgValue={setPublisherImg}
+                  readingValue={publisherReading}
+                  setReadingValue={setPublisherReading}
                 />
               )}
             </div>
           </div>
 
-          {/* ✅ My Review (new) */}
+          {/* My Review */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium">My Review</div>
             {!editing ? (
@@ -531,12 +700,97 @@ export default function BookInfoPage() {
               </div>
             </div>
 
-            {timeToRead && !editing && (
-              <div className="mt-3 text-sm">
-                <span className="text-gray-600">Time to read:</span>{" "}
-                <span className="font-medium">{timeToRead}</span>
+            {!editing && (
+  <div className="mt-3 text-sm flex flex-wrap items-center gap-x-6 gap-y-1">
+    {timeToRead && (
+      <div className="whitespace-nowrap">
+        <span className="text-gray-600">Time to read:</span>{" "}
+        <span className="font-medium">{timeToRead}</span>
+      </div>
+    )}
+
+    <div className="whitespace-nowrap">
+      <span className="text-gray-600">Words looked up (unique):</span>{" "}
+      <span className="font-medium">
+        {uniqueLookupCount == null ? "—" : uniqueLookupCount}
+      </span>
+    </div>
+  </div>
+)}
+          </div>
+
+          {/* Ratings */}
+          <div className="rounded-lg border bg-white p-4">
+            <div className="text-sm font-medium mb-3">Ratings</div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <RatingField
+                label="Overall"
+                value={row.rating_overall}
+                editing={editing}
+                inputValue={ratingOverall}
+                setInputValue={setRatingOverall}
+                helper="1 = worst, 10 = best"
+              />
+
+              <RatingField
+                label="Would Recommend"
+                value={row.rating_recommend}
+                editing={editing}
+                inputValue={ratingRecommend}
+                setInputValue={setRatingRecommend}
+                helper="1 = definitely recommend, 10 = absolutely not"
+              />
+
+              <RatingField
+                label="Difficulty (for me)"
+                value={row.rating_difficulty}
+                editing={editing}
+                inputValue={ratingDifficulty}
+                setInputValue={setRatingDifficulty}
+                helper="1 = hardest, 10 = easiest"
+              />
+
+              <div className="p-3 rounded border bg-gray-50 text-sm">
+                <div className="text-gray-600">My Level at Time of Reading</div>
+                {!editing ? (
+                  <div className="font-medium mt-1">{row.reader_level || "—"}</div>
+                ) : (
+                  <select
+                    value={readerLevel}
+                    onChange={(e) => setReaderLevel(e.target.value)}
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm bg-white"
+                  >
+                    <option value="">—</option>
+                    {LEVEL_OPTIONS.map((lvl) => (
+                      <option key={lvl} value={lvl}>
+                        {lvl}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
-            )}
+
+              <div className="p-3 rounded border bg-gray-50 text-sm sm:col-span-2">
+                <div className="text-gray-600">What level would I recommend it to?</div>
+                {!editing ? (
+                  <div className="font-medium mt-1">{row.recommended_level || "—"}</div>
+                ) : (
+                  <select
+                    value={recommendedLevel}
+                    onChange={(e) => setRecommendedLevel(e.target.value)}
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm bg-white"
+                  >
+                    <option value="">—</option>
+                    {LEVEL_OPTIONS.map((lvl) => (
+                      <option key={lvl} value={lvl}>
+                        {lvl}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Details */}
@@ -660,8 +914,8 @@ export default function BookInfoPage() {
             )}
 
             <div className="mt-2 text-xs text-gray-500">
-              Notes & review save to <code className="px-1">user_books</code> • Details save to{" "}
-              <code className="px-1">books</code>
+              Notes/review/ratings/levels save to <code className="px-1">user_books</code> •
+              Metadata saves to <code className="px-1">books</code>
             </div>
           </div>
         </div>
@@ -705,24 +959,90 @@ function Detail({
   );
 }
 
+function RatingField({
+  label,
+  value,
+  editing,
+  inputValue,
+  setInputValue,
+  helper,
+}: {
+  label: string;
+  value: number | null;
+  editing: boolean;
+  inputValue: string;
+  setInputValue: (v: string) => void;
+  helper: string;
+}) {
+  const numeric = value ?? null;
+
+  return (
+    <div className="p-3 rounded border bg-gray-50 text-sm">
+      <div className="text-gray-600">{label}</div>
+
+      {!editing ? (
+        <>
+          <div className="mt-1 font-medium">{numeric ? `${numeric}/10` : "—"}</div>
+          <div className="text-amber-600 tracking-tight">{stars10(numeric)}</div>
+          <div className="text-xs text-gray-500 mt-1">{helper}</div>
+        </>
+      ) : (
+        <>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={1}
+              value={inputValue || 5}
+              onChange={(e) => setInputValue(e.target.value)}
+              className="w-full"
+            />
+            <input
+              type="number"
+              min={1}
+              max={10}
+              step={1}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="1-10"
+              className="w-16 rounded border px-2 py-1 text-sm"
+            />
+          </div>
+          <div className="text-amber-600 tracking-tight mt-1">
+            {stars10(inputValue ? Number(inputValue) : null)}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">{helper}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function PersonRow({
   label,
   name,
+  reading,
   img,
   editing,
   imgValue,
   setImgValue,
+  readingValue,
+  setReadingValue,
 }: {
   label: string;
   name: string | null | undefined;
+  reading: string | null | undefined;
   img: string | null | undefined;
   editing: boolean;
   imgValue: string;
   setImgValue: (v: string) => void;
+  readingValue: string;
+  setReadingValue: (v: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-12 h-12 rounded-full border overflow-hidden bg-gray-100 shrink-0">
+    <div className="flex items-start gap-3">
+      <div className="w-12 h-12 rounded-full border overflow-hidden bg-gray-100 shrink-0 mt-0.5">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={img} alt={`${label} photo`} className="w-full h-full object-cover" />
@@ -737,13 +1057,23 @@ function PersonRow({
         <div className="text-xs text-gray-600">{label}</div>
         <div className="text-sm font-medium truncate">{name || "—"}</div>
 
-        {editing && (
-          <input
-            value={imgValue}
-            onChange={(e) => setImgValue(e.target.value)}
-            placeholder={`${label} image URL`}
-            className="mt-1 w-full rounded border px-2 py-1 text-xs"
-          />
+        {!editing ? (
+          <div className="text-xs text-gray-500 mt-0.5">{reading || "—"}</div>
+        ) : (
+          <>
+            <input
+              value={readingValue}
+              onChange={(e) => setReadingValue(e.target.value)}
+              placeholder={`${label} reading (よみ)`}
+              className="mt-1 w-full rounded border px-2 py-1 text-xs"
+            />
+            <input
+              value={imgValue}
+              onChange={(e) => setImgValue(e.target.value)}
+              placeholder={`${label} image URL / logo URL`}
+              className="mt-1 w-full rounded border px-2 py-1 text-xs"
+            />
+          </>
         )}
       </div>
     </div>
