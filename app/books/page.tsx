@@ -10,7 +10,10 @@ type Book = {
   author: string | null;
   translator: string | null;
   illustrator: string | null;
+  publisher: string | null;
+  isbn13: string | null;
   cover_url: string | null;
+  book_key?: string | null;
 };
 
 type UserBookRow = {
@@ -43,16 +46,13 @@ function UserBar() {
         return;
       }
 
-      // Try to show a privacy-friendly name instead of email
       const { data: prof, error: profErr } = await supabase
         .from("profiles")
         .select("display_name")
         .eq("id", user.id)
         .single();
 
-      if (profErr) {
-        console.warn("UserBar: could not load profile display_name:", profErr);
-      }
+      if (profErr) console.warn("UserBar: could not load profile display_name:", profErr);
 
       setLabel(prof?.display_name || "Student");
     };
@@ -61,9 +61,7 @@ function UserBar() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      loadUser();
-    });
+    } = supabase.auth.onAuthStateChange(() => loadUser());
 
     return () => subscription.unsubscribe();
   }, []);
@@ -88,11 +86,14 @@ function UserBar() {
 export default function BooksPage() {
   const [rows, setRows] = useState<UserBookRow[]>([]);
 
-  // ✅ Floating add button opens a modal
   const [showAddModal, setShowAddModal] = useState(false);
+  const [adding, setAdding] = useState(false);
 
+  // form fields
+  const [isbn13, setIsbn13] = useState("");
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
+  const [publisher, setPublisher] = useState("");
   const [translator, setTranslator] = useState("");
   const [illustrator, setIllustrator] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
@@ -100,7 +101,6 @@ export default function BooksPage() {
   const [finishingUserBookId, setFinishingUserBookId] = useState<string | null>(null);
   const [finishDate, setFinishDate] = useState("");
 
-  // ✅ start-date UI state
   const [startingUserBookId, setStartingUserBookId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
 
@@ -115,6 +115,21 @@ export default function BooksPage() {
     viewingUserId && viewingUserId === meId
       ? "Me"
       : students.find((s) => s.id === viewingUserId)?.display_name || "Student";
+
+  function digitsOnly(s: string) {
+    return (s ?? "").replace(/[^0-9]/g, "").trim();
+  }
+
+  function normKey(s: string) {
+    return (s ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "");
+  }
+
+  function logSbError(prefix: string, err: any) {
+    console.error(prefix, err?.message, err?.details, err?.hint, err?.code, err);
+  }
 
   async function fetchBooks(userIdToView: string) {
     setMessage("");
@@ -146,6 +161,8 @@ export default function BooksPage() {
           author,
           translator,
           illustrator,
+          publisher,
+          isbn13,
           cover_url
         )
       `
@@ -154,7 +171,7 @@ export default function BooksPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching user_books:", error);
+      logSbError("Error fetching user_books:", error);
       setMessage("Error loading books. (If viewing a student: confirm link + RLS policies.)");
       setMessageType("error");
       setRows([]);
@@ -197,7 +214,7 @@ export default function BooksPage() {
         .eq("teacher_id", user.id);
 
       if (relErr) {
-        console.error("Error loading teacher_students:", relErr);
+        logSbError("Error loading teacher_students:", relErr);
         if (!cancelled) setStudents([]);
         return;
       }
@@ -216,7 +233,7 @@ export default function BooksPage() {
         .order("display_name", { ascending: true });
 
       if (profErr) {
-        console.error("Error loading student profiles:", profErr);
+        logSbError("Error loading student profiles:", profErr);
         if (!cancelled) setStudents([]);
         return;
       }
@@ -246,77 +263,158 @@ export default function BooksPage() {
 
   async function addBook(e: React.FormEvent) {
     e.preventDefault();
+    if (adding) return;
+
+    setAdding(true);
     setMessage("");
     setMessageType("");
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      setMessage("Please sign in before adding a book.");
-      setMessageType("error");
-      return;
-    }
+      if (userError || !user) {
+        setMessage("Please sign in before adding a book.");
+        setMessageType("error");
+        return;
+      }
 
-    if (!viewingUserId) {
-      setMessage("Select a student (or Me) first.");
-      setMessageType("error");
-      return;
-    }
+      if (!viewingUserId) {
+        setMessage("Select a student (or Me) first.");
+        setMessageType("error");
+        return;
+      }
 
-    const { data: createdBook, error: bookErr } = await supabase
-      .from("books")
-      .insert([
+      if (!title.trim()) {
+        setMessage("Title is required.");
+        setMessageType("error");
+        return;
+      }
+
+      const cleanIsbn13 = digitsOnly(isbn13);
+      const book_key = [normKey(title), normKey(author), normKey(publisher)].join("|");
+
+      let bookIdToUse: string | null = null;
+
+      // 1) Prefer ISBN-13 match if provided
+      if (cleanIsbn13) {
+        const { data: existingByIsbn, error: findErr } = await supabase
+          .from("books")
+          .select("id")
+          .eq("isbn13", cleanIsbn13)
+          .maybeSingle();
+
+        if (findErr) {
+          logSbError("Find by isbn13 error:", findErr);
+          setMessage(`Error searching books by ISBN: ${findErr?.message || "Unknown"}`);
+          setMessageType("error");
+          return;
+        }
+
+        bookIdToUse = (existingByIsbn as any)?.id ?? null;
+      }
+
+      // 2) Fallback: match by book_key
+      if (!bookIdToUse) {
+        const { data: existingByKey, error: keyErr } = await supabase
+          .from("books")
+          .select("id")
+          .eq("book_key", book_key)
+          .maybeSingle();
+
+        if (keyErr) {
+          logSbError("Find by book_key error:", keyErr);
+          setMessage(`Error searching books by key: ${keyErr?.message || "Unknown"}`);
+          setMessageType("error");
+          return;
+        }
+
+        bookIdToUse = (existingByKey as any)?.id ?? null;
+      }
+
+      // 3) Insert if missing
+      if (!bookIdToUse) {
+        const baseInsert = {
+          title: title.trim(),
+          author: author.trim() || null,
+          translator: translator.trim() || null,
+          illustrator: illustrator.trim() || null,
+          publisher: publisher.trim() || null,
+          isbn13: cleanIsbn13 || null,
+          book_key,
+          cover_url: coverUrl.trim() || null,
+        };
+
+        // shared insert first
+        const { data: createdA, error: errA } = await supabase
+          .from("books")
+          .insert([baseInsert])
+          .select("id")
+          .maybeSingle();
+
+        if (errA) {
+          // fallback insert with user_id (compat with current RLS)
+          const { data: createdB, error: errB } = await supabase
+            .from("books")
+            .insert([{ ...baseInsert, user_id: user.id } as any])
+            .select("id")
+            .maybeSingle();
+
+          if (errB) {
+            logSbError("books insert error:", errB);
+            setMessage(`Error adding book: ${errB?.message || errA?.message || "Unknown"}`);
+            setMessageType("error");
+            return;
+          }
+
+          bookIdToUse = (createdB as any)?.id ?? null;
+        } else {
+          bookIdToUse = (createdA as any)?.id ?? null;
+        }
+
+        if (!bookIdToUse) {
+          setMessage("Error adding book: insert returned no id.");
+          setMessageType("error");
+          return;
+        }
+      }
+
+      // 4) Create user_books assignment
+      const { error: ubErr } = await supabase.from("user_books").insert([
         {
           user_id: viewingUserId,
-          title,
-          author,
-          translator,
-          illustrator,
-          cover_url: coverUrl,
+          book_id: bookIdToUse,
+          started_at: null,
+          finished_at: null,
         },
-      ])
-      .select("id")
-      .single();
+      ]);
 
-    if (bookErr) {
-      console.error("addBook insert error", bookErr);
-      setMessage(`Error adding book: ${bookErr.message}`);
-      setMessageType("error");
-      return;
+      if (ubErr) {
+        logSbError("user_books insert error:", ubErr);
+        setMessage(`Book added, but failed to assign: ${ubErr?.message || "Unknown"}`);
+        setMessageType("error");
+        return;
+      }
+
+      // Reset form
+      setIsbn13("");
+      setTitle("");
+      setAuthor("");
+      setPublisher("");
+      setTranslator("");
+      setIllustrator("");
+      setCoverUrl("");
+
+      await fetchBooks(viewingUserId);
+
+      setMessage(`✅ Book added for ${viewingLabel}.`);
+      setMessageType("success");
+      setShowAddModal(false);
+    } finally {
+      setAdding(false);
     }
-
-    const { error: ubErr } = await supabase.from("user_books").insert([
-      {
-        user_id: viewingUserId,
-        book_id: createdBook.id,
-        started_at: null,
-        finished_at: null,
-      },
-    ]);
-
-    if (ubErr) {
-      console.error("addBook -> user_books insert error", ubErr);
-      setMessage(`Book added, but failed to create user_books row: ${ubErr.message}`);
-      setMessageType("error");
-      return;
-    }
-
-    setTitle("");
-    setAuthor("");
-    setTranslator("");
-    setIllustrator("");
-    setCoverUrl("");
-
-    await fetchBooks(viewingUserId);
-
-    setMessage(`✅ Book added for ${viewingLabel}.`);
-    setMessageType("success");
-
-    // ✅ close modal after success
-    setShowAddModal(false);
   }
 
   async function saveStartedDate(userBookId: string) {
@@ -325,7 +423,7 @@ export default function BooksPage() {
     const { error } = await supabase.from("user_books").update({ started_at: startDate }).eq("id", userBookId);
 
     if (error) {
-      console.error("Error saving started date:", error);
+      logSbError("Error saving started date:", error);
       setMessage("Error saving start date.");
       setMessageType("error");
       return;
@@ -342,7 +440,7 @@ export default function BooksPage() {
     const { error } = await supabase.from("user_books").update({ finished_at: finishDate }).eq("id", userBookId);
 
     if (error) {
-      console.error("Error saving finished date:", error);
+      logSbError("Error saving finish date:", error);
       setMessage("Error saving finish date.");
       setMessageType("error");
       return;
@@ -353,9 +451,7 @@ export default function BooksPage() {
     fetchBooks(viewingUserId);
   }
 
-  // ----------------------------
-  // ✅ Sections
-  // ----------------------------
+  // Sections
   const validRows = rows.filter((r) => !!r.books);
 
   const currentlyReading = validRows.filter((r) => !!r.started_at && !r.finished_at);
@@ -403,6 +499,7 @@ export default function BooksPage() {
       >
         <a href={`/books/${row.id}`} onClick={(e) => e.stopPropagation()} className="block">
           {book.cover_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={book.cover_url} alt={`${book.title} cover`} className="w-32 h-48 object-cover rounded-md shadow-md" />
           ) : (
             <div className="w-32 h-48 bg-gray-200 rounded-md mb-2 flex items-center justify-center text-gray-400 text-sm">
@@ -412,10 +509,10 @@ export default function BooksPage() {
         </a>
 
         <a
-  href={`/books/${row.id}`}
-  onClick={(e) => e.stopPropagation()}
-  className="text-center font-medium text-sm underline hover:text-blue-700 mt-2"
->
+          href={`/books/${row.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="text-center font-medium text-sm underline hover:text-blue-700 mt-2"
+        >
           {book.title}
         </a>
 
@@ -595,7 +692,7 @@ export default function BooksPage() {
           ))}
         </select>
 
-        <p className="text-xs text-gray-500">You can add books for the selected student (student-owned).</p>
+        <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
       </div>
 
       {message ? (
@@ -616,7 +713,7 @@ export default function BooksPage() {
         className="fixed bottom-6 right-6 z-40 rounded-full bg-blue-600 text-white px-5 py-3 shadow-lg hover:bg-blue-700"
         title={`Add a book for: ${viewingLabel}`}
       >
-        + Add Book
+        + Add Book (Not Working)
       </button>
 
       {showAddModal ? (
@@ -639,6 +736,15 @@ export default function BooksPage() {
             </div>
 
             <form onSubmit={addBook} className="flex flex-col gap-3">
+              {/* ✅ ISBN first */}
+              <input
+                type="text"
+                placeholder="ISBN-13 (recommended, digits only)"
+                value={isbn13}
+                onChange={(e) => setIsbn13(e.target.value)}
+                className="border p-2 rounded"
+              />
+
               <input
                 type="text"
                 placeholder="Book title"
@@ -647,6 +753,7 @@ export default function BooksPage() {
                 className="border p-2 rounded"
                 required
               />
+
               <input
                 type="text"
                 placeholder="Author (optional)"
@@ -654,6 +761,15 @@ export default function BooksPage() {
                 onChange={(e) => setAuthor(e.target.value)}
                 className="border p-2 rounded"
               />
+
+              <input
+                type="text"
+                placeholder="Publisher (optional)"
+                value={publisher}
+                onChange={(e) => setPublisher(e.target.value)}
+                className="border p-2 rounded"
+              />
+
               <input
                 type="text"
                 placeholder="Translator (optional)"
@@ -661,6 +777,7 @@ export default function BooksPage() {
                 onChange={(e) => setTranslator(e.target.value)}
                 className="border p-2 rounded"
               />
+
               <input
                 type="text"
                 placeholder="Illustrator (optional)"
@@ -668,6 +785,7 @@ export default function BooksPage() {
                 onChange={(e) => setIllustrator(e.target.value)}
                 className="border p-2 rounded"
               />
+
               <input
                 type="text"
                 placeholder="Cover image URL (optional)"
@@ -676,8 +794,12 @@ export default function BooksPage() {
                 className="border p-2 rounded"
               />
 
-              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                Add
+              <button
+                type="submit"
+                disabled={adding}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {adding ? "Adding..." : "Add"}
               </button>
 
               <button

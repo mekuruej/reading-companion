@@ -1042,7 +1042,7 @@ function PersonRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="w-12 h-12 rounded-full border overflow-hidden bg-gray-100 shrink-0 mt-0.5">
+      <div className="w-20 h-20 rounded-full border overflow-hidden bg-gray-100 shrink-0 mt-0.5">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={img} alt={`${label} photo`} className="w-full h-full object-cover" />
