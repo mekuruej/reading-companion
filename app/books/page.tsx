@@ -67,9 +67,16 @@ function UserBar() {
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    console.error("Logout error:", error);
+    return;
+  }
+
+  router.replace("/login");
+  router.refresh();
+};
 
   if (!label) return null;
 
