@@ -17,15 +17,15 @@ type Book = {
 };
 
 type UserBookRow = {
-  id: string; // user_books.id (aka userBookId)
+  id: string;
   book_id: string;
   started_at: string | null;
   finished_at: string | null;
-  books: Book | null; // joined book
+  books: Book | null;
 };
 
 type StudentOption = {
-  id: string; // profile/user id
+  id: string;
   display_name: string;
   level?: string | null;
 };
@@ -89,7 +89,6 @@ export default function BooksPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [adding, setAdding] = useState(false);
 
-  // form fields
   const [isbn13, setIsbn13] = useState("");
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -129,6 +128,16 @@ export default function BooksPage() {
 
   function logSbError(prefix: string, err: any) {
     console.error(prefix, err?.message, err?.details, err?.hint, err?.code, err);
+  }
+
+  function resetAddForm() {
+    setIsbn13("");
+    setTitle("");
+    setAuthor("");
+    setPublisher("");
+    setTranslator("");
+    setIllustrator("");
+    setCoverUrl("");
   }
 
   async function fetchBooks(userIdToView: string) {
@@ -181,7 +190,6 @@ export default function BooksPage() {
     setRows((data as any) || []);
   }
 
-  // Load auth + students list
   useEffect(() => {
     let cancelled = false;
 
@@ -254,12 +262,43 @@ export default function BooksPage() {
     };
   }, []);
 
-  // Fetch books whenever viewingUserId changes
   useEffect(() => {
     if (!viewingUserId) return;
     fetchBooks(viewingUserId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingUserId]);
+
+  async function findExistingBookId(cleanIsbn13: string, bookKey: string) {
+    if (cleanIsbn13) {
+      const { data, error } = await supabase
+        .from("books")
+        .select("id")
+        .eq("isbn13", cleanIsbn13)
+        .limit(1);
+
+      if (error) {
+        logSbError("Find by isbn13 error:", error);
+        throw new Error(`Error searching books by ISBN: ${error.message}`);
+      }
+
+      const first = (data ?? [])[0] as { id: string } | undefined;
+      if (first?.id) return first.id;
+    }
+
+    const { data, error } = await supabase
+      .from("books")
+      .select("id")
+      .eq("book_key", bookKey)
+      .limit(1);
+
+    if (error) {
+      logSbError("Find by book_key error:", error);
+      throw new Error(`Error searching books by key: ${error.message}`);
+    }
+
+    const first = (data ?? [])[0] as { id: string } | undefined;
+    return first?.id ?? null;
+  }
 
   async function addBook(e: React.FormEvent) {
     e.preventDefault();
@@ -294,94 +333,81 @@ export default function BooksPage() {
       }
 
       const cleanIsbn13 = digitsOnly(isbn13);
-      const book_key = [normKey(title), normKey(author), normKey(publisher)].join("|");
+      const cleanTitle = title.trim();
+      const cleanAuthor = author.trim();
+      const cleanPublisher = publisher.trim();
+      const cleanTranslator = translator.trim();
+      const cleanIllustrator = illustrator.trim();
+      const cleanCoverUrl = coverUrl.trim();
 
-      let bookIdToUse: string | null = null;
+      const bookKey = [normKey(cleanTitle), normKey(cleanAuthor), normKey(cleanPublisher)].join("|");
 
-      // 1) Prefer ISBN-13 match if provided
-      if (cleanIsbn13) {
-        const { data: existingByIsbn, error: findErr } = await supabase
-          .from("books")
-          .select("id")
-          .eq("isbn13", cleanIsbn13)
-          .maybeSingle();
+      let bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
 
-        if (findErr) {
-          logSbError("Find by isbn13 error:", findErr);
-          setMessage(`Error searching books by ISBN: ${findErr?.message || "Unknown"}`);
-          setMessageType("error");
-          return;
-        }
-
-        bookIdToUse = (existingByIsbn as any)?.id ?? null;
-      }
-
-      // 2) Fallback: match by book_key
       if (!bookIdToUse) {
-        const { data: existingByKey, error: keyErr } = await supabase
-          .from("books")
-          .select("id")
-          .eq("book_key", book_key)
-          .maybeSingle();
-
-        if (keyErr) {
-          logSbError("Find by book_key error:", keyErr);
-          setMessage(`Error searching books by key: ${keyErr?.message || "Unknown"}`);
-          setMessageType("error");
-          return;
-        }
-
-        bookIdToUse = (existingByKey as any)?.id ?? null;
-      }
-
-      // 3) Insert if missing
-      if (!bookIdToUse) {
-        const baseInsert = {
-          title: title.trim(),
-          author: author.trim() || null,
-          translator: translator.trim() || null,
-          illustrator: illustrator.trim() || null,
-          publisher: publisher.trim() || null,
+        const insertPayload: any = {
+          title: cleanTitle,
+          author: cleanAuthor || null,
+          translator: cleanTranslator || null,
+          illustrator: cleanIllustrator || null,
+          publisher: cleanPublisher || null,
           isbn13: cleanIsbn13 || null,
-          book_key,
-          cover_url: coverUrl.trim() || null,
+          book_key: bookKey,
+          cover_url: cleanCoverUrl || null,
         };
 
-        // shared insert first
+        let insertError: any = null;
+
         const { data: createdA, error: errA } = await supabase
           .from("books")
-          .insert([baseInsert])
+          .insert([insertPayload])
           .select("id")
-          .maybeSingle();
+          .limit(1);
 
         if (errA) {
-          // fallback insert with user_id (compat with current RLS)
-          const { data: createdB, error: errB } = await supabase
-            .from("books")
-            .insert([{ ...baseInsert, user_id: user.id } as any])
-            .select("id")
-            .maybeSingle();
-
-          if (errB) {
-            logSbError("books insert error:", errB);
-            setMessage(`Error adding book: ${errB?.message || errA?.message || "Unknown"}`);
-            setMessageType("error");
-            return;
-          }
-
-          bookIdToUse = (createdB as any)?.id ?? null;
+          insertError = errA;
         } else {
-          bookIdToUse = (createdA as any)?.id ?? null;
+          const first = (createdA ?? [])[0] as { id: string } | undefined;
+          bookIdToUse = first?.id ?? null;
         }
 
         if (!bookIdToUse) {
-          setMessage("Error adding book: insert returned no id.");
+          bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
+        }
+
+        if (!bookIdToUse) {
+          logSbError("books insert error:", insertError);
+          setMessage(`Error adding book: ${insertError?.message || "Could not create or find book."}`);
           setMessageType("error");
           return;
         }
       }
 
-      // 4) Create user_books assignment
+      const { data: existingAssignment, error: existingErr } = await supabase
+        .from("user_books")
+        .select("id")
+        .eq("user_id", viewingUserId)
+        .eq("book_id", bookIdToUse)
+        .limit(1);
+
+      if (existingErr) {
+        logSbError("user_books existing check error:", existingErr);
+        setMessage(`Could not check existing assignment: ${existingErr.message}`);
+        setMessageType("error");
+        return;
+      }
+
+      const alreadyAssigned = !!(existingAssignment && existingAssignment.length > 0);
+
+      if (alreadyAssigned) {
+        await fetchBooks(viewingUserId);
+        resetAddForm();
+        setShowAddModal(false);
+        setMessage(`That book is already on ${viewingLabel}'s shelf.`);
+        setMessageType("success");
+        return;
+      }
+
       const { error: ubErr } = await supabase.from("user_books").insert([
         {
           user_id: viewingUserId,
@@ -393,25 +419,21 @@ export default function BooksPage() {
 
       if (ubErr) {
         logSbError("user_books insert error:", ubErr);
-        setMessage(`Book added, but failed to assign: ${ubErr?.message || "Unknown"}`);
+        setMessage(`Book found, but failed to assign: ${ubErr.message || "Unknown error"}`);
         setMessageType("error");
         return;
       }
 
-      // Reset form
-      setIsbn13("");
-      setTitle("");
-      setAuthor("");
-      setPublisher("");
-      setTranslator("");
-      setIllustrator("");
-      setCoverUrl("");
-
+      resetAddForm();
       await fetchBooks(viewingUserId);
 
       setMessage(`✅ Book added for ${viewingLabel}.`);
       setMessageType("success");
       setShowAddModal(false);
+    } catch (e: any) {
+      logSbError("addBook unexpected error:", e);
+      setMessage(e?.message || "Something went wrong while adding the book.");
+      setMessageType("error");
     } finally {
       setAdding(false);
     }
@@ -451,7 +473,6 @@ export default function BooksPage() {
     fetchBooks(viewingUserId);
   }
 
-  // Sections
   const validRows = rows.filter((r) => !!r.books);
 
   const currentlyReading = validRows.filter((r) => !!r.started_at && !r.finished_at);
@@ -499,7 +520,6 @@ export default function BooksPage() {
       >
         <a href={`/books/${row.id}`} onClick={(e) => e.stopPropagation()} className="block">
           {book.cover_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={book.cover_url} alt={`${book.title} cover`} className="w-32 h-48 object-cover rounded-md shadow-md" />
           ) : (
             <div className="w-32 h-48 bg-gray-200 rounded-md mb-2 flex items-center justify-center text-gray-400 text-sm">
@@ -709,11 +729,15 @@ export default function BooksPage() {
 
       <button
         type="button"
-        onClick={() => setShowAddModal(true)}
+        onClick={() => {
+          setMessage("");
+          setMessageType("");
+          setShowAddModal(true);
+        }}
         className="fixed bottom-6 right-6 z-40 rounded-full bg-blue-600 text-white px-5 py-3 shadow-lg hover:bg-blue-700"
         title={`Add a book for: ${viewingLabel}`}
       >
-        + Add Book (Not Working)
+        + Add Book
       </button>
 
       {showAddModal ? (
@@ -736,10 +760,9 @@ export default function BooksPage() {
             </div>
 
             <form onSubmit={addBook} className="flex flex-col gap-3">
-              {/* ✅ ISBN first */}
               <input
                 type="text"
-                placeholder="ISBN-13 (recommended, digits only)"
+                placeholder="ISBN-13 (recommended, digits only, no hyphen)"
                 value={isbn13}
                 onChange={(e) => setIsbn13(e.target.value)}
                 className="border p-2 rounded"

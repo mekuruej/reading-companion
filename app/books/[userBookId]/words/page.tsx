@@ -117,6 +117,7 @@ export default function BookWordsPage() {
   const [editSurface, setEditSurface] = useState("");
   const [editReading, setEditReading] = useState("");
   const [editMeaning, setEditMeaning] = useState("");
+  const [editJlpt, setEditJlpt] = useState("");
   const [editPage, setEditPage] = useState<string>("");
   const [editChapterNum, setEditChapterNum] = useState<string>("");
   const [editChapterName, setEditChapterName] = useState("");
@@ -132,6 +133,7 @@ export default function BookWordsPage() {
     setEditSurface(w.surface ?? "");
     setEditReading(w.reading ?? "");
     setEditMeaning(w.meaning ?? "");
+    setEditJlpt(w.jlpt ?? "");
 
     setEditPage(w.page_number != null ? String(w.page_number) : "");
     setEditChapterNum(w.chapter_number != null ? String(w.chapter_number) : "");
@@ -139,7 +141,7 @@ export default function BookWordsPage() {
 
     const choices = asStringArray((w as any).meaning_choices);
     const idxRaw = Number.isFinite(w.meaning_choice_index as any) ? (w.meaning_choice_index as number) : 0;
-    const idx = choices.length ? Math.max(0, Math.min(idxRaw, choices.length - 1)) : 0;
+    const idx = Math.max(0, choices.length ? Math.min(idxRaw, choices.length - 1) : idxRaw);
 
     setEditMeaningChoices(choices);
     setEditMeaningChoiceIndex(idx);
@@ -164,15 +166,17 @@ export default function BookWordsPage() {
   }
 
   function changeDefinition(newIndex: number) {
-    const choices = editMeaningChoices ?? [];
-    if (!choices.length) return;
+  const choices = editMeaningChoices ?? [];
+  const safe = Math.max(0, newIndex);
 
-    const safe = Math.max(0, Math.min(newIndex, choices.length - 1));
-    setEditMeaningChoiceIndex(safe);
+  setEditMeaningChoiceIndex(safe);
 
-    const chosen = choices[safe] ?? "";
-    if (chosen) setEditMeaning(chosen);
+  if (choices.length) {
+    const clamped = Math.min(safe, choices.length - 1);
+    const chosen = choices[clamped] ?? "";
+    setEditMeaning(chosen);
   }
+}
 
   async function saveEdit() {
     if (!editing) return;
@@ -189,13 +193,14 @@ export default function BookWordsPage() {
       surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
+      jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
       page_number: parseNullableInt(editPage),
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
+      meaning_choice_index: editMeaningChoiceIndex,
     };
 
     if (hasChoices) {
-      patch.meaning_choice_index = editMeaningChoiceIndex;
       const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
       if (chosen) patch.meaning = chosen;
     }
@@ -310,8 +315,7 @@ export default function BookWordsPage() {
         const list = rows ?? [];
         setWords(list);
 
-        // ✅ options: stable value, pretty label
-        const optMap = new Map<string, string>(); // value -> label
+        const optMap = new Map<string, string>();
         for (const w of list) {
           optMap.set(chapterKey(w), chapterDisplayParts(w).fallback);
         }
@@ -336,7 +340,6 @@ export default function BookWordsPage() {
     load();
   }, [userBookId]);
 
-  // ✅ Repeats map (same surface + same selected definition)
   const repeatCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const w of words) {
@@ -364,6 +367,7 @@ export default function BookWordsPage() {
         normalizeJlpt(w.jlpt),
         chLabel,
         w.page_number?.toString() ?? "",
+        w.meaning_choice_index != null ? String(w.meaning_choice_index + 1) : "",
       ]
         .join(" ")
         .toLowerCase();
@@ -404,7 +408,6 @@ export default function BookWordsPage() {
 
   return (
     <main className="max-w-6xl mx-auto p-6">
-      {/* Edit Modal */}
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border p-4">
@@ -433,39 +436,49 @@ export default function BookWordsPage() {
                 <input value={editReading} onChange={(e) => setEditReading(e.target.value)} className="border p-2 rounded" />
               </label>
 
-              {editMeaningChoices.length > 1 ? (
-                <div className="sm:col-span-2 border rounded p-3 bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-gray-600">
-                      Definition: <span className="font-medium">{editMeaningChoiceIndex + 1}</span>/{editMeaningChoices.length}
-                    </div>
+              <label className="flex flex-col gap-1">
+  <span className="text-xs text-gray-600">JLPT</span>
+  <select value={editJlpt} onChange={(e) => setEditJlpt(e.target.value)} className="border p-2 rounded bg-white">
+    <option value="">NON-JLPT</option>
+    <option value="N5">N5</option>
+    <option value="N4">N4</option>
+    <option value="N3">N3</option>
+    <option value="N2">N2</option>
+    <option value="N1">N1</option>
+  </select>
+</label>
 
-                    <select
-                      value={editMeaningChoiceIndex}
-                      onChange={(e) => changeDefinition(Number(e.target.value))}
-                      className="border p-1 rounded text-sm bg-white"
-                      title="Choose which dictionary definition to use"
-                    >
-                      {editMeaningChoices.map((_, i) => (
-                        <option key={i} value={i}>
-                          {i + 1}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <details className="mt-2 text-xs text-gray-600">
-                    <summary className="cursor-pointer select-none">Show all definitions</summary>
-                    <ol className="list-decimal ml-5 mt-2 space-y-1">
-                      {editMeaningChoices.map((m, i) => (
-                        <li key={i} className={i === editMeaningChoiceIndex ? "font-medium text-gray-900" : ""}>
-                          {m}
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                </div>
-              ) : null}
+<label className="flex flex-col gap-1">
+  <span className="text-xs text-gray-600">Definition #</span>
+  {editMeaningChoices.length > 1 ? (
+    <select
+      value={Math.min(editMeaningChoiceIndex, editMeaningChoices.length - 1)}
+      onChange={(e) => changeDefinition(Number(e.target.value))}
+      className="border p-2 rounded bg-white"
+    >
+      {editMeaningChoices.map((_, i) => (
+        <option key={i} value={i}>
+          {i + 1}
+        </option>
+      ))}
+    </select>
+  ) : (
+    <input
+      type="number"
+      min="1"
+      value={editMeaningChoiceIndex + 1}
+      onChange={(e) => {
+        const raw = Number(e.target.value);
+        if (!Number.isFinite(raw) || raw < 1) {
+          changeDefinition(0);
+        } else {
+          changeDefinition(raw - 1);
+        }
+      }}
+      className="border p-2 rounded"
+    />
+  )}
+</label>
 
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-600">Meaning</span>
@@ -517,12 +530,19 @@ export default function BookWordsPage() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)}
             className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
             + Add Vocab
+          </button>
+
+          <button
+            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+            className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm"
+          >
+            Book Info
           </button>
 
           <button
@@ -538,7 +558,7 @@ export default function BookWordsPage() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search (word/reading/meaning/page/chapter)…"
+          placeholder="Search (word/reading/meaning/def #/page/chapter)…"
           className="border p-2 rounded w-full"
         />
 
@@ -562,6 +582,7 @@ export default function BookWordsPage() {
               <th className="p-2 w-25">Word</th>
               <th className="p-2 w-25">Reading</th>
               <th className="p-2 w-60">Meaning</th>
+              <th className="p-2 w-10 text-center">Def #</th>
               <th className="p-2 w-30">Chapter</th>
               <th className="p-2 w-10">Page</th>
               <th className="p-2 w-20">JLPT</th>
@@ -580,6 +601,9 @@ export default function BookWordsPage() {
                   <td className="p-2 font-medium">{w.surface}</td>
                   <td className="p-2">{w.reading ?? "—"}</td>
                   <td className="p-2">{w.meaning ?? "—"}</td>
+                  <td className="p-2 text-center">
+                    {w.meaning_choice_index != null ? w.meaning_choice_index + 1 : "—"}
+                  </td>
 
                   <td className="p-2">
                     {(() => {
@@ -630,7 +654,7 @@ export default function BookWordsPage() {
 
             {filtered.length === 0 ? (
               <tr>
-                <td className="p-4 text-gray-500" colSpan={8}>
+                <td className="p-4 text-gray-500" colSpan={9}>
                   No words match your filters.
                 </td>
               </tr>

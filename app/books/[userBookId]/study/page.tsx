@@ -138,7 +138,6 @@ function normalizeRepeatKey(surface: string) {
   return (surface ?? "").trim();
 }
 
-// ✅ keep this outside the component so it’s always in scope
 const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1", "NON-JLPT"] as const;
 
 export default function BookFlashcardsPage() {
@@ -163,7 +162,6 @@ export default function BookFlashcardsPage() {
 
   const isTwoStep = steps.length === 2;
 
-  // Type mode (only for 2-step)
   const [typeMode, setTypeMode] = useState(false);
   const [answer, setAnswer] = useState("");
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
@@ -177,8 +175,7 @@ export default function BookFlashcardsPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ✅ JLPT multi
-  const [jlptSelected, setJlptSelected] = useState<string[]>([]); // [] means no filter
+  const [jlptSelected, setJlptSelected] = useState<string[]>([]);
   const [chapterFilter, setChapterFilter] = useState("all");
   const [repeatsOnly, setRepeatsOnly] = useState(false);
 
@@ -187,14 +184,12 @@ export default function BookFlashcardsPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
 
-  // Definition UI state
   const [defSaving, setDefSaving] = useState(false);
   const [defError, setDefError] = useState<string | null>(null);
   const [showDefPicker, setShowDefPicker] = useState(false);
 
   const typeModeEnabled = typeMode && isTwoStep;
 
-  // Load saved settings
   useEffect(() => {
     if (!userBookId) return;
     try {
@@ -212,7 +207,6 @@ export default function BookFlashcardsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsKey]);
 
-  // Save settings
   useEffect(() => {
     if (!userBookId) return;
     try {
@@ -249,7 +243,6 @@ export default function BookFlashcardsPage() {
     }
   }, [isTwoStep, typeMode]);
 
-  // Load words + book info
   useEffect(() => {
     if (!userBookId) return;
 
@@ -272,7 +265,6 @@ export default function BookFlashcardsPage() {
           return;
         }
 
-        // ✅ Teacher can view student decks (RLS should govern)
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")
           .select(
@@ -338,7 +330,7 @@ export default function BookFlashcardsPage() {
 
           const chosenMeaning = meaningChoices.length
             ? meaningChoices[safeIdx]
-            : (w.meaning ?? null);
+            : w.meaning ?? null;
 
           const repeatKey = normalizeRepeatKey(w.surface);
           const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;
@@ -403,12 +395,9 @@ export default function BookFlashcardsPage() {
     loadData();
   }, [userBookId]);
 
-  // Apply filters
   useEffect(() => {
     let result = [...cards];
 
-    // ✅ if none selected => no JLPT filtering
-    // ✅ if ALL selected => no JLPT filtering
     const isAllSelected = jlptSelected.length === JLPT_LEVELS.length;
     if (jlptSelected.length > 0 && !isAllSelected) {
       result = result.filter((c) => jlptSelected.includes(c.jlpt));
@@ -431,7 +420,6 @@ export default function BookFlashcardsPage() {
     setShowDefPicker(false);
   }, [cards, jlptSelected, chapterFilter, repeatsOnly]);
 
-  // Hide definition picker when changing cards
   useEffect(() => {
     setShowDefPicker(false);
     setDefError(null);
@@ -566,7 +554,6 @@ export default function BookFlashcardsPage() {
     }
   }
 
-  // Keyboard
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (typeModeEnabled) {
@@ -644,15 +631,25 @@ export default function BookFlashcardsPage() {
   }
 
   if (filteredCards.length === 0) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p>No words match your filters (or none have been added to this book yet).</p>
-        <button onClick={() => router.push(`/books`)} className="px-4 py-2 bg-gray-200 rounded">
-          Back to Books
+  return (
+    <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
+      <p>No words match your filters (or none have been added to this book yet).</p>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            setJlptSelected([]);
+            setChapterFilter("all");
+            setRepeatsOnly(false);
+          }}
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
+          Clear Filters
         </button>
-      </main>
-    );
-  }
+      </div>
+    </main>
+  );
+}
 
   const card = filteredCards[index];
 
@@ -702,9 +699,11 @@ export default function BookFlashcardsPage() {
   const defIdx = card.meaningChoiceIndex ?? 0;
   const showDefInfo = defTotal > 1;
 
+  const frontBookCount = card.repeatCount ?? 1;
+  const frontDefNumber = (card.meaningChoiceIndex ?? 0) + 1;
+
   return (
     <main className="min-h-screen flex flex-col items-center p-6">
-      {/* Header */}
       <div className="flex flex-col items-center mb-4">
         {bookCover ? <img src={bookCover} alt="" className="w-20 h-28 rounded mb-2" /> : null}
         <h1 className="text-xl font-semibold">{bookTitle} Flashcards</h1>
@@ -778,7 +777,6 @@ export default function BookFlashcardsPage() {
         ) : null}
       </div>
 
-      {/* Controls */}
       <div className="flex flex-wrap justify-center gap-2 mb-4">
         <select
           value={studySet}
@@ -811,7 +809,6 @@ export default function BookFlashcardsPage() {
           Type mode
         </label>
 
-        {/* JLPT multi */}
         <div className="mt-2 px-2 py-2 border rounded bg-white">
           <div className="text-xs text-gray-500 mb-1">JLPT (multi)</div>
 
@@ -887,10 +884,10 @@ export default function BookFlashcardsPage() {
         </p>
       )}
 
-      {/* Card */}
       <div
         onClick={flip}
         className="
+          relative
           w-[90vw] max-w-xl
           min-h-72 bg-white rounded-2xl
           border border-slate-500
@@ -900,6 +897,14 @@ export default function BookFlashcardsPage() {
           p-8
         "
       >
+        <div className="absolute top-3 right-4 text-[11px] text-slate-500">
+          Book Count {frontBookCount} • Total Count ***
+        </div>
+
+        <div className="absolute bottom-3 right-4 text-[11px] text-slate-500">
+          Def #{frontDefNumber}
+        </div>
+
         <div className="w-full flex flex-col items-center justify-center gap-6">
           {typeModeEnabled ? (
             <>
@@ -974,9 +979,11 @@ export default function BookFlashcardsPage() {
                           <div className="text-base font-medium">{card.meaning || "—"}</div>
                         </div>
 
-                        {card.repeatCount >= 2 ? (
-                          <div className="text-xs text-slate-500">Repeats in this book: {card.repeatCount}</div>
-                        ) : null}
+                        <div className="text-xs text-slate-500">
+                          Book Count: {frontBookCount} • Total Count: ***
+                        </div>
+
+                        <div className="text-xs text-slate-500">Def #{frontDefNumber}</div>
                       </div>
                     </div>
 
@@ -1005,7 +1012,6 @@ export default function BookFlashcardsPage() {
         </div>
       </div>
 
-      {/* Nav */}
       <div className="flex gap-10 mt-6">
         <button onClick={typeModeEnabled ? goToPrevWord : prevCardReveal} className="px-4 py-2 bg-gray-200 rounded">
           ← Review
@@ -1015,7 +1021,6 @@ export default function BookFlashcardsPage() {
         </button>
       </div>
 
-      {/* Back */}
       <div className="mt-6">
         <button onClick={() => router.push(`/books`)} className="text-sm text-slate-600 hover:underline">
           ← Back to Books
