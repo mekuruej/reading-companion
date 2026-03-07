@@ -67,16 +67,16 @@ function UserBar() {
   }, []);
 
   const handleLogout = async () => {
-  const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
 
-  if (error) {
-    console.error("Logout error:", error);
-    return;
-  }
+    if (error) {
+      console.error("Logout error:", error);
+      return;
+    }
 
-  router.replace("/login");
-  router.refresh();
-};
+    router.replace("/login");
+    router.refresh();
+  };
 
   if (!label) return null;
 
@@ -298,181 +298,148 @@ export default function BooksPage() {
       .eq("book_key", bookKey)
       .limit(1);
 
-    if (error) {
-      logSbError("Find by book_key error:", error);
-      throw new Error(`Error searching books by key: ${error.message}`);
-    }
+      if (error) {
+        logSbError("Find by book_key error:", error);
+        throw new Error(`Error searching books by key: ${error.message}`);
+      }
 
     const first = (data ?? [])[0] as { id: string } | undefined;
     return first?.id ?? null;
   }
 
   async function addBook(e: React.FormEvent) {
-  e.preventDefault();
-  if (adding) return;
+    e.preventDefault();
+    if (adding) return;
 
-  setAdding(true);
-  setMessage("Starting add...");
-  setMessageType("success");
+    setAdding(true);
+    setMessage("");
+    setMessageType("");
 
-  try {
-    console.log("STEP 1: getUser");
-    const {
-  data: { session },
-} = await supabase.auth.getSession();
+    try {
+      if (!meId) {
+        setMessage("Please sign in before adding a book.");
+        setMessageType("error");
+        return;
+      }
 
-const user = session?.user;
+      if (!viewingUserId) {
+        setMessage("Select a student (or Me) first.");
+        setMessageType("error");
+        return;
+      }
 
-if (!user) {
-  setMessage("Please sign in before adding a book.");
-  setMessageType("error");
-  return;
-}
+      if (!title.trim()) {
+        setMessage("Title is required.");
+        setMessageType("error");
+        return;
+      }
 
-    console.log("STEP 2: basic validation", { viewingUserId, userId: user.id });
+      const cleanIsbn13 = digitsOnly(isbn13);
+      const cleanTitle = title.trim();
+      const cleanAuthor = author.trim();
+      const cleanPublisher = publisher.trim();
+      const cleanTranslator = translator.trim();
+      const cleanIllustrator = illustrator.trim();
+      const cleanCoverUrl = coverUrl.trim();
 
-    if (!viewingUserId) {
-      setMessage("Select a student (or Me) first.");
-      setMessageType("error");
-      return;
-    }
+      const bookKey = [normKey(cleanTitle), normKey(cleanAuthor), normKey(cleanPublisher)].join("|");
 
-    if (!title.trim()) {
-      setMessage("Title is required.");
-      setMessageType("error");
-      return;
-    }
+      let bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
 
-    const cleanIsbn13 = digitsOnly(isbn13);
-    const cleanTitle = title.trim();
-    const cleanAuthor = author.trim();
-    const cleanPublisher = publisher.trim();
-    const cleanTranslator = translator.trim();
-    const cleanIllustrator = illustrator.trim();
-    const cleanCoverUrl = coverUrl.trim();
+      if (!bookIdToUse) {
+        const insertPayload: any = {
+          title: cleanTitle,
+          author: cleanAuthor || null,
+          translator: cleanTranslator || null,
+          illustrator: cleanIllustrator || null,
+          publisher: cleanPublisher || null,
+          isbn13: cleanIsbn13 || null,
+          book_key: bookKey,
+          cover_url: cleanCoverUrl || null,
+        };
 
-    const bookKey = [normKey(cleanTitle), normKey(cleanAuthor), normKey(cleanPublisher)].join("|");
+        let insertError: any = null;
 
-    console.log("STEP 3: find existing book");
-    setMessage("Checking existing books...");
-    let bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
-    console.log("STEP 3 result:", bookIdToUse);
+        const { data: createdA, error: errA } = await supabase
+          .from("books")
+          .insert([insertPayload])
+          .select("id")
+          .limit(1);
 
-    if (!bookIdToUse) {
-      console.log("STEP 4: insert into books");
-      setMessage("Creating shared book record...");
+        if (errA) {
+          insertError = errA;
+        } else {
+          const first = (createdA ?? [])[0] as { id: string } | undefined;
+          bookIdToUse = first?.id ?? null;
+        }
 
-      const insertPayload: any = {
-        title: cleanTitle,
-        author: cleanAuthor || null,
-        translator: cleanTranslator || null,
-        illustrator: cleanIllustrator || null,
-        publisher: cleanPublisher || null,
-        isbn13: cleanIsbn13 || null,
-        book_key: bookKey,
-        cover_url: cleanCoverUrl || null,
-      };
+        if (!bookIdToUse) {
+          bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
+        }
 
-      const { data: createdA, error: errA } = await supabase
-        .from("books")
-        .insert([insertPayload])
+        if (!bookIdToUse) {
+          logSbError("books insert error:", insertError);
+          setMessage(`Error adding book: ${insertError?.message || "Could not create or find book."}`);
+          setMessageType("error");
+          return;
+        }
+      }
+
+      const { data: existingAssignment, error: existingErr } = await supabase
+        .from("user_books")
         .select("id")
+        .eq("user_id", viewingUserId)
+        .eq("book_id", bookIdToUse)
         .limit(1);
 
-      console.log("STEP 4 result:", { createdA, errA });
-
-      if (errA) {
-        logSbError("books insert error:", errA);
-        setMessage(`Error creating book row: ${errA.message}`);
+      if (existingErr) {
+        logSbError("user_books existing check error:", existingErr);
+        setMessage(`Could not check existing assignment: ${existingErr.message}`);
         setMessageType("error");
         return;
       }
 
-      const first = (createdA ?? [])[0] as { id: string } | undefined;
-      bookIdToUse = first?.id ?? null;
+      const alreadyAssigned = !!(existingAssignment && existingAssignment.length > 0);
 
-      if (!bookIdToUse) {
-        console.log("STEP 5: re-find book after insert");
-        setMessage("Re-checking created book...");
-        bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
+      if (alreadyAssigned) {
+        await fetchBooks(viewingUserId);
+        resetAddForm();
+        setShowAddModal(false);
+        setMessage(`That book is already on ${viewingLabel}'s shelf.`);
+        setMessageType("success");
+        return;
       }
 
-      if (!bookIdToUse) {
-        setMessage("Book insert finished, but no book id was found.");
+      const { error: ubErr } = await supabase.from("user_books").insert([
+        {
+          user_id: viewingUserId,
+          book_id: bookIdToUse,
+          started_at: null,
+          finished_at: null,
+        },
+      ]);
+
+      if (ubErr) {
+        logSbError("user_books insert error:", ubErr);
+        setMessage(`Book found, but failed to assign: ${ubErr.message || "Unknown error"}`);
         setMessageType("error");
         return;
       }
-    }
 
-    console.log("STEP 6: check existing user_books assignment", { bookIdToUse, viewingUserId });
-    setMessage("Checking shelf assignment...");
-
-    const { data: existingAssignment, error: existingErr } = await supabase
-      .from("user_books")
-      .select("id")
-      .eq("user_id", viewingUserId)
-      .eq("book_id", bookIdToUse)
-      .limit(1);
-
-    console.log("STEP 6 result:", { existingAssignment, existingErr });
-
-    if (existingErr) {
-      logSbError("user_books existing check error:", existingErr);
-      setMessage(`Could not check existing assignment: ${existingErr.message}`);
-      setMessageType("error");
-      return;
-    }
-
-    const alreadyAssigned = !!(existingAssignment && existingAssignment.length > 0);
-
-    if (alreadyAssigned) {
-      await fetchBooks(viewingUserId);
       resetAddForm();
-      setShowAddModal(false);
-      setMessage(`That book is already on ${viewingLabel}'s shelf.`);
+      await fetchBooks(viewingUserId);
+
+      setMessage(`✅ Book added for ${viewingLabel}.`);
       setMessageType("success");
-      return;
-    }
-
-    console.log("STEP 7: insert into user_books");
-    setMessage("Assigning book to shelf...");
-
-    const { error: ubErr } = await supabase.from("user_books").insert([
-      {
-        user_id: viewingUserId,
-        book_id: bookIdToUse,
-        started_at: null,
-        finished_at: null,
-      },
-    ]);
-
-    console.log("STEP 7 result:", { ubErr });
-
-    if (ubErr) {
-      logSbError("user_books insert error:", ubErr);
-      setMessage(`Book found, but failed to assign: ${ubErr.message || "Unknown error"}`);
+      setShowAddModal(false);
+    } catch (e: any) {
+      logSbError("addBook unexpected error:", e);
+      setMessage(e?.message || "Something went wrong while adding the book.");
       setMessageType("error");
-      return;
+    } finally {
+      setAdding(false);
     }
-
-    console.log("STEP 8: refresh books");
-    setMessage("Refreshing shelf...");
-
-    resetAddForm();
-    await fetchBooks(viewingUserId);
-
-    setMessage(`✅ Book added for ${viewingLabel}.`);
-    setMessageType("success");
-    setShowAddModal(false);
-  } catch (e: any) {
-    console.log("STEP X unexpected error:", e);
-    logSbError("addBook unexpected error:", e);
-    setMessage(e?.message || "Something went wrong while adding the book.");
-    setMessageType("error");
-  } finally {
-    setAdding(false);
   }
-}
 
   async function saveStartedDate(userBookId: string) {
     if (!startDate) return;
