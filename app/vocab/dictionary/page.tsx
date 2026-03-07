@@ -2,224 +2,132 @@
 
 import { useState } from "react";
 
-// -------------------------------------------------------------
-// Helpers
-// -------------------------------------------------------------
-function normalizeJlpt(val: string): string {
-  if (!val) return "NON-JLPT";
-  const v = val.toUpperCase();
+type DictionaryEntry = {
+  word: string;
+  reading: string;
+  meaning: string;
+  jlpt?: string | null;
+  isCommon?: boolean | null;
+};
 
-  if (v.includes("N5")) return "N5";
-  if (v.includes("N4")) return "N4";
-  if (v.includes("N3")) return "N3";
-  if (v.includes("N2")) return "N2";
-  if (v.includes("N1")) return "N1";
-
-  return "NON-JLPT";
-}
-
-function extractMeaningChoices(entry: any): string[] {
-  const senses = entry?.senses ?? [];
-  const choices: string[] = [];
-
-  for (const s of senses) {
-    const defs: string[] = s?.english_definitions ?? [];
-    const text = defs.join(", ").trim();
-    if (text) choices.push(text);
-  }
-
-  // Deduplicate while preserving order
-  const seen = new Set<string>();
-  return choices.filter((c) => {
-    const key = c.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-// -------------------------------------------------------------
-// Page
-// -------------------------------------------------------------
-export default function DictionaryPage() {
+export default function JishoPage() {
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState<DictionaryEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [surface, setSurface] = useState("");
-  const [reading, setReading] = useState("");
-  const [jlpt, setJlpt] = useState("NON-JLPT");
-  const [isCommon, setIsCommon] = useState(false);
-
-  const [meaningChoices, setMeaningChoices] = useState<string[]>([]);
-  const [meaningChoiceIndex, setMeaningChoiceIndex] = useState(0);
-
-  async function lookup() {
+  async function runSearch() {
     const q = query.trim();
     if (!q) return;
 
     setLoading(true);
-    setErr(null);
-
-    setSurface("");
-    setReading("");
-    setJlpt("NON-JLPT");
-    setIsCommon(false);
-    setMeaningChoices([]);
-    setMeaningChoiceIndex(0);
+    setErrorMsg(null);
+    setResults([]);
 
     try {
       const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`);
-      if (!res.ok) throw new Error("Lookup failed");
 
-      const data = await res.json();
-      const entry = data?.data?.[0];
-
-      if (!entry) {
-        setErr("No results found.");
-        return;
+      if (!res.ok) {
+        throw new Error(`Search failed (${res.status})`);
       }
 
-      const s = entry.japanese?.[0]?.word || q;
-      const r = entry.japanese?.[0]?.reading || "";
-      const j = normalizeJlpt(entry.jlpt?.[0] || "");
-      const c = !!entry.is_common;
+      const json = await res.json();
+      const data = Array.isArray(json?.data) ? json.data : [];
 
-      const choices = extractMeaningChoices(entry);
+      const mapped: DictionaryEntry[] = data.map((item: any) => {
+        const japanese0 = item?.japanese?.[0] ?? {};
+        const senses = Array.isArray(item?.senses) ? item.senses : [];
 
-      setSurface(s);
-      setReading(r);
-      setJlpt(j);
-      setIsCommon(c);
-      setMeaningChoices(choices);
-      setMeaningChoiceIndex(0);
+        const word = japanese0.word ?? japanese0.reading ?? "";
+        const reading = japanese0.reading ?? "";
+        const meaning = senses
+          .flatMap((s: any) => s.english_definitions ?? [])
+          .filter(Boolean)
+          .join("; ");
+
+        const jlptArr = Array.isArray(item?.jlpt) ? item.jlpt : [];
+        const jlpt =
+          jlptArr.length > 0
+            ? String(jlptArr[0]).toUpperCase().replace("JLPT-", "")
+            : null;
+
+        return {
+          word,
+          reading,
+          meaning: meaning || "—",
+          jlpt,
+          isCommon: item?.is_common ?? false,
+        };
+      });
+
+      setResults(mapped);
+
+      if (mapped.length === 0) {
+        setErrorMsg("No results found.");
+      }
     } catch (e: any) {
-      setErr(e?.message ?? "Lookup failed");
+      console.error(e);
+      setErrorMsg(e?.message ?? "Could not search dictionary.");
+      setResults([]);
     } finally {
       setLoading(false);
     }
   }
 
-  // Always display the first meaning as the “default” (non-movable)
-  const defaultMeaning = meaningChoices[0] ?? "";
-  const hasMultipleMeanings = meaningChoices.length > 1;
-
   return (
-    <main className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-2">📘 Dictionary Lookup</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Look up a word to check reading / meanings. This page does not save anywhere.
-      </p>
+    <main className="min-h-screen p-6 max-w-5xl mx-auto">
+      <h1 className="text-2xl font-semibold mb-4">Dictionary</h1>
 
-      <div className="flex gap-2 mb-3">
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <input
+          type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              lookup();
-            }
+            if (e.key === "Enter") runSearch();
           }}
-          placeholder="Type a word… (例: 生意気)"
-          className="border p-2 rounded w-full"
+          placeholder="Search Japanese word..."
+          className="flex-1 border rounded px-3 py-2 bg-white"
         />
+
         <button
-          onClick={lookup}
-          disabled={loading || !query.trim()}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
+          type="button"
+          onClick={runSearch}
+          disabled={loading}
+          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? "..." : "Lookup"}
+          {loading ? "Searching..." : "Search"}
         </button>
       </div>
 
-      {err ? <p className="text-sm text-red-700 mb-3">{err}</p> : null}
+      {errorMsg ? <p className="text-sm text-red-600 mb-3">{errorMsg}</p> : null}
 
-      {surface || reading || meaningChoices.length ? (
-        <div className="border rounded bg-white p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-xl font-semibold">{surface || query}</div>
-              {reading ? <div className="text-sm text-gray-600">{reading}</div> : null}
+      <div className="space-y-3">
+        {results.map((entry, idx) => (
+          <div
+            key={`${entry.word}-${entry.reading}-${idx}`}
+            className="border rounded-lg p-4 bg-white"
+          >
+            <div className="text-xl font-semibold">{entry.word || "—"}</div>
+            <div className="text-sm text-gray-600">{entry.reading || "—"}</div>
+            <div className="mt-2 text-sm text-gray-800">{entry.meaning || "—"}</div>
 
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{jlpt}</span>
-                <span
-                  className={`px-2 py-1 rounded-full border ${
-                    isCommon
-                      ? "bg-green-100 text-green-700 border-green-300"
-                      : "bg-gray-100 text-gray-700 border-gray-300"
-                  }`}
-                >
-                  {isCommon ? "Common" : "Rare"}
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {entry.jlpt ? (
+                <span className="px-2 py-1 rounded bg-gray-100 border">
+                  {entry.jlpt}
                 </span>
-              </div>
-            </div>
+              ) : null}
 
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                setErr(null);
-                setSurface("");
-                setReading("");
-                setJlpt("NON-JLPT");
-                setIsCommon(false);
-                setMeaningChoices([]);
-                setMeaningChoiceIndex(0);
-              }}
-              className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-            >
-              Clear
-            </button>
-          </div>
-
-          {meaningChoices.length ? (
-            <div className="mt-4">
-              <div className="text-sm font-medium mb-2">Meaning</div>
-
-              {/* ✅ Default meaning is always the first meaning and is not changeable */}
-              <div className="p-3 rounded bg-gray-50 border text-sm">{defaultMeaning}</div>
-
-              {/* ✅ Dropdown is only for browsing other meanings */}
-              {hasMultipleMeanings ? (
-                <details className="mt-3 text-sm text-gray-600">
-                  <summary className="cursor-pointer select-none">Show other meanings</summary>
-
-                  <div className="mt-2 flex items-center justify-between">
-                    <div className="text-xs text-gray-500">Browse meanings</div>
-                    <div className="text-xs text-gray-500">
-                      {meaningChoiceIndex + 1}/{meaningChoices.length}
-                    </div>
-                  </div>
-
-                  <select
-                    value={meaningChoiceIndex}
-                    onChange={(e) => setMeaningChoiceIndex(Number(e.target.value))}
-                    className="border p-2 rounded w-full mt-2 bg-white text-sm"
-                  >
-                    {meaningChoices.map((m, i) => (
-                      <option key={i} value={i}>
-                        {i + 1}: {m}
-                      </option>
-                    ))}
-                  </select>
-
-                  <ol className="list-decimal ml-5 mt-3 space-y-1">
-                    {meaningChoices.map((m, i) => (
-                      <li key={i} className="text-gray-700">
-                        {m}
-                      </li>
-                    ))}
-                  </ol>
-                </details>
+              {entry.isCommon ? (
+                <span className="px-2 py-1 rounded bg-green-50 border text-green-700">
+                  Common
+                </span>
               ) : null}
             </div>
-          ) : (
-            <p className="mt-4 text-sm text-gray-600">No meanings returned for this entry.</p>
-          )}
-        </div>
-      ) : null}
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

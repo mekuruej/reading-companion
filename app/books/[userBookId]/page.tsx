@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient"; // <-- swap to ../../lib/supabaseClient if needed
+import { supabase } from "@/lib/supabaseClient";
 
 type Book = {
   id: string;
@@ -12,7 +12,6 @@ type Book = {
   illustrator: string | null;
   cover_url: string | null;
 
-  // metadata
   genre: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
@@ -20,36 +19,32 @@ type Book = {
   isbn13: string | null;
   publisher: string | null;
 
-  // people photos / logos
   author_image_url: string | null;
   translator_image_url: string | null;
   illustrator_image_url: string | null;
   publisher_image_url: string | null;
 
-  // people readings
   author_reading: string | null;
   translator_reading: string | null;
   illustrator_reading: string | null;
   publisher_reading: string | null;
 
-  // jsonb array of links
   related_links: any | null;
 };
 
 type UserBook = {
-  id: string; // user_books.id = userBookId
+  id: string;
   book_id: string;
   started_at: string | null;
   finished_at: string | null;
   notes: string | null;
   my_review: string | null;
 
-  // ratings + level snapshot
-  rating_overall: number | null; // 1-10
-  rating_recommend: number | null; // 1-10
-  rating_difficulty: number | null; // 1 hardest -> 10 easiest
-  reader_level: string | null; // N5/N4/N3/N2/N1
-  recommended_level: string | null; // N5/N4/N3/N2/N1
+  rating_overall: number | null;
+  rating_recommend: number | null;
+  rating_difficulty: number | null;
+  reader_level: string | null;
+  recommended_level: string | null;
 
   books: Book | null;
 };
@@ -148,10 +143,8 @@ export default function BookInfoPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // unique lookup count
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
 
-  // Drafts (user_books)
   const [startedAt, setStartedAt] = useState<string>("");
   const [finishedAt, setFinishedAt] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
@@ -159,17 +152,21 @@ export default function BookInfoPage() {
 
   const [ratingOverall, setRatingOverall] = useState<string>("");
   const [ratingRecommend, setRatingRecommend] = useState<string>("");
-  const [ratingDifficulty, setRatingDifficulty] = useState<string>(""); // 1 hardest, 10 easiest
+  const [ratingDifficulty, setRatingDifficulty] = useState<string>("");
   const [readerLevel, setReaderLevel] = useState<string>("");
   const [recommendedLevel, setRecommendedLevel] = useState<string>("");
 
-  // Drafts (books)
   const [genre, setGenre] = useState<string>("");
   const [triggerWarnings, setTriggerWarnings] = useState<string>("");
   const [pageCount, setPageCount] = useState<string>("");
   const [isbn, setIsbn] = useState<string>("");
   const [isbn13, setIsbn13] = useState<string>("");
-  const [publisher, setPublisher] = useState<string>("");
+
+  const [authorName, setAuthorName] = useState<string>("");
+  const [translatorName, setTranslatorName] = useState<string>("");
+  const [illustratorName, setIllustratorName] = useState<string>("");
+  const [publisherName, setPublisherName] = useState<string>("");
+
   const [publisherReading, setPublisherReading] = useState<string>("");
 
   const [coverUrl, setCoverUrl] = useState<string>("");
@@ -210,7 +207,6 @@ export default function BookInfoPage() {
 
     const rows = (data ?? []) as LookupRow[];
 
-    // Deduplicate by same word + same definition
     const set = new Set<string>();
     for (const r of rows) {
       const surface = (r.surface ?? "").trim();
@@ -281,7 +277,6 @@ export default function BookInfoPage() {
     const r = data as unknown as UserBook;
     setRow(r);
 
-    // Seed drafts from db
     setStartedAt(r.started_at ? formatYmd(new Date(r.started_at)) : "");
     setFinishedAt(r.finished_at ? formatYmd(new Date(r.finished_at)) : "");
     setNotes(r.notes ?? "");
@@ -298,7 +293,11 @@ export default function BookInfoPage() {
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
-    setPublisher(b?.publisher ?? "");
+
+    setAuthorName(b?.author ?? "");
+    setTranslatorName(b?.translator ?? "");
+    setIllustratorName(b?.illustrator ?? "");
+    setPublisherName(b?.publisher ?? "");
     setPublisherReading(b?.publisher_reading ?? "");
 
     setCoverUrl(b?.cover_url ?? "");
@@ -344,7 +343,11 @@ export default function BookInfoPage() {
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
-    setPublisher(b?.publisher ?? "");
+
+    setAuthorName(b?.author ?? "");
+    setTranslatorName(b?.translator ?? "");
+    setIllustratorName(b?.illustrator ?? "");
+    setPublisherName(b?.publisher ?? "");
     setPublisherReading(b?.publisher_reading ?? "");
 
     setCoverUrl(b?.cover_url ?? "");
@@ -366,15 +369,12 @@ export default function BookInfoPage() {
     setSaving(true);
     setError(null);
 
-    // Normalize dates
     const started_at = startedAt.trim() ? startedAt.trim() : null;
     const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
 
-    // Normalize page count
     const pc = pageCount.trim() ? Number(pageCount.trim()) : null;
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
 
-    // Normalize ratings (1-10 only)
     const ro = ratingOverall.trim() ? clampRating(Number(ratingOverall.trim())) : null;
     const rr = ratingRecommend.trim() ? clampRating(Number(ratingRecommend.trim())) : null;
     const rd = ratingDifficulty.trim() ? clampRating(Number(ratingDifficulty.trim())) : null;
@@ -399,12 +399,16 @@ export default function BookInfoPage() {
     const booksUpdate = supabase
       .from("books")
       .update({
+        author: authorName || null,
+        translator: translatorName || null,
+        illustrator: illustratorName || null,
+        publisher: publisherName || null,
+
         genre: genre || null,
         trigger_warnings: triggerWarnings || null,
         page_count,
         isbn: isbn || null,
         isbn13: isbn13 || null,
-        publisher: publisher || null,
         publisher_reading: publisherReading || null,
         publisher_image_url: publisherImg || null,
         related_links,
@@ -422,11 +426,16 @@ export default function BookInfoPage() {
 
     const [uRes, bRes] = await Promise.all([userBooksUpdate, booksUpdate]);
 
-    if (uRes.error || bRes.error) {
-      setError(uRes.error?.message || bRes.error?.message || "Save failed");
-      setSaving(false);
-      return;
-    }
+    console.log("user_books save error:", uRes.error);
+console.log("books save error:", bRes.error);
+
+if (uRes.error || bRes.error) {
+  setError(
+    `user_books: ${uRes.error?.message ?? "ok"} | books: ${bRes.error?.message ?? "ok"}`
+  );
+  setSaving(false);
+  return;
+}
 
     setEditing(false);
     setSaving(false);
@@ -460,7 +469,6 @@ export default function BookInfoPage() {
 
   return (
     <main className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold leading-tight">{book.title}</h1>
@@ -469,33 +477,25 @@ export default function BookInfoPage() {
             {book.author && (
               <div>
                 <span className="font-medium">Author:</span> {book.author}
-                {book.author_reading ? (
-                  <span className="text-gray-500">（{book.author_reading}）</span>
-                ) : null}
+                {book.author_reading ? <span className="text-gray-500">（{book.author_reading}）</span> : null}
               </div>
             )}
             {book.translator && (
               <div>
                 <span className="font-medium">Translator:</span> {book.translator}
-                {book.translator_reading ? (
-                  <span className="text-gray-500">（{book.translator_reading}）</span>
-                ) : null}
+                {book.translator_reading ? <span className="text-gray-500">（{book.translator_reading}）</span> : null}
               </div>
             )}
             {book.illustrator && (
               <div>
                 <span className="font-medium">Illustrator:</span> {book.illustrator}
-                {book.illustrator_reading ? (
-                  <span className="text-gray-500">（{book.illustrator_reading}）</span>
-                ) : null}
+                {book.illustrator_reading ? <span className="text-gray-500">（{book.illustrator_reading}）</span> : null}
               </div>
             )}
             {book.publisher && (
               <div>
                 <span className="font-medium">Publisher:</span> {book.publisher}
-                {book.publisher_reading ? (
-                  <span className="text-gray-500">（{book.publisher_reading}）</span>
-                ) : null}
+                {book.publisher_reading ? <span className="text-gray-500">（{book.publisher_reading}）</span> : null}
               </div>
             )}
           </div>
@@ -555,11 +555,8 @@ export default function BookInfoPage() {
 
       {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
 
-      {/* Main grid */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left column */}
         <div className="md:col-span-1 space-y-4">
-          {/* Cover */}
           <div className="rounded-lg border bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-medium">Cover</div>
@@ -574,7 +571,6 @@ export default function BookInfoPage() {
             </div>
 
             {(editing ? coverUrl : book.cover_url) ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={editing ? coverUrl : (book.cover_url ?? "")}
                 alt={`${book.title} cover`}
@@ -585,17 +581,18 @@ export default function BookInfoPage() {
             )}
           </div>
 
-          {/* People */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium mb-3">People</div>
 
             <div className="space-y-4">
               <PersonRow
                 label="Author"
-                name={book.author}
+                name={editing ? authorName : book.author}
                 reading={book.author_reading}
                 img={editing ? authorImg : book.author_image_url}
                 editing={editing}
+                nameValue={authorName}
+                setNameValue={setAuthorName}
                 imgValue={authorImg}
                 setImgValue={setAuthorImg}
                 readingValue={authorReading}
@@ -605,10 +602,12 @@ export default function BookInfoPage() {
               {(book.translator || book.translator_image_url || editing) && (
                 <PersonRow
                   label="Translator"
-                  name={book.translator}
+                  name={editing ? translatorName : book.translator}
                   reading={book.translator_reading}
                   img={editing ? translatorImg : book.translator_image_url}
                   editing={editing}
+                  nameValue={translatorName}
+                  setNameValue={setTranslatorName}
                   imgValue={translatorImg}
                   setImgValue={setTranslatorImg}
                   readingValue={translatorReading}
@@ -619,10 +618,12 @@ export default function BookInfoPage() {
               {(book.illustrator || book.illustrator_image_url || editing) && (
                 <PersonRow
                   label="Illustrator"
-                  name={book.illustrator}
+                  name={editing ? illustratorName : book.illustrator}
                   reading={book.illustrator_reading}
                   img={editing ? illustratorImg : book.illustrator_image_url}
                   editing={editing}
+                  nameValue={illustratorName}
+                  setNameValue={setIllustratorName}
                   imgValue={illustratorImg}
                   setImgValue={setIllustratorImg}
                   readingValue={illustratorReading}
@@ -633,10 +634,12 @@ export default function BookInfoPage() {
               {(book.publisher || book.publisher_image_url || editing) && (
                 <PersonRow
                   label="Publisher"
-                  name={book.publisher}
+                  name={editing ? publisherName : book.publisher}
                   reading={book.publisher_reading}
                   img={editing ? publisherImg : book.publisher_image_url}
                   editing={editing}
+                  nameValue={publisherName}
+                  setNameValue={setPublisherName}
                   imgValue={publisherImg}
                   setImgValue={setPublisherImg}
                   readingValue={publisherReading}
@@ -646,7 +649,6 @@ export default function BookInfoPage() {
             </div>
           </div>
 
-          {/* My Review */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium">My Review</div>
             {!editing ? (
@@ -664,9 +666,7 @@ export default function BookInfoPage() {
           </div>
         </div>
 
-        {/* Right column */}
         <div className="md:col-span-2 space-y-6">
-          {/* Reading */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium mb-3">Reading</div>
 
@@ -701,25 +701,24 @@ export default function BookInfoPage() {
             </div>
 
             {!editing && (
-  <div className="mt-3 text-sm flex flex-wrap items-center gap-x-6 gap-y-1">
-    {timeToRead && (
-      <div className="whitespace-nowrap">
-        <span className="text-gray-600">Time to read:</span>{" "}
-        <span className="font-medium">{timeToRead}</span>
-      </div>
-    )}
+              <div className="mt-3 text-sm flex flex-wrap items-center gap-x-6 gap-y-1">
+                {timeToRead && (
+                  <div className="whitespace-nowrap">
+                    <span className="text-gray-600">Time to read:</span>{" "}
+                    <span className="font-medium">{timeToRead}</span>
+                  </div>
+                )}
 
-    <div className="whitespace-nowrap">
-      <span className="text-gray-600">Words looked up (unique):</span>{" "}
-      <span className="font-medium">
-        {uniqueLookupCount == null ? "—" : uniqueLookupCount}
-      </span>
-    </div>
-  </div>
-)}
+                <div className="whitespace-nowrap">
+                  <span className="text-gray-600">Words looked up (unique):</span>{" "}
+                  <span className="font-medium">
+                    {uniqueLookupCount == null ? "—" : uniqueLookupCount}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Ratings */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium mb-3">Ratings</div>
 
@@ -793,7 +792,6 @@ export default function BookInfoPage() {
             </div>
           </div>
 
-          {/* Details */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium mb-3">Details</div>
 
@@ -849,7 +847,6 @@ export default function BookInfoPage() {
             </div>
           </div>
 
-          {/* Related Links */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium mb-3">Related Links</div>
 
@@ -896,7 +893,6 @@ export default function BookInfoPage() {
             )}
           </div>
 
-          {/* Notes */}
           <div className="rounded-lg border bg-white p-4">
             <div className="text-sm font-medium">Notes</div>
 
@@ -1025,6 +1021,8 @@ function PersonRow({
   reading,
   img,
   editing,
+  nameValue,
+  setNameValue,
   imgValue,
   setImgValue,
   readingValue,
@@ -1035,6 +1033,8 @@ function PersonRow({
   reading: string | null | undefined;
   img: string | null | undefined;
   editing: boolean;
+  nameValue: string;
+  setNameValue: (v: string) => void;
   imgValue: string;
   setImgValue: (v: string) => void;
   readingValue: string;
@@ -1044,7 +1044,6 @@ function PersonRow({
     <div className="flex items-start gap-3">
       <div className="w-20 h-20 rounded-full border overflow-hidden bg-gray-100 shrink-0 mt-0.5">
         {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={img} alt={`${label} photo`} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">
@@ -1055,12 +1054,20 @@ function PersonRow({
 
       <div className="min-w-0 flex-1">
         <div className="text-xs text-gray-600">{label}</div>
-        <div className="text-sm font-medium truncate">{name || "—"}</div>
 
         {!editing ? (
-          <div className="text-xs text-gray-500 mt-0.5">{reading || "—"}</div>
+          <>
+            <div className="text-sm font-medium truncate">{name || "—"}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{reading || "—"}</div>
+          </>
         ) : (
           <>
+            <input
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              placeholder={`${label} name`}
+              className="mt-1 w-full rounded border px-2 py-1 text-xs"
+            />
             <input
               value={readingValue}
               onChange={(e) => setReadingValue(e.target.value)}

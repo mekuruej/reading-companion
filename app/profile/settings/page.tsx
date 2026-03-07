@@ -178,7 +178,7 @@ export default function LearningSettingsPage() {
 
   return (
     <main className="max-w-xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-4">Learning Settings</h1>
+      <h1 className="text-2xl font-semibold mb-4">THIS PAGE IS CURRENTLY NOT ACTIVE: Learning Settings</h1>
 
       {message && <p className="mb-3 text-sm text-gray-700">{message}</p>}
 

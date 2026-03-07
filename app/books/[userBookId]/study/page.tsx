@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+declare global {
+  interface Window {
+    SpeechRecognition?: any;
+    webkitSpeechRecognition?: any;
+  }
+}
+
 type StudySet =
   | "KANJI_READING_MEANING"
   | "KANJI_READING"
@@ -62,8 +69,7 @@ type WordRow = {
   chapter_number: number | null;
   chapter_name: string | null;
   created_at: string;
-
-  meaning_choices: any | null; // jsonb
+  meaning_choices: any | null;
   meaning_choice_index: number | null;
 };
 
@@ -76,10 +82,8 @@ type Flashcard = {
   chapterLabel: string;
   chapterDisplay: string;
   page_number: number | null;
-
   meaningChoices: string[];
   meaningChoiceIndex: number;
-
   repeatKey: string;
   repeatCount: number;
 };
@@ -143,7 +147,6 @@ const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1", "NON-JLPT"] as const;
 export default function BookFlashcardsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
-
   const router = useRouter();
 
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -183,10 +186,15 @@ export default function BookFlashcardsPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
+  const [meId, setMeId] = useState("");
 
   const [defSaving, setDefSaving] = useState(false);
   const [defError, setDefError] = useState<string | null>(null);
   const [showDefPicker, setShowDefPicker] = useState(false);
+
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const typeModeEnabled = typeMode && isTwoStep;
 
@@ -204,8 +212,7 @@ export default function BookFlashcardsPage() {
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settingsKey]);
+  }, [settingsKey, userBookId]);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -244,6 +251,15 @@ export default function BookFlashcardsPage() {
   }, [isTwoStep, typeMode]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const supported =
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
+
+    setVoiceSupported(supported);
+  }, []);
+
+  useEffect(() => {
     if (!userBookId) return;
 
     async function loadData() {
@@ -254,6 +270,8 @@ export default function BookFlashcardsPage() {
       try {
         const { data: userData } = await supabase.auth.getUser();
         const user = userData?.user;
+
+        if (user?.id) setMeId(user.id);
 
         if (!user) {
           setNeedsSignIn(true);
@@ -320,7 +338,7 @@ export default function BookFlashcardsPage() {
         const normalized: Flashcard[] = (words ?? []).map((w) => {
           const ch = chapterInfoFromRow(w);
 
-          const meaningChoices = asStringArray((w as any).meaning_choices);
+          const meaningChoices = asStringArray(w.meaning_choices);
           const idx = Number.isFinite(w.meaning_choice_index as any)
             ? (w.meaning_choice_index as number)
             : 0;
@@ -378,6 +396,7 @@ export default function BookFlashcardsPage() {
         setChecked(null);
         setDefError(null);
         setShowDefPicker(false);
+        setVoiceError(null);
       } catch (e: any) {
         setErrorMsg(
           e?.message?.includes("single JSON object")
@@ -418,17 +437,20 @@ export default function BookFlashcardsPage() {
     setChecked(null);
     setDefError(null);
     setShowDefPicker(false);
+    setVoiceError(null);
   }, [cards, jlptSelected, chapterFilter, repeatsOnly]);
 
   useEffect(() => {
     setShowDefPicker(false);
     setDefError(null);
+    setVoiceError(null);
   }, [index]);
 
   useEffect(() => {
     setStepIndex(0);
     setAnswer("");
     setChecked(null);
+    setVoiceError(null);
   }, [studySet, reverseMode]);
 
   function getFieldValue(field: StepField, c: Flashcard) {
@@ -437,8 +459,26 @@ export default function BookFlashcardsPage() {
     return c.meaning || "";
   }
 
-  function goToNextWord() {
+  async function logStudyEvent(result: "revealed" | "correct" | "wrong") {
+    const card = filteredCards[index];
+    if (!card || !meId) return;
+
+    await supabase.from("study_logs").insert([
+      {
+        user_id: meId,
+        user_book_id: userBookId,
+        user_book_word_id: card.id,
+        study_mode: typeModeEnabled ? "type" : "flashcard",
+        step_mode: studySet,
+        result,
+      },
+    ]);
+  }
+
+  async function goToNextWord(result: "revealed" | "correct" | "wrong" = "revealed") {
     if (filteredCards.length === 0) return;
+
+    await logStudyEvent(result);
 
     if (randomMode) setIndex(Math.floor(Math.random() * filteredCards.length));
     else setIndex((prev) => (prev + 1 < filteredCards.length ? prev + 1 : 0));
@@ -448,6 +488,7 @@ export default function BookFlashcardsPage() {
     setChecked(null);
     setDefError(null);
     setShowDefPicker(false);
+    setVoiceError(null);
   }
 
   function goToPrevWord() {
@@ -461,6 +502,7 @@ export default function BookFlashcardsPage() {
     setChecked(null);
     setDefError(null);
     setShowDefPicker(false);
+    setVoiceError(null);
   }
 
   function nextCardReveal() {
@@ -554,17 +596,64 @@ export default function BookFlashcardsPage() {
     }
   }
 
+  const card = filteredCards[index];
+  const promptField = card ? steps[0] : "word";
+  const answerField = card && steps.length >= 2 ? steps[1] : null;
+
+  function startVoiceInput() {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognitionCtor =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setVoiceError("Voice input is not supported in this browser.");
+      return;
+    }
+
+    setVoiceError(null);
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = answerField === "meaning" ? "en-US" : "ja-JP";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      setIsListening(false);
+      setVoiceError(event?.error ? `Voice input error: ${event.error}` : "Voice input failed.");
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event?.results?.[0]?.[0]?.transcript ?? "";
+      setAnswer(transcript);
+      setChecked(null);
+    };
+
+    recognition.start();
+  }
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (typeModeEnabled) {
         if (e.key === "Enter") {
           e.preventDefault();
-          if (!checked) checkTypedAnswer();
-          else goToNextWord();
+          if (!checked) {
+            checkTypedAnswer();
+          } else {
+            goToNextWord(checked.ok ? "correct" : "wrong");
+          }
         }
         if (e.key === "ArrowRight") {
           e.preventDefault();
-          goToNextWord();
+          goToNextWord(checked ? (checked.ok ? "correct" : "wrong") : "revealed");
         }
         if (e.key === "ArrowLeft") {
           e.preventDefault();
@@ -586,11 +675,9 @@ export default function BookFlashcardsPage() {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     typeModeEnabled,
     checked,
-    answer,
     steps,
     stepIndex,
     randomMode,
@@ -631,27 +718,25 @@ export default function BookFlashcardsPage() {
   }
 
   if (filteredCards.length === 0) {
-  return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-      <p>No words match your filters (or none have been added to this book yet).</p>
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
+        <p>No words match your filters (or none have been added to this book yet).</p>
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => {
-            setJlptSelected([]);
-            setChapterFilter("all");
-            setRepeatsOnly(false);
-          }}
-          className="px-4 py-2 bg-gray-200 rounded"
-        >
-          Clear Filters
-        </button>
-      </div>
-    </main>
-  );
-}
-
-  const card = filteredCards[index];
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setJlptSelected([]);
+              setChapterFilter("all");
+              setRepeatsOnly(false);
+            }}
+            className="px-4 py-2 bg-gray-200 rounded"
+          >
+            Clear Filters
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   const revealed = new Set<StepField>(steps.slice(0, stepIndex + 1));
   const showWord = revealed.has("word");
@@ -688,11 +773,7 @@ export default function BookFlashcardsPage() {
   const baseLabel = studySetLabel(studySet);
   const effectiveLabel = reverseMode ? reverseLabel(baseLabel) : baseLabel;
 
-  const promptField = steps[0];
-  const answerField = steps.length >= 2 ? steps[1] : null;
-
   const promptValue = getFieldValue(promptField, card);
-
   const needsKanaInput = typeModeEnabled && answerField === "reading";
 
   const defTotal = card.meaningChoices?.length ?? 0;
@@ -719,7 +800,9 @@ export default function BookFlashcardsPage() {
           <p className="mt-1 text-xs text-gray-500">Chapter: {card.chapterDisplay}</p>
         ) : null}
 
-        {card.page_number != null ? <p className="mt-1 text-xs text-gray-500">Page: {card.page_number}</p> : null}
+        {card.page_number != null ? (
+          <p className="mt-1 text-xs text-gray-500">Page: {card.page_number}</p>
+        ) : null}
 
         {card.repeatCount >= 2 ? (
           <p className="mt-1 text-xs text-gray-500">Repeats in this book: {card.repeatCount}</p>
@@ -814,14 +897,16 @@ export default function BookFlashcardsPage() {
 
           <div className="flex flex-wrap gap-3 text-sm items-center">
             {JLPT_LEVELS.map((lvl) => {
-              const checked = jlptSelected.includes(lvl);
+              const checkedLvl = jlptSelected.includes(lvl);
               return (
                 <label key={lvl} className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={checked}
+                    checked={checkedLvl}
                     onChange={() =>
-                      setJlptSelected((prev) => (checked ? prev.filter((x) => x !== lvl) : [...prev, lvl]))
+                      setJlptSelected((prev) =>
+                        checkedLvl ? prev.filter((x) => x !== lvl) : [...prev, lvl]
+                      )
                     }
                   />
                   {lvl}
@@ -926,39 +1011,64 @@ export default function BookFlashcardsPage() {
                   </p>
                 ) : null}
 
-                <input
-                  type="text"
-                  value={answer}
-                  onChange={(e) => {
-                    setAnswer(e.target.value);
-                    setChecked(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (!checked) checkTypedAnswer();
-                      else goToNextWord();
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={answer}
+                    onChange={(e) => {
+                      setAnswer(e.target.value);
+                      setChecked(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!checked) {
+                          checkTypedAnswer();
+                        } else {
+                          goToNextWord(checked.ok ? "correct" : "wrong");
+                        }
+                      }
+                    }}
+                    inputMode="text"
+                    lang={needsKanaInput ? "ja" : undefined}
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="border p-2 rounded w-full"
+                    placeholder={
+                      answerField === "meaning"
+                        ? "Type a keyword (partial OK)"
+                        : needsKanaInput
+                        ? "かなで入力"
+                        : "Type your answer"
                     }
-                  }}
-                  inputMode="text"
-                  lang={needsKanaInput ? "ja" : undefined}
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  className="border p-2 rounded w-full"
-                  placeholder={
-                    answerField === "meaning"
-                      ? "Type a keyword (partial OK)"
-                      : needsKanaInput
-                      ? "かなで入力"
-                      : "Type your answer"
-                  }
-                />
+                  />
+
+                  {voiceSupported && (
+                    <button
+                      type="button"
+                      onClick={startVoiceInput}
+                      disabled={isListening}
+                      className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                      title="Voice input"
+                    >
+                      {isListening ? "Listening..." : "🎤"}
+                    </button>
+                  )}
+                </div>
+
+                {voiceError ? (
+                  <p className="mt-2 text-xs text-red-700">{voiceError}</p>
+                ) : null}
 
                 {checked ? (
                   <div className="mt-3 text-sm">
-                    {checked.ok ? <p className="text-green-700">✅ Correct!</p> : <p className="text-red-700">❌ Not quite.</p>}
+                    {checked.ok ? (
+                      <p className="text-green-700">✅ Correct!</p>
+                    ) : (
+                      <p className="text-red-700">❌ Not quite.</p>
+                    )}
 
                     <div className="mt-2 border rounded p-3 bg-gray-50 text-left">
                       <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Full answer</div>
@@ -990,13 +1100,17 @@ export default function BookFlashcardsPage() {
                     <button
                       type="button"
                       className="mt-3 px-3 py-1 bg-gray-200 rounded"
-                      onClick={() => goToNextWord()}
+                      onClick={() => goToNextWord(checked.ok ? "correct" : "wrong")}
                     >
                       Continue →
                     </button>
                   </div>
                 ) : (
-                  <button type="button" className="mt-2 px-3 py-1 bg-gray-200 rounded" onClick={checkTypedAnswer}>
+                  <button
+                    type="button"
+                    className="mt-2 px-3 py-1 bg-gray-200 rounded"
+                    onClick={checkTypedAnswer}
+                  >
                     Check (Enter)
                   </button>
                 )}
@@ -1013,10 +1127,20 @@ export default function BookFlashcardsPage() {
       </div>
 
       <div className="flex gap-10 mt-6">
-        <button onClick={typeModeEnabled ? goToPrevWord : prevCardReveal} className="px-4 py-2 bg-gray-200 rounded">
+        <button
+          onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
           ← Review
         </button>
-        <button onClick={typeModeEnabled ? goToNextWord : nextCardReveal} className="px-4 py-2 bg-gray-200 rounded">
+        <button
+          onClick={() =>
+            typeModeEnabled
+              ? goToNextWord(checked ? (checked.ok ? "correct" : "wrong") : "revealed")
+              : nextCardReveal()
+          }
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
           Answer →
         </button>
       </div>
