@@ -735,33 +735,29 @@ export default function BooksPage() {
       <UserBar />
 
       {isTeacher ? (
-        <div className="mb-4 flex flex-col gap-2">
-          <div className="text-sm text-gray-700">
-            Viewing: <span className="font-medium">{viewingLabel}</span>
-          </div>
+  <div className="mb-4 flex flex-col gap-2">
+    <div className="text-sm text-gray-700">
+      Viewing: <span className="font-medium">{viewingLabel}</span>
+    </div>
 
-          <select
-            value={viewingUserId || meId}
-            onChange={(e) => setViewingUserId(e.target.value)}
-            className="border p-2 rounded w-full bg-white"
-            disabled={!meId}
-          >
-            <option value={meId}>Me</option>
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.display_name}
-                {s.level ? ` (${s.level})` : ""}
-              </option>
-            ))}
-          </select>
+    <select
+      value={viewingUserId || meId}
+      onChange={(e) => setViewingUserId(e.target.value)}
+      className="border p-2 rounded w-full bg-white"
+      disabled={!meId}
+    >
+      <option value={meId}>Me</option>
+      {students.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.display_name}
+          {s.level ? ` (${s.level})` : ""}
+        </option>
+      ))}
+    </select>
 
-          <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
-        </div>
-      ) : (
-        <div className="mb-4 text-sm text-gray-700">
-          Viewing: <span className="font-medium">Me</span>
-        </div>
-      )}
+    <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
+  </div>
+) : null}
 
       {message ? (
         <p className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"}`}>{message}</p>
