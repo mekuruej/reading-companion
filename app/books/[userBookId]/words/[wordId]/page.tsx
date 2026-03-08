@@ -529,12 +529,12 @@ setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
 
         <div className="flex gap-2">
           <button
-            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/flashcards`)}
-            className="px-3 py-2 rounded bg-gray-200"
-            title="Go to flashcards for this book"
-          >
-            Flashcards
-          </button>
+  onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
+  className="px-3 py-2 rounded bg-gray-200"
+  title="Go to study for this book"
+>
+  Study
+</button>
 
           <button onClick={() => router.back()} className="px-3 py-2 rounded bg-gray-100">
             ← Back

@@ -170,8 +170,6 @@ export default function BookFlashcardsPage() {
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
 
   const [stepIndex, setStepIndex] = useState(0);
-
-  const [randomMode, setRandomMode] = useState(false);
   const [firstTouch, setFirstTouch] = useState(true);
 
   const [loading, setLoading] = useState(true);
@@ -187,6 +185,9 @@ export default function BookFlashcardsPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
   const [meId, setMeId] = useState("");
+
+  const [weeklyReadingsReady, setWeeklyReadingsReady] = useState(false);
+  const [weeklyReadingsIsNew, setWeeklyReadingsIsNew] = useState(false);
 
   const [defSaving, setDefSaving] = useState(false);
   const [defError, setDefError] = useState<string | null>(null);
@@ -206,7 +207,6 @@ export default function BookFlashcardsPage() {
       const parsed = JSON.parse(raw);
       if (parsed?.studySet) setStudySet(parsed.studySet as StudySet);
       if (typeof parsed?.reverseMode === "boolean") setReverseMode(parsed.reverseMode);
-      if (typeof parsed?.randomMode === "boolean") setRandomMode(parsed.randomMode);
       if (typeof parsed?.typeMode === "boolean") setTypeMode(parsed.typeMode);
       if (Array.isArray(parsed?.jlptSelected)) setJlptSelected(parsed.jlptSelected);
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
@@ -222,7 +222,6 @@ export default function BookFlashcardsPage() {
         JSON.stringify({
           studySet,
           reverseMode,
-          randomMode,
           typeMode,
           jlptSelected,
           chapterFilter,
@@ -235,7 +234,6 @@ export default function BookFlashcardsPage() {
     userBookId,
     studySet,
     reverseMode,
-    randomMode,
     typeMode,
     jlptSelected,
     chapterFilter,
@@ -302,6 +300,36 @@ export default function BookFlashcardsPage() {
 
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
+
+        const { data: weeklySet } = await supabase
+          .from("user_book_weekly_reading_sets")
+          .select("id, activated_at")
+          .eq("user_book_id", userBookId)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (weeklySet) {
+          setWeeklyReadingsReady(true);
+
+          const { data: ubSeen } = await supabase
+            .from("user_books")
+            .select("weekly_readings_last_seen_at")
+            .eq("id", userBookId)
+            .single();
+
+          const lastSeen = ubSeen?.weekly_readings_last_seen_at
+            ? new Date(ubSeen.weekly_readings_last_seen_at).getTime()
+            : 0;
+
+          const activated = weeklySet.activated_at
+            ? new Date(weeklySet.activated_at).getTime()
+            : 0;
+
+          setWeeklyReadingsIsNew(activated > lastSeen);
+        } else {
+          setWeeklyReadingsReady(false);
+          setWeeklyReadingsIsNew(false);
+        }
 
         const { data: words, error: wErr } = await supabase
           .from("user_book_words")
@@ -480,8 +508,7 @@ export default function BookFlashcardsPage() {
 
     await logStudyEvent(result);
 
-    if (randomMode) setIndex(Math.floor(Math.random() * filteredCards.length));
-    else setIndex((prev) => (prev + 1 < filteredCards.length ? prev + 1 : 0));
+    setIndex(Math.floor(Math.random() * filteredCards.length));
 
     setStepIndex(0);
     setAnswer("");
@@ -494,8 +521,7 @@ export default function BookFlashcardsPage() {
   function goToPrevWord() {
     if (filteredCards.length === 0) return;
 
-    if (randomMode) setIndex(Math.floor(Math.random() * filteredCards.length));
-    else setIndex((prev) => (prev - 1 >= 0 ? prev - 1 : filteredCards.length - 1));
+    setIndex(Math.floor(Math.random() * filteredCards.length));
 
     setStepIndex(Math.max(steps.length - 1, 0));
     setAnswer("");
@@ -680,7 +706,6 @@ export default function BookFlashcardsPage() {
     checked,
     steps,
     stepIndex,
-    randomMode,
     studySet,
     reverseMode,
     filteredCards,
@@ -770,195 +795,124 @@ export default function BookFlashcardsPage() {
     );
   }
 
-  const baseLabel = studySetLabel(studySet);
-  const effectiveLabel = reverseMode ? reverseLabel(baseLabel) : baseLabel;
-
   const promptValue = getFieldValue(promptField, card);
   const needsKanaInput = typeModeEnabled && answerField === "reading";
-
-  const defTotal = card.meaningChoices?.length ?? 0;
-  const defIdx = card.meaningChoiceIndex ?? 0;
-  const showDefInfo = defTotal > 1;
-
-  const frontBookCount = card.repeatCount ?? 1;
-  const frontDefNumber = (card.meaningChoiceIndex ?? 0) + 1;
 
   return (
     <main className="min-h-screen flex flex-col items-center p-6">
       <div className="flex flex-col items-center mb-4">
         {bookCover ? <img src={bookCover} alt="" className="w-20 h-28 rounded mb-2" /> : null}
-        <h1 className="text-xl font-semibold">{bookTitle} Flashcards</h1>
-
         <p className="text-sm text-gray-500">
-          Step {stepIndex + 1}/{steps.length} • Card {index + 1}/{filteredCards.length}
-          {repeatsOnly ? <span className="ml-2 text-xs text-gray-500">• Repeats only</span> : null}
+          Card {index + 1}/{filteredCards.length}
         </p>
-
-        <p className="mt-1 text-xs text-gray-500">Mode: {effectiveLabel}</p>
-
-        {card.chapterDisplay && card.chapterDisplay !== "(none)" ? (
-          <p className="mt-1 text-xs text-gray-500">Chapter: {card.chapterDisplay}</p>
-        ) : null}
-
-        {card.page_number != null ? (
-          <p className="mt-1 text-xs text-gray-500">Page: {card.page_number}</p>
-        ) : null}
-
-        {card.repeatCount >= 2 ? (
-          <p className="mt-1 text-xs text-gray-500">Repeats in this book: {card.repeatCount}</p>
-        ) : null}
-
-        {showDefInfo ? (
-          <div className="mt-2 flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">
-                Definition: {defIdx + 1}/{defTotal}
-              </span>
-
-              {!showDefPicker ? (
-                <button
-                  type="button"
-                  onClick={() => setShowDefPicker(true)}
-                  className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                >
-                  Change
-                </button>
-              ) : (
-                <>
-                  <select
-                    value={defIdx}
-                    disabled={defSaving}
-                    onChange={(e) => setDefinitionForCurrent(Number(e.target.value))}
-                    className="border p-1 rounded text-xs bg-white"
-                  >
-                    {card.meaningChoices.map((_, i) => (
-                      <option key={i} value={i}>
-                        {i + 1}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    type="button"
-                    disabled={defSaving}
-                    onClick={() => {
-                      setShowDefPicker(false);
-                      setDefError(null);
-                    }}
-                    className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-                  >
-                    Done
-                  </button>
-
-                  {defSaving ? <span className="text-xs text-gray-500">Saving…</span> : null}
-                </>
-              )}
-            </div>
-
-            {defError ? <p className="text-xs text-red-700">{defError}</p> : null}
-          </div>
-        ) : null}
       </div>
 
-      <div className="flex flex-wrap justify-center gap-2 mb-4">
-        <select
-          value={studySet}
-          onChange={(e) => setStudySet(e.target.value as StudySet)}
-          className="mt-2 px-2 py-1 border rounded text-sm bg-white"
-        >
-          <option value="KANJI_READING_MEANING">{studySetLabel("KANJI_READING_MEANING")}</option>
-          <option value="KANJI_READING">{studySetLabel("KANJI_READING")}</option>
-          <option value="KANJI_MEANING">{studySetLabel("KANJI_MEANING")}</option>
-          <option value="READING_MEANING">{studySetLabel("READING_MEANING")}</option>
-        </select>
+      <div className="w-full max-w-6xl mb-4 flex flex-col items-center gap-3">
+        <div className="w-full flex flex-col items-center gap-2">
+          <div className="text-sm font-medium text-gray-700">Study Mode</div>
 
-        <label className="flex items-center gap-2 mt-2 text-sm px-2 py-1 border rounded bg-white">
-          <input type="checkbox" checked={reverseMode} onChange={() => setReverseMode((v) => !v)} />
-          Reverse (R)
-        </label>
-
-        <label
-          className={`flex items-center gap-2 mt-2 text-sm px-2 py-1 border rounded bg-white ${
-            !isTwoStep ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-          title={!isTwoStep ? "Type mode is only for 2-step modes right now." : "Type the answer for step 2."}
-        >
-          <input
-            type="checkbox"
-            checked={typeModeEnabled}
-            disabled={!isTwoStep}
-            onChange={() => setTypeMode((v) => !v)}
-          />
-          Type mode
-        </label>
-
-        <div className="mt-2 px-2 py-2 border rounded bg-white">
-          <div className="text-xs text-gray-500 mb-1">JLPT (multi)</div>
-
-          <div className="flex flex-wrap gap-3 text-sm items-center">
-            {JLPT_LEVELS.map((lvl) => {
-              const checkedLvl = jlptSelected.includes(lvl);
-              return (
-                <label key={lvl} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={checkedLvl}
-                    onChange={() =>
-                      setJlptSelected((prev) =>
-                        checkedLvl ? prev.filter((x) => x !== lvl) : [...prev, lvl]
-                      )
-                    }
-                  />
-                  {lvl}
-                </label>
-              );
-            })}
-
-            <button
-              type="button"
-              onClick={() => setJlptSelected([...JLPT_LEVELS])}
-              className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
-              title="Select all JLPT levels"
+          <div className="flex flex-wrap justify-center gap-2">
+            <select
+              value={studySet}
+              onChange={(e) => setStudySet(e.target.value as StudySet)}
+              className="px-2 py-1 border rounded text-sm bg-white"
             >
-              All
-            </button>
+              <option value="KANJI_READING_MEANING">{studySetLabel("KANJI_READING_MEANING")}</option>
+              <option value="KANJI_READING">{studySetLabel("KANJI_READING")}</option>
+              <option value="KANJI_MEANING">{studySetLabel("KANJI_MEANING")}</option>
+              <option value="READING_MEANING">{studySetLabel("READING_MEANING")}</option>
+            </select>
 
-            <button
-              type="button"
-              onClick={() => setJlptSelected([])}
-              className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
-              title="Clear JLPT filter"
+            <label className="flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white">
+              <input type="checkbox" checked={reverseMode} onChange={() => setReverseMode((v) => !v)} />
+              Reverse (R)
+            </label>
+
+            <label
+              className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${
+                !isTwoStep ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              title={!isTwoStep ? "Type mode is only for 2-step modes right now." : "Type the answer for step 2."}
             >
-              Clear
-            </button>
+              <input
+                type="checkbox"
+                checked={typeModeEnabled}
+                disabled={!isTwoStep}
+                onChange={() => setTypeMode((v) => !v)}
+              />
+              Type mode
+            </label>
           </div>
         </div>
 
-        <select
-          value={chapterFilter}
-          onChange={(e) => setChapterFilter(e.target.value)}
-          className="mt-2 px-2 py-1 border rounded text-sm bg-white"
-        >
-          <option value="all">Chapters: All</option>
-          {chapterOptions.map((ch) => (
-            <option key={ch.value} value={ch.value}>
-              {ch.label}
-            </option>
-          ))}
-        </select>
+        <div className="w-full flex flex-col items-center gap-2">
+          <div className="text-sm font-medium text-gray-700">Filter By</div>
 
-        <label
-          className="flex items-center gap-2 mt-2 text-sm px-2 py-1 border rounded bg-white"
-          title="Show only words that appear 2+ times in this book"
-        >
-          <input type="checkbox" checked={repeatsOnly} onChange={() => setRepeatsOnly((v) => !v)} />
-          Repeats
-        </label>
+          <div className="flex flex-wrap justify-center gap-2">
+            <div className="px-2 py-2 border rounded bg-white">
+              <div className="text-xs text-gray-500 mb-1">JLPT (multi)</div>
 
-        <label className="flex items-center gap-1 mt-2 text-sm">
-          <input type="checkbox" checked={randomMode} onChange={() => setRandomMode(!randomMode)} />
-          Random
-        </label>
+              <div className="flex flex-wrap gap-3 text-sm items-center">
+                {JLPT_LEVELS.map((lvl) => {
+                  const checkedLvl = jlptSelected.includes(lvl);
+                  return (
+                    <label key={lvl} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={checkedLvl}
+                        onChange={() =>
+                          setJlptSelected((prev) =>
+                            checkedLvl ? prev.filter((x) => x !== lvl) : [...prev, lvl]
+                          )
+                        }
+                      />
+                      {lvl}
+                    </label>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => setJlptSelected([...JLPT_LEVELS])}
+                  className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                  title="Select all JLPT levels"
+                >
+                  All
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setJlptSelected([])}
+                  className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                  title="Clear JLPT filter"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <select
+              value={chapterFilter}
+              onChange={(e) => setChapterFilter(e.target.value)}
+              className="px-2 py-1 border rounded text-sm bg-white"
+            >
+              <option value="all">Chapters: All</option>
+              {chapterOptions.map((ch) => (
+                <option key={ch.value} value={ch.value}>
+                  {ch.label}
+                </option>
+              ))}
+            </select>
+
+            <label
+              className="flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white"
+              title="Show only words that appear 2+ times in this book"
+            >
+              <input type="checkbox" checked={repeatsOnly} onChange={() => setRepeatsOnly((v) => !v)} />
+              Repeats
+            </label>
+          </div>
+        </div>
       </div>
 
       {firstTouch && (
@@ -983,11 +937,11 @@ export default function BookFlashcardsPage() {
         "
       >
         <div className="absolute top-3 right-4 text-[11px] text-slate-500">
-          Book Count {frontBookCount} • Total Count ***
+          Book Count {card.repeatCount ?? 1} • Total Count ***
         </div>
 
         <div className="absolute bottom-3 right-4 text-[11px] text-slate-500">
-          Def #{frontDefNumber}
+          Def #{(card.meaningChoiceIndex ?? 0) + 1}
         </div>
 
         <div className="w-full flex flex-col items-center justify-center gap-6">
@@ -1090,10 +1044,10 @@ export default function BookFlashcardsPage() {
                         </div>
 
                         <div className="text-xs text-slate-500">
-                          Book Count: {frontBookCount} • Total Count: ***
+                          Book Count: {card.repeatCount ?? 1} • Total Count: ***
                         </div>
 
-                        <div className="text-xs text-slate-500">Def #{frontDefNumber}</div>
+                        <div className="text-xs text-slate-500">Def #{(card.meaningChoiceIndex ?? 0) + 1}</div>
                       </div>
                     </div>
 

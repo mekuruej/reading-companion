@@ -690,31 +690,45 @@ export default function BooksPage() {
           )}
         </div>
 
-        <a
-          href={`/books/${row.id}/study`}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-2 text-[12px] px-3 py-1 bg-green-700 text-white rounded hover:bg-amber-600 transition"
-        >
-          Study
-        </a>
+                <div className="mt-2 flex flex-col items-center gap-1">
+  <div className="text-[10px] uppercase tracking-wide text-gray-500">
+    Read → Review → Prepare
+  </div>
 
-        <a
-          href={`/books/${row.id}/words`}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-1 text-[12px] px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-        >
-          View Vocab List
-        </a>
+  <a
+    href={`/books/${row.id}/words`}
+    onClick={(e) => e.stopPropagation()}
+    className="mt-1 text-[12px] px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-800 transition"
+  >
+    View Vocab List (Book Order)
+  </a>
 
-        {isTeacher ? (
-          <a
-            href={`/vocab/bulk?userBookId=${row.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-1 text-[12px] px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-          >
-            Add Vocab
-          </a>
-        ) : null}
+  <a
+    href={`/books/${row.id}/study`}
+    onClick={(e) => e.stopPropagation()}
+    className="mt-1 text-[12px] px-3 py-1 bg-green-600 text-white rounded hover:bg-green-800 transition"
+  >
+    Review Vocab (Random)
+  </a>
+
+  <a
+    href={`/books/${row.id}/weekly-readings`}
+    onClick={(e) => e.stopPropagation()}
+    className="mt-1 text-[12px] px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-800 transition"
+  >
+    Practice Weekly Kanji Readings
+  </a>
+
+  {isTeacher ? (
+    <a
+      href={`/vocab/bulk?userBookId=${row.id}`}
+      onClick={(e) => e.stopPropagation()}
+      className="mt-1 text-[12px] px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-800 transition"
+    >
+      Add Vocab
+    </a>
+  ) : null}
+</div>
       </li>
     );
   }
@@ -737,6 +751,10 @@ export default function BooksPage() {
       }}
     >
       <h1 className="text-2xl font-semibold mb-2">📚 Books</h1>
+     
+      <p className="text-sm text-gray-500 mt-2 max-w-xl">
+Read with the vocab list in book order, review vocabulary with flashcards, and strengthen your reading skills for the week with kanji readings.
+</p>
 
       {isTeacher ? (
   <div className="mb-4 flex flex-col gap-2">
