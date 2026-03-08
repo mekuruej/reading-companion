@@ -32,7 +32,7 @@ type StudentOption = {
 
 type ProfileRole = "teacher" | "student";
 
-function UserBar() {
+function UserBar({ isTeacher }: { isTeacher: boolean }) {
   const router = useRouter();
   const [label, setLabel] = useState<string | null>(null);
 
@@ -84,9 +84,15 @@ function UserBar() {
 
   if (!label) return null;
 
-  return (
+    return isTeacher ? (
     <div className="flex justify-between items-center mb-4 text-sm text-gray-700">
       <span>Logged in as: {label}</span>
+      <button onClick={handleLogout} className="border px-2 py-1 rounded-md hover:bg-gray-100">
+        Log out
+      </button>
+    </div>
+  ) : (
+    <div className="flex justify-end items-center mb-4 text-sm text-gray-700">
       <button onClick={handleLogout} className="border px-2 py-1 rounded-md hover:bg-gray-100">
         Log out
       </button>
@@ -732,7 +738,7 @@ export default function BooksPage() {
     >
       <h1 className="text-2xl font-semibold mb-2">📚 Books</h1>
 
-      <UserBar />
+      <UserBar isTeacher={isTeacher} />
 
       {isTeacher ? (
   <div className="mb-4 flex flex-col gap-2">
