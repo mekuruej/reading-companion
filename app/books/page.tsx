@@ -738,8 +738,6 @@ export default function BooksPage() {
     >
       <h1 className="text-2xl font-semibold mb-2">📚 Books</h1>
 
-      <UserBar isTeacher={isTeacher} />
-
       {isTeacher ? (
   <div className="mb-4 flex flex-col gap-2">
     <div className="text-sm text-gray-700">
