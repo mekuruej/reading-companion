@@ -23,6 +23,8 @@ type WordRow = {
   meaning_choice_index: number | null;
 };
 
+type ProfileRole = "teacher" | "student";
+
 function normalizeJlpt(val: string | null | undefined) {
   const v = (val ?? "").toUpperCase();
   if (v === "N1" || v === "N2" || v === "N3" || v === "N4" || v === "N5") return v;
@@ -97,8 +99,11 @@ export default function BookWordsPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [needsSignIn, setNeedsSignIn] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+const [needsSignIn, setNeedsSignIn] = useState(false);
+const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+const [myRole, setMyRole] = useState<ProfileRole>("student");
+const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -256,13 +261,25 @@ export default function BookWordsPage() {
 
       try {
         const { data: auth } = await supabase.auth.getUser();
-        const user = auth?.user;
+const user = auth?.user;
 
-        if (!user) {
-          setNeedsSignIn(true);
-          setLoading(false);
-          return;
-        }
+if (!user) {
+  setNeedsSignIn(true);
+  setLoading(false);
+  return;
+}
+
+const { data: meProfile, error: meProfileErr } = await supabase
+  .from("profiles")
+  .select("role")
+  .eq("id", user.id)
+  .single();
+
+if (meProfileErr) {
+  console.error("Error loading profile role:", meProfileErr);
+}
+
+setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
 
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")
@@ -408,7 +425,7 @@ export default function BookWordsPage() {
 
   return (
     <main className="max-w-6xl mx-auto p-6">
-      {editing ? (
+      {editing && isTeacher ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border p-4">
             <div className="flex items-start justify-between gap-3">
@@ -531,12 +548,14 @@ export default function BookWordsPage() {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)}
-            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
-            + Add Vocab
-          </button>
+          {isTeacher ? (
+  <button
+    onClick={() => router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)}
+    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+  >
+    + Add Vocab
+  </button>
+) : null}
 
           <button
             onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
@@ -625,28 +644,32 @@ export default function BookWordsPage() {
 
                   <td className="p-2">
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)}
-                        className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
-                        title="Open word card"
-                      >
-                        Open
-                      </button>
+  <button
+    onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)}
+    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
+    title="Open word card"
+  >
+    Open
+  </button>
 
-                      <button
-                        onClick={() => openEdit(w)}
-                        className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
-                      >
-                        Edit
-                      </button>
+  {isTeacher ? (
+    <>
+      <button
+        onClick={() => openEdit(w)}
+        className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
+      >
+        Edit
+      </button>
 
-                      <button
-                        onClick={() => deleteWord(w)}
-                        className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
-                      >
-                        Delete
-                      </button>
-                    </div>
+      <button
+        onClick={() => deleteWord(w)}
+        className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+      >
+        Delete
+      </button>
+    </>
+  ) : null}
+</div>
                   </td>
                 </tr>
               );

@@ -272,8 +272,11 @@ export default function WordDetailPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [needsSignIn, setNeedsSignIn] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+const [needsSignIn, setNeedsSignIn] = useState(false);
+const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+const [myRole, setMyRole] = useState<"teacher" | "student">("student");
+const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
@@ -296,15 +299,23 @@ export default function WordDetailPage() {
 
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
+const user = userData?.user;
 
-      if (!user) {
-        setNeedsSignIn(true);
-        setWord(null);
-        setBookTitle("");
-        setBookCover(null);
-        return;
-      }
+if (!user) {
+  setNeedsSignIn(true);
+  setWord(null);
+  setBookTitle("");
+  setBookCover(null);
+  return;
+}
+
+const { data: meProfile } = await supabase
+  .from("profiles")
+  .select("role")
+  .eq("id", user.id)
+  .single();
+
+setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
 
       // verify book ownership + get book info
       const { data: ub, error: ubErr } = await supabase
@@ -560,8 +571,8 @@ export default function WordDetailPage() {
                     {meaningChoiceIndex + 1}/{defTotal}
                   </span>
                   <select
-                    value={meaningChoiceIndex}
-                    disabled={defSaving}
+  value={meaningChoiceIndex}
+  disabled={defSaving || !isTeacher}
                     onChange={(e) => setDefinition(Number(e.target.value))}
                     className="border p-1 rounded text-xs bg-white"
                     title="Choose which dictionary definition to use"
