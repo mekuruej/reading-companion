@@ -130,6 +130,7 @@ function stars10(value: number | null) {
 }
 
 const LEVEL_OPTIONS = ["N5", "N4", "N3", "N2", "N1"] as const;
+type ProfileRole = "teacher" | "student";
 
 export default function BookInfoPage() {
   const router = useRouter();
@@ -139,6 +140,9 @@ export default function BookInfoPage() {
   const [loading, setLoading] = useState(true);
   const [row, setRow] = useState<UserBook | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [myRole, setMyRole] = useState<ProfileRole>("student");
+  const isTeacher = myRole === "teacher";
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -222,7 +226,30 @@ export default function BookInfoPage() {
     if (!userBookId) return;
 
     setLoading(true);
-    setError(null);
+setError(null);
+
+const {
+  data: { user },
+  error: authErr,
+} = await supabase.auth.getUser();
+
+if (authErr || !user) {
+  setError("Please sign in.");
+  setLoading(false);
+  return;
+}
+
+const { data: meProfile, error: meProfileErr } = await supabase
+  .from("profiles")
+  .select("role")
+  .eq("id", user.id)
+  .single();
+
+if (meProfileErr) {
+  console.error("Error loading profile role:", meProfileErr);
+}
+
+setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
 
     const { data, error } = await supabase
       .from("user_books")
@@ -510,30 +537,32 @@ if (uRes.error || bRes.error) {
               Back
             </button>
 
-            {!editing ? (
-              <button
-                onClick={() => setEditing(true)}
-                className="px-4 py-2 rounded bg-gray-900 text-white hover:bg-black transition"
-              >
-                Edit
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={cancelEdits}
-                  className="px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-300 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveAll}
-                  disabled={saving}
-                  className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              </>
-            )}
+            {isTeacher ? (
+  !editing ? (
+    <button
+      onClick={() => setEditing(true)}
+      className="px-4 py-2 rounded bg-gray-900 text-white hover:bg-black transition"
+    >
+      Edit
+    </button>
+  ) : (
+    <>
+      <button
+        onClick={cancelEdits}
+        className="px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-300 transition"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={saveAll}
+        disabled={saving}
+        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
+      >
+        {saving ? "Saving…" : "Save"}
+      </button>
+    </>
+  )
+) : null}
           </div>
 
           <div className="flex gap-2">
