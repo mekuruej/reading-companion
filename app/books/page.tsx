@@ -30,6 +30,8 @@ type StudentOption = {
   level?: string | null;
 };
 
+type ProfileRole = "teacher" | "student";
+
 function UserBar() {
   const router = useRouter();
   const [label, setLabel] = useState<string | null>(null);
@@ -52,9 +54,11 @@ function UserBar() {
         .eq("id", user.id)
         .single();
 
-      if (profErr) console.warn("UserBar: could not load profile display_name:", profErr);
+      if (profErr) {
+        console.warn("UserBar: could not load profile display_name:", profErr);
+      }
 
-      setLabel(prof?.display_name || "Student");
+      setLabel(prof?.display_name || "User");
     };
 
     loadUser();
@@ -114,8 +118,11 @@ export default function BooksPage() {
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
 
   const [meId, setMeId] = useState<string>("");
+  const [myRole, setMyRole] = useState<ProfileRole>("student");
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
+
+  const isTeacher = myRole === "teacher";
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
@@ -163,6 +170,9 @@ export default function BooksPage() {
       return;
     }
 
+    // Students should only ever view themselves.
+    const safeUserId = isTeacher ? userIdToView : user.id;
+
     const { data, error } = await supabase
       .from("user_books")
       .select(
@@ -183,7 +193,7 @@ export default function BooksPage() {
         )
       `
       )
-      .eq("user_id", userIdToView)
+      .eq("user_id", safeUserId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -221,7 +231,29 @@ export default function BooksPage() {
       if (cancelled) return;
 
       setMeId(user.id);
-      setViewingUserId((prev) => prev || user.id);
+
+      const { data: meProfile, error: meProfileErr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (meProfileErr) {
+        logSbError("Error loading my profile role:", meProfileErr);
+      }
+
+      const role = (meProfile?.role as ProfileRole | null) ?? "student";
+
+      if (cancelled) return;
+
+      setMyRole(role);
+      setViewingUserId(user.id);
+
+      // Only teachers need student lists.
+      if (role !== "teacher") {
+        setStudents([]);
+        return;
+      }
 
       const { data: rels, error: relErr } = await supabase
         .from("teacher_students")
@@ -270,10 +302,10 @@ export default function BooksPage() {
   }, []);
 
   useEffect(() => {
-    if (!viewingUserId) return;
+    if (!viewingUserId || !meId) return;
     fetchBooks(viewingUserId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingUserId]);
+  }, [viewingUserId, meId, isTeacher]);
 
   async function findExistingBookId(cleanIsbn13: string, bookKey: string) {
     if (cleanIsbn13) {
@@ -298,10 +330,10 @@ export default function BooksPage() {
       .eq("book_key", bookKey)
       .limit(1);
 
-      if (error) {
-        logSbError("Find by book_key error:", error);
-        throw new Error(`Error searching books by key: ${error.message}`);
-      }
+    if (error) {
+      logSbError("Find by book_key error:", error);
+      throw new Error(`Error searching books by key: ${error.message}`);
+    }
 
     const first = (data ?? [])[0] as { id: string } | undefined;
     return first?.id ?? null;
@@ -310,6 +342,12 @@ export default function BooksPage() {
   async function addBook(e: React.FormEvent) {
     e.preventDefault();
     if (adding) return;
+
+    if (!isTeacher) {
+      setMessage("Only teachers can add books.");
+      setMessageType("error");
+      return;
+    }
 
     setAdding(true);
     setMessage("");
@@ -455,7 +493,7 @@ export default function BooksPage() {
 
     setStartingUserBookId(null);
     setStartDate("");
-    fetchBooks(viewingUserId);
+    fetchBooks(viewingUserId || meId);
   }
 
   async function saveFinishedDate(userBookId: string) {
@@ -472,7 +510,7 @@ export default function BooksPage() {
 
     setFinishingUserBookId(null);
     setFinishDate("");
-    fetchBooks(viewingUserId);
+    fetchBooks(viewingUserId || meId);
   }
 
   const validRows = rows.filter((r) => !!r.books);
@@ -662,13 +700,15 @@ export default function BooksPage() {
           View Vocab List
         </a>
 
-        <a
-          href={`/vocab/bulk?userBookId=${row.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-1 text-[12px] px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-        >
-          Add Vocab
-        </a>
+        {isTeacher ? (
+          <a
+            href={`/vocab/bulk?userBookId=${row.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 text-[12px] px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+          >
+            Add Vocab
+          </a>
+        ) : null}
       </li>
     );
   }
@@ -694,28 +734,34 @@ export default function BooksPage() {
 
       <UserBar />
 
-      <div className="mb-4 flex flex-col gap-2">
-        <div className="text-sm text-gray-700">
-          Viewing: <span className="font-medium">{viewingLabel}</span>
+      {isTeacher ? (
+        <div className="mb-4 flex flex-col gap-2">
+          <div className="text-sm text-gray-700">
+            Viewing: <span className="font-medium">{viewingLabel}</span>
+          </div>
+
+          <select
+            value={viewingUserId || meId}
+            onChange={(e) => setViewingUserId(e.target.value)}
+            className="border p-2 rounded w-full bg-white"
+            disabled={!meId}
+          >
+            <option value={meId}>Me</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.display_name}
+                {s.level ? ` (${s.level})` : ""}
+              </option>
+            ))}
+          </select>
+
+          <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
         </div>
-
-        <select
-          value={viewingUserId || meId}
-          onChange={(e) => setViewingUserId(e.target.value)}
-          className="border p-2 rounded w-full bg-white"
-          disabled={!meId}
-        >
-          <option value={meId}>Me</option>
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.display_name}
-              {s.level ? ` (${s.level})` : ""}
-            </option>
-          ))}
-        </select>
-
-        <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
-      </div>
+      ) : (
+        <div className="mb-4 text-sm text-gray-700">
+          Viewing: <span className="font-medium">Me</span>
+        </div>
+      )}
 
       {message ? (
         <p className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"}`}>{message}</p>
@@ -726,23 +772,27 @@ export default function BooksPage() {
       <Section title="Finished" subtitle="Completed books" items={finished} />
 
       {validRows.length === 0 ? (
-        <div className="text-sm text-gray-600 mt-8">No books yet — click “+ Add Book” to start.</div>
+        <div className="text-sm text-gray-600 mt-8">
+          {isTeacher ? "No books yet — click “+ Add Book” to start." : "No books yet."}
+        </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => {
-          setMessage("");
-          setMessageType("");
-          setShowAddModal(true);
-        }}
-        className="fixed bottom-6 right-6 z-40 rounded-full bg-blue-600 text-white px-5 py-3 shadow-lg hover:bg-blue-700"
-        title={`Add a book for: ${viewingLabel}`}
-      >
-        + Add Book
-      </button>
+      {isTeacher ? (
+        <button
+          type="button"
+          onClick={() => {
+            setMessage("");
+            setMessageType("");
+            setShowAddModal(true);
+          }}
+          className="fixed bottom-6 right-6 z-40 rounded-full bg-blue-600 text-white px-5 py-3 shadow-lg hover:bg-blue-700"
+          title={`Add a book for: ${viewingLabel}`}
+        >
+          + Add Book
+        </button>
+      ) : null}
 
-      {showAddModal ? (
+      {showAddModal && isTeacher ? (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white border shadow-xl p-5">
             <div className="flex items-start justify-between gap-3 mb-3">

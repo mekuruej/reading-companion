@@ -3,7 +3,7 @@ import "./globals.css";
 import Header from "../components/Header";
 
 export const metadata: Metadata = {
-  title: "Mekuru Reading Companion",
+  title: "Mekuru Reading Companion | ページをめくって、話しまくろう",
   description: "Every word carries the memory of where you met it.",
 };
 
