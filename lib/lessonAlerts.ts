@@ -79,7 +79,7 @@ export function getLessonAlertInfo(params: {
       kind: "student_last_chance" as LessonAlertKind,
       title: "⚠ LAST CHANCE!",
       message:
-        "Lesson tomorrow! A quick review today will make the reading feel lighter.",
+        "Lesson tomorrow! A quick review of your kanji readings will make the reading feel lighter.",
       alertKey: `student_last_chance:${dateStamp}:${normalizedLessonDay}`,
       showBadge: true,
       badgeText: "LAST CHANCE",

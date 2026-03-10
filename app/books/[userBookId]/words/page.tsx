@@ -323,9 +323,10 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
           )
           .eq("user_book_id", userBookId)
           .order("chapter_number", { ascending: true, nullsFirst: false })
-          .order("page_number", { ascending: true, nullsFirst: false })
-          .order("created_at", { ascending: true })
-          .order("id", { ascending: true })
+.order("page_number", { ascending: true, nullsFirst: false })
+.order("page_order", { ascending: true, nullsFirst: false })
+.order("created_at", { ascending: true })
+.order("id", { ascending: true })
           .returns<WordRow[]>();
 
         if (wErr) throw wErr;
