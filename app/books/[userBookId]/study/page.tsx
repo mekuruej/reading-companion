@@ -115,9 +115,18 @@ function normalizeReading(s: string) {
     .trim()
     .replace(/\s+/g, "")
     .replace(/[・･]/g, "")
+    .replace(/ー/g, "")
     .toLowerCase();
 }
 
+function isHiraganaOnly(s: string) {
+  return /^[ぁ-ゖー]+$/.test(s.trim());
+}
+function kataToHira(s: string) {
+  return s.replace(/[ァ-ヶ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
 function normalizeMeaning(s: string) {
   return (s ?? "")
     .trim()
@@ -546,31 +555,41 @@ export default function BookFlashcardsPage() {
   }
 
   function checkTypedAnswer() {
-    if (!isTwoStep) return;
-    const c = filteredCards[index];
-    const answerField = steps[1];
+  if (!isTwoStep) return;
+  const c = filteredCards[index];
+  const answerField = steps[1];
 
-    const correctRaw = getFieldValue(answerField, c);
-    if (!correctRaw) {
-      setChecked({ ok: true, correct: "—" });
-      return;
-    }
-
-    const userAns = answer;
-    let ok = false;
-
-    if (answerField === "reading") {
-      ok = normalizeReading(userAns) === normalizeReading(correctRaw);
-    } else if (answerField === "meaning") {
-      const u = normalizeMeaning(userAns);
-      const corr = normalizeMeaning(correctRaw);
-      ok = u.length > 0 && corr.includes(u);
-    } else {
-      ok = userAns.trim() === correctRaw.trim();
-    }
-
-    setChecked({ ok, correct: correctRaw });
+  const correctRaw = getFieldValue(answerField, c);
+  if (!correctRaw) {
+    setChecked({ ok: true, correct: "—" });
+    return;
   }
+
+  let userAns = kataToHira(answer.trim());
+
+  // Enforce hiragana-only answers for reading questions
+  if (answerField === "reading" && !isHiraganaOnly(userAns)) {
+    setChecked({
+      ok: false,
+      correct: "Please answer in hiragana only.",
+    });
+    return;
+  }
+
+  let ok = false;
+
+  if (answerField === "reading") {
+    ok = normalizeReading(userAns) === normalizeReading(correctRaw);
+  } else if (answerField === "meaning") {
+    const u = normalizeMeaning(userAns);
+    const corr = normalizeMeaning(correctRaw);
+    ok = u.length > 0 && corr.includes(u);
+  } else {
+    ok = userAns === correctRaw.trim();
+  }
+
+  setChecked({ ok, correct: correctRaw });
+}
 
   function flip() {
     if (firstTouch) setFirstTouch(false);
@@ -960,10 +979,10 @@ export default function BookFlashcardsPage() {
                 </div>
 
                 {needsKanaInput ? (
-                  <p className="mb-2 text-xs text-gray-500">
-                    Tip: for reading questions, switch your keyboard to かな and disable 漢字変換 if it keeps converting.
-                  </p>
-                ) : null}
+  <p className="mb-2 text-xs text-gray-500">
+    Reading quizzes should be answered in hiragana only. If needed, switch your keyboard to かな and disable 漢字変換.
+  </p>
+) : null}
 
                 <div className="flex gap-2">
                   <input

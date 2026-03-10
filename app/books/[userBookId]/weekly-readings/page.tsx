@@ -18,6 +18,7 @@ type ReadingCardRow = {
   source_word: string;
   kanji: string;
   reading: string;
+  reading_type: "onyomi" | "kunyomi" | "other" | null;
   created_at: string;
 };
 
@@ -25,7 +26,15 @@ type QuizCard = {
   key: string;
   kanji: string;
   reading: string;
+  readingType: "onyomi" | "kunyomi" | "other" | null;
 };
+
+function readingTypeLabel(val: "onyomi" | "kunyomi" | "other" | null) {
+  if (val === "onyomi") return "Onyomi";
+  if (val === "kunyomi") return "Kunyomi";
+  if (val === "other") return "Other";
+  return "";
+}
 
 function shuffleArray<T>(arr: T[]) {
   const copy = [...arr];
@@ -37,7 +46,11 @@ function shuffleArray<T>(arr: T[]) {
 }
 
 function normalizeReading(s: string) {
-  return (s ?? "").trim().replace(/\s+/g, "").replace(/[・･]/g, "").toLowerCase();
+  return (s ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[・･]/g, "")
+    .toLowerCase();
 }
 
 export default function WeeklyReadingsPage() {
@@ -58,8 +71,6 @@ export default function WeeklyReadingsPage() {
 
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
-
-  const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -117,7 +128,7 @@ export default function WeeklyReadingsPage() {
 
         const { data: rows, error: cardsErr } = await supabase
           .from("user_book_weekly_reading_cards")
-          .select("id,set_id,sort_order,source_word,kanji,reading,created_at")
+          .select("id,set_id,sort_order,source_word,kanji,reading,reading_type,created_at")
           .eq("set_id", activeSet.id)
           .order("sort_order", { ascending: true })
           .order("created_at", { ascending: true })
@@ -125,12 +136,13 @@ export default function WeeklyReadingsPage() {
 
         if (cardsErr) throw cardsErr;
 
-        const core = (rows ?? [])
+        const core: QuizCard[] = (rows ?? [])
           .filter((r) => r.kanji?.trim() && r.reading?.trim())
           .map((r) => ({
             key: r.id,
             kanji: r.kanji.trim(),
             reading: r.reading.trim(),
+            readingType: r.reading_type ?? null,
           }));
 
         setBaseCards(core);
@@ -187,13 +199,12 @@ export default function WeeklyReadingsPage() {
     );
 
     const shuffled = shuffleArray(distractorPool).slice(0, 2);
-    const all = shuffleArray([correct, ...shuffled]);
-
-    return all;
+    return shuffleArray([correct, ...shuffled]);
   }, [card, baseCards, index]);
 
   function checkAnswer(choice: string) {
     if (!card || checked) return;
+
     const ok = normalizeReading(choice) === normalizeReading(card.reading);
     setSelected(choice);
     setChecked({ ok, correct: card.reading });
@@ -206,10 +217,11 @@ export default function WeeklyReadingsPage() {
       setChecked(null);
       return;
     }
+
     setIndex((prev) => prev + 1);
     setSelected(null);
     setChecked(null);
-    if (showIntro) setShowIntro(false);
+
   }
 
   useEffect(() => {
@@ -219,6 +231,7 @@ export default function WeeklyReadingsPage() {
       if (checked && e.key === "Enter") {
         e.preventDefault();
         nextCard();
+        return;
       }
 
       if (!checked) {
@@ -230,7 +243,7 @@ export default function WeeklyReadingsPage() {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [card, checked, options, index]);
+  }, [card, checked, options]);
 
   if (loading) {
     return (
@@ -244,7 +257,10 @@ export default function WeeklyReadingsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-gray-700">You need to sign in to view this week’s readings.</p>
-        <button onClick={() => router.push("/books")} className="px-4 py-2 bg-gray-200 rounded">
+        <button
+          onClick={() => router.push("/books")}
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
           Back to Books
         </button>
       </main>
@@ -255,7 +271,10 @@ export default function WeeklyReadingsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-red-700">{errorMsg}</p>
-        <button onClick={() => router.push(`/books/${userBookId}/study`)} className="px-4 py-2 bg-gray-200 rounded">
+        <button
+          onClick={() => router.push(`/books/${userBookId}/study`)}
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
           Back to Study
         </button>
       </main>
@@ -266,7 +285,10 @@ export default function WeeklyReadingsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-gray-700">This week’s readings are not ready yet.</p>
-        <button onClick={() => router.push(`/books/${userBookId}/study`)} className="px-4 py-2 bg-gray-200 rounded">
+        <button
+          onClick={() => router.push(`/books/${userBookId}/study`)}
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
           Back to Study
         </button>
       </main>
@@ -278,9 +300,7 @@ export default function WeeklyReadingsPage() {
       <main className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-xl border rounded-2xl bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold">Nice work!</h1>
-          <p className="mt-3 text-gray-700">
-            You’re more ready for this week’s reading.
-          </p>
+          <p className="mt-3 text-gray-700">You’re more ready for this week’s reading.</p>
           <p className="mt-2 text-sm text-gray-500">
             Come back tomorrow to reinforce the readings.
           </p>
@@ -292,14 +312,17 @@ export default function WeeklyReadingsPage() {
             >
               Back to Study
             </button>
+
             <button
               onClick={() => {
                 const firstRound = shuffleArray(baseCards).map((c, i) => ({
                   ...c,
                   key: `${c.key}-restart-first-${i}`,
                 }));
+
                 const repeatsNeeded = Math.max(40 - firstRound.length, 0);
                 const repeatPool: QuizCard[] = [];
+
                 for (let i = 0; i < repeatsNeeded; i++) {
                   const picked = baseCards[Math.floor(Math.random() * baseCards.length)];
                   repeatPool.push({
@@ -307,11 +330,11 @@ export default function WeeklyReadingsPage() {
                     key: `${picked.key}-restart-repeat-${i}`,
                   });
                 }
+
                 setDeck([...firstRound, ...shuffleArray(repeatPool)]);
                 setIndex(0);
                 setSelected(null);
                 setChecked(null);
-                setShowIntro(false);
               }}
               className="px-4 py-2 bg-gray-700 text-white rounded"
             >
@@ -326,7 +349,10 @@ export default function WeeklyReadingsPage() {
   return (
     <main className="min-h-screen flex flex-col items-center p-6">
       <div className="flex flex-col items-center mb-4">
-        {bookCover ? <img src={bookCover} alt="" className="w-20 h-28 rounded mb-2" /> : null}
+        {bookCover ? (
+          <img src={bookCover} alt="" className="w-20 h-28 rounded mb-2" />
+        ) : null}
+
         <h1 className="text-xl font-semibold">{bookTitle}</h1>
         <p className="mt-1 text-sm text-gray-500">This Week’s Kanji Readings</p>
         <p className="text-sm text-gray-500">
@@ -334,14 +360,20 @@ export default function WeeklyReadingsPage() {
         </p>
       </div>
 
-      {showIntro ? (
-        <p className="mb-3 text-sm text-gray-500 text-center">
-          These readings appear in the pages you'll read this week.
-          Focus on recognizing the kanji reading.
-        </p>
-      ) : null}
+      <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
+  Kanji often have many different readings. 
+  <br />
+  The reading you will practice here
+  comes from an upcoming word in your book.
+</p>
 
-      <div className="w-[90vw] max-w-xl min-h-72 bg-white rounded-2xl border border-slate-500 shadow-2xl flex items-center justify-center text-center select-none p-8">
+      <div className="relative w-[90vw] max-w-xl min-h-72 bg-white rounded-2xl border border-slate-500 shadow-2xl flex items-center justify-center text-center select-none p-8">
+        {card.readingType ? (
+          <div className="absolute top-3 left-4 text-[11px] text-slate-500">
+            {readingTypeLabel(card.readingType)}
+          </div>
+        ) : null}
+
         <div className="w-full flex flex-col items-center justify-center gap-6">
           <div className="w-full flex flex-col items-center gap-1">
             <div className="text-xs uppercase tracking-wide text-slate-500">Kanji</div>
@@ -350,10 +382,13 @@ export default function WeeklyReadingsPage() {
 
           <div className="w-full max-w-sm flex flex-col gap-3">
             {options.map((opt, i) => {
-              const isCorrect = checked && normalizeReading(opt) === normalizeReading(card.reading);
-              const isChosen = selected && normalizeReading(opt) === normalizeReading(selected);
+              const isCorrect =
+                !!checked && normalizeReading(opt) === normalizeReading(card.reading);
+              const isChosen =
+                !!selected && normalizeReading(opt) === normalizeReading(selected);
 
               let className = "w-full px-4 py-3 rounded border text-base ";
+
               if (!checked) {
                 className += "bg-white hover:bg-gray-50";
               } else if (isCorrect) {

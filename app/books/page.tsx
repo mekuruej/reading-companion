@@ -239,16 +239,17 @@ export default function BooksPage() {
       setMeId(user.id);
 
       const { data: meProfile, error: meProfileErr } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+  .from("profiles")
+  .select("role, is_super_teacher")
+  .eq("id", user.id)
+  .single();
 
       if (meProfileErr) {
         logSbError("Error loading my profile role:", meProfileErr);
       }
 
       const role = (meProfile?.role as ProfileRole | null) ?? "student";
+const isSuperTeacher = Boolean((meProfile as any)?.is_super_teacher);
 
       if (cancelled) return;
 
@@ -256,50 +257,99 @@ export default function BooksPage() {
       setViewingUserId(user.id);
 
       // Only teachers need student lists.
-      if (role !== "teacher") {
-        setStudents([]);
-        return;
-      }
+if (role !== "teacher") {
+  setStudents([]);
+  return;
+}
 
-      const { data: rels, error: relErr } = await supabase
-        .from("teacher_students")
-        .select("student_id")
-        .eq("teacher_id", user.id);
+if (isSuperTeacher) {
+  const { data: profs, error: profErr } = await supabase
+    .from("profiles")
+    .select("id, display_name, level, role")
+    .order("display_name", { ascending: true });
 
-      if (relErr) {
-        logSbError("Error loading teacher_students:", relErr);
-        if (!cancelled) setStudents([]);
-        return;
-      }
+  if (profErr) {
+    logSbError("Error loading all profiles:", profErr);
+    if (!cancelled) setStudents([]);
+    return;
+  }
 
-      const studentIds = (rels ?? []).map((r: any) => r.student_id).filter(Boolean);
+  if (cancelled) return;
 
-      if (studentIds.length === 0) {
-        if (!cancelled) setStudents([]);
-        return;
-      }
+  setStudents(
+    (profs ?? []).map((p: any) => ({
+      id: p.id,
+      display_name: p.display_name || "User",
+      level: p.level ?? null,
+      role: p.role ?? null,
+    })) as any
+  );
 
-      const { data: profs, error: profErr } = await supabase
-        .from("profiles")
-        .select("id, display_name, level")
-        .in("id", studentIds)
-        .order("display_name", { ascending: true });
+  return;
+}
 
-      if (profErr) {
-        logSbError("Error loading student profiles:", profErr);
-        if (!cancelled) setStudents([]);
-        return;
-      }
+const { data: rels, error: relErr } = await supabase
+  .from("teacher_students")
+  .select("student_id")
+  .eq("teacher_id", user.id);
+
+if (relErr) {
+  logSbError("Error loading teacher_students:", relErr);
+  if (!cancelled) setStudents([]);
+  return;
+}
+
+const studentIds = (rels ?? []).map((r: any) => r.student_id).filter(Boolean);
+
+if (studentIds.length === 0) {
+  if (!cancelled) setStudents([]);
+  return;
+}
+
+const { data: profs, error: profErr } = await supabase
+  .from("profiles")
+  .select("id, display_name, level, role")
+  .in("id", studentIds)
+  .order("display_name", { ascending: true });
+
+if (profErr) {
+  logSbError("Error loading student profiles:", profErr);
+  if (!cancelled) setStudents([]);
+  return;
+}
 
       if (cancelled) return;
 
-      setStudents(
-        (profs ?? []).map((p: any) => ({
-          id: p.id,
-          display_name: p.display_name,
-          level: p.level ?? null,
-        }))
-      );
+      const meOption = {
+  id: user.id,
+  display_name: "Me",
+  level: null,
+  role: "teacher",
+};
+
+const studentOptions = (profs ?? [])
+  .filter((p: any) => p.id !== user.id && p.role === "student")
+  .map((p: any) => ({
+    id: p.id,
+    display_name: p.display_name,
+    level: p.level ?? null,
+    role: p.role,
+  }));
+
+const teacherOptions = (profs ?? [])
+  .filter((p: any) => p.id !== user.id && p.role === "teacher")
+  .map((p: any) => ({
+    id: p.id,
+    display_name: p.display_name,
+    level: p.level ?? null,
+    role: p.role,
+  }));
+
+setStudents([
+  meOption,
+  ...studentOptions,
+  ...teacherOptions,
+] as any);
     })();
 
     return () => {
@@ -690,43 +740,57 @@ export default function BooksPage() {
           )}
         </div>
 
-                <div className="mt-2 flex flex-col items-center gap-1">
+                <div className="mt-2 flex flex-col items-center gap-2 w-full">
   <div className="text-[10px] uppercase tracking-wide text-gray-500">
-    Read → Review → Prepare
+    Read → Review → Practice
   </div>
 
   <a
-    href={`/books/${row.id}/words`}
-    onClick={(e) => e.stopPropagation()}
-    className="mt-1 text-[12px] px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-800 transition"
-  >
-    View Vocab List (Book Order)
-  </a>
+  href={`/books/${row.id}/words`}
+  onClick={(e) => e.stopPropagation()}
+  className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+>
+  {row.finished_at ? "Vocab List" : "Read with the Vocab List"}
+</a>
 
-  <a
-    href={`/books/${row.id}/study`}
-    onClick={(e) => e.stopPropagation()}
-    className="mt-1 text-[12px] px-3 py-1 bg-green-600 text-white rounded hover:bg-green-800 transition"
-  >
-    Review Vocab (Random)
-  </a>
+  {row.started_at && !row.finished_at ? (
+    <>
+      <a
+        href={`/books/${row.id}/study`}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition"
+      >
+        Study Vocab
+      </a>
 
-  <a
-    href={`/books/${row.id}/weekly-readings`}
-    onClick={(e) => e.stopPropagation()}
-    className="mt-1 text-[12px] px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-800 transition"
-  >
-    Practice Weekly Kanji Readings
-  </a>
+      <a
+        href={`/books/${row.id}/weekly-readings`}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-purple-700 text-white rounded hover:bg-purple-800 transition"
+      >
+        Practice Readings
+      </a>
 
-  {isTeacher ? (
+      {isTeacher ? (
+  <>
     <a
       href={`/vocab/bulk?userBookId=${row.id}`}
       onClick={(e) => e.stopPropagation()}
-      className="mt-1 text-[12px] px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-800 transition"
+      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
     >
       Add Vocab
     </a>
+
+    <a
+      href={`/books/${row.id}/weekly-readings/prepare`}
+      onClick={(e) => e.stopPropagation()}
+      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
+    >
+      Prepare Readings
+    </a>
+  </>
+) : null}
+    </>
   ) : null}
 </div>
       </li>
@@ -753,7 +817,8 @@ export default function BooksPage() {
       <h1 className="text-2xl font-semibold mb-2">📚 Books</h1>
      
       <p className="text-sm text-gray-500 mt-2 max-w-xl">
-Read with the vocab list in book order, review vocabulary with flashcards, and strengthen your reading skills for the week with kanji readings.
+Read the book along with your vocab, review your vocabulary with flashcards,
+        or strengthen your reading skills for the week with kanji readings.
 </p>
 
       {isTeacher ? (
@@ -769,12 +834,31 @@ Read with the vocab list in book order, review vocabulary with flashcards, and s
       disabled={!meId}
     >
       <option value={meId}>Me</option>
-      {students.map((s) => (
+
+{students.some((s: any) => s.role === "student" && s.id !== meId) ? (
+  <optgroup label="Students">
+    {students
+      .filter((s: any) => s.role === "student" && s.id !== meId)
+      .map((s: any) => (
         <option key={s.id} value={s.id}>
           {s.display_name}
           {s.level ? ` (${s.level})` : ""}
         </option>
       ))}
+  </optgroup>
+) : null}
+
+{students.some((s: any) => s.role === "teacher" && s.id !== meId) ? (
+  <optgroup label="Teachers">
+    {students
+      .filter((s: any) => s.role === "teacher" && s.id !== meId)
+      .map((s: any) => (
+        <option key={s.id} value={s.id}>
+          {s.display_name}
+        </option>
+      ))}
+  </optgroup>
+) : null}
     </select>
 
     <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
@@ -786,8 +870,16 @@ Read with the vocab list in book order, review vocabulary with flashcards, and s
       ) : null}
 
       <Section title="Currently Reading" subtitle="Started but not finished yet" items={currentlyReading} />
-      <Section title="Want to Read" subtitle="Not started yet" items={notStarted} />
-      <Section title="Finished" subtitle="Completed books" items={finished} />
+      <Section
+  title="Want to Read"
+  subtitle="Not started yet • Study buttons will appear once marked started."
+  items={notStarted}
+/>
+      <Section
+  title="Finished"
+  subtitle="Completed books • Study buttons can be found in Vocab List."
+  items={finished}
+/>
 
       {validRows.length === 0 ? (
         <div className="text-sm text-gray-600 mt-8">

@@ -234,7 +234,7 @@ export default function StatsPage() {
     <main className="mx-auto max-w-3xl p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">THIS PAGE IS CURRENTLY NOT ACTIVE: Stats</h1>
+          <h1 className="text-2xl font-bold">THIS PAGE IS CURRENTLY UNDER CONSTRUCTION: Stats</h1>
           <p className="mt-1 text-sm text-slate-600">
             Your colors are based on lookup behavior — not self-reports.
           </p>
