@@ -1,3 +1,4 @@
+// Readings Flashcards
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -22,18 +23,31 @@ type ReadingCardRow = {
   created_at: string;
 };
 
+type UserBookWordRow = {
+  surface: string;
+  reading: string | null;
+  meaning: string | null;
+  created_at: string;
+};
+
 type QuizCard = {
   key: string;
   kanji: string;
   reading: string;
   readingType: "onyomi" | "kunyomi" | "other" | null;
+  sourceWord: string;
+  sourceMeaning: string | null;
+  sourceReading: string | null;
 };
 
-function readingTypeLabel(val: "onyomi" | "kunyomi" | "other" | null) {
-  if (val === "onyomi") return "Onyomi";
-  if (val === "kunyomi") return "Kunyomi";
-  if (val === "other") return "Other";
-  return "";
+type RecallResult = "correct" | "wrong" | "shown" | null;
+
+function readingTypeLabel(val: "onyomi" | "kunyomi" | "other" | null | string) {
+  const v = (val ?? "").toLowerCase().trim();
+  if (v === "onyomi") return "Onyomi";
+  if (v === "kunyomi") return "Kunyomi";
+  if (v === "other") return "Other";
+  return v ? v : "";
 }
 
 function shuffleArray<T>(arr: T[]) {
@@ -46,6 +60,14 @@ function shuffleArray<T>(arr: T[]) {
 }
 
 function normalizeReading(s: string) {
+  return (s ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[・･]/g, "")
+    .toLowerCase();
+}
+
+function normalizeWord(s: string) {
   return (s ?? "")
     .trim()
     .replace(/\s+/g, "")
@@ -71,6 +93,14 @@ export default function WeeklyReadingsPage() {
 
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
+
+  const [guessInput, setGuessInput] = useState("");
+  const [recallRevealed, setRecallRevealed] = useState(false);
+  const [recallResult, setRecallResult] = useState<RecallResult>(null);
+  const [skipTypingThisSession, setSkipTypingThisSession] = useState(false);
+  const [endedEarly, setEndedEarly] = useState(false);
+  const [usedRecallWords, setUsedRecallWords] = useState<string[]>([]);
+  const [cardsSinceLastRecall, setCardsSinceLastRecall] = useState(0);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -136,13 +166,46 @@ export default function WeeklyReadingsPage() {
 
         if (cardsErr) throw cardsErr;
 
+        const sourceWords = Array.from(
+          new Set((rows ?? []).map((r) => r.source_word?.trim()).filter(Boolean))
+        ) as string[];
+
+        const sourceWordMap = new Map<string, { meaning: string | null; reading: string | null }>();
+
+        if (sourceWords.length > 0) {
+          const { data: wordRows, error: wordErr } = await supabase
+            .from("user_book_words")
+            .select("surface,reading,meaning,created_at")
+            .eq("user_book_id", userBookId)
+            .in("surface", sourceWords)
+            .order("created_at", { ascending: true })
+            .returns<UserBookWordRow[]>();
+
+          if (wordErr) throw wordErr;
+
+          for (const row of wordRows ?? []) {
+            const key = normalizeWord(row.surface);
+            if (!sourceWordMap.has(key)) {
+              sourceWordMap.set(key, {
+                meaning: row.meaning ?? null,
+                reading: row.reading ?? null,
+              });
+            }
+          }
+        }
+
         const core: QuizCard[] = (rows ?? [])
           .filter((r) => r.kanji?.trim() && r.reading?.trim())
           .map((r) => ({
             key: r.id,
             kanji: r.kanji.trim(),
             reading: r.reading.trim(),
-            readingType: r.reading_type ?? null,
+            readingType: (r.reading_type ?? null) as "onyomi" | "kunyomi" | "other" | null,
+            sourceWord: r.source_word?.trim() ?? "",
+            sourceMeaning:
+              sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.meaning ?? null,
+            sourceReading:
+              sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.reading ?? null,
           }));
 
         setBaseCards(core);
@@ -186,6 +249,23 @@ export default function WeeklyReadingsPage() {
 
   const card = deck[index];
 
+  const canStartRecall =
+  !!card &&
+  !!checked &&
+  checked.ok &&
+  !skipTypingThisSession &&
+  cardsSinceLastRecall >= 4 &&
+  !!card.sourceWord &&
+  !usedRecallWords.includes(normalizeWord(card.sourceWord));
+
+const inRecallFlow =
+  !!card &&
+  !!checked &&
+  checked.ok &&
+  !skipTypingThisSession &&
+  !!card.sourceWord &&
+  (recallRevealed || canStartRecall);
+
   const options = useMemo(() => {
     if (!card || baseCards.length === 0) return [];
 
@@ -202,31 +282,113 @@ export default function WeeklyReadingsPage() {
     return shuffleArray([correct, ...shuffled]);
   }, [card, baseCards, index]);
 
+  function resetCardState() {
+    setSelected(null);
+    setChecked(null);
+    setGuessInput("");
+    setRecallRevealed(false);
+    setRecallResult(null);
+  }
+
+  function restartDeck() {
+    const firstRound = shuffleArray(baseCards).map((c, i) => ({
+      ...c,
+      key: `${c.key}-restart-first-${i}`,
+    }));
+
+    const repeatsNeeded = Math.max(40 - firstRound.length, 0);
+    const repeatPool: QuizCard[] = [];
+
+    for (let i = 0; i < repeatsNeeded; i++) {
+      const picked = baseCards[Math.floor(Math.random() * baseCards.length)];
+      repeatPool.push({
+        ...picked,
+        key: `${picked.key}-restart-repeat-${i}`,
+      });
+    }
+
+    setDeck([...firstRound, ...shuffleArray(repeatPool)]);
+    setIndex(0);
+    resetCardState();
+    setSkipTypingThisSession(false);
+    setEndedEarly(false);
+    setUsedRecallWords([]);
+    setCardsSinceLastRecall(0);
+  }
+
   function checkAnswer(choice: string) {
     if (!card || checked) return;
 
     const ok = normalizeReading(choice) === normalizeReading(card.reading);
     setSelected(choice);
     setChecked({ ok, correct: card.reading });
+    setGuessInput("");
+    setRecallRevealed(false);
+    setRecallResult(null);
+  }
+
+  function revealRecallCard(mode: Exclude<RecallResult, null>) {
+    if (card?.sourceWord) {
+      const normalized = normalizeWord(card.sourceWord);
+      setUsedRecallWords((prev) =>
+        prev.includes(normalized) ? prev : [...prev, normalized]
+      );
+    }
+
+    setRecallResult(mode);
+    setRecallRevealed(true);
+    setCardsSinceLastRecall(0);
+  }
+
+  function submitGuess() {
+    if (!card || !inRecallFlow || recallRevealed) return;
+
+    const typed = normalizeWord(guessInput);
+    const answer = normalizeWord(card.sourceWord);
+
+    if (!typed) {
+      revealRecallCard("shown");
+      return;
+    }
+
+    if (typed === answer) {
+      revealRecallCard("correct");
+    } else {
+      revealRecallCard("wrong");
+    }
   }
 
   function nextCard() {
     if (index + 1 >= deck.length) {
       setIndex(deck.length);
-      setSelected(null);
-      setChecked(null);
+      resetCardState();
+      setEndedEarly(false);
       return;
     }
 
-    setIndex((prev) => prev + 1);
-    setSelected(null);
-    setChecked(null);
+    const shouldCountNormalCorrect = !!checked?.ok && !recallRevealed;
 
+    setIndex((prev) => prev + 1);
+    resetCardState();
+
+    if (shouldCountNormalCorrect) {
+      setCardsSinceLastRecall((prev) => prev + 1);
+    }
+  }
+
+  function finishForToday() {
+    setEndedEarly(true);
+    setIndex(deck.length);
+    resetCardState();
   }
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (!card) return;
+
+      if (inRecallFlow) {
+  return;
+}
 
       if (checked && e.key === "Enter") {
         e.preventDefault();
@@ -243,7 +405,7 @@ export default function WeeklyReadingsPage() {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [card, checked, options]);
+  }, [card, checked, options, inRecallFlow]);
 
   if (loading) {
     return (
@@ -299,11 +461,23 @@ export default function WeeklyReadingsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-xl border rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">Nice work!</h1>
-          <p className="mt-3 text-gray-700">You’re more ready for this week’s reading.</p>
-          <p className="mt-2 text-sm text-gray-500">
-            Come back tomorrow to reinforce the readings.
-          </p>
+          <h1 className="text-2xl font-semibold">
+            {endedEarly ? "Nice work today!" : "Nice work!"}
+          </h1>
+
+          {endedEarly ? (
+            <>
+              <p className="mt-3 text-gray-700">You gave these readings some practice.</p>
+              <p className="mt-2 text-sm text-gray-500">Come back when you’re ready.</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-3 text-gray-700">You’re more ready for this week’s reading.</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Come back tomorrow to reinforce the readings.
+              </p>
+            </>
+          )}
 
           <div className="mt-6 flex justify-center gap-3">
             <button
@@ -314,31 +488,10 @@ export default function WeeklyReadingsPage() {
             </button>
 
             <button
-              onClick={() => {
-                const firstRound = shuffleArray(baseCards).map((c, i) => ({
-                  ...c,
-                  key: `${c.key}-restart-first-${i}`,
-                }));
-
-                const repeatsNeeded = Math.max(40 - firstRound.length, 0);
-                const repeatPool: QuizCard[] = [];
-
-                for (let i = 0; i < repeatsNeeded; i++) {
-                  const picked = baseCards[Math.floor(Math.random() * baseCards.length)];
-                  repeatPool.push({
-                    ...picked,
-                    key: `${picked.key}-restart-repeat-${i}`,
-                  });
-                }
-
-                setDeck([...firstRound, ...shuffleArray(repeatPool)]);
-                setIndex(0);
-                setSelected(null);
-                setChecked(null);
-              }}
+              onClick={restartDeck}
               className="px-4 py-2 bg-gray-700 text-white rounded"
             >
-              Do It Again
+              {endedEarly ? "Do More Today" : "Do It Again"}
             </button>
           </div>
         </div>
@@ -347,32 +500,51 @@ export default function WeeklyReadingsPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center p-6">
-      <div className="flex flex-col items-center mb-4">
-        {bookCover ? (
-          <img src={bookCover} alt="" className="w-20 h-28 rounded mb-2" />
-        ) : null}
+    <main
+  className="min-h-screen flex flex-col items-center px-6 py-4"
+  style={{
+    backgroundImage: `
+      repeating-linear-gradient(
+        to bottom,
+        #f9f6ef 0px,
+        #f9f6ef 180px,
+        #d1b58f 181px,
+        #d1b58f 183px
+      ),
+      linear-gradient(to right, #f8f3e8 0%, #f3ede2 100%)
+    `,
+    backgroundSize: "100% 183px",
+  }}
+>
+      <div className="w-full max-w-5xl mb-1 flex flex-col md:flex-row items-center justify-center gap-8">
+  <div className="flex flex-col items-center shrink-0 md:mt-4">
+    {bookCover ? (
+      <img src={bookCover} alt="" className="w-24 h-32 rounded mb-2 object-cover" />
+    ) : null}
+    <h1 className="text-2xl font-semibold text-center">{bookTitle}</h1>
+  </div>
 
-        <h1 className="text-xl font-semibold">{bookTitle}</h1>
-        <p className="mt-1 text-sm text-gray-500">This Week’s Kanji Readings</p>
+  <div className="w-full md:w-[430px] flex items-center">
+    <p className="text-[15px] text-gray-500 text-left leading-7">
+      This page is refreshed each week with readings from upcoming vocabulary in your book. It is designed to help you strengthen your reading skills by focusing on individual onyomi and kunyomi readings. While the kanji come from upcoming words, the goal is to notice each kanji’s reading and whether it is onyomi or kunyomi so that you can apply that knowledge to vocabulary far beyond this week’s words.
+    </p>
+  </div>
+</div>
+<p className="mt-1 text-sm text-gray-500">This Week’s Kanji Readings</p>
         <p className="text-sm text-gray-500">
           Card {index + 1}/{deck.length}
         </p>
-      </div>
-
-      <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
-  Kanji often have many different readings. 
-  <br />
-  The reading you will practice here
-  comes from an upcoming word in your book.
-</p>
-
-      <div className="relative w-[90vw] max-w-xl min-h-72 bg-white rounded-2xl border border-slate-500 shadow-2xl flex items-center justify-center text-center select-none p-8">
-        {card.readingType ? (
-          <div className="absolute top-3 left-4 text-[11px] text-slate-500">
-            {readingTypeLabel(card.readingType)}
-          </div>
-        ) : null}
+<div
+  className="mt-6 relative w-[90vw] max-w-xl min-h-72 bg-white rounded-2xl border border-slate-500 shadow-2xl flex items-center justify-center text-center select-none p-8"
+        onClick={() => {
+          if (!checked && !inRecallFlow) return;
+if (inRecallFlow) return;
+          if (checked) nextCard();
+        }}
+      >
+        <div className="absolute top-3 left-4 text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
+  {String(card.readingType ?? "NO TYPE")}
+</div>
 
         <div className="w-full flex flex-col items-center justify-center gap-6">
           <div className="w-full flex flex-col items-center gap-1">
@@ -404,7 +576,10 @@ export default function WeeklyReadingsPage() {
                   key={`${opt}-${i}`}
                   type="button"
                   disabled={!!checked}
-                  onClick={() => checkAnswer(opt)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    checkAnswer(opt);
+                  }}
                   className={className}
                 >
                   <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
@@ -415,7 +590,7 @@ export default function WeeklyReadingsPage() {
           </div>
 
           {checked ? (
-            <div className="mt-2 text-sm text-center">
+            <div className="mt-2 w-full max-w-sm text-sm text-center">
               {checked.ok ? (
                 <p className="text-green-700">✅ Correct!</p>
               ) : (
@@ -425,25 +600,191 @@ export default function WeeklyReadingsPage() {
                 </>
               )}
 
-              <button
-                type="button"
-                onClick={nextCard}
-                className="mt-3 px-4 py-2 bg-gray-200 rounded"
-              >
-                Continue →
-              </button>
+              {inRecallFlow ? (
+                <div
+                  className="mt-4 border rounded-xl bg-slate-50 p-4 text-left"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {!recallRevealed ? (
+                    <>
+                      <p className="text-sm font-medium text-slate-800 text-center">
+                        Can you guess the word from this week?
+                      </p>
+
+                      <input
+                        type="text"
+                        value={guessInput}
+                        onChange={(e) => setGuessInput(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
+                        placeholder="Type your guess"
+                        className="mt-3 w-full rounded border px-3 py-2 text-base"
+                      />
+
+                      <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            submitGuess();
+                          }}
+                          className="px-4 py-2 bg-gray-700 text-white rounded"
+                        >
+                          Check
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            revealRecallCard("shown");
+                          }}
+                          className="px-4 py-2 bg-gray-200 rounded"
+                        >
+                          Show me
+                        </button>
+                      </div>
+
+                      {cardsSinceLastRecall >= 4 &&
+                      !skipTypingThisSession &&
+                      usedRecallWords.length === 0 ? (
+                        <div className="mt-3 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSkipTypingThisSession(true);
+                              setRecallResult("shown");
+                              setRecallRevealed(true);
+                              setCardsSinceLastRecall(0);
+                              if (card?.sourceWord) {
+                                const normalized = normalizeWord(card.sourceWord);
+                                setUsedRecallWords((prev) =>
+                                  prev.includes(normalized) ? prev : [...prev, normalized]
+                                );
+                              }
+                            }}
+                            className="text-xs text-slate-500 hover:underline"
+                          >
+                            Skip typing questions this session
+                          </button>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      {recallResult === "correct" ? (
+  <p className="text-green-700 text-center font-medium">
+    ピンポーン！ You got it!
+  </p>
+) : recallResult === "wrong" ? (
+  <p className="text-amber-700 text-center font-medium">
+    Good guess, but not that one!
+  </p>
+) : null}
+
+<div className="mt-3 rounded-xl border bg-white p-4 text-center">
+  {recallResult === "correct" ? (
+    <div className="mb-3 text-sm text-slate-700">
+      <div>
+        <span className="font-medium">⭕️ Your guess:</span> {guessInput.trim()}
+      </div>
+    </div>
+  ) : recallResult === "wrong" ? (
+    <div className="mb-3 text-sm text-slate-700 space-y-1">
+      <div>
+        <span className="font-medium">△ Your guess:</span> {guessInput.trim()}
+      </div>
+      <div>
+        <span className="font-medium">⭕️ Correct word:</span> {card.sourceWord}
+      </div>
+    </div>
+  ) : null}
+
+  {recallResult !== "wrong" ? (
+    <div className="text-lg font-semibold">{card.sourceWord}</div>
+  ) : null}
+
+  {card.sourceReading ? (
+    <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
+  ) : null}
+
+  {card.sourceMeaning ? (
+    <div className="mt-2 text-sm text-slate-700">{card.sourceMeaning}</div>
+  ) : null}
+</div>
+
+                      <div className="mt-3 text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            nextCard();
+                          }}
+                          className="px-4 py-2 bg-gray-200 rounded"
+                        >
+                          Continue
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    nextCard();
+                  }}
+                  className="mt-3 px-4 py-2 bg-gray-200 rounded"
+                >
+                  Continue
+                </button>
+              )}
             </div>
           ) : null}
         </div>
       </div>
+<p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
+  Kanji often have many different readings.
+  <br />
+  The reading you will practice here comes from an upcoming word in your book.
+</p>
+      <div className="mt-4 flex flex-col items-center gap-2">
+        <button
+          onClick={finishForToday}
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
+        >
+          That’s enough for today
+        </button>
 
-      <div className="mt-6">
+        <div className="mt-8 flex justify-center gap-3">
+        <button
+          onClick={() => router.push(`/books/${userBookId}/words`)}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
+        >
+          Vocab List
+        </button>
+
+        <button
+          onClick={() => router.push(`/books`)}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
+        >
+          Back to Books
+        </button>
+
         <button
           onClick={() => router.push(`/books/${userBookId}/study`)}
-          className="text-sm text-slate-600 hover:underline"
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
         >
-          ← Back to Study
+          Study Vocab
         </button>
+      </div>
       </div>
     </main>
   );

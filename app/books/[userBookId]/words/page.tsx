@@ -1,3 +1,4 @@
+// Word List
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -590,8 +591,14 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
           ))}
         </select>
       </div>
+<div className="mt-2 mb-4 w-full border-b border-gray-300 pb-4">
+  <p className="text-sm text-gray-500 text-center">
+    This page keeps track of all the vocabulary you didn’t know or had difficulty with while studying with your teacher. It is arranged in book order, so you are encouraged to read back over your passages with the list on hand to help you read more independently.
+  </p>
+</div>
 
-      <div className="overflow-x-auto border rounded bg-white">
+<div className="overflow-x-auto border rounded bg-white">
+
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left">

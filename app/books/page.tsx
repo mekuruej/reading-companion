@@ -1,8 +1,10 @@
+// Books Page
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
+import { getLessonAlertInfo } from "@/lib/lessonAlerts";
 
 type Book = {
   id: string;
@@ -28,9 +30,25 @@ type StudentOption = {
   id: string;
   display_name: string;
   level?: string | null;
+  role?: ProfileRole | null;
 };
 
 type ProfileRole = "teacher" | "student";
+
+type AlertBoxState = {
+  title: string;
+  message: string;
+  alertKey: string;
+  kind: "teacher_prepare" | "student_new_readings" | "student_last_chance";
+  showBadge: boolean;
+  badgeText: string | null;
+} | null;
+
+type TeacherPrepItem = {
+  studentId: string;
+  studentName: string;
+  message: string;
+};
 
 function UserBar({ isTeacher }: { isTeacher: boolean }) {
   const router = useRouter();
@@ -84,7 +102,7 @@ function UserBar({ isTeacher }: { isTeacher: boolean }) {
 
   if (!label) return null;
 
-    return isTeacher ? (
+  return isTeacher ? (
     <div className="flex justify-between items-center mb-4 text-sm text-gray-700">
       <span>Logged in as: {label}</span>
       <button onClick={handleLogout} className="border px-2 py-1 rounded-md hover:bg-gray-100">
@@ -102,8 +120,12 @@ function UserBar({ isTeacher }: { isTeacher: boolean }) {
 
 export default function BooksPage() {
   const [rows, setRows] = useState<UserBookRow[]>([]);
-
   const [showAddModal, setShowAddModal] = useState(false);
+
+  const [alertBox, setAlertBox] = useState<AlertBoxState>(null);
+  const [studentBadge, setStudentBadge] = useState<string | null>(null);
+  const [teacherPrepAlerts, setTeacherPrepAlerts] = useState<TeacherPrepItem[]>([]);
+
   const [adding, setAdding] = useState(false);
 
   const [isbn13, setIsbn13] = useState("");
@@ -161,57 +183,58 @@ export default function BooksPage() {
   }
 
   async function fetchBooks(userIdToView: string) {
-    setMessage("");
-    setMessageType("");
+  setMessage("");
+  setMessageType("");
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      setMessage("Please sign in to see books.");
-      setMessageType("error");
-      setRows([]);
-      return;
-    }
-
-    // Students should only ever view themselves.
-    const safeUserId = isTeacher ? userIdToView : user.id;
-
-    const { data, error } = await supabase
-      .from("user_books")
-      .select(
-        `
-        id,
-        book_id,
-        started_at,
-        finished_at,
-        books:book_id (
-          id,
-          title,
-          author,
-          translator,
-          illustrator,
-          publisher,
-          isbn13,
-          cover_url
-        )
-      `
-      )
-      .eq("user_id", safeUserId)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      logSbError("Error fetching user_books:", error);
-      setMessage("Error loading books. (If viewing a student: confirm link + RLS policies.)");
-      setMessageType("error");
-      setRows([]);
-      return;
-    }
-
-    setRows((data as any) || []);
+  if (userError || !user) {
+    setMessage("Please sign in to see books.");
+    setMessageType("error");
+    setRows([]);
+    return;
   }
+
+  // Teachers can view the selected user.
+  // Students can only view themselves.
+  const targetUserId = myRole === "teacher" ? userIdToView : user.id;
+
+  const { data, error } = await supabase
+    .from("user_books")
+    .select(
+      `
+      id,
+      book_id,
+      started_at,
+      finished_at,
+      books:book_id (
+        id,
+        title,
+        author,
+        translator,
+        illustrator,
+        publisher,
+        isbn13,
+        cover_url
+      )
+    `
+    )
+    .eq("user_id", targetUserId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    logSbError("Error fetching user_books:", error);
+    setMessage("Error loading books. (If viewing a student: confirm link + RLS policies.)");
+    setMessageType("error");
+    setRows([]);
+    return;
+  }
+
+  setRows((data as any) || []);
+}
 
   useEffect(() => {
     let cancelled = false;
@@ -239,117 +262,112 @@ export default function BooksPage() {
       setMeId(user.id);
 
       const { data: meProfile, error: meProfileErr } = await supabase
-  .from("profiles")
-  .select("role, is_super_teacher")
-  .eq("id", user.id)
-  .single();
+        .from("profiles")
+        .select("role, is_super_teacher")
+        .eq("id", user.id)
+        .single();
 
       if (meProfileErr) {
         logSbError("Error loading my profile role:", meProfileErr);
       }
 
       const role = (meProfile?.role as ProfileRole | null) ?? "student";
-const isSuperTeacher = Boolean((meProfile as any)?.is_super_teacher);
+      const isSuperTeacher = Boolean((meProfile as any)?.is_super_teacher);
 
       if (cancelled) return;
 
       setMyRole(role);
       setViewingUserId(user.id);
 
-      // Only teachers need student lists.
-if (role !== "teacher") {
-  setStudents([]);
-  return;
-}
+      if (role !== "teacher") {
+        setStudents([]);
+        return;
+      }
 
-if (isSuperTeacher) {
-  const { data: profs, error: profErr } = await supabase
-    .from("profiles")
-    .select("id, display_name, level, role")
-    .order("display_name", { ascending: true });
+      if (isSuperTeacher) {
+        const { data: profs, error: profErr } = await supabase
+          .from("profiles")
+          .select("id, display_name, level, role")
+          .order("display_name", { ascending: true });
 
-  if (profErr) {
-    logSbError("Error loading all profiles:", profErr);
-    if (!cancelled) setStudents([]);
-    return;
-  }
+        if (profErr) {
+          logSbError("Error loading all profiles:", profErr);
+          if (!cancelled) setStudents([]);
+          return;
+        }
 
-  if (cancelled) return;
+        if (cancelled) return;
 
-  setStudents(
-    (profs ?? []).map((p: any) => ({
-      id: p.id,
-      display_name: p.display_name || "User",
-      level: p.level ?? null,
-      role: p.role ?? null,
-    })) as any
-  );
+        setStudents(
+          (profs ?? []).map((p: any) => ({
+            id: p.id,
+            display_name: p.display_name || "User",
+            level: p.level ?? null,
+            role: p.role ?? null,
+          }))
+        );
 
-  return;
-}
+        return;
+      }
 
-const { data: rels, error: relErr } = await supabase
-  .from("teacher_students")
-  .select("student_id")
-  .eq("teacher_id", user.id);
+      const { data: rels, error: relErr } = await supabase
+        .from("teacher_students")
+        .select("student_id")
+        .eq("teacher_id", user.id);
 
-if (relErr) {
-  logSbError("Error loading teacher_students:", relErr);
-  if (!cancelled) setStudents([]);
-  return;
-}
+      if (relErr) {
+        logSbError("Error loading teacher_students:", relErr);
+        if (!cancelled) setStudents([]);
+        return;
+      }
 
-const studentIds = (rels ?? []).map((r: any) => r.student_id).filter(Boolean);
+      const studentIds = (rels ?? []).map((r: any) => r.student_id).filter(Boolean);
 
-if (studentIds.length === 0) {
-  if (!cancelled) setStudents([]);
-  return;
-}
+      if (studentIds.length === 0) {
+        if (!cancelled) setStudents([]);
+        return;
+      }
 
-const { data: profs, error: profErr } = await supabase
-  .from("profiles")
-  .select("id, display_name, level, role")
-  .in("id", studentIds)
-  .order("display_name", { ascending: true });
+      const { data: profs, error: profErr } = await supabase
+        .from("profiles")
+        .select("id, display_name, level, role")
+        .in("id", studentIds)
+        .order("display_name", { ascending: true });
 
-if (profErr) {
-  logSbError("Error loading student profiles:", profErr);
-  if (!cancelled) setStudents([]);
-  return;
-}
+      if (profErr) {
+        logSbError("Error loading student profiles:", profErr);
+        if (!cancelled) setStudents([]);
+        return;
+      }
 
       if (cancelled) return;
 
-      const meOption = {
-  id: user.id,
-  display_name: "Me",
-  level: null,
-  role: "teacher",
-};
+      const meOption: StudentOption = {
+        id: user.id,
+        display_name: "Me",
+        level: null,
+        role: "teacher",
+      };
 
-const studentOptions = (profs ?? [])
-  .filter((p: any) => p.id !== user.id && p.role === "student")
-  .map((p: any) => ({
-    id: p.id,
-    display_name: p.display_name,
-    level: p.level ?? null,
-    role: p.role,
-  }));
+      const studentOptions: StudentOption[] = (profs ?? [])
+        .filter((p: any) => p.id !== user.id && p.role === "student")
+        .map((p: any) => ({
+          id: p.id,
+          display_name: p.display_name,
+          level: p.level ?? null,
+          role: p.role,
+        }));
 
-const teacherOptions = (profs ?? [])
-  .filter((p: any) => p.id !== user.id && p.role === "teacher")
-  .map((p: any) => ({
-    id: p.id,
-    display_name: p.display_name,
-    level: p.level ?? null,
-    role: p.role,
-  }));
+      const teacherOptions: StudentOption[] = (profs ?? [])
+        .filter((p: any) => p.id !== user.id && p.role === "teacher")
+        .map((p: any) => ({
+          id: p.id,
+          display_name: p.display_name,
+          level: p.level ?? null,
+          role: p.role,
+        }));
 
-setStudents([
-  meOption,
-  ...studentOptions,
-  ...teacherOptions,
-] as any);
+      setStudents([meOption, ...studentOptions, ...teacherOptions]);
     })();
 
     return () => {
@@ -358,10 +376,168 @@ setStudents([
   }, []);
 
   useEffect(() => {
-    if (!viewingUserId || !meId) return;
-    fetchBooks(viewingUserId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingUserId, meId, isTeacher]);
+  if (!viewingUserId || !meId) return;
+
+  setRows([]);
+  fetchBooks(viewingUserId);
+}, [viewingUserId, meId, myRole]);
+
+  useEffect(() => {
+  const loadAlerts = async () => {
+    if (!viewingUserId || !meId) {
+      setAlertBox(null);
+      setTeacherPrepAlerts([]);
+      return;
+    }
+
+    // Teacher viewing their own page:
+    // show all teacher prep alerts for assigned students due today.
+    if (isTeacher && viewingUserId === meId) {
+      const studentIds = students
+        .filter((s) => s.role === "student" && s.id !== meId)
+        .map((s) => s.id);
+
+      if (studentIds.length === 0) {
+        setTeacherPrepAlerts([]);
+        setAlertBox(null);
+        return;
+      }
+
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, lesson_day")
+        .in("id", studentIds);
+
+      if (error) {
+        logSbError("Error loading student profiles for teacher alerts:", error);
+        setTeacherPrepAlerts([]);
+        setAlertBox(null);
+        return;
+      }
+
+      const prepAlerts: TeacherPrepItem[] = (profiles ?? [])
+        .map((p: any) => {
+          const info = getLessonAlertInfo({
+            lessonDay: p.lesson_day ?? null,
+            isTeacherView: true,
+            studentName: p.display_name ?? null,
+          });
+
+          if (!info || info.kind !== "teacher_prepare") return null;
+
+          return {
+            studentId: p.id,
+            studentName: p.display_name || "Student",
+            message: info.message,
+          };
+        })
+        .filter(Boolean) as TeacherPrepItem[];
+
+      setTeacherPrepAlerts(prepAlerts);
+      setAlertBox(null);
+      return;
+    }
+
+    // Student viewing own page:
+    // show student alerts only.
+    if (!isTeacher || viewingUserId !== meId) {
+      const { data: viewedProfile, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, lesson_day")
+        .eq("id", viewingUserId)
+        .single();
+
+      if (error) {
+        logSbError("Error loading viewed profile for alerts:", error);
+        setAlertBox(null);
+        setTeacherPrepAlerts([]);
+        return;
+      }
+
+      const nextAlert = getLessonAlertInfo({
+        lessonDay: viewedProfile?.lesson_day ?? null,
+        isTeacherView: false,
+        studentName: viewedProfile?.display_name ?? null,
+      });
+
+      // If teacher is viewing a student, do not show teacher alert here.
+      // Only student-facing alerts should live on the personal page.
+      const allowedAlert =
+        !isTeacher && viewingUserId === meId
+          ? nextAlert
+          : null;
+
+      setAlertBox((allowedAlert as AlertBoxState) ?? null);
+      setTeacherPrepAlerts([]);
+      return;
+    }
+
+    setAlertBox(null);
+    setTeacherPrepAlerts([]);
+  };
+
+  loadAlerts();
+}, [viewingUserId, meId, isTeacher, students]);
+
+  useEffect(() => {
+    const loadSeenState = async () => {
+      if (!alertBox?.showBadge) {
+        setStudentBadge(null);
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setStudentBadge(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_alert_reads")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("alert_key", alertBox.alertKey)
+        .maybeSingle();
+
+      if (error) {
+        logSbError("Error checking alert seen state:", error);
+        setStudentBadge(alertBox.badgeText);
+        return;
+      }
+
+      setStudentBadge(data ? null : alertBox.badgeText);
+    };
+
+    loadSeenState();
+  }, [alertBox]);
+
+  async function markAlertSeen() {
+    if (!alertBox?.showBadge) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { error } = await supabase.from("user_alert_reads").upsert(
+      {
+        user_id: user.id,
+        alert_key: alertBox.alertKey,
+      },
+      { onConflict: "user_id,alert_key" }
+    );
+
+    if (error) {
+      logSbError("Error marking alert seen:", error);
+      return;
+    }
+
+    setStudentBadge(null);
+  }
 
   async function findExistingBookId(cleanIsbn13: string, bookKey: string) {
     if (cleanIsbn13) {
@@ -740,59 +916,75 @@ setStudents([
           )}
         </div>
 
-                <div className="mt-2 flex flex-col items-center gap-2 w-full">
-  <div className="text-[10px] uppercase tracking-wide text-gray-500">
-    Read → Review → Practice
-  </div>
+        <div className="mt-2 flex flex-col items-center gap-2 w-full">
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Read → Review → Practice</div>
 
-  <a
-  href={`/books/${row.id}/words`}
-  onClick={(e) => e.stopPropagation()}
-  className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
->
-  {row.finished_at ? "Vocab List" : "Read with the Vocab List"}
-</a>
+          <div className="w-full flex flex-col items-center gap-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+              Student Tools
+            </div>
 
-  {row.started_at && !row.finished_at ? (
-    <>
-      <a
-        href={`/books/${row.id}/study`}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition"
-      >
-        Study Vocab
-      </a>
+            <a
+              href={`/books/${row.id}/words`}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+            >
+              Vocab List
+            </a>
 
-      <a
-        href={`/books/${row.id}/weekly-readings`}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-purple-700 text-white rounded hover:bg-purple-800 transition"
-      >
-        Practice Readings
-      </a>
+            {row.started_at && !row.finished_at ? (
+              <>
+                <a
+                  href={`/books/${row.id}/study`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition"
+                >
+                  Study Vocab
+                </a>
 
-      {isTeacher ? (
-  <>
-    <a
-      href={`/vocab/bulk?userBookId=${row.id}`}
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
-    >
-      Add Vocab
-    </a>
+                <a
+                  href={`/books/${row.id}/weekly-readings`}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await markAlertSeen();
+                  }}
+                  className="w-full max-w-[160px] inline-flex items-center justify-center gap-2 text-center text-[12px] px-3 py-2 bg-purple-700 text-white rounded hover:bg-purple-800 transition"
+                >
+                  <span>Practice Readings</span>
+                  {studentBadge ? (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {studentBadge}
+                    </span>
+                  ) : null}
+                </a>
+              </>
+            ) : null}
+          </div>
 
-    <a
-      href={`/books/${row.id}/weekly-readings/prepare`}
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
-    >
-      Prepare Readings
-    </a>
-  </>
-) : null}
-    </>
-  ) : null}
-</div>
+          {isTeacher && row.started_at && !row.finished_at ? (
+            <div className="w-full flex flex-col items-center gap-2 pt-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                Teacher Tools
+              </div>
+
+              <a
+                href={`/vocab/bulk?userBookId=${row.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
+              >
+                Add Vocab
+              </a>
+
+              <a
+                href={`/books/${row.id}/weekly-readings/prepare`}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
+              >
+                Prepare Readings
+              </a>
+            </div>
+          ) : null}
+        </div>
       </li>
     );
   }
@@ -815,71 +1007,99 @@ setStudents([
       }}
     >
       <h1 className="text-2xl font-semibold mb-2">📚 Books</h1>
-     
-      <p className="text-sm text-gray-500 mt-2 max-w-xl">
-Read the book along with your vocab, review your vocabulary with flashcards,
-        or strengthen your reading skills for the week with kanji readings.
-</p>
 
-      {isTeacher ? (
-  <div className="mb-4 flex flex-col gap-2">
-    <div className="text-sm text-gray-700">
-      Viewing: <span className="font-medium">{viewingLabel}</span>
+      <UserBar isTeacher={isTeacher} />
+
+      {isTeacher && viewingUserId === meId && teacherPrepAlerts.length > 0 ? (
+  <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
+    <div className="text-sm font-semibold text-slate-800">📚 TEACHER REMINDERS</div>
+
+    <div className="mt-2 flex flex-col gap-2">
+      {teacherPrepAlerts.map((item) => (
+        <button
+          key={item.studentId}
+          type="button"
+          onClick={() => setViewingUserId(item.studentId)}
+          className="text-left text-sm leading-6 text-slate-700 hover:text-slate-900 underline underline-offset-2"
+        >
+          {item.message}
+        </button>
+      ))}
     </div>
-
-    <select
-      value={viewingUserId || meId}
-      onChange={(e) => setViewingUserId(e.target.value)}
-      className="border p-2 rounded w-full bg-white"
-      disabled={!meId}
-    >
-      <option value={meId}>Me</option>
-
-{students.some((s: any) => s.role === "student" && s.id !== meId) ? (
-  <optgroup label="Students">
-    {students
-      .filter((s: any) => s.role === "student" && s.id !== meId)
-      .map((s: any) => (
-        <option key={s.id} value={s.id}>
-          {s.display_name}
-          {s.level ? ` (${s.level})` : ""}
-        </option>
-      ))}
-  </optgroup>
-) : null}
-
-{students.some((s: any) => s.role === "teacher" && s.id !== meId) ? (
-  <optgroup label="Teachers">
-    {students
-      .filter((s: any) => s.role === "teacher" && s.id !== meId)
-      .map((s: any) => (
-        <option key={s.id} value={s.id}>
-          {s.display_name}
-        </option>
-      ))}
-  </optgroup>
-) : null}
-    </select>
-
-    <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
   </div>
 ) : null}
 
+{alertBox ? (
+  <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
+    <div className="text-sm font-semibold text-slate-800">{alertBox.title}</div>
+    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{alertBox.message}</p>
+  </div>
+) : null}
+
+      {isTeacher ? (
+
+        <div className="mb-4 flex flex-col gap-2">
+          <div className="text-sm text-gray-700">
+  Viewing: <span className="font-medium">{viewingLabel}</span>
+</div>
+<div className="text-xs text-gray-400">
+  viewingUserId: {viewingUserId}
+</div>
+          <select
+            value={viewingUserId || meId}
+            onChange={(e) => setViewingUserId(e.target.value)}
+            className="border p-2 rounded w-full bg-white"
+            disabled={!meId}
+          >
+            <option value={meId}>Me</option>
+
+            {students.some((s) => s.role === "student" && s.id !== meId) ? (
+              <optgroup label="Students">
+                {students
+                  .filter((s) => s.role === "student" && s.id !== meId)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.display_name}
+                      {s.level ? ` (${s.level})` : ""}
+                    </option>
+                  ))}
+              </optgroup>
+            ) : null}
+
+            {students.some((s) => s.role === "teacher" && s.id !== meId) ? (
+              <optgroup label="Teachers">
+                {students
+                  .filter((s) => s.role === "teacher" && s.id !== meId)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.display_name}
+                    </option>
+                  ))}
+              </optgroup>
+            ) : null}
+          </select>
+
+          <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
+        </div>
+      ) : null}
+
       {message ? (
-        <p className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"}`}>{message}</p>
+        <p className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"}`}>
+          {message}
+        </p>
       ) : null}
 
       <Section title="Currently Reading" subtitle="Started but not finished yet" items={currentlyReading} />
       <Section
-  title="Want to Read"
-  subtitle="Not started yet • Study buttons will appear once marked started."
-  items={notStarted}
-/>
+        title="Want to Read"
+        subtitle="Not started yet • Study buttons will appear once marked started."
+        items={notStarted}
+      />
       <Section
-  title="Finished"
-  subtitle="Completed books • Study buttons can be found in Vocab List."
-  items={finished}
-/>
+        title="Finished"
+        subtitle="Completed books • Study buttons can be found in Vocab List."
+        items={finished}
+      />
 
       {validRows.length === 0 ? (
         <div className="text-sm text-gray-600 mt-8">

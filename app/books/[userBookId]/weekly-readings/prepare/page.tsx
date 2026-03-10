@@ -1,3 +1,4 @@
+// Prepare Readings
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -268,6 +269,7 @@ function splitReadingAcrossKanji(word: string, reading: string) {
   reading_type: r.readingType,
 }));
 
+  console.log("weekly reading payload", cardPayload);
       const { error: cardsErr } = await supabase
         .from("user_book_weekly_reading_cards")
         .insert(cardPayload);
