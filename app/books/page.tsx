@@ -154,6 +154,8 @@ export default function BooksPage() {
   const [myRole, setMyRole] = useState<ProfileRole>("student");
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
+  const [includeVocabNotify, setIncludeVocabNotify] = useState(true);
+  const [includeReadingNotify, setIncludeReadingNotify] = useState(true);
 
   const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
@@ -164,41 +166,53 @@ export default function BooksPage() {
       : students.find((s) => s.id === viewingUserId)?.display_name || "Student";
 
   const handleNotifyStudent = async (
-    e: React.MouseEvent,
-    userBookId: string
-  ) => {
-    e.stopPropagation();
+  e: React.MouseEvent,
+  userBookId: string
+) => {
+  e.stopPropagation();
 
-    const { error } = await supabase
-      .from("user_books")
-      .update({
-        notify_banner: true,
-        has_new_vocab: true,
-        has_new_reading: true,
-      })
-      .eq("id", userBookId);
+  if (!includeVocabNotify && !includeReadingNotify) {
+    alert("Select at least one: Vocab or Readings.");
+    return;
+  }
 
-    if (error) {
-      console.error("Failed to notify student:", error);
-      alert("Could not notify student.");
-      return;
-    }
-
-    setRows((prev) =>
-      prev.map((row) =>
-        row.id === userBookId
-          ? {
-              ...row,
-              notify_banner: true,
-              has_new_vocab: true,
-              has_new_reading: true,
-            }
-          : row
-      )
-    );
-
-    alert("Student notified.");
+  const updates: {
+    notify_banner: boolean;
+    has_new_vocab?: boolean;
+    has_new_reading?: boolean;
+  } = {
+    notify_banner: true,
   };
+
+  if (includeVocabNotify) updates.has_new_vocab = true;
+  if (includeReadingNotify) updates.has_new_reading = true;
+
+  const { error } = await supabase
+    .from("user_books")
+    .update(updates)
+    .eq("id", userBookId);
+
+  if (error) {
+    console.error("Failed to notify student:", error);
+    alert("Could not notify student.");
+    return;
+  }
+
+  setRows((prev) =>
+    prev.map((row) =>
+      row.id === userBookId
+        ? {
+            ...row,
+            notify_banner: true,
+            has_new_vocab: includeVocabNotify ? true : row.has_new_vocab,
+            has_new_reading: includeReadingNotify ? true : row.has_new_reading,
+          }
+        : row
+    )
+  );
+
+  alert("Student notified.");
+};
 
   const openVocabList = async (e: React.MouseEvent, userBookId: string) => {
     e.stopPropagation();
@@ -1079,35 +1093,62 @@ export default function BooksPage() {
           </div>
 
           {isTeacher && row.started_at && !row.finished_at ? (
-            <div className="w-full flex flex-col items-center gap-2 pt-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                Teacher Tools
-              </div>
+  <div className="w-full flex flex-col items-center gap-2 pt-1">
+    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+      Teacher Tools
+    </div>
 
-              <a
-                href={`/vocab/bulk?userBookId=${row.id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
-              >
-                Add Vocab
-              </a>
+    <a
+      href={`/vocab/bulk?userBookId=${row.id}`}
+      onClick={(e) => e.stopPropagation()}
+      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
+    >
+      Add Vocab
+    </a>
 
-              <a
-                href={`/books/${row.id}/weekly-readings/prepare`}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
-              >
-                Prepare Readings
-              </a>
+    <a
+      href={`/books/${row.id}/weekly-readings/prepare`}
+      onClick={(e) => e.stopPropagation()}
+      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
+    >
+      Prepare Readings
+    </a>
 
-              <button
-                onClick={(e) => handleNotifyStudent(e, row.id)}
-                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-pink-700 text-white rounded hover:bg-pink-800 transition"
-              >
-                Notify Student
-              </button>
-            </div>
-          ) : null}
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="w-full max-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-[11px] text-gray-700"
+    >
+      <div className="font-semibold text-[10px] uppercase tracking-wide text-gray-500 mb-2">
+        Notify Includes
+      </div>
+
+      <label className="flex items-center gap-2 mb-1 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={includeVocabNotify}
+          onChange={(e) => setIncludeVocabNotify(e.target.checked)}
+        />
+        <span>Vocab</span>
+      </label>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={includeReadingNotify}
+          onChange={(e) => setIncludeReadingNotify(e.target.checked)}
+        />
+        <span>Readings</span>
+      </label>
+    </div>
+
+    <button
+      onClick={(e) => handleNotifyStudent(e, row.id)}
+      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-pink-700 text-white rounded hover:bg-pink-800 transition"
+    >
+      Notify Student
+    </button>
+  </div>
+) : null}
         </div>
       </li>
     );
