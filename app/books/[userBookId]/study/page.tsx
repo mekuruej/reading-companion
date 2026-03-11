@@ -61,9 +61,14 @@ type WordRow = {
   page_number: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
+  seen_on: string | null;
   created_at: string;
+
   meaning_choices: any | null;
   meaning_choice_index: number | null;
+
+  hidden: boolean | null;
+  skipped_on: string | null;
 };
 
 type Flashcard = {
@@ -161,6 +166,7 @@ export default function BookFlashcardsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const router = useRouter();
+  const today = new Date().toISOString().slice(0, 10);
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
@@ -318,27 +324,35 @@ export default function BookFlashcardsPage() {
         setBookCover((ub as any)?.books?.cover_url ?? "");
 
         const { data: words, error: wErr } = await supabase
-          .from("user_book_words")
-          .select(
-            `
-            id,
-            user_book_id,
-            surface,
-            reading,
-            meaning,
-            jlpt,
-            is_common,
-            page_number,
-            chapter_number,
-            chapter_name,
-            created_at,
-            meaning_choices,
-            meaning_choice_index
-          `
-          )
-          .eq("user_book_id", userBookId)
-          .order("created_at", { ascending: true })
-          .returns<WordRow[]>();
+  .from("user_book_words")
+  .select(
+    `
+    id,
+    user_book_id,
+    surface,
+    reading,
+    meaning,
+    jlpt,
+    is_common,
+    page_number,
+    chapter_number,
+    chapter_name,
+    created_at,
+    meaning_choices,
+    meaning_choice_index,
+    hidden,
+    skipped_on
+  `
+  )
+  .eq("user_book_id", userBookId)
+  .eq("hidden", false)
+  .or(`skipped_on.is.null,skipped_on.neq.${today}`)
+  .order("chapter_number", { ascending: true, nullsFirst: false })
+  .order("page_number", { ascending: true, nullsFirst: false })
+  .order("page_order", { ascending: true, nullsFirst: false })
+  .order("created_at", { ascending: true })
+  .order("id", { ascending: true })
+  .returns<WordRow[]>();
 
         if (wErr) throw wErr;
 
@@ -542,7 +556,37 @@ export default function BookFlashcardsPage() {
     setShowDefPicker(false);
     setVoiceError(null);
   }
+async function skipCardForToday(cardId: string) {
+  const today = new Date().toISOString().slice(0, 10);
 
+  const { error } = await supabase
+    .from("user_book_words")
+    .update({ skipped_on: today })
+    .eq("id", cardId);
+
+  if (error) {
+    console.error("Error skipping card for today:", error);
+    return;
+  }
+
+  setCards((prev) => prev.filter((c) => c.id !== cardId));
+  setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
+}
+
+async function hideCardPermanently(cardId: string) {
+  const { error } = await supabase
+    .from("user_book_words")
+    .update({ hidden: true })
+    .eq("id", cardId);
+
+  if (error) {
+    console.error("Error hiding card:", error);
+    return;
+  }
+
+  setCards((prev) => prev.filter((c) => c.id !== cardId));
+  setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
+}
   function nextCardReveal() {
     const max = steps.length;
     if (max <= 1) return goToNextWord();
@@ -1178,24 +1222,45 @@ min-h-[20rem]
         </div>
       </div>
 
-      <div className="flex gap-10 mt-6">
-        <button
-          onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
-          className="px-4 py-2 bg-gray-200 rounded"
-        >
-          Review
-        </button>
-        <button
-          onClick={() =>
-            typeModeEnabled
-              ? goToNextWord(checked ? (checked.ok ? "correct" : "wrong") : "revealed")
-              : nextCardReveal()
-          }
-          className="px-4 py-2 bg-gray-200 rounded"
-        >
-          Next
-        </button>
-      </div>
+      <div className="flex flex-wrap gap-3 mt-6 justify-center">
+  <button
+    onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
+    className="px-4 py-2 bg-gray-200 rounded"
+  >
+    Review
+  </button>
+
+  <button
+    onClick={() =>
+      typeModeEnabled
+        ? goToNextWord(checked ? (checked.ok ? "correct" : "wrong") : "revealed")
+        : nextCardReveal()
+    }
+    className="px-4 py-2 bg-gray-200 rounded"
+  >
+    Next
+  </button>
+
+  <button
+    onClick={() => {
+      if (!card) return;
+      skipCardForToday(card.id);
+    }}
+    className="px-4 py-2 bg-slate-200 rounded hover:bg-slate-300 transition"
+  >
+    Skip for today
+  </button>
+
+  <button
+    onClick={() => {
+      if (!card) return;
+      hideCardPermanently(card.id);
+    }}
+    className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+  >
+    Hide card
+  </button>
+</div>
 
       <div className="mt-5 flex justify-center gap-3">
         <button

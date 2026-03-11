@@ -1,4 +1,4 @@
-// Books Page
+// Books Home
 "use client";
 
 import { useState, useEffect } from "react";
@@ -23,6 +23,9 @@ type UserBookRow = {
   book_id: string;
   started_at: string | null;
   finished_at: string | null;
+  notify_banner: boolean;
+  has_new_vocab: boolean;
+  has_new_reading: boolean;
   books: Book | null;
 };
 
@@ -119,6 +122,8 @@ function UserBar({ isTeacher }: { isTeacher: boolean }) {
 }
 
 export default function BooksPage() {
+  const router = useRouter();
+
   const [rows, setRows] = useState<UserBookRow[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -150,12 +155,118 @@ export default function BooksPage() {
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
 
+  const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
       ? "Me"
       : students.find((s) => s.id === viewingUserId)?.display_name || "Student";
+
+  const handleNotifyStudent = async (
+    e: React.MouseEvent,
+    userBookId: string
+  ) => {
+    e.stopPropagation();
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        notify_banner: true,
+        has_new_vocab: true,
+        has_new_reading: true,
+      })
+      .eq("id", userBookId);
+
+    if (error) {
+      console.error("Failed to notify student:", error);
+      alert("Could not notify student.");
+      return;
+    }
+
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === userBookId
+          ? {
+              ...row,
+              notify_banner: true,
+              has_new_vocab: true,
+              has_new_reading: true,
+            }
+          : row
+      )
+    );
+
+    alert("Student notified.");
+  };
+
+  const openVocabList = async (e: React.MouseEvent, userBookId: string) => {
+    e.stopPropagation();
+
+    await supabase
+      .from("user_books")
+      .update({
+        notify_banner: false,
+        has_new_vocab: false,
+      })
+      .eq("id", userBookId);
+
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === userBookId
+          ? { ...row, notify_banner: false, has_new_vocab: false }
+          : row
+      )
+    );
+
+    router.push(`/books/${userBookId}/words`);
+  };
+
+  const openStudyVocab = async (e: React.MouseEvent, userBookId: string) => {
+    e.stopPropagation();
+
+    await supabase
+      .from("user_books")
+      .update({
+        notify_banner: false,
+        has_new_vocab: false,
+      })
+      .eq("id", userBookId);
+
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === userBookId
+          ? { ...row, notify_banner: false, has_new_vocab: false }
+          : row
+      )
+    );
+
+    router.push(`/books/${userBookId}/study`);
+  };
+
+  const openWeeklyReadings = async (e: React.MouseEvent, userBookId: string) => {
+    e.stopPropagation();
+
+    await markAlertSeen();
+
+    await supabase
+      .from("user_books")
+      .update({
+        notify_banner: false,
+        has_new_reading: false,
+      })
+      .eq("id", userBookId);
+
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === userBookId
+          ? { ...row, notify_banner: false, has_new_reading: false }
+          : row
+      )
+    );
+
+    router.push(`/books/${userBookId}/weekly-readings`);
+  };
 
   function digitsOnly(s: string) {
     return (s ?? "").replace(/[^0-9]/g, "").trim();
@@ -183,58 +294,59 @@ export default function BooksPage() {
   }
 
   async function fetchBooks(userIdToView: string) {
-  setMessage("");
-  setMessageType("");
+    setMessage("");
+    setMessageType("");
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-  if (userError || !user) {
-    setMessage("Please sign in to see books.");
-    setMessageType("error");
-    setRows([]);
-    return;
-  }
+    if (userError || !user) {
+      setMessage("Please sign in to see books.");
+      setMessageType("error");
+      setRows([]);
+      return;
+    }
 
-  // Teachers can view the selected user.
-  // Students can only view themselves.
-  const targetUserId = myRole === "teacher" ? userIdToView : user.id;
+    const targetUserId = myRole === "teacher" ? userIdToView : user.id;
 
-  const { data, error } = await supabase
-    .from("user_books")
-    .select(
-      `
-      id,
-      book_id,
-      started_at,
-      finished_at,
-      books:book_id (
-        id,
-        title,
-        author,
-        translator,
-        illustrator,
-        publisher,
-        isbn13,
-        cover_url
+    const { data, error } = await supabase
+      .from("user_books")
+      .select(
+        `
+          id,
+          book_id,
+          started_at,
+          finished_at,
+          notify_banner,
+          has_new_vocab,
+          has_new_reading,
+          books:book_id (
+            id,
+            title,
+            author,
+            translator,
+            illustrator,
+            publisher,
+            isbn13,
+            cover_url
+          )
+        `
       )
-    `
-    )
-    .eq("user_id", targetUserId)
-    .order("created_at", { ascending: false });
+      .eq("user_id", targetUserId)
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    logSbError("Error fetching user_books:", error);
-    setMessage("Error loading books. (If viewing a student: confirm link + RLS policies.)");
-    setMessageType("error");
-    setRows([]);
-    return;
+    if (error) {
+      logSbError("Error fetching user_books:", error);
+      setMessage("Error loading books. (If viewing a student: confirm link + RLS policies.)");
+      setMessageType("error");
+      setRows([]);
+      return;
+    }
+
+    setRows((data as any) || []);
   }
-
-  setRows((data as any) || []);
-}
 
   useEffect(() => {
     let cancelled = false;
@@ -376,108 +488,102 @@ export default function BooksPage() {
   }, []);
 
   useEffect(() => {
-  if (!viewingUserId || !meId) return;
+    if (!viewingUserId || !meId) return;
 
-  setRows([]);
-  fetchBooks(viewingUserId);
-}, [viewingUserId, meId, myRole]);
+    setRows([]);
+    fetchBooks(viewingUserId);
+  }, [viewingUserId, meId, myRole]);
 
   useEffect(() => {
-  const loadAlerts = async () => {
-    if (!viewingUserId || !meId) {
+    const loadAlerts = async () => {
+      if (!viewingUserId || !meId) {
+        setAlertBox(null);
+        setTeacherPrepAlerts([]);
+        return;
+      }
+
+      if (isTeacher && viewingUserId === meId) {
+        const studentIds = students
+          .filter((s) => s.role === "student" && s.id !== meId)
+          .map((s) => s.id);
+
+        if (studentIds.length === 0) {
+          setTeacherPrepAlerts([]);
+          setAlertBox(null);
+          return;
+        }
+
+        const { data: profiles, error } = await supabase
+          .from("profiles")
+          .select("id, display_name, lesson_day")
+          .in("id", studentIds);
+
+        if (error) {
+          logSbError("Error loading student profiles for teacher alerts:", error);
+          setTeacherPrepAlerts([]);
+          setAlertBox(null);
+          return;
+        }
+
+        const prepAlerts: TeacherPrepItem[] = (profiles ?? [])
+          .map((p: any) => {
+            const info = getLessonAlertInfo({
+              lessonDay: p.lesson_day ?? null,
+              isTeacherView: true,
+              studentName: p.display_name ?? null,
+            });
+
+            if (!info || info.kind !== "teacher_prepare") return null;
+
+            return {
+              studentId: p.id,
+              studentName: p.display_name || "Student",
+              message: info.message,
+            };
+          })
+          .filter(Boolean) as TeacherPrepItem[];
+
+        setTeacherPrepAlerts(prepAlerts);
+        setAlertBox(null);
+        return;
+      }
+
+      if (!isTeacher || viewingUserId !== meId) {
+        const { data: viewedProfile, error } = await supabase
+          .from("profiles")
+          .select("id, display_name, lesson_day")
+          .eq("id", viewingUserId)
+          .single();
+
+        if (error) {
+          logSbError("Error loading viewed profile for alerts:", error);
+          setAlertBox(null);
+          setTeacherPrepAlerts([]);
+          return;
+        }
+
+        const nextAlert = getLessonAlertInfo({
+          lessonDay: viewedProfile?.lesson_day ?? null,
+          isTeacherView: false,
+          studentName: viewedProfile?.display_name ?? null,
+        });
+
+        const allowedAlert =
+          !isTeacher && viewingUserId === meId
+            ? nextAlert
+            : null;
+
+        setAlertBox((allowedAlert as AlertBoxState) ?? null);
+        setTeacherPrepAlerts([]);
+        return;
+      }
+
       setAlertBox(null);
       setTeacherPrepAlerts([]);
-      return;
-    }
+    };
 
-    // Teacher viewing their own page:
-    // show all teacher prep alerts for assigned students due today.
-    if (isTeacher && viewingUserId === meId) {
-      const studentIds = students
-        .filter((s) => s.role === "student" && s.id !== meId)
-        .map((s) => s.id);
-
-      if (studentIds.length === 0) {
-        setTeacherPrepAlerts([]);
-        setAlertBox(null);
-        return;
-      }
-
-      const { data: profiles, error } = await supabase
-        .from("profiles")
-        .select("id, display_name, lesson_day")
-        .in("id", studentIds);
-
-      if (error) {
-        logSbError("Error loading student profiles for teacher alerts:", error);
-        setTeacherPrepAlerts([]);
-        setAlertBox(null);
-        return;
-      }
-
-      const prepAlerts: TeacherPrepItem[] = (profiles ?? [])
-        .map((p: any) => {
-          const info = getLessonAlertInfo({
-            lessonDay: p.lesson_day ?? null,
-            isTeacherView: true,
-            studentName: p.display_name ?? null,
-          });
-
-          if (!info || info.kind !== "teacher_prepare") return null;
-
-          return {
-            studentId: p.id,
-            studentName: p.display_name || "Student",
-            message: info.message,
-          };
-        })
-        .filter(Boolean) as TeacherPrepItem[];
-
-      setTeacherPrepAlerts(prepAlerts);
-      setAlertBox(null);
-      return;
-    }
-
-    // Student viewing own page:
-    // show student alerts only.
-    if (!isTeacher || viewingUserId !== meId) {
-      const { data: viewedProfile, error } = await supabase
-        .from("profiles")
-        .select("id, display_name, lesson_day")
-        .eq("id", viewingUserId)
-        .single();
-
-      if (error) {
-        logSbError("Error loading viewed profile for alerts:", error);
-        setAlertBox(null);
-        setTeacherPrepAlerts([]);
-        return;
-      }
-
-      const nextAlert = getLessonAlertInfo({
-        lessonDay: viewedProfile?.lesson_day ?? null,
-        isTeacherView: false,
-        studentName: viewedProfile?.display_name ?? null,
-      });
-
-      // If teacher is viewing a student, do not show teacher alert here.
-      // Only student-facing alerts should live on the personal page.
-      const allowedAlert =
-        !isTeacher && viewingUserId === meId
-          ? nextAlert
-          : null;
-
-      setAlertBox((allowedAlert as AlertBoxState) ?? null);
-      setTeacherPrepAlerts([]);
-      return;
-    }
-
-    setAlertBox(null);
-    setTeacherPrepAlerts([]);
-  };
-
-  loadAlerts();
-}, [viewingUserId, meId, isTeacher, students]);
+    loadAlerts();
+  }, [viewingUserId, meId, isTeacher, students]);
 
   useEffect(() => {
     const loadSeenState = async () => {
@@ -686,6 +792,9 @@ export default function BooksPage() {
           book_id: bookIdToUse,
           started_at: null,
           finished_at: null,
+          notify_banner: false,
+          has_new_vocab: false,
+          has_new_reading: false,
         },
       ]);
 
@@ -924,39 +1033,47 @@ export default function BooksPage() {
               Student Tools
             </div>
 
-            <a
-              href={`/books/${row.id}/words`}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+            <button
+              onClick={(e) => openVocabList(e, row.id)}
+              className="w-full max-w-[160px] inline-flex items-center justify-center gap-2 text-center text-[12px] px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
             >
-              Vocab List
-            </a>
+              <span>Vocab List</span>
+              {row.has_new_vocab ? (
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  New
+                </span>
+              ) : null}
+            </button>
 
             {row.started_at && !row.finished_at ? (
               <>
-                <a
-                  href={`/books/${row.id}/study`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition"
+                <button
+                  onClick={(e) => openStudyVocab(e, row.id)}
+                  className="w-full max-w-[160px] inline-flex items-center justify-center gap-2 text-center text-[12px] px-3 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition"
                 >
-                  Study Vocab
-                </a>
+                  <span>Study Vocab</span>
+                  {row.has_new_vocab ? (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      New
+                    </span>
+                  ) : null}
+                </button>
 
-                <a
-                  href={`/books/${row.id}/weekly-readings`}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    await markAlertSeen();
-                  }}
+                <button
+                  onClick={(e) => openWeeklyReadings(e, row.id)}
                   className="w-full max-w-[160px] inline-flex items-center justify-center gap-2 text-center text-[12px] px-3 py-2 bg-purple-700 text-white rounded hover:bg-purple-800 transition"
                 >
                   <span>Practice Readings</span>
-                  {studentBadge ? (
+                  {row.has_new_reading ? (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      New
+                    </span>
+                  ) : studentBadge ? (
                     <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
                       {studentBadge}
                     </span>
                   ) : null}
-                </a>
+                </button>
               </>
             ) : null}
           </div>
@@ -982,6 +1099,13 @@ export default function BooksPage() {
               >
                 Prepare Readings
               </a>
+
+              <button
+                onClick={(e) => handleNotifyStudent(e, row.id)}
+                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-pink-700 text-white rounded hover:bg-pink-800 transition"
+              >
+                Notify Student
+              </button>
             </div>
           ) : null}
         </div>
@@ -1011,40 +1135,52 @@ export default function BooksPage() {
       <UserBar isTeacher={isTeacher} />
 
       {isTeacher && viewingUserId === meId && teacherPrepAlerts.length > 0 ? (
-  <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
-    <div className="text-sm font-semibold text-slate-800">📚 TEACHER REMINDERS</div>
+        <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
+          <div className="text-sm font-semibold text-slate-800">📚 TEACHER REMINDERS</div>
 
-    <div className="mt-2 flex flex-col gap-2">
-      {teacherPrepAlerts.map((item) => (
-        <button
-          key={item.studentId}
-          type="button"
-          onClick={() => setViewingUserId(item.studentId)}
-          className="text-left text-sm leading-6 text-slate-700 hover:text-slate-900 underline underline-offset-2"
-        >
-          {item.message}
-        </button>
-      ))}
-    </div>
-  </div>
-) : null}
+          <div className="mt-2 flex flex-col gap-2">
+            {teacherPrepAlerts.map((item) => (
+              <button
+                key={item.studentId}
+                type="button"
+                onClick={() => setViewingUserId(item.studentId)}
+                className="text-left text-sm leading-6 text-slate-700 hover:text-slate-900 underline underline-offset-2"
+              >
+                {item.message}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
-{alertBox ? (
-  <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
-    <div className="text-sm font-semibold text-slate-800">{alertBox.title}</div>
-    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{alertBox.message}</p>
-  </div>
-) : null}
+      {alertBox ? (
+        <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
+          <div className="text-sm font-semibold text-slate-800">{alertBox.title}</div>
+          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{alertBox.message}</p>
+        </div>
+      ) : null}
+
+      {hasAnyNotifyBanner ? (
+        <div className="mt-5 mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm max-w-2xl">
+          <div className="text-sm font-semibold text-amber-900">
+            ✨ New study material is available
+          </div>
+          <p className="mt-2 text-sm leading-6 text-amber-800">
+            New vocabulary and/or reading has been added.
+          </p>
+        </div>
+      ) : null}
 
       {isTeacher ? (
-
         <div className="mb-4 flex flex-col gap-2">
           <div className="text-sm text-gray-700">
-  Viewing: <span className="font-medium">{viewingLabel}</span>
-</div>
-<div className="text-xs text-gray-400">
-  viewingUserId: {viewingUserId}
-</div>
+            Viewing: <span className="font-medium">{viewingLabel}</span>
+          </div>
+
+          <div className="text-xs text-gray-400">
+            viewingUserId: {viewingUserId}
+          </div>
+
           <select
             value={viewingUserId || meId}
             onChange={(e) => setViewingUserId(e.target.value)}
