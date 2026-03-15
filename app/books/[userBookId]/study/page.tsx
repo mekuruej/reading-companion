@@ -866,16 +866,18 @@ async function hideCardPermanently(cardId: string) {
   const showReading = revealed.has("reading");
   const showMeaning = revealed.has("meaning");
 
-  function Row({
+    function Row({
     label,
     value,
     visible,
     big,
+    placeholder = "—",
   }: {
     label: string;
     value: string;
     visible: boolean;
     big?: boolean;
+    placeholder?: string;
   }) {
     return (
       <div className="w-full flex flex-col items-center gap-1">
@@ -884,10 +886,10 @@ async function hideCardPermanently(cardId: string) {
           className={[
             big ? "text-[2.6rem] font-bold" : "text-[1.65rem]",
             "transition-opacity duration-200",
-            visible ? "opacity-100" : "opacity-0",
+            visible ? "opacity-100 text-slate-900" : "opacity-100 text-slate-300",
           ].join(" ")}
         >
-          {value}
+          {visible ? value : placeholder}
         </div>
       </div>
     );
@@ -1213,10 +1215,10 @@ min-h-[20rem]
               </div>
             </>
           ) : card ? (
-            <>
-              <Row label="Word" value={card.word} visible={showWord} big />
-              <Row label="Reading" value={card.reading || "—"} visible={showReading} />
-              <Row label="Meaning" value={card.meaning || "—"} visible={showMeaning} />
+                        <>
+              <Row label="Word" value={card.word} visible={showWord} big placeholder="---" />
+              <Row label="Reading" value={card.reading || "—"} visible={showReading} placeholder="---" />
+              <Row label="Meaning" value={card.meaning || "—"} visible={showMeaning} placeholder="---" />
             </>
           ) : null}
         </div>

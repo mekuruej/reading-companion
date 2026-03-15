@@ -50,7 +50,6 @@ function parseWords(raw: string): string[] {
     .filter((w) => w.length > 0);
 }
 
-// Grab ALL meanings from Jisho entry.
 function extractMeaningChoices(entry: any): string[] {
   const senses = entry?.senses ?? [];
   const choices: string[] = [];
@@ -61,7 +60,6 @@ function extractMeaningChoices(entry: any): string[] {
     if (text) choices.push(text);
   }
 
-  // Deduplicate while preserving order
   const seen = new Set<string>();
   const unique = choices.filter((c) => {
     const key = c.toLowerCase();
@@ -73,18 +71,27 @@ function extractMeaningChoices(entry: any): string[] {
   return unique;
 }
 
+function toNullableInt(value: string): number | null {
+  const t = (value ?? "").trim();
+  if (!t) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return null;
+  return Math.trunc(n);
+}
+
 // -------------------------------------------------------------
 // Types
 // -------------------------------------------------------------
 type BulkItem = {
   surface: string;
   reading: string;
-  meaning: string; // chosen meaning (saved as meaning)
+  meaning: string;
+  otherDefinition: string;
   jlpt: string;
   isCommon: boolean;
 
   meaningChoices: string[];
-  meaningChoiceIndex: number;
+  meaningChoiceIndex: number | null;
 
   page: string;
   chapterNumber: string;
@@ -114,7 +121,6 @@ export default function BulkVocabPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
 
-  // ✅ paste pages in order
   const [pagePaste, setPagePaste] = useState("");
 
   const wordCount = useMemo(() => parseWords(rawInput).length, [rawInput]);
@@ -135,7 +141,6 @@ export default function BulkVocabPage() {
   useEffect(() => {
     if (!userBookId) return;
 
-    // Load chapter saved locally
     const saved = localStorage.getItem(`chapter_userBook_${userBookId}`);
     if (saved) {
       try {
@@ -237,7 +242,7 @@ export default function BulkVocabPage() {
         let isCommon = false;
 
         let meaningChoices: string[] = [];
-        let meaningChoiceIndex = 0;
+        let meaningChoiceIndex: number | null = 0;
         let meaning = "";
 
         try {
@@ -264,22 +269,20 @@ export default function BulkVocabPage() {
           surface: w,
           reading,
           meaning,
+          otherDefinition: "",
           jlpt,
           isCommon,
-
           meaningChoices,
           meaningChoiceIndex,
-
           page: defaultPageNumber || "",
           chapterNumber: chapterNumber || "",
           chapterName: chapterName || "",
-
           strokes,
         });
       }
 
       setItems(results);
-      setMessage("✅ Preview ready! Pick the meaning (definition #) if needed, then Save All.");
+      setMessage("✅ Preview ready! Pick the meaning (or choose Other), then Save All.");
       setPagePaste("");
     } catch (err: any) {
       console.error(err);
@@ -310,26 +313,84 @@ export default function BulkVocabPage() {
         return;
       }
 
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const today = new Date().toISOString().slice(0, 10);
+
+      const comboKeys = Array.from(
+        new Set(
+          items.map((i) => {
+            const ch = toNullableInt(i.chapterNumber);
+            const pg = toNullableInt(i.page);
+            return `${ch ?? "null"}||${pg ?? "null"}`;
+          })
+        )
+      );
+
+      const maxOrderByCombo = new Map<string, number>();
+
+      for (const key of comboKeys) {
+        const [chRaw, pgRaw] = key.split("||");
+        const chNum = chRaw === "null" ? null : Number(chRaw);
+        const pgNum = pgRaw === "null" ? null : Number(pgRaw);
+
+        let query = supabase
+          .from("user_book_words")
+          .select("page_order")
+          .eq("user_book_id", userBookId);
+
+        if (chNum == null) {
+          query = query.is("chapter_number", null);
+        } else {
+          query = query.eq("chapter_number", chNum);
+        }
+
+        if (pgNum == null) {
+          query = query.is("page_number", null);
+        } else {
+          query = query.eq("page_number", pgNum);
+        }
+
+        const { data: existingRows, error: existingErr } = await query;
+        if (existingErr) throw existingErr;
+
+        const maxPageOrder = Math.max(
+          0,
+          ...(existingRows ?? []).map((r: any) => Number(r.page_order) || 0)
+        );
+
+        maxOrderByCombo.set(key, maxPageOrder);
+      }
+
+      const nextOrderByCombo = new Map<string, number>(maxOrderByCombo);
 
       const payload = items.map((i) => {
+        const chNum = toNullableInt(i.chapterNumber);
+        const pgNum = toNullableInt(i.page);
+        const comboKey = `${chNum ?? "null"}||${pgNum ?? "null"}`;
+
+        const current = nextOrderByCombo.get(comboKey) ?? 0;
+        const nextPageOrder = current + 1;
+        nextOrderByCombo.set(comboKey, nextPageOrder);
+
+        const useOther = i.meaningChoiceIndex == null;
         const chosen =
-          i.meaningChoices?.length && Number.isFinite(i.meaningChoiceIndex)
-            ? i.meaningChoices[i.meaningChoiceIndex] ?? i.meaning
+          !useOther && i.meaningChoices?.length
+            ? i.meaningChoices[i.meaningChoiceIndex ?? 0] ?? i.meaning
             : i.meaning;
 
         return {
           user_book_id: userBookId,
           surface: i.surface,
           reading: i.reading || null,
-          meaning: chosen || null,
+          meaning: chosen?.trim() || null,
+          other_definition: i.otherDefinition?.trim() || null,
           meaning_choices: i.meaningChoices ?? [],
-          meaning_choice_index: Number.isFinite(i.meaningChoiceIndex) ? i.meaningChoiceIndex : 0,
+          meaning_choice_index: i.meaningChoiceIndex == null ? null : i.meaningChoiceIndex,
           jlpt: normalizeJlpt(i.jlpt),
           is_common: !!i.isCommon,
-          page_number: i.page ? Number(i.page) : null,
-          chapter_number: i.chapterNumber ? Number(i.chapterNumber) : null,
-          chapter_name: i.chapterName || null,
+          page_number: pgNum,
+          page_order: nextPageOrder,
+          chapter_number: chNum,
+          chapter_name: i.chapterName?.trim() || null,
           strokes: i.strokes ?? [],
           seen_on: today,
         };
@@ -362,23 +423,33 @@ export default function BulkVocabPage() {
     });
   }
 
-  function chooseMeaning(index: number, newIndex: number) {
+  function chooseMeaning(index: number, rawValue: string) {
     setItems((prev) => {
       const copy = [...prev];
       const item = copy[index];
+
+      if (rawValue === "other") {
+        copy[index] = {
+          ...item,
+          meaningChoiceIndex: null,
+          meaning: "",
+        };
+        return copy;
+      }
+
+      const newIndex = Number(rawValue);
       const choices = item.meaningChoices ?? [];
       const chosen = choices[newIndex] ?? "";
 
       copy[index] = {
         ...item,
-        meaningChoiceIndex: newIndex,
+        meaningChoiceIndex: Number.isFinite(newIndex) ? newIndex : 0,
         meaning: chosen || item.meaning,
       };
       return copy;
     });
   }
 
-  // ✅ Add More Words: reset form
   function resetForMore() {
     setRawInput("");
     setItems([]);
@@ -387,7 +458,6 @@ export default function BulkVocabPage() {
     setSaveComplete(false);
   }
 
-  // ✅ NEW: Go to vocab list (keep userBookId)
   function goToVocabList() {
     if (!userBookId) return;
     router.push(`/books/${encodeURIComponent(userBookId)}/words`);
@@ -413,7 +483,6 @@ export default function BulkVocabPage() {
         </p>
       )}
 
-      {/* Defaults */}
       <div className="mb-2 text-xs text-gray-500">
         Defaults (optional): you can leave these blank. You can override per word in the preview.
       </div>
@@ -442,7 +511,6 @@ export default function BulkVocabPage() {
         />
       </div>
 
-      {/* Raw Input */}
       <form onSubmit={handlePreview} className="flex flex-col gap-3 mb-6">
         <textarea
           value={rawInput}
@@ -471,7 +539,6 @@ export default function BulkVocabPage() {
             </button>
           ) : null}
 
-          {/* After save: Add More + Go to Vocab List */}
           {saveComplete ? (
             <>
               <button
@@ -502,10 +569,8 @@ export default function BulkVocabPage() {
         </div>
       ) : null}
 
-      {/* Preview */}
       {items.length > 0 && (
         <>
-          {/* Paste pages block */}
           <div className="mb-4 border rounded p-3 bg-white">
             <div className="text-sm font-medium mb-1">Paste page numbers (optional)</div>
             <p className="text-xs text-gray-500 mb-2">
@@ -574,17 +639,19 @@ export default function BulkVocabPage() {
                     placeholder="Reading"
                   />
 
-                  {/* Definition picker */}
                   {i.meaningChoices?.length ? (
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-500">
-                          Definition: {i.meaningChoiceIndex + 1}/{i.meaningChoices.length}
+                          Definition:{" "}
+                          {i.meaningChoiceIndex == null
+                            ? "Other"
+                            : `${i.meaningChoiceIndex + 1}/${i.meaningChoices.length}`}
                         </span>
 
                         <select
-                          value={i.meaningChoiceIndex}
-                          onChange={(e) => chooseMeaning(idx, Number(e.target.value))}
+                          value={i.meaningChoiceIndex == null ? "other" : String(i.meaningChoiceIndex)}
+                          onChange={(e) => chooseMeaning(idx, e.target.value)}
                           className="border p-1 rounded text-xs bg-white"
                           title="Pick which Jisho definition to save as Meaning"
                         >
@@ -593,6 +660,7 @@ export default function BulkVocabPage() {
                               {mi + 1}
                             </option>
                           ))}
+                          <option value="other">Other</option>
                         </select>
                       </div>
 
@@ -601,7 +669,7 @@ export default function BulkVocabPage() {
                         value={i.meaning}
                         onChange={(e) => updateItem(idx, "meaning", e.target.value)}
                         className="border p-2 rounded w-full text-sm"
-                        placeholder="Meaning"
+                        placeholder={i.meaningChoiceIndex == null ? "Type your custom definition" : "Meaning"}
                       />
 
                       <details className="text-xs text-gray-600">
@@ -616,13 +684,15 @@ export default function BulkVocabPage() {
                       </details>
                     </div>
                   ) : (
-                    <textarea
-                      rows={2}
-                      value={i.meaning}
-                      onChange={(e) => updateItem(idx, "meaning", e.target.value)}
-                      className="border p-2 rounded w-full text-sm"
-                      placeholder="Meaning"
-                    />
+                    <>
+                      <textarea
+                        rows={2}
+                        value={i.meaning}
+                        onChange={(e) => updateItem(idx, "meaning", e.target.value)}
+                        className="border p-2 rounded w-full text-sm"
+                        placeholder="Meaning"
+                      />
+                    </>
                   )}
                 </div>
 

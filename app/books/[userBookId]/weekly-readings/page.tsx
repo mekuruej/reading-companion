@@ -457,7 +457,7 @@ const inRecallFlow =
     );
   }
 
-  if (index >= deck.length) {
+    if (index >= deck.length) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-xl border rounded-2xl bg-white p-8 text-center shadow-sm">
@@ -479,7 +479,14 @@ const inRecallFlow =
             </>
           )}
 
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              onClick={() => router.push(`/books`)}
+              className="px-4 py-2 bg-gray-200 rounded"
+            >
+              Back to Books
+            </button>
+
             <button
               onClick={() => router.push(`/books/${userBookId}/study`)}
               className="px-4 py-2 bg-gray-200 rounded"

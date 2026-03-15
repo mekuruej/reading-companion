@@ -15,7 +15,6 @@ type Book = {
   publisher: string | null;
   isbn13: string | null;
   cover_url: string | null;
-  book_key?: string | null;
 };
 
 type UserBookRow = {
@@ -23,6 +22,7 @@ type UserBookRow = {
   book_id: string;
   started_at: string | null;
   finished_at: string | null;
+  dnf_at: string | null;
   notify_banner: boolean;
   has_new_vocab: boolean;
   has_new_reading: boolean;
@@ -125,27 +125,19 @@ export default function BooksPage() {
   const router = useRouter();
 
   const [rows, setRows] = useState<UserBookRow[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
 
   const [alertBox, setAlertBox] = useState<AlertBoxState>(null);
   const [studentBadge, setStudentBadge] = useState<string | null>(null);
   const [teacherPrepAlerts, setTeacherPrepAlerts] = useState<TeacherPrepItem[]>([]);
-
-  const [adding, setAdding] = useState(false);
-
-  const [isbn13, setIsbn13] = useState("");
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [publisher, setPublisher] = useState("");
-  const [translator, setTranslator] = useState("");
-  const [illustrator, setIllustrator] = useState("");
-  const [coverUrl, setCoverUrl] = useState("");
 
   const [finishingUserBookId, setFinishingUserBookId] = useState<string | null>(null);
   const [finishDate, setFinishDate] = useState("");
 
   const [startingUserBookId, setStartingUserBookId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
+
+  const [dnfingUserBookId, setDnfingUserBookId] = useState<string | null>(null);
+  const [dnfDate, setDnfDate] = useState("");
 
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
@@ -165,54 +157,48 @@ export default function BooksPage() {
       ? "Me"
       : students.find((s) => s.id === viewingUserId)?.display_name || "Student";
 
-  const handleNotifyStudent = async (
-  e: React.MouseEvent,
-  userBookId: string
-) => {
-  e.stopPropagation();
+  const handleNotifyStudent = async (e: React.MouseEvent, userBookId: string) => {
+    e.stopPropagation();
 
-  if (!includeVocabNotify && !includeReadingNotify) {
-    alert("Select at least one: Vocab or Readings.");
-    return;
-  }
+    if (!includeVocabNotify && !includeReadingNotify) {
+      alert("Select at least one: Vocab or Readings.");
+      return;
+    }
 
-  const updates: {
-    notify_banner: boolean;
-    has_new_vocab?: boolean;
-    has_new_reading?: boolean;
-  } = {
-    notify_banner: true,
+    const updates: {
+      notify_banner: boolean;
+      has_new_vocab?: boolean;
+      has_new_reading?: boolean;
+    } = {
+      notify_banner: true,
+    };
+
+    if (includeVocabNotify) updates.has_new_vocab = true;
+    if (includeReadingNotify) updates.has_new_reading = true;
+
+    const { error } = await supabase.from("user_books").update(updates).eq("id", userBookId);
+
+    if (error) {
+      console.error("Failed to notify student:", error);
+      alert("Could not notify student.");
+      return;
+    }
+
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === userBookId
+          ? {
+              ...row,
+              notify_banner: true,
+              has_new_vocab: includeVocabNotify ? true : row.has_new_vocab,
+              has_new_reading: includeReadingNotify ? true : row.has_new_reading,
+            }
+          : row
+      )
+    );
+
+    alert("Student notified.");
   };
-
-  if (includeVocabNotify) updates.has_new_vocab = true;
-  if (includeReadingNotify) updates.has_new_reading = true;
-
-  const { error } = await supabase
-    .from("user_books")
-    .update(updates)
-    .eq("id", userBookId);
-
-  if (error) {
-    console.error("Failed to notify student:", error);
-    alert("Could not notify student.");
-    return;
-  }
-
-  setRows((prev) =>
-    prev.map((row) =>
-      row.id === userBookId
-        ? {
-            ...row,
-            notify_banner: true,
-            has_new_vocab: includeVocabNotify ? true : row.has_new_vocab,
-            has_new_reading: includeReadingNotify ? true : row.has_new_reading,
-          }
-        : row
-    )
-  );
-
-  alert("Student notified.");
-};
 
   const openVocabList = async (e: React.MouseEvent, userBookId: string) => {
     e.stopPropagation();
@@ -227,9 +213,7 @@ export default function BooksPage() {
 
     setRows((prev) =>
       prev.map((row) =>
-        row.id === userBookId
-          ? { ...row, notify_banner: false, has_new_vocab: false }
-          : row
+        row.id === userBookId ? { ...row, notify_banner: false, has_new_vocab: false } : row
       )
     );
 
@@ -249,9 +233,7 @@ export default function BooksPage() {
 
     setRows((prev) =>
       prev.map((row) =>
-        row.id === userBookId
-          ? { ...row, notify_banner: false, has_new_vocab: false }
-          : row
+        row.id === userBookId ? { ...row, notify_banner: false, has_new_vocab: false } : row
       )
     );
 
@@ -273,38 +255,15 @@ export default function BooksPage() {
 
     setRows((prev) =>
       prev.map((row) =>
-        row.id === userBookId
-          ? { ...row, notify_banner: false, has_new_reading: false }
-          : row
+        row.id === userBookId ? { ...row, notify_banner: false, has_new_reading: false } : row
       )
     );
 
     router.push(`/books/${userBookId}/weekly-readings`);
   };
 
-  function digitsOnly(s: string) {
-    return (s ?? "").replace(/[^0-9]/g, "").trim();
-  }
-
-  function normKey(s: string) {
-    return (s ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "");
-  }
-
   function logSbError(prefix: string, err: any) {
     console.error(prefix, err?.message, err?.details, err?.hint, err?.code, err);
-  }
-
-  function resetAddForm() {
-    setIsbn13("");
-    setTitle("");
-    setAuthor("");
-    setPublisher("");
-    setTranslator("");
-    setIllustrator("");
-    setCoverUrl("");
   }
 
   async function fetchBooks(userIdToView: string) {
@@ -333,6 +292,7 @@ export default function BooksPage() {
           book_id,
           started_at,
           finished_at,
+          dnf_at,
           notify_banner,
           has_new_vocab,
           has_new_reading,
@@ -582,10 +542,7 @@ export default function BooksPage() {
           studentName: viewedProfile?.display_name ?? null,
         });
 
-        const allowedAlert =
-          !isTeacher && viewingUserId === meId
-            ? nextAlert
-            : null;
+        const allowedAlert = !isTeacher && viewingUserId === meId ? nextAlert : null;
 
         setAlertBox((allowedAlert as AlertBoxState) ?? null);
         setTeacherPrepAlerts([]);
@@ -659,188 +616,13 @@ export default function BooksPage() {
     setStudentBadge(null);
   }
 
-  async function findExistingBookId(cleanIsbn13: string, bookKey: string) {
-    if (cleanIsbn13) {
-      const { data, error } = await supabase
-        .from("books")
-        .select("id")
-        .eq("isbn13", cleanIsbn13)
-        .limit(1);
-
-      if (error) {
-        logSbError("Find by isbn13 error:", error);
-        throw new Error(`Error searching books by ISBN: ${error.message}`);
-      }
-
-      const first = (data ?? [])[0] as { id: string } | undefined;
-      if (first?.id) return first.id;
-    }
-
-    const { data, error } = await supabase
-      .from("books")
-      .select("id")
-      .eq("book_key", bookKey)
-      .limit(1);
-
-    if (error) {
-      logSbError("Find by book_key error:", error);
-      throw new Error(`Error searching books by key: ${error.message}`);
-    }
-
-    const first = (data ?? [])[0] as { id: string } | undefined;
-    return first?.id ?? null;
-  }
-
-  async function addBook(e: React.FormEvent) {
-    e.preventDefault();
-    if (adding) return;
-
-    if (!isTeacher) {
-      setMessage("Only teachers can add books.");
-      setMessageType("error");
-      return;
-    }
-
-    setAdding(true);
-    setMessage("");
-    setMessageType("");
-
-    try {
-      if (!meId) {
-        setMessage("Please sign in before adding a book.");
-        setMessageType("error");
-        return;
-      }
-
-      if (!viewingUserId) {
-        setMessage("Select a student (or Me) first.");
-        setMessageType("error");
-        return;
-      }
-
-      if (!title.trim()) {
-        setMessage("Title is required.");
-        setMessageType("error");
-        return;
-      }
-
-      const cleanIsbn13 = digitsOnly(isbn13);
-      const cleanTitle = title.trim();
-      const cleanAuthor = author.trim();
-      const cleanPublisher = publisher.trim();
-      const cleanTranslator = translator.trim();
-      const cleanIllustrator = illustrator.trim();
-      const cleanCoverUrl = coverUrl.trim();
-
-      const bookKey = [normKey(cleanTitle), normKey(cleanAuthor), normKey(cleanPublisher)].join("|");
-
-      let bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
-
-      if (!bookIdToUse) {
-        const insertPayload: any = {
-          title: cleanTitle,
-          author: cleanAuthor || null,
-          translator: cleanTranslator || null,
-          illustrator: cleanIllustrator || null,
-          publisher: cleanPublisher || null,
-          isbn13: cleanIsbn13 || null,
-          book_key: bookKey,
-          cover_url: cleanCoverUrl || null,
-        };
-
-        let insertError: any = null;
-
-        const { data: createdA, error: errA } = await supabase
-          .from("books")
-          .insert([insertPayload])
-          .select("id")
-          .limit(1);
-
-        if (errA) {
-          insertError = errA;
-        } else {
-          const first = (createdA ?? [])[0] as { id: string } | undefined;
-          bookIdToUse = first?.id ?? null;
-        }
-
-        if (!bookIdToUse) {
-          bookIdToUse = await findExistingBookId(cleanIsbn13, bookKey);
-        }
-
-        if (!bookIdToUse) {
-          logSbError("books insert error:", insertError);
-          setMessage(`Error adding book: ${insertError?.message || "Could not create or find book."}`);
-          setMessageType("error");
-          return;
-        }
-      }
-
-      const { data: existingAssignment, error: existingErr } = await supabase
-        .from("user_books")
-        .select("id")
-        .eq("user_id", viewingUserId)
-        .eq("book_id", bookIdToUse)
-        .limit(1);
-
-      if (existingErr) {
-        logSbError("user_books existing check error:", existingErr);
-        setMessage(`Could not check existing assignment: ${existingErr.message}`);
-        setMessageType("error");
-        return;
-      }
-
-      const alreadyAssigned = !!(existingAssignment && existingAssignment.length > 0);
-
-      if (alreadyAssigned) {
-        await fetchBooks(viewingUserId);
-        resetAddForm();
-        setShowAddModal(false);
-        setMessage(`That book is already on ${viewingLabel}'s shelf.`);
-        setMessageType("success");
-        return;
-      }
-
-      const { error: ubErr } = await supabase.from("user_books").insert([
-        {
-          user_id: viewingUserId,
-          book_id: bookIdToUse,
-          started_at: null,
-          finished_at: null,
-          notify_banner: false,
-          has_new_vocab: false,
-          has_new_reading: false,
-        },
-      ]);
-
-      if (ubErr) {
-        logSbError("user_books insert error:", ubErr);
-        setMessage(`Book found, but failed to assign: ${ubErr.message || "Unknown error"}`);
-        setMessageType("error");
-        return;
-      }
-
-      resetAddForm();
-      await fetchBooks(viewingUserId);
-
-      setMessage(`✅ Book added for ${viewingLabel}.`);
-      setMessageType("success");
-      setShowAddModal(false);
-    } catch (e: any) {
-      logSbError("addBook unexpected error:", e);
-      setMessage(e?.message || "Something went wrong while adding the book.");
-      setMessageType("error");
-    } finally {
-      setAdding(false);
-    }
-  }
-
   async function saveStartedDate(userBookId: string) {
     if (!startDate) return;
 
     const { error } = await supabase.from("user_books").update({ started_at: startDate }).eq("id", userBookId);
 
     if (error) {
-      logSbError("Error saving started date:", error);
+      logSbError("Error saving start date:", error);
       setMessage("Error saving start date.");
       setMessageType("error");
       return;
@@ -854,7 +636,10 @@ export default function BooksPage() {
   async function saveFinishedDate(userBookId: string) {
     if (!finishDate) return;
 
-    const { error } = await supabase.from("user_books").update({ finished_at: finishDate }).eq("id", userBookId);
+    const { error } = await supabase
+      .from("user_books")
+      .update({ finished_at: finishDate, dnf_at: null })
+      .eq("id", userBookId);
 
     if (error) {
       logSbError("Error saving finish date:", error);
@@ -868,11 +653,36 @@ export default function BooksPage() {
     fetchBooks(viewingUserId || meId);
   }
 
+  async function saveDnfDate(userBookId: string) {
+    if (!dnfDate) return;
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({ dnf_at: dnfDate, finished_at: null })
+      .eq("id", userBookId);
+
+    if (error) {
+      logSbError("Error saving DNF date:", error);
+      setMessage("Error saving DNF date.");
+      setMessageType("error");
+      return;
+    }
+
+    setDnfingUserBookId(null);
+    setDnfDate("");
+    fetchBooks(viewingUserId || meId);
+  }
+
   const validRows = rows.filter((r) => !!r.books);
 
-  const currentlyReading = validRows.filter((r) => !!r.started_at && !r.finished_at);
-  const notStarted = validRows.filter((r) => !r.started_at && !r.finished_at);
-  const finished = validRows.filter((r) => !!r.finished_at);
+  const currentlyReading = validRows.filter(
+    (r) => !!r.started_at && !r.finished_at && !r.dnf_at
+  );
+  const notStarted = validRows.filter(
+    (r) => !r.started_at && !r.finished_at && !r.dnf_at
+  );
+  const finished = validRows.filter((r) => !!r.finished_at && !r.dnf_at);
+  const dnf = validRows.filter((r) => !!r.dnf_at);
 
   const gridClass =
     "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-2 gap-y-3";
@@ -908,6 +718,8 @@ export default function BooksPage() {
     const book = row.books;
     if (!book) return null;
 
+    const canStudy = !!row.started_at && !row.finished_at && !row.dnf_at;
+
     return (
       <li
         key={row.id}
@@ -915,7 +727,11 @@ export default function BooksPage() {
       >
         <a href={`/books/${row.id}`} onClick={(e) => e.stopPropagation()} className="block">
           {book.cover_url ? (
-            <img src={book.cover_url} alt={`${book.title} cover`} className="w-32 h-48 object-cover rounded-md shadow-md" />
+            <img
+              src={book.cover_url}
+              alt={`${book.title} cover`}
+              className="w-32 h-48 object-cover rounded-md shadow-md"
+            />
           ) : (
             <div className="w-32 h-48 bg-gray-200 rounded-md mb-2 flex items-center justify-center text-gray-400 text-sm">
               No cover
@@ -936,108 +752,154 @@ export default function BooksPage() {
         {book.illustrator && <span className="text-gray-500 text-xs">絵：{book.illustrator}</span>}
 
         <div className="mt-1 text-[11px] text-gray-500 text-center">
-          {row.started_at ? (
-            <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
-          ) : startingUserBookId === row.id ? (
-            <div className="mt-1 flex flex-col gap-1 text-[11px]">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border p-1 rounded text-xs"
-                onClick={(e) => e.stopPropagation()}
-              />
+  {row.started_at ? (
+    <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
+  ) : startingUserBookId === row.id ? (
+    <div className="mt-1 flex flex-col gap-1 text-[11px]">
+      <input
+        type="date"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        className="border p-1 rounded text-xs"
+        onClick={(e) => e.stopPropagation()}
+      />
 
-              <div className="flex gap-2 justify-center">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    saveStartedDate(row.id);
-                  }}
-                  className="text-blue-600 underline hover:text-blue-800"
-                >
-                  Save
-                </button>
+      <div className="flex gap-2 justify-center">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            saveStartedDate(row.id);
+          }}
+          className="text-blue-600 underline hover:text-blue-800"
+        >
+          Save
+        </button>
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setStartingUserBookId(null);
-                    setStartDate("");
-                  }}
-                  className="text-gray-500 underline hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setStartingUserBookId(row.id);
-                setStartDate(new Date().toISOString().split("T")[0]);
-              }}
-              className="mt-1 text-[11px] text-blue-600 underline hover:text-blue-800"
-            >
-              Mark as Started
-            </button>
-          )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setStartingUserBookId(null);
+            setStartDate("");
+          }}
+          className="text-gray-500 underline hover:text-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : !row.finished_at && !row.dnf_at ? (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setStartingUserBookId(row.id);
+        setStartDate(new Date().toISOString().split("T")[0]);
+      }}
+      className="mt-1 text-[11px] text-blue-600 underline hover:text-blue-800"
+    >
+      Mark as Started
+    </button>
+  ) : null}
 
-          {row.finished_at ? (
-            <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
-          ) : (
-            <>
-              {finishingUserBookId === row.id ? (
-                <div className="mt-1 flex flex-col gap-1 text-[11px]">
-                  <input
-                    type="date"
-                    value={finishDate}
-                    onChange={(e) => setFinishDate(e.target.value)}
-                    className="border p-1 rounded text-xs"
-                    onClick={(e) => e.stopPropagation()}
-                  />
+  {row.finished_at ? (
+    <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
+  ) : row.dnf_at ? (
+    <div>DNF: {new Date(row.dnf_at).toLocaleDateString()}</div>
+  ) : finishingUserBookId === row.id ? (
+    <div className="mt-1 flex flex-col gap-1 text-[11px]">
+      <input
+        type="date"
+        value={finishDate}
+        onChange={(e) => setFinishDate(e.target.value)}
+        className="border p-1 rounded text-xs"
+        onClick={(e) => e.stopPropagation()}
+      />
 
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        saveFinishedDate(row.id);
-                      }}
-                      className="text-blue-600 underline hover:text-blue-800"
-                    >
-                      Save
-                    </button>
+      <div className="flex gap-2 justify-center">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            saveFinishedDate(row.id);
+          }}
+          className="text-blue-600 underline hover:text-blue-800"
+        >
+          Save
+        </button>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFinishingUserBookId(null);
-                        setFinishDate("");
-                      }}
-                      className="text-gray-500 underline hover:text-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                row.started_at && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFinishingUserBookId(row.id);
-                      setFinishDate(new Date().toISOString().split("T")[0]);
-                    }}
-                    className="mt-1 text-[11px] text-blue-600 underline hover:text-blue-800"
-                  >
-                    Mark as Finished
-                  </button>
-                )
-              )}
-            </>
-          )}
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setFinishingUserBookId(null);
+            setFinishDate("");
+          }}
+          className="text-gray-500 underline hover:text-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : dnfingUserBookId === row.id ? (
+    <div className="mt-1 flex flex-col gap-1 text-[11px]">
+      <input
+        type="date"
+        value={dnfDate}
+        onChange={(e) => setDnfDate(e.target.value)}
+        className="border p-1 rounded text-xs"
+        onClick={(e) => e.stopPropagation()}
+      />
+
+      <div className="flex gap-2 justify-center">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            saveDnfDate(row.id);
+          }}
+          className="text-red-600 underline hover:text-red-800"
+        >
+          Save DNF
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDnfingUserBookId(null);
+            setDnfDate("");
+          }}
+          className="text-gray-500 underline hover:text-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : row.started_at ? (
+    <div className="mt-1 flex justify-center gap-4 text-[11px]">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setFinishingUserBookId(row.id);
+          setDnfingUserBookId(null);
+          setDnfDate("");
+          setFinishDate(new Date().toISOString().split("T")[0]);
+        }}
+        className="text-blue-600 underline hover:text-blue-800"
+      >
+        Mark as Finished
+      </button>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setDnfingUserBookId(row.id);
+          setFinishingUserBookId(null);
+          setFinishDate("");
+          setDnfDate(new Date().toISOString().split("T")[0]);
+        }}
+        className="text-red-600 underline hover:text-red-800"
+      >
+        Mark as DNF
+      </button>
+    </div>
+  ) : null}
+</div>
 
         <div className="mt-2 flex flex-col items-center gap-2 w-full">
           <div className="text-[10px] uppercase tracking-wide text-gray-500">Read → Review → Practice</div>
@@ -1059,7 +921,7 @@ export default function BooksPage() {
               ) : null}
             </button>
 
-            {row.started_at && !row.finished_at ? (
+            {canStudy ? (
               <>
                 <button
                   onClick={(e) => openStudyVocab(e, row.id)}
@@ -1092,63 +954,63 @@ export default function BooksPage() {
             ) : null}
           </div>
 
-          {isTeacher && row.started_at && !row.finished_at ? (
-  <div className="w-full flex flex-col items-center gap-2 pt-1">
-    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-      Teacher Tools
-    </div>
+          {isTeacher && canStudy ? (
+            <div className="w-full flex flex-col items-center gap-2 pt-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                Teacher Tools
+              </div>
 
-    <a
-      href={`/vocab/bulk?userBookId=${row.id}`}
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
-    >
-      Add Vocab
-    </a>
+              <a
+                href={`/vocab/bulk?userBookId=${row.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
+              >
+                Add Vocab
+              </a>
 
-    <a
-      href={`/books/${row.id}/weekly-readings/prepare`}
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
-    >
-      Prepare Readings
-    </a>
+              <a
+                href={`/books/${row.id}/weekly-readings/prepare`}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
+              >
+                Prepare Readings
+              </a>
 
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-[11px] text-gray-700"
-    >
-      <div className="font-semibold text-[10px] uppercase tracking-wide text-gray-500 mb-2">
-        Notify Includes
-      </div>
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-[11px] text-gray-700"
+              >
+                <div className="font-semibold text-[10px] uppercase tracking-wide text-gray-500 mb-2">
+                  Notify Includes
+                </div>
 
-      <label className="flex items-center gap-2 mb-1 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={includeVocabNotify}
-          onChange={(e) => setIncludeVocabNotify(e.target.checked)}
-        />
-        <span>Vocab</span>
-      </label>
+                <label className="flex items-center gap-2 mb-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeVocabNotify}
+                    onChange={(e) => setIncludeVocabNotify(e.target.checked)}
+                  />
+                  <span>Vocab</span>
+                </label>
 
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={includeReadingNotify}
-          onChange={(e) => setIncludeReadingNotify(e.target.checked)}
-        />
-        <span>Readings</span>
-      </label>
-    </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeReadingNotify}
+                    onChange={(e) => setIncludeReadingNotify(e.target.checked)}
+                  />
+                  <span>Readings</span>
+                </label>
+              </div>
 
-    <button
-      onClick={(e) => handleNotifyStudent(e, row.id)}
-      className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-pink-700 text-white rounded hover:bg-pink-800 transition"
-    >
-      Notify Student
-    </button>
-  </div>
-) : null}
+              <button
+                onClick={(e) => handleNotifyStudent(e, row.id)}
+                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-pink-700 text-white rounded hover:bg-pink-800 transition"
+              >
+                Notify Student
+              </button>
+            </div>
+          ) : null}
         </div>
       </li>
     );
@@ -1203,9 +1065,7 @@ export default function BooksPage() {
 
       {hasAnyNotifyBanner ? (
         <div className="mt-5 mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm max-w-2xl">
-          <div className="text-sm font-semibold text-amber-900">
-            ✨ New study material is available
-          </div>
+          <div className="text-sm font-semibold text-amber-900">✨ New study material is available</div>
           <p className="mt-2 text-sm leading-6 text-amber-800">
             New vocabulary and/or reading has been added.
           </p>
@@ -1218,9 +1078,7 @@ export default function BooksPage() {
             Viewing: <span className="font-medium">{viewingLabel}</span>
           </div>
 
-          <div className="text-xs text-gray-400">
-            viewingUserId: {viewingUserId}
-          </div>
+          <div className="text-xs text-gray-400">viewingUserId: {viewingUserId}</div>
 
           <select
             value={viewingUserId || meId}
@@ -1255,8 +1113,6 @@ export default function BooksPage() {
               </optgroup>
             ) : null}
           </select>
-
-          <p className="text-xs text-gray-500">Tip: Enter ISBN-13 first to prevent duplicates.</p>
         </div>
       ) : null}
 
@@ -1277,123 +1133,14 @@ export default function BooksPage() {
         subtitle="Completed books • Study buttons can be found in Vocab List."
         items={finished}
       />
+      <Section
+        title="DNF"
+        subtitle="Did not finish"
+        items={dnf}
+      />
 
       {validRows.length === 0 ? (
-        <div className="text-sm text-gray-600 mt-8">
-          {isTeacher ? "No books yet — click “+ Add Book” to start." : "No books yet."}
-        </div>
-      ) : null}
-
-      {isTeacher ? (
-        <button
-          type="button"
-          onClick={() => {
-            setMessage("");
-            setMessageType("");
-            setShowAddModal(true);
-          }}
-          className="fixed bottom-6 right-6 z-40 rounded-full bg-blue-600 text-white px-5 py-3 shadow-lg hover:bg-blue-700"
-          title={`Add a book for: ${viewingLabel}`}
-        >
-          + Add Book
-        </button>
-      ) : null}
-
-      {showAddModal && isTeacher ? (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white border shadow-xl p-5">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h2 className="text-lg font-semibold">Add a book</h2>
-                <p className="text-sm text-gray-600">
-                  For: <span className="font-medium">{viewingLabel}</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm"
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            <form onSubmit={addBook} className="flex flex-col gap-3">
-              <input
-                type="text"
-                placeholder="ISBN-13 (recommended, digits only, no hyphen)"
-                value={isbn13}
-                onChange={(e) => setIsbn13(e.target.value)}
-                className="border p-2 rounded"
-              />
-
-              <input
-                type="text"
-                placeholder="Book title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="border p-2 rounded"
-                required
-              />
-
-              <input
-                type="text"
-                placeholder="Author (optional)"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                className="border p-2 rounded"
-              />
-
-              <input
-                type="text"
-                placeholder="Publisher (optional)"
-                value={publisher}
-                onChange={(e) => setPublisher(e.target.value)}
-                className="border p-2 rounded"
-              />
-
-              <input
-                type="text"
-                placeholder="Translator (optional)"
-                value={translator}
-                onChange={(e) => setTranslator(e.target.value)}
-                className="border p-2 rounded"
-              />
-
-              <input
-                type="text"
-                placeholder="Illustrator (optional)"
-                value={illustrator}
-                onChange={(e) => setIllustrator(e.target.value)}
-                className="border p-2 rounded"
-              />
-
-              <input
-                type="text"
-                placeholder="Cover image URL (optional)"
-                value={coverUrl}
-                onChange={(e) => setCoverUrl(e.target.value)}
-                className="border p-2 rounded"
-              />
-
-              <button
-                type="submit"
-                disabled={adding}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {adding ? "Adding..." : "Add"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-            </form>
-          </div>
-        </div>
+        <div className="text-sm text-gray-600 mt-8">No books yet.</div>
       ) : null}
     </main>
   );

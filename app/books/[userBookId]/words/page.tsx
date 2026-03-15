@@ -1,7 +1,7 @@
 // Word List
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -11,6 +11,7 @@ type WordRow = {
   surface: string;
   reading: string | null;
   meaning: string | null;
+  other_definition: string | null;
   jlpt: string | null;
   is_common: boolean | null;
   page_number: number | null;
@@ -18,9 +19,8 @@ type WordRow = {
   chapter_name: string | null;
   seen_on: string | null;
   created_at: string;
-
-  // ✅ definition support
-  meaning_choices: any | null; // jsonb
+  hidden: boolean | null;
+  meaning_choices: any | null;
   meaning_choice_index: number | null;
 };
 
@@ -32,7 +32,6 @@ function normalizeJlpt(val: string | null | undefined) {
   return "NON-JLPT";
 }
 
-// For dropdown/search/filter: always use a single-line label
 function chapterDisplayParts(w: WordRow) {
   const num = w.chapter_number;
   const name = (w.chapter_name ?? "").trim();
@@ -51,14 +50,12 @@ function chapterDisplayParts(w: WordRow) {
   };
 }
 
-// ✅ stable key (doesn't depend on label formatting)
 function chapterKey(w: WordRow) {
   const num = w.chapter_number != null ? String(w.chapter_number) : "";
   const name = (w.chapter_name ?? "").trim();
   return `${num}||${name}`;
 }
 
-// ✅ jsonb -> string[]
 function asStringArray(val: any): string[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.map((x) => String(x)).filter(Boolean);
@@ -75,9 +72,6 @@ function normalizeText(val: string | null | undefined) {
   return (val ?? "").trim();
 }
 
-// ✅ Repeats = same surface + same selected definition
-// - If meaning_choice_index exists AND there are meaning_choices, use IDX.
-// - Otherwise fall back to meaning text.
 function repeatKey(w: WordRow) {
   const s = normalizeText(w.surface);
   if (!s) return "";
@@ -96,15 +90,14 @@ function repeatKey(w: WordRow) {
 export default function BookWordsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
-
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-const [needsSignIn, setNeedsSignIn] = useState(false);
-const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-const [myRole, setMyRole] = useState<ProfileRole>("student");
-const isTeacher = myRole === "teacher";
+  const [myRole, setMyRole] = useState<ProfileRole>("student");
+  const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -113,24 +106,52 @@ const isTeacher = myRole === "teacher";
   const [query, setQuery] = useState("");
   const [chapterFilter, setChapterFilter] = useState("all");
   const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
 
-  // --- Edit modal state ---
   const [editing, setEditing] = useState<WordRow | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
 
-  // Editable fields
   const [editSurface, setEditSurface] = useState("");
   const [editReading, setEditReading] = useState("");
   const [editMeaning, setEditMeaning] = useState("");
+  const [editOtherDefinition, setEditOtherDefinition] = useState("");
   const [editJlpt, setEditJlpt] = useState("");
   const [editPage, setEditPage] = useState<string>("");
   const [editChapterNum, setEditChapterNum] = useState<string>("");
   const [editChapterName, setEditChapterName] = useState("");
 
-  // ✅ definition edit state
   const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
   const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number>(0);
+
+  const stickyControlsRef = useRef<HTMLDivElement | null>(null);
+  const [stickyOffset, setStickyOffset] = useState(0);
+
+  useLayoutEffect(() => {
+    function measure() {
+      if (!stickyControlsRef.current) return;
+      setStickyOffset(stickyControlsRef.current.offsetHeight);
+    }
+
+    measure();
+
+    const el = stickyControlsRef.current;
+    if (!el) return;
+
+    let ro: ResizeObserver | null = null;
+
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => measure());
+      ro.observe(el);
+    }
+
+    window.addEventListener("resize", measure);
+
+    return () => {
+      window.removeEventListener("resize", measure);
+      if (ro) ro.disconnect();
+    };
+  }, []);
 
   function openEdit(w: WordRow) {
     setEditErr(null);
@@ -139,14 +160,17 @@ const isTeacher = myRole === "teacher";
     setEditSurface(w.surface ?? "");
     setEditReading(w.reading ?? "");
     setEditMeaning(w.meaning ?? "");
+    setEditOtherDefinition(w.other_definition ?? "");
     setEditJlpt(w.jlpt ?? "");
 
     setEditPage(w.page_number != null ? String(w.page_number) : "");
     setEditChapterNum(w.chapter_number != null ? String(w.chapter_number) : "");
     setEditChapterName(w.chapter_name ?? "");
 
-    const choices = asStringArray((w as any).meaning_choices);
-    const idxRaw = Number.isFinite(w.meaning_choice_index as any) ? (w.meaning_choice_index as number) : 0;
+    const choices = asStringArray(w.meaning_choices);
+    const idxRaw = Number.isFinite(w.meaning_choice_index as any)
+      ? (w.meaning_choice_index as number)
+      : 0;
     const idx = Math.max(0, choices.length ? Math.min(idxRaw, choices.length - 1) : idxRaw);
 
     setEditMeaningChoices(choices);
@@ -172,17 +196,17 @@ const isTeacher = myRole === "teacher";
   }
 
   function changeDefinition(newIndex: number) {
-  const choices = editMeaningChoices ?? [];
-  const safe = Math.max(0, newIndex);
+    const choices = editMeaningChoices ?? [];
+    const safe = Math.max(0, newIndex);
 
-  setEditMeaningChoiceIndex(safe);
+    setEditMeaningChoiceIndex(safe);
 
-  if (choices.length) {
-    const clamped = Math.min(safe, choices.length - 1);
-    const chosen = choices[clamped] ?? "";
-    setEditMeaning(chosen);
+    if (choices.length) {
+      const clamped = Math.min(safe, choices.length - 1);
+      const chosen = choices[clamped] ?? "";
+      setEditMeaning(chosen);
+    }
   }
-}
 
   async function saveEdit() {
     if (!editing) return;
@@ -199,6 +223,7 @@ const isTeacher = myRole === "teacher";
       surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
+      other_definition: editOtherDefinition.trim() ? editOtherDefinition.trim() : null,
       jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
       page_number: parseNullableInt(editPage),
       chapter_number: parseNullableInt(editChapterNum),
@@ -244,11 +269,52 @@ const isTeacher = myRole === "teacher";
     if (!ok) return;
 
     try {
-      const { error } = await supabase.from("user_book_words").delete().eq("id", w.id).eq("user_book_id", userBookId);
+      const { error } = await supabase
+        .from("user_book_words")
+        .delete()
+        .eq("id", w.id)
+        .eq("user_book_id", userBookId);
+
       if (error) throw error;
       setWords((prev) => prev.filter((x) => x.id !== w.id));
     } catch (e: any) {
       alert(e?.message ?? "Failed to delete word");
+    }
+  }
+
+  async function hideWord(w: WordRow) {
+    try {
+      const { error } = await supabase
+        .from("user_book_words")
+        .update({ hidden: true })
+        .eq("id", w.id)
+        .eq("user_book_id", userBookId);
+
+      if (error) throw error;
+
+      if (showHidden) {
+        setWords((prev) => prev.map((x) => (x.id === w.id ? { ...x, hidden: true } : x)));
+      } else {
+        setWords((prev) => prev.filter((x) => x.id !== w.id));
+      }
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to hide word");
+    }
+  }
+
+  async function unhideWord(w: WordRow) {
+    try {
+      const { error } = await supabase
+        .from("user_book_words")
+        .update({ hidden: false })
+        .eq("id", w.id)
+        .eq("user_book_id", userBookId);
+
+      if (error) throw error;
+
+      setWords((prev) => prev.map((x) => (x.id === w.id ? { ...x, hidden: false } : x)));
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to unhide word");
     }
   }
 
@@ -262,25 +328,25 @@ const isTeacher = myRole === "teacher";
 
       try {
         const { data: auth } = await supabase.auth.getUser();
-const user = auth?.user;
+        const user = auth?.user;
 
-if (!user) {
-  setNeedsSignIn(true);
-  setLoading(false);
-  return;
-}
+        if (!user) {
+          setNeedsSignIn(true);
+          setLoading(false);
+          return;
+        }
 
-const { data: meProfile, error: meProfileErr } = await supabase
-  .from("profiles")
-  .select("role")
-  .eq("id", user.id)
-  .single();
+        const { data: meProfile, error: meProfileErr } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
 
-if (meProfileErr) {
-  console.error("Error loading profile role:", meProfileErr);
-}
+        if (meProfileErr) {
+          console.error("Error loading profile role:", meProfileErr);
+        }
 
-setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
+        setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
 
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")
@@ -301,7 +367,7 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
 
-        const { data: rows, error: wErr } = await supabase
+        let wordsQuery = supabase
           .from("user_book_words")
           .select(
             `
@@ -310,6 +376,7 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
             surface,
             reading,
             meaning,
+            other_definition,
             jlpt,
             is_common,
             page_number,
@@ -317,17 +384,23 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
             chapter_name,
             seen_on,
             created_at,
+            hidden,
             meaning_choices,
             meaning_choice_index
           `
           )
           .eq("user_book_id", userBookId)
           .order("chapter_number", { ascending: true, nullsFirst: false })
-.order("page_number", { ascending: true, nullsFirst: false })
-.order("page_order", { ascending: true, nullsFirst: false })
-.order("created_at", { ascending: true })
-.order("id", { ascending: true })
-          .returns<WordRow[]>();
+          .order("page_number", { ascending: true, nullsFirst: false })
+          .order("page_order", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
+
+        if (!showHidden) {
+          wordsQuery = wordsQuery.eq("hidden", false);
+        }
+
+        const { data: rows, error: wErr } = await wordsQuery.returns<WordRow[]>();
 
         if (wErr) throw wErr;
 
@@ -357,7 +430,7 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
     }
 
     load();
-  }, [userBookId]);
+  }, [userBookId, showHidden]);
 
   const repeatCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -386,7 +459,7 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
         normalizeJlpt(w.jlpt),
         chLabel,
         w.page_number?.toString() ?? "",
-        w.meaning_choice_index != null ? String(w.meaning_choice_index + 1) : "",
+        w.meaning_choice_index != null ? String(w.meaning_choice_index + 1) : "o",
       ]
         .join(" ")
         .toLowerCase();
@@ -394,6 +467,8 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
       return hay.includes(q);
     });
   }, [words, query, chapterFilter]);
+
+  const headerStickyStyle = { top: `${stickyOffset}px` };
 
   if (loading) {
     return (
@@ -426,7 +501,7 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
   }
 
   return (
-    <main className="max-w-6xl mx-auto p-6">
+    <main className="max-w-6xl mx-auto p-6 pb-24">
       {editing && isTeacher ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border p-4">
@@ -437,7 +512,10 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
                   {editing.surface} • {editing.id}
                 </p>
               </div>
-              <button onClick={closeEdit} className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">
+              <button
+                onClick={closeEdit}
+                className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+              >
                 ✕ Close
               </button>
             </div>
@@ -447,84 +525,128 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Word</span>
-                <input value={editSurface} onChange={(e) => setEditSurface(e.target.value)} className="border p-2 rounded" />
+                <input
+                  value={editSurface}
+                  onChange={(e) => setEditSurface(e.target.value)}
+                  className="border p-2 rounded"
+                />
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Reading</span>
-                <input value={editReading} onChange={(e) => setEditReading(e.target.value)} className="border p-2 rounded" />
+                <input
+                  value={editReading}
+                  onChange={(e) => setEditReading(e.target.value)}
+                  className="border p-2 rounded"
+                />
               </label>
 
               <label className="flex flex-col gap-1">
-  <span className="text-xs text-gray-600">JLPT</span>
-  <select value={editJlpt} onChange={(e) => setEditJlpt(e.target.value)} className="border p-2 rounded bg-white">
-    <option value="">NON-JLPT</option>
-    <option value="N5">N5</option>
-    <option value="N4">N4</option>
-    <option value="N3">N3</option>
-    <option value="N2">N2</option>
-    <option value="N1">N1</option>
-  </select>
-</label>
+                <span className="text-xs text-gray-600">JLPT</span>
+                <select
+                  value={editJlpt}
+                  onChange={(e) => setEditJlpt(e.target.value)}
+                  className="border p-2 rounded bg-white"
+                >
+                  <option value="">NON-JLPT</option>
+                  <option value="N5">N5</option>
+                  <option value="N4">N4</option>
+                  <option value="N3">N3</option>
+                  <option value="N2">N2</option>
+                  <option value="N1">N1</option>
+                </select>
+              </label>
 
-<label className="flex flex-col gap-1">
-  <span className="text-xs text-gray-600">Definition #</span>
-  {editMeaningChoices.length > 1 ? (
-    <select
-      value={Math.min(editMeaningChoiceIndex, editMeaningChoices.length - 1)}
-      onChange={(e) => changeDefinition(Number(e.target.value))}
-      className="border p-2 rounded bg-white"
-    >
-      {editMeaningChoices.map((_, i) => (
-        <option key={i} value={i}>
-          {i + 1}
-        </option>
-      ))}
-    </select>
-  ) : (
-    <input
-      type="number"
-      min="1"
-      value={editMeaningChoiceIndex + 1}
-      onChange={(e) => {
-        const raw = Number(e.target.value);
-        if (!Number.isFinite(raw) || raw < 1) {
-          changeDefinition(0);
-        } else {
-          changeDefinition(raw - 1);
-        }
-      }}
-      className="border p-2 rounded"
-    />
-  )}
-</label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-gray-600">Definition #</span>
+                {editMeaningChoices.length > 1 ? (
+                  <select
+                    value={Math.min(editMeaningChoiceIndex, editMeaningChoices.length - 1)}
+                    onChange={(e) => changeDefinition(Number(e.target.value))}
+                    className="border p-2 rounded bg-white"
+                  >
+                    {editMeaningChoices.map((_, i) => (
+                      <option key={i} value={i}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="number"
+                    min="1"
+                    value={editMeaningChoiceIndex + 1}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value);
+                      if (!Number.isFinite(raw) || raw < 1) {
+                        changeDefinition(0);
+                      } else {
+                        changeDefinition(raw - 1);
+                      }
+                    }}
+                    className="border p-2 rounded"
+                  />
+                )}
+              </label>
 
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-600">Meaning</span>
-                <textarea value={editMeaning} onChange={(e) => setEditMeaning(e.target.value)} className="border p-2 rounded min-h-[90px]" />
+                <textarea
+                  value={editMeaning}
+                  onChange={(e) => setEditMeaning(e.target.value)}
+                  className="border p-2 rounded min-h-[90px]"
+                />
                 {editMeaningChoices.length > 1 ? (
-                  <p className="text-[11px] text-gray-500">Tip: changing “Definition #” will overwrite Meaning to match that definition.</p>
+                  <p className="text-[11px] text-gray-500">
+                    Tip: changing “Definition #” will overwrite Meaning to match that definition.
+                  </p>
                 ) : null}
+              </label>
+
+              <label className="flex flex-col gap-1 sm:col-span-2">
+                <span className="text-xs text-gray-600">Other definition</span>
+                <textarea
+                  value={editOtherDefinition}
+                  onChange={(e) => setEditOtherDefinition(e.target.value)}
+                  className="border p-2 rounded min-h-[70px]"
+                  placeholder="Optional custom definition"
+                />
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Chapter #</span>
-                <input value={editChapterNum} onChange={(e) => setEditChapterNum(e.target.value)} className="border p-2 rounded" />
+                <input
+                  value={editChapterNum}
+                  onChange={(e) => setEditChapterNum(e.target.value)}
+                  className="border p-2 rounded"
+                />
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Chapter title</span>
-                <input value={editChapterName} onChange={(e) => setEditChapterName(e.target.value)} className="border p-2 rounded" />
+                <input
+                  value={editChapterName}
+                  onChange={(e) => setEditChapterName(e.target.value)}
+                  className="border p-2 rounded"
+                />
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-600">Page</span>
-                <input value={editPage} onChange={(e) => setEditPage(e.target.value)} className="border p-2 rounded" />
+                <input
+                  value={editPage}
+                  onChange={(e) => setEditPage(e.target.value)}
+                  className="border p-2 rounded"
+                />
               </label>
             </div>
 
             <div className="mt-4 flex items-center justify-end gap-2">
-              <button onClick={closeEdit} disabled={editSaving} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50">
+              <button
+                onClick={closeEdit}
+                disabled={editSaving}
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50"
+              >
                 Cancel
               </button>
               <button
@@ -539,81 +661,124 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
         </div>
       ) : null}
 
-      <div className="flex items-center gap-3 mb-4">
-        {bookCover ? <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover" /> : null}
+      <div className="mt-2 mb-4 w-full border-b border-gray-300 pb-4">
+        <p className="text-sm text-gray-500 text-center">
+          This page keeps track of all the vocabulary you didn’t know or had difficulty with while
+          studying with your teacher. It is arranged in book order, so you are encouraged to read
+          back over your passages with the list on hand to help you read more independently.
+        </p>
+      </div>
 
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold">{bookTitle || "Words"}</h1>
-          <p className="text-sm text-gray-500">
-            Total: {words.length} • Showing: {filtered.length}
-          </p>
+      <div ref={stickyControlsRef} className="sticky top-0 z-30 bg-white border-b border-gray-200">
+        <div className="flex items-start gap-3 py-3">
+          {bookCover ? (
+            <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover shrink-0" />
+          ) : null}
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-semibold">{bookTitle || "Words"}</h1>
+            <p className="text-sm text-gray-500">
+              Total: {words.length} • Showing: {filtered.length}
+            </p>
+          </div>
+
+          <div className="flex gap-2 flex-wrap items-center justify-end">
+            <label className="flex items-center gap-2 text-sm px-3 py-2 border rounded bg-white whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showHidden}
+                onChange={(e) => setShowHidden(e.target.checked)}
+              />
+              Show Hidden Words
+            </label>
+
+            {isTeacher ? (
+              <button
+                onClick={() =>
+                  router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)
+                }
+                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
+              >
+                + Add Vocab
+              </button>
+            ) : null}
+
+            <button
+              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+              className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
+            >
+              Book Info
+            </button>
+
+            <button
+              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
+              className="px-3 py-2 bg-green-700 text-white rounded hover:bg-amber-600 text-sm whitespace-nowrap"
+            >
+              Study
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
-          {isTeacher ? (
-  <button
-    onClick={() => router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)}
-    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-  >
-    + Add Vocab
-  </button>
-) : null}
+        <div className="border-t border-gray-200 py-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search (word/reading/meaning/def #/page/chapter)…"
+              className="border p-2 rounded w-full"
+            />
 
-          <button
-            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm"
-          >
-            Book Info
-          </button>
-
-          <button
-            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
-            className="px-3 py-2 bg-green-700 text-white rounded hover:bg-amber-600 text-sm"
-          >
-            Study
-          </button>
+            <select
+              value={chapterFilter}
+              onChange={(e) => setChapterFilter(e.target.value)}
+              className="border p-2 rounded bg-white"
+            >
+              <option value="all">All chapters</option>
+              {chapterOptions.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search (word/reading/meaning/def #/page/chapter)…"
-          className="border p-2 rounded w-full"
-        />
-
-        <select value={chapterFilter} onChange={(e) => setChapterFilter(e.target.value)} className="border p-2 rounded bg-white">
-          <option value="all">All chapters</option>
-          {chapterOptions.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
-<div className="mt-2 mb-4 w-full border-b border-gray-300 pb-4">
-  <p className="text-sm text-gray-500 text-center">
-    This page keeps track of all the vocabulary you didn’t know or had difficulty with while studying with your teacher. It is arranged in book order, so you are encouraged to read back over your passages with the list on hand to help you read more independently.
-  </p>
-</div>
-
-<div className="overflow-x-auto border rounded bg-white">
-
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto overflow-y-visible border rounded bg-white relative">
+        <table className="w-full text-sm border-separate border-spacing-0">
           <thead className="bg-gray-50">
             <tr className="text-left">
-              <th className="p-2 w-8 text-center" title="How many times this word appears in this book (same word + same definition)">
+              <th
+                className="p-2 w-5 sticky bg-gray-50 z-20"
+                style={headerStickyStyle}
+                title="How many times this word appears in this book (same word + same definition)"
+              >
                 Repeats
               </th>
-              <th className="p-2 w-25">Word</th>
-              <th className="p-2 w-25">Reading</th>
-              <th className="p-2 w-60">Meaning</th>
-              <th className="p-2 w-10 text-center">Def #</th>
-              <th className="p-2 w-30">Chapter</th>
-              <th className="p-2 w-10">Page</th>
-              <th className="p-2 w-20">JLPT</th>
-              <th className="p-2 w-24">Actions</th>
+              <th className="p-2 w-20 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Word
+              </th>
+              <th className="p-2 w-30 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Reading
+              </th>
+              <th className="p-2 w-60 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Meaning
+              </th>
+              <th className="p-2 w-10 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Def #
+              </th>
+              <th className="p-2 w-5 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Chapter
+              </th>
+              <th className="p-2 w-10 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Page
+              </th>
+              <th className="p-2 w-20 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                JLPT
+              </th>
+              <th className="p-2 w-25 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Actions
+              </th>
             </tr>
           </thead>
 
@@ -622,14 +787,18 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
               const rep = repeatCounts.get(repeatKey(w)) ?? 0;
 
               return (
-                <tr key={w.id} className="border-t">
+                <tr key={w.id} className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""}`}>
                   <td className="p-2 text-center text-xs text-gray-600">{rep > 1 ? rep : ""}</td>
 
                   <td className="p-2 font-medium">{w.surface}</td>
                   <td className="p-2">{w.reading ?? "—"}</td>
-                  <td className="p-2">{w.meaning ?? "—"}</td>
+
+                  <td className="p-2">
+                    <div>{w.meaning ?? "—"}</div>
+                  </td>
+
                   <td className="p-2 text-center">
-                    {w.meaning_choice_index != null ? w.meaning_choice_index + 1 : "—"}
+                    {w.meaning_choice_index != null ? w.meaning_choice_index + 1 : w.meaning ? "O" : "—"}
                   </td>
 
                   <td className="p-2">
@@ -651,33 +820,51 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
                   <td className="p-2">{normalizeJlpt(w.jlpt)}</td>
 
                   <td className="p-2">
-                    <div className="flex gap-2">
-  <button
-    onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)}
-    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
-    title="Open word card"
-  >
-    Open
-  </button>
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() =>
+                          router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
+                        }
+                        className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
+                        title="Open word card"
+                      >
+                        Open
+                      </button>
 
-  {isTeacher ? (
-    <>
-      <button
-        onClick={() => openEdit(w)}
-        className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
-      >
-        Edit
-      </button>
+                      {isTeacher ? (
+                        <>
+                          <button
+                            onClick={() => openEdit(w)}
+                            className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
+                          >
+                            Edit
+                          </button>
 
-      <button
-        onClick={() => deleteWord(w)}
-        className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
-      >
-        Delete
-      </button>
-    </>
-  ) : null}
-</div>
+                          {w.hidden ? (
+                            <button
+                              onClick={() => unhideWord(w)}
+                              className="px-2 py-1 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
+                            >
+                              Unhide
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => hideWord(w)}
+                              className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                            >
+                              Hide
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => deleteWord(w)}
+                            className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               );
@@ -695,7 +882,10 @@ setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
       </div>
 
       <div className="mt-4">
-        <button onClick={() => router.push("/books")} className="text-sm text-slate-600 hover:underline">
+        <button
+          onClick={() => router.push("/books")}
+          className="text-sm text-slate-600 hover:underline"
+        >
           ← Back to Books
         </button>
       </div>
