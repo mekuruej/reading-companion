@@ -97,6 +97,17 @@ function formatReadingForType(
   return reading;
 }
 
+function getKanjiPositionHint(sourceWord: string, kanji: string) {
+  if (!sourceWord || !kanji) return "";
+
+  const chars = Array.from(sourceWord);
+  const index = chars.findIndex((ch) => ch === kanji);
+
+  if (index === -1) return "";
+
+  return `${index + 1} of ${chars.length}`;
+}
+
 export default function WeeklyReadingsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
@@ -270,6 +281,9 @@ export default function WeeklyReadingsPage() {
   }, [userBookId]);
 
   const card = deck[index];
+
+  const kanjiPositionHint =
+  card ? getKanjiPositionHint(card.sourceWord, card.kanji) : "";
 
   const canStartRecall =
   !!card &&
@@ -589,10 +603,12 @@ if (inRecallFlow) return;
 
           <div className="w-full max-w-sm flex flex-col gap-3">
             {options.map((opt, i) => {
-              const isCorrect =
-                !!checked && normalizeReading(opt) === normalizeReading(card.reading);
-              const isChosen =
-                !!selected && normalizeReading(opt) === normalizeReading(selected);
+              const displayedCorrect = formatReadingForType(card.reading, card.readingType);
+
+const isCorrect =
+  !!checked && normalizeReading(opt) === normalizeReading(displayedCorrect);
+const isChosen =
+  !!selected && normalizeReading(opt) === normalizeReading(selected);
 
               let className = "w-full px-4 py-3 rounded border text-base ";
 
@@ -647,7 +663,11 @@ if (!checked) {
                       <p className="text-sm font-medium text-slate-800 text-center">
                         Can you guess the word from this week?
                       </p>
-
+                      {kanjiPositionHint ? (
+  <p className="mt-1 text-xs text-slate-500 text-center">
+    Hint: This kanji is character {kanjiPositionHint} in the word.
+  </p>
+) : null}
                       <input
                         type="text"
                         value={guessInput}
