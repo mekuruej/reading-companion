@@ -75,6 +75,28 @@ function normalizeWord(s: string) {
     .toLowerCase();
 }
 
+function hiraToKata(s: string) {
+  return (s ?? "").replace(/[ぁ-ゖ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) + 0x60)
+  );
+}
+
+function kataToHira(s: string) {
+  return (s ?? "").replace(/[ァ-ヶ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
+
+function formatReadingForType(
+  reading: string,
+  readingType: "onyomi" | "kunyomi" | "other" | null
+) {
+  if (!reading) return "";
+  if (readingType === "onyomi") return hiraToKata(kataToHira(reading));
+  if (readingType === "kunyomi") return kataToHira(reading);
+  return reading;
+}
+
 export default function WeeklyReadingsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
@@ -266,10 +288,12 @@ const inRecallFlow =
   !!card.sourceWord &&
   (recallRevealed || canStartRecall);
 
-  const options = useMemo(() => {
+    const options = useMemo(() => {
     if (!card || baseCards.length === 0) return [];
 
     const correct = card.reading;
+    const displayType = card.readingType;
+
     const distractorPool = Array.from(
       new Set(
         baseCards
@@ -279,7 +303,10 @@ const inRecallFlow =
     );
 
     const shuffled = shuffleArray(distractorPool).slice(0, 2);
-    return shuffleArray([correct, ...shuffled]);
+
+    return shuffleArray([correct, ...shuffled]).map((r) =>
+      formatReadingForType(r, displayType)
+    );
   }, [card, baseCards, index]);
 
   function resetCardState() {
@@ -319,9 +346,10 @@ const inRecallFlow =
   function checkAnswer(choice: string) {
     if (!card || checked) return;
 
-    const ok = normalizeReading(choice) === normalizeReading(card.reading);
+    const displayedCorrect = formatReadingForType(card.reading, card.readingType);
+    const ok = normalizeReading(choice) === normalizeReading(displayedCorrect);
     setSelected(choice);
-    setChecked({ ok, correct: card.reading });
+    setChecked({ ok, correct: formatReadingForType(card.reading, card.readingType) });
     setGuessInput("");
     setRecallRevealed(false);
     setRecallResult(null);
@@ -568,15 +596,17 @@ if (inRecallFlow) return;
 
               let className = "w-full px-4 py-3 rounded border text-base ";
 
-              if (!checked) {
-                className += "bg-white hover:bg-gray-50";
-              } else if (isCorrect) {
-                className += "bg-green-100 border-green-400";
-              } else if (isChosen) {
-                className += "bg-red-100 border-red-400";
-              } else {
-                className += "bg-white";
-              }
+if (!checked) {
+  className += "bg-white hover:bg-gray-50";
+} else if (isCorrect && isChosen) {
+  className += "bg-green-100 border-green-400";
+} else if (isCorrect) {
+  className += "bg-green-100 border-green-400";
+} else if (isChosen) {
+  className += "bg-red-100 border-red-400";
+} else {
+  className += "bg-white";
+}
 
               return (
                 <button
