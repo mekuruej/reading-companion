@@ -122,7 +122,7 @@ export default function BookWordsPage() {
   const [editChapterName, setEditChapterName] = useState("");
 
   const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
-  const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number>(0);
+  const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number | null>(0);
 
   const stickyControlsRef = useRef<HTMLDivElement | null>(null);
   const [stickyOffset, setStickyOffset] = useState(0);
@@ -168,17 +168,26 @@ export default function BookWordsPage() {
     setEditChapterName(w.chapter_name ?? "");
 
     const choices = asStringArray(w.meaning_choices);
-    const idxRaw = Number.isFinite(w.meaning_choice_index as any)
-      ? (w.meaning_choice_index as number)
-      : 0;
-    const idx = Math.max(0, choices.length ? Math.min(idxRaw, choices.length - 1) : idxRaw);
+const rawIdx =
+  w.meaning_choice_index == null
+    ? null
+    : Number.isFinite(w.meaning_choice_index as any)
+    ? (w.meaning_choice_index as number)
+    : 0;
 
-    setEditMeaningChoices(choices);
-    setEditMeaningChoiceIndex(idx);
+const idx =
+  rawIdx == null
+    ? null
+    : Math.max(0, choices.length ? Math.min(rawIdx, choices.length - 1) : rawIdx);
 
-    if (choices.length && choices[idx]) {
-      setEditMeaning(choices[idx]);
-    }
+setEditMeaningChoices(choices);
+setEditMeaningChoiceIndex(idx);
+
+if (idx != null && choices.length && choices[idx]) {
+  setEditMeaning(choices[idx]);
+} else {
+  setEditMeaning(w.meaning ?? "");
+}
   }
 
   function closeEdit() {
@@ -195,18 +204,26 @@ export default function BookWordsPage() {
     return Math.trunc(n);
   }
 
-  function changeDefinition(newIndex: number) {
-    const choices = editMeaningChoices ?? [];
-    const safe = Math.max(0, newIndex);
+  function changeDefinition(newValue: string) {
+  const choices = editMeaningChoices ?? [];
 
-    setEditMeaningChoiceIndex(safe);
-
-    if (choices.length) {
-      const clamped = Math.min(safe, choices.length - 1);
-      const chosen = choices[clamped] ?? "";
-      setEditMeaning(chosen);
-    }
+  if (newValue === "other") {
+    setEditMeaningChoiceIndex(null);
+    setEditMeaning("");
+    return;
   }
+
+  const newIndex = Number(newValue);
+  const safe = Math.max(0, newIndex);
+
+  setEditMeaningChoiceIndex(safe);
+
+  if (choices.length) {
+    const clamped = Math.min(safe, choices.length - 1);
+    const chosen = choices[clamped] ?? "";
+    setEditMeaning(chosen);
+  }
+}
 
   async function saveEdit() {
     if (!editing) return;
@@ -217,24 +234,24 @@ export default function BookWordsPage() {
     const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
 
     const patch: Partial<WordRow> & {
-      meaning_choices?: any;
-      meaning_choice_index?: number;
-    } = {
+  meaning_choices?: any;
+  meaning_choice_index?: number | null;
+} = {
       surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
-      other_definition: editOtherDefinition.trim() ? editOtherDefinition.trim() : null,
+      other_definition: null,
       jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
       page_number: parseNullableInt(editPage),
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
-      meaning_choice_index: editMeaningChoiceIndex,
+      meaning_choice_index: editMeaningChoiceIndex == null ? null : editMeaningChoiceIndex,
     };
 
-    if (hasChoices) {
-      const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
-      if (chosen) patch.meaning = chosen;
-    }
+    if (hasChoices && editMeaningChoiceIndex != null) {
+  const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
+  if (chosen) patch.meaning = chosen;
+}
 
     try {
       const { error } = await supabase
@@ -558,36 +575,30 @@ export default function BookWordsPage() {
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Definition #</span>
-                {editMeaningChoices.length > 1 ? (
-                  <select
-                    value={Math.min(editMeaningChoiceIndex, editMeaningChoices.length - 1)}
-                    onChange={(e) => changeDefinition(Number(e.target.value))}
-                    className="border p-2 rounded bg-white"
-                  >
-                    {editMeaningChoices.map((_, i) => (
-                      <option key={i} value={i}>
-                        {i + 1}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    min="1"
-                    value={editMeaningChoiceIndex + 1}
-                    onChange={(e) => {
-                      const raw = Number(e.target.value);
-                      if (!Number.isFinite(raw) || raw < 1) {
-                        changeDefinition(0);
-                      } else {
-                        changeDefinition(raw - 1);
-                      }
-                    }}
-                    className="border p-2 rounded"
-                  />
-                )}
-              </label>
+  <span className="text-xs text-gray-600">Definition #</span>
+  {editMeaningChoices.length > 0 ? (
+    <select
+      value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
+      onChange={(e) => changeDefinition(e.target.value)}
+      className="border p-2 rounded bg-white"
+    >
+      {editMeaningChoices.map((_, i) => (
+        <option key={i} value={i}>
+          {i + 1}
+        </option>
+      ))}
+      <option value="other">Other</option>
+    </select>
+  ) : (
+    <select
+      value={editMeaningChoiceIndex == null ? "other" : "0"}
+      onChange={(e) => changeDefinition(e.target.value)}
+      className="border p-2 rounded bg-white"
+    >
+      <option value="other">Other</option>
+    </select>
+  )}
+</label>
 
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-600">Meaning</span>
@@ -601,16 +612,6 @@ export default function BookWordsPage() {
                     Tip: changing “Definition #” will overwrite Meaning to match that definition.
                   </p>
                 ) : null}
-              </label>
-
-              <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-xs text-gray-600">Other definition</span>
-                <textarea
-                  value={editOtherDefinition}
-                  onChange={(e) => setEditOtherDefinition(e.target.value)}
-                  className="border p-2 rounded min-h-[70px]"
-                  placeholder="Optional custom definition"
-                />
               </label>
 
               <label className="flex flex-col gap-1">
