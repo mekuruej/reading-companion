@@ -11,19 +11,19 @@ const KANJI_REGEX = /[\u3400-\u9FFF]/g;
 
 async function getStrokeData(word: string) {
   const chars = word.match(KANJI_REGEX) || [];
-  const results: { char: string; strokes: number | null }[] = [];
+  const results: { kanji: string; strokes: number | null }[] = [];
 
   for (const ch of chars) {
     try {
       const r = await fetch(`https://kanjiapi.dev/v1/kanji/${encodeURIComponent(ch)}`);
       if (!r.ok) {
-        results.push({ char: ch, strokes: null });
+        results.push({ kanji: ch, strokes: null });
         continue;
       }
       const data = await r.json();
-      results.push({ char: ch, strokes: data.stroke_count ?? null });
+      results.push({ kanji: ch, strokes: data.stroke_count ?? null });
     } catch {
-      results.push({ char: ch, strokes: null });
+      results.push({ kanji: ch, strokes: null });
     }
   }
 
@@ -97,7 +97,7 @@ type BulkItem = {
   chapterNumber: string;
   chapterName: string;
 
-  strokes: { char: string; strokes: number | null }[];
+  kanjiMeta: { kanji: string; strokes: number | null }[];
 };
 
 // -------------------------------------------------------------
@@ -263,7 +263,7 @@ export default function BulkVocabPage() {
           }
         } catch {}
 
-        const strokes = await getStrokeData(w);
+        const kanjiMeta = await getStrokeData(w);
 
         results.push({
           surface: w,
@@ -277,7 +277,7 @@ export default function BulkVocabPage() {
           page: defaultPageNumber || "",
           chapterNumber: chapterNumber || "",
           chapterName: chapterName || "",
-          strokes,
+          kanjiMeta,
         });
       }
 
@@ -391,7 +391,7 @@ export default function BulkVocabPage() {
           page_order: nextPageOrder,
           chapter_number: chNum,
           chapter_name: i.chapterName?.trim() || null,
-          strokes: i.strokes ?? [],
+          kanji_meta: i.kanjiMeta ?? [],
           seen_on: today,
         };
       });
@@ -709,11 +709,11 @@ export default function BulkVocabPage() {
                     {i.isCommon ? "Common" : "Rare"}
                   </button>
 
-                  {i.strokes?.length ? (
-                    <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">
-                      {i.strokes.map((s) => `${s.char}:${s.strokes ?? "?"}`).join(" / ")} strokes
-                    </span>
-                  ) : null}
+                  {i.kanjiMeta?.length ? (
+  <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">
+    {i.kanjiMeta.map((s) => `${s.kanji}:${s.strokes ?? "?"}`).join(" / ")} strokes
+  </span>
+) : null}
                 </div>
               </li>
             ))}

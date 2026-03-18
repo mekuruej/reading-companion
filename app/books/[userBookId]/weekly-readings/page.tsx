@@ -21,6 +21,9 @@ type ReadingCardRow = {
   reading: string;
   reading_type: "onyomi" | "kunyomi" | "other" | null;
   created_at: string;
+  stroke_count: number | null;
+  radical: string | null;
+  radical_name: string | null;
 };
 
 type UserBookWordRow = {
@@ -38,6 +41,9 @@ type QuizCard = {
   sourceWord: string;
   sourceMeaning: string | null;
   sourceReading: string | null;
+  strokeCount: number | null;
+  radical: string | null;
+  radicalName: string | null;
 };
 
 type RecallResult = "correct" | "wrong" | "shown" | null;
@@ -190,12 +196,14 @@ export default function WeeklyReadingsPage() {
         }
 
         const { data: rows, error: cardsErr } = await supabase
-          .from("user_book_weekly_reading_cards")
-          .select("id,set_id,sort_order,source_word,kanji,reading,reading_type,created_at")
-          .eq("set_id", activeSet.id)
-          .order("sort_order", { ascending: true })
-          .order("created_at", { ascending: true })
-          .returns<ReadingCardRow[]>();
+  .from("user_book_weekly_reading_cards")
+  .select(
+    "id, set_id, sort_order, source_word, kanji, reading, reading_type, created_at, stroke_count, radical, radical_name"
+  )
+  .eq("set_id", activeSet.id)
+  .order("sort_order", { ascending: true })
+  .order("created_at", { ascending: true })
+  .returns<ReadingCardRow[]>();
 
         if (cardsErr) throw cardsErr;
 
@@ -230,16 +238,19 @@ export default function WeeklyReadingsPage() {
         const core: QuizCard[] = (rows ?? [])
           .filter((r) => r.kanji?.trim() && r.reading?.trim())
           .map((r) => ({
-            key: r.id,
-            kanji: r.kanji.trim(),
-            reading: r.reading.trim(),
-            readingType: (r.reading_type ?? null) as "onyomi" | "kunyomi" | "other" | null,
-            sourceWord: r.source_word?.trim() ?? "",
-            sourceMeaning:
-              sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.meaning ?? null,
-            sourceReading:
-              sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.reading ?? null,
-          }));
+  key: r.id,
+  kanji: r.kanji.trim(),
+  reading: r.reading.trim(),
+  readingType: (r.reading_type ?? null) as "onyomi" | "kunyomi" | "other" | null,
+  sourceWord: r.source_word?.trim() ?? "",
+  sourceMeaning:
+    sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.meaning ?? null,
+  sourceReading:
+    sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.reading ?? null,
+  strokeCount: r.stroke_count ?? null,
+  radical: r.radical ?? null,
+  radicalName: r.radical_name ?? null,
+}));
 
         setBaseCards(core);
 
@@ -591,8 +602,19 @@ if (inRecallFlow) return;
           if (checked) nextCard();
         }}
       >
-        <div className="absolute top-3 left-4 text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
-  {String(card.readingType ?? "NO TYPE")}
+        <div className="absolute top-3 left-4 z-10 text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+  {readingTypeLabel(card.readingType ?? "NO TYPE")}
+</div>
+        <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+  <div className="flex flex-col items-end leading-none">
+    <div className="text-sm font-medium">
+      {card.kanji} {card.strokeCount ?? "?"}
+    </div>
+    <div className="mt-1 text-[10px] text-slate-400">
+  radical: {card.radical ?? "—"}
+  {card.radicalName ? ` (${card.radicalName})` : ""}
+</div>
+  </div>
 </div>
 
         <div className="w-full flex flex-col items-center justify-center gap-6">

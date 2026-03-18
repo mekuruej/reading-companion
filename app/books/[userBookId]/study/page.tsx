@@ -50,6 +50,11 @@ function studySetLabel(s: StudySet) {
   }
 }
 
+type KanjiMetaItem = {
+  kanji: string;
+  strokes: number | null;
+};
+
 type WordRow = {
   id: string;
   user_book_id: string;
@@ -69,6 +74,8 @@ type WordRow = {
 
   hidden: boolean | null;
   skipped_on: string | null;
+
+  kanji_meta: KanjiMetaItem[] | null;
 };
 
 type Flashcard = {
@@ -84,6 +91,7 @@ type Flashcard = {
   meaningChoiceIndex: number;
   repeatKey: string;
   repeatCount: number;
+  kanjiMeta: KanjiMetaItem[];
 };
 
 function normalizeJlpt(val: string | null | undefined) {
@@ -341,7 +349,8 @@ export default function BookFlashcardsPage() {
     meaning_choices,
     meaning_choice_index,
     hidden,
-    skipped_on
+    skipped_on,
+    kanji_meta
   `
   )
   .eq("user_book_id", userBookId)
@@ -382,19 +391,20 @@ export default function BookFlashcardsPage() {
           const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;
 
           return {
-            id: w.id,
-            word: w.surface,
-            reading: w.reading ?? null,
-            meaning: chosenMeaning ?? w.meaning ?? null,
-            jlpt: normalizeJlpt(w.jlpt),
-            chapterLabel: ch.label,
-            chapterDisplay: ch.display,
-            page_number: w.page_number ?? null,
-            meaningChoices,
-            meaningChoiceIndex: safeIdx,
-            repeatKey,
-            repeatCount,
-          };
+  id: w.id,
+  word: w.surface,
+  reading: w.reading ?? null,
+  meaning: chosenMeaning ?? w.meaning ?? null,
+  jlpt: normalizeJlpt(w.jlpt),
+  chapterLabel: ch.label,
+  chapterDisplay: ch.display,
+  page_number: w.page_number ?? null,
+  meaningChoices,
+  meaningChoiceIndex: safeIdx,
+  repeatKey,
+  repeatCount,
+  kanjiMeta: Array.isArray(w.kanji_meta) ? w.kanji_meta : [],
+};
         });
 
         setCards(normalized);
@@ -1071,22 +1081,45 @@ async function hideCardPermanently(cardId: string) {
   className="
     relative
     w-[92vw] max-w-2xl
-min-h-[20rem]
-          min-h-60 bg-white rounded-2xl
-          border border-slate-500
-          shadow-2xl
-          flex items-center justify-center
-          cursor-pointer text-center select-none
-          p-8
-        "
-      >
-        <div className="absolute top-3 right-4 text-[11px] text-slate-500">
-          Book Count {card?.repeatCount ?? 1} • Total Count ***
-        </div>
+    min-h-[20rem]
+    min-h-60 bg-white rounded-2xl
+    border border-slate-500
+    shadow-2xl
+    flex items-center justify-center
+    cursor-pointer text-center select-none
+    p-8
+  "
+>
+  <div className="absolute top-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+  <div className="text-xs font-medium leading-none">
+    {card?.jlpt ?? "NON-JLPT"}
+  </div>
+</div>
 
-        <div className="absolute bottom-3 right-4 text-[11px] text-slate-500">
-          Def #{((card?.meaningChoiceIndex ?? 0) as number) + 1}
-        </div>
+  <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+  <div className="text-xs font-medium leading-none">
+    Book Count {card?.repeatCount ?? 1} • Total Count ***
+  </div>
+</div>
+
+  <div className="absolute bottom-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+  <div className="text-xs font-medium leading-none">
+    Def #{((card?.meaningChoiceIndex ?? 0) as number) + 1}
+  </div>
+</div>
+
+  {card?.kanjiMeta?.length ? (
+    <div className="absolute bottom-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+      <div className="flex flex-col items-start gap-1">
+        {card.kanjiMeta.map((item, i) => (
+          <div key={`${item.kanji}-${i}`} className="flex items-center gap-2 leading-none">
+            <span className="text-sm font-medium text-slate-500">{item.kanji}</span>
+            <span className="text-xs text-slate-400">{item.strokes ?? "?"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null}
 
         <div className="w-full flex flex-col items-center justify-center gap-6">
           {typeModeEnabled && card ? (
@@ -1185,10 +1218,6 @@ min-h-[20rem]
                         <div>
                           <div className="text-[10px] uppercase tracking-wide text-slate-500">Meaning</div>
                           <div className="text-base font-medium">{card.meaning || "—"}</div>
-                        </div>
-
-                        <div className="text-xs text-slate-500">
-                          Book Count: {card.repeatCount ?? 1} • Total Count: ***
                         </div>
 
                         <div className="text-xs text-slate-500">Def #{(card.meaningChoiceIndex ?? 0) + 1}</div>

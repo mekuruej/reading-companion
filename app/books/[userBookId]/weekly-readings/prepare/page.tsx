@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { KANJI_RADICALS } from "@/lib/kanjiRadicals";
 
 type ProfileRole = "teacher" | "student";
 
@@ -13,17 +14,106 @@ type DraftRow = {
   kanji: string;
   reading: string;
   readingType: "onyomi" | "kunyomi" | "other";
+  strokeCount: number | null;
+  radical: string | null;
+  radicalName: string | null;
 };
-
-const KANJI_REGEX = /[\u3400-\u9FFF]/g;
-
-function extractKanjiChars(text: string): string[] {
-  const matches = text.match(KANJI_REGEX) || [];
-  return matches.filter(Boolean);
-}
 
 function makeRowId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function hiraToKata(s: string) {
+  return (s ?? "").replace(/[ぁ-ゖ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) + 0x60)
+  );
+}
+
+function kataToHira(s: string) {
+  return (s ?? "").replace(/[ァ-ヶ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
+
+function formatReadingByType(
+  reading: string,
+  readingType: "onyomi" | "kunyomi" | "other" | null
+) {
+  if (!reading) return "";
+  if (readingType === "onyomi") return hiraToKata(kataToHira(reading));
+  if (readingType === "kunyomi") return kataToHira(reading);
+  return reading;
+}
+
+async function getKanjiInfo(
+  kanji: string
+): Promise<{
+  strokeCount: number | null;
+  radical: string | null;
+  radicalName: string | null;
+}> {
+  const radicalInfo = KANJI_RADICALS[kanji] ?? null;
+
+  try {
+    const res = await fetch(
+      `https://kanjiapi.dev/v1/kanji/${encodeURIComponent(kanji)}`
+    );
+
+    if (!res.ok) {
+      return {
+        strokeCount: null,
+        radical: radicalInfo?.radical ?? null,
+        radicalName: radicalInfo?.name ?? null,
+      };
+    }
+
+    const data = await res.json();
+
+    return {
+      strokeCount: data.stroke_count ?? null,
+      radical: radicalInfo?.radical ?? null,
+      radicalName: radicalInfo?.name ?? null,
+    };
+  } catch {
+    return {
+      strokeCount: null,
+      radical: radicalInfo?.radical ?? null,
+      radicalName: radicalInfo?.name ?? null,
+    };
+  }
+}
+
+async function fetchWordReading(word: string) {
+  try {
+    const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
+    const json = await res.json();
+    const item = json?.data?.[0];
+    const reading = item?.japanese?.[0]?.reading;
+    return reading ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function splitReadingAcrossKanji(word: string, reading: string) {
+  const kanjiChars = Array.from(word).filter((c) => /[一-龯々]/.test(c));
+  if (kanjiChars.length === 0) return [];
+
+  const readingChars = Array.from(reading);
+  const chunkSize = Math.floor(readingChars.length / kanjiChars.length) || 1;
+  const chunks: string[] = [];
+  let idx = 0;
+
+  for (let i = 0; i < kanjiChars.length; i++) {
+    if (i === kanjiChars.length - 1) {
+      chunks.push(readingChars.slice(idx).join(""));
+    } else {
+      chunks.push(readingChars.slice(idx, idx + chunkSize).join(""));
+      idx += chunkSize;
+    }
+  }
+
+  return chunks;
 }
 
 export default function PrepareWeeklyReadingsPage() {
@@ -33,14 +123,14 @@ export default function PrepareWeeklyReadingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [myRole, setMyRole] = useState<ProfileRole>("student");
-
   const [bookTitle, setBookTitle] = useState("");
-const [bookCover, setBookCover] = useState<string | null>(null);
-const [studentName, setStudentName] = useState("");
+  const [bookCover, setBookCover] = useState<string | null>(null);
+  const [studentName, setStudentName] = useState("");
 
   const [sourceWordsText, setSourceWordsText] = useState("");
   const [rows, setRows] = useState<DraftRow[]>([]);
@@ -78,39 +168,38 @@ const [studentName, setStudentName] = useState("");
         setMyRole(role);
 
         const { data: ub, error: ubErr } = await supabase
-  .from("user_books")
-  .select(
-    `
-    id,
-    user_id,
-    books:book_id (
-      title,
-      cover_url
-    )
-  `
-  )
-  .eq("id", userBookId)
-  .single();
+          .from("user_books")
+          .select(
+            `
+            id,
+            user_id,
+            books:book_id (
+              title,
+              cover_url
+            )
+          `
+          )
+          .eq("id", userBookId)
+          .single();
 
         if (ubErr) throw ubErr;
 
         setBookTitle((ub as any)?.books?.title ?? "");
-setBookCover((ub as any)?.books?.cover_url ?? null);
+        setBookCover((ub as any)?.books?.cover_url ?? null);
 
-const studentUserId = (ub as any)?.user_id ?? null;
+        const studentUserId = (ub as any)?.user_id ?? null;
 
-if (studentUserId) {
-  const { data: studentProf } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("id", studentUserId)
-    .single();
+        if (studentUserId) {
+          const { data: studentProf } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("id", studentUserId)
+            .single();
 
-  setStudentName(studentProf?.display_name ?? "");
-} else {
-  setStudentName("");
-}
-
+          setStudentName(studentProf?.display_name ?? "");
+        } else {
+          setStudentName("");
+        }
       } catch (e: any) {
         setErrorMsg(e?.message ?? "Failed to load page");
       } finally {
@@ -130,77 +219,102 @@ if (studentUserId) {
     const nextRows: DraftRow[] = [];
 
     for (const word of words) {
-  const kanjiChars = Array.from(word).filter((c) => /[一-龯々]/.test(c));
-  if (!kanjiChars.length) continue;
+      const kanjiChars = Array.from(word).filter((c) => /[一-龯々]/.test(c));
+      if (!kanjiChars.length) continue;
 
-  const wordReading = await fetchWordReading(word);
-  const split = splitReadingAcrossKanji(word, wordReading);
+      const wordReading = await fetchWordReading(word);
+      const split = splitReadingAcrossKanji(word, wordReading);
 
-  kanjiChars.forEach((k, i) => {
-    const r = split[i] ? hiraToKata(split[i]) : "";
+      for (let i = 0; i < kanjiChars.length; i++) {
+        const k = kanjiChars[i];
+        const r = split[i] ? hiraToKata(split[i]) : "";
+        const kanjiInfo = await getKanjiInfo(k);
 
-    nextRows.push({
+        nextRows.push({
   id: makeRowId(),
   sourceWord: word,
   kanji: k,
   reading: r,
   readingType: "onyomi",
+  strokeCount: kanjiInfo.strokeCount,
+  radical: kanjiInfo.radical,
+  radicalName: kanjiInfo.radicalName,
 });
-  });
-}
+      }
+    }
 
     setRows(nextRows);
   }
 
   function updateRow(id: string, patch: Partial<DraftRow>) {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+
+        const next = { ...r, ...patch };
+
+        if (patch.readingType !== undefined) {
+          next.reading = formatReadingByType(next.reading, patch.readingType);
+        } else if (patch.reading !== undefined) {
+          next.reading = formatReadingByType(patch.reading, next.readingType);
+        }
+
+        return next;
+      })
+    );
   }
 
   function removeRow(id: string) {
     setRows((prev) => prev.filter((r) => r.id !== id));
   }
-  function hiraToKata(s: string) {
-  return s.replace(/[ぁ-ゖ]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) + 0x60)
-  );
-}
 
-async function fetchWordReading(word: string) {
-  try {
-    const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
-    const json = await res.json();
+  async function clearReadings() {
+    const ok = window.confirm(
+      "Remove the currently active weekly readings for this book? Students will no longer see them."
+    );
+    if (!ok) return;
 
-    const item = json?.data?.[0];
-    const reading = item?.japanese?.[0]?.reading;
+    setClearing(true);
+    setErrorMsg(null);
 
-    return reading ?? "";
-  } catch {
-    return "";
-  }
-}
+    try {
+      const { data: existingSets, error: setErr } = await supabase
+        .from("user_book_weekly_reading_sets")
+        .select("id")
+        .eq("user_book_id", userBookId);
 
-function splitReadingAcrossKanji(word: string, reading: string) {
-  const kanjiChars = Array.from(word).filter((c) => /[一-龯々]/.test(c));
+      if (setErr) throw setErr;
 
-  if (kanjiChars.length === 0) return [];
+      const setIds = (existingSets ?? []).map((s: any) => s.id);
 
-  const readingChars = Array.from(reading);
-  const chunkSize = Math.floor(readingChars.length / kanjiChars.length) || 1;
+      if (setIds.length > 0) {
+        const { error: cardsErr } = await supabase
+          .from("user_book_weekly_reading_cards")
+          .delete()
+          .in("set_id", setIds);
 
-  const chunks: string[] = [];
-  let idx = 0;
+        if (cardsErr) throw cardsErr;
 
-  for (let i = 0; i < kanjiChars.length; i++) {
-    if (i === kanjiChars.length - 1) {
-      chunks.push(readingChars.slice(idx).join(""));
-    } else {
-      chunks.push(readingChars.slice(idx, idx + chunkSize).join(""));
-      idx += chunkSize;
+        const { error: deleteSetsErr } = await supabase
+          .from("user_book_weekly_reading_sets")
+          .delete()
+          .in("id", setIds);
+
+        if (deleteSetsErr) throw deleteSetsErr;
+      }
+
+      await supabase
+        .from("user_books")
+        .update({ weekly_readings_last_seen_at: null })
+        .eq("id", userBookId);
+
+      setErrorMsg("✅ Active weekly readings removed.");
+    } catch (e: any) {
+      setErrorMsg(e?.message ?? "Failed to remove active readings");
+    } finally {
+      setClearing(false);
     }
   }
-
-  return chunks;
-}
 
   async function activateNow() {
     if (validRows.length === 0) {
@@ -214,13 +328,13 @@ function splitReadingAcrossKanji(word: string, reading: string) {
     try {
       const { data: auth } = await supabase.auth.getUser();
       const user = auth?.user;
+
       if (!user) throw new Error("You must be signed in.");
 
       if (myRole !== "teacher") {
         throw new Error("Only teachers can prepare weekly readings.");
       }
 
-      // Remove any existing active / prepared sets for this book
       const { data: oldSets, error: oldErr } = await supabase
         .from("user_book_weekly_reading_sets")
         .select("id")
@@ -230,6 +344,14 @@ function splitReadingAcrossKanji(word: string, reading: string) {
 
       if ((oldSets ?? []).length > 0) {
         const oldIds = oldSets!.map((s: any) => s.id);
+
+        const { error: delCardsErr } = await supabase
+          .from("user_book_weekly_reading_cards")
+          .delete()
+          .in("set_id", oldIds);
+
+        if (delCardsErr) throw delCardsErr;
+
         const { error: delErr } = await supabase
           .from("user_book_weekly_reading_sets")
           .delete()
@@ -267,9 +389,11 @@ function splitReadingAcrossKanji(word: string, reading: string) {
   kanji: r.kanji.trim(),
   reading: r.reading.trim(),
   reading_type: r.readingType,
+  stroke_count: r.strokeCount,
+  radical: r.radical,
+  radical_name: r.radicalName,
 }));
 
-  console.log("weekly reading payload", cardPayload);
       const { error: cardsErr } = await supabase
         .from("user_book_weekly_reading_cards")
         .insert(cardPayload);
@@ -292,7 +416,7 @@ function splitReadingAcrossKanji(word: string, reading: string) {
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-gray-500">Loading weekly readings prep…</p>
+        <p className="text-gray-500">Loading weekly readings prep...</p>
       </main>
     );
   }
@@ -328,38 +452,40 @@ function splitReadingAcrossKanji(word: string, reading: string) {
   return (
     <main className="max-w-5xl mx-auto p-6">
       <div className="flex items-center gap-3 mb-6">
-  {bookCover ? (
-    <img src={bookCover} alt="" className="w-16 h-24 rounded object-cover" />
-  ) : null}
-  <div>
-    <div className="text-xs uppercase tracking-wide text-gray-500">Teacher Prep</div>
-    <h1 className="text-2xl font-semibold">Prepare Weekly Readings</h1>
+        {bookCover ? (
+          <img src={bookCover} alt="" className="w-16 h-24 rounded object-cover" />
+        ) : null}
 
-    <p className="text-sm text-gray-500 mt-1 max-w-xl">
-      Kanji have multiple readings. The reading you will practice
-      comes from an upcoming word in your book.
-    </p>
+        <div>
+          <div className="text-xs uppercase tracking-wide text-gray-500">
+            Teacher Prep
+          </div>
+          <h1 className="text-2xl font-semibold">Prepare Weekly Readings</h1>
+          <p className="text-sm text-gray-500 mt-1 max-w-xl">
+            Kanji have multiple readings. The reading you will practice comes from
+            an upcoming word in your book.
+          </p>
+          <p className="text-sm text-gray-700">{bookTitle}</p>
+          {studentName ? (
+            <p className="text-sm text-gray-500">Student: {studentName}</p>
+          ) : null}
+        </div>
+      </div>
 
-    <p className="text-sm text-gray-700">{bookTitle}</p>
-
-    {studentName ? (
-      <p className="text-sm text-gray-500">Student: {studentName}</p>
-    ) : null}
-  </div>
-</div>
-
-      {errorMsg ? <p className="mb-4 text-sm text-red-700">{errorMsg}</p> : null}
+      {errorMsg ? (
+        <p className="mb-4 text-sm text-red-700">{errorMsg}</p>
+      ) : null}
 
       <div className="border rounded-xl bg-white p-4 mb-6">
         <h2 className="text-lg font-medium mb-2">Step 1: Enter upcoming compounds</h2>
         <p className="text-sm text-gray-500 mb-2">
-  Paste one word per line. We’ll split the kanji out into editable rows.
-</p>
-
-<p className="text-sm text-amber-700 mb-3">
-  Teachers: Be sure to check the readings. The auto-generation can make mistakes.
-  Readings should be in katakana only. On Mac, control + K will turn it into katakana.
-</p>
+          Paste one word per line. We&apos;ll split the kanji out into editable rows.
+        </p>
+        <p className="text-sm text-amber-700 mb-3">
+          Teachers: Be sure to check the readings. The auto-generation can make mistakes.
+          <br />
+          Onyomi will auto-convert to katakana. Kunyomi will auto-convert to hiragana.
+        </p>
 
         <textarea
           value={sourceWordsText}
@@ -385,7 +511,7 @@ function splitReadingAcrossKanji(word: string, reading: string) {
             }}
             className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
           >
-            Clear
+            Clear Words
           </button>
         </div>
       </div>
@@ -397,57 +523,76 @@ function splitReadingAcrossKanji(word: string, reading: string) {
         </p>
 
         {rows.length === 0 ? (
-          <p className="text-sm text-gray-500">No rows yet. Generate them from the words above.</p>
+          <p className="text-sm text-gray-500">
+            No rows yet. Generate them from the words above.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-  <tr className="text-left border-b">
-    <th className="p-2">Source Word</th>
-    <th className="p-2">Kanji</th>
-    <th className="p-2">Reading</th>
-    <th className="p-2">Reading Type</th>
-    <th className="p-2">Action</th>
-  </tr>
-</thead>
+                <tr className="text-left border-b">
+                  <th className="p-2">Source Word</th>
+                  <th className="p-2">Kanji</th>
+                  <th className="p-2">Reading</th>
+                  <th className="p-2">Reading Type</th>
+                  <th className="p-2">Kanji Info</th>
+                  <th className="p-2">Action</th>
+                </tr>
+              </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b">
-  <td className="p-2">{r.sourceWord}</td>
-  <td className="p-2 text-xl font-semibold">{r.kanji}</td>
-  <td className="p-2">
-    <input
-      value={r.reading}
-      onChange={(e) => updateRow(r.id, { reading: e.target.value })}
-      placeholder="e.g. ショク"
-      className="w-full border rounded px-2 py-1"
-    />
-  </td>
-  <td className="p-2">
-    <select
-      value={r.readingType}
-      onChange={(e) =>
-        updateRow(r.id, {
-          readingType: e.target.value as "onyomi" | "kunyomi" | "other",
-        })
-      }
-      className="w-full border rounded px-2 py-1 bg-white"
-    >
-      <option value="onyomi">Onyomi</option>
-      <option value="kunyomi">Kunyomi</option>
-      <option value="other">Other</option>
-    </select>
-  </td>
-  <td className="p-2">
-    <button
-      type="button"
-      onClick={() => removeRow(r.id)}
-      className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-    >
-      Remove
-    </button>
-  </td>
-</tr>
+                    <td className="p-2">{r.sourceWord}</td>
+                    <td className="p-2 text-xl font-semibold">{r.kanji}</td>
+
+                    <td className="p-2">
+                      <input
+                        value={r.reading}
+                        onChange={(e) =>
+                          updateRow(r.id, { reading: e.target.value })
+                        }
+                        placeholder={
+                          r.readingType === "kunyomi" ? "e.g. たべ" : "e.g. ショク"
+                        }
+                        className="w-full border rounded px-2 py-1"
+                      />
+                    </td>
+
+                    <td className="p-2">
+                      <select
+                        value={r.readingType}
+                        onChange={(e) =>
+                          updateRow(r.id, {
+                            readingType: e.target.value as
+                              | "onyomi"
+                              | "kunyomi"
+                              | "other",
+                          })
+                        }
+                        className="w-full border rounded px-2 py-1 bg-white"
+                      >
+                        <option value="onyomi">Onyomi</option>
+                        <option value="kunyomi">Kunyomi</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </td>
+
+                    <td className="p-2 text-xs text-gray-500">
+  {r.strokeCount ?? "?"}
+  {r.radical ? ` • Radical ${r.radical}` : ""}
+  {r.radicalName ? ` (${r.radicalName})` : ""}
+</td>
+
+                    <td className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => removeRow(r.id)}
+                        className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -455,14 +600,12 @@ function splitReadingAcrossKanji(word: string, reading: string) {
         )}
 
         <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            Ready rows: {validRows.length}
-          </p>
+          <p className="text-sm text-gray-500">Ready rows: {validRows.length}</p>
 
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => router.push(`/books/${userBookId}`)}
+              onClick={() => router.push("/books")}
               className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
             >
               Back
@@ -470,8 +613,28 @@ function splitReadingAcrossKanji(word: string, reading: string) {
 
             <button
               type="button"
+              onClick={() => {
+                setSourceWordsText("");
+                setRows([]);
+              }}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            >
+              Clear Readings
+            </button>
+
+            <button
+              type="button"
+              onClick={clearReadings}
+              disabled={clearing || saving}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            >
+              {clearing ? "Removing..." : "Remove Active Readings"}
+            </button>
+
+            <button
+              type="button"
               onClick={activateNow}
-              disabled={saving || validRows.length === 0}
+              disabled={saving || clearing || validRows.length === 0}
               className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-800 disabled:opacity-50"
             >
               {saving ? "Activating..." : "Activate Weekly Readings"}
