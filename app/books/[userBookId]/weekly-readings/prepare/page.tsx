@@ -131,6 +131,7 @@ export default function PrepareWeeklyReadingsPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
   const [studentName, setStudentName] = useState("");
+  const [studentUsername, setStudentUsername] = useState("");
 
   const [sourceWordsText, setSourceWordsText] = useState("");
   const [rows, setRows] = useState<DraftRow[]>([]);
@@ -189,17 +190,19 @@ export default function PrepareWeeklyReadingsPage() {
 
         const studentUserId = (ub as any)?.user_id ?? null;
 
-        if (studentUserId) {
-          const { data: studentProf } = await supabase
-            .from("profiles")
-            .select("display_name")
-            .eq("id", studentUserId)
-            .single();
+if (studentUserId) {
+  const { data: studentProf } = await supabase
+    .from("profiles")
+    .select("display_name, username")
+    .eq("id", studentUserId)
+    .single();
 
-          setStudentName(studentProf?.display_name ?? "");
-        } else {
-          setStudentName("");
-        }
+  setStudentName(studentProf?.display_name ?? "");
+  setStudentUsername(studentProf?.username ?? "");
+} else {
+  setStudentName("");
+  setStudentUsername("");
+}
       } catch (e: any) {
         setErrorMsg(e?.message ?? "Failed to load page");
       } finally {
@@ -605,7 +608,7 @@ export default function PrepareWeeklyReadingsPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => router.push("/books")}
+              onClick={() => router.push(`/users/${studentUsername}/books`)}
               className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
             >
               Back

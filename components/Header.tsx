@@ -1,23 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
+
 
 export default function Header() {
   const [user, setUser] = useState<any>(null);
+const [username, setUsername] = useState<string>("");
+  
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
+  const loadUserAndUsername = async () => {
+    const { data } = await supabase.auth.getUser();
+    setUser(data.user);
 
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    });
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", data.user.id)
+        .single();
 
-    return () => listener.subscription.unsubscribe();
-  }, []);
+      setUsername(profile?.username ?? "");
+    } else {
+      setUsername("");
+    }
+  };
+
+  loadUserAndUsername();
+
+  const { data: listener } = supabase.auth.onAuthStateChange(() => {
+    loadUserAndUsername();
+  });
+
+  return () => listener.subscription.unsubscribe();
+}, []);
 
   const btnClass =
     "text-sm px-3 py-2 border rounded hover:bg-gray-100 text-center leading-none";
@@ -40,9 +58,9 @@ export default function Header() {
           <div className="justify-self-end w-full md:w-auto">
             <div className="grid grid-cols-3 gap-2 w-full md:w-[360px]">
               {/* Row 1: Books + Auth (auth spans 2 columns to match width) */}
-              <Link href="/books" className={btnClass}>
-                Books
-              </Link>
+              <Link href={username ? `/users/${username}/books` : "/books"} className={btnClass}>
+  Books
+</Link>
 
               {user ? (
                 <button
