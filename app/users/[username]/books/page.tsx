@@ -60,6 +60,7 @@ type TeacherPrepItem = {
 type ReadingSessionStats = {
   progressPercent: number | null;
   averageMinutesPerPage: number | null;
+  furthestPage: number | null;
 };
 
 function UserBar({ isTeacher }: { isTeacher: boolean }) {
@@ -286,9 +287,10 @@ await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
 
     if (!g) {
       stats[userBookId] = {
-        progressPercent: null,
-        averageMinutesPerPage: null,
-      };
+  progressPercent: null,
+  averageMinutesPerPage: null,
+  furthestPage: null,
+};
       continue;
     }
 
@@ -301,9 +303,10 @@ await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
       g.totalPagesRead > 0 ? g.totalMinutesRead / g.totalPagesRead : null;
 
     stats[userBookId] = {
-      progressPercent,
-      averageMinutesPerPage,
-    };
+  progressPercent,
+  averageMinutesPerPage,
+  furthestPage: g.furthestPage,
+};
   }
 
   setReadingStatsByUserBookId(stats);
@@ -677,11 +680,26 @@ await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
       DNF: {new Date(row.dnf_at).toLocaleDateString()}
     </div>
   ) : row.started_at ? (
-    <div className="text-[11px] text-gray-600">
-      {readingStatsByUserBookId[row.id]?.progressPercent != null
-        ? `${readingStatsByUserBookId[row.id].progressPercent}%`
-        : "In progress"}
-    </div>
+    <div className="space-y-1">
+  <div className="text-[11px] text-gray-600">
+  {readingStatsByUserBookId[row.id]?.progressPercent != null &&
+  readingStatsByUserBookId[row.id]?.furthestPage != null
+    ? `${readingStatsByUserBookId[row.id].progressPercent}% · p.${readingStatsByUserBookId[row.id].furthestPage}`
+    : "In progress"}
+</div>
+
+  <div className="mx-auto h-3 w-20 overflow-hidden rounded-full bg-gray-200">
+    <div
+      className="h-full bg-gray-700 transition-all"
+      style={{
+        width:
+          readingStatsByUserBookId[row.id]?.progressPercent != null
+            ? `${readingStatsByUserBookId[row.id].progressPercent}%`
+            : "8%",
+      }}
+    />
+  </div>
+</div>
   ) : (
     <div className="text-[11px] text-gray-400">Not started</div>
   )}

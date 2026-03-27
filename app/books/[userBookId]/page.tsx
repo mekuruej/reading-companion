@@ -55,6 +55,16 @@ type LookupRow = {
   meaning?: string | null;
 };
 
+type ReadingSession = {
+  id: string;
+  user_book_id: string;
+  read_on: string;
+  start_page: number;
+  end_page: number;
+  minutes_read: number | null;
+  created_at: string;
+};
+
 type HubTab = "book" | "readers" | "learners";
 type ProfileRole = "teacher" | "student";
 
@@ -66,14 +76,15 @@ type Character = {
   notes: string;
 };
 
-type ReadingSession = {
+type ChapterSummary = {
   id: string;
   user_book_id: string;
-  read_on: string;
-  start_page: number;
-  end_page: number;
-  minutes_read: number;
+  chapter_number: number | null;
+  chapter_title: string | null;
+  summary: string;
+  sort_order: number;
   created_at: string;
+  updated_at: string;
 };
 
 const LEVEL_OPTIONS = ["N5", "N4", "N3", "N2", "N1"] as const;
@@ -220,19 +231,25 @@ export default function BookHubPage() {
 
   const [linksText, setLinksText] = useState<string>("");
 
-  const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
-  const [sessionDate, setSessionDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
-  const [sessionStartPage, setSessionStartPage] = useState<string>("");
-  const [sessionEndPage, setSessionEndPage] = useState<string>("");
-  const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
-
-  // Local only for now
   const [characters, setCharacters] = useState<Character[]>([]);
+
+  const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
+const [showAllSessions, setShowAllSessions] = useState(false);
+const [sessionDate, setSessionDate] = useState<string>(
+  new Date().toISOString().split("T")[0]
+);
+
+const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
+const [showChapterSummaries, setShowChapterSummaries] = useState(true);
+
+const [sessionStartPage, setSessionStartPage] = useState<string>("");
+const [sessionEndPage, setSessionEndPage] = useState<string>("");
+const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
+
 
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
+  const book = row?.books ?? null;
 
   const timeToRead = useMemo(() => {
     if (!started || !finished) return null;
@@ -240,44 +257,101 @@ export default function BookHubPage() {
     if (days == null) return null;
     return days === 1 ? "1 day" : `${days} days`;
   }, [started, finished]);
-  
-  const book = row?.books ?? null;
 
-  const totalMinutesRead = useMemo(
-  () => readingSessions.reduce((sum, s) => sum + s.minutes_read, 0),
-  [readingSessions]
-);
+  const totalPagesRead = useMemo(
+    () =>
+      readingSessions.reduce(
+        (sum, s) => sum + (s.end_page - s.start_page + 1),
+        0
+      ),
+    [readingSessions]
+  );
 
-const totalPagesRead = useMemo(
-  () =>
-    readingSessions.reduce(
-      (sum, s) => sum + (s.end_page - s.start_page + 1),
-      0
-    ),
-  [readingSessions]
-);
+  const timedSessions = useMemo(
+    () => readingSessions.filter((s) => s.minutes_read != null),
+    [readingSessions]
+  );
 
-const averageMinutesPerPage = useMemo(() => {
-  if (!totalPagesRead) return null;
-  return totalMinutesRead / totalPagesRead;
-}, [totalMinutesRead, totalPagesRead]);
+  const totalTimedMinutes = useMemo(
+    () =>
+      timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0),
+    [timedSessions]
+  );
 
-const furthestPage = useMemo(() => {
-  if (readingSessions.length === 0) return null;
-  return Math.max(...readingSessions.map((s) => s.end_page));
-}, [readingSessions]);
+  const totalTimedPages = useMemo(
+    () =>
+      timedSessions.reduce(
+        (sum, s) => sum + (s.end_page - s.start_page + 1),
+        0
+      ),
+    [timedSessions]
+  );
 
-const progressPercent = useMemo(() => {
-  if (!book?.page_count || !furthestPage) return null;
-  return Math.min(100, Math.round((furthestPage / book.page_count) * 100));
-}, [book?.page_count, furthestPage]);
+  const averageMinutesPerPage = useMemo(() => {
+    if (!totalTimedPages) return null;
+    return totalTimedMinutes / totalTimedPages;
+  }, [totalTimedMinutes, totalTimedPages]);
 
-const lastReadDate = useMemo(() => {
+  const furthestPage = useMemo(() => {
+    if (readingSessions.length === 0) return null;
+    return Math.max(...readingSessions.map((s) => s.end_page));
+  }, [readingSessions]);
+
+  const progressPercent = useMemo(() => {
+    if (!book?.page_count || !furthestPage) return null;
+    return Math.min(100, Math.round((furthestPage / book.page_count) * 100));
+  }, [book?.page_count, furthestPage]);
+
+  const lastReadDate = useMemo(() => {
   if (readingSessions.length === 0) return null;
   return readingSessions[0]?.read_on ?? null;
 }, [readingSessions]);
 
-  function addCharacter() {
+const visibleReadingSessions = useMemo(() => {
+  return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
+}, [readingSessions, showAllSessions]);
+
+function addChapterSummary() {
+  if (!row?.id) return;
+
+  setChapterSummaries((prev) => [
+    ...prev,
+    {
+      id: `new-${Date.now()}`,
+      user_book_id: row.id,
+      chapter_number: null,
+      chapter_title: "",
+      summary: "",
+      sort_order: prev.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ]);
+}
+
+function updateChapterSummary(
+  id: string,
+  field: keyof ChapterSummary,
+  value: string
+) {
+  setChapterSummaries((prev) =>
+    prev.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            [field]:
+              field === "chapter_number" || field === "sort_order"
+                ? value === ""
+                  ? null
+                  : Number(value)
+                : value,
+          }
+        : item
+    )
+  );
+}
+
+function addCharacter() {
     setCharacters((prev) => [
       ...prev,
       { id: makeId(), name: "", reading: "", role: "", notes: "" },
@@ -293,11 +367,12 @@ const lastReadDate = useMemo(() => {
       prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
     );
   }
-  async function loadReadingSessions(userBookId: string) {
+
+  async function loadReadingSessions(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
       .select("id, user_book_id, read_on, start_page, end_page, minutes_read, created_at")
-      .eq("user_book_id", userBookId)
+      .eq("user_book_id", userBookIdValue)
       .order("read_on", { ascending: false })
       .order("created_at", { ascending: false });
 
@@ -310,51 +385,169 @@ const lastReadDate = useMemo(() => {
     setReadingSessions((data as ReadingSession[]) ?? []);
   }
 
-  async function deleteReadingSession(sessionId: string) {
-  const ok = window.confirm("Delete this reading session?");
-  if (!ok) return;
-
-  const { error } = await supabase
-    .from("user_book_reading_sessions")
-    .delete()
-    .eq("id", sessionId);
+  async function loadChapterSummaries(userBookIdValue: string) {
+  const { data, error } = await supabase
+    .from("user_book_chapter_summaries")
+    .select(
+      "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
+    )
+    .eq("user_book_id", userBookIdValue)
+    .order("sort_order", { ascending: true })
+    .order("chapter_number", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Error deleting reading session:", {
-      message: (error as any)?.message,
-      details: (error as any)?.details,
-      hint: (error as any)?.hint,
-      code: (error as any)?.code,
-      raw: error,
-    });
-    alert(`Could not delete reading session.\n${(error as any)?.message || "Unknown error"}`);
+    console.error("Error loading chapter summaries:", error);
+    setChapterSummaries([]);
     return;
   }
 
-  if (row?.id) {
-    await loadReadingSessions(row.id);
+  setChapterSummaries((data as ChapterSummary[]) ?? []);
+}
+  async function deleteReadingSession(sessionId: string) {
+    const ok = window.confirm("Delete this reading session?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("user_book_reading_sessions")
+      .delete()
+      .eq("id", sessionId);
+
+    if (error) {
+      console.error("Error deleting reading session:", {
+        message: (error as any)?.message,
+        details: (error as any)?.details,
+        hint: (error as any)?.hint,
+        code: (error as any)?.code,
+        raw: error,
+      });
+      alert(
+        `Could not delete reading session.\n${(error as any)?.message || "Unknown error"}`
+      );
+      return;
+    }
+
+    
+
+    if (row?.id) {
+      await loadReadingSessions(row.id);
+    }
   }
+
+  const renderSessionToggle = () => {
+  if (readingSessions.length <= 3) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => setShowAllSessions((prev) => !prev)}
+      className="text-sm font-medium text-stone-600 underline underline-offset-4 hover:text-stone-900"
+    >
+      {showAllSessions ? "Show less" : `View all (${readingSessions.length})`}
+    </button>
+  );
+};
+
+async function saveChapterSummary(item: ChapterSummary) {
+  if (!row?.id) return;
+
+  const payload = {
+    user_book_id: row.id,
+    chapter_number: item.chapter_number,
+    chapter_title: item.chapter_title?.trim() || null,
+    summary: item.summary.trim(),
+    sort_order: item.sort_order ?? 0,
+  };
+
+  if (!payload.summary) {
+    alert("Please write a short summary before saving.");
+    return;
+  }
+
+  if (item.id.startsWith("new-")) {
+    const { data, error } = await supabase
+      .from("user_book_chapter_summaries")
+      .insert(payload)
+      .select(
+        "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
+      )
+      .single();
+
+    if (error) {
+      console.error("Error creating chapter summary:", error);
+      alert("Could not save chapter summary.");
+      return;
+    }
+
+    setChapterSummaries((prev) =>
+      prev.map((x) => (x.id === item.id ? (data as ChapterSummary) : x))
+    );
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("user_book_chapter_summaries")
+    .update(payload)
+    .eq("id", item.id)
+    .select(
+      "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
+    )
+    .single();
+
+  if (error) {
+    console.error("Error updating chapter summary:", error);
+    alert("Could not update chapter summary.");
+    return;
+  }
+
+  setChapterSummaries((prev) =>
+    prev.map((x) => (x.id === item.id ? (data as ChapterSummary) : x))
+  );
 }
 
-async function saveReadingSession() {
+async function deleteChapterSummary(id: string) {
+  if (id.startsWith("new-")) {
+    setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
+    return;
+  }
+
+  const ok = window.confirm("Delete this chapter summary?");
+  if (!ok) return;
+
+  const { error } = await supabase
+    .from("user_book_chapter_summaries")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting chapter summary:", error);
+    alert("Could not delete chapter summary.");
+    return;
+  }
+
+  setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
+}
+
+  async function saveReadingSession() {
   if (!row?.id) return;
 
   const start = Number(sessionStartPage);
   const end = Number(sessionEndPage);
-  const minutes = Number(sessionMinutesRead);
+  const minutes =
+    sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
 
-  if (
-    !sessionDate ||
-    !Number.isFinite(start) ||
-    !Number.isFinite(end) ||
-    !Number.isFinite(minutes)
-  ) {
-    alert("Please fill in date, start page, end page, and minutes.");
+  if (!sessionDate || !Number.isFinite(start) || !Number.isFinite(end)) {
+    alert("Please fill in date, start page, and end page.");
     return;
   }
 
-  if (start <= 0 || end <= 0 || minutes <= 0) {
-    alert("Pages and minutes must be greater than 0.");
+  if (start <= 0 || end <= 0) {
+    alert("Pages must be greater than 0.");
+    return;
+  }
+
+  if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
+    alert("Minutes must be greater than 0 if provided.");
     return;
   }
 
@@ -363,13 +556,19 @@ async function saveReadingSession() {
     return;
   }
 
-  const { error } = await supabase.from("user_book_reading_sessions").insert({
+  const newSession = {
     user_book_id: row.id,
     read_on: sessionDate,
     start_page: start,
     end_page: end,
     minutes_read: minutes,
-  });
+  };
+
+  const { data, error } = await supabase
+    .from("user_book_reading_sessions")
+    .insert(newSession)
+    .select()
+    .single();
 
   if (error) {
     console.error("Error saving reading session:", {
@@ -379,16 +578,25 @@ async function saveReadingSession() {
       code: (error as any)?.code,
       raw: error,
     });
-    alert(`Could not save reading session.\n${(error as any)?.message || "Unknown error"}`);
+    alert(
+      `Could not save reading session.\n${(error as any)?.message || "Unknown error"}`
+    );
     return;
   }
+
+  setReadingSessions((prev) =>
+    [data as ReadingSession, ...prev].sort((a, b) => {
+      const dateCompare = b.read_on.localeCompare(a.read_on);
+      if (dateCompare !== 0) return dateCompare;
+      return b.created_at.localeCompare(a.created_at);
+    })
+  );
 
   setSessionStartPage("");
   setSessionEndPage("");
   setSessionMinutesRead("");
-
-  await loadReadingSessions(row.id);
 }
+
   const loadUniqueLookupCount = async (id: string) => {
     const { data, error } = await supabase
       .from("user_book_words")
@@ -535,6 +743,7 @@ async function saveReadingSession() {
 
     await loadUniqueLookupCount(r.id);
     await loadReadingSessions(r.id);
+    await loadChapterSummaries(r.id);
 
     setLoading(false);
   };
@@ -690,7 +899,7 @@ async function saveReadingSession() {
       <div className="mx-auto max-w-6xl">
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="flex flex-col gap-6 p-5 md:flex-row md:items-start md:gap-8 md:p-8">
-            <div className="w-[140px] md:w-[150px] shrink-0">
+            <div className="w-[140px] shrink-0 md:w-[150px]">
               {(editing ? coverUrl : book.cover_url) ? (
                 <img
                   src={editing ? coverUrl : (book.cover_url ?? "")}
@@ -727,45 +936,45 @@ async function saveReadingSession() {
                     ) : null}
                   </p>
                 )}
-
               </div>
 
               <div className="mt-6 space-y-4">
-  <div>
-    <div className="mb-2 text-sm text-stone-700">
-      <div className="font-medium">Progress</div>
-      <div className="mt-1 text-stone-500">
-        {progressPercent != null
-          ? `${progressPercent}%`
-          : finished
-          ? "100%"
-          : started
-          ? "In progress"
-          : "Not started"}
-      </div>
-    </div>
+                <div>
+                  <div className="mb-2 text-sm text-stone-700">
+                    <div className="font-medium">Progress</div>
+                    <div className="mt-1 text-stone-500">
+                      {readingSessions.length > 0 && progressPercent != null && furthestPage != null
+                        ? `${progressPercent}% · page ${furthestPage}`
+                        : finished
+                        ? "100%"
+                        : started
+                        ? "In progress"
+                        : "Not started"}
+                    </div>
+                  </div>
 
-    <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
-      <div
-        className="h-full rounded-full bg-stone-700 transition-all"
-        style={{
-          width:
-            progressPercent != null
-              ? `${progressPercent}%`
-              : finished
-              ? "100%"
-              : started
-              ? "45%"
-              : "0%",
-        }}
-      />
-    </div>
-  </div>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
+                    <div
+                      className="h-full rounded-full bg-stone-700 transition-all"
+                      style={{
+                        width:
+                          progressPercent != null
+                            ? `${progressPercent}%`
+                            : finished
+                            ? "100%"
+                            : started
+                            ? "8%"
+                            : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
 
-  <p className="text-sm text-stone-500">
-    Last read: {lastReadDate ?? "—"}
-  </p>
-</div>
+                <p className="text-sm text-stone-500">
+                  Last read: {lastReadDate ?? "—"}
+                </p>
+              </div>
+
               <div className="mt-6 flex flex-wrap gap-2">
                 <button
                   onClick={() => router.push("/books")}
@@ -803,33 +1012,33 @@ async function saveReadingSession() {
               </div>
 
               <div className="mt-5">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
-                Student
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                  Student
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <button
+                    onClick={() => router.push(`/books/${row.id}/words`)}
+                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                  >
+                    📚 Vocab List
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
+                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                  >
+                    🈶 Reading Flashcards
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/books/${row.id}/study`)}
+                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                  >
+                    🔁 Vocab Flashcards
+                  </button>
+                </div>
               </div>
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <button
-                  onClick={() => router.push(`/books/${row.id}/words`)}
-                  className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                >
-                  📚 Vocab List
-                </button>
-
-                <button
-                  onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
-                  className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                >
-                  🈶 Reading Flashcards
-                </button>
-
-                <button
-                  onClick={() => router.push(`/books/${row.id}/study`)}
-                  className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                >
-                  🔁 Vocab Flashcards
-                </button>
-              </div>
-            </div>
 
               {isTeacher && (
                 <div className="mt-3">
@@ -837,31 +1046,29 @@ async function saveReadingSession() {
                     Teacher
                   </div>
 
-                </div>
-              )}
-              {isTeacher && (
-                <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <button
-                    onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
-                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                  >
-                    ➕ Add Vocab
-                  </button>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <button
+                      onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      ➕ Add Vocab
+                    </button>
 
-                  <button
-                    onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
-                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                  >
-                    📝 Prepare Readings
-                  </button>
+                    <button
+                      onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      📝 Prepare Readings
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => alert("Notify Student coming next")}
-                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                  >
-                    🔔 Notify Student
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => alert("Notify Student coming next")}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      🔔 Notify Student
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1065,7 +1272,6 @@ async function saveReadingSession() {
               {activeTab === "readers" && (
                 <div className="space-y-6">
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    
                     <div className="mb-3 text-sm font-semibold text-stone-900">Reading Summary</div>
 
                     <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
@@ -1088,13 +1294,17 @@ async function saveReadingSession() {
 
                       <div className="rounded border bg-white p-3">
                         <div className="text-stone-600">Total minutes read</div>
-                        <div className="mt-1 font-medium">{totalMinutesRead || "—"}</div>
+                        <div className="mt-1 font-medium">
+                          {totalTimedMinutes ? totalTimedMinutes : "—"}
+                        </div>
                       </div>
 
                       <div className="rounded border bg-white p-3 sm:col-span-2">
                         <div className="text-stone-600">Average minutes per page</div>
                         <div className="mt-1 font-medium">
-                          {averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(2) : "—"}
+                          {averageMinutesPerPage != null
+                            ? averageMinutesPerPage.toFixed(2)
+                            : "—"}
                         </div>
                       </div>
                     </div>
@@ -1165,6 +1375,7 @@ async function saveReadingSession() {
                       </div>
                     </div>
                   </div>
+
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
 
@@ -1180,7 +1391,7 @@ async function saveReadingSession() {
                       </div>
 
                       <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Minutes read</div>
+                        <div className="text-stone-600">Minutes read (optional)</div>
                         <input
                           type="number"
                           min={1}
@@ -1233,14 +1444,22 @@ async function saveReadingSession() {
                       Personal quotes can live here later. Public sharing can stay limited to 2.
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-  <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
 
-  {readingSessions.length === 0 ? (
-    <div className="text-sm text-stone-500">No sessions yet.</div>
-  ) : (
-    <div className="space-y-2">
-      {readingSessions.map((session) => {
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
+
+                    {readingSessions.length === 0 ? (
+  <div className="text-sm text-stone-500">No sessions yet.</div>
+) : (
+  <>
+    {showAllSessions && (
+  <div className="mb-3">
+    {renderSessionToggle()}
+  </div>
+)}
+
+<div className="space-y-2">
+      {visibleReadingSessions.map((session) => {
         const pagesRead = session.end_page - session.start_page + 1;
 
         return (
@@ -1255,7 +1474,9 @@ async function saveReadingSession() {
                   p. {session.start_page} → {session.end_page}
                 </div>
                 <div className="mt-1 text-stone-500">
-                  {session.minutes_read} min · {pagesRead} pages
+                  {session.minutes_read != null
+                    ? `${session.minutes_read} min · ${pagesRead} pages`
+                    : `Untimed · ${pagesRead} pages`}
                 </div>
               </div>
 
@@ -1265,13 +1486,18 @@ async function saveReadingSession() {
                 className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
               >
                 Remove
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    <div className="mt-3">
+  {renderSessionToggle()}
+</div>
+  </>
+)}
                   </div>
                 </div>
               )}
@@ -1420,11 +1646,104 @@ async function saveReadingSession() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Chapter Summaries</div>
-                    <div className="text-sm text-stone-600">
-                      Personal chapter summaries can live here later to help readers remember the story flow.
+                  <div className="rounded-2xl border bg-stone-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-semibold text-stone-900">Chapter Summaries</h2>
+                        <p className="mt-1 text-sm text-stone-500">
+                          Writing short summaries can help you remember the story later on.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowChapterSummaries((prev) => !prev)}
+                        className="shrink-0 rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                      >
+                        {showChapterSummaries ? "Hide" : "Show"}
+                      </button>
                     </div>
+
+                    {showChapterSummaries && (
+                      <div className="mt-4 space-y-3">
+                        {chapterSummaries.length === 0 ? (
+                          <div className="text-sm text-stone-500">No chapter summaries yet.</div>
+                        ) : (
+                          chapterSummaries.map((item) => (
+                            <div key={item.id} className="rounded-xl border bg-white p-3">
+                              <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
+                                <input
+                                  type="number"
+                                  value={item.chapter_number ?? ""}
+                                  onChange={(e) =>
+                                    updateChapterSummary(item.id, "chapter_number", e.target.value)
+                                  }
+                                  placeholder="Chapter #"
+                                  className="rounded border px-3 py-2 text-sm"
+                                />
+
+                                <input
+                                  value={item.chapter_title ?? ""}
+                                  onChange={(e) =>
+                                    updateChapterSummary(item.id, "chapter_title", e.target.value)
+                                  }
+                                  placeholder="Chapter title (optional)"
+                                  className="rounded border px-3 py-2 text-sm"
+                                />
+
+                                <input
+                                  type="number"
+                                  value={item.sort_order ?? 0}
+                                  onChange={(e) =>
+                                    updateChapterSummary(item.id, "sort_order", e.target.value)
+                                  }
+                                  placeholder="Sort order (optional)"
+                      
+                                  className="rounded border px-3 py-2 text-sm"
+                                />
+                              </div>
+                                <p className="mt-2 text-xs text-stone-500">
+                                    Usually you can ignore sort order unless you want to rearrange chapters.
+                                  </p>
+                              <textarea
+                                value={item.summary}
+                                onChange={(e) =>
+                                  updateChapterSummary(item.id, "summary", e.target.value)
+                                }
+                                placeholder="Write a short summary..."
+                                className="mt-3 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                              />
+
+                              <div className="mt-3 flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => saveChapterSummary(item)}
+                                  className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                                >
+                                  Save
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => deleteChapterSummary(item.id)}
+                                  className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={addChapterSummary}
+                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
+                        >
+                          + Add chapter summary
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
