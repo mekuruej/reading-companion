@@ -1,4 +1,15 @@
 // lib/kanjiRadicals.ts
+//
+// Format:
+// 漢字: { radical: "部首の形", name: "learner-friendly English name" }
+//
+// Example:
+// 語: { radical: "言", name: "speech" }
+//
+// Notes:
+// - Use one consistent English label for each radical across the app.
+// - Prefer the radical form learners see in lookup contexts (for example ⻌ rather than 辶 when appropriate).
+// - If unsure, check the existing naming style before adding a new entry.
 
 export const KANJI_RADICALS: Record<
   string,

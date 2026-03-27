@@ -91,7 +91,9 @@ type Flashcard = {
   meaningChoiceIndex: number;
   repeatKey: string;
   repeatCount: number;
+  totalCount: number;
   kanjiMeta: KanjiMetaItem[];
+  isCommon: boolean | null;
 };
 
 function normalizeJlpt(val: string | null | undefined) {
@@ -130,7 +132,7 @@ function isHiraganaOnly(s: string) {
 }
 
 function kataToHira(s: string) {
-  return s.replace(/[ァ-ヶ]/g, (ch) =>
+  return (s ?? "").replace(/[ァ-ヶ]/g, (ch) =>
     String.fromCharCode(ch.charCodeAt(0) - 0x60)
   );
 }
@@ -146,12 +148,14 @@ function normalizeMeaning(s: string) {
 function asStringArray(val: any): string[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.map((x) => String(x)).filter(Boolean);
+
   if (typeof val === "string") {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
     } catch {}
   }
+
   return [];
 }
 
@@ -174,7 +178,6 @@ export default function BookFlashcardsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const router = useRouter();
-  const today = new Date().toISOString().slice(0, 10);
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
@@ -186,18 +189,22 @@ export default function BookFlashcardsPage() {
   const [sessionOrder, setSessionOrder] = useState<number[]>([]);
   const [sessionIndex, setSessionIndex] = useState(0);
 
-  const settingsKey = useMemo(() => `flashcards_settings_${userBookId}`, [userBookId]);
+  const settingsKey = useMemo(
+    () => `flashcards_settings_${userBookId}`,
+    [userBookId]
+  );
 
   const steps = useMemo(() => {
     const base = baseStepsFor(studySet);
     return reverseMode ? [...base].reverse() : base;
   }, [studySet, reverseMode]);
 
-  const isTwoStep = steps.length === 2;
-
   const [typeMode, setTypeMode] = useState(false);
-  const [answer, setAnswer] = useState("");
-  const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
+  const [typedInput, setTypedInput] = useState("");
+  const [typedFeedback, setTypedFeedback] = useState<null | { ok: boolean; message: string }>(null);
+  const [typeRevealIndex, setTypeRevealIndex] = useState(0);
+  const [readyForNextCard, setReadyForNextCard] = useState(false);
+  const [lastTypedResult, setLastTypedResult] = useState<"revealed" | "correct" | "wrong" | null>(null);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [firstTouch, setFirstTouch] = useState(true);
@@ -224,13 +231,15 @@ export default function BookFlashcardsPage() {
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
 
-  const typeModeEnabled = typeMode && isTwoStep;
+  const typeModeEnabled = typeMode && steps.length >= 2;
 
   useEffect(() => {
     if (!userBookId) return;
+
     try {
       const raw = localStorage.getItem(settingsKey);
       if (!raw) return;
+
       const parsed = JSON.parse(raw);
       if (parsed?.studySet) setStudySet(parsed.studySet as StudySet);
       if (typeof parsed?.reverseMode === "boolean") setReverseMode(parsed.reverseMode);
@@ -244,6 +253,7 @@ export default function BookFlashcardsPage() {
 
   useEffect(() => {
     if (!userBookId) return;
+
     try {
       localStorage.setItem(
         settingsKey,
@@ -271,12 +281,16 @@ export default function BookFlashcardsPage() {
   ]);
 
   useEffect(() => {
-    if (!isTwoStep && typeMode) {
+    if (steps.length < 2 && typeMode) {
       setTypeMode(false);
-      setAnswer("");
-      setChecked(null);
+      setTypedInput("");
+      setTypedFeedback(null);
+      setTypeRevealIndex(0);
+      setReadyForNextCard(false);
+    setLastTypedResult(null);
+      setLastTypedResult(null);
     }
-  }, [isTwoStep, typeMode]);
+  }, [steps.length, typeMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -331,80 +345,113 @@ export default function BookFlashcardsPage() {
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
 
-        const { data: words, error: wErr } = await supabase
-  .from("user_book_words")
-  .select(
-    `
-    id,
-    user_book_id,
-    surface,
-    reading,
-    meaning,
-    jlpt,
-    is_common,
-    page_number,
-    chapter_number,
-    chapter_name,
-    created_at,
-    meaning_choices,
-    meaning_choice_index,
-    hidden,
-    skipped_on,
-    kanji_meta
-  `
-  )
-  .eq("user_book_id", userBookId)
-  .eq("hidden", false)
-  .or(`skipped_on.is.null,skipped_on.neq.${today}`)
-  .order("chapter_number", { ascending: true, nullsFirst: false })
-  .order("page_number", { ascending: true, nullsFirst: false })
-  .order("page_order", { ascending: true, nullsFirst: false })
-  .order("created_at", { ascending: true })
-  .order("id", { ascending: true })
-  .returns<WordRow[]>();
+        const ownerUserId = (ub as any)?.user_id ?? "";
 
-        if (wErr) throw wErr;
+        const totalCounts = new Map<string, number>();
+
+        if (ownerUserId) {
+          const { data: ownedBooks, error: ownedBooksErr } = await supabase
+            .from("user_books")
+            .select("id")
+            .eq("user_id", ownerUserId);
+
+          if (ownedBooksErr) throw ownedBooksErr;
+
+          const ownedBookIds = (ownedBooks ?? []).map((b: any) => b.id).filter(Boolean);
+
+          if (ownedBookIds.length > 0) {
+            const { data: libraryWords, error: libraryWordsErr } = await supabase
+              .from("user_book_words")
+              .select("surface")
+              .in("user_book_id", ownedBookIds)
+              .eq("hidden", false);
+
+            if (libraryWordsErr) throw libraryWordsErr;
+
+            for (const w of libraryWords ?? []) {
+              const key = normalizeRepeatKey((w as any).surface ?? "");
+              if (!key) continue;
+              totalCounts.set(key, (totalCounts.get(key) ?? 0) + 1);
+            }
+          }
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+
+        const { data: words, error: wordsErr } = await supabase
+          .from("user_book_words")
+          .select(
+            `
+            id,
+            user_book_id,
+            surface,
+            reading,
+            meaning,
+            jlpt,
+            is_common,
+            page_number,
+            chapter_number,
+            chapter_name,
+            seen_on,
+            created_at,
+            meaning_choices,
+            meaning_choice_index,
+            hidden,
+            skipped_on,
+            kanji_meta
+          `
+          )
+          .eq("user_book_id", userBookId)
+          .eq("hidden", false)
+          .or(`skipped_on.is.null,skipped_on.neq.${today}`)
+          .order("page_number", { ascending: true })
+          .order("created_at", { ascending: true });
+
+        if (wordsErr) throw wordsErr;
 
         const repeatCounts = new Map<string, number>();
-        for (const w of words ?? []) {
+        for (const w of (words ?? []) as WordRow[]) {
           const key = normalizeRepeatKey(w.surface);
           if (!key) continue;
           repeatCounts.set(key, (repeatCounts.get(key) ?? 0) + 1);
         }
 
-        const normalized: Flashcard[] = (words ?? []).map((w) => {
+        const normalized: Flashcard[] = ((words ?? []) as WordRow[]).map((w) => {
           const ch = chapterInfoFromRow(w);
-
           const meaningChoices = asStringArray(w.meaning_choices);
-          const idx = Number.isFinite(w.meaning_choice_index as any)
-            ? (w.meaning_choice_index as number)
-            : 0;
-          const safeIdx = meaningChoices.length
-            ? Math.max(0, Math.min(idx, meaningChoices.length - 1))
-            : 0;
 
-          const chosenMeaning = meaningChoices.length
-            ? meaningChoices[safeIdx]
-            : w.meaning ?? null;
+          const safeIdx =
+            typeof w.meaning_choice_index === "number" &&
+            w.meaning_choice_index >= 0 &&
+            w.meaning_choice_index < meaningChoices.length
+              ? w.meaning_choice_index
+              : 0;
+
+          const chosenMeaning =
+            meaningChoices.length > 0
+              ? meaningChoices[safeIdx]
+              : w.meaning ?? null;
 
           const repeatKey = normalizeRepeatKey(w.surface);
           const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;
 
           return {
-  id: w.id,
-  word: w.surface,
-  reading: w.reading ?? null,
-  meaning: chosenMeaning ?? w.meaning ?? null,
-  jlpt: normalizeJlpt(w.jlpt),
-  chapterLabel: ch.label,
-  chapterDisplay: ch.display,
-  page_number: w.page_number ?? null,
-  meaningChoices,
-  meaningChoiceIndex: safeIdx,
-  repeatKey,
-  repeatCount,
-  kanjiMeta: Array.isArray(w.kanji_meta) ? w.kanji_meta : [],
-};
+            id: w.id,
+            word: w.surface,
+            reading: w.reading ?? null,
+            meaning: chosenMeaning ?? w.meaning ?? null,
+            jlpt: normalizeJlpt(w.jlpt),
+            chapterLabel: ch.label,
+            chapterDisplay: ch.display,
+            page_number: w.page_number ?? null,
+            meaningChoices,
+            meaningChoiceIndex: safeIdx,
+            repeatKey,
+            repeatCount,
+            totalCount: repeatKey ? (totalCounts.get(repeatKey) ?? repeatCount ?? 1) : 1,
+            kanjiMeta: Array.isArray(w.kanji_meta) ? w.kanji_meta : [],
+            isCommon: w.is_common ?? null,
+          };
         });
 
         setCards(normalized);
@@ -429,8 +476,12 @@ export default function BookFlashcardsPage() {
         setChapterOptions(opts);
 
         setStepIndex(0);
-        setAnswer("");
-        setChecked(null);
+        setTypedInput("");
+        setTypedFeedback(null);
+        setTypeRevealIndex(0);
+        setReadyForNextCard(false);
+    setLastTypedResult(null);
+      setLastTypedResult(null);
         setDefError(null);
         setShowDefPicker(false);
         setVoiceError(null);
@@ -469,8 +520,11 @@ export default function BookFlashcardsPage() {
 
     setFilteredCards(result);
     setStepIndex(0);
-    setAnswer("");
-    setChecked(null);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setTypeRevealIndex(0);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
     setVoiceError(null);
@@ -481,8 +535,11 @@ export default function BookFlashcardsPage() {
     setSessionOrder(studyOnceMode ? shuffleArray(order) : order);
     setSessionIndex(0);
     setStepIndex(0);
-    setAnswer("");
-    setChecked(null);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setTypeRevealIndex(0);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
     setVoiceError(null);
@@ -493,12 +550,20 @@ export default function BookFlashcardsPage() {
     setShowDefPicker(false);
     setDefError(null);
     setVoiceError(null);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setTypeRevealIndex(0);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
   }, [sessionIndex]);
 
   useEffect(() => {
     setStepIndex(0);
-    setAnswer("");
-    setChecked(null);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setTypeRevealIndex(0);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
     setVoiceError(null);
   }, [studySet, reverseMode]);
 
@@ -526,7 +591,9 @@ export default function BookFlashcardsPage() {
     ]);
   }
 
-  async function goToNextWord(result: "revealed" | "correct" | "wrong" = "revealed") {
+  async function goToNextWord(
+    result: "revealed" | "correct" | "wrong" = "revealed"
+  ) {
     if (filteredCards.length === 0 || !card) return;
 
     await logStudyEvent(result);
@@ -542,8 +609,11 @@ export default function BookFlashcardsPage() {
     }
 
     setStepIndex(0);
-    setAnswer("");
-    setChecked(null);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setTypeRevealIndex(0);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
     setVoiceError(null);
@@ -560,43 +630,48 @@ export default function BookFlashcardsPage() {
     }
 
     setStepIndex(Math.max(steps.length - 1, 0));
-    setAnswer("");
-    setChecked(null);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setTypeRevealIndex(0);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
     setVoiceError(null);
   }
-async function skipCardForToday(cardId: string) {
-  const today = new Date().toISOString().slice(0, 10);
 
-  const { error } = await supabase
-    .from("user_book_words")
-    .update({ skipped_on: today })
-    .eq("id", cardId);
+  async function skipCardForToday(cardId: string) {
+    const today = new Date().toISOString().slice(0, 10);
 
-  if (error) {
-    console.error("Error skipping card for today:", error);
-    return;
+    const { error } = await supabase
+      .from("user_book_words")
+      .update({ skipped_on: today })
+      .eq("id", cardId);
+
+    if (error) {
+      console.error("Error skipping card for today:", error);
+      return;
+    }
+
+    setCards((prev) => prev.filter((c) => c.id !== cardId));
+    setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
   }
 
-  setCards((prev) => prev.filter((c) => c.id !== cardId));
-  setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
-}
+  async function hideCardPermanently(cardId: string) {
+    const { error } = await supabase
+      .from("user_book_words")
+      .update({ hidden: true })
+      .eq("id", cardId);
 
-async function hideCardPermanently(cardId: string) {
-  const { error } = await supabase
-    .from("user_book_words")
-    .update({ hidden: true })
-    .eq("id", cardId);
+    if (error) {
+      console.error("Error hiding card:", error);
+      return;
+    }
 
-  if (error) {
-    console.error("Error hiding card:", error);
-    return;
+    setCards((prev) => prev.filter((c) => c.id !== cardId));
+    setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
   }
 
-  setCards((prev) => prev.filter((c) => c.id !== cardId));
-  setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
-}
   function nextCardReveal() {
     const max = steps.length;
     if (max <= 1) return goToNextWord();
@@ -612,38 +687,68 @@ async function hideCardPermanently(cardId: string) {
   }
 
   function checkTypedAnswer() {
-    if (!isTwoStep || !card) return;
-    const answerField = steps[1];
+    if (!typeModeEnabled || !card) return;
 
-    const correctRaw = getFieldValue(answerField, card);
+    const currentAnswerField = steps[typeRevealIndex + 1];
+    if (!currentAnswerField) return;
+
+    const correctRaw = getFieldValue(currentAnswerField, card);
+    const userAnsRaw = typedInput.trim();
+
     if (!correctRaw) {
-      setChecked({ ok: true, correct: "—" });
-      return;
-    }
-
-    let userAns = kataToHira(answer.trim());
-
-    if (answerField === "reading" && !isHiraganaOnly(userAns)) {
-      setChecked({
-        ok: false,
-        correct: "Please answer in hiragana only.",
+      setTypedInput("");
+      const nextRevealIndex = Math.min(typeRevealIndex + 1, steps.length - 1);
+      setTypeRevealIndex(nextRevealIndex);
+      setTypedFeedback({
+        ok: true,
+        message: "Answer revealed.",
       });
+      setLastTypedResult("revealed");
+      setReadyForNextCard(nextRevealIndex >= steps.length - 1);
       return;
     }
 
+    const userAns = kataToHira(userAnsRaw);
     let ok = false;
 
-    if (answerField === "reading") {
-      ok = normalizeReading(userAns) === normalizeReading(correctRaw);
-    } else if (answerField === "meaning") {
+    if (currentAnswerField === "reading") {
+      ok =
+        isHiraganaOnly(userAns) &&
+        normalizeReading(userAns) === normalizeReading(correctRaw);
+    } else if (currentAnswerField === "meaning") {
       const u = normalizeMeaning(userAns);
-      const corr = normalizeMeaning(correctRaw);
-      ok = u.length > 0 && corr.includes(u);
+      const possible = [card.meaning, ...(card.meaningChoices ?? [])]
+        .filter(Boolean)
+        .map((x) => normalizeMeaning(String(x)));
+
+      ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
     } else {
       ok = userAns === correctRaw.trim();
     }
 
-    setChecked({ ok, correct: correctRaw });
+    setTypedInput("");
+
+    const nextRevealIndex = Math.min(typeRevealIndex + 1, steps.length - 1);
+    setTypeRevealIndex(nextRevealIndex);
+
+    setTypedFeedback({
+      ok,
+      message:
+        currentAnswerField === "reading"
+          ? ok
+            ? `You got it! Reading: ${card.reading || "—"}`
+            : `Better luck next time. Reading: ${card.reading || "—"}`
+          : currentAnswerField === "meaning"
+          ? ok
+            ? `You got it! Meaning: ${card.meaning || "—"}`
+            : `Better luck next time. Meaning: ${card.meaning || "—"}`
+          : ok
+          ? `You got it! Answer: ${correctRaw}`
+          : `Better luck next time. Answer: ${correctRaw}`,
+    });
+
+    setLastTypedResult(ok ? "correct" : "wrong");
+    setReadyForNextCard(nextRevealIndex >= steps.length - 1);
   }
 
   function flip() {
@@ -676,18 +781,25 @@ async function hideCardPermanently(cardId: string) {
 
       setCards((prev) =>
         prev.map((x) =>
-          x.id === card.id ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning } : x
+          x.id === card.id
+            ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning }
+            : x
         )
       );
 
       setFilteredCards((prev) =>
         prev.map((x) =>
-          x.id === card.id ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning } : x
+          x.id === card.id
+            ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning }
+            : x
         )
       );
 
-      setAnswer("");
-      setChecked(null);
+      setTypedInput("");
+      setTypedFeedback(null);
+      setReadyForNextCard(false);
+    setLastTypedResult(null);
+      setLastTypedResult(null);
     } catch (e: any) {
       setDefError(e?.message ?? "Failed to change definition");
     } finally {
@@ -695,12 +807,13 @@ async function hideCardPermanently(cardId: string) {
     }
   }
 
-  const promptField = card ? steps[0] : "word";
-  const answerField = card && steps.length >= 2 ? steps[1] : null;
+  const currentTypeAnswerField = typeModeEnabled ? steps[typeRevealIndex + 1] : null;
 
   function startVoiceInput() {
     if (typeof window === "undefined") return;
-    if (answerField !== "meaning") return;
+
+    const currentAnswerField = steps[typeRevealIndex + 1];
+    if (currentAnswerField !== "meaning") return;
 
     const SpeechRecognitionCtor =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -727,13 +840,18 @@ async function hideCardPermanently(cardId: string) {
 
     recognition.onerror = (event: any) => {
       setIsListening(false);
-      setVoiceError(event?.error ? `Voice input error: ${event.error}` : "Voice input failed.");
+      setVoiceError(
+        event?.error ? `Voice input error: ${event.error}` : "Voice input failed."
+      );
     };
 
     recognition.onresult = (event: any) => {
       const transcript = event?.results?.[0]?.[0]?.transcript ?? "";
-      setAnswer(transcript);
-      setChecked(null);
+      setTypedInput(transcript);
+      setTypedFeedback(null);
+      setReadyForNextCard(false);
+    setLastTypedResult(null);
+      setLastTypedResult(null);
     };
 
     recognition.start();
@@ -744,20 +862,28 @@ async function hideCardPermanently(cardId: string) {
       if (typeModeEnabled) {
         if (e.key === "Enter") {
           e.preventDefault();
-          if (!checked) {
-            checkTypedAnswer();
-          } else {
-            goToNextWord(checked.ok ? "correct" : "wrong");
+
+          if (readyForNextCard) {
+            goToNextWord(lastTypedResult ?? "revealed");
+            return;
           }
+
+          checkTypedAnswer();
+          return;
         }
+
         if (e.key === "ArrowRight") {
           e.preventDefault();
-          goToNextWord(checked ? (checked.ok ? "correct" : "wrong") : "revealed");
+          goToNextWord(readyForNextCard ? lastTypedResult ?? "revealed" : "revealed");
+          return;
         }
+
         if (e.key === "ArrowLeft") {
           e.preventDefault();
           goToPrevWord();
+          return;
         }
+
         return;
       }
 
@@ -774,7 +900,7 @@ async function hideCardPermanently(cardId: string) {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [typeModeEnabled, checked, steps, stepIndex, studySet, reverseMode, filteredCards, sessionIndex, studyOnceMode]);
+  }, [typeModeEnabled, stepIndex, typeRevealIndex, filteredCards, sessionIndex, studyOnceMode, steps, readyForNextCard, lastTypedResult]);
 
   if (loading) {
     return (
@@ -848,8 +974,12 @@ async function hideCardPermanently(cardId: string) {
                 setSessionOrder(newOrder);
                 setSessionIndex(0);
                 setStepIndex(0);
-                setAnswer("");
-                setChecked(null);
+                setTypedInput("");
+                setTypedFeedback(null);
+                setTypeRevealIndex(0);
+                setReadyForNextCard(false);
+    setLastTypedResult(null);
+      setLastTypedResult(null);
                 setFirstTouch(true);
               }}
               className="px-4 py-2 bg-gray-200 rounded"
@@ -876,7 +1006,7 @@ async function hideCardPermanently(cardId: string) {
   const showReading = revealed.has("reading");
   const showMeaning = revealed.has("meaning");
 
-    function Row({
+  function Row({
     label,
     value,
     visible,
@@ -905,41 +1035,23 @@ async function hideCardPermanently(cardId: string) {
     );
   }
 
-  const promptValue = card ? getFieldValue(promptField, card) : "";
-  const needsKanaInput = typeModeEnabled && answerField === "reading";
-  const showMicButton = voiceSupported && typeModeEnabled && answerField === "meaning";
-
   return (
-  <main
-  className="min-h-screen flex flex-col items-center px-6 py-4"
-  style={{
-    backgroundImage: `
-      repeating-linear-gradient(
-        to bottom,
-        #f9f6ef 0px,
-        #f9f6ef 180px,
-        #d1b58f 181px,
-        #d1b58f 183px
-      ),
-      linear-gradient(to right, #f8f3e8 0%, #f3ede2 100%)
-    `,
-    backgroundSize: "100% 183px",
-  }}
->
-    <div className="w-full max-w-5xl mb-1 flex flex-col md:flex-row items-center md:items-start justify-center gap-8">
-  <div className="flex flex-col items-center shrink-0">
-    {bookCover ? (
-      <img src={bookCover} alt="" className="w-24 h-32 rounded mb-2 object-cover" />
-    ) : null}
-    <h1 className="text-2xl font-semibold text-center">{bookTitle}</h1>
-  </div>
+    <main className="min-h-screen flex flex-col items-center px-6 py-4 bg-slate-100">
+      <div className="w-full max-w-5xl mb-1 flex flex-col md:flex-row items-center md:items-start justify-center gap-8">
+        <div className="flex flex-col items-center shrink-0">
+          {bookCover ? (
+            <img src={bookCover} alt="" className="w-24 h-32 rounded mb-2 object-cover" />
+          ) : null}
+          <h1 className="text-2xl font-semibold text-center">{bookTitle}</h1>
+        </div>
 
-  <div className="w-full md:w-[460px] md:mt-6 md:ml-4">
-  <p className="text-base text-gray-500 text-left leading-8">
-    This page is intended to help you strengthen the vocabulary you are still working on. Study the flashcards however you like. Vocabulary is always shown in random order.
-  </p>
-</div>
-</div>
+        <div className="w-full md:w-[460px] md:mt-6 md:ml-4">
+          <p className="text-base text-gray-500 text-left leading-8">
+            This page is intended to help you strengthen the vocabulary you are still working on.
+            Study the flashcards however you like. Vocabulary is always shown in random order.
+          </p>
+        </div>
+      </div>
 
       <div className="w-full max-w-6xl mb-3 flex flex-col items-center gap-2">
         <div className="w-full flex flex-col items-center gap-1">
@@ -958,20 +1070,28 @@ async function hideCardPermanently(cardId: string) {
             </select>
 
             <label className="flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white">
-              <input type="checkbox" checked={reverseMode} onChange={() => setReverseMode((v) => !v)} />
+              <input
+                type="checkbox"
+                checked={reverseMode}
+                onChange={() => setReverseMode((v) => !v)}
+              />
               Reverse (R)
             </label>
 
             <label
               className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${
-                !isTwoStep ? "opacity-50 cursor-not-allowed" : ""
+                steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
               }`}
-              title={!isTwoStep ? "Type mode is only for 2-step modes right now." : "Type the answer for step 2."}
+              title={
+                steps.length < 2
+                  ? "Type mode needs at least 2 study steps."
+                  : "Press Enter to reveal. Press Enter again to move to the next card."
+              }
             >
               <input
                 type="checkbox"
                 checked={typeModeEnabled}
-                disabled={!isTwoStep}
+                disabled={steps.length < 2}
                 onChange={() => setTypeMode((v) => !v)}
               />
               Type mode
@@ -1051,7 +1171,11 @@ async function hideCardPermanently(cardId: string) {
               className="flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white"
               title="Show only words that appear 2+ times in this book"
             >
-              <input type="checkbox" checked={repeatsOnly} onChange={() => setRepeatsOnly((v) => !v)} />
+              <input
+                type="checkbox"
+                checked={repeatsOnly}
+                onChange={() => setRepeatsOnly((v) => !v)}
+              />
               Repeats
             </label>
           </div>
@@ -1059,239 +1183,288 @@ async function hideCardPermanently(cardId: string) {
       </div>
 
       {firstTouch && (
-  <p className="mb-2 text-sm text-gray-500">
-    {typeModeEnabled
-      ? "Type the answer and press Enter (Enter again to continue)."
-      : "Click card, press Space, or use Review / Next."}
-  </p>
-)}
+        <p className="mb-2 text-sm text-gray-500">
+          {typeModeEnabled
+            ? "Press Enter to reveal. Press Enter again to move to the next card."
+            : "Click card, press Space, or use Review / Next."}
+        </p>
+      )}
 
-<div className="mb-3 flex flex-col items-center">
-  <p className="text-[11px] uppercase tracking-wide text-gray-400">
-    Session Progress
-  </p>
-  <p className="text-sm text-gray-500 text-center">
-    Card {Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}/
-    {studyOnceMode ? sessionOrder.length : filteredCards.length}
-  </p>
-</div>
-
-<div
-  onClick={flip}
-  className="
-    relative
-    w-[92vw] max-w-2xl
-    min-h-[20rem]
-    min-h-60 bg-white rounded-2xl
-    border border-slate-500
-    shadow-2xl
-    flex items-center justify-center
-    cursor-pointer text-center select-none
-    p-8
-  "
->
-  <div className="absolute top-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-  <div className="text-xs font-medium leading-none">
-    {card?.jlpt ?? "NON-JLPT"}
-  </div>
-</div>
-
-  <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-  <div className="text-xs font-medium leading-none">
-    Book Count {card?.repeatCount ?? 1} • Total Count ***
-  </div>
-</div>
-
-  <div className="absolute bottom-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-  <div className="text-xs font-medium leading-none">
-    Def #{((card?.meaningChoiceIndex ?? 0) as number) + 1}
-  </div>
-</div>
-
-  {card?.kanjiMeta?.length ? (
-    <div className="absolute bottom-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-      <div className="flex flex-col items-start gap-1">
-        {card.kanjiMeta.map((item, i) => (
-          <div key={`${item.kanji}-${i}`} className="flex items-center gap-2 leading-none">
-            <span className="text-sm font-medium text-slate-500">{item.kanji}</span>
-            <span className="text-xs text-slate-400">{item.strokes ?? "?"}</span>
-          </div>
-        ))}
+      <div className="mb-3 flex flex-col items-center">
+        <p className="text-[11px] uppercase tracking-wide text-gray-400">Session Progress</p>
+        <p className="text-sm text-gray-500 text-center">
+          Card {Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}/
+          {studyOnceMode ? sessionOrder.length : filteredCards.length}
+        </p>
       </div>
-    </div>
-  ) : null}
+
+      <div
+        onClick={flip}
+        className="
+          relative
+          w-[92vw] max-w-2xl
+          min-h-[20rem]
+          min-h-60 bg-white rounded-2xl
+          border border-slate-500
+          shadow-2xl
+          flex items-center justify-center
+          cursor-pointer text-center select-none
+          p-8
+        "
+      >
+        <div className="absolute top-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+          <div className="text-xs font-medium leading-none">
+            {card?.jlpt ?? "NON-JLPT"}
+          </div>
+        </div>
+
+        <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+          <div className="flex flex-col items-end leading-tight">
+            <div className="text-xs font-medium">
+              Book Count: {card?.repeatCount ?? 1}
+            </div>
+            <div className="text-xs font-medium">
+              Total Count: {card?.totalCount ?? 1}
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute bottom-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+          <div className="text-xs font-medium leading-none">
+            Def #{((card?.meaningChoiceIndex ?? 0) as number) + 1}
+          </div>
+        </div>
+
+        {card?.isCommon === true ? (
+          <div className="absolute bottom-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+            <div className="text-xs font-medium leading-none">Common</div>
+          </div>
+        ) : null}
 
         <div className="w-full flex flex-col items-center justify-center gap-6">
           {typeModeEnabled && card ? (
             <>
               <Row
-                label={promptField === "word" ? "Kanji" : promptField === "reading" ? "Reading" : "Meaning"}
-                value={promptValue || "—"}
-                visible={true}
+                label="Word"
+                value={card.word}
+                visible={steps.includes("word") ? typeRevealIndex >= steps.indexOf("word") : false}
                 big
+                placeholder="---"
+              />
+              <Row
+                label="Reading"
+                value={card.reading || "—"}
+                visible={steps.includes("reading") ? typeRevealIndex >= steps.indexOf("reading") : false}
+                placeholder="---"
+              />
+              <Row
+                label="Meaning"
+                value={card.meaning || "—"}
+                visible={steps.includes("meaning") ? typeRevealIndex >= steps.indexOf("meaning") : false}
+                placeholder="---"
               />
 
-              <div className="w-full max-w-md">
-                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                  Type {answerField === "word" ? "Kanji" : answerField === "reading" ? "Reading" : "Meaning"}
-                </div>
-
-                {needsKanaInput ? (
-                  <p className="mb-2 text-xs text-gray-500">
-                    Reading quizzes should be answered in hiragana only. If needed, switch your keyboard to かな and disable 漢字変換.
-                  </p>
-                ) : null}
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={answer}
-                    onChange={(e) => {
-                      setAnswer(e.target.value);
-                      setChecked(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!checked) {
-                          checkTypedAnswer();
-                        } else {
-                          goToNextWord(checked.ok ? "correct" : "wrong");
-                        }
-                      }
-                    }}
-                    inputMode="text"
-                    lang={needsKanaInput ? "ja" : undefined}
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    className="border p-2 rounded w-full"
-                    placeholder={
-                      answerField === "meaning"
-                        ? "Type a keyword (partial OK)"
-                        : needsKanaInput
-                        ? "かなで入力"
-                        : "Type your answer"
-                    }
-                  />
-
-                  {showMicButton && (
-                    <button
-                      type="button"
-                      onClick={startVoiceInput}
-                      disabled={isListening}
-                      className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-                      title="Voice input"
-                    >
-                      {isListening ? "Listening..." : "🎤"}
-                    </button>
-                  )}
-                </div>
-
-                {voiceError ? (
-                  <p className="mt-2 text-xs text-red-700">{voiceError}</p>
-                ) : null}
-
-                {checked ? (
-                  <div className="mt-3 text-sm">
-                    {checked.ok ? (
-                      <p className="text-green-700">✅ Correct!</p>
-                    ) : (
-                      <p className="text-red-700">❌ Not quite.</p>
-                    )}
-
-                    <div className="mt-2 border rounded p-3 bg-gray-50 text-left">
-                      <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Full answer</div>
-
-                      <div className="flex flex-col gap-2">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Kanji</div>
-                          <div className="text-base font-medium">{card.word || "—"}</div>
-                        </div>
-
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Reading</div>
-                          <div className="text-base font-medium">{card.reading || "—"}</div>
-                        </div>
-
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Meaning</div>
-                          <div className="text-base font-medium">{card.meaning || "—"}</div>
-                        </div>
-
-                        <div className="text-xs text-slate-500">Def #{(card.meaningChoiceIndex ?? 0) + 1}</div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="mt-3 px-3 py-1 bg-gray-200 rounded"
-                      onClick={() => goToNextWord(checked.ok ? "correct" : "wrong")}
-                    >
-                      Continue
-                    </button>
+              {currentTypeAnswerField ? (
+                <div className="w-full max-w-md">
+                  <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+                    Type{" "}
+                    {currentTypeAnswerField === "word"
+                      ? "Kanji"
+                      : currentTypeAnswerField === "reading"
+                      ? "Reading"
+                      : "Meaning"}
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="mt-2 px-3 py-1 bg-gray-200 rounded"
-                    onClick={checkTypedAnswer}
-                  >
-                    Check
-                  </button>
-                )}
-              </div>
+
+                  {currentTypeAnswerField === "reading" ? (
+                    <p className="mb-2 text-xs text-gray-500">
+                      Reading quizzes should be answered in hiragana only.
+                    </p>
+                  ) : null}
+
+                  <div className="flex gap-2">
+                    <input
+                      key={currentTypeAnswerField}
+                      type="text"
+                      value={typedInput}
+                      onChange={(e) => {
+                        setTypedInput(e.target.value);
+                        setTypedFeedback(null);
+                        setReadyForNextCard(false);
+    setLastTypedResult(null);
+      setLastTypedResult(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          if (readyForNextCard) {
+                            goToNextWord(lastTypedResult ?? "revealed");
+                            return;
+                          }
+
+                          checkTypedAnswer();
+                        }
+                      }}
+                      inputMode="text"
+                      lang={currentTypeAnswerField === "reading" ? "ja" : undefined}
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      autoFocus
+                      className="border p-2 rounded w-full"
+                      placeholder={
+                        readyForNextCard
+                          ? "Press Enter for next card"
+                          : currentTypeAnswerField === "meaning"
+                          ? "Type a meaning"
+                          : currentTypeAnswerField === "reading"
+                          ? "かなで入力"
+                          : "Type your answer"
+                      }
+                    />
+
+                    {voiceSupported && currentTypeAnswerField === "meaning" ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startVoiceInput();
+                        }}
+                        disabled={isListening}
+                        className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                        title="Voice input"
+                      >
+                        {isListening ? "Listening..." : "🎤"}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {voiceError ? (
+                    <p className="mt-2 text-xs text-red-700">{voiceError}</p>
+                  ) : null}
+
+                  {typedFeedback ? (
+                    <p
+                      className={`mt-2 text-sm ${
+                        typedFeedback.ok ? "text-green-700" : "text-red-700"
+                      }`}
+                    >
+                      {typedFeedback.ok ? "✅ " : "❌ "}
+                      {typedFeedback.message}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </>
           ) : card ? (
-                        <>
+            <>
               <Row label="Word" value={card.word} visible={showWord} big placeholder="---" />
-              <Row label="Reading" value={card.reading || "—"} visible={showReading} placeholder="---" />
-              <Row label="Meaning" value={card.meaning || "—"} visible={showMeaning} placeholder="---" />
+              <Row
+                label="Reading"
+                value={card.reading || "—"}
+                visible={showReading}
+                placeholder="---"
+              />
+              <Row
+                label="Meaning"
+                value={card.meaning || "—"}
+                visible={showMeaning}
+                placeholder="---"
+              />
             </>
           ) : null}
         </div>
       </div>
 
+      {showDefPicker && card?.meaningChoices?.length ? (
+        <div className="mt-4 w-full max-w-2xl rounded-xl border bg-white p-4 shadow-sm">
+          <div className="text-sm font-medium text-slate-700 mb-2">Choose a definition</div>
+
+          <div className="flex flex-col gap-2">
+            {card.meaningChoices.map((choice, i) => {
+              const active = i === card.meaningChoiceIndex;
+              return (
+                <button
+                  key={`${card.id}-def-${i}`}
+                  type="button"
+                  disabled={defSaving}
+                  onClick={() => setDefinitionForCurrent(i)}
+                  className={`text-left px-3 py-2 rounded border ${
+                    active
+                      ? "bg-slate-700 text-white border-slate-700"
+                      : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="text-xs mr-2 opacity-70">#{i + 1}</span>
+                  {choice || "—"}
+                </button>
+              );
+            })}
+          </div>
+
+          {defError ? <p className="mt-2 text-sm text-red-700">{defError}</p> : null}
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowDefPicker(false)}
+              className="px-3 py-1 bg-gray-200 rounded"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-3 mt-6 justify-center">
-  <button
-    onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
-    className="px-4 py-2 bg-gray-200 rounded"
-  >
-    Review
-  </button>
+        <button
+          onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
+          Review
+        </button>
 
-  <button
-    onClick={() =>
-      typeModeEnabled
-        ? goToNextWord(checked ? (checked.ok ? "correct" : "wrong") : "revealed")
-        : nextCardReveal()
-    }
-    className="px-4 py-2 bg-gray-200 rounded"
-  >
-    Next
-  </button>
+        <button
+          onClick={() =>
+            typeModeEnabled
+              ? goToNextWord(readyForNextCard ? lastTypedResult ?? "revealed" : "revealed")
+              : nextCardReveal()
+          }
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
+          Next
+        </button>
 
-  <button
-    onClick={() => {
-      if (!card) return;
-      skipCardForToday(card.id);
-    }}
-    className="px-4 py-2 bg-slate-200 rounded hover:bg-slate-300 transition"
-  >
-    Skip for today
-  </button>
+        {card?.meaningChoices?.length ? (
+          <button
+            onClick={() => setShowDefPicker((v) => !v)}
+            className="px-4 py-2 bg-gray-200 rounded"
+          >
+            {showDefPicker ? "Hide Definitions" : "Change Definition"}
+          </button>
+        ) : null}
 
-  <button
-    onClick={() => {
-      if (!card) return;
-      hideCardPermanently(card.id);
-    }}
-    className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-  >
-    Hide card
-  </button>
-</div>
+        <button
+          onClick={() => {
+            if (!card) return;
+            skipCardForToday(card.id);
+          }}
+          className="px-4 py-2 bg-slate-200 rounded hover:bg-slate-300 transition"
+        >
+          Skip for today
+        </button>
+
+        <button
+          onClick={() => {
+            if (!card) return;
+            hideCardPermanently(card.id);
+          }}
+          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+        >
+          Hide card
+        </button>
+      </div>
 
       <div className="mt-5 flex justify-center gap-3">
         <button
@@ -1302,11 +1475,11 @@ async function hideCardPermanently(cardId: string) {
         </button>
 
         <button
-          onClick={() => router.push(`/books`)}
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
-        >
-          Back to Books
-        </button>
+              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+              className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
+            >
+              Book Hub
+            </button>
 
         <button
           onClick={() => router.push(`/books/${userBookId}/weekly-readings`)}

@@ -708,7 +708,7 @@ if (idx != null && choices.length && choices[idx]) {
               onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
               className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
             >
-              Book Info
+              Book Hub
             </button>
 
             <button
@@ -887,7 +887,7 @@ if (idx != null && choices.length && choices[idx]) {
           onClick={() => router.push("/books")}
           className="text-sm text-slate-600 hover:underline"
         >
-          ← Back to Books
+          ← Back to Library
         </button>
       </div>
     </main>

@@ -110,9 +110,10 @@ export default function BulkVocabPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
 
-  const [chapterNumber, setChapterNumber] = useState("");
-  const [chapterName, setChapterName] = useState("");
-  const [defaultPageNumber, setDefaultPageNumber] = useState("");
+  // Bulk tools
+  const [bulkPageNumber, setBulkPageNumber] = useState("");
+  const [bulkChapterNumber, setBulkChapterNumber] = useState("");
+  const [bulkChapterName, setBulkChapterName] = useState("");
 
   const [rawInput, setRawInput] = useState("");
   const [items, setItems] = useState<BulkItem[]>([]);
@@ -145,8 +146,8 @@ export default function BulkVocabPage() {
     if (saved) {
       try {
         const { number, name } = JSON.parse(saved);
-        setChapterNumber(number || "");
-        setChapterName(name || "");
+        setBulkChapterNumber(number || "");
+        setBulkChapterName(name || "");
       } catch {}
     }
 
@@ -182,11 +183,55 @@ export default function BulkVocabPage() {
     localStorage.setItem(
       `chapter_userBook_${userBookId}`,
       JSON.stringify({
-        number: chapterNumber,
-        name: chapterName,
+        number: bulkChapterNumber,
+        name: bulkChapterName,
       })
     );
-  }, [chapterNumber, chapterName, userBookId]);
+  }, [bulkChapterNumber, bulkChapterName, userBookId]);
+
+  // -------------------------------------------------------------
+  // Bulk apply helpers
+  // -------------------------------------------------------------
+  function applyBulkField(
+    field: "page" | "chapterNumber" | "chapterName",
+    value: string,
+    mode: "blank" | "all"
+  ) {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      setMessage("Fill in a value first.");
+      return;
+    }
+
+    let changed = 0;
+
+    setItems((prev) =>
+      prev.map((item) => {
+        const currentValue = (item[field] ?? "").toString().trim();
+        const shouldUpdate = mode === "all" || currentValue === "";
+
+        if (!shouldUpdate) return item;
+
+        changed += 1;
+        return {
+          ...item,
+          [field]: value,
+        };
+      })
+    );
+
+    const label =
+      field === "page"
+        ? "page number"
+        : field === "chapterNumber"
+        ? "chapter number"
+        : "chapter name";
+
+    setMessage(
+      `✅ Applied ${label} to ${changed} row${changed === 1 ? "" : "s"} (${mode === "all" ? "all" : "blanks only"}).`
+    );
+  }
 
   // -------------------------------------------------------------
   // Apply pasted page numbers to preview list (in order)
@@ -274,22 +319,24 @@ export default function BulkVocabPage() {
           isCommon,
           meaningChoices,
           meaningChoiceIndex,
-          page: defaultPageNumber || "",
-          chapterNumber: chapterNumber || "",
-          chapterName: chapterName || "",
+          page: "",
+          chapterNumber: "",
+          chapterName: "",
           kanjiMeta,
         });
       }
 
-      setItems(results);
-      setMessage("✅ Preview ready! Pick the meaning (or choose Other), then Save All.");
+            setItems(results);
+      setMessage("✅ Preview ready! Now bulk apply page/chapter info if you want, then review and save.");
+      setRawInput("");
       setPagePaste("");
-    } catch (err: any) {
-      console.error(err);
-      setMessage(`❌ Error generating preview: ${err?.message ?? "unknown error"}`);
-    } finally {
-      setIsPreviewing(false);
-    }
+
+        } catch (err: any) {
+  console.error("PREVIEW ERROR:", err);
+  setMessage(`❌ Error generating preview: ${err?.message ?? "unknown error"}`);
+} finally {
+  setIsPreviewing(false);
+}
   }
 
   // -------------------------------------------------------------
@@ -300,6 +347,20 @@ export default function BulkVocabPage() {
     setSaveComplete(false);
 
     if (!userBookId || items.length === 0) return;
+
+        const incompleteItems = items.filter(
+      (i) => !i.reading.trim() || !i.meaning.trim()
+    );
+
+    if (incompleteItems.length > 0) {
+      const confirmed = window.confirm(
+        `${incompleteItems.length} word${
+          incompleteItems.length === 1 ? "" : "s"
+        } ${incompleteItems.length === 1 ? "is" : "are"} missing a reading or definition.\n\nDo you want to save anyway?`
+      );
+
+      if (!confirmed) return;
+    }
 
     setIsSaving(true);
     setMessage("Saving to Supabase…");
@@ -396,17 +457,25 @@ export default function BulkVocabPage() {
         };
       });
 
-      const { error } = await supabase
-        .from("user_book_words")
-        .upsert(payload, { onConflict: "user_book_id,surface,page_number,seen_on" });
+            const { error } = await supabase
+  .from("user_book_words")
+  .upsert(payload);
 
       if (error) throw error;
 
       setMessage(`✅ Saved ${payload.length} words!`);
       setSaveComplete(true);
-    } catch (err: any) {
-      console.error(err);
-      setMessage(`❌ Failed saving: ${err?.message ?? "unknown error"}`);
+        } catch (err: any) {
+      console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
+      setMessage(
+        `❌ Failed saving: ${
+          err?.message ||
+          err?.error_description ||
+          err?.details ||
+          JSON.stringify(err) ||
+          "unknown error"
+        }`
+      );
     } finally {
       setIsSaving(false);
     }
@@ -467,224 +536,325 @@ export default function BulkVocabPage() {
   // UI
   // -------------------------------------------------------------
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-2">🧺 Add Vocabulary</h1>
+    <main className="min-h-screen bg-slate-100 px-6 py-8">
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-2">🧺 Add Vocabulary</h1>
 
-      {bookTitle ? (
-        <div className="flex items-center gap-3 mb-4">
-          {bookCover ? <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover" /> : null}
-          <p className="text-sm text-gray-700">
-            For book: <span className="font-medium">{bookTitle}</span>
-          </p>
-        </div>
-      ) : (
-        <p className="text-sm text-gray-500 mb-4">
-          (Tip) Open with <code className="px-1 py-0.5 bg-gray-100 rounded">?userBookId=...</code>
-        </p>
-      )}
-
-      <div className="mb-2 text-xs text-gray-500">
-        Defaults (optional): you can leave these blank. You can override per word in the preview.
-      </div>
-
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <input
-          type="number"
-          value={defaultPageNumber}
-          onChange={(e) => setDefaultPageNumber(e.target.value)}
-          placeholder="Default page"
-          className="border p-2 rounded"
-        />
-        <input
-          type="number"
-          value={chapterNumber}
-          onChange={(e) => setChapterNumber(e.target.value)}
-          placeholder="Chapter number"
-          className="border p-2 rounded"
-        />
-        <input
-          type="text"
-          value={chapterName}
-          onChange={(e) => setChapterName(e.target.value)}
-          placeholder="Chapter name"
-          className="border p-2 rounded"
-        />
-      </div>
-
-      <form onSubmit={handlePreview} className="flex flex-col gap-3 mb-6">
-        <textarea
-          value={rawInput}
-          onChange={(e) => setRawInput(e.target.value)}
-          rows={8}
-          className="border p-2 rounded font-mono text-sm"
-          placeholder={`Paste one per line (or comma-separated)\n\n生意気\nメンヘラ\n都市伝説`}
-        />
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            disabled={isPreviewing}
-            className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 disabled:opacity-60"
-          >
-            {isPreviewing ? "Loading…" : `Preview Words${wordCount ? ` (${wordCount})` : ""}`}
-          </button>
-
-          {items.length > 0 ? (
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={handleSaveAll}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
-            >
-              {isSaving ? "Saving…" : "Save All"}
-            </button>
-          ) : null}
-
-          {saveComplete ? (
-            <>
-              <button
-                type="button"
-                onClick={resetForMore}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                title="Clear the preview and start a new batch"
-              >
-                ➕ Add More Words
-              </button>
-
-              <button
-                type="button"
-                onClick={goToVocabList}
-                className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-                title="Go to the vocab list for this book"
-              >
-                📄 Go to Vocab List
-              </button>
-            </>
-          ) : null}
-        </div>
-      </form>
-
-      {message ? (
-        <div className="mb-4 text-sm">
-          {message.startsWith("❌") ? <p className="text-red-700">{message}</p> : <p className="text-gray-700">{message}</p>}
-        </div>
-      ) : null}
-
-      {items.length > 0 && (
-        <>
-          <div className="mb-4 border rounded p-3 bg-white">
-            <div className="text-sm font-medium mb-1">Paste page numbers (optional)</div>
-            <p className="text-xs text-gray-500 mb-2">
-              Paste one per line (or copied from a spreadsheet). They’ll be applied to the preview list in order.
-            </p>
-
-            <textarea
-              rows={4}
-              value={pagePaste}
-              onChange={(e) => setPagePaste(e.target.value)}
-              className="border p-2 rounded font-mono text-sm w-full"
-              placeholder={`10\n10\n11\n11\n12`}
-            />
-
-            <div className="flex gap-2 mt-2">
-              <button type="button" onClick={applyPastedPages} className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-                Apply pages
-              </button>
-
-              <button type="button" onClick={() => setPagePaste("")} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">
-                Clear
-              </button>
+        {bookTitle ? (
+          <div className="flex items-center gap-3 mb-6">
+            {bookCover ? (
+              <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover" />
+            ) : null}
+            <div>
+              <p className="text-sm text-gray-700">
+                For book: <span className="font-medium">{bookTitle}</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Paste words first. Then apply page/chapter info in bulk.
+              </p>
             </div>
           </div>
+        ) : (
+          <p className="text-sm text-gray-500 mb-6">
+            (Tip) Open with <code className="px-1 py-0.5 bg-gray-100 rounded">?userBookId=...</code>
+          </p>
+        )}
 
-          <h2 className="text-xl font-medium mb-3">Preview ({items.length})</h2>
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-lg font-medium mb-1">Step 1 — Paste Words</div>
+          <p className="text-sm text-gray-500 mb-3">
+            Paste one word per line or comma-separated. You can organize page and chapter info after preview.
+          </p>
 
-          <ul className="space-y-3">
-            {items.map((i, idx) => (
-              <li key={`${i.surface}_${idx}`} className="border p-3 rounded bg-white shadow-sm">
-                <div className="flex justify-between items-start gap-3 mb-2">
-                  <span className="font-semibold text-lg">{i.surface}</span>
+          <form onSubmit={handlePreview} className="flex flex-col gap-3">
+            <textarea
+              value={rawInput}
+              onChange={(e) => setRawInput(e.target.value)}
+              rows={8}
+              className="border p-3 rounded font-mono text-sm bg-white"
+              placeholder={`Paste one per line (or comma-separated)\n\n生意気\nメンヘラ\n都市伝説`}
+            />
 
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="Ch #"
-                      value={i.chapterNumber}
-                      onChange={(e) => updateItem(idx, "chapterNumber", e.target.value)}
-                      className="border p-1 rounded text-xs w-16 text-right"
-                    />
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                disabled={isPreviewing}
+                className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 disabled:opacity-60"
+              >
+                {isPreviewing ? "Loading…" : `Preview Words${wordCount ? ` (${wordCount})` : ""}`}
+              </button>
 
-                    <input
-                      type="text"
-                      placeholder="Chapter name"
-                      value={i.chapterName}
-                      onChange={(e) => updateItem(idx, "chapterName", e.target.value)}
-                      className="border p-1 rounded text-xs w-40"
-                    />
+              {items.length > 0 ? (
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={handleSaveAll}
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+                >
+                  {isSaving ? "Saving…" : "Save All"}
+                </button>
+              ) : null}
 
-                    <input
-                      type="number"
-                      placeholder="Page"
-                      value={i.page}
-                      onChange={(e) => updateItem(idx, "page", e.target.value)}
-                      className="border p-1 rounded text-xs w-20 text-right"
-                    />
-                  </div>
+              {saveComplete ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={resetForMore}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    title="Clear the preview and start a new batch"
+                  >
+                    ➕ Add More Words
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={goToVocabList}
+                    className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+                    title="Go to the vocab list for this book"
+                  >
+                    📄 Go to Vocab List
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </form>
+        </div>
+
+        {message ? (
+  <div className="mb-4">
+    {message.startsWith("❌") ? (
+      <p className="text-red-700 text-base font-medium">{message}</p>
+    ) : (
+      <p className="text-green-700 text-lg font-semibold">{message}</p>
+    )}
+  </div>
+) : null}
+
+        {items.length > 0 && (
+          <>
+            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="text-lg font-medium mb-1">Step 2 — Bulk Apply Info</div>
+              <p className="text-sm text-gray-500 mb-4">
+                Apply page or chapter info to all rows, or just to blanks. You can still edit anything row by row below.
+              </p>
+
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-[160px_1fr_auto_auto] items-center">
+                  <div className="text-sm font-medium text-gray-700">Page number</div>
+                  <input
+                    type="number"
+                    value={bulkPageNumber}
+                    onChange={(e) => setBulkPageNumber(e.target.value)}
+                    placeholder="e.g. 45"
+                    className="border p-2 rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("page", bulkPageNumber, "blank")}
+                    className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Apply to blanks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("page", bulkPageNumber, "all")}
+                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Apply to all
+                  </button>
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-3 md:grid-cols-[160px_1fr_auto_auto] items-center">
+                  <div className="text-sm font-medium text-gray-700">Chapter number</div>
                   <input
-                    value={i.reading}
-                    onChange={(e) => updateItem(idx, "reading", e.target.value)}
-                    className="border p-2 rounded w-full text-sm"
-                    placeholder="Reading"
+                    type="number"
+                    value={bulkChapterNumber}
+                    onChange={(e) => setBulkChapterNumber(e.target.value)}
+                    placeholder="e.g. 3"
+                    className="border p-2 rounded"
                   />
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "blank")}
+                    className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Apply to blanks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "all")}
+                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Apply to all
+                  </button>
+                </div>
 
-                  {i.meaningChoices?.length ? (
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          Definition:{" "}
-                          {i.meaningChoiceIndex == null
-                            ? "Other"
-                            : `${i.meaningChoiceIndex + 1}/${i.meaningChoices.length}`}
-                        </span>
+                <div className="grid gap-3 md:grid-cols-[160px_1fr_auto_auto] items-center">
+                  <div className="text-sm font-medium text-gray-700">Chapter name</div>
+                  <input
+                    type="text"
+                    value={bulkChapterName}
+                    onChange={(e) => setBulkChapterName(e.target.value)}
+                    placeholder="e.g. Summer Festival"
+                    className="border p-2 rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterName", bulkChapterName, "blank")}
+                    className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Apply to blanks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterName", bulkChapterName, "all")}
+                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Apply to all
+                  </button>
+                </div>
+              </div>
 
-                        <select
-                          value={i.meaningChoiceIndex == null ? "other" : String(i.meaningChoiceIndex)}
-                          onChange={(e) => chooseMeaning(idx, e.target.value)}
-                          className="border p-1 rounded text-xs bg-white"
-                          title="Pick which Jisho definition to save as Meaning"
-                        >
-                          {i.meaningChoices.map((m, mi) => (
-                            <option key={mi} value={mi}>
-                              {mi + 1}
-                            </option>
-                          ))}
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
+              <div className="mt-6 border-t pt-4">
+                <div className="text-sm font-medium mb-1">Paste page numbers in order (optional)</div>
+                <p className="text-xs text-gray-500 mb-2">
+                  Paste one per line or copied from a spreadsheet. They’ll be applied to the preview list in order.
+                </p>
 
-                      <textarea
-                        rows={2}
-                        value={i.meaning}
-                        onChange={(e) => updateItem(idx, "meaning", e.target.value)}
-                        className="border p-2 rounded w-full text-sm"
-                        placeholder={i.meaningChoiceIndex == null ? "Type your custom definition" : "Meaning"}
+                <textarea
+                  rows={4}
+                  value={pagePaste}
+                  onChange={(e) => setPagePaste(e.target.value)}
+                  className="border p-2 rounded font-mono text-sm w-full"
+                  placeholder={`10\n10\n11\n11\n12`}
+                />
+
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={applyPastedPages}
+                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Apply pages
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPagePaste("")}
+                    className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+  <h2 className="text-xl font-medium">Step 3 — Review and Save ({items.length})</h2>
+
+  <div className="flex items-center gap-3 flex-wrap">
+    {saveComplete ? (
+      <div className="text-green-700 text-lg font-semibold">
+        {message}
+      </div>
+    ) : null}
+
+    <button
+      type="button"
+      disabled={isSaving}
+      onClick={handleSaveAll}
+      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+    >
+      {isSaving ? "Saving…" : "Save All"}
+    </button>
+  </div>
+</div>
+
+            <ul className="space-y-3">
+              {items.map((i, idx) => (
+                <li key={`${i.surface}_${idx}`} className="border border-slate-200 p-3 rounded-2xl bg-white shadow-sm">
+                  <div className="flex justify-between items-start gap-3 mb-2 flex-wrap">
+                    <span className="font-semibold text-lg">{i.surface}</span>
+
+                    <div className="flex gap-2 flex-wrap">
+                      <input
+                        type="number"
+                        placeholder="Ch #"
+                        value={i.chapterNumber}
+                        onChange={(e) => updateItem(idx, "chapterNumber", e.target.value)}
+                        className="border p-1 rounded text-xs w-16 text-right"
                       />
 
-                      <details className="text-xs text-gray-600">
-                        <summary className="cursor-pointer select-none">Show all definitions</summary>
-                        <ol className="list-decimal ml-5 mt-1 space-y-1">
-                          {i.meaningChoices.map((m, mi) => (
-                            <li key={mi} className={mi === i.meaningChoiceIndex ? "font-medium" : ""}>
-                              {m}
-                            </li>
-                          ))}
-                        </ol>
-                      </details>
+                      <input
+                        type="text"
+                        placeholder="Chapter name"
+                        value={i.chapterName}
+                        onChange={(e) => updateItem(idx, "chapterName", e.target.value)}
+                        className="border p-1 rounded text-xs w-40"
+                      />
+
+                      <input
+                        type="number"
+                        placeholder="Page"
+                        value={i.page}
+                        onChange={(e) => updateItem(idx, "page", e.target.value)}
+                        className="border p-1 rounded text-xs w-20 text-right"
+                      />
                     </div>
-                  ) : (
-                    <>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <input
+                      value={i.reading}
+                      onChange={(e) => updateItem(idx, "reading", e.target.value)}
+                      className="border p-2 rounded w-full text-sm"
+                      placeholder="Reading"
+                    />
+
+                    {i.meaningChoices?.length ? (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">
+                            Definition:{" "}
+                            {i.meaningChoiceIndex == null
+                              ? "Other"
+                              : `${i.meaningChoiceIndex + 1}/${i.meaningChoices.length}`}
+                          </span>
+
+                          <select
+                            value={i.meaningChoiceIndex == null ? "other" : String(i.meaningChoiceIndex)}
+                            onChange={(e) => chooseMeaning(idx, e.target.value)}
+                            className="border p-1 rounded text-xs bg-white"
+                            title="Pick which Jisho definition to save as Meaning"
+                          >
+                            {i.meaningChoices.map((m, mi) => (
+                              <option key={mi} value={mi}>
+                                {mi + 1}
+                              </option>
+                            ))}
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+
+                        <textarea
+                          rows={2}
+                          value={i.meaning}
+                          onChange={(e) => updateItem(idx, "meaning", e.target.value)}
+                          className="border p-2 rounded w-full text-sm"
+                          placeholder={i.meaningChoiceIndex == null ? "Type your custom definition" : "Meaning"}
+                        />
+
+                        <details className="text-xs text-gray-600">
+                          <summary className="cursor-pointer select-none">Show all definitions</summary>
+                          <ol className="list-decimal ml-5 mt-1 space-y-1">
+                            {i.meaningChoices.map((m, mi) => (
+                              <li key={mi} className={mi === i.meaningChoiceIndex ? "font-medium" : ""}>
+                                {m}
+                              </li>
+                            ))}
+                          </ol>
+                        </details>
+                      </div>
+                    ) : (
                       <textarea
                         rows={2}
                         value={i.meaning}
@@ -692,34 +862,77 @@ export default function BulkVocabPage() {
                         className="border p-2 rounded w-full text-sm"
                         placeholder="Meaning"
                       />
-                    </>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                <div className="flex flex-wrap gap-2 text-xs mt-2">
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{normalizeJlpt(i.jlpt)}</span>
+                  <div className="flex flex-wrap gap-2 text-xs mt-2">
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                      {normalizeJlpt(i.jlpt)}
+                    </span>
 
-                  <button
-                    type="button"
-                    onClick={() => updateItem(idx, "isCommon", !i.isCommon)}
-                    className={`px-2 py-1 rounded border ${
-                      i.isCommon ? "bg-green-100 text-green-700 border-green-300" : "bg-gray-100 text-gray-700 border-gray-300"
-                    }`}
-                  >
-                    {i.isCommon ? "Common" : "Rare"}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => updateItem(idx, "isCommon", !i.isCommon)}
+                      className={`px-2 py-1 rounded border ${
+                        i.isCommon
+                          ? "bg-green-100 text-green-700 border-green-300"
+                          : "bg-gray-100 text-gray-700 border-gray-300"
+                      }`}
+                    >
+                      {i.isCommon ? "Common" : "Rare"}
+                    </button>
 
-                  {i.kanjiMeta?.length ? (
-  <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">
-    {i.kanjiMeta.map((s) => `${s.kanji}:${s.strokes ?? "?"}`).join(" / ")} strokes
-  </span>
-) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+                    {i.kanjiMeta?.length ? (
+                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">
+                        {i.kanjiMeta.map((s) => `${s.kanji}:${s.strokes ?? "?"}`).join(" / ")} strokes
+                      </span>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-6">
+  {saveComplete ? (
+    <div className="mb-3 text-green-700 text-lg font-semibold">
+      {message}
+    </div>
+  ) : null}
+
+  <div className="flex flex-wrap gap-3">
+    <button
+      type="button"
+      disabled={isSaving}
+      onClick={handleSaveAll}
+      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+    >
+      {isSaving ? "Saving…" : "Save All"}
+    </button>
+
+    {saveComplete ? (
+      <>
+        <button
+          type="button"
+          onClick={resetForMore}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          ➕ Add More Words
+        </button>
+
+        <button
+          type="button"
+          onClick={goToVocabList}
+          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+        >
+          📄 Go to Vocab List
+        </button>
+      </>
+    ) : null}
+  </div>
+</div>
+          </>
+        )}
+      </div>
     </main>
   );
 }

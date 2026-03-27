@@ -1,4 +1,4 @@
-// Books Home
+// Library
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,6 +15,7 @@ type Book = {
   publisher: string | null;
   isbn13: string | null;
   cover_url: string | null;
+  page_count: number | null;
 };
 
 type UserBookRow = {
@@ -54,6 +55,11 @@ type TeacherPrepItem = {
   studentUsername: string | null;
   message: string;
   alertKey: string;
+};
+
+type ReadingSessionStats = {
+  progressPercent: number | null;
+  averageMinutesPerPage: number | null;
 };
 
 function UserBar({ isTeacher }: { isTeacher: boolean }) {
@@ -109,20 +115,20 @@ function UserBar({ isTeacher }: { isTeacher: boolean }) {
   if (!label) return null;
 
   return isTeacher ? (
-    <div className="flex justify-between items-center mb-4 text-sm text-gray-700">
+    <div className="mb-4 flex items-center justify-between text-sm text-gray-700">
       <span>Logged in as: {label}</span>
       <button
         onClick={handleLogout}
-        className="border px-2 py-1 rounded-md hover:bg-gray-100"
+        className="rounded-md border px-2 py-1 hover:bg-gray-100"
       >
         Log out
       </button>
     </div>
   ) : (
-    <div className="flex justify-end items-center mb-4 text-sm text-gray-700">
+    <div className="mb-4 flex items-center justify-end text-sm text-gray-700">
       <button
         onClick={handleLogout}
-        className="border px-2 py-1 rounded-md hover:bg-gray-100"
+        className="rounded-md border px-2 py-1 hover:bg-gray-100"
       >
         Log out
       </button>
@@ -136,19 +142,12 @@ export default function BooksPage() {
   const routeUsername = params?.username ?? null;
 
   const [rows, setRows] = useState<UserBookRow[]>([]);
+  const [readingStatsByUserBookId, setReadingStatsByUserBookId] = useState<
+  Record<string, ReadingSessionStats>
+>({});
 
   const [alertBox, setAlertBox] = useState<AlertBoxState>(null);
-  const [studentBadge, setStudentBadge] = useState<string | null>(null);
   const [teacherPrepAlerts, setTeacherPrepAlerts] = useState<TeacherPrepItem[]>([]);
-
-  const [finishingUserBookId, setFinishingUserBookId] = useState<string | null>(null);
-  const [finishDate, setFinishDate] = useState("");
-
-  const [startingUserBookId, setStartingUserBookId] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState("");
-
-  const [dnfingUserBookId, setDnfingUserBookId] = useState<string | null>(null);
-  const [dnfDate, setDnfDate] = useState("");
 
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
@@ -158,132 +157,14 @@ export default function BooksPage() {
   const [myRole, setMyRole] = useState<ProfileRole>("student");
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
-  const [includeVocabNotify, setIncludeVocabNotify] = useState(true);
-  const [includeReadingNotify, setIncludeReadingNotify] = useState(true);
 
   const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
-
-  const currentUsernameForLinks = routeUsername ?? myUsername;
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
       ? "Me"
       : students.find((s) => s.id === viewingUserId)?.display_name || "Student";
-
-  const handleNotifyStudent = async (e: React.MouseEvent, userBookId: string) => {
-    e.stopPropagation();
-
-    if (!includeVocabNotify && !includeReadingNotify) {
-      alert("Select at least one: Vocab or Readings.");
-      return;
-    }
-
-    const updates: {
-      notify_banner: boolean;
-      has_new_vocab?: boolean;
-      has_new_reading?: boolean;
-    } = {
-      notify_banner: true,
-    };
-
-    if (includeVocabNotify) updates.has_new_vocab = true;
-    if (includeReadingNotify) updates.has_new_reading = true;
-
-    const { error } = await supabase
-      .from("user_books")
-      .update(updates)
-      .eq("id", userBookId);
-
-    if (error) {
-      console.error("Failed to notify student:", error);
-      alert("Could not notify student.");
-      return;
-    }
-
-    setRows((prev) =>
-      prev.map((row) =>
-        row.id === userBookId
-          ? {
-              ...row,
-              notify_banner: true,
-              has_new_vocab: includeVocabNotify ? true : row.has_new_vocab,
-              has_new_reading: includeReadingNotify ? true : row.has_new_reading,
-            }
-          : row
-      )
-    );
-
-    alert("Student notified.");
-  };
-
-  const openVocabList = async (e: React.MouseEvent, userBookId: string) => {
-    e.stopPropagation();
-
-    await supabase
-      .from("user_books")
-      .update({
-        notify_banner: false,
-        has_new_vocab: false,
-      })
-      .eq("id", userBookId);
-
-    setRows((prev) =>
-      prev.map((row) =>
-        row.id === userBookId
-          ? { ...row, notify_banner: false, has_new_vocab: false }
-          : row
-      )
-    );
-
-    router.push(`/books/${userBookId}/words`);
-  };
-
-  const openStudyVocab = async (e: React.MouseEvent, userBookId: string) => {
-    e.stopPropagation();
-
-    await supabase
-      .from("user_books")
-      .update({
-        notify_banner: false,
-        has_new_vocab: false,
-      })
-      .eq("id", userBookId);
-
-    setRows((prev) =>
-      prev.map((row) =>
-        row.id === userBookId
-          ? { ...row, notify_banner: false, has_new_vocab: false }
-          : row
-      )
-    );
-
-    router.push(`/books/${userBookId}/study`);
-  };
-
-  const openWeeklyReadings = async (e: React.MouseEvent, userBookId: string) => {
-    e.stopPropagation();
-
-    await markAlertSeen();
-
-    await supabase
-      .from("user_books")
-      .update({
-        notify_banner: false,
-        has_new_reading: false,
-      })
-      .eq("id", userBookId);
-
-    setRows((prev) =>
-      prev.map((row) =>
-        row.id === userBookId
-          ? { ...row, notify_banner: false, has_new_reading: false }
-          : row
-      )
-    );
-
-    router.push(`/books/${userBookId}/weekly-readings`);
-  };
 
   function logSbError(prefix: string, err: any) {
     console.error(prefix, err?.message, err?.details, err?.hint, err?.code, err);
@@ -327,7 +208,8 @@ export default function BooksPage() {
             illustrator,
             publisher,
             isbn13,
-            cover_url
+            cover_url,
+            page_count
           )
         `
       )
@@ -342,8 +224,90 @@ export default function BooksPage() {
       return;
     }
 
-    setRows((data as any) || []);
+    const loadedRows = (data as any) || [];
+setRows(loadedRows);
+
+const userBookIds = loadedRows.map((r: any) => r.id);
+const pageCountByUserBookId: Record<string, number | null> = {};
+
+for (const r of loadedRows) {
+  pageCountByUserBookId[r.id] = r.books?.page_count ?? null;
+}
+
+await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
   }
+
+  async function loadReadingStatsForBooks(userBookIds: string[], pageCountByUserBookId: Record<string, number | null>) {
+  if (userBookIds.length === 0) {
+    setReadingStatsByUserBookId({});
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("user_book_reading_sessions")
+    .select("user_book_id, start_page, end_page, minutes_read")
+    .in("user_book_id", userBookIds);
+
+  if (error) {
+    console.error("Error loading reading stats for library:", error);
+    setReadingStatsByUserBookId({});
+    return;
+  }
+
+  const grouped: Record<
+    string,
+    { furthestPage: number; totalPagesRead: number; totalMinutesRead: number }
+  > = {};
+
+  for (const row of data ?? []) {
+    const userBookId = row.user_book_id as string;
+    const startPage = Number((row as any).start_page);
+    const endPage = Number((row as any).end_page);
+    const minutesRead = Number((row as any).minutes_read);
+
+    if (!grouped[userBookId]) {
+      grouped[userBookId] = {
+        furthestPage: 0,
+        totalPagesRead: 0,
+        totalMinutesRead: 0,
+      };
+    }
+
+    grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
+    grouped[userBookId].totalPagesRead += endPage - startPage + 1;
+    grouped[userBookId].totalMinutesRead += minutesRead;
+  }
+
+  const stats: Record<string, ReadingSessionStats> = {};
+
+  for (const userBookId of userBookIds) {
+    const pageCount = pageCountByUserBookId[userBookId];
+    const g = grouped[userBookId];
+
+    if (!g) {
+      stats[userBookId] = {
+        progressPercent: null,
+        averageMinutesPerPage: null,
+      };
+      continue;
+    }
+
+    const progressPercent =
+      pageCount && pageCount > 0
+        ? Math.min(100, Math.round((g.furthestPage / pageCount) * 100))
+        : null;
+
+    const averageMinutesPerPage =
+      g.totalPagesRead > 0 ? g.totalMinutesRead / g.totalPagesRead : null;
+
+    stats[userBookId] = {
+      progressPercent,
+      averageMinutesPerPage,
+    };
+  }
+
+  setReadingStatsByUserBookId(stats);
+}
 
   useEffect(() => {
     let cancelled = false;
@@ -522,27 +486,27 @@ export default function BooksPage() {
 
       if (isTeacher && viewingUserId === meId) {
         const studentIds = students
-  .filter((s) => s.role === "student" && s.id !== meId)
-  .map((s) => s.id);
+          .filter((s) => s.role === "student" && s.id !== meId)
+          .map((s) => s.id);
 
-if (studentIds.length === 0) {
-  setTeacherPrepAlerts([]);
-  setAlertBox(null);
-  return;
-}
+        if (studentIds.length === 0) {
+          setTeacherPrepAlerts([]);
+          setAlertBox(null);
+          return;
+        }
 
-const { data: completedRows, error: completedErr } = await supabase
-  .from("teacher_alert_completions")
-  .select("student_id, alert_key")
-  .eq("teacher_id", meId);
+        const { data: completedRows, error: completedErr } = await supabase
+          .from("teacher_alert_completions")
+          .select("student_id, alert_key")
+          .eq("teacher_id", meId);
 
-if (completedErr) {
-  logSbError("Error loading completed teacher alerts:", completedErr);
-}
+        if (completedErr) {
+          logSbError("Error loading completed teacher alerts:", completedErr);
+        }
 
-const completedSet = new Set(
-  (completedRows ?? []).map((r: any) => `${r.student_id}__${r.alert_key}`)
-);
+        const completedSet = new Set(
+          (completedRows ?? []).map((r: any) => `${r.student_id}__${r.alert_key}`)
+        );
 
         const { data: profiles, error } = await supabase
           .from("profiles")
@@ -557,27 +521,27 @@ const completedSet = new Set(
         }
 
         const prepAlerts: TeacherPrepItem[] = (profiles ?? [])
-  .map((p: any) => {
-    const info = getLessonAlertInfo({
-      lessonDay: p.lesson_day ?? null,
-      isTeacherView: true,
-      studentName: p.display_name ?? null,
-    });
+          .map((p: any) => {
+            const info = getLessonAlertInfo({
+              lessonDay: p.lesson_day ?? null,
+              isTeacherView: true,
+              studentName: p.display_name ?? null,
+            });
 
-    if (!info || info.kind !== "teacher_prepare") return null;
+            if (!info || info.kind !== "teacher_prepare") return null;
 
-    const key = `${p.id}__${info.alertKey}`;
-    if (completedSet.has(key)) return null;
+            const key = `${p.id}__${info.alertKey}`;
+            if (completedSet.has(key)) return null;
 
-    return {
-      studentId: p.id,
-      studentName: p.display_name || "Student",
-      studentUsername: p.username ?? null,
-      message: info.message,
-      alertKey: info.alertKey,
-    };
-  })
-  .filter(Boolean) as TeacherPrepItem[];
+            return {
+              studentId: p.id,
+              studentName: p.display_name || "Student",
+              studentUsername: p.username ?? null,
+              message: info.message,
+              alertKey: info.alertKey,
+            };
+          })
+          .filter(Boolean) as TeacherPrepItem[];
 
         setTeacherPrepAlerts(prepAlerts);
         setAlertBox(null);
@@ -618,126 +582,6 @@ const completedSet = new Set(
     loadAlerts();
   }, [viewingUserId, meId, isTeacher, students]);
 
-  useEffect(() => {
-    const loadSeenState = async () => {
-      if (!alertBox?.showBadge) {
-        setStudentBadge(null);
-        return;
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        setStudentBadge(null);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("user_alert_reads")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("alert_key", alertBox.alertKey)
-        .maybeSingle();
-
-      if (error) {
-        logSbError("Error checking alert seen state:", error);
-        setStudentBadge(alertBox.badgeText);
-        return;
-      }
-
-      setStudentBadge(data ? null : alertBox.badgeText);
-    };
-
-    loadSeenState();
-  }, [alertBox]);
-
-  async function markAlertSeen() {
-    if (!alertBox?.showBadge) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { error } = await supabase.from("user_alert_reads").upsert(
-      {
-        user_id: user.id,
-        alert_key: alertBox.alertKey,
-      },
-      { onConflict: "user_id,alert_key" }
-    );
-
-    if (error) {
-      logSbError("Error marking alert seen:", error);
-      return;
-    }
-
-    setStudentBadge(null);
-  }
-
-  async function saveStartedDate(userBookId: string) {
-    if (!startDate) return;
-
-    const { error } = await supabase
-      .from("user_books")
-      .update({ started_at: startDate })
-      .eq("id", userBookId);
-
-    if (error) {
-      logSbError("Error saving start date:", error);
-      setMessage("Error saving start date.");
-      setMessageType("error");
-      return;
-    }
-
-    setStartingUserBookId(null);
-    setStartDate("");
-    fetchBooks(viewingUserId || meId);
-  }
-
-  async function saveFinishedDate(userBookId: string) {
-    if (!finishDate) return;
-
-    const { error } = await supabase
-      .from("user_books")
-      .update({ finished_at: finishDate, dnf_at: null })
-      .eq("id", userBookId);
-
-    if (error) {
-      logSbError("Error saving finish date:", error);
-      setMessage("Error saving finish date.");
-      setMessageType("error");
-      return;
-    }
-
-    setFinishingUserBookId(null);
-    setFinishDate("");
-    fetchBooks(viewingUserId || meId);
-  }
-
-  async function saveDnfDate(userBookId: string) {
-    if (!dnfDate) return;
-
-    const { error } = await supabase
-      .from("user_books")
-      .update({ dnf_at: dnfDate, finished_at: null })
-      .eq("id", userBookId);
-
-    if (error) {
-      logSbError("Error saving DNF date:", error);
-      setMessage("Error saving DNF date.");
-      setMessageType("error");
-      return;
-    }
-
-    setDnfingUserBookId(null);
-    setDnfDate("");
-    fetchBooks(viewingUserId || meId);
-  }
-
   const validRows = rows.filter((r) => !!r.books);
 
   const currentlyReading = validRows.filter(
@@ -750,7 +594,7 @@ const completedSet = new Set(
   const dnf = validRows.filter((r) => !!r.dnf_at);
 
   const gridClass =
-    "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-2 gap-y-3";
+    "grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
   function Section({
     title,
@@ -765,14 +609,12 @@ const completedSet = new Set(
 
     return (
       <section className="mb-10">
-        <div className="flex items-end justify-between gap-4 mb-3">
+        <div className="mb-3 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-800">
-              {title} <span className="text-gray-500 font-normal">({items.length})</span>
+              {title} <span className="font-normal text-gray-500">({items.length})</span>
             </h2>
-            {subtitle ? (
-              <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
-            ) : null}
+            {subtitle ? <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p> : null}
           </div>
         </div>
 
@@ -785,491 +627,254 @@ const completedSet = new Set(
     const book = row.books;
     if (!book) return null;
 
-    const canStudy = !!row.started_at && !row.finished_at && !row.dnf_at;
-
     return (
       <li
         key={row.id}
-        className="flex flex-col items-center p-2 rounded-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-200/40 cursor-pointer"
+        className="flex flex-col items-center rounded-lg p-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-200/40"
       >
         <a
-  href={`/books/${row.id}`}
-  onClick={(e) => e.stopPropagation()}
-  className="block"
->
+          href={`/books/${row.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="block"
+        >
           {book.cover_url ? (
             <img
               src={book.cover_url}
               alt={`${book.title} cover`}
-              className="w-32 h-48 object-cover rounded-md shadow-md"
+              className="h-48 w-32 rounded-md object-cover shadow-md"
             />
           ) : (
-            <div className="w-32 h-48 bg-gray-200 rounded-md mb-2 flex items-center justify-center text-gray-400 text-sm">
+            <div className="flex h-48 w-32 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-400">
               No cover
             </div>
           )}
         </a>
 
         <a
-  href={`/books/${row.id}`}
-  onClick={(e) => e.stopPropagation()}
-  className="text-center font-medium text-sm underline hover:text-blue-700 mt-2"
->
+          href={`/books/${row.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-2 text-center text-sm font-medium underline hover:text-blue-700"
+        >
           {book.title}
         </a>
 
-        {book.author && <span className="text-gray-600 text-xs">著：{book.author}</span>}
-        {book.translator && (
-          <span className="text-gray-500 text-xs">訳：{book.translator}</span>
-        )}
-        {book.illustrator && (
-          <span className="text-gray-500 text-xs">絵：{book.illustrator}</span>
-        )}
-
-        <div className="mt-1 text-[11px] text-gray-500 text-center">
-          {row.started_at ? (
-            <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
-          ) : startingUserBookId === row.id ? (
-            <div className="mt-1 flex flex-col gap-1 text-[11px]">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border p-1 rounded text-xs"
-                onClick={(e) => e.stopPropagation()}
-              />
-
-              <div className="flex gap-2 justify-center">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    saveStartedDate(row.id);
-                  }}
-                  className="text-blue-600 underline hover:text-blue-800"
-                >
-                  Save
-                </button>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setStartingUserBookId(null);
-                    setStartDate("");
-                  }}
-                  className="text-gray-500 underline hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : !row.finished_at && !row.dnf_at ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setStartingUserBookId(row.id);
-                setStartDate(new Date().toISOString().split("T")[0]);
-              }}
-              className="mt-1 text-[11px] text-blue-600 underline hover:text-blue-800"
-            >
-              Mark as Started
-            </button>
-          ) : null}
-
-          {row.finished_at ? (
-            <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
-          ) : row.dnf_at ? (
-            <div>DNF: {new Date(row.dnf_at).toLocaleDateString()}</div>
-          ) : finishingUserBookId === row.id ? (
-            <div className="mt-1 flex flex-col gap-1 text-[11px]">
-              <input
-                type="date"
-                value={finishDate}
-                onChange={(e) => setFinishDate(e.target.value)}
-                className="border p-1 rounded text-xs"
-                onClick={(e) => e.stopPropagation()}
-              />
-
-              <div className="flex gap-2 justify-center">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    saveFinishedDate(row.id);
-                  }}
-                  className="text-blue-600 underline hover:text-blue-800"
-                >
-                  Save
-                </button>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFinishingUserBookId(null);
-                    setFinishDate("");
-                  }}
-                  className="text-gray-500 underline hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : dnfingUserBookId === row.id ? (
-            <div className="mt-1 flex flex-col gap-1 text-[11px]">
-              <input
-                type="date"
-                value={dnfDate}
-                onChange={(e) => setDnfDate(e.target.value)}
-                className="border p-1 rounded text-xs"
-                onClick={(e) => e.stopPropagation()}
-              />
-
-              <div className="flex gap-2 justify-center">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    saveDnfDate(row.id);
-                  }}
-                  className="text-red-600 underline hover:text-red-800"
-                >
-                  Save DNF
-                </button>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDnfingUserBookId(null);
-                    setDnfDate("");
-                  }}
-                  className="text-gray-500 underline hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : row.started_at ? (
-            <div className="mt-1 flex justify-center gap-4 text-[11px]">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFinishingUserBookId(row.id);
-                  setDnfingUserBookId(null);
-                  setDnfDate("");
-                  setFinishDate(new Date().toISOString().split("T")[0]);
-                }}
-                className="text-blue-600 underline hover:text-blue-800"
-              >
-                Mark as Finished
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDnfingUserBookId(row.id);
-                  setFinishingUserBookId(null);
-                  setFinishDate("");
-                  setDnfDate(new Date().toISOString().split("T")[0]);
-                }}
-                className="text-red-600 underline hover:text-red-800"
-              >
-                Mark as DNF
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mt-2 flex flex-col items-center gap-2 w-full">
-          <div className="text-[10px] uppercase tracking-wide text-gray-500">
-            Read → Review → Practice
-          </div>
-
-          <div className="w-full flex flex-col items-center gap-2">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-              Student Tools
-            </div>
-
-            <button
-              onClick={(e) => openVocabList(e, row.id)}
-              className="w-full max-w-[160px] inline-flex items-center justify-center gap-2 text-center text-[12px] px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-            >
-              <span>Vocab List</span>
-              {row.has_new_vocab ? (
-                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                  New
-                </span>
-              ) : null}
-            </button>
-
-            {canStudy ? (
-              <>
-                <button
-                  onClick={(e) => openStudyVocab(e, row.id)}
-                  className="w-full max-w-[160px] inline-flex items-center justify-center gap-2 text-center text-[12px] px-3 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition"
-                >
-                  <span>Study Vocab</span>
-                  {row.has_new_vocab ? (
-                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      New
-                    </span>
-                  ) : null}
-                </button>
-
-                <button
-                  onClick={(e) => openWeeklyReadings(e, row.id)}
-                  className="w-full max-w-[160px] inline-flex items-center justify-center gap-2 text-center text-[12px] px-3 py-2 bg-purple-700 text-white rounded hover:bg-purple-800 transition"
-                >
-                  <span>Practice Readings</span>
-                  {row.has_new_reading ? (
-                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      New
-                    </span>
-                  ) : studentBadge ? (
-                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      {studentBadge}
-                    </span>
-                  ) : null}
-                </button>
-              </>
-            ) : null}
-          </div>
-
-          {isTeacher && canStudy ? (
-            <div className="w-full flex flex-col items-center gap-2 pt-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                Teacher Tools
-              </div>
-
-              <a
-                href={`/vocab/bulk?userBookId=${row.id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
-              >
-                Add Vocab
-              </a>
-
-              <a
-                href={`/books/${row.id}/weekly-readings/prepare`}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800 transition"
-              >
-                Prepare Readings
-              </a>
-
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-[11px] text-gray-700"
-              >
-                <div className="font-semibold text-[10px] uppercase tracking-wide text-gray-500 mb-2">
-                  Notify Includes
-                </div>
-
-                <label className="flex items-center gap-2 mb-1 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeVocabNotify}
-                    onChange={(e) => setIncludeVocabNotify(e.target.checked)}
-                  />
-                  <span>Vocab</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeReadingNotify}
-                    onChange={(e) => setIncludeReadingNotify(e.target.checked)}
-                  />
-                  <span>Readings</span>
-                </label>
-              </div>
-
-              <button
-                onClick={(e) => handleNotifyStudent(e, row.id)}
-                className="w-full max-w-[160px] text-center text-[12px] px-3 py-2 bg-pink-700 text-white rounded hover:bg-pink-800 transition"
-              >
-                Notify Student
-              </button>
-            </div>
-          ) : null}
-        </div>
+        <div className="mt-2 w-full text-center">
+  {row.finished_at ? (
+    <div className="space-y-1 text-[11px] text-gray-500">
+      {row.started_at ? (
+        <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
+      ) : null}
+      <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
+      <div>
+        Avg:{" "}
+        {readingStatsByUserBookId[row.id]?.averageMinutesPerPage != null
+          ? `${readingStatsByUserBookId[row.id].averageMinutesPerPage!.toFixed(2)} min/page`
+          : "—"}
+      </div>
+    </div>
+  ) : row.dnf_at ? (
+    <div className="text-[11px] text-gray-400">
+      DNF: {new Date(row.dnf_at).toLocaleDateString()}
+    </div>
+  ) : row.started_at ? (
+    <div className="text-[11px] text-gray-600">
+      {readingStatsByUserBookId[row.id]?.progressPercent != null
+        ? `${readingStatsByUserBookId[row.id].progressPercent}%`
+        : "In progress"}
+    </div>
+  ) : (
+    <div className="text-[11px] text-gray-400">Not started</div>
+  )}
+</div>
       </li>
     );
   }
 
   return (
-    <main className="min-h-screen p-8 bg-stone-50">
-      <h1 className="text-2xl font-semibold mb-2">
-        📚 {viewingLabel === "Me" ? "My Books" : `${viewingLabel}'s Books`}
-      </h1>
+    <main className="min-h-screen bg-slate-100 px-6 py-8">
+      <div className="mx-auto max-w-screen-xl">
+        <h1 className="mb-2 text-2xl font-semibold">
+          📚 {viewingLabel === "Me" ? "My Library" : `${viewingLabel}'s Library`}
+        </h1>
 
-      <UserBar isTeacher={isTeacher} />
-
-      {isTeacher && viewingUserId === meId && teacherPrepAlerts.length > 0 ? (
-        <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
-          <div className="text-sm font-semibold text-slate-800">📚 TEACHER REMINDERS</div>
-
-          <div className="mt-2 flex flex-col gap-2">
-            {teacherPrepAlerts.map((item) => (
-  <div key={item.studentId} className="flex items-start justify-between gap-3">
-    <button
-      type="button"
-      onClick={() => {
-        if (item.studentUsername) {
-          router.push(`/users/${item.studentUsername}/books`);
-        } else {
-          setViewingUserId(item.studentId);
-        }
-      }}
-      className="text-left text-sm leading-6 text-slate-700 hover:text-slate-900 underline underline-offset-2"
-    >
-      {item.message}
-    </button>
-
-    <button
-      type="button"
-      onClick={async () => {
-        const { error } = await supabase
-          .from("teacher_alert_completions")
-          .upsert(
-            {
-              teacher_id: meId,
-              student_id: item.studentId,
-              alert_key: item.alertKey,
-            },
-            { onConflict: "teacher_id,student_id,alert_key" }
-          );
-
-        if (error) {
-          logSbError("Error saving teacher alert completion:", error);
-          return;
-        }
-
-        setTeacherPrepAlerts((prev) =>
-          prev.filter(
-            (a) =>
-              !(
-                a.studentId === item.studentId &&
-                a.alertKey === item.alertKey
-              )
-          )
-        );
-      }}
-      className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
-    >
-      Done
-    </button>
-  </div>
-))}
-          </div>
-        </div>
-      ) : null}
-
-      {alertBox ? (
-        <div className="mt-5 mb-6 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm max-w-2xl">
-          <div className="text-sm font-semibold text-slate-800">{alertBox.title}</div>
-          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">
-            {alertBox.message}
-          </p>
-        </div>
-      ) : null}
-
-      {hasAnyNotifyBanner ? (
-        <div className="mt-5 mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm max-w-2xl">
-          <div className="text-sm font-semibold text-amber-900">
-            ✨ New study material is available
-          </div>
-          <p className="mt-2 text-sm leading-6 text-amber-800">
-            New vocabulary and/or reading has been added.
-          </p>
-        </div>
-      ) : null}
-
-      {isTeacher ? (
-        <div className="mb-4 flex flex-col gap-2">
-          <div className="text-sm text-gray-700">
-            Viewing: <span className="font-medium">{viewingLabel}</span>
-          </div>
-
-          <div className="text-xs text-gray-400">viewingUserId: {viewingUserId}</div>
-
-          <select
-            value={viewingUserId || meId}
-            onChange={(e) => {
-              const nextUserId = e.target.value;
-
-              if (nextUserId === meId) {
-                router.push(`/users/${myUsername}/books`);
-                return;
-              }
-
-              const selectedUser = students.find((s) => s.id === nextUserId);
-
-              if (selectedUser?.username) {
-                router.push(`/users/${selectedUser.username}/books`);
-              } else {
-                setViewingUserId(nextUserId);
-              }
-            }}
-            className="border p-2 rounded w-full bg-white"
-            disabled={!meId}
-          >
-            <option value={meId}>Me</option>
-
-            {students.some((s) => s.role === "student" && s.id !== meId) ? (
-              <optgroup label="Students">
-                {students
-                  .filter((s) => s.role === "student" && s.id !== meId)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.display_name}
-                      {s.level ? ` (${s.level})` : ""}
-                    </option>
-                  ))}
-              </optgroup>
-            ) : null}
-
-            {students.some((s) => s.role === "teacher" && s.id !== meId) ? (
-              <optgroup label="Teachers">
-                {students
-                  .filter((s) => s.role === "teacher" && s.id !== meId)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.display_name}
-                    </option>
-                  ))}
-              </optgroup>
-            ) : null}
-          </select>
-        </div>
-      ) : null}
-
-      {message ? (
-        <p
-          className={`mb-4 text-sm ${
-            messageType === "error" ? "text-red-600" : "text-green-700"
-          }`}
-        >
-          {message}
+        <p className="mb-4 text-sm text-gray-600">
+          All study tools live inside each book. Click a cover to open the Book Hub.
         </p>
-      ) : null}
 
-      <Section
-        title="Currently Reading"
-        subtitle="Started but not finished yet"
-        items={currentlyReading}
-      />
-      <Section
-        title="Want to Read"
-        subtitle="Not started yet • Study buttons will appear once marked started."
-        items={notStarted}
-      />
-      <Section
-        title="Finished"
-        subtitle="Completed books • Study buttons can be found in Vocab List."
-        items={finished}
-      />
-      <Section title="DNF" subtitle="Did not finish" items={dnf} />
+        <UserBar isTeacher={isTeacher} />
 
-      {validRows.length === 0 ? (
-        <div className="text-sm text-gray-600 mt-8">No books yet.</div>
-      ) : null}
+        {isTeacher && viewingUserId === meId && teacherPrepAlerts.length > 0 ? (
+          <div className="mt-5 mb-6 max-w-2xl rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm">
+            <div className="text-sm font-semibold text-slate-800">📚 TEACHER REMINDERS</div>
+
+            <div className="mt-2 flex flex-col gap-2">
+              {teacherPrepAlerts.map((item) => (
+                <div key={item.studentId} className="flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (item.studentUsername) {
+                        router.push(`/users/${item.studentUsername}/books`);
+                      } else {
+                        setViewingUserId(item.studentId);
+                      }
+                    }}
+                    className="text-left text-sm leading-6 text-slate-700 underline underline-offset-2 hover:text-slate-900"
+                  >
+                    {item.message}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from("teacher_alert_completions")
+                        .upsert(
+                          {
+                            teacher_id: meId,
+                            student_id: item.studentId,
+                            alert_key: item.alertKey,
+                          },
+                          { onConflict: "teacher_id,student_id,alert_key" }
+                        );
+
+                      if (error) {
+                        logSbError("Error saving teacher alert completion:", error);
+                        return;
+                      }
+
+                      setTeacherPrepAlerts((prev) =>
+                        prev.filter(
+                          (a) =>
+                            !(
+                              a.studentId === item.studentId &&
+                              a.alertKey === item.alertKey
+                            )
+                        )
+                      );
+                    }}
+                    className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                  >
+                    Done
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {alertBox ? (
+          <div className="mt-5 mb-6 max-w-2xl rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm">
+            <div className="text-sm font-semibold text-slate-800">{alertBox.title}</div>
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">
+              {alertBox.message}
+            </p>
+          </div>
+        ) : null}
+
+        {hasAnyNotifyBanner ? (
+          <div className="mt-5 mb-6 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm">
+            <div className="text-sm font-semibold text-amber-900">
+              ✨ New study material is available
+            </div>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              New vocabulary and/or reading has been added.
+            </p>
+          </div>
+        ) : null}
+
+        {isTeacher ? (
+          <div className="mb-4 flex flex-col gap-2">
+            <div className="text-sm text-gray-700">
+              Viewing: <span className="font-medium">{viewingLabel}</span>
+            </div>
+
+            <select
+              value={viewingUserId || meId}
+              onChange={(e) => {
+                const nextUserId = e.target.value;
+
+                if (nextUserId === meId) {
+                  router.push(`/users/${myUsername}/books`);
+                  return;
+                }
+
+                const selectedUser = students.find((s) => s.id === nextUserId);
+
+                if (selectedUser?.username) {
+                  router.push(`/users/${selectedUser.username}/books`);
+                } else {
+                  setViewingUserId(nextUserId);
+                }
+              }}
+              className="w-full rounded border bg-white p-2"
+              disabled={!meId}
+            >
+              <option value={meId}>Me</option>
+
+              {students.some((s) => s.role === "student" && s.id !== meId) ? (
+                <optgroup label="Students">
+                  {students
+                    .filter((s) => s.role === "student" && s.id !== meId)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.display_name}
+                        {s.level ? ` (${s.level})` : ""}
+                      </option>
+                    ))}
+                </optgroup>
+              ) : null}
+
+              {students.some((s) => s.role === "teacher" && s.id !== meId) ? (
+                <optgroup label="Teachers">
+                  {students
+                    .filter((s) => s.role === "teacher" && s.id !== meId)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.display_name}
+                      </option>
+                    ))}
+                </optgroup>
+              ) : null}
+            </select>
+          </div>
+        ) : null}
+
+        {message ? (
+          <p
+            className={`mb-4 text-sm ${
+              messageType === "error" ? "text-red-600" : "text-green-700"
+            }`}
+          >
+            {message}
+          </p>
+        ) : null}
+
+        <Section
+          title="Currently Reading"
+          subtitle="Started but not finished yet"
+          items={currentlyReading}
+        />
+        <Section
+          title="Want to Read"
+          subtitle="Not started yet"
+          items={notStarted}
+        />
+        <Section
+          title="Finished"
+          subtitle="Completed books"
+          items={finished}
+        />
+        <Section
+          title="DNF"
+          subtitle="Did not finish"
+          items={dnf}
+        />
+
+        {validRows.length === 0 ? (
+          <div className="mt-8 text-sm text-gray-600">No books yet.</div>
+        ) : null}
+      </div>
     </main>
   );
 }

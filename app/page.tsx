@@ -6,17 +6,19 @@ export default function HomePage() {
   const router = useRouter();
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-8 p-8 text-center">
+    <div className="flex flex-col items-center gap-10 py-12 px-6 text-center">
       <img
         src="/mekuru-banner.png"
         alt="MEKURU banner"
-        className="w-full max-w-4xl rounded-xl object-cover"
+        className="w-full max-w-2xl rounded-xl object-cover"
       />
 
-      <div>
+      <div className="max-w-xl">
         <h1 className="text-3xl font-semibold">Welcome to MEKURU</h1>
-        <p className="text-gray-500 mt-2">
-          Every word carries the memory of where you met it. ぺーじをめくって、話まくろう！
+        <p className="text-gray-500 mt-3">
+          Every word carries the memory of where you met it.
+          <br />
+          ページをめくって、話しまくろう！
         </p>
       </div>
 
@@ -42,6 +44,6 @@ export default function HomePage() {
           View My Study Stats
         </button>
       </div>
-    </main>
+    </div>
   );
 }
