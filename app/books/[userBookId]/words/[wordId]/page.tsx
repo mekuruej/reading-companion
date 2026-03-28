@@ -290,6 +290,9 @@ export default function WordDetailPage() {
 
   const [repeatsInThisBook, setRepeatsInThisBook] = useState<number>(1);
   const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
+  const [kanjiWords, setKanjiWords] = useState<
+    { word: string; reading: string; meaning: string }[]
+  >([]);
   const totalLookupCount = seenInstances.length;
 
   async function loadAll() {
@@ -438,6 +441,44 @@ export default function WordDetailPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    async function fetchKanjiWords() {
+      if (!word?.surface) return;
+
+      const firstKanji = word.surface.match(/[一-龯]/)?.[0];
+      if (!firstKanji) {
+        setKanjiWords([]);
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/jisho?keyword=${encodeURIComponent(firstKanji)}`
+        );
+        const data = await res.json();
+
+        const results = (data?.data ?? [])
+          .slice(0, 3)
+          .map((item: any) => ({
+            word:
+              item.japanese?.[0]?.word ??
+              item.japanese?.[0]?.reading ??
+              "",
+            reading: item.japanese?.[0]?.reading ?? "",
+            meaning:
+              item.senses?.[0]?.english_definitions?.join(", ") ?? "",
+          }));
+
+        setKanjiWords(results);
+      } catch (e) {
+        console.error("kanji words fetch failed", e);
+        setKanjiWords([]);
+      }
+    }
+
+    fetchKanjiWords();
+  }, [word?.surface]);
 
   useEffect(() => {
     if (!userBookId || !wordId) return;
@@ -618,6 +659,20 @@ export default function WordDetailPage() {
         </div>
       </section>
 
+      {!isTeacher && (
+        <div className="mt-4">
+          <button
+            onClick={() => {
+              // placeholder for now
+              alert("Thanks! Your teacher will review this word.");
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            Something seems off?
+          </button>
+        </div>
+      )}
+      
       {/* Related Information */}
       {(() => {
         const firstKanji = word.surface?.match(/[一-龯]/)?.[0];
@@ -638,9 +693,25 @@ export default function WordDetailPage() {
                 </span>
               </div>
 
-              <div className="text-sm text-gray-500">
-                (Coming soon)
-              </div>
+              {kanjiWords.length === 0 ? (
+                <div className="text-sm text-gray-500">
+                  No related words found.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {kanjiWords.map((kw, i) => (
+                    <div key={`${kw.word}-${i}`} className="text-sm">
+                      <span className="font-medium text-stone-900">{kw.word}</span>
+                      {kw.reading ? (
+                        <span className="ml-2 text-stone-600">（{kw.reading}）</span>
+                      ) : null}
+                      {kw.meaning ? (
+                        <div className="text-stone-500 mt-0.5">{kw.meaning}</div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Other meanings (placeholder for now) */}
