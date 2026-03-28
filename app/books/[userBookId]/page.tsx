@@ -234,18 +234,20 @@ export default function BookHubPage() {
   const [characters, setCharacters] = useState<Character[]>([]);
 
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
-const [showAllSessions, setShowAllSessions] = useState(false);
-const [sessionDate, setSessionDate] = useState<string>(
-  new Date().toISOString().split("T")[0]
-);
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const [sessionDate, setSessionDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
 
-const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
-const [showChapterSummaries, setShowChapterSummaries] = useState(true);
+  const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
+  const [showChapterSummaries, setShowChapterSummaries] = useState(true);
+  const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
+  const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
+  const [savedChapterIds, setSavedChapterIds] = useState<string[]>([]);
 
-const [sessionStartPage, setSessionStartPage] = useState<string>("");
-const [sessionEndPage, setSessionEndPage] = useState<string>("");
-const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
-
+  const [sessionStartPage, setSessionStartPage] = useState<string>("");
+  const [sessionEndPage, setSessionEndPage] = useState<string>("");
+  const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
 
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
@@ -259,11 +261,7 @@ const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
   }, [started, finished]);
 
   const totalPagesRead = useMemo(
-    () =>
-      readingSessions.reduce(
-        (sum, s) => sum + (s.end_page - s.start_page + 1),
-        0
-      ),
+    () => readingSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0),
     [readingSessions]
   );
 
@@ -273,17 +271,12 @@ const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
   );
 
   const totalTimedMinutes = useMemo(
-    () =>
-      timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0),
+    () => timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0),
     [timedSessions]
   );
 
   const totalTimedPages = useMemo(
-    () =>
-      timedSessions.reduce(
-        (sum, s) => sum + (s.end_page - s.start_page + 1),
-        0
-      ),
+    () => timedSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0),
     [timedSessions]
   );
 
@@ -303,55 +296,74 @@ const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
   }, [book?.page_count, furthestPage]);
 
   const lastReadDate = useMemo(() => {
-  if (readingSessions.length === 0) return null;
-  return readingSessions[0]?.read_on ?? null;
-}, [readingSessions]);
+    if (readingSessions.length === 0) return null;
+    return readingSessions[0]?.read_on ?? null;
+  }, [readingSessions]);
 
-const visibleReadingSessions = useMemo(() => {
-  return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
-}, [readingSessions, showAllSessions]);
+  const visibleReadingSessions = useMemo(() => {
+    return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
+  }, [readingSessions, showAllSessions]);
 
-function addChapterSummary() {
-  if (!row?.id) return;
+  function addChapterSummary() {
+    if (!row?.id) return;
 
-  setChapterSummaries((prev) => [
-    ...prev,
-    {
-      id: `new-${Date.now()}`,
-      user_book_id: row.id,
-      chapter_number: null,
-      chapter_title: "",
-      summary: "",
-      sort_order: prev.length,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ]);
-}
+    const newId = `new-${Date.now()}`;
 
-function updateChapterSummary(
-  id: string,
-  field: keyof ChapterSummary,
-  value: string
-) {
-  setChapterSummaries((prev) =>
-    prev.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            [field]:
-              field === "chapter_number" || field === "sort_order"
-                ? value === ""
-                  ? null
-                  : Number(value)
-                : value,
-          }
-        : item
-    )
-  );
-}
+    setChapterSummaries((prev) => [
+      ...prev,
+      {
+        id: newId,
+        user_book_id: row.id,
+        chapter_number: null,
+        chapter_title: "",
+        summary: "",
+        sort_order: prev.length,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]);
 
-function addCharacter() {
+    setEditingChapterIds((prev) => [...prev, newId]);
+  }
+
+  function updateChapterSummary(
+    id: string,
+    field: keyof ChapterSummary,
+    value: string
+  ) {
+    setChapterSummaries((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              [field]:
+                field === "chapter_number" || field === "sort_order"
+                  ? value === ""
+                    ? null
+                    : Number(value)
+                  : value,
+            }
+          : item
+      )
+    );
+  }
+
+  function startEditingChapter(id: string) {
+    setEditingChapterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }
+
+  function stopEditingChapter(id: string) {
+    setEditingChapterIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function markChapterSaved(id: string) {
+    setSavedChapterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    window.setTimeout(() => {
+      setSavedChapterIds((prev) => prev.filter((x) => x !== id));
+    }, 1800);
+  }
+
+  function addCharacter() {
     setCharacters((prev) => [
       ...prev,
       { id: makeId(), name: "", reading: "", role: "", notes: "" },
@@ -386,24 +398,25 @@ function addCharacter() {
   }
 
   async function loadChapterSummaries(userBookIdValue: string) {
-  const { data, error } = await supabase
-    .from("user_book_chapter_summaries")
-    .select(
-      "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
-    )
-    .eq("user_book_id", userBookIdValue)
-    .order("sort_order", { ascending: true })
-    .order("chapter_number", { ascending: true })
-    .order("created_at", { ascending: true });
+    const { data, error } = await supabase
+      .from("user_book_chapter_summaries")
+      .select(
+        "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
+      )
+      .eq("user_book_id", userBookIdValue)
+      .order("sort_order", { ascending: true })
+      .order("chapter_number", { ascending: true })
+      .order("created_at", { ascending: true });
 
-  if (error) {
-    console.error("Error loading chapter summaries:", error);
-    setChapterSummaries([]);
-    return;
+    if (error) {
+      console.error("Error loading chapter summaries:", error);
+      setChapterSummaries([]);
+      return;
+    }
+
+    setChapterSummaries((data as ChapterSummary[]) ?? []);
   }
 
-  setChapterSummaries((data as ChapterSummary[]) ?? []);
-}
   async function deleteReadingSession(sessionId: string) {
     const ok = window.confirm("Delete this reading session?");
     if (!ok) return;
@@ -427,175 +440,201 @@ function addCharacter() {
       return;
     }
 
-    
-
     if (row?.id) {
       await loadReadingSessions(row.id);
     }
   }
 
   const renderSessionToggle = () => {
-  if (readingSessions.length <= 3) return null;
+    if (readingSessions.length <= 3) return null;
 
-  return (
-    <button
-      type="button"
-      onClick={() => setShowAllSessions((prev) => !prev)}
-      className="text-sm font-medium text-stone-600 underline underline-offset-4 hover:text-stone-900"
-    >
-      {showAllSessions ? "Show less" : `View all (${readingSessions.length})`}
-    </button>
-  );
-};
-
-async function saveChapterSummary(item: ChapterSummary) {
-  if (!row?.id) return;
-
-  const payload = {
-    user_book_id: row.id,
-    chapter_number: item.chapter_number,
-    chapter_title: item.chapter_title?.trim() || null,
-    summary: item.summary.trim(),
-    sort_order: item.sort_order ?? 0,
+    return (
+      <button
+        type="button"
+        onClick={() => setShowAllSessions((prev) => !prev)}
+        className="text-sm font-medium text-stone-600 underline underline-offset-4 hover:text-stone-900"
+      >
+        {showAllSessions ? "Show less" : `View all (${readingSessions.length})`}
+      </button>
+    );
   };
 
-  if (!payload.summary) {
-    alert("Please write a short summary before saving.");
-    return;
-  }
+  async function saveChapterSummary(item: ChapterSummary) {
+    if (!row?.id) return;
 
-  if (item.id.startsWith("new-")) {
+    const payload = {
+      user_book_id: row.id,
+      chapter_number: item.chapter_number,
+      chapter_title: item.chapter_title?.trim() || null,
+      summary: item.summary.trim(),
+      sort_order: item.sort_order ?? 0,
+    };
+
+    if (!payload.summary) {
+      alert("Please write a short summary before saving.");
+      return;
+    }
+
+    setSavingChapterIds((prev) => [...prev, item.id]);
+
+    if (item.id.startsWith("new-")) {
+      const oldId = item.id;
+
+      const { data, error } = await supabase
+        .from("user_book_chapter_summaries")
+        .insert(payload)
+        .select(
+          "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
+        )
+        .single();
+
+      setSavingChapterIds((prev) => prev.filter((x) => x !== oldId));
+
+      if (error) {
+        console.error("Error creating chapter summary:", error);
+        alert("Could not save chapter summary.");
+        return;
+      }
+
+      const saved = data as ChapterSummary;
+
+      setChapterSummaries((prev) =>
+        prev.map((x) => (x.id === oldId ? saved : x))
+      );
+
+      setEditingChapterIds((prev) =>
+        prev.map((x) => (x === oldId ? saved.id : x))
+      );
+
+      stopEditingChapter(saved.id);
+      markChapterSaved(saved.id);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("user_book_chapter_summaries")
-      .insert(payload)
+      .update(payload)
+      .eq("id", item.id)
       .select(
         "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
       )
       .single();
 
+    setSavingChapterIds((prev) => prev.filter((x) => x !== item.id));
+
     if (error) {
-      console.error("Error creating chapter summary:", error);
-      alert("Could not save chapter summary.");
+      console.error("Error updating chapter summary:", error);
+      alert("Could not update chapter summary.");
       return;
     }
 
+    const saved = data as ChapterSummary;
+
     setChapterSummaries((prev) =>
-      prev.map((x) => (x.id === item.id ? (data as ChapterSummary) : x))
+      prev.map((x) => (x.id === item.id ? saved : x))
     );
-    return;
+
+    stopEditingChapter(saved.id);
+    markChapterSaved(saved.id);
   }
 
-  const { data, error } = await supabase
-    .from("user_book_chapter_summaries")
-    .update(payload)
-    .eq("id", item.id)
-    .select(
-      "id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at"
-    )
-    .single();
+  async function deleteChapterSummary(id: string) {
+    if (id.startsWith("new-")) {
+      setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
+      setEditingChapterIds((prev) => prev.filter((x) => x !== id));
+      setSavingChapterIds((prev) => prev.filter((x) => x !== id));
+      setSavedChapterIds((prev) => prev.filter((x) => x !== id));
+      return;
+    }
 
-  if (error) {
-    console.error("Error updating chapter summary:", error);
-    alert("Could not update chapter summary.");
-    return;
-  }
+    const ok = window.confirm("Delete this chapter summary?");
+    if (!ok) return;
 
-  setChapterSummaries((prev) =>
-    prev.map((x) => (x.id === item.id ? (data as ChapterSummary) : x))
-  );
-}
+    const { error } = await supabase
+      .from("user_book_chapter_summaries")
+      .delete()
+      .eq("id", id);
 
-async function deleteChapterSummary(id: string) {
-  if (id.startsWith("new-")) {
+    if (error) {
+      console.error("Error deleting chapter summary:", error);
+      alert("Could not delete chapter summary.");
+      return;
+    }
+
     setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
-    return;
+    setEditingChapterIds((prev) => prev.filter((x) => x !== id));
+    setSavingChapterIds((prev) => prev.filter((x) => x !== id));
+    setSavedChapterIds((prev) => prev.filter((x) => x !== id));
   }
-
-  const ok = window.confirm("Delete this chapter summary?");
-  if (!ok) return;
-
-  const { error } = await supabase
-    .from("user_book_chapter_summaries")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting chapter summary:", error);
-    alert("Could not delete chapter summary.");
-    return;
-  }
-
-  setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
-}
 
   async function saveReadingSession() {
-  if (!row?.id) return;
+    if (!row?.id) return;
 
-  const start = Number(sessionStartPage);
-  const end = Number(sessionEndPage);
-  const minutes =
-    sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
+    const start = Number(sessionStartPage);
+    const end = Number(sessionEndPage);
+    const minutes =
+      sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
 
-  if (!sessionDate || !Number.isFinite(start) || !Number.isFinite(end)) {
-    alert("Please fill in date, start page, and end page.");
-    return;
-  }
+    if (!sessionDate || !Number.isFinite(start) || !Number.isFinite(end)) {
+      alert("Please fill in date, start page, and end page.");
+      return;
+    }
 
-  if (start <= 0 || end <= 0) {
-    alert("Pages must be greater than 0.");
-    return;
-  }
+    if (start <= 0 || end <= 0) {
+      alert("Pages must be greater than 0.");
+      return;
+    }
 
-  if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
-    alert("Minutes must be greater than 0 if provided.");
-    return;
-  }
+    if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
+      alert("Minutes must be greater than 0 if provided.");
+      return;
+    }
 
-  if (end < start) {
-    alert("End page must be greater than or equal to start page.");
-    return;
-  }
+    if (end < start) {
+      alert("End page must be greater than or equal to start page.");
+      return;
+    }
 
-  const newSession = {
-    user_book_id: row.id,
-    read_on: sessionDate,
-    start_page: start,
-    end_page: end,
-    minutes_read: minutes,
-  };
+    const newSession = {
+      user_book_id: row.id,
+      read_on: sessionDate,
+      start_page: start,
+      end_page: end,
+      minutes_read: minutes,
+    };
 
-  const { data, error } = await supabase
-    .from("user_book_reading_sessions")
-    .insert(newSession)
-    .select()
-    .single();
+    const { data, error } = await supabase
+      .from("user_book_reading_sessions")
+      .insert(newSession)
+      .select()
+      .single();
 
-  if (error) {
-    console.error("Error saving reading session:", {
-      message: (error as any)?.message,
-      details: (error as any)?.details,
-      hint: (error as any)?.hint,
-      code: (error as any)?.code,
-      raw: error,
-    });
-    alert(
-      `Could not save reading session.\n${(error as any)?.message || "Unknown error"}`
+    if (error) {
+      console.error("Error saving reading session:", {
+        message: (error as any)?.message,
+        details: (error as any)?.details,
+        hint: (error as any)?.hint,
+        code: (error as any)?.code,
+        raw: error,
+      });
+      alert(
+        `Could not save reading session.\n${(error as any)?.message || "Unknown error"}`
+      );
+      return;
+    }
+
+    setReadingSessions((prev) =>
+      [data as ReadingSession, ...prev].sort((a, b) => {
+        const dateCompare = b.read_on.localeCompare(a.read_on);
+        if (dateCompare !== 0) return dateCompare;
+        return b.created_at.localeCompare(a.created_at);
+      })
     );
-    return;
+
+    setSessionStartPage("");
+    setSessionEndPage("");
+    setSessionMinutesRead("");
   }
-
-  setReadingSessions((prev) =>
-    [data as ReadingSession, ...prev].sort((a, b) => {
-      const dateCompare = b.read_on.localeCompare(a.read_on);
-      if (dateCompare !== 0) return dateCompare;
-      return b.created_at.localeCompare(a.created_at);
-    })
-  );
-
-  setSessionStartPage("");
-  setSessionEndPage("");
-  setSessionMinutesRead("");
-}
 
   const loadUniqueLookupCount = async (id: string) => {
     const { data, error } = await supabase
@@ -1302,9 +1341,7 @@ async function deleteChapterSummary(id: string) {
                       <div className="rounded border bg-white p-3 sm:col-span-2">
                         <div className="text-stone-600">Average minutes per page</div>
                         <div className="mt-1 font-medium">
-                          {averageMinutesPerPage != null
-                            ? averageMinutesPerPage.toFixed(2)
-                            : "—"}
+                          {averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(2) : "—"}
                         </div>
                       </div>
                     </div>
@@ -1449,55 +1486,53 @@ async function deleteChapterSummary(id: string) {
                     <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
 
                     {readingSessions.length === 0 ? (
-  <div className="text-sm text-stone-500">No sessions yet.</div>
-) : (
-  <>
-    {showAllSessions && (
-  <div className="mb-3">
-    {renderSessionToggle()}
-  </div>
-)}
+                      <div className="text-sm text-stone-500">No sessions yet.</div>
+                    ) : (
+                      <>
+                        {showAllSessions && (
+                          <div className="mb-3">
+                            {renderSessionToggle()}
+                          </div>
+                        )}
 
-<div className="space-y-2">
-      {visibleReadingSessions.map((session) => {
-        const pagesRead = session.end_page - session.start_page + 1;
+                        <div className="space-y-2">
+                          {visibleReadingSessions.map((session) => {
+                            const pagesRead = session.end_page - session.start_page + 1;
 
-        return (
-          <div
-            key={session.id}
-            className="rounded-xl border bg-white p-3 text-sm text-stone-700"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{session.read_on}</div>
-                <div className="mt-1">
-                  p. {session.start_page} → {session.end_page}
-                </div>
-                <div className="mt-1 text-stone-500">
-                  {session.minutes_read != null
-                    ? `${session.minutes_read} min · ${pagesRead} pages`
-                    : `Untimed · ${pagesRead} pages`}
-                </div>
-              </div>
+                            return (
+                              <div
+                                key={session.id}
+                                className="rounded-xl border bg-white p-3 text-sm text-stone-700"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <div className="font-medium">{session.read_on}</div>
+                                    <div className="mt-1">
+                                      p. {session.start_page} → {session.end_page}
+                                    </div>
+                                    <div className="mt-1 text-stone-500">
+                                      {session.minutes_read != null
+                                        ? `${session.minutes_read} min · ${pagesRead} pages`
+                                        : `Untimed · ${pagesRead} pages`}
+                                    </div>
+                                  </div>
 
-              <button
-                type="button"
-                onClick={() => deleteReadingSession(session.id)}
-                className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteReadingSession(session.id)}
+                                    className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
 
-    <div className="mt-3">
-  {renderSessionToggle()}
-</div>
-  </>
-)}
+                        <div className="mt-3">{renderSessionToggle()}</div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -1669,70 +1704,154 @@ async function deleteChapterSummary(id: string) {
                         {chapterSummaries.length === 0 ? (
                           <div className="text-sm text-stone-500">No chapter summaries yet.</div>
                         ) : (
-                          chapterSummaries.map((item) => (
-                            <div key={item.id} className="rounded-xl border bg-white p-3">
-                              <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
-                                <input
-                                  type="number"
-                                  value={item.chapter_number ?? ""}
-                                  onChange={(e) =>
-                                    updateChapterSummary(item.id, "chapter_number", e.target.value)
-                                  }
-                                  placeholder="Chapter #"
-                                  className="rounded border px-3 py-2 text-sm"
-                                />
+                          chapterSummaries.map((item) => {
+                            const isEditing =
+                              item.id.startsWith("new-") || editingChapterIds.includes(item.id);
+                            const isSaving = savingChapterIds.includes(item.id);
+                            const wasJustSaved = savedChapterIds.includes(item.id);
 
-                                <input
-                                  value={item.chapter_title ?? ""}
-                                  onChange={(e) =>
-                                    updateChapterSummary(item.id, "chapter_title", e.target.value)
-                                  }
-                                  placeholder="Chapter title (optional)"
-                                  className="rounded border px-3 py-2 text-sm"
-                                />
+                            return (
+                              <div key={item.id} className="rounded-xl border bg-white p-4">
+                                {!isEditing ? (
+                                  <>
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-semibold text-stone-900">
+                                          {item.chapter_number != null
+                                            ? `Chapter ${item.chapter_number}`
+                                            : "Untitled chapter"}
+                                          {item.chapter_title ? (
+                                            <span className="ml-2 font-normal text-stone-500">
+                                              · {item.chapter_title}
+                                            </span>
+                                          ) : null}
+                                        </div>
 
-                                <input
-                                  type="number"
-                                  value={item.sort_order ?? 0}
-                                  onChange={(e) =>
-                                    updateChapterSummary(item.id, "sort_order", e.target.value)
-                                  }
-                                  placeholder="Sort order (optional)"
-                      
-                                  className="rounded border px-3 py-2 text-sm"
-                                />
+                                        {item.sort_order != null && (
+                                          <div className="mt-1 text-xs text-stone-400">
+                                            Sort order: {item.sort_order}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="flex shrink-0 gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => startEditingChapter(item.id)}
+                                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                        >
+                                          Edit
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteChapterSummary(item.id)}
+                                          className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
+                                      {item.summary}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
+                                      <input
+                                        type="number"
+                                        value={item.chapter_number ?? ""}
+                                        onChange={(e) =>
+                                          updateChapterSummary(
+                                            item.id,
+                                            "chapter_number",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="Chapter #"
+                                        className="rounded border px-3 py-2 text-sm"
+                                      />
+
+                                      <input
+                                        value={item.chapter_title ?? ""}
+                                        onChange={(e) =>
+                                          updateChapterSummary(
+                                            item.id,
+                                            "chapter_title",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="Chapter title (optional)"
+                                        className="rounded border px-3 py-2 text-sm"
+                                      />
+
+                                      <input
+                                        type="number"
+                                        value={item.sort_order ?? 0}
+                                        onChange={(e) =>
+                                          updateChapterSummary(
+                                            item.id,
+                                            "sort_order",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="Sort order"
+                                        className="rounded border px-3 py-2 text-sm"
+                                      />
+                                    </div>
+
+                                    <p className="mt-2 text-xs text-stone-500">
+                                      Usually you can ignore sort order unless you want to rearrange chapters.
+                                    </p>
+
+                                    <textarea
+                                      value={item.summary}
+                                      onChange={(e) =>
+                                        updateChapterSummary(item.id, "summary", e.target.value)
+                                      }
+                                      placeholder="Write a short summary..."
+                                      className="mt-3 min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                                    />
+
+                                    <div className="mt-3 flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => saveChapterSummary(item)}
+                                        disabled={isSaving}
+                                        className={`rounded px-3 py-2 text-sm font-medium text-white transition ${
+                                          wasJustSaved
+                                            ? "bg-green-600 hover:bg-green-700"
+                                            : "bg-blue-600 hover:bg-blue-700"
+                                        } disabled:opacity-50`}
+                                      >
+                                        {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
+                                      </button>
+
+                                      {!item.id.startsWith("new-") && (
+                                        <button
+                                          type="button"
+                                          onClick={() => stopEditingChapter(item.id)}
+                                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                        >
+                                          Cancel
+                                        </button>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteChapterSummary(item.id)}
+                                        className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
-                                <p className="mt-2 text-xs text-stone-500">
-                                    Usually you can ignore sort order unless you want to rearrange chapters.
-                                  </p>
-                              <textarea
-                                value={item.summary}
-                                onChange={(e) =>
-                                  updateChapterSummary(item.id, "summary", e.target.value)
-                                }
-                                placeholder="Write a short summary..."
-                                className="mt-3 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                              />
-
-                              <div className="mt-3 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => saveChapterSummary(item)}
-                                  className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                                >
-                                  Save
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => deleteChapterSummary(item.id)}
-                                  className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
 
                         <button
