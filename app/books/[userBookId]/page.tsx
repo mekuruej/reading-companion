@@ -70,10 +70,14 @@ type ProfileRole = "teacher" | "student";
 
 type Character = {
   id: string;
+  user_book_id: string;
   name: string;
-  reading: string;
-  role: string;
-  notes: string;
+  reading: string | null;
+  role: string | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 };
 
 type ChapterSummary = {
@@ -232,6 +236,10 @@ export default function BookHubPage() {
   const [linksText, setLinksText] = useState<string>("");
 
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [showCharacters, setShowCharacters] = useState(false);
+  const [editingCharacterIds, setEditingCharacterIds] = useState<string[]>([]);
+  const [savingCharacterIds, setSavingCharacterIds] = useState<string[]>([]);
+  const [savedCharacterIds, setSavedCharacterIds] = useState<string[]>([]);
 
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [showAllSessions, setShowAllSessions] = useState(false);
@@ -240,7 +248,7 @@ export default function BookHubPage() {
   );
 
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
-  const [showChapterSummaries, setShowChapterSummaries] = useState(true);
+  const [showChapterSummaries, setShowChapterSummaries] = useState(false);
   const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
   const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
   const [savedChapterIds, setSavedChapterIds] = useState<string[]>([]);
@@ -323,6 +331,7 @@ export default function BookHubPage() {
       },
     ]);
 
+    setShowChapterSummaries(true);
     setEditingChapterIds((prev) => [...prev, newId]);
   }
 
@@ -364,20 +373,49 @@ export default function BookHubPage() {
   }
 
   function addCharacter() {
+    if (!row?.id) return;
+
+    const newId = `new-character-${Date.now()}`;
+
     setCharacters((prev) => [
       ...prev,
-      { id: makeId(), name: "", reading: "", role: "", notes: "" },
+      {
+        id: newId,
+        user_book_id: row.id,
+        name: "",
+        reading: "",
+        role: "",
+        notes: "",
+        sort_order: prev.length,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
     ]);
-  }
 
-  function removeCharacter(id: string) {
-    setCharacters((prev) => prev.filter((c) => c.id !== id));
+    setShowCharacters(true);
+    setEditingCharacterIds((prev) => [...prev, newId]);
   }
 
   function updateCharacter(id: string, field: keyof Character, value: string) {
     setCharacters((prev) =>
       prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
     );
+  }
+
+  function startEditingCharacter(id: string) {
+    setEditingCharacterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }
+
+  function stopEditingCharacter(id: string) {
+    setEditingCharacterIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function markCharacterSaved(id: string) {
+    setSavedCharacterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+
+    window.setTimeout(() => {
+      setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
+    }, 1800);
   }
 
   async function loadReadingSessions(userBookIdValue: string) {
@@ -395,6 +433,136 @@ export default function BookHubPage() {
     }
 
     setReadingSessions((data as ReadingSession[]) ?? []);
+  }
+
+  async function loadCharacters(userBookIdValue: string) {
+    const { data, error } = await supabase
+      .from("user_book_characters")
+      .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+      .eq("user_book_id", userBookIdValue)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error loading characters:", error);
+      setCharacters([]);
+      return;
+    }
+
+    setCharacters((data as Character[]) ?? []);
+  }
+
+  async function saveCharacter(item: Character) {
+    if (!row?.id) return;
+
+    const payload = {
+      user_book_id: row.id,
+      name: item.name.trim(),
+      reading: item.reading?.trim() || null,
+      role: item.role?.trim() || null,
+      notes: item.notes?.trim() || null,
+      sort_order: item.sort_order ?? 0,
+    };
+
+    if (!payload.name) {
+      alert("Please enter a character name before saving.");
+      return;
+    }
+
+    setSavingCharacterIds((prev) => [...prev, item.id]);
+
+    if (item.id.startsWith("new-character-")) {
+      const oldId = item.id;
+
+      const { data, error } = await supabase
+        .from("user_book_characters")
+        .insert(payload)
+        .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+        .single();
+
+      setSavingCharacterIds((prev) => prev.filter((x) => x !== oldId));
+
+      if (error) {
+        console.error("Error creating character:", {
+          message: error.message,
+          details: (error as any).details,
+          hint: (error as any).hint,
+          code: (error as any).code,
+          raw: error,
+        });
+        alert(`Could not save character.\n${error.message}`);
+        return;
+      }
+
+      const saved = data as Character;
+
+      setCharacters((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
+
+      setEditingCharacterIds((prev) =>
+        prev.map((x) => (x === oldId ? saved.id : x))
+      );
+
+      stopEditingCharacter(saved.id);
+      markCharacterSaved(saved.id);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_characters")
+      .update(payload)
+      .eq("id", item.id)
+      .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+      .single();
+
+    setSavingCharacterIds((prev) => prev.filter((x) => x !== item.id));
+
+    if (error) {
+      console.error("Error updating character:", {
+        message: error.message,
+        details: (error as any).details,
+        hint: (error as any).hint,
+        code: (error as any).code,
+        raw: error,
+      });
+      alert(`Could not update character.\n${error.message}`);
+      return;
+    }
+
+    const saved = data as Character;
+
+    setCharacters((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
+
+    stopEditingCharacter(saved.id);
+    markCharacterSaved(saved.id);
+  }
+
+  async function deleteCharacter(id: string) {
+    if (id.startsWith("new-character-")) {
+      setCharacters((prev) => prev.filter((x) => x.id !== id));
+      setEditingCharacterIds((prev) => prev.filter((x) => x !== id));
+      setSavingCharacterIds((prev) => prev.filter((x) => x !== id));
+      setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
+      return;
+    }
+
+    const ok = window.confirm("Delete this character?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("user_book_characters")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error deleting character:", error);
+      alert("Could not delete character.");
+      return;
+    }
+
+    setCharacters((prev) => prev.filter((x) => x.id !== id));
+    setEditingCharacterIds((prev) => prev.filter((x) => x !== id));
+    setSavingCharacterIds((prev) => prev.filter((x) => x !== id));
+    setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
   }
 
   async function loadChapterSummaries(userBookIdValue: string) {
@@ -498,9 +666,7 @@ export default function BookHubPage() {
 
       const saved = data as ChapterSummary;
 
-      setChapterSummaries((prev) =>
-        prev.map((x) => (x.id === oldId ? saved : x))
-      );
+      setChapterSummaries((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
 
       setEditingChapterIds((prev) =>
         prev.map((x) => (x === oldId ? saved.id : x))
@@ -530,9 +696,7 @@ export default function BookHubPage() {
 
     const saved = data as ChapterSummary;
 
-    setChapterSummaries((prev) =>
-      prev.map((x) => (x.id === item.id ? saved : x))
-    );
+    setChapterSummaries((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
 
     stopEditingChapter(saved.id);
     markChapterSaved(saved.id);
@@ -783,6 +947,7 @@ export default function BookHubPage() {
     await loadUniqueLookupCount(r.id);
     await loadReadingSessions(r.id);
     await loadChapterSummaries(r.id);
+    await loadCharacters(r.id);
 
     setLoading(false);
   };
@@ -1597,88 +1762,176 @@ export default function BookHubPage() {
                     <div className="mb-3 flex items-center justify-between">
                       <div className="text-sm font-semibold text-stone-900">Character List</div>
 
-                      {editing && (
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={addCharacter}
+                          onClick={() => setShowCharacters((prev) => !prev)}
+                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                        >
+                          {showCharacters ? "Hide" : "Show"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCharacters(true);
+                            addCharacter();
+                          }}
                           className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
                         >
                           + Add
                         </button>
-                      )}
+                      </div>
                     </div>
 
-                    {characters.length === 0 && !editing && (
-                      <div className="text-sm text-stone-500">—</div>
-                    )}
+                    {showCharacters && (
+                      <>
+                        {characters.length === 0 ? (
+                          <div className="text-sm text-stone-500">No characters yet.</div>
+                        ) : (
+                          <div className="space-y-4">
+                            {characters.map((c) => {
+                              const isEditing =
+                                c.id.startsWith("new-character-") ||
+                                editingCharacterIds.includes(c.id);
+                              const isSaving = savingCharacterIds.includes(c.id);
+                              const wasJustSaved = savedCharacterIds.includes(c.id);
 
-                    <div className="space-y-4">
-                      {characters.map((c) => (
-                        <div key={c.id} className="rounded-xl border bg-white p-3">
-                          {!editing ? (
-                            <>
-                              <div className="text-sm font-medium text-stone-900">
-                                {c.name || "—"}
-                                {c.reading && (
-                                  <span className="ml-2 text-stone-500">（{c.reading}）</span>
-                                )}
-                              </div>
+                              return (
+                                <div key={c.id} className="rounded-xl border bg-white p-3">
+                                  {!isEditing ? (
+                                    <>
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="text-sm font-medium text-stone-900">
+                                            {c.name || "—"}
+                                            {c.reading ? (
+                                              <span className="ml-2 text-stone-500">
+                                                （{c.reading}）
+                                              </span>
+                                            ) : null}
+                                          </div>
 
-                              {c.role && (
-                                <div className="mt-1 text-xs text-stone-500">{c.role}</div>
-                              )}
+                                          {c.role ? (
+                                            <div className="mt-1 text-xs text-stone-500">
+                                              {c.role}
+                                            </div>
+                                          ) : null}
+                                        </div>
 
-                              {c.notes && (
-                                <div className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
-                                  {c.notes}
+                                        <div className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowCharacters(true);
+                                              startEditingCharacter(c.id);
+                                            }}
+                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                          >
+                                            Edit
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => deleteCharacter(c.id)}
+                                            className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {c.notes ? (
+                                        <div className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
+                                          {c.notes}
+                                        </div>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      <div className="flex gap-2">
+                                        <input
+                                          value={c.name ?? ""}
+                                          onChange={(e) =>
+                                            updateCharacter(c.id, "name", e.target.value)
+                                          }
+                                          placeholder="Name"
+                                          className="w-1/2 rounded border px-2 py-1 text-sm"
+                                        />
+
+                                        <input
+                                          value={c.reading ?? ""}
+                                          onChange={(e) =>
+                                            updateCharacter(c.id, "reading", e.target.value)
+                                          }
+                                          placeholder="Reading"
+                                          className="w-1/2 rounded border px-2 py-1 text-sm"
+                                        />
+                                      </div>
+
+                                      <input
+                                        value={c.role ?? ""}
+                                        onChange={(e) =>
+                                          updateCharacter(c.id, "role", e.target.value)
+                                        }
+                                        placeholder="Role (e.g. 主人公, 先輩, 母)"
+                                        className="w-full rounded border px-2 py-1 text-sm"
+                                      />
+
+                                      <textarea
+                                        value={c.notes ?? ""}
+                                        onChange={(e) =>
+                                          updateCharacter(c.id, "notes", e.target.value)
+                                        }
+                                        placeholder="Notes about this character"
+                                        className="w-full rounded border p-2 text-sm"
+                                      />
+
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => saveCharacter(c)}
+                                          disabled={isSaving}
+                                          className={`rounded px-3 py-2 text-sm font-medium text-white transition ${
+                                            wasJustSaved
+                                              ? "bg-green-600 hover:bg-green-700"
+                                              : "bg-blue-600 hover:bg-blue-700"
+                                          } disabled:opacity-50`}
+                                        >
+                                          {isSaving
+                                            ? "Saving..."
+                                            : wasJustSaved
+                                            ? "Saved!"
+                                            : "Save"}
+                                        </button>
+
+                                        {!c.id.startsWith("new-character-") && (
+                                          <button
+                                            type="button"
+                                            onClick={() => stopEditingCharacter(c.id)}
+                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                          >
+                                            Cancel
+                                          </button>
+                                        )}
+
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteCharacter(c.id)}
+                                          className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="space-y-2">
-                              <div className="flex gap-2">
-                                <input
-                                  value={c.name}
-                                  onChange={(e) => updateCharacter(c.id, "name", e.target.value)}
-                                  placeholder="Name"
-                                  className="w-1/2 rounded border px-2 py-1 text-sm"
-                                />
-                                <input
-                                  value={c.reading}
-                                  onChange={(e) => updateCharacter(c.id, "reading", e.target.value)}
-                                  placeholder="Reading"
-                                  className="w-1/2 rounded border px-2 py-1 text-sm"
-                                />
-                              </div>
-
-                              <input
-                                value={c.role}
-                                onChange={(e) => updateCharacter(c.id, "role", e.target.value)}
-                                placeholder="Role (e.g. 主人公, 先輩, 母)"
-                                className="w-full rounded border px-2 py-1 text-sm"
-                              />
-
-                              <textarea
-                                value={c.notes}
-                                onChange={(e) => updateCharacter(c.id, "notes", e.target.value)}
-                                placeholder="Notes about this character"
-                                className="w-full rounded border p-2 text-sm"
-                              />
-
-                              <div className="flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => removeCharacter(c.id)}
-                                  className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   <div className="rounded-2xl border bg-stone-50 p-4">
@@ -1826,7 +2079,11 @@ export default function BookHubPage() {
                                             : "bg-blue-600 hover:bg-blue-700"
                                         } disabled:opacity-50`}
                                       >
-                                        {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
+                                        {isSaving
+                                          ? "Saving..."
+                                          : wasJustSaved
+                                          ? "Saved!"
+                                          : "Save"}
                                       </button>
 
                                       {!item.id.startsWith("new-") && (
