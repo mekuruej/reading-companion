@@ -681,13 +681,15 @@ export default function BookWordsPage() {
       </div>
 
       <div ref={stickyControlsRef} className="sticky top-0 z-30 bg-white border-b border-gray-200">
-        <div className="flex items-start gap-3 py-3">
+        <div className="flex items-start gap-3 py-3 min-w-0">
           {bookCover ? (
             <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover shrink-0" />
           ) : null}
 
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-semibold">{bookTitle || "Words"}</h1>
+            <h1 className="text-2xl font-semibold leading-tight break-words min-w-0">
+              {bookTitle || "Words"}
+            </h1>
             <p className="text-sm text-gray-500">
               Total: {words.length} • Showing: {filtered.length}
             </p>
@@ -785,10 +787,10 @@ export default function BookWordsPage() {
               >
                 <div
                   className={`grid gap-x-6 items-start ${supportMode === "full"
-                      ? "grid-cols-[1fr_1fr_2fr]"
-                      : supportMode === "reduced"
-                        ? "grid-cols-[1fr_1fr]"
-                        : "grid-cols-1"
+                    ? "grid-cols-[1fr_1fr_2fr]"
+                    : supportMode === "reduced"
+                      ? "grid-cols-[1fr_1fr]"
+                      : "grid-cols-1"
                     }`}
                 >
                   <div
