@@ -1746,21 +1746,27 @@ export default function BookHubPage() {
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Main Words</div>
-                    <div className="text-sm text-stone-600">
+                    <div className="text-sm text-stone-400">
                       Personal main words can live here later. Personal limit: 10. Public share: 5.
                     </div>
                   </div>
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Difficult Sentences</div>
-                    <div className="text-sm text-stone-600">
+                    <div className="text-sm text-stone-400">
                       Learner-marked difficult sentences can live here later. Public sharing can stay limited to 2.
                     </div>
                   </div>
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="text-sm font-semibold text-stone-900">Character List</div>
+
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-stone-900">Character List</div>
+                        <p className="mt-1 text-sm text-stone-400">
+                          Forgetting the readings of characters&apos; names? Jot them down here.
+                        </p>
+                      </div>
 
                       <div className="flex items-center gap-2">
                         <button
@@ -1787,7 +1793,7 @@ export default function BookHubPage() {
                     {showCharacters && (
                       <>
                         {characters.length === 0 ? (
-                          <div className="text-sm text-stone-500">No characters yet.</div>
+                          <div className="text-sm text-stone-400">No characters yet.</div>
                         ) : (
                           <div className="space-y-4">
                             {characters.map((c) => {
@@ -1803,20 +1809,26 @@ export default function BookHubPage() {
                                     <>
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
+                                          <div className="min-w-0">
                                           <div className="text-sm font-medium text-stone-900">
                                             {c.name || "—"}
                                             {c.reading ? (
-                                              <span className="ml-2 text-stone-500">
+                                              <span className="ml-2 hidden text-stone-500 sm:inline">
                                                 （{c.reading}）
                                               </span>
                                             ) : null}
                                           </div>
 
-                                          {c.role ? (
-                                            <div className="mt-1 text-xs text-stone-500">
-                                              {c.role}
+                                          {c.reading ? (
+                                            <div className="text-xs text-stone-500 sm:hidden">
+                                              {c.reading}
                                             </div>
                                           ) : null}
+
+                                          {c.role ? (
+                                            <div className="mt-1 text-xs text-stone-500">{c.role}</div>
+                                          ) : null}
+                                        </div>
                                         </div>
 
                                         <div className="flex gap-2">
@@ -1935,21 +1947,35 @@ export default function BookHubPage() {
                   </div>
 
                   <div className="rounded-2xl border bg-stone-50 p-4">
+
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-lg font-semibold text-stone-900">Chapter Summaries</h2>
-                        <p className="mt-1 text-sm text-stone-500">
+                        <div className="text-sm font-semibold text-stone-900">Chapter Summaries</div>
+                        <p className="mt-1 text-sm text-stone-400">
                           Writing short summaries can help you remember the story later on.
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setShowChapterSummaries((prev) => !prev)}
-                        className="shrink-0 rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                      >
-                        {showChapterSummaries ? "Hide" : "Show"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowChapterSummaries((prev) => !prev)}
+                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                        >
+                          {showChapterSummaries ? "Hide" : "Show"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowChapterSummaries(true);
+                            addChapterSummary();
+                          }}
+                          className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
+                        >
+                          + Add
+                        </button>
+                      </div>
                     </div>
 
                     {showChapterSummaries && (
