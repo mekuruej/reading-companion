@@ -59,7 +59,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch {}
+    } catch { }
   }
   return [];
 }
@@ -184,12 +184,11 @@ function CollocationsPanel({
 
   return (
     <section className="w-full max-w-3xl mt-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold">Collocations</h2>
-        <span className="text-xs text-gray-500">{rows.length} saved</span>
-      </div>
-
       <div className="border rounded-2xl p-4 bg-white">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Collocations</h2>
+          <span className="text-xs text-gray-500">{rows.length} saved</span>
+        </div>
         <div className="flex flex-col gap-2">
           <input
             value={value}
@@ -273,11 +272,11 @@ export default function WordDetailPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-const [needsSignIn, setNeedsSignIn] = useState(false);
-const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-const [myRole, setMyRole] = useState<"teacher" | "student">("student");
-const isTeacher = myRole === "teacher";
+  const [myRole, setMyRole] = useState<"teacher" | "student">("student");
+  const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
@@ -300,23 +299,23 @@ const isTeacher = myRole === "teacher";
 
     try {
       const { data: userData } = await supabase.auth.getUser();
-const user = userData?.user;
+      const user = userData?.user;
 
-if (!user) {
-  setNeedsSignIn(true);
-  setWord(null);
-  setBookTitle("");
-  setBookCover(null);
-  return;
-}
+      if (!user) {
+        setNeedsSignIn(true);
+        setWord(null);
+        setBookTitle("");
+        setBookCover(null);
+        return;
+      }
 
-const { data: meProfile } = await supabase
-  .from("profiles")
-  .select("role")
-  .eq("id", user.id)
-  .single();
+      const { data: meProfile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
 
-setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
+      setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
 
       // verify book ownership + get book info
       const { data: ub, error: ubErr } = await supabase
@@ -530,12 +529,12 @@ setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
 
         <div className="flex gap-2">
           <button
-  onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
-  className="px-3 py-2 rounded bg-gray-200"
-  title="Go to study for this book"
->
-  Study
-</button>
+            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
+            className="px-3 py-2 rounded bg-gray-200"
+            title="Go to study for this book"
+          >
+            Study
+          </button>
 
           <button onClick={() => router.back()} className="px-3 py-2 rounded bg-gray-100">
             ← Back
@@ -545,18 +544,15 @@ setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
 
       {/* Main Card */}
       <section className="w-full max-w-3xl border rounded-2xl bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="text-xs uppercase tracking-wide text-slate-500">Word</div>
               <div className="text-4xl font-bold break-words">{word.surface}</div>
-              <div className="mt-2 text-sm text-gray-600">
-                {jlpt !== "NON-JLPT" ? <span className="mr-2">JLPT: {jlpt}</span> : null}
-                {word.is_common ? <span className="mr-2">Common</span> : null}
-              </div>
             </div>
           </div>
 
+          {/* Reading */}
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-500">Reading</div>
             <div className="text-2xl font-medium">{word.reading || "—"}</div>
@@ -572,8 +568,8 @@ setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
                     {meaningChoiceIndex + 1}/{defTotal}
                   </span>
                   <select
-  value={meaningChoiceIndex}
-  disabled={defSaving || !isTeacher}
+                    value={meaningChoiceIndex}
+                    disabled={defSaving || !isTeacher}
                     onChange={(e) => setDefinition(Number(e.target.value))}
                     className="border p-1 rounded text-xs bg-white"
                     title="Choose which dictionary definition to use"
@@ -593,6 +589,20 @@ setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
             {defError ? <p className="mt-2 text-sm text-red-700">{defError}</p> : null}
           </div>
 
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            {jlpt !== "NON-JLPT" ? (
+              <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-800 font-medium text-[17px] leading-none">
+                {jlpt}
+              </span>
+            ) : null}
+
+            {word.is_common ? (
+              <span className="text-gray-500">
+                Common
+              </span>
+            ) : null}
+          </div>
+
           {/* Counts */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
             <div className="border rounded-xl p-3">
@@ -607,6 +617,45 @@ setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
           </div>
         </div>
       </section>
+
+      {/* Related Information */}
+      {(() => {
+        const firstKanji = word.surface?.match(/[一-龯]/)?.[0];
+        if (!firstKanji) return null;
+
+        return (
+          <section className="w-full max-w-3xl mt-6 border rounded-2xl bg-white p-6 shadow-sm">
+            <div className="text-lg font-semibold mb-4">
+              Related Information
+            </div>
+
+            {/* Words with this kanji */}
+            <div className="mb-6">
+              <div className="text-sm font-semibold mb-2">
+                Words with{" "}
+                <span className="text-xl font-medium text-stone-900">
+                  {firstKanji}
+                </span>
+              </div>
+
+              <div className="text-sm text-gray-500">
+                (Coming soon)
+              </div>
+            </div>
+
+            {/* Other meanings (placeholder for now) */}
+            <div>
+              <div className="text-sm font-semibold mb-2">
+                Other meanings
+              </div>
+
+              <div className="text-sm text-gray-400">
+                (Coming soon)
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Collocations */}
       <CollocationsPanel userBookId={userBookId} userBookWordId={word.id} />
