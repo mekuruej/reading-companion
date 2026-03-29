@@ -180,6 +180,34 @@ function stars5(value: number | null) {
   return "★".repeat(v) + "☆".repeat(5 - v);
 }
 
+function formatMinutes(total: number | null) {
+  if (!total || total <= 0) return "—";
+
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+function levelStars(level: string | null | undefined) {
+  switch ((level ?? "").toUpperCase()) {
+    case "N1":
+      return "★★★★★";
+    case "N2":
+      return "★★★★☆";
+    case "N3":
+      return "★★★☆☆";
+    case "N4":
+      return "★★☆☆☆";
+    case "N5":
+      return "★☆☆☆☆";
+    default:
+      return "—";
+  }
+}
+
 export default function BookHubPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -247,6 +275,15 @@ export default function BookHubPage() {
     new Date().toISOString().split("T")[0]
   );
 
+  const daysRead = useMemo(() => {
+    if (!readingSessions.length) return null;
+
+    const uniqueDays = new Set(
+      readingSessions.map((s) => s.read_on)
+    );
+
+    return uniqueDays.size;
+  }, [readingSessions]);
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
   const [showChapterSummaries, setShowChapterSummaries] = useState(false);
   const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
@@ -260,13 +297,6 @@ export default function BookHubPage() {
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
   const book = row?.books ?? null;
-
-  const timeToRead = useMemo(() => {
-    if (!started || !finished) return null;
-    const days = diffDays(started, finished);
-    if (days == null) return null;
-    return days === 1 ? "1 day" : `${days} days`;
-  }, [started, finished]);
 
   const totalPagesRead = useMemo(
     () => readingSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0),
@@ -344,14 +374,14 @@ export default function BookHubPage() {
       prev.map((item) =>
         item.id === id
           ? {
-              ...item,
-              [field]:
-                field === "chapter_number" || field === "sort_order"
-                  ? value === ""
-                    ? null
-                    : Number(value)
-                  : value,
-            }
+            ...item,
+            [field]:
+              field === "chapter_number" || field === "sort_order"
+                ? value === ""
+                  ? null
+                  : Number(value)
+                : value,
+          }
           : item
       )
     );
@@ -1086,12 +1116,6 @@ export default function BookHubPage() {
       <main className="p-6">
         <div className="text-2xl font-semibold">Book not found</div>
         {error && <div className="mt-2 text-sm text-red-600">{error}</div>}
-        <button
-          onClick={() => router.push("/books")}
-          className="mt-4 rounded bg-gray-800 px-6 py-3 text-white transition hover:bg-gray-900"
-        >
-          Back to Library
-        </button>
       </main>
     );
   }
@@ -1150,10 +1174,10 @@ export default function BookHubPage() {
                       {readingSessions.length > 0 && progressPercent != null && furthestPage != null
                         ? `${progressPercent}% · page ${furthestPage}`
                         : finished
-                        ? "100%"
-                        : started
-                        ? "In progress"
-                        : "Not started"}
+                          ? "100%"
+                          : started
+                            ? "In progress"
+                            : "Not started"}
                     </div>
                   </div>
 
@@ -1165,12 +1189,59 @@ export default function BookHubPage() {
                           progressPercent != null
                             ? `${progressPercent}%`
                             : finished
-                            ? "100%"
-                            : started
-                            ? "8%"
-                            : "0%",
+                              ? "100%"
+                              : started
+                                ? "8%"
+                                : "0%",
                       }}
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+                  <div className="rounded-xl border bg-white p-3 text-center">
+                    <div className="text-xs text-stone-500">Pages Read</div>
+                    <div className="mt-1 font-medium">
+                      {totalPagesRead || "—"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-3 text-center">
+                    <div className="text-xs text-stone-500">Days Read</div>
+                    <div className="mt-1 font-medium">
+                      {daysRead != null ? daysRead : "—"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-3 text-center">
+                    <div className="text-xs text-stone-500">Words Looked Up</div>
+                    <div className="mt-1 font-medium">
+                      {uniqueLookupCount != null ? uniqueLookupCount : "—"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-3 text-center">
+                    <div className="text-xs text-stone-500">Time Read</div>
+                    <div className="mt-1 font-medium">
+                      {formatMinutes(totalTimedMinutes)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-3 text-center">
+                    <div className="text-xs text-stone-500">Avg Min/Page</div>
+                    <div className="mt-1 font-medium">
+                      {averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(2) : "—"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-3 text-center">
+                    <div className="text-xs text-stone-500">Recommended Level</div>
+                    <div className="mt-1 font-medium">
+                      {row.recommended_level || "—"}
+                    </div>
+                    <div className="mt-1 text-xs text-amber-600">
+                      {levelStars(row.recommended_level)}
+                    </div>
                   </div>
                 </div>
 
@@ -1180,13 +1251,6 @@ export default function BookHubPage() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-2">
-                <button
-                  onClick={() => router.push("/books")}
-                  className="rounded-2xl !bg-stone-700 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-stone-800"
-                >
-                  Back to Library
-                </button>
-
                 {isTeacher ? (
                   !editing ? (
                     <button
@@ -1475,43 +1539,7 @@ export default function BookHubPage() {
 
               {activeTab === "readers" && (
                 <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading Summary</div>
-
-                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                      <div className="rounded border bg-white p-3">
-                        <div className="text-stone-600">Progress</div>
-                        <div className="mt-1 font-medium">
-                          {progressPercent != null ? `${progressPercent}%` : "—"}
-                        </div>
-                      </div>
-
-                      <div className="rounded border bg-white p-3">
-                        <div className="text-stone-600">Last read</div>
-                        <div className="mt-1 font-medium">{lastReadDate ?? "—"}</div>
-                      </div>
-
-                      <div className="rounded border bg-white p-3">
-                        <div className="text-stone-600">Total pages read</div>
-                        <div className="mt-1 font-medium">{totalPagesRead || "—"}</div>
-                      </div>
-
-                      <div className="rounded border bg-white p-3">
-                        <div className="text-stone-600">Total minutes read</div>
-                        <div className="mt-1 font-medium">
-                          {totalTimedMinutes ? totalTimedMinutes : "—"}
-                        </div>
-                      </div>
-
-                      <div className="rounded border bg-white p-3 sm:col-span-2">
-                        <div className="text-stone-600">Average minutes per page</div>
-                        <div className="mt-1 font-medium">
-                          {averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(2) : "—"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
+                
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
 
@@ -1570,11 +1598,6 @@ export default function BookHubPage() {
                         inputValue={finishedAt}
                         setInputValue={setFinishedAt}
                       />
-
-                      <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
-                        <div className="text-stone-600">Time to read</div>
-                        <div className="mt-1 font-medium">{timeToRead ?? "—"}</div>
-                      </div>
                     </div>
                   </div>
 
@@ -1734,12 +1757,52 @@ export default function BookHubPage() {
                         inputValue={ratingDifficulty}
                         setInputValue={setRatingDifficulty}
                       />
+<div className="rounded border bg-white p-3 text-sm">
+                        <div className="text-stone-600">Recommended Level</div>
 
-                      <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
-                        <div className="text-stone-600">Words looked up (unique)</div>
-                        <div className="mt-1 font-medium">
-                          {uniqueLookupCount == null ? "—" : uniqueLookupCount}
-                        </div>
+                        {!editing ? (
+                          <>
+                            <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
+                            <div className="mt-1 text-xs text-amber-600">
+                              {levelStars(row.recommended_level)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {[
+                              { value: "N1", stars: "★★★★★" },
+                              { value: "N2", stars: "★★★★☆" },
+                              { value: "N3", stars: "★★★☆☆" },
+                              { value: "N4", stars: "★★☆☆☆" },
+                              { value: "N5", stars: "★☆☆☆☆" },
+                            ].map((opt) => {
+                              const isSelected = recommendedLevel === opt.value;
+
+                              return (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => setRecommendedLevel(opt.value)}
+                                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
+                                      ? "border-stone-900 bg-stone-100"
+                                      : "border-stone-200 hover:bg-stone-50"
+                                    }`}
+                                >
+                                  <div className="text-amber-600">{opt.stars}</div>
+                                  <div className="text-xs text-stone-600">{opt.value}</div>
+                                </button>
+                              );
+                            })}
+
+                            <button
+                              type="button"
+                              onClick={() => setRecommendedLevel("")}
+                              className="w-full rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+                            >
+                              <div className="text-xs text-stone-600">Clear</div>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1810,25 +1873,25 @@ export default function BookHubPage() {
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                           <div className="min-w-0">
-                                          <div className="text-sm font-medium text-stone-900">
-                                            {c.name || "—"}
+                                            <div className="text-sm font-medium text-stone-900">
+                                              {c.name || "—"}
+                                              {c.reading ? (
+                                                <span className="ml-2 hidden text-stone-500 sm:inline">
+                                                  （{c.reading}）
+                                                </span>
+                                              ) : null}
+                                            </div>
+
                                             {c.reading ? (
-                                              <span className="ml-2 hidden text-stone-500 sm:inline">
-                                                （{c.reading}）
-                                              </span>
+                                              <div className="text-xs text-stone-500 sm:hidden">
+                                                {c.reading}
+                                              </div>
+                                            ) : null}
+
+                                            {c.role ? (
+                                              <div className="mt-1 text-xs text-stone-500">{c.role}</div>
                                             ) : null}
                                           </div>
-
-                                          {c.reading ? (
-                                            <div className="text-xs text-stone-500 sm:hidden">
-                                              {c.reading}
-                                            </div>
-                                          ) : null}
-
-                                          {c.role ? (
-                                            <div className="mt-1 text-xs text-stone-500">{c.role}</div>
-                                          ) : null}
-                                        </div>
                                         </div>
 
                                         <div className="flex gap-2">
@@ -1904,17 +1967,16 @@ export default function BookHubPage() {
                                           type="button"
                                           onClick={() => saveCharacter(c)}
                                           disabled={isSaving}
-                                          className={`rounded px-3 py-2 text-sm font-medium text-white transition ${
-                                            wasJustSaved
-                                              ? "bg-green-600 hover:bg-green-700"
-                                              : "bg-blue-600 hover:bg-blue-700"
-                                          } disabled:opacity-50`}
+                                          className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
+                                            ? "bg-green-600 hover:bg-green-700"
+                                            : "bg-blue-600 hover:bg-blue-700"
+                                            } disabled:opacity-50`}
                                         >
                                           {isSaving
                                             ? "Saving..."
                                             : wasJustSaved
-                                            ? "Saved!"
-                                            : "Save"}
+                                              ? "Saved!"
+                                              : "Save"}
                                         </button>
 
                                         {!c.id.startsWith("new-character-") && (
@@ -2099,17 +2161,16 @@ export default function BookHubPage() {
                                         type="button"
                                         onClick={() => saveChapterSummary(item)}
                                         disabled={isSaving}
-                                        className={`rounded px-3 py-2 text-sm font-medium text-white transition ${
-                                          wasJustSaved
-                                            ? "bg-green-600 hover:bg-green-700"
-                                            : "bg-blue-600 hover:bg-blue-700"
-                                        } disabled:opacity-50`}
+                                        className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
+                                          ? "bg-green-600 hover:bg-green-700"
+                                          : "bg-blue-600 hover:bg-blue-700"
+                                          } disabled:opacity-50`}
                                       >
                                         {isSaving
                                           ? "Saving..."
                                           : wasJustSaved
-                                          ? "Saved!"
-                                          : "Save"}
+                                            ? "Saved!"
+                                            : "Save"}
                                       </button>
 
                                       {!item.id.startsWith("new-") && (
@@ -2297,11 +2358,10 @@ function StarRatingField({
                 key={n}
                 type="button"
                 onClick={() => setInputValue(String(n))}
-                className={`rounded-lg border px-3 py-2 transition ${
-                  isSelected
-                    ? "border-amber-500 bg-amber-50 shadow-sm"
-                    : "border-stone-200 bg-white hover:bg-stone-50"
-                }`}
+                className={`rounded-lg border px-3 py-2 transition ${isSelected
+                  ? "border-amber-500 bg-amber-50 shadow-sm"
+                  : "border-stone-200 bg-white hover:bg-stone-50"
+                  }`}
               >
                 <span className="font-medium text-amber-600">{stars5(n)}</span>
               </button>
@@ -2346,11 +2406,10 @@ function DifficultyField({
                 key={opt.value}
                 type="button"
                 onClick={() => setInputValue(String(opt.value))}
-                className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                  isSelected
-                    ? "border-stone-900 bg-stone-100"
-                    : "border-stone-200 hover:bg-stone-50"
-                }`}
+                className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
+                  ? "border-stone-900 bg-stone-100"
+                  : "border-stone-200 hover:bg-stone-50"
+                  }`}
               >
                 <div className="text-amber-600">{stars5(opt.value)}</div>
                 <div className="text-xs text-stone-600">{opt.label}</div>

@@ -914,9 +914,6 @@ export default function BookFlashcardsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-gray-700">You need to sign in to see your book flashcards.</p>
-        <button onClick={() => router.push(`/books`)} className="px-4 py-2 bg-gray-200 rounded">
-          Back to Books
-        </button>
       </main>
     );
   }
@@ -925,9 +922,6 @@ export default function BookFlashcardsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-red-700">{errorMsg}</p>
-        <button onClick={() => router.push(`/books`)} className="px-4 py-2 bg-gray-200 rounded">
-          Back to Books
-        </button>
       </main>
     );
   }
@@ -985,15 +979,6 @@ export default function BookFlashcardsPage() {
               className="px-4 py-2 bg-gray-200 rounded"
             >
               Study Again
-            </button>
-          </div>
-
-          <div className="mt-4">
-            <button
-              onClick={() => router.push(`/books`)}
-              className="text-sm text-slate-600 hover:underline"
-            >
-              Back to Books
             </button>
           </div>
         </div>

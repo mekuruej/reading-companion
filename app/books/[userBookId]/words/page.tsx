@@ -775,6 +775,7 @@ export default function BookWordsPage() {
             No words match your filters.
           </div>
         ) : (
+
           <div className="w-full">
             {filtered.map((w) => (
               <div
@@ -814,6 +815,51 @@ export default function BookWordsPage() {
                     </div>
                   )}
                 </div>
+                {isTeacher && (
+                <div className="mt-3 flex gap-2 flex-wrap">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEdit(w);
+                    }}
+                    className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
+                  >
+                    Edit
+                  </button>
+
+                  {w.hidden ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        unhideWord(w);
+                      }}
+                      className="px-2 py-1 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
+                    >
+                      Unhide
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        hideWord(w);
+                      }}
+                      className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                    >
+                      Hide
+                    </button>
+                  )}
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteWord(w);
+                    }}
+                    className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
               </div>
             ))}
           </div>
