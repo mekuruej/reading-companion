@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 type Book = {
   id: string;
   title: string;
+  title_reading: string | null;
   author: string | null;
   translator: string | null;
   illustrator: string | null;
@@ -902,6 +903,7 @@ export default function BookHubPage() {
         books (
           id,
           title,
+          title_reading,
           author,
           translator,
           illustrator,
@@ -1151,18 +1153,45 @@ export default function BookHubPage() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
-                  {book.title}
-                </h1>
+              <div className="space-y-3">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
+                    {book.title}
+                  </h1>
+
+                  {book.title_reading ? (
+                    <div className="mt-1 text-lg text-stone-500 md:text-xl">
+                      {book.title_reading}
+                    </div>
+                  ) : null}
+                </div>
 
                 {book.author && (
-                  <p className="text-lg text-stone-800 md:text-xl">
-                    {book.author}
+                  <div>
+                    <div className="text-xl font-semibold text-stone-900 md:text-2xl">
+                      {book.author}
+                    </div>
+
                     {book.author_reading ? (
-                      <span className="ml-2 text-stone-500">（{book.author_reading}）</span>
+                      <div className="mt-1 text-base text-stone-500 md:text-lg">
+                        {book.author_reading}
+                      </div>
                     ) : null}
-                  </p>
+                  </div>
+                )}
+
+                {book.translator && (
+                  <div>
+                    <div className="text-base font-medium text-stone-700 md:text-lg">
+                      Translated by {book.translator}
+                    </div>
+
+                    {book.translator_reading ? (
+                      <div className="mt-1 text-sm text-stone-500 md:text-base">
+                        {book.translator_reading}
+                      </div>
+                    ) : null}
+                  </div>
                 )}
               </div>
 
@@ -1539,7 +1568,7 @@ export default function BookHubPage() {
 
               {activeTab === "readers" && (
                 <div className="space-y-6">
-                
+
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
 
@@ -1757,7 +1786,7 @@ export default function BookHubPage() {
                         inputValue={ratingDifficulty}
                         setInputValue={setRatingDifficulty}
                       />
-<div className="rounded border bg-white p-3 text-sm">
+                      <div className="rounded border bg-white p-3 text-sm">
                         <div className="text-stone-600">Recommended Level</div>
 
                         {!editing ? (
@@ -1784,8 +1813,8 @@ export default function BookHubPage() {
                                   type="button"
                                   onClick={() => setRecommendedLevel(opt.value)}
                                   className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
-                                      ? "border-stone-900 bg-stone-100"
-                                      : "border-stone-200 hover:bg-stone-50"
+                                    ? "border-stone-900 bg-stone-100"
+                                    : "border-stone-200 hover:bg-stone-50"
                                     }`}
                                 >
                                   <div className="text-amber-600">{opt.stars}</div>
