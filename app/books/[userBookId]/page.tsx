@@ -192,6 +192,12 @@ function formatMinutes(total: number | null) {
   return `${hours}h ${minutes}m`;
 }
 
+function formatTimer(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function levelStars(level: string | null | undefined) {
   switch ((level ?? "").toUpperCase()) {
     case "N1":
@@ -294,6 +300,11 @@ export default function BookHubPage() {
   const [sessionStartPage, setSessionStartPage] = useState<string>("");
   const [sessionEndPage, setSessionEndPage] = useState<string>("");
   const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
+
+  const [isRunning, setIsRunning] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
 
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
@@ -829,6 +840,9 @@ export default function BookHubPage() {
     setSessionStartPage("");
     setSessionEndPage("");
     setSessionMinutesRead("");
+    setShowTimedSessionForm(false);
+    setElapsed(0);
+    setStartTime(null);
   }
 
   const loadUniqueLookupCount = async (id: string) => {
@@ -988,6 +1002,16 @@ export default function BookHubPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userBookId]);
+
+  useEffect(() => {
+    if (!isRunning || !startTime) return;
+
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRunning, startTime]);
 
   const cancelEdits = () => {
     if (!row) return;
@@ -1278,34 +1302,106 @@ export default function BookHubPage() {
                   Last read: {lastReadDate ?? "—"}
                 </p>
               </div>
+              <p className="mt-6 text-sm text-stone-500">
+                Time your reading session and log it more easily.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {!isRunning ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartTime(Date.now());
+                      setElapsed(0);
+                      setIsRunning(true);
+                    }}
+                    className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+                  >
+                    Start Timer
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (startTime) {
+                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                      }
+                      setIsRunning(false);
+                      setSessionStartPage(String(furthestPage ?? ""));
+                      setShowTimedSessionForm(true);
+                    }}
+                    className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                  >
+                    Stop Timer
+                  </button>
+                )}
+                {showTimedSessionForm && !isRunning ? (
+                  <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
+                    <div className="mb-3 text-sm font-medium text-stone-700">
+                      Save this reading session
+                    </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                {isTeacher ? (
-                  !editing ? (
-                    <button
-                      onClick={() => setEditing(true)}
-                      className="rounded-2xl !bg-stone-900 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-black"
-                    >
-                      Edit
-                    </button>
-                  ) : (
-                    <>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <div className="mb-1 text-sm text-stone-600">Start page</div>
+                        <input
+                          type="number"
+                          min={1}
+                          value={sessionStartPage}
+                          onChange={(e) => setSessionStartPage(e.target.value)}
+                          placeholder="e.g. 45"
+                          className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="mb-1 text-sm text-stone-600">End page</div>
+                        <input
+                          type="number"
+                          min={1}
+                          value={sessionEndPage}
+                          onChange={(e) => setSessionEndPage(e.target.value)}
+                          placeholder="e.g. 52"
+                          className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 text-sm text-stone-500">
+                      Time: {formatTimer(elapsed)}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
                       <button
-                        onClick={cancelEdits}
-                        className="rounded-2xl !bg-stone-200 px-4 py-2 text-sm font-medium !text-stone-900 transition hover:!bg-stone-300"
+                        type="button"
+                        onClick={() => {
+                          setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
+                          saveReadingSession();
+                          setShowTimedSessionForm(false);
+                          setElapsed(0);
+                          setStartTime(null);
+                        }}
+                        className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                      >
+                        Save Timed Session
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowTimedSessionForm(false);
+                          setElapsed(0);
+                          setStartTime(null);
+                        }}
+                        className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
                       >
                         Cancel
                       </button>
-                      <button
-                        onClick={saveAll}
-                        disabled={saving}
-                        className="rounded-2xl !bg-blue-600 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-blue-700 disabled:opacity-50"
-                      >
-                        {saving ? "Saving…" : "Save"}
-                      </button>
-                    </>
-                  )
+                    </div>
+                  </div>
                 ) : null}
+                <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
+                  ⏱ {formatTimer(elapsed)}
+                </div>
               </div>
 
               <div className="mt-5">
@@ -1378,18 +1474,47 @@ export default function BookHubPage() {
           ) : null}
 
           <div className="mt-2 px-4 md:px-8">
-            <div className="flex gap-2 border-b border-stone-300 px-2">
-              <FilingTab active={activeTab === "book"} onClick={() => setActiveTab("book")}>
-                Book
-              </FilingTab>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div className="flex gap-2 border-b border-stone-300 px-2">
+                <FilingTab active={activeTab === "book"} onClick={() => setActiveTab("book")}>
+                  Book
+                </FilingTab>
 
-              <FilingTab active={activeTab === "readers"} onClick={() => setActiveTab("readers")}>
-                Readers
-              </FilingTab>
+                <FilingTab active={activeTab === "readers"} onClick={() => setActiveTab("readers")}>
+                  Readers
+                </FilingTab>
 
-              <FilingTab active={activeTab === "learners"} onClick={() => setActiveTab("learners")}>
-                Learners
-              </FilingTab>
+                <FilingTab active={activeTab === "learners"} onClick={() => setActiveTab("learners")}>
+                  Learners
+                </FilingTab>
+              </div>
+
+              {isTeacher ? (
+                !editing ? (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={cancelEdits}
+                      className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveAll}
+                      disabled={saving}
+                      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+                )
+              ) : null}
             </div>
 
             <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
@@ -2259,8 +2384,8 @@ export default function BookHubPage() {
             </div>
           </div>
         </section>
-      </div>
-    </main>
+      </div >
+    </main >
   );
 }
 
