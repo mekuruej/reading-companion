@@ -12,41 +12,20 @@ declare global {
   }
 }
 
-type StudySet =
-  | "KANJI_READING_MEANING"
-  | "KANJI_READING"
-  | "KANJI_MEANING"
-  | "READING_MEANING";
+type StudySet = "READING" | "MEANING" | "FROM_READING";
 
 type StepField = "word" | "reading" | "meaning";
 
-function baseStepsFor(set: StudySet): StepField[] {
-  switch (set) {
-    case "KANJI_READING_MEANING":
-      return ["word", "reading", "meaning"];
-    case "KANJI_READING":
-      return ["word", "reading"];
-    case "KANJI_MEANING":
-      return ["word", "meaning"];
-    case "READING_MEANING":
-      return ["reading", "meaning"];
-    default:
-      return ["word", "reading", "meaning"];
-  }
-}
-
 function studySetLabel(s: StudySet) {
   switch (s) {
-    case "KANJI_READING_MEANING":
-      return "Kanji → Reading → Meaning";
-    case "KANJI_READING":
-      return "Kanji → Reading";
-    case "KANJI_MEANING":
-      return "Kanji → Meaning";
-    case "READING_MEANING":
-      return "Reading → Meaning";
+    case "READING":
+      return "Reading";
+    case "MEANING":
+      return "Meaning";
+    case "FROM_READING":
+      return "From Reading";
     default:
-      return "Kanji → Reading → Meaning";
+      return "Reading";
   }
 }
 
@@ -153,7 +132,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch {}
+    } catch { }
   }
 
   return [];
@@ -182,8 +161,7 @@ export default function BookFlashcardsPage() {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
 
-  const [studySet, setStudySet] = useState<StudySet>("KANJI_READING_MEANING");
-  const [reverseMode, setReverseMode] = useState(false);
+  const [studySet, setStudySet] = useState<StudySet>("READING");
   const [studyOnceMode, setStudyOnceMode] = useState(false);
 
   const [sessionOrder, setSessionOrder] = useState<number[]>([]);
@@ -194,10 +172,18 @@ export default function BookFlashcardsPage() {
     [userBookId]
   );
 
-  const steps = useMemo(() => {
-    const base = baseStepsFor(studySet);
-    return reverseMode ? [...base].reverse() : base;
-  }, [studySet, reverseMode]);
+  const steps = useMemo<StepField[]>(() => {
+    switch (studySet) {
+      case "READING":
+        return ["word", "meaning", "reading"];
+      case "MEANING":
+        return ["word", "reading", "meaning"];
+      case "FROM_READING":
+        return ["reading", "word", "meaning"];
+      default:
+        return ["word", "meaning", "reading"];
+    }
+  }, [studySet]);
 
   const [typeMode, setTypeMode] = useState(false);
   const [typedInput, setTypedInput] = useState("");
@@ -242,13 +228,12 @@ export default function BookFlashcardsPage() {
 
       const parsed = JSON.parse(raw);
       if (parsed?.studySet) setStudySet(parsed.studySet as StudySet);
-      if (typeof parsed?.reverseMode === "boolean") setReverseMode(parsed.reverseMode);
       if (typeof parsed?.typeMode === "boolean") setTypeMode(parsed.typeMode);
       if (typeof parsed?.studyOnceMode === "boolean") setStudyOnceMode(parsed.studyOnceMode);
       if (Array.isArray(parsed?.jlptSelected)) setJlptSelected(parsed.jlptSelected);
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
-    } catch {}
+    } catch { }
   }, [settingsKey, userBookId]);
 
   useEffect(() => {
@@ -259,7 +244,6 @@ export default function BookFlashcardsPage() {
         settingsKey,
         JSON.stringify({
           studySet,
-          reverseMode,
           typeMode,
           studyOnceMode,
           jlptSelected,
@@ -267,12 +251,11 @@ export default function BookFlashcardsPage() {
           repeatsOnly,
         })
       );
-    } catch {}
+    } catch { }
   }, [
     settingsKey,
     userBookId,
     studySet,
-    reverseMode,
     typeMode,
     studyOnceMode,
     jlptSelected,
@@ -287,7 +270,6 @@ export default function BookFlashcardsPage() {
       setTypedFeedback(null);
       setTypeRevealIndex(0);
       setReadyForNextCard(false);
-    setLastTypedResult(null);
       setLastTypedResult(null);
     }
   }, [steps.length, typeMode]);
@@ -422,8 +404,8 @@ export default function BookFlashcardsPage() {
 
           const safeIdx =
             typeof w.meaning_choice_index === "number" &&
-            w.meaning_choice_index >= 0 &&
-            w.meaning_choice_index < meaningChoices.length
+              w.meaning_choice_index >= 0 &&
+              w.meaning_choice_index < meaningChoices.length
               ? w.meaning_choice_index
               : 0;
 
@@ -480,8 +462,7 @@ export default function BookFlashcardsPage() {
         setTypedFeedback(null);
         setTypeRevealIndex(0);
         setReadyForNextCard(false);
-    setLastTypedResult(null);
-      setLastTypedResult(null);
+        setLastTypedResult(null);
         setDefError(null);
         setShowDefPicker(false);
         setVoiceError(null);
@@ -565,7 +546,7 @@ export default function BookFlashcardsPage() {
     setReadyForNextCard(false);
     setLastTypedResult(null);
     setVoiceError(null);
-  }, [studySet, reverseMode]);
+  }, [studySet]);
 
   function getFieldValue(field: StepField, c: Flashcard) {
     if (field === "word") return c.word || "";
@@ -673,16 +654,18 @@ export default function BookFlashcardsPage() {
   }
 
   function nextCardReveal() {
-    const max = steps.length;
-    if (max <= 1) return goToNextWord();
-    if (stepIndex < max - 1) return setStepIndex((s) => s + 1);
+    if (stepIndex < 1) {
+      setStepIndex(1);
+      return;
+    }
     return goToNextWord();
   }
 
   function prevCardReveal() {
-    const max = steps.length;
-    if (max <= 1) return goToPrevWord();
-    if (stepIndex > 0) return setStepIndex((s) => s - 1);
+    if (stepIndex > 0) {
+      setStepIndex(0);
+      return;
+    }
     return goToPrevWord();
   }
 
@@ -739,12 +722,12 @@ export default function BookFlashcardsPage() {
             ? `You got it! Reading: ${card.reading || "—"}`
             : `Better luck next time. Reading: ${card.reading || "—"}`
           : currentAnswerField === "meaning"
-          ? ok
-            ? `You got it! Meaning: ${card.meaning || "—"}`
-            : `Better luck next time. Meaning: ${card.meaning || "—"}`
-          : ok
-          ? `You got it! Answer: ${correctRaw}`
-          : `Better luck next time. Answer: ${correctRaw}`,
+            ? ok
+              ? `You got it! Meaning: ${card.meaning || "—"}`
+              : `Better luck next time. Meaning: ${card.meaning || "—"}`
+            : ok
+              ? `You got it! Answer: ${correctRaw}`
+              : `Better luck next time. Answer: ${correctRaw}`,
     });
 
     setLastTypedResult(ok ? "correct" : "wrong");
@@ -798,7 +781,6 @@ export default function BookFlashcardsPage() {
       setTypedInput("");
       setTypedFeedback(null);
       setReadyForNextCard(false);
-    setLastTypedResult(null);
       setLastTypedResult(null);
     } catch (e: any) {
       setDefError(e?.message ?? "Failed to change definition");
@@ -850,7 +832,6 @@ export default function BookFlashcardsPage() {
       setTypedInput(transcript);
       setTypedFeedback(null);
       setReadyForNextCard(false);
-    setLastTypedResult(null);
       setLastTypedResult(null);
     };
 
@@ -892,9 +873,6 @@ export default function BookFlashcardsPage() {
       if (e.key === " ") {
         e.preventDefault();
         nextCardReveal();
-      }
-      if (e.key.toLowerCase() === "r") {
-        setReverseMode((v) => !v);
       }
     }
 
@@ -972,8 +950,7 @@ export default function BookFlashcardsPage() {
                 setTypedFeedback(null);
                 setTypeRevealIndex(0);
                 setReadyForNextCard(false);
-    setLastTypedResult(null);
-      setLastTypedResult(null);
+                setLastTypedResult(null);
                 setFirstTouch(true);
               }}
               className="px-4 py-2 bg-gray-200 rounded"
@@ -986,10 +963,26 @@ export default function BookFlashcardsPage() {
     );
   }
 
-  const revealed = new Set<StepField>(steps.slice(0, stepIndex + 1));
-  const showWord = revealed.has("word");
-  const showReading = revealed.has("reading");
-  const showMeaning = revealed.has("meaning");
+  const showWord =
+    studySet === "READING"
+      ? true
+      : studySet === "MEANING"
+        ? true
+        : stepIndex >= 1;
+
+  const showReading =
+    studySet === "READING"
+      ? stepIndex >= 1
+      : studySet === "MEANING"
+        ? true
+        : true;
+
+  const showMeaning =
+    studySet === "READING"
+      ? true
+      : studySet === "MEANING"
+        ? stepIndex >= 1
+        : stepIndex >= 1;
 
   function Row({
     label,
@@ -1009,9 +1002,9 @@ export default function BookFlashcardsPage() {
         <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
         <div
           className={[
-            big ? "text-[2.6rem] font-bold" : "text-[1.65rem]",
+            big ? "text-[2rem] font-bold sm:text-[2.3rem]" : "text-[1.25rem] sm:text-[1.45rem]",
             "transition-opacity duration-200",
-            visible ? "opacity-100 text-slate-900" : "opacity-100 text-slate-300",
+            visible ? "opacity-100 text-slate-900" : "opacity-70 text-slate-300",
           ].join(" ")}
         >
           {visible ? value : placeholder}
@@ -1048,25 +1041,14 @@ export default function BookFlashcardsPage() {
               onChange={(e) => setStudySet(e.target.value as StudySet)}
               className="px-2 py-1 border rounded text-sm bg-white"
             >
-              <option value="KANJI_READING_MEANING">{studySetLabel("KANJI_READING_MEANING")}</option>
-              <option value="KANJI_READING">{studySetLabel("KANJI_READING")}</option>
-              <option value="KANJI_MEANING">{studySetLabel("KANJI_MEANING")}</option>
-              <option value="READING_MEANING">{studySetLabel("READING_MEANING")}</option>
+              <option value="READING">{studySetLabel("READING")}</option>
+              <option value="MEANING">{studySetLabel("MEANING")}</option>
+              <option value="FROM_READING">{studySetLabel("FROM_READING")}</option>
             </select>
 
-            <label className="flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white">
-              <input
-                type="checkbox"
-                checked={reverseMode}
-                onChange={() => setReverseMode((v) => !v)}
-              />
-              Reverse (R)
-            </label>
-
             <label
-              className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${
-                steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               title={
                 steps.length < 2
                   ? "Type mode needs at least 2 study steps."
@@ -1183,18 +1165,24 @@ export default function BookFlashcardsPage() {
         </p>
       </div>
 
+      <div className="mb-2 text-sm text-gray-500">
+        {studySet === "READING" && "Show word + meaning → think of the reading"}
+        {studySet === "MEANING" && "Show word + reading → think of the meaning"}
+        {studySet === "FROM_READING" && "Show reading → think of the word and meaning"}
+      </div>
+
       <div
         onClick={flip}
         className="
           relative
           w-[92vw] max-w-2xl
-          min-h-[20rem]
-          min-h-60 bg-white rounded-2xl
+          min-h-[38vh] sm:min-h-[44vh]
+          bg-white rounded-2xl
           border border-slate-500
           shadow-2xl
           flex items-center justify-center
           cursor-pointer text-center select-none
-          p-8
+          p-6
         "
       >
         <div className="absolute top-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
@@ -1204,29 +1192,12 @@ export default function BookFlashcardsPage() {
         </div>
 
         <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-          <div className="flex flex-col items-end leading-tight">
-            <div className="text-xs font-medium">
-              Book Count: {card?.repeatCount ?? 1}
-            </div>
-            <div className="text-xs font-medium">
-              Total Count: {card?.totalCount ?? 1}
-            </div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
           <div className="text-xs font-medium leading-none">
             Def #{((card?.meaningChoiceIndex ?? 0) as number) + 1}
           </div>
         </div>
 
-        {card?.isCommon === true ? (
-          <div className="absolute bottom-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-            <div className="text-xs font-medium leading-none">Common</div>
-          </div>
-        ) : null}
-
-        <div className="w-full flex flex-col items-center justify-center gap-6">
+        <div className="w-full flex flex-col items-center justify-center gap-3">
           {typeModeEnabled && card ? (
             <>
               <Row
@@ -1256,8 +1227,8 @@ export default function BookFlashcardsPage() {
                     {currentTypeAnswerField === "word"
                       ? "Kanji"
                       : currentTypeAnswerField === "reading"
-                      ? "Reading"
-                      : "Meaning"}
+                        ? "Reading"
+                        : "Meaning"}
                   </div>
 
                   {currentTypeAnswerField === "reading" ? (
@@ -1275,8 +1246,7 @@ export default function BookFlashcardsPage() {
                         setTypedInput(e.target.value);
                         setTypedFeedback(null);
                         setReadyForNextCard(false);
-    setLastTypedResult(null);
-      setLastTypedResult(null);
+                        setLastTypedResult(null);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -1302,10 +1272,10 @@ export default function BookFlashcardsPage() {
                         readyForNextCard
                           ? "Press Enter for next card"
                           : currentTypeAnswerField === "meaning"
-                          ? "Type a meaning"
-                          : currentTypeAnswerField === "reading"
-                          ? "かなで入力"
-                          : "Type your answer"
+                            ? "Type a meaning"
+                            : currentTypeAnswerField === "reading"
+                              ? "かなで入力"
+                              : "Type your answer"
                       }
                     />
 
@@ -1331,9 +1301,8 @@ export default function BookFlashcardsPage() {
 
                   {typedFeedback ? (
                     <p
-                      className={`mt-2 text-sm ${
-                        typedFeedback.ok ? "text-green-700" : "text-red-700"
-                      }`}
+                      className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"
+                        }`}
                     >
                       {typedFeedback.ok ? "✅ " : "❌ "}
                       {typedFeedback.message}
@@ -1375,11 +1344,10 @@ export default function BookFlashcardsPage() {
                   type="button"
                   disabled={defSaving}
                   onClick={() => setDefinitionForCurrent(i)}
-                  className={`text-left px-3 py-2 rounded border ${
-                    active
-                      ? "bg-slate-700 text-white border-slate-700"
-                      : "bg-white hover:bg-slate-50"
-                  }`}
+                  className={`text-left px-3 py-2 rounded border ${active
+                    ? "bg-slate-700 text-white border-slate-700"
+                    : "bg-white hover:bg-slate-50"
+                    }`}
                 >
                   <span className="text-xs mr-2 opacity-70">#{i + 1}</span>
                   {choice || "—"}
@@ -1402,76 +1370,71 @@ export default function BookFlashcardsPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-3 mt-6 justify-center">
-        <button
-          onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
-          className="px-4 py-2 bg-gray-200 rounded"
-        >
-          Review
-        </button>
-
-        <button
-          onClick={() =>
-            typeModeEnabled
-              ? goToNextWord(readyForNextCard ? lastTypedResult ?? "revealed" : "revealed")
-              : nextCardReveal()
-          }
-          className="px-4 py-2 bg-gray-200 rounded"
-        >
-          Next
-        </button>
-
-        {card?.meaningChoices?.length ? (
+      <div className="mt-6 w-full max-w-2xl space-y-2">
+        <div className="flex gap-2">
           <button
-            onClick={() => setShowDefPicker((v) => !v)}
-            className="px-4 py-2 bg-gray-200 rounded"
+            onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
+            className="flex-1 rounded-xl bg-gray-200 py-3"
           >
-            {showDefPicker ? "Hide Definitions" : "Change Definition"}
+            Review
           </button>
-        ) : null}
 
-        <button
-          onClick={() => {
-            if (!card) return;
-            skipCardForToday(card.id);
-          }}
-          className="px-4 py-2 bg-slate-200 rounded hover:bg-slate-300 transition"
-        >
-          Skip for today
-        </button>
+          <button
+            onClick={() =>
+              typeModeEnabled
+                ? goToNextWord(readyForNextCard ? lastTypedResult ?? "revealed" : "revealed")
+                : nextCardReveal()
+            }
+            className="flex-1 rounded-xl bg-gray-800 text-white py-3"
+          >
+            Next
+          </button>
+        </div>
 
-        <button
-          onClick={() => {
-            if (!card) return;
-            hideCardPermanently(card.id);
-          }}
-          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-        >
-          Hide card
-        </button>
-      </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              if (!card) return;
+              skipCardForToday(card.id);
+            }}
+            className="flex-1 rounded-xl bg-slate-200 py-3"
+          >
+            Skip (for Today)
+          </button>
 
-      <div className="mt-5 flex justify-center gap-3">
-        <button
-          onClick={() => router.push(`/books/${userBookId}/words`)}
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
-        >
-          Vocab List
-        </button>
+          <button
+            onClick={() => {
+              if (!card) return;
+              hideCardPermanently(card.id);
+            }}
+            className="flex-1 rounded-xl bg-gray-700 text-white py-3"
+          >
+            Hide (for Good)
+          </button>
+        </div>
 
-        <button
-              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-              className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
-            >
-              Book Hub
-            </button>
+        <div className="mt-5 flex justify-center gap-3">
+          <button
+            onClick={() => router.push(`/books/${userBookId}/words`)}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
+          >
+            Vocab List
+          </button>
 
-        <button
-          onClick={() => router.push(`/books/${userBookId}/weekly-readings`)}
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
-        >
-          Practice Readings
-        </button>
+          <button
+            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+            className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
+          >
+            Book Hub
+          </button>
+
+          <button
+            onClick={() => router.push(`/books/${userBookId}/weekly-readings`)}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
+          >
+            Practice Readings
+          </button>
+        </div>
       </div>
     </main>
   );

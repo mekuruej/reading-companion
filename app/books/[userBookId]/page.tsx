@@ -39,6 +39,7 @@ type UserBook = {
   book_id: string;
   started_at: string | null;
   finished_at: string | null;
+  dnf_at: string | null;
   notes: string | null;
   my_review: string | null;
 
@@ -66,7 +67,7 @@ type ReadingSession = {
   created_at: string;
 };
 
-type HubTab = "book" | "readers" | "learners";
+type HubTab = "bookInfo" | "rating" | "reading" | "story" | "study";
 type ProfileRole = "teacher" | "student";
 
 type Character = {
@@ -102,10 +103,6 @@ const DIFFICULTY_OPTIONS = [
   { value: 5, label: "Easy" },
 ] as const;
 
-function makeId() {
-  return `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-}
-
 function safeDate(s: string | null) {
   if (!s) return null;
   const d = new Date(s);
@@ -117,12 +114,6 @@ function formatYmd(d: Date) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function diffDays(start: Date, end: Date) {
-  const ms = end.getTime() - start.getTime();
-  if (ms < 0) return null;
-  return Math.ceil(ms / (1000 * 60 * 60 * 24));
 }
 
 function linksToText(links: any): string {
@@ -230,11 +221,12 @@ export default function BookHubPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<HubTab>("book");
+  const [activeTab, setActiveTab] = useState<HubTab>("bookInfo");
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
 
   const [startedAt, setStartedAt] = useState<string>("");
   const [finishedAt, setFinishedAt] = useState<string>("");
+  const [dnfAt, setDnfAt] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [myReview, setMyReview] = useState<string>("");
 
@@ -284,15 +276,12 @@ export default function BookHubPage() {
 
   const daysRead = useMemo(() => {
     if (!readingSessions.length) return null;
-
-    const uniqueDays = new Set(
-      readingSessions.map((s) => s.read_on)
-    );
-
-    return uniqueDays.size;
+    return new Set(readingSessions.map((s) => s.read_on)).size;
   }, [readingSessions]);
+
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
   const [showChapterSummaries, setShowChapterSummaries] = useState(false);
+  const [chapterReverseOrder, setChapterReverseOrder] = useState(false);
   const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
   const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
   const [savedChapterIds, setSavedChapterIds] = useState<string[]>([]);
@@ -354,6 +343,22 @@ export default function BookHubPage() {
     return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
   }, [readingSessions, showAllSessions]);
 
+  const visibleChapterSummaries = useMemo(() => {
+    const sorted = [...chapterSummaries].sort((a, b) => {
+      const aSort = a.sort_order ?? 0;
+      const bSort = b.sort_order ?? 0;
+      if (aSort !== bSort) return aSort - bSort;
+
+      const aChapter = a.chapter_number ?? 0;
+      const bChapter = b.chapter_number ?? 0;
+      if (aChapter !== bChapter) return aChapter - bChapter;
+
+      return a.created_at.localeCompare(b.created_at);
+    });
+
+    return chapterReverseOrder ? sorted.reverse() : sorted;
+  }, [chapterSummaries, chapterReverseOrder]);
+
   function addChapterSummary() {
     if (!row?.id) return;
 
@@ -364,10 +369,13 @@ export default function BookHubPage() {
       {
         id: newId,
         user_book_id: row.id,
-        chapter_number: null,
+        chapter_number: 1,
         chapter_title: "",
         summary: "",
-        sort_order: prev.length,
+        sort_order:
+          prev.length > 0
+            ? Math.max(...prev.map((x) => x.sort_order ?? 0)) + 1
+            : 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
@@ -454,7 +462,6 @@ export default function BookHubPage() {
 
   function markCharacterSaved(id: string) {
     setSavedCharacterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-
     window.setTimeout(() => {
       setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
     }, 1800);
@@ -525,13 +532,7 @@ export default function BookHubPage() {
       setSavingCharacterIds((prev) => prev.filter((x) => x !== oldId));
 
       if (error) {
-        console.error("Error creating character:", {
-          message: error.message,
-          details: (error as any).details,
-          hint: (error as any).hint,
-          code: (error as any).code,
-          raw: error,
-        });
+        console.error("Error creating character:", error);
         alert(`Could not save character.\n${error.message}`);
         return;
       }
@@ -539,7 +540,6 @@ export default function BookHubPage() {
       const saved = data as Character;
 
       setCharacters((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
-
       setEditingCharacterIds((prev) =>
         prev.map((x) => (x === oldId ? saved.id : x))
       );
@@ -559,13 +559,7 @@ export default function BookHubPage() {
     setSavingCharacterIds((prev) => prev.filter((x) => x !== item.id));
 
     if (error) {
-      console.error("Error updating character:", {
-        message: error.message,
-        details: (error as any).details,
-        hint: (error as any).hint,
-        code: (error as any).code,
-        raw: error,
-      });
+      console.error("Error updating character:", error);
       alert(`Could not update character.\n${error.message}`);
       return;
     }
@@ -637,16 +631,8 @@ export default function BookHubPage() {
       .eq("id", sessionId);
 
     if (error) {
-      console.error("Error deleting reading session:", {
-        message: (error as any)?.message,
-        details: (error as any)?.details,
-        hint: (error as any)?.hint,
-        code: (error as any)?.code,
-        raw: error,
-      });
-      alert(
-        `Could not delete reading session.\n${(error as any)?.message || "Unknown error"}`
-      );
+      console.error("Error deleting reading session:", error);
+      alert(`Could not delete reading session.\n${error.message || "Unknown error"}`);
       return;
     }
 
@@ -709,7 +695,6 @@ export default function BookHubPage() {
       const saved = data as ChapterSummary;
 
       setChapterSummaries((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
-
       setEditingChapterIds((prev) =>
         prev.map((x) => (x === oldId ? saved.id : x))
       );
@@ -778,8 +763,13 @@ export default function BookHubPage() {
 
     const start = Number(sessionStartPage);
     const end = Number(sessionEndPage);
-    const minutes =
+    const minutesFromInput =
       sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
+
+    const minutes =
+      showTimedSessionForm
+        ? Math.max(1, Math.round(elapsed / 60))
+        : minutesFromInput;
 
     if (!sessionDate || !Number.isFinite(start) || !Number.isFinite(end)) {
       alert("Please fill in date, start page, and end page.");
@@ -816,16 +806,8 @@ export default function BookHubPage() {
       .single();
 
     if (error) {
-      console.error("Error saving reading session:", {
-        message: (error as any)?.message,
-        details: (error as any)?.details,
-        hint: (error as any)?.hint,
-        code: (error as any)?.code,
-        raw: error,
-      });
-      alert(
-        `Could not save reading session.\n${(error as any)?.message || "Unknown error"}`
-      );
+      console.error("Error saving reading session:", error);
+      alert(`Could not save reading session.\n${error.message || "Unknown error"}`);
       return;
     }
 
@@ -907,6 +889,7 @@ export default function BookHubPage() {
         book_id,
         started_at,
         finished_at,
+        dnf_at,
         notes,
         my_review,
         rating_overall,
@@ -955,6 +938,7 @@ export default function BookHubPage() {
 
     setStartedAt(r.started_at ? formatYmd(new Date(r.started_at)) : "");
     setFinishedAt(r.finished_at ? formatYmd(new Date(r.finished_at)) : "");
+    setDnfAt(r.dnf_at ? formatYmd(new Date(r.dnf_at)) : "");
     setNotes(r.notes ?? "");
     setMyReview(r.my_review ?? "");
 
@@ -1020,6 +1004,7 @@ export default function BookHubPage() {
 
     setStartedAt(row.started_at ? formatYmd(new Date(row.started_at)) : "");
     setFinishedAt(row.finished_at ? formatYmd(new Date(row.finished_at)) : "");
+    setDnfAt(row.dnf_at ? formatYmd(new Date(row.dnf_at)) : "");
     setNotes(row.notes ?? "");
     setMyReview(row.my_review ?? "");
 
@@ -1064,6 +1049,7 @@ export default function BookHubPage() {
 
     const started_at = startedAt.trim() ? startedAt.trim() : null;
     const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
+    const dnf_at = dnfAt.trim() ? dnfAt.trim() : null;
 
     const pc = pageCount.trim() ? Number(pageCount.trim()) : null;
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
@@ -1079,6 +1065,7 @@ export default function BookHubPage() {
       .update({
         started_at,
         finished_at,
+        dnf_at,
         notes: notes || null,
         my_review: myReview || null,
         rating_overall: ro,
@@ -1166,7 +1153,7 @@ export default function BookHubPage() {
                 </div>
               )}
 
-              {editing && (
+              {editing && activeTab === "bookInfo" && (
                 <input
                   value={coverUrl}
                   onChange={(e) => setCoverUrl(e.target.value)}
@@ -1254,16 +1241,12 @@ export default function BookHubPage() {
                 <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                   <div className="rounded-xl border bg-white p-3 text-center">
                     <div className="text-xs text-stone-500">Pages Read</div>
-                    <div className="mt-1 font-medium">
-                      {totalPagesRead || "—"}
-                    </div>
+                    <div className="mt-1 font-medium">{totalPagesRead || "—"}</div>
                   </div>
 
                   <div className="rounded-xl border bg-white p-3 text-center">
                     <div className="text-xs text-stone-500">Days Read</div>
-                    <div className="mt-1 font-medium">
-                      {daysRead != null ? daysRead : "—"}
-                    </div>
+                    <div className="mt-1 font-medium">{daysRead != null ? daysRead : "—"}</div>
                   </div>
 
                   <div className="rounded-xl border bg-white p-3 text-center">
@@ -1275,9 +1258,7 @@ export default function BookHubPage() {
 
                   <div className="rounded-xl border bg-white p-3 text-center">
                     <div className="text-xs text-stone-500">Time Read</div>
-                    <div className="mt-1 font-medium">
-                      {formatMinutes(totalTimedMinutes)}
-                    </div>
+                    <div className="mt-1 font-medium">{formatMinutes(totalTimedMinutes)}</div>
                   </div>
 
                   <div className="rounded-xl border bg-white p-3 text-center">
@@ -1289,9 +1270,7 @@ export default function BookHubPage() {
 
                   <div className="rounded-xl border bg-white p-3 text-center">
                     <div className="text-xs text-stone-500">Recommended Level</div>
-                    <div className="mt-1 font-medium">
-                      {row.recommended_level || "—"}
-                    </div>
+                    <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
                     <div className="mt-1 text-xs text-amber-600">
                       {levelStars(row.recommended_level)}
                     </div>
@@ -1302,9 +1281,11 @@ export default function BookHubPage() {
                   Last read: {lastReadDate ?? "—"}
                 </p>
               </div>
+
               <p className="mt-6 text-sm text-stone-500">
                 Time your reading session and log it more easily.
               </p>
+
               <div className="mt-2 flex flex-wrap gap-3">
                 {!isRunning ? (
                   <button
@@ -1326,7 +1307,9 @@ export default function BookHubPage() {
                         setElapsed(Math.floor((Date.now() - startTime) / 1000));
                       }
                       setIsRunning(false);
-                      setSessionStartPage(String(furthestPage ?? ""));
+                      setSessionStartPage(
+                        furthestPage != null ? String(furthestPage + 1) : ""
+                      );
                       setShowTimedSessionForm(true);
                     }}
                     className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
@@ -1334,6 +1317,7 @@ export default function BookHubPage() {
                     Stop Timer
                   </button>
                 )}
+
                 {showTimedSessionForm && !isRunning ? (
                   <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
                     <div className="mb-3 text-sm font-medium text-stone-700">
@@ -1399,71 +1383,11 @@ export default function BookHubPage() {
                     </div>
                   </div>
                 ) : null}
+
                 <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
                   ⏱ {formatTimer(elapsed)}
                 </div>
               </div>
-
-              <div className="mt-5">
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
-                  Student
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  <button
-                    onClick={() => router.push(`/books/${row.id}/words`)}
-                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                  >
-                    📚 Vocab List
-                  </button>
-
-                  <button
-                    onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
-                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                  >
-                    🈶 Reading Flashcards
-                  </button>
-
-                  <button
-                    onClick={() => router.push(`/books/${row.id}/study`)}
-                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                  >
-                    🔁 Vocab Flashcards
-                  </button>
-                </div>
-              </div>
-
-              {isTeacher && (
-                <div className="mt-3">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
-                    Teacher
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <button
-                      onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
-                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                    >
-                      ➕ Add Vocab
-                    </button>
-
-                    <button
-                      onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
-                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                    >
-                      📝 Prepare Readings
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => alert("Notify Student coming next")}
-                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                    >
-                      🔔 Notify Student
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1476,16 +1400,24 @@ export default function BookHubPage() {
           <div className="mt-2 px-4 md:px-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div className="flex gap-2 border-b border-stone-300 px-2">
-                <FilingTab active={activeTab === "book"} onClick={() => setActiveTab("book")}>
-                  Book
+                <FilingTab active={activeTab === "bookInfo"} onClick={() => setActiveTab("bookInfo")}>
+                  Book Info
                 </FilingTab>
 
-                <FilingTab active={activeTab === "readers"} onClick={() => setActiveTab("readers")}>
-                  Readers
+                <FilingTab active={activeTab === "study"} onClick={() => setActiveTab("study")}>
+                  Study
                 </FilingTab>
 
-                <FilingTab active={activeTab === "learners"} onClick={() => setActiveTab("learners")}>
-                  Learners
+                <FilingTab active={activeTab === "rating"} onClick={() => setActiveTab("rating")}>
+                  Ratings
+                </FilingTab>
+
+                <FilingTab active={activeTab === "reading"} onClick={() => setActiveTab("reading")}>
+                  Reading
+                </FilingTab>
+
+                <FilingTab active={activeTab === "story"} onClick={() => setActiveTab("story")}>
+                  Story
                 </FilingTab>
               </div>
 
@@ -1518,7 +1450,7 @@ export default function BookHubPage() {
             </div>
 
             <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
-              {activeTab === "book" && (
+              {activeTab === "bookInfo" && (
                 <div className="space-y-6">
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
@@ -1691,45 +1623,118 @@ export default function BookHubPage() {
                 </div>
               )}
 
-              {activeTab === "readers" && (
+              {activeTab === "reading" && (
                 <div className="space-y-6">
-
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
 
-                    {!editing ? (
-                      <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
-                        {row.my_review?.trim() ? row.my_review : "—"}
-                      </div>
-                    ) : (
-                      <textarea
-                        value={myReview}
-                        onChange={(e) => setMyReview(e.target.value)}
-                        placeholder="Write your review here…"
-                        className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                      />
-                    )}
-                  </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!row?.id) return;
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Ratings</div>
+                          const today = new Date().toISOString().slice(0, 10);
+                          const isDnf = !!row.dnf_at;
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <StarRatingField
-                        label="Overall Rating"
-                        value={row.rating_overall}
-                        editing={editing}
-                        inputValue={ratingOverall}
-                        setInputValue={setRatingOverall}
-                      />
+                          const updateValues = isDnf
+                            ? {
+                              finished_at: null,
+                              dnf_at: null,
+                            }
+                            : {
+                              started_at: today,
+                              finished_at: null,
+                              dnf_at: null,
+                            };
 
-                      <StarRatingField
-                        label="Would Recommend"
-                        value={row.rating_recommend}
-                        editing={editing}
-                        inputValue={ratingRecommend}
-                        setInputValue={setRatingRecommend}
-                      />
+                          const { error } = await supabase
+                            .from("user_books")
+                            .update(updateValues)
+                            .eq("id", row.id);
+
+                          if (error) {
+                            console.error("Error updating book status:", error);
+                            alert("Could not update book status.");
+                            return;
+                          }
+
+                          if (!isDnf) {
+                            setStartedAt(today);
+                          }
+
+                          setFinishedAt("");
+                          setDnfAt("");
+                          await load();
+                          alert(isDnf ? "Book resumed." : "Marked as started.");
+                        }}
+                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                      >
+                        {row.dnf_at ? "Resume Book" : "Start Today"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!row?.id) return;
+
+                          const today = new Date().toISOString().slice(0, 10);
+
+                          const { error } = await supabase
+                            .from("user_books")
+                            .update({
+                              finished_at: today,
+                              dnf_at: null,
+                            })
+                            .eq("id", row.id);
+
+                          if (error) {
+                            console.error("Error marking book as finished:", error);
+                            alert("Could not update book status.");
+                            return;
+                          }
+
+                          setFinishedAt(today);
+                          setDnfAt("");
+                          await load();
+                        }}
+                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                      >
+                        Mark Finished
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!row?.id) return;
+
+                          const confirmed = window.confirm("Mark this book as DNF?");
+                          if (!confirmed) return;
+
+                          const today = new Date().toISOString().slice(0, 10);
+
+                          const { error } = await supabase
+                            .from("user_books")
+                            .update({
+                              dnf_at: today,
+                              finished_at: null,
+                            })
+                            .eq("id", row.id);
+
+                          if (error) {
+                            console.error("Error marking book as DNF:", error);
+                            alert("Could not update book status.");
+                            return;
+                          }
+
+                          setFinishedAt("");
+                          setDnfAt(today);
+                          await load();
+                        }}
+                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                      >
+                        Mark DNF
+                      </button>
                     </div>
                   </div>
 
@@ -1739,19 +1744,39 @@ export default function BookHubPage() {
                     <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                       <DateField
                         label="Started"
-                        value={started}
+                        value={safeDate(startedAt) ?? started}
                         editing={editing}
                         inputValue={startedAt}
                         setInputValue={setStartedAt}
                       />
 
-                      <DateField
-                        label="Finished"
-                        value={finished}
-                        editing={editing}
-                        inputValue={finishedAt}
-                        setInputValue={setFinishedAt}
-                      />
+                      <div className="rounded border bg-white p-3 text-sm">
+                        <div className="text-stone-600">Finished / DNF</div>
+                        {!editing ? (
+                          <div className="mt-1 font-medium">
+                            {dnfAt
+                              ? `${dnfAt} (DNF)`
+                              : safeDate(finishedAt) ?? finished
+                                ? formatYmd((safeDate(finishedAt) ?? finished) as Date)
+                                : "—"}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <input
+                              type="date"
+                              value={finishedAt}
+                              onChange={(e) => setFinishedAt(e.target.value)}
+                              className="w-full rounded border px-2 py-1"
+                            />
+                            <input
+                              type="date"
+                              value={dnfAt}
+                              onChange={(e) => setDnfAt(e.target.value)}
+                              className="w-full rounded border px-2 py-1"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1818,24 +1843,13 @@ export default function BookHubPage() {
                   </div>
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Favorite Quotes</div>
-                    <div className="text-sm text-stone-600">
-                      Personal quotes can live here later. Public sharing can stay limited to 2.
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
 
                     {readingSessions.length === 0 ? (
                       <div className="text-sm text-stone-500">No sessions yet.</div>
                     ) : (
                       <>
-                        {showAllSessions && (
-                          <div className="mb-3">
-                            {renderSessionToggle()}
-                          </div>
-                        )}
+                        {showAllSessions && <div className="mb-3">{renderSessionToggle()}</div>}
 
                         <div className="space-y-2">
                           {visibleReadingSessions.map((session) => {
@@ -1879,10 +1893,49 @@ export default function BookHubPage() {
                 </div>
               )}
 
-              {activeTab === "learners" && (
+              {activeTab === "rating" && (
                 <div className="space-y-6">
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Learning Snapshot</div>
+                    <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+
+                    {!editing ? (
+                      <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
+                        {row.my_review?.trim() ? row.my_review : "—"}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={myReview}
+                        onChange={(e) => setMyReview(e.target.value)}
+                        placeholder="Write your review here…"
+                        className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                      />
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Ratings</div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <StarRatingField
+                        label="Overall Rating"
+                        value={row.rating_overall}
+                        editing={editing}
+                        inputValue={ratingOverall}
+                        setInputValue={setRatingOverall}
+                      />
+
+                      <StarRatingField
+                        label="Would Recommend"
+                        value={row.rating_recommend}
+                        editing={editing}
+                        inputValue={ratingRecommend}
+                        setInputValue={setRatingRecommend}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading Level & Difficulty</div>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="rounded border bg-white p-3 text-sm">
@@ -1911,7 +1964,8 @@ export default function BookHubPage() {
                         inputValue={ratingDifficulty}
                         setInputValue={setRatingDifficulty}
                       />
-                      <div className="rounded border bg-white p-3 text-sm">
+
+                      <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
                         <div className="text-stone-600">Recommended Level</div>
 
                         {!editing ? (
@@ -1922,13 +1976,13 @@ export default function BookHubPage() {
                             </div>
                           </>
                         ) : (
-                          <div className="mt-2 space-y-2">
+                          <div className="mt-2 grid gap-2 sm:grid-cols-5">
                             {[
-                              { value: "N1", stars: "★★★★★" },
-                              { value: "N2", stars: "★★★★☆" },
-                              { value: "N3", stars: "★★★☆☆" },
-                              { value: "N4", stars: "★★☆☆☆" },
                               { value: "N5", stars: "★☆☆☆☆" },
+                              { value: "N4", stars: "★★☆☆☆" },
+                              { value: "N3", stars: "★★★☆☆" },
+                              { value: "N2", stars: "★★★★☆" },
+                              { value: "N1", stars: "★★★★★" },
                             ].map((opt) => {
                               const isSelected = recommendedLevel === opt.value;
 
@@ -1937,7 +1991,7 @@ export default function BookHubPage() {
                                   key={opt.value}
                                   type="button"
                                   onClick={() => setRecommendedLevel(opt.value)}
-                                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
+                                  className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
                                     ? "border-stone-900 bg-stone-100"
                                     : "border-stone-200 hover:bg-stone-50"
                                     }`}
@@ -1951,7 +2005,7 @@ export default function BookHubPage() {
                             <button
                               type="button"
                               onClick={() => setRecommendedLevel("")}
-                              className="w-full rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+                              className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
                             >
                               <div className="text-xs text-stone-600">Clear</div>
                             </button>
@@ -1960,23 +2014,12 @@ export default function BookHubPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
 
+              {activeTab === "story" && (
+                <div className="space-y-6">
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Main Words</div>
-                    <div className="text-sm text-stone-400">
-                      Personal main words can live here later. Personal limit: 10. Public share: 5.
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Difficult Sentences</div>
-                    <div className="text-sm text-stone-400">
-                      Learner-marked difficult sentences can live here later. Public sharing can stay limited to 2.
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-stone-900">Character List</div>
@@ -2126,11 +2169,7 @@ export default function BookHubPage() {
                                             : "bg-blue-600 hover:bg-blue-700"
                                             } disabled:opacity-50`}
                                         >
-                                          {isSaving
-                                            ? "Saving..."
-                                            : wasJustSaved
-                                              ? "Saved!"
-                                              : "Save"}
+                                          {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
                                         </button>
 
                                         {!c.id.startsWith("new-character-") && (
@@ -2163,7 +2202,6 @@ export default function BookHubPage() {
                   </div>
 
                   <div className="rounded-2xl border bg-stone-50 p-4">
-
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-stone-900">Chapter Summaries</div>
@@ -2179,6 +2217,14 @@ export default function BookHubPage() {
                           className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
                         >
                           {showChapterSummaries ? "Hide" : "Show"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setChapterReverseOrder((prev) => !prev)}
+                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                        >
+                          {chapterReverseOrder ? "Oldest First" : "Newest First"}
                         </button>
 
                         <button
@@ -2199,7 +2245,7 @@ export default function BookHubPage() {
                         {chapterSummaries.length === 0 ? (
                           <div className="text-sm text-stone-500">No chapter summaries yet.</div>
                         ) : (
-                          chapterSummaries.map((item) => {
+                          visibleChapterSummaries.map((item) => {
                             const isEditing =
                               item.id.startsWith("new-") || editingChapterIds.includes(item.id);
                             const isSaving = savingChapterIds.includes(item.id);
@@ -2320,11 +2366,7 @@ export default function BookHubPage() {
                                           : "bg-blue-600 hover:bg-blue-700"
                                           } disabled:opacity-50`}
                                       >
-                                        {isSaving
-                                          ? "Saving..."
-                                          : wasJustSaved
-                                            ? "Saved!"
-                                            : "Save"}
+                                        {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
                                       </button>
 
                                       {!item.id.startsWith("new-") && (
@@ -2364,7 +2406,7 @@ export default function BookHubPage() {
                   </div>
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="text-sm font-medium">Learning Notes</div>
+                    <div className="text-sm font-medium">Notes</div>
 
                     {!editing ? (
                       <div className="mt-3 min-h-[260px] whitespace-pre-wrap text-sm text-stone-700">
@@ -2374,18 +2416,89 @@ export default function BookHubPage() {
                       <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Japanese-learning notes, tricky patterns, reminders, reading support notes, etc."
+                        placeholder="Story notes, interpretation notes, reminders, etc."
                         className="mt-3 min-h-[260px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
                       />
                     )}
                   </div>
                 </div>
               )}
+
+              {activeTab === "study" && (
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Study Tools</div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <button
+                        onClick={() => router.push(`/books/${row.id}/words`)}
+                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      >
+                        📚 Vocab List
+                      </button>
+
+                      <button
+                        onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
+                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      >
+                        🈶 Reading Flashcards
+                      </button>
+
+                      <button
+                        onClick={() => router.push(`/books/${row.id}/study`)}
+                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      >
+                        🔁 Vocab Flashcards
+                      </button>
+                    </div>
+                  </div>
+
+                  {isTeacher && (
+                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                      <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Study Tools</div>
+
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <button
+                          onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
+                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                        >
+                          ➕ Add Vocab
+                        </button>
+
+                        <button
+                          onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
+                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                        >
+                          📝 Prepare Readings
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => alert("Notify Student coming next")}
+                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                        >
+                          🔔 Notify Student
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Kanji</div>
+                    <div className="text-sm text-stone-400"> </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Mistakes</div>
+                    <div className="text-sm text-stone-400"> </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
-      </div >
-    </main >
+      </div>
+    </main>
   );
 }
 
@@ -2561,8 +2674,8 @@ function DifficultyField({
                 type="button"
                 onClick={() => setInputValue(String(opt.value))}
                 className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
-                  ? "border-stone-900 bg-stone-100"
-                  : "border-stone-200 hover:bg-stone-50"
+                    ? "border-stone-900 bg-stone-100"
+                    : "border-stone-200 hover:bg-stone-50"
                   }`}
               >
                 <div className="text-amber-600">{stars5(opt.value)}</div>

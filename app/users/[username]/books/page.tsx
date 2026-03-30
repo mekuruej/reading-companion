@@ -68,37 +68,61 @@ function UserBar({ isTeacher }: { isTeacher: boolean }) {
   const [label, setLabel] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    let loading = false;
+
     const loadUser = async () => {
-      const {
-        data: { user },
-        error: userErr,
-      } = await supabase.auth.getUser();
+      if (loading) return;
+      loading = true;
 
-      if (userErr || !user) {
-        setLabel(null);
-        return;
+      try {
+        const {
+          data: { user },
+          error: userErr,
+        } = await supabase.auth.getUser();
+
+        if (cancelled) return;
+
+        if (userErr || !user) {
+          setLabel(null);
+          return;
+        }
+
+        const { data: prof, error: profErr } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", user.id)
+          .single();
+
+        if (cancelled) return;
+
+        if (profErr) {
+          console.warn("UserBar: could not load profile display_name:", profErr);
+        }
+
+        setLabel(prof?.display_name || "User");
+      } catch (err) {
+        if (!cancelled) {
+          console.error("UserBar loadUser error:", err);
+          setLabel(null);
+        }
+      } finally {
+        loading = false;
       }
-
-      const { data: prof, error: profErr } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", user.id)
-        .single();
-
-      if (profErr) {
-        console.warn("UserBar: could not load profile display_name:", profErr);
-      }
-
-      setLabel(prof?.display_name || "User");
     };
 
     loadUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => loadUser());
+    } = supabase.auth.onAuthStateChange(() => {
+      void loadUser();
+    });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -137,6 +161,18 @@ function UserBar({ isTeacher }: { isTeacher: boolean }) {
   );
 }
 
+function normalizeBookPart(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizeIsbn(isbn: string | null | undefined) {
+  return (isbn ?? "").replace(/[^0-9X]/gi, "");
+}
+
+function makeBookKey(title: string, author?: string | null) {
+  return [normalizeBookPart(title), normalizeBookPart(author)].join("|");
+}
+
 export default function BooksPage() {
   const router = useRouter();
   const params = useParams<{ username: string }>();
@@ -144,8 +180,8 @@ export default function BooksPage() {
 
   const [rows, setRows] = useState<UserBookRow[]>([]);
   const [readingStatsByUserBookId, setReadingStatsByUserBookId] = useState<
-  Record<string, ReadingSessionStats>
->({});
+    Record<string, ReadingSessionStats>
+  >({});
 
   const [alertBox, setAlertBox] = useState<AlertBoxState>(null);
   const [teacherPrepAlerts, setTeacherPrepAlerts] = useState<TeacherPrepItem[]>([]);
@@ -158,6 +194,12 @@ export default function BooksPage() {
   const [myRole, setMyRole] = useState<ProfileRole>("student");
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
+
+  const [newBookTitle, setNewBookTitle] = useState("");
+  const [newBookAuthor, setNewBookAuthor] = useState("");
+  const [newBookIsbn, setNewBookIsbn] = useState("");
+  const [isSavingBook, setIsSavingBook] = useState(false);
+  const [showAddBook, setShowAddBook] = useState(false);
 
   const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
@@ -226,91 +268,183 @@ export default function BooksPage() {
     }
 
     const loadedRows = (data as any) || [];
-setRows(loadedRows);
+    setRows(loadedRows);
 
-const userBookIds = loadedRows.map((r: any) => r.id);
-const pageCountByUserBookId: Record<string, number | null> = {};
+    const userBookIds = loadedRows.map((r: any) => r.id);
+    const pageCountByUserBookId: Record<string, number | null> = {};
 
-for (const r of loadedRows) {
-  pageCountByUserBookId[r.id] = r.books?.page_count ?? null;
-}
+    for (const r of loadedRows) {
+      pageCountByUserBookId[r.id] = r.books?.page_count ?? null;
+    }
 
-await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
+    await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
+  }
+
+  async function handleAddBook() {
+    if (!isTeacher) {
+      alert("Only teachers can add books right now.");
+      return;
+    }
+
+    if (!meId) {
+      alert("You need to be signed in to add a book.");
+      return;
+    }
+
+    const cleanTitle = newBookTitle.trim();
+    const cleanAuthor = newBookAuthor.trim();
+    const cleanIsbn = normalizeIsbn(newBookIsbn);
+
+    if (!cleanTitle) {
+      alert("Please enter a title.");
+      return;
+    }
+
+    setIsSavingBook(true);
+
+    try {
+      const bookKey = makeBookKey(cleanTitle, cleanAuthor || null);
+      let bookId: string | null = null;
+
+      if (cleanIsbn) {
+        const { data: byIsbn, error: isbnLookupError } = await supabase
+          .from("books")
+          .select("id")
+          .eq("isbn13", cleanIsbn)
+          .maybeSingle();
+
+        if (isbnLookupError) throw isbnLookupError;
+        if (byIsbn) bookId = byIsbn.id;
+      }
+
+      if (!bookId) {
+        const { data: byKey, error: keyLookupError } = await supabase
+          .from("books")
+          .select("id")
+          .eq("book_key", bookKey)
+          .maybeSingle();
+
+        if (keyLookupError) throw keyLookupError;
+        if (byKey) bookId = byKey.id;
+      }
+
+      if (!bookId) {
+        const { data: insertedBook, error: insertBookError } = await supabase
+          .from("books")
+          .insert({
+            title: cleanTitle,
+            author: cleanAuthor || null,
+            isbn13: cleanIsbn || null,
+            book_key: bookKey,
+          })
+          .select("id")
+          .single();
+
+        if (insertBookError) throw insertBookError;
+        bookId = insertedBook.id;
+      }
+
+      const { error: userBookError } = await supabase.from("user_books").insert({
+        user_id: meId,
+        book_id: bookId,
+      });
+
+      if (userBookError) {
+        if (userBookError.code === "23505") {
+          alert("You already added this book.");
+          return;
+        }
+        throw userBookError;
+      }
+
+      setNewBookTitle("");
+      setNewBookAuthor("");
+      setNewBookIsbn("");
+      setShowAddBook(false);
+      await fetchBooks(viewingUserId || meId);
+
+      alert("Book added!");
+    } catch (err) {
+      console.error("ADD BOOK ERROR:", err);
+      alert("Could not add book.");
+    } finally {
+      setIsSavingBook(false);
+    }
   }
 
   async function loadReadingStatsForBooks(userBookIds: string[], pageCountByUserBookId: Record<string, number | null>) {
-  if (userBookIds.length === 0) {
-    setReadingStatsByUserBookId({});
-    return;
-  }
+    if (userBookIds.length === 0) {
+      setReadingStatsByUserBookId({});
+      return;
+    }
 
-  const { data, error } = await supabase
-    .from("user_book_reading_sessions")
-    .select("user_book_id, start_page, end_page, minutes_read")
-    .in("user_book_id", userBookIds);
+    const { data, error } = await supabase
+      .from("user_book_reading_sessions")
+      .select("user_book_id, start_page, end_page, minutes_read")
+      .in("user_book_id", userBookIds);
 
-  if (error) {
-    console.error("Error loading reading stats for library:", error);
-    setReadingStatsByUserBookId({});
-    return;
-  }
+    if (error) {
+      console.error("Error loading reading stats for library:", error);
+      setReadingStatsByUserBookId({});
+      return;
+    }
 
-  const grouped: Record<
-    string,
-    { furthestPage: number; totalPagesRead: number; totalMinutesRead: number }
-  > = {};
+    const grouped: Record<
+      string,
+      { furthestPage: number; totalPagesRead: number; totalMinutesRead: number }
+    > = {};
 
-  for (const row of data ?? []) {
-    const userBookId = row.user_book_id as string;
-    const startPage = Number((row as any).start_page);
-    const endPage = Number((row as any).end_page);
-    const minutesRead = Number((row as any).minutes_read);
+    for (const row of data ?? []) {
+      const userBookId = row.user_book_id as string;
+      const startPage = Number((row as any).start_page);
+      const endPage = Number((row as any).end_page);
+      const minutesRead = Number((row as any).minutes_read);
 
-    if (!grouped[userBookId]) {
-      grouped[userBookId] = {
-        furthestPage: 0,
-        totalPagesRead: 0,
-        totalMinutesRead: 0,
+      if (!grouped[userBookId]) {
+        grouped[userBookId] = {
+          furthestPage: 0,
+          totalPagesRead: 0,
+          totalMinutesRead: 0,
+        };
+      }
+
+      grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
+      grouped[userBookId].totalPagesRead += endPage - startPage + 1;
+      grouped[userBookId].totalMinutesRead += minutesRead;
+    }
+
+    const stats: Record<string, ReadingSessionStats> = {};
+
+    for (const userBookId of userBookIds) {
+      const pageCount = pageCountByUserBookId[userBookId];
+      const g = grouped[userBookId];
+
+      if (!g) {
+        stats[userBookId] = {
+          progressPercent: null,
+          averageMinutesPerPage: null,
+          furthestPage: null,
+        };
+        continue;
+      }
+
+      const progressPercent =
+        pageCount && pageCount > 0
+          ? Math.min(100, Math.round((g.furthestPage / pageCount) * 100))
+          : null;
+
+      const averageMinutesPerPage =
+        g.totalPagesRead > 0 ? g.totalMinutesRead / g.totalPagesRead : null;
+
+      stats[userBookId] = {
+        progressPercent,
+        averageMinutesPerPage,
+        furthestPage: g.furthestPage,
       };
     }
 
-    grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
-    grouped[userBookId].totalPagesRead += endPage - startPage + 1;
-    grouped[userBookId].totalMinutesRead += minutesRead;
+    setReadingStatsByUserBookId(stats);
   }
-
-  const stats: Record<string, ReadingSessionStats> = {};
-
-  for (const userBookId of userBookIds) {
-    const pageCount = pageCountByUserBookId[userBookId];
-    const g = grouped[userBookId];
-
-    if (!g) {
-      stats[userBookId] = {
-  progressPercent: null,
-  averageMinutesPerPage: null,
-  furthestPage: null,
-};
-      continue;
-    }
-
-    const progressPercent =
-      pageCount && pageCount > 0
-        ? Math.min(100, Math.round((g.furthestPage / pageCount) * 100))
-        : null;
-
-    const averageMinutesPerPage =
-      g.totalPagesRead > 0 ? g.totalMinutesRead / g.totalPagesRead : null;
-
-    stats[userBookId] = {
-  progressPercent,
-  averageMinutesPerPage,
-  furthestPage: g.furthestPage,
-};
-  }
-
-  setReadingStatsByUserBookId(stats);
-}
 
   useEffect(() => {
     let cancelled = false;
@@ -662,48 +796,48 @@ await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
         </a>
 
         <div className="mt-2 w-full text-center">
-  {row.finished_at ? (
-    <div className="space-y-1 text-[11px] text-gray-500">
-      {row.started_at ? (
-        <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
-      ) : null}
-      <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
-      <div>
-        Avg:{" "}
-        {readingStatsByUserBookId[row.id]?.averageMinutesPerPage != null
-          ? `${readingStatsByUserBookId[row.id].averageMinutesPerPage!.toFixed(2)} min/page`
-          : "—"}
-      </div>
-    </div>
-  ) : row.dnf_at ? (
-    <div className="text-[11px] text-gray-400">
-      DNF: {new Date(row.dnf_at).toLocaleDateString()}
-    </div>
-  ) : row.started_at ? (
-    <div className="space-y-1">
-  <div className="text-[11px] text-gray-600">
-  {readingStatsByUserBookId[row.id]?.progressPercent != null &&
-  readingStatsByUserBookId[row.id]?.furthestPage != null
-    ? `${readingStatsByUserBookId[row.id].progressPercent}% · p.${readingStatsByUserBookId[row.id].furthestPage}`
-    : "In progress"}
-</div>
+          {row.finished_at ? (
+            <div className="space-y-1 text-[11px] text-gray-500">
+              {row.started_at ? (
+                <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
+              ) : null}
+              <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
+              <div>
+                Avg:{" "}
+                {readingStatsByUserBookId[row.id]?.averageMinutesPerPage != null
+                  ? `${readingStatsByUserBookId[row.id].averageMinutesPerPage!.toFixed(2)} min/page`
+                  : "—"}
+              </div>
+            </div>
+          ) : row.dnf_at ? (
+            <div className="text-[11px] text-gray-400">
+              DNF: {new Date(row.dnf_at).toLocaleDateString()}
+            </div>
+          ) : row.started_at ? (
+            <div className="space-y-1">
+              <div className="text-[11px] text-gray-600">
+                {readingStatsByUserBookId[row.id]?.progressPercent != null &&
+                  readingStatsByUserBookId[row.id]?.furthestPage != null
+                  ? `${readingStatsByUserBookId[row.id].progressPercent}% · p.${readingStatsByUserBookId[row.id].furthestPage}`
+                  : "In progress"}
+              </div>
 
-  <div className="mx-auto h-3 w-20 overflow-hidden rounded-full bg-gray-200">
-    <div
-      className="h-full bg-gray-700 transition-all"
-      style={{
-        width:
-          readingStatsByUserBookId[row.id]?.progressPercent != null
-            ? `${readingStatsByUserBookId[row.id].progressPercent}%`
-            : "8%",
-      }}
-    />
-  </div>
-</div>
-  ) : (
-    <div className="text-[11px] text-gray-400">Not started</div>
-  )}
-</div>
+              <div className="mx-auto h-3 w-20 overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className="h-full bg-gray-700 transition-all"
+                  style={{
+                    width:
+                      readingStatsByUserBookId[row.id]?.progressPercent != null
+                        ? `${readingStatsByUserBookId[row.id].progressPercent}%`
+                        : "8%",
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="text-[11px] text-gray-400">Not started</div>
+          )}
+        </div>
       </li>
     );
   }
@@ -860,9 +994,8 @@ await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
 
         {message ? (
           <p
-            className={`mb-4 text-sm ${
-              messageType === "error" ? "text-red-600" : "text-green-700"
-            }`}
+            className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"
+              }`}
           >
             {message}
           </p>
@@ -892,6 +1025,92 @@ await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
         {validRows.length === 0 ? (
           <div className="mt-8 text-sm text-gray-600">No books yet.</div>
         ) : null}
+
+        {isTeacher ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowAddBook(true)}
+              className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
+            >
+              + Add Book
+            </button>
+
+            {showAddBook ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">Add Book</h2>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddBook(false)}
+                      className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Title</label>
+                      <input
+                        type="text"
+                        value={newBookTitle}
+                        onChange={(e) => setNewBookTitle(e.target.value)}
+                        placeholder="Enter book title"
+                        className="w-full rounded-xl border px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Author</label>
+                      <input
+                        type="text"
+                        value={newBookAuthor}
+                        onChange={(e) => setNewBookAuthor(e.target.value)}
+                        placeholder="Enter author name"
+                        className="w-full rounded-xl border px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">ISBN-13</label>
+                      <input
+                        type="text"
+                        value={newBookIsbn}
+                        onChange={(e) => setNewBookIsbn(e.target.value)}
+                        placeholder="978..."
+                        className="w-full rounded-xl border px-3 py-2"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">
+                        Hyphens and spaces are okay. They will be removed automatically.
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddBook(false)}
+                        className="rounded-xl border px-4 py-2 text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddBook}
+                        disabled={isSavingBook}
+                        className="rounded-xl bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                      >
+                        {isSavingBook ? "Saving..." : "Add Book"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
       </div>
     </main>
   );

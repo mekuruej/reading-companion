@@ -5,11 +5,11 @@ import Link from "next/link";
 export default function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-3">
+      <div className="mx-auto max-w-6xl px-4 py-2.5">
         <div className="text-center md:text-left">
           <Link
             href="/books"
-            className="text-lg font-semibold tracking-tight text-stone-900"
+            className="text-base font-semibold tracking-tight text-stone-900 sm:text-lg md:text-3xl"
           >
             MEKURU
           </Link>
@@ -23,7 +23,7 @@ export default function Header() {
           <button
             type="button"
             onClick={() =>
-              alert("Book Hubs is coming soon. For now, choose a book from your Library.")
+              alert("Book Hubs are coming soon. For now, choose a book from your Library.")
             }
             className="text-stone-700 transition hover:text-stone-900"
           >
@@ -48,7 +48,7 @@ export default function Header() {
           </Link>
         </nav>
 
-        <div className="mt-2 text-center text-xs text-stone-500 md:text-left">
+        <div className="mt-1 text-center text-xs text-stone-500 md:text-left">
           ページをめくって、話しまくろう
         </div>
       </div>
