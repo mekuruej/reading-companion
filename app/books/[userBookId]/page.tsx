@@ -294,6 +294,7 @@ export default function BookHubPage() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
@@ -1283,1222 +1284,1269 @@ export default function BookHubPage() {
               </div>
 
               <p className="mt-6 text-sm text-stone-500">
-                Time your reading session and log it more easily.
-              </p>
+  Time your reading session and log it more easily.
+</p>
 
-              <div className="mt-2 flex flex-wrap gap-3">
-                {!isRunning ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStartTime(Date.now());
-                      setElapsed(0);
-                      setIsRunning(true);
-                    }}
-                    className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-                  >
-                    Start Timer
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (startTime) {
-                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                      }
-                      setIsRunning(false);
-                      setSessionStartPage(
-                        furthestPage != null ? String(furthestPage + 1) : ""
-                      );
-                      setShowTimedSessionForm(true);
-                    }}
-                    className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                  >
-                    Stop Timer
-                  </button>
-                )}
+<div className="mt-2 flex flex-wrap gap-3">
+  {!isRunning && !isPaused ? (
+    <button
+      type="button"
+      onClick={() => {
+        setStartTime(Date.now());
+        setElapsed(0);
+        setIsRunning(true);
+        setIsPaused(false);
+      }}
+      className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+    >
+      Start Timer
+    </button>
+  ) : null}
 
-                {showTimedSessionForm && !isRunning ? (
-                  <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
-                    <div className="mb-3 text-sm font-medium text-stone-700">
-                      Save this reading session
-                    </div>
+  {isRunning ? (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          if (startTime) {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+          }
+          setIsRunning(false);
+          setIsPaused(true);
+        }}
+        className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
+      >
+        Pause
+      </button>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <div className="mb-1 text-sm text-stone-600">Start page</div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sessionStartPage}
-                          onChange={(e) => setSessionStartPage(e.target.value)}
-                          placeholder="e.g. 45"
-                          className="w-full rounded border px-3 py-2 text-sm"
-                        />
-                      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (startTime) {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+          }
+          setIsRunning(false);
+          setIsPaused(false);
+          setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
+          setShowTimedSessionForm(true);
+        }}
+        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+      >
+        Finish
+      </button>
+    </>
+  ) : null}
 
-                      <div>
-                        <div className="mb-1 text-sm text-stone-600">End page</div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sessionEndPage}
-                          onChange={(e) => setSessionEndPage(e.target.value)}
-                          placeholder="e.g. 52"
-                          className="w-full rounded border px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </div>
+  {isPaused ? (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setStartTime(Date.now() - elapsed * 1000);
+          setIsRunning(true);
+          setIsPaused(false);
+        }}
+        className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+      >
+        Resume
+      </button>
 
-                    <div className="mt-3 text-sm text-stone-500">
-                      Time: {formatTimer(elapsed)}
-                    </div>
+      <button
+        type="button"
+        onClick={() => {
+          setIsPaused(false);
+          setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
+          setShowTimedSessionForm(true);
+        }}
+        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+      >
+        Finish
+      </button>
+    </>
+  ) : null}
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
-                          saveReadingSession();
-                          setShowTimedSessionForm(false);
-                          setElapsed(0);
-                          setStartTime(null);
-                        }}
-                        className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                      >
-                        Save Timed Session
-                      </button>
+  <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
+    ⏱ {formatTimer(elapsed)}
+  </div>
+</div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowTimedSessionForm(false);
-                          setElapsed(0);
-                          setStartTime(null);
-                        }}
-                        className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
+{showTimedSessionForm && !isRunning ? (
+  <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
+    <div className="mb-3 text-sm font-medium text-stone-700">
+      Save this reading session
+    </div>
 
-                <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
-                  ⏱ {formatTimer(elapsed)}
-                </div>
-              </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div>
+        <div className="mb-1 text-sm text-stone-600">Start page</div>
+        <input
+          type="number"
+          min={1}
+          value={sessionStartPage}
+          onChange={(e) => setSessionStartPage(e.target.value)}
+          placeholder="e.g. 45"
+          className="w-full rounded border px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <div className="mb-1 text-sm text-stone-600">End page</div>
+        <input
+          type="number"
+          min={1}
+          value={sessionEndPage}
+          onChange={(e) => setSessionEndPage(e.target.value)}
+          placeholder="e.g. 52"
+          className="w-full rounded border px-3 py-2 text-sm"
+        />
+      </div>
+    </div>
+
+    <div className="mt-3 text-sm text-stone-500">
+      Time: {formatTimer(elapsed)}
+    </div>
+
+    <div className="mt-4 flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
+          saveReadingSession();
+          setShowTimedSessionForm(false);
+          setElapsed(0);
+          setStartTime(null);
+          setIsPaused(false);
+        }}
+        className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+      >
+        Save Timed Session
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          setShowTimedSessionForm(false);
+          setElapsed(0);
+          setStartTime(null);
+          setIsPaused(false);
+        }}
+        className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+) : null}
             </div>
           </div>
+      {error ? (
+        <div className="border-t border-stone-200 px-5 py-3 text-sm text-red-600 md:px-8">
+          {error}
+        </div>
+      ) : null}
 
-          {error ? (
-            <div className="border-t border-stone-200 px-5 py-3 text-sm text-red-600 md:px-8">
-              {error}
-            </div>
+      <div className="mt-2 px-4 md:px-8">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div className="flex gap-2 border-b border-stone-300 px-2">
+            <FilingTab active={activeTab === "bookInfo"} onClick={() => setActiveTab("bookInfo")}>
+              Book Info
+            </FilingTab>
+
+            <FilingTab active={activeTab === "study"} onClick={() => setActiveTab("study")}>
+              Study
+            </FilingTab>
+
+            <FilingTab active={activeTab === "rating"} onClick={() => setActiveTab("rating")}>
+              Ratings
+            </FilingTab>
+
+            <FilingTab active={activeTab === "reading"} onClick={() => setActiveTab("reading")}>
+              Reading
+            </FilingTab>
+
+            <FilingTab active={activeTab === "story"} onClick={() => setActiveTab("story")}>
+              Story
+            </FilingTab>
+          </div>
+
+          {isTeacher ? (
+            !editing ? (
+              <button
+                onClick={() => setEditing(true)}
+                className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+              >
+                Edit
+              </button>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={cancelEdits}
+                  className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveAll}
+                  disabled={saving}
+                  className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            )
           ) : null}
+        </div>
 
-          <div className="mt-2 px-4 md:px-8">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div className="flex gap-2 border-b border-stone-300 px-2">
-                <FilingTab active={activeTab === "bookInfo"} onClick={() => setActiveTab("bookInfo")}>
-                  Book Info
-                </FilingTab>
+        <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
+          {activeTab === "bookInfo" && (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
 
-                <FilingTab active={activeTab === "study"} onClick={() => setActiveTab("study")}>
-                  Study
-                </FilingTab>
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                  <Detail
+                    label="Genre"
+                    value={book.genre}
+                    editing={editing}
+                    inputValue={genre}
+                    setInputValue={setGenre}
+                    placeholder="e.g. novel, mystery, picture book..."
+                  />
+                  <Detail
+                    label="Page Count"
+                    value={book.page_count}
+                    editing={editing}
+                    inputValue={pageCount}
+                    setInputValue={setPageCount}
+                    placeholder="e.g. 352"
+                  />
+                  <Detail
+                    label="ISBN"
+                    value={book.isbn}
+                    editing={editing}
+                    inputValue={isbn}
+                    setInputValue={setIsbn}
+                    placeholder="ISBN"
+                  />
+                  <Detail
+                    label="ISBN-13"
+                    value={book.isbn13}
+                    editing={editing}
+                    inputValue={isbn13}
+                    setInputValue={setIsbn13}
+                    placeholder="ISBN-13"
+                  />
+                </div>
 
-                <FilingTab active={activeTab === "rating"} onClick={() => setActiveTab("rating")}>
-                  Ratings
-                </FilingTab>
-
-                <FilingTab active={activeTab === "reading"} onClick={() => setActiveTab("reading")}>
-                  Reading
-                </FilingTab>
-
-                <FilingTab active={activeTab === "story"} onClick={() => setActiveTab("story")}>
-                  Story
-                </FilingTab>
+                <div className="mt-4">
+                  <div className="text-sm font-medium">Trigger Warnings</div>
+                  {!editing ? (
+                    <div className="mt-1 min-h-[40px] whitespace-pre-wrap text-sm text-stone-700">
+                      {book.trigger_warnings?.trim() ? book.trigger_warnings : "—"}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={triggerWarnings}
+                      onChange={(e) => setTriggerWarnings(e.target.value)}
+                      placeholder="Anything you want to flag"
+                      className="mt-2 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                    />
+                  )}
+                </div>
               </div>
 
-              {isTeacher ? (
-                !editing ? (
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={cancelEdits}
-                      className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving…" : "Save"}
-                    </button>
-                  </div>
-                )
-              ) : null}
-            </div>
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">People</div>
 
-            <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
-              {activeTab === "bookInfo" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
+                <div className="space-y-4">
+                  <PersonRow
+                    label="Author"
+                    name={editing ? authorName : book.author}
+                    reading={editing ? authorReading : book.author_reading}
+                    img={editing ? authorImg : book.author_image_url}
+                    editing={editing}
+                    nameValue={authorName}
+                    setNameValue={setAuthorName}
+                    imgValue={authorImg}
+                    setImgValue={setAuthorImg}
+                    readingValue={authorReading}
+                    setReadingValue={setAuthorReading}
+                  />
 
-                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                      <Detail
-                        label="Genre"
-                        value={book.genre}
-                        editing={editing}
-                        inputValue={genre}
-                        setInputValue={setGenre}
-                        placeholder="e.g. novel, mystery, picture book..."
-                      />
-                      <Detail
-                        label="Page Count"
-                        value={book.page_count}
-                        editing={editing}
-                        inputValue={pageCount}
-                        setInputValue={setPageCount}
-                        placeholder="e.g. 352"
-                      />
-                      <Detail
-                        label="ISBN"
-                        value={book.isbn}
-                        editing={editing}
-                        inputValue={isbn}
-                        setInputValue={setIsbn}
-                        placeholder="ISBN"
-                      />
-                      <Detail
-                        label="ISBN-13"
-                        value={book.isbn13}
-                        editing={editing}
-                        inputValue={isbn13}
-                        setInputValue={setIsbn13}
-                        placeholder="ISBN-13"
-                      />
-                    </div>
+                  {(book.translator || book.translator_image_url || editing) && (
+                    <PersonRow
+                      label="Translator"
+                      name={editing ? translatorName : book.translator}
+                      reading={editing ? translatorReading : book.translator_reading}
+                      img={editing ? translatorImg : book.translator_image_url}
+                      editing={editing}
+                      nameValue={translatorName}
+                      setNameValue={setTranslatorName}
+                      imgValue={translatorImg}
+                      setImgValue={setTranslatorImg}
+                      readingValue={translatorReading}
+                      setReadingValue={setTranslatorReading}
+                    />
+                  )}
 
-                    <div className="mt-4">
-                      <div className="text-sm font-medium">Trigger Warnings</div>
-                      {!editing ? (
-                        <div className="mt-1 min-h-[40px] whitespace-pre-wrap text-sm text-stone-700">
-                          {book.trigger_warnings?.trim() ? book.trigger_warnings : "—"}
-                        </div>
-                      ) : (
-                        <textarea
-                          value={triggerWarnings}
-                          onChange={(e) => setTriggerWarnings(e.target.value)}
-                          placeholder="Anything you want to flag"
-                          className="mt-2 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                        />
-                      )}
-                    </div>
-                  </div>
+                  {(book.illustrator || book.illustrator_image_url || editing) && (
+                    <PersonRow
+                      label="Illustrator"
+                      name={editing ? illustratorName : book.illustrator}
+                      reading={editing ? illustratorReading : book.illustrator_reading}
+                      img={editing ? illustratorImg : book.illustrator_image_url}
+                      editing={editing}
+                      nameValue={illustratorName}
+                      setNameValue={setIllustratorName}
+                      imgValue={illustratorImg}
+                      setImgValue={setIllustratorImg}
+                      readingValue={illustratorReading}
+                      setReadingValue={setIllustratorReading}
+                    />
+                  )}
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">People</div>
-
-                    <div className="space-y-4">
-                      <PersonRow
-                        label="Author"
-                        name={editing ? authorName : book.author}
-                        reading={editing ? authorReading : book.author_reading}
-                        img={editing ? authorImg : book.author_image_url}
-                        editing={editing}
-                        nameValue={authorName}
-                        setNameValue={setAuthorName}
-                        imgValue={authorImg}
-                        setImgValue={setAuthorImg}
-                        readingValue={authorReading}
-                        setReadingValue={setAuthorReading}
-                      />
-
-                      {(book.translator || book.translator_image_url || editing) && (
-                        <PersonRow
-                          label="Translator"
-                          name={editing ? translatorName : book.translator}
-                          reading={editing ? translatorReading : book.translator_reading}
-                          img={editing ? translatorImg : book.translator_image_url}
-                          editing={editing}
-                          nameValue={translatorName}
-                          setNameValue={setTranslatorName}
-                          imgValue={translatorImg}
-                          setImgValue={setTranslatorImg}
-                          readingValue={translatorReading}
-                          setReadingValue={setTranslatorReading}
-                        />
-                      )}
-
-                      {(book.illustrator || book.illustrator_image_url || editing) && (
-                        <PersonRow
-                          label="Illustrator"
-                          name={editing ? illustratorName : book.illustrator}
-                          reading={editing ? illustratorReading : book.illustrator_reading}
-                          img={editing ? illustratorImg : book.illustrator_image_url}
-                          editing={editing}
-                          nameValue={illustratorName}
-                          setNameValue={setIllustratorName}
-                          imgValue={illustratorImg}
-                          setImgValue={setIllustratorImg}
-                          readingValue={illustratorReading}
-                          setReadingValue={setIllustratorReading}
-                        />
-                      )}
-
-                      {(book.publisher || book.publisher_image_url || editing) && (
-                        <PersonRow
-                          label="Publisher"
-                          name={editing ? publisherName : book.publisher}
-                          reading={editing ? publisherReading : book.publisher_reading}
-                          img={editing ? publisherImg : book.publisher_image_url}
-                          editing={editing}
-                          nameValue={publisherName}
-                          setNameValue={setPublisherName}
-                          imgValue={publisherImg}
-                          setImgValue={setPublisherImg}
-                          readingValue={publisherReading}
-                          setReadingValue={setPublisherReading}
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Related Links</div>
-
-                    {!editing ? (
-                      relatedLinksArr.length > 0 ? (
-                        <ul className="space-y-2 text-sm">
-                          {relatedLinksArr.map((l: any, idx: number) => {
-                            const label = displayLinkLabel(l);
-                            const url = displayLinkUrl(l);
-                            return (
-                              <li key={idx} className="flex items-center justify-between gap-3">
-                                <span className="truncate">{label}</span>
-                                {url ? (
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="shrink-0 text-blue-600 hover:underline"
-                                  >
-                                    Open
-                                  </a>
-                                ) : (
-                                  <span className="text-stone-500">—</span>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : (
-                        <div className="text-sm text-stone-500">—</div>
-                      )
-                    ) : (
-                      <div>
-                        <div className="mb-2 text-xs text-stone-500">
-                          One per line. Optional format: <span className="font-mono">Label | URL</span>
-                        </div>
-                        <textarea
-                          value={linksText}
-                          onChange={(e) => setLinksText(e.target.value)}
-                          placeholder={`Amazon | https://...\nPublisher | https://...\nhttps://...`}
-                          className="min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  {(book.publisher || book.publisher_image_url || editing) && (
+                    <PersonRow
+                      label="Publisher"
+                      name={editing ? publisherName : book.publisher}
+                      reading={editing ? publisherReading : book.publisher_reading}
+                      img={editing ? publisherImg : book.publisher_image_url}
+                      editing={editing}
+                      nameValue={publisherName}
+                      setNameValue={setPublisherName}
+                      imgValue={publisherImg}
+                      setImgValue={setPublisherImg}
+                      readingValue={publisherReading}
+                      setReadingValue={setPublisherReading}
+                    />
+                  )}
                 </div>
-              )}
+              </div>
 
-              {activeTab === "reading" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Related Links</div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!row?.id) return;
-
-                          const today = new Date().toISOString().slice(0, 10);
-                          const isDnf = !!row.dnf_at;
-
-                          const updateValues = isDnf
-                            ? {
-                              finished_at: null,
-                              dnf_at: null,
-                            }
-                            : {
-                              started_at: today,
-                              finished_at: null,
-                              dnf_at: null,
-                            };
-
-                          const { error } = await supabase
-                            .from("user_books")
-                            .update(updateValues)
-                            .eq("id", row.id);
-
-                          if (error) {
-                            console.error("Error updating book status:", error);
-                            alert("Could not update book status.");
-                            return;
-                          }
-
-                          if (!isDnf) {
-                            setStartedAt(today);
-                          }
-
-                          setFinishedAt("");
-                          setDnfAt("");
-                          await load();
-                          alert(isDnf ? "Book resumed." : "Marked as started.");
-                        }}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        {row.dnf_at ? "Resume Book" : "Start Today"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!row?.id) return;
-
-                          const today = new Date().toISOString().slice(0, 10);
-
-                          const { error } = await supabase
-                            .from("user_books")
-                            .update({
-                              finished_at: today,
-                              dnf_at: null,
-                            })
-                            .eq("id", row.id);
-
-                          if (error) {
-                            console.error("Error marking book as finished:", error);
-                            alert("Could not update book status.");
-                            return;
-                          }
-
-                          setFinishedAt(today);
-                          setDnfAt("");
-                          await load();
-                        }}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        Mark Finished
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!row?.id) return;
-
-                          const confirmed = window.confirm("Mark this book as DNF?");
-                          if (!confirmed) return;
-
-                          const today = new Date().toISOString().slice(0, 10);
-
-                          const { error } = await supabase
-                            .from("user_books")
-                            .update({
-                              dnf_at: today,
-                              finished_at: null,
-                            })
-                            .eq("id", row.id);
-
-                          if (error) {
-                            console.error("Error marking book as DNF:", error);
-                            alert("Could not update book status.");
-                            return;
-                          }
-
-                          setFinishedAt("");
-                          setDnfAt(today);
-                          await load();
-                        }}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        Mark DNF
-                      </button>
+                {!editing ? (
+                  relatedLinksArr.length > 0 ? (
+                    <ul className="space-y-2 text-sm">
+                      {relatedLinksArr.map((l: any, idx: number) => {
+                        const label = displayLinkLabel(l);
+                        const url = displayLinkUrl(l);
+                        return (
+                          <li key={idx} className="flex items-center justify-between gap-3">
+                            <span className="truncate">{label}</span>
+                            {url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="shrink-0 text-blue-600 hover:underline"
+                              >
+                                Open
+                              </a>
+                            ) : (
+                              <span className="text-stone-500">—</span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-stone-500">—</div>
+                  )
+                ) : (
+                  <div>
+                    <div className="mb-2 text-xs text-stone-500">
+                      One per line. Optional format: <span className="font-mono">Label | URL</span>
                     </div>
+                    <textarea
+                      value={linksText}
+                      onChange={(e) => setLinksText(e.target.value)}
+                      placeholder={`Amazon | https://...\nPublisher | https://...\nhttps://...`}
+                      className="min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                    />
                   </div>
+                )}
+              </div>
+            </div>
+          )}
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading History</div>
+          {activeTab === "reading" && (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
 
-                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                      <DateField
-                        label="Started"
-                        value={safeDate(startedAt) ?? started}
-                        editing={editing}
-                        inputValue={startedAt}
-                        setInputValue={setStartedAt}
-                      />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!row?.id) return;
 
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Finished / DNF</div>
-                        {!editing ? (
-                          <div className="mt-1 font-medium">
-                            {dnfAt
-                              ? `${dnfAt} (DNF)`
-                              : safeDate(finishedAt) ?? finished
-                                ? formatYmd((safeDate(finishedAt) ?? finished) as Date)
-                                : "—"}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <input
-                              type="date"
-                              value={finishedAt}
-                              onChange={(e) => setFinishedAt(e.target.value)}
-                              className="w-full rounded border px-2 py-1"
-                            />
-                            <input
-                              type="date"
-                              value={dnfAt}
-                              onChange={(e) => setDnfAt(e.target.value)}
-                              className="w-full rounded border px-2 py-1"
-                            />
-                          </div>
-                        )}
+                      const today = new Date().toISOString().slice(0, 10);
+                      const isDnf = !!row.dnf_at;
+
+                      const updateValues = isDnf
+                        ? {
+                          finished_at: null,
+                          dnf_at: null,
+                        }
+                        : {
+                          started_at: today,
+                          finished_at: null,
+                          dnf_at: null,
+                        };
+
+                      const { error } = await supabase
+                        .from("user_books")
+                        .update(updateValues)
+                        .eq("id", row.id);
+
+                      if (error) {
+                        console.error("Error updating book status:", error);
+                        alert("Could not update book status.");
+                        return;
+                      }
+
+                      if (!isDnf) {
+                        setStartedAt(today);
+                      }
+
+                      setFinishedAt("");
+                      setDnfAt("");
+                      await load();
+                      alert(isDnf ? "Book resumed." : "Marked as started.");
+                    }}
+                    className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                  >
+                    {row.dnf_at ? "Resume Book" : "Start Today"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!row?.id) return;
+
+                      const today = new Date().toISOString().slice(0, 10);
+
+                      const { error } = await supabase
+                        .from("user_books")
+                        .update({
+                          finished_at: today,
+                          dnf_at: null,
+                        })
+                        .eq("id", row.id);
+
+                      if (error) {
+                        console.error("Error marking book as finished:", error);
+                        alert("Could not update book status.");
+                        return;
+                      }
+
+                      setFinishedAt(today);
+                      setDnfAt("");
+                      await load();
+                    }}
+                    className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                  >
+                    Mark Finished
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!row?.id) return;
+
+                      const confirmed = window.confirm("Mark this book as DNF?");
+                      if (!confirmed) return;
+
+                      const today = new Date().toISOString().slice(0, 10);
+
+                      const { error } = await supabase
+                        .from("user_books")
+                        .update({
+                          dnf_at: today,
+                          finished_at: null,
+                        })
+                        .eq("id", row.id);
+
+                      if (error) {
+                        console.error("Error marking book as DNF:", error);
+                        alert("Could not update book status.");
+                        return;
+                      }
+
+                      setFinishedAt("");
+                      setDnfAt(today);
+                      await load();
+                    }}
+                    className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                  >
+                    Mark DNF
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Reading History</div>
+
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                  <DateField
+                    label="Started"
+                    value={safeDate(startedAt) ?? started}
+                    editing={editing}
+                    inputValue={startedAt}
+                    setInputValue={setStartedAt}
+                  />
+
+                  <div className="rounded border bg-white p-3 text-sm">
+                    <div className="text-stone-600">Finished / DNF</div>
+                    {!editing ? (
+                      <div className="mt-1 font-medium">
+                        {dnfAt
+                          ? `${dnfAt} (DNF)`
+                          : safeDate(finishedAt) ?? finished
+                            ? formatYmd((safeDate(finishedAt) ?? finished) as Date)
+                            : "—"}
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Date</div>
+                    ) : (
+                      <div className="space-y-2">
                         <input
                           type="date"
-                          value={sessionDate}
-                          onChange={(e) => setSessionDate(e.target.value)}
-                          className="mt-1 w-full rounded border px-2 py-1"
+                          value={finishedAt}
+                          onChange={(e) => setFinishedAt(e.target.value)}
+                          className="w-full rounded border px-2 py-1"
                         />
-                      </div>
-
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Minutes read (optional)</div>
                         <input
-                          type="number"
-                          min={1}
-                          value={sessionMinutesRead}
-                          onChange={(e) => setSessionMinutesRead(e.target.value)}
-                          placeholder="e.g. 25"
-                          className="mt-1 w-full rounded border px-2 py-1"
+                          type="date"
+                          value={dnfAt}
+                          onChange={(e) => setDnfAt(e.target.value)}
+                          className="w-full rounded border px-2 py-1"
                         />
                       </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Start page</div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sessionStartPage}
-                          onChange={(e) => setSessionStartPage(e.target.value)}
-                          placeholder="e.g. 4"
-                          className="mt-1 w-full rounded border px-2 py-1"
-                        />
-                      </div>
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
 
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">End page</div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sessionEndPage}
-                          onChange={(e) => setSessionEndPage(e.target.value)}
-                          placeholder="e.g. 10"
-                          className="mt-1 w-full rounded border px-2 py-1"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={saveReadingSession}
-                        className="rounded-2xl !bg-stone-900 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-black"
-                      >
-                        Save Session
-                      </button>
-                    </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded border bg-white p-3 text-sm">
+                    <div className="text-stone-600">Date</div>
+                    <input
+                      type="date"
+                      value={sessionDate}
+                      onChange={(e) => setSessionDate(e.target.value)}
+                      className="mt-1 w-full rounded border px-2 py-1"
+                    />
                   </div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
+                  <div className="rounded border bg-white p-3 text-sm">
+                    <div className="text-stone-600">Minutes read (optional)</div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={sessionMinutesRead}
+                      onChange={(e) => setSessionMinutesRead(e.target.value)}
+                      placeholder="e.g. 25"
+                      className="mt-1 w-full rounded border px-2 py-1"
+                    />
+                  </div>
 
-                    {readingSessions.length === 0 ? (
-                      <div className="text-sm text-stone-500">No sessions yet.</div>
-                    ) : (
-                      <>
-                        {showAllSessions && <div className="mb-3">{renderSessionToggle()}</div>}
+                  <div className="rounded border bg-white p-3 text-sm">
+                    <div className="text-stone-600">Start page</div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={sessionStartPage}
+                      onChange={(e) => setSessionStartPage(e.target.value)}
+                      placeholder="e.g. 4"
+                      className="mt-1 w-full rounded border px-2 py-1"
+                    />
+                  </div>
 
-                        <div className="space-y-2">
-                          {visibleReadingSessions.map((session) => {
-                            const pagesRead = session.end_page - session.start_page + 1;
+                  <div className="rounded border bg-white p-3 text-sm">
+                    <div className="text-stone-600">End page</div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={sessionEndPage}
+                      onChange={(e) => setSessionEndPage(e.target.value)}
+                      placeholder="e.g. 10"
+                      className="mt-1 w-full rounded border px-2 py-1"
+                    />
+                  </div>
+                </div>
 
-                            return (
-                              <div
-                                key={session.id}
-                                className="rounded-xl border bg-white p-3 text-sm text-stone-700"
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <div className="font-medium">{session.read_on}</div>
-                                    <div className="mt-1">
-                                      p. {session.start_page} → {session.end_page}
-                                    </div>
-                                    <div className="mt-1 text-stone-500">
-                                      {session.minutes_read != null
-                                        ? `${session.minutes_read} min · ${pagesRead} pages`
-                                        : `Untimed · ${pagesRead} pages`}
-                                    </div>
-                                  </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={saveReadingSession}
+                    className="rounded-2xl !bg-stone-900 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-black"
+                  >
+                    Save Session
+                  </button>
+                </div>
+              </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteReadingSession(session.id)}
-                                    className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
-                                  >
-                                    Remove
-                                  </button>
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
+
+                {readingSessions.length === 0 ? (
+                  <div className="text-sm text-stone-500">No sessions yet.</div>
+                ) : (
+                  <>
+                    {showAllSessions && <div className="mb-3">{renderSessionToggle()}</div>}
+
+                    <div className="space-y-2">
+                      {visibleReadingSessions.map((session) => {
+                        const pagesRead = session.end_page - session.start_page + 1;
+
+                        return (
+                          <div
+                            key={session.id}
+                            className="rounded-xl border bg-white p-3 text-sm text-stone-700"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-medium">{session.read_on}</div>
+                                <div className="mt-1">
+                                  p. {session.start_page} → {session.end_page}
+                                </div>
+                                <div className="mt-1 text-stone-500">
+                                  {session.minutes_read != null
+                                    ? `${session.minutes_read} min · ${pagesRead} pages`
+                                    : `Untimed · ${pagesRead} pages`}
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
 
-                        <div className="mt-3">{renderSessionToggle()}</div>
-                      </>
+                              <button
+                                type="button"
+                                onClick={() => deleteReadingSession(session.id)}
+                                className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3">{renderSessionToggle()}</div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "rating" && (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+
+                {!editing ? (
+                  <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
+                    {row.my_review?.trim() ? row.my_review : "—"}
+                  </div>
+                ) : (
+                  <textarea
+                    value={myReview}
+                    onChange={(e) => setMyReview(e.target.value)}
+                    placeholder="Write your review here…"
+                    className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                  />
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Ratings</div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <StarRatingField
+                    label="Overall Rating"
+                    value={row.rating_overall}
+                    editing={editing}
+                    inputValue={ratingOverall}
+                    setInputValue={setRatingOverall}
+                  />
+
+                  <StarRatingField
+                    label="Would Recommend"
+                    value={row.rating_recommend}
+                    editing={editing}
+                    inputValue={ratingRecommend}
+                    setInputValue={setRatingRecommend}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Reading Level & Difficulty</div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded border bg-white p-3 text-sm">
+                    <div className="text-stone-600">My Level at Time of Reading</div>
+                    {!editing ? (
+                      <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
+                    ) : (
+                      <select
+                        value={readerLevel}
+                        onChange={(e) => setReaderLevel(e.target.value)}
+                        className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+                      >
+                        <option value="">—</option>
+                        {LEVEL_OPTIONS.map((lvl) => (
+                          <option key={lvl} value={lvl}>
+                            {lvl}
+                          </option>
+                        ))}
+                      </select>
                     )}
                   </div>
-                </div>
-              )}
 
-              {activeTab === "rating" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+                  <DifficultyField
+                    value={row.rating_difficulty}
+                    editing={editing}
+                    inputValue={ratingDifficulty}
+                    setInputValue={setRatingDifficulty}
+                  />
+
+                  <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
+                    <div className="text-stone-600">Recommended Level</div>
 
                     {!editing ? (
-                      <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
-                        {row.my_review?.trim() ? row.my_review : "—"}
-                      </div>
+                      <>
+                        <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
+                        <div className="mt-1 text-xs text-amber-600">
+                          {levelStars(row.recommended_level)}
+                        </div>
+                      </>
                     ) : (
-                      <textarea
-                        value={myReview}
-                        onChange={(e) => setMyReview(e.target.value)}
-                        placeholder="Write your review here…"
-                        className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                      />
-                    )}
-                  </div>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-5">
+                        {[
+                          { value: "N5", stars: "★☆☆☆☆" },
+                          { value: "N4", stars: "★★☆☆☆" },
+                          { value: "N3", stars: "★★★☆☆" },
+                          { value: "N2", stars: "★★★★☆" },
+                          { value: "N1", stars: "★★★★★" },
+                        ].map((opt) => {
+                          const isSelected = recommendedLevel === opt.value;
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Ratings</div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <StarRatingField
-                        label="Overall Rating"
-                        value={row.rating_overall}
-                        editing={editing}
-                        inputValue={ratingOverall}
-                        setInputValue={setRatingOverall}
-                      />
-
-                      <StarRatingField
-                        label="Would Recommend"
-                        value={row.rating_recommend}
-                        editing={editing}
-                        inputValue={ratingRecommend}
-                        setInputValue={setRatingRecommend}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading Level & Difficulty</div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">My Level at Time of Reading</div>
-                        {!editing ? (
-                          <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
-                        ) : (
-                          <select
-                            value={readerLevel}
-                            onChange={(e) => setReaderLevel(e.target.value)}
-                            className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                          >
-                            <option value="">—</option>
-                            {LEVEL_OPTIONS.map((lvl) => (
-                              <option key={lvl} value={lvl}>
-                                {lvl}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-
-                      <DifficultyField
-                        value={row.rating_difficulty}
-                        editing={editing}
-                        inputValue={ratingDifficulty}
-                        setInputValue={setRatingDifficulty}
-                      />
-
-                      <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
-                        <div className="text-stone-600">Recommended Level</div>
-
-                        {!editing ? (
-                          <>
-                            <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
-                            <div className="mt-1 text-xs text-amber-600">
-                              {levelStars(row.recommended_level)}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="mt-2 grid gap-2 sm:grid-cols-5">
-                            {[
-                              { value: "N5", stars: "★☆☆☆☆" },
-                              { value: "N4", stars: "★★☆☆☆" },
-                              { value: "N3", stars: "★★★☆☆" },
-                              { value: "N2", stars: "★★★★☆" },
-                              { value: "N1", stars: "★★★★★" },
-                            ].map((opt) => {
-                              const isSelected = recommendedLevel === opt.value;
-
-                              return (
-                                <button
-                                  key={opt.value}
-                                  type="button"
-                                  onClick={() => setRecommendedLevel(opt.value)}
-                                  className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
-                                    ? "border-stone-900 bg-stone-100"
-                                    : "border-stone-200 hover:bg-stone-50"
-                                    }`}
-                                >
-                                  <div className="text-amber-600">{opt.stars}</div>
-                                  <div className="text-xs text-stone-600">{opt.value}</div>
-                                </button>
-                              );
-                            })}
-
+                          return (
                             <button
+                              key={opt.value}
                               type="button"
-                              onClick={() => setRecommendedLevel("")}
-                              className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+                              onClick={() => setRecommendedLevel(opt.value)}
+                              className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
+                                ? "border-stone-900 bg-stone-100"
+                                : "border-stone-200 hover:bg-stone-50"
+                                }`}
                             >
-                              <div className="text-xs text-stone-600">Clear</div>
+                              <div className="text-amber-600">{opt.stars}</div>
+                              <div className="text-xs text-stone-600">{opt.value}</div>
                             </button>
-                          </div>
-                        )}
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() => setRecommendedLevel("")}
+                          className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+                        >
+                          <div className="text-xs text-stone-600">Clear</div>
+                        </button>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
+          )}
 
-              {activeTab === "story" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-stone-900">Character List</div>
-                        <p className="mt-1 text-sm text-stone-400">
-                          Forgetting the readings of characters&apos; names? Jot them down here.
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowCharacters((prev) => !prev)}
-                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                        >
-                          {showCharacters ? "Hide" : "Show"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCharacters(true);
-                            addCharacter();
-                          }}
-                          className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
-                        >
-                          + Add
-                        </button>
-                      </div>
-                    </div>
-
-                    {showCharacters && (
-                      <>
-                        {characters.length === 0 ? (
-                          <div className="text-sm text-stone-400">No characters yet.</div>
-                        ) : (
-                          <div className="space-y-4">
-                            {characters.map((c) => {
-                              const isEditing =
-                                c.id.startsWith("new-character-") ||
-                                editingCharacterIds.includes(c.id);
-                              const isSaving = savingCharacterIds.includes(c.id);
-                              const wasJustSaved = savedCharacterIds.includes(c.id);
-
-                              return (
-                                <div key={c.id} className="rounded-xl border bg-white p-3">
-                                  {!isEditing ? (
-                                    <>
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <div className="min-w-0">
-                                            <div className="text-sm font-medium text-stone-900">
-                                              {c.name || "—"}
-                                              {c.reading ? (
-                                                <span className="ml-2 hidden text-stone-500 sm:inline">
-                                                  （{c.reading}）
-                                                </span>
-                                              ) : null}
-                                            </div>
-
-                                            {c.reading ? (
-                                              <div className="text-xs text-stone-500 sm:hidden">
-                                                {c.reading}
-                                              </div>
-                                            ) : null}
-
-                                            {c.role ? (
-                                              <div className="mt-1 text-xs text-stone-500">{c.role}</div>
-                                            ) : null}
-                                          </div>
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setShowCharacters(true);
-                                              startEditingCharacter(c.id);
-                                            }}
-                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                          >
-                                            Edit
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => deleteCharacter(c.id)}
-                                            className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                          >
-                                            Delete
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                      {c.notes ? (
-                                        <div className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
-                                          {c.notes}
-                                        </div>
-                                      ) : null}
-                                    </>
-                                  ) : (
-                                    <div className="space-y-2">
-                                      <div className="flex gap-2">
-                                        <input
-                                          value={c.name ?? ""}
-                                          onChange={(e) =>
-                                            updateCharacter(c.id, "name", e.target.value)
-                                          }
-                                          placeholder="Name"
-                                          className="w-1/2 rounded border px-2 py-1 text-sm"
-                                        />
-
-                                        <input
-                                          value={c.reading ?? ""}
-                                          onChange={(e) =>
-                                            updateCharacter(c.id, "reading", e.target.value)
-                                          }
-                                          placeholder="Reading"
-                                          className="w-1/2 rounded border px-2 py-1 text-sm"
-                                        />
-                                      </div>
-
-                                      <input
-                                        value={c.role ?? ""}
-                                        onChange={(e) =>
-                                          updateCharacter(c.id, "role", e.target.value)
-                                        }
-                                        placeholder="Role (e.g. 主人公, 先輩, 母)"
-                                        className="w-full rounded border px-2 py-1 text-sm"
-                                      />
-
-                                      <textarea
-                                        value={c.notes ?? ""}
-                                        onChange={(e) =>
-                                          updateCharacter(c.id, "notes", e.target.value)
-                                        }
-                                        placeholder="Notes about this character"
-                                        className="w-full rounded border p-2 text-sm"
-                                      />
-
-                                      <div className="flex gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => saveCharacter(c)}
-                                          disabled={isSaving}
-                                          className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
-                                            ? "bg-green-600 hover:bg-green-700"
-                                            : "bg-blue-600 hover:bg-blue-700"
-                                            } disabled:opacity-50`}
-                                        >
-                                          {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
-                                        </button>
-
-                                        {!c.id.startsWith("new-character-") && (
-                                          <button
-                                            type="button"
-                                            onClick={() => stopEditingCharacter(c.id)}
-                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                          >
-                                            Cancel
-                                          </button>
-                                        )}
-
-                                        <button
-                                          type="button"
-                                          onClick={() => deleteCharacter(c.id)}
-                                          className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                        >
-                                          Delete
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    )}
+          {activeTab === "story" && (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-stone-900">Character List</div>
+                    <p className="mt-1 text-sm text-stone-400">
+                      Forgetting the readings of characters&apos; names? Jot them down here.
+                    </p>
                   </div>
 
-                  <div className="rounded-2xl border bg-stone-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-stone-900">Chapter Summaries</div>
-                        <p className="mt-1 text-sm text-stone-400">
-                          Writing short summaries can help you remember the story later on.
-                        </p>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCharacters((prev) => !prev)}
+                      className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                    >
+                      {showCharacters ? "Hide" : "Show"}
+                    </button>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowChapterSummaries((prev) => !prev)}
-                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                        >
-                          {showChapterSummaries ? "Hide" : "Show"}
-                        </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCharacters(true);
+                        addCharacter();
+                      }}
+                      className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setChapterReverseOrder((prev) => !prev)}
-                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                        >
-                          {chapterReverseOrder ? "Oldest First" : "Newest First"}
-                        </button>
+                {showCharacters && (
+                  <>
+                    {characters.length === 0 ? (
+                      <div className="text-sm text-stone-400">No characters yet.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {characters.map((c) => {
+                          const isEditing =
+                            c.id.startsWith("new-character-") ||
+                            editingCharacterIds.includes(c.id);
+                          const isSaving = savingCharacterIds.includes(c.id);
+                          const wasJustSaved = savedCharacterIds.includes(c.id);
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowChapterSummaries(true);
-                            addChapterSummary();
-                          }}
-                          className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
-                        >
-                          + Add
-                        </button>
-                      </div>
-                    </div>
-
-                    {showChapterSummaries && (
-                      <div className="mt-4 space-y-3">
-                        {chapterSummaries.length === 0 ? (
-                          <div className="text-sm text-stone-500">No chapter summaries yet.</div>
-                        ) : (
-                          visibleChapterSummaries.map((item) => {
-                            const isEditing =
-                              item.id.startsWith("new-") || editingChapterIds.includes(item.id);
-                            const isSaving = savingChapterIds.includes(item.id);
-                            const wasJustSaved = savedChapterIds.includes(item.id);
-
-                            return (
-                              <div key={item.id} className="rounded-xl border bg-white p-4">
-                                {!isEditing ? (
-                                  <>
-                                    <div className="flex items-start justify-between gap-3">
+                          return (
+                            <div key={c.id} className="rounded-xl border bg-white p-3">
+                              {!isEditing ? (
+                                <>
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
                                       <div className="min-w-0">
-                                        <div className="text-sm font-semibold text-stone-900">
-                                          {item.chapter_number != null
-                                            ? `Chapter ${item.chapter_number}`
-                                            : "Untitled chapter"}
-                                          {item.chapter_title ? (
-                                            <span className="ml-2 font-normal text-stone-500">
-                                              · {item.chapter_title}
+                                        <div className="text-sm font-medium text-stone-900">
+                                          {c.name || "—"}
+                                          {c.reading ? (
+                                            <span className="ml-2 hidden text-stone-500 sm:inline">
+                                              （{c.reading}）
                                             </span>
                                           ) : null}
                                         </div>
 
-                                        {item.sort_order != null && (
-                                          <div className="mt-1 text-xs text-stone-400">
-                                            Sort order: {item.sort_order}
+                                        {c.reading ? (
+                                          <div className="text-xs text-stone-500 sm:hidden">
+                                            {c.reading}
                                           </div>
-                                        )}
-                                      </div>
+                                        ) : null}
 
-                                      <div className="flex shrink-0 gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => startEditingChapter(item.id)}
-                                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                        >
-                                          Edit
-                                        </button>
-
-                                        <button
-                                          type="button"
-                                          onClick={() => deleteChapterSummary(item.id)}
-                                          className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                        >
-                                          Delete
-                                        </button>
+                                        {c.role ? (
+                                          <div className="mt-1 text-xs text-stone-500">{c.role}</div>
+                                        ) : null}
                                       </div>
                                     </div>
 
-                                    <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
-                                      {item.summary}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
-                                      <input
-                                        type="number"
-                                        value={item.chapter_number ?? ""}
-                                        onChange={(e) =>
-                                          updateChapterSummary(
-                                            item.id,
-                                            "chapter_number",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="Chapter #"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
-
-                                      <input
-                                        value={item.chapter_title ?? ""}
-                                        onChange={(e) =>
-                                          updateChapterSummary(
-                                            item.id,
-                                            "chapter_title",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="Chapter title (optional)"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
-
-                                      <input
-                                        type="number"
-                                        value={item.sort_order ?? 0}
-                                        onChange={(e) =>
-                                          updateChapterSummary(
-                                            item.id,
-                                            "sort_order",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="Sort order"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
-                                    </div>
-
-                                    <p className="mt-2 text-xs text-stone-500">
-                                      Usually you can ignore sort order unless you want to rearrange chapters.
-                                    </p>
-
-                                    <textarea
-                                      value={item.summary}
-                                      onChange={(e) =>
-                                        updateChapterSummary(item.id, "summary", e.target.value)
-                                      }
-                                      placeholder="Write a short summary..."
-                                      className="mt-3 min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                                    />
-
-                                    <div className="mt-3 flex gap-2">
+                                    <div className="flex gap-2">
                                       <button
                                         type="button"
-                                        onClick={() => saveChapterSummary(item)}
-                                        disabled={isSaving}
-                                        className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
-                                          ? "bg-green-600 hover:bg-green-700"
-                                          : "bg-blue-600 hover:bg-blue-700"
-                                          } disabled:opacity-50`}
+                                        onClick={() => {
+                                          setShowCharacters(true);
+                                          startEditingCharacter(c.id);
+                                        }}
+                                        className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
                                       >
-                                        {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
+                                        Edit
                                       </button>
 
-                                      {!item.id.startsWith("new-") && (
-                                        <button
-                                          type="button"
-                                          onClick={() => stopEditingChapter(item.id)}
-                                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                        >
-                                          Cancel
-                                        </button>
-                                      )}
-
                                       <button
                                         type="button"
-                                        onClick={() => deleteChapterSummary(item.id)}
+                                        onClick={() => deleteCharacter(c.id)}
                                         className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
                                       >
                                         Delete
                                       </button>
                                     </div>
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
+                                  </div>
 
-                        <button
-                          type="button"
-                          onClick={addChapterSummary}
-                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
-                        >
-                          + Add chapter summary
-                        </button>
+                                  {c.notes ? (
+                                    <div className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
+                                      {c.notes}
+                                    </div>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="flex gap-2">
+                                    <input
+                                      value={c.name ?? ""}
+                                      onChange={(e) =>
+                                        updateCharacter(c.id, "name", e.target.value)
+                                      }
+                                      placeholder="Name"
+                                      className="w-1/2 rounded border px-2 py-1 text-sm"
+                                    />
+
+                                    <input
+                                      value={c.reading ?? ""}
+                                      onChange={(e) =>
+                                        updateCharacter(c.id, "reading", e.target.value)
+                                      }
+                                      placeholder="Reading"
+                                      className="w-1/2 rounded border px-2 py-1 text-sm"
+                                    />
+                                  </div>
+
+                                  <input
+                                    value={c.role ?? ""}
+                                    onChange={(e) =>
+                                      updateCharacter(c.id, "role", e.target.value)
+                                    }
+                                    placeholder="Role (e.g. 主人公, 先輩, 母)"
+                                    className="w-full rounded border px-2 py-1 text-sm"
+                                  />
+
+                                  <textarea
+                                    value={c.notes ?? ""}
+                                    onChange={(e) =>
+                                      updateCharacter(c.id, "notes", e.target.value)
+                                    }
+                                    placeholder="Notes about this character"
+                                    className="w-full rounded border p-2 text-sm"
+                                  />
+
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => saveCharacter(c)}
+                                      disabled={isSaving}
+                                      className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
+                                        ? "bg-green-600 hover:bg-green-700"
+                                        : "bg-blue-600 hover:bg-blue-700"
+                                        } disabled:opacity-50`}
+                                    >
+                                      {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
+                                    </button>
+
+                                    {!c.id.startsWith("new-character-") && (
+                                      <button
+                                        type="button"
+                                        onClick={() => stopEditingCharacter(c.id)}
+                                        className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                      >
+                                        Cancel
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteCharacter(c.id)}
+                                      className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
+                  </>
+                )}
+              </div>
+
+              <div className="rounded-2xl border bg-stone-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-stone-900">Chapter Summaries</div>
+                    <p className="mt-1 text-sm text-stone-400">
+                      Writing short summaries can help you remember the story later on.
+                    </p>
                   </div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="text-sm font-medium">Notes</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowChapterSummaries((prev) => !prev)}
+                      className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                    >
+                      {showChapterSummaries ? "Hide" : "Show"}
+                    </button>
 
-                    {!editing ? (
-                      <div className="mt-3 min-h-[260px] whitespace-pre-wrap text-sm text-stone-700">
-                        {row.notes?.trim() ? row.notes : "—"}
-                      </div>
+                    <button
+                      type="button"
+                      onClick={() => setChapterReverseOrder((prev) => !prev)}
+                      className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                    >
+                      {chapterReverseOrder ? "Oldest First" : "Newest First"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowChapterSummaries(true);
+                        addChapterSummary();
+                      }}
+                      className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+
+                {showChapterSummaries && (
+                  <div className="mt-4 space-y-3">
+                    {chapterSummaries.length === 0 ? (
+                      <div className="text-sm text-stone-500">No chapter summaries yet.</div>
                     ) : (
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Story notes, interpretation notes, reminders, etc."
-                        className="mt-3 min-h-[260px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                      />
+                      visibleChapterSummaries.map((item) => {
+                        const isEditing =
+                          item.id.startsWith("new-") || editingChapterIds.includes(item.id);
+                        const isSaving = savingChapterIds.includes(item.id);
+                        const wasJustSaved = savedChapterIds.includes(item.id);
+
+                        return (
+                          <div key={item.id} className="rounded-xl border bg-white p-4">
+                            {!isEditing ? (
+                              <>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-stone-900">
+                                      {item.chapter_number != null
+                                        ? `Chapter ${item.chapter_number}`
+                                        : "Untitled chapter"}
+                                      {item.chapter_title ? (
+                                        <span className="ml-2 font-normal text-stone-500">
+                                          · {item.chapter_title}
+                                        </span>
+                                      ) : null}
+                                    </div>
+
+                                    {item.sort_order != null && (
+                                      <div className="mt-1 text-xs text-stone-400">
+                                        Sort order: {item.sort_order}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex shrink-0 gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingChapter(item.id)}
+                                      className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                    >
+                                      Edit
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteChapterSummary(item.id)}
+                                      className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
+                                  {item.summary}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
+                                  <input
+                                    type="number"
+                                    value={item.chapter_number ?? ""}
+                                    onChange={(e) =>
+                                      updateChapterSummary(
+                                        item.id,
+                                        "chapter_number",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Chapter #"
+                                    className="rounded border px-3 py-2 text-sm"
+                                  />
+
+                                  <input
+                                    value={item.chapter_title ?? ""}
+                                    onChange={(e) =>
+                                      updateChapterSummary(
+                                        item.id,
+                                        "chapter_title",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Chapter title (optional)"
+                                    className="rounded border px-3 py-2 text-sm"
+                                  />
+
+                                  <input
+                                    type="number"
+                                    value={item.sort_order ?? 0}
+                                    onChange={(e) =>
+                                      updateChapterSummary(
+                                        item.id,
+                                        "sort_order",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Sort order"
+                                    className="rounded border px-3 py-2 text-sm"
+                                  />
+                                </div>
+
+                                <p className="mt-2 text-xs text-stone-500">
+                                  Usually you can ignore sort order unless you want to rearrange chapters.
+                                </p>
+
+                                <textarea
+                                  value={item.summary}
+                                  onChange={(e) =>
+                                    updateChapterSummary(item.id, "summary", e.target.value)
+                                  }
+                                  placeholder="Write a short summary..."
+                                  className="mt-3 min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                                />
+
+                                <div className="mt-3 flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => saveChapterSummary(item)}
+                                    disabled={isSaving}
+                                    className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
+                                      ? "bg-green-600 hover:bg-green-700"
+                                      : "bg-blue-600 hover:bg-blue-700"
+                                      } disabled:opacity-50`}
+                                  >
+                                    {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
+                                  </button>
+
+                                  {!item.id.startsWith("new-") && (
+                                    <button
+                                      type="button"
+                                      onClick={() => stopEditingChapter(item.id)}
+                                      className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                    >
+                                      Cancel
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteChapterSummary(item.id)}
+                                    className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
+
+                    <button
+                      type="button"
+                      onClick={addChapterSummary}
+                      className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
+                    >
+                      + Add chapter summary
+                    </button>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {activeTab === "study" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Study Tools</div>
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="text-sm font-medium">Notes</div>
 
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <button
-                        onClick={() => router.push(`/books/${row.id}/words`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        📚 Vocab List
-                      </button>
-
-                      <button
-                        onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        🈶 Reading Flashcards
-                      </button>
-
-                      <button
-                        onClick={() => router.push(`/books/${row.id}/study`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        🔁 Vocab Flashcards
-                      </button>
-                    </div>
+                {!editing ? (
+                  <div className="mt-3 min-h-[260px] whitespace-pre-wrap text-sm text-stone-700">
+                    {row.notes?.trim() ? row.notes : "—"}
                   </div>
-
-                  {isTeacher && (
-                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                      <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Study Tools</div>
-
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <button
-                          onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
-                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                        >
-                          ➕ Add Vocab
-                        </button>
-
-                        <button
-                          onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
-                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                        >
-                          📝 Prepare Readings
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => alert("Notify Student coming next")}
-                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                        >
-                          🔔 Notify Student
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Kanji</div>
-                    <div className="text-sm text-stone-400"> </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Mistakes</div>
-                    <div className="text-sm text-stone-400"> </div>
-                  </div>
-                </div>
-              )}
+                ) : (
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Story notes, interpretation notes, reminders, etc."
+                    className="mt-3 min-h-[260px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        </section>
+          )}
+
+          {activeTab === "study" && (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Study Tools</div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <button
+                    onClick={() => router.push(`/books/${row.id}/words`)}
+                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                  >
+                    📚 Vocab List
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
+                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                  >
+                    🈶 Reading Flashcards
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/books/${row.id}/study`)}
+                    className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                  >
+                    🔁 Vocab Flashcards
+                  </button>
+                </div>
+              </div>
+
+              {isTeacher && (
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Study Tools</div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <button
+                      onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      ➕ Add Vocab
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      📝 Prepare Readings
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => alert("Notify Student coming next")}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      🔔 Notify Student
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Kanji</div>
+                <div className="text-sm text-stone-400"> </div>
+              </div>
+
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Mistakes</div>
+                <div className="text-sm text-stone-400"> </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </main>
+    </section>
+      </div >
+    </main >
   );
 }
 
@@ -2674,8 +2722,8 @@ function DifficultyField({
                 type="button"
                 onClick={() => setInputValue(String(opt.value))}
                 className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
-                    ? "border-stone-900 bg-stone-100"
-                    : "border-stone-200 hover:bg-stone-50"
+                  ? "border-stone-900 bg-stone-100"
+                  : "border-stone-200 hover:bg-stone-50"
                   }`}
               >
                 <div className="text-amber-600">{stars5(opt.value)}</div>
