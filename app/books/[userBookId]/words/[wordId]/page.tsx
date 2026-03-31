@@ -275,7 +275,7 @@ export default function WordDetailPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [myRole, setMyRole] = useState<"teacher" | "student">("student");
+  const [myRole, setMyRole] = useState<"teacher" | "member" | "student">("member");
   const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
@@ -318,7 +318,7 @@ export default function WordDetailPage() {
         .eq("id", user.id)
         .single();
 
-      setMyRole((meProfile?.role as "teacher" | "student") ?? "student");
+      setMyRole((meProfile?.role as "teacher" | "member" | "student") ?? "member");
 
       // verify book ownership + get book info
       const { data: ub, error: ubErr } = await supabase

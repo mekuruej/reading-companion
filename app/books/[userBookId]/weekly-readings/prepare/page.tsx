@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { KANJI_RADICALS } from "@/lib/kanjiRadicals";
 
-type ProfileRole = "teacher" | "student";
+type ProfileRole = "teacher" | "member" | "student";
 
 type DraftRow = {
   id: string;
@@ -127,7 +127,7 @@ export default function PrepareWeeklyReadingsPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [myRole, setMyRole] = useState<ProfileRole>("student");
+  const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
   const [studentName, setStudentName] = useState("");
@@ -165,7 +165,7 @@ export default function PrepareWeeklyReadingsPage() {
           .eq("id", user.id)
           .single();
 
-        const role = (prof?.role as ProfileRole | null) ?? "student";
+        const role = (prof?.role as ProfileRole | null) ?? "member";
         setMyRole(role);
 
         const { data: ub, error: ubErr } = await supabase

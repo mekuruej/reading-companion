@@ -30,7 +30,7 @@ type UserBookRow = {
   books: Book | null;
 };
 
-type ProfileRole = "teacher" | "student";
+type ProfileRole = "teacher" | "member" | "student";
 
 type StudentOption = {
   id: string;
@@ -191,7 +191,7 @@ export default function BooksPage() {
 
   const [meId, setMeId] = useState<string>("");
   const [myUsername, setMyUsername] = useState<string>("");
-  const [myRole, setMyRole] = useState<ProfileRole>("student");
+  const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
 
@@ -207,7 +207,7 @@ export default function BooksPage() {
   const viewingLabel =
     viewingUserId && viewingUserId === meId
       ? "Me"
-      : students.find((s) => s.id === viewingUserId)?.display_name || "Student";
+      : students.find((s) => s.id === viewingUserId)?.display_name || "Member";
 
   function logSbError(prefix: string, err: any) {
     console.error(prefix, err?.message, err?.details, err?.hint, err?.code, err);
@@ -485,7 +485,7 @@ export default function BooksPage() {
 
       setMyUsername((meProfile as any)?.username ?? "");
 
-      const role = (meProfile?.role as ProfileRole | null) ?? "student";
+      const role = (meProfile?.role as ProfileRole | null) ?? "member";
       const isSuperTeacher = Boolean((meProfile as any)?.is_super_teacher);
 
       setMyRole(role);
@@ -579,7 +579,7 @@ export default function BooksPage() {
       };
 
       const studentOptions: StudentOption[] = (profs ?? [])
-        .filter((p: any) => p.id !== user.id && p.role === "student")
+        .filter((p: any) => p.id !== user.id && (p.role === "member" || p.role === "student"))
         .map((p: any) => ({
           id: p.id,
           display_name: p.display_name,
@@ -623,7 +623,7 @@ export default function BooksPage() {
 
       if (isTeacher && viewingUserId === meId) {
         const studentIds = students
-          .filter((s) => s.role === "student" && s.id !== meId)
+          .filter((s) => (s.role === "member" || s.role === "student") && s.id !== meId)
           .map((s) => s.id);
 
         if (studentIds.length === 0) {
@@ -672,7 +672,7 @@ export default function BooksPage() {
 
             return {
               studentId: p.id,
-              studentName: p.display_name || "Student",
+              studentName: p.display_name || "Member",
               studentUsername: p.username ?? null,
               message: info.message,
               alertKey: info.alertKey,
@@ -964,10 +964,10 @@ export default function BooksPage() {
             >
               <option value={meId}>Me</option>
 
-              {students.some((s) => s.role === "student" && s.id !== meId) ? (
+              {students.some((s) => (s.role === "member" || s.role === "student") && s.id !== meId) ? (
                 <optgroup label="Students">
                   {students
-                    .filter((s) => s.role === "student" && s.id !== meId)
+                    .filter((s) => (s.role === "member" || s.role === "student") && s.id !== meId)
                     .map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.display_name}

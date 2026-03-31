@@ -157,7 +157,7 @@ export default function AssignBookPage() {
 
       setSuccessMsg(
         `Assigned "${chosenBook?.title ?? "Untitled"}" to ${
-          chosenStudent ? labelProfile(chosenStudent) : "student"
+          chosenStudent ? labelProfile(chosenStudent) : "member"
         }.\nuser_books.id: ${data.id}`
       );
     } catch (e: any) {

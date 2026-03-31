@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 
 export default function HomePage() {
   const router = useRouter();
+  
 
   return (
     <div className="flex flex-col items-center gap-10 py-12 px-6 text-center">

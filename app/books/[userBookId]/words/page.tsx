@@ -24,7 +24,7 @@ type WordRow = {
   meaning_choice_index: number | null;
 };
 
-type ProfileRole = "teacher" | "student";
+type ProfileRole = "teacher" | "member" | "student";
 
 function normalizeJlpt(val: string | null | undefined) {
   const v = (val ?? "").toUpperCase();
@@ -96,7 +96,7 @@ export default function BookWordsPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [myRole, setMyRole] = useState<ProfileRole>("student");
+  const [myRole, setMyRole] = useState<ProfileRole>("member");
   const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
@@ -373,7 +373,7 @@ export default function BookWordsPage() {
           console.error("Error loading profile role:", meProfileErr);
         }
 
-        setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
+        setMyRole((meProfile?.role as ProfileRole | null) ?? "member");
 
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")

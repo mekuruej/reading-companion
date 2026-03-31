@@ -68,7 +68,7 @@ type ReadingSession = {
 };
 
 type HubTab = "bookInfo" | "rating" | "reading" | "story" | "study";
-type ProfileRole = "teacher" | "student";
+type ProfileRole = "teacher" | "member" | "student";
 
 type Character = {
   id: string;
@@ -215,7 +215,7 @@ export default function BookHubPage() {
   const [row, setRow] = useState<UserBook | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [myRole, setMyRole] = useState<ProfileRole>("student");
+  const [myRole, setMyRole] = useState<ProfileRole>("member");
   const isTeacher = myRole === "teacher";
 
   const [editing, setEditing] = useState(false);
@@ -880,7 +880,7 @@ export default function BookHubPage() {
       console.error("Error loading profile role:", meProfileErr);
     }
 
-    setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
+    setMyRole((meProfile?.role as ProfileRole | null) ?? "member");
 
     const { data, error } = await supabase
       .from("user_books")

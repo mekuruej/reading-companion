@@ -7,13 +7,10 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
     let alive = true;
-
-    const goBooks = () => {
-      window.location.href = "/books";
-    };
 
     const run = async () => {
       const {
@@ -22,11 +19,7 @@ export default function LoginPage() {
 
       if (!alive) return;
 
-      if (session) {
-        goBooks();
-        return;
-      }
-
+      setHasSession(!!session);
       setChecking(false);
     };
 
@@ -35,9 +28,9 @@ export default function LoginPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        goBooks();
-      }
+      if (!alive) return;
+      setHasSession(!!session);
+      setChecking(false);
     });
 
     return () => {
@@ -56,6 +49,22 @@ export default function LoginPage() {
     );
   }
 
+  if (hasSession) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-6">
+        <div className="w-full max-w-md border rounded-lg p-6 shadow-sm text-center">
+          <p className="text-gray-700 mb-4">You are signed in.</p>
+          <a
+            href="/books"
+            className="inline-block px-4 py-2 bg-gray-800 text-white rounded hover:bg-black transition"
+          >
+            Continue to Books
+          </a>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md border rounded-lg p-6 shadow-sm">
@@ -65,7 +74,11 @@ export default function LoginPage() {
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
           providers={["google"]}
-          redirectTo={typeof window !== "undefined" ? window.location.origin : undefined}
+          redirectTo={
+            typeof window !== "undefined"
+              ? `${window.location.origin}/login`
+              : undefined
+          }
         />
       </div>
     </main>

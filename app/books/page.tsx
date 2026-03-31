@@ -1,4 +1,4 @@
-// Redirect
+// Books Redirect
 // 
 "use client";
 
@@ -27,9 +27,9 @@ export default function BooksRedirectPage() {
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("username")
+        .select("username, display_name, native_language, target_language")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!mounted) return;
 
@@ -39,12 +39,19 @@ export default function BooksRedirectPage() {
         return;
       }
 
-      if (profile?.username) {
-        router.replace(`/users/${profile.username}/books`);
-        router.refresh();
-      } else {
-        router.replace("/login");
+      const isComplete =
+        !!profile?.username &&
+        !!profile?.display_name &&
+        !!profile?.native_language &&
+        !!profile?.target_language;
+
+      if (!isComplete) {
+        router.replace("/profile/setup");
+        return;
       }
+
+      router.replace(`/users/${profile.username}/books`);
+      router.refresh();
     };
 
     redirect();
