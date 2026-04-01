@@ -192,6 +192,7 @@ export default function BooksPage() {
   const [meId, setMeId] = useState<string>("");
   const [myUsername, setMyUsername] = useState<string>("");
   const [myRole, setMyRole] = useState<ProfileRole>("member");
+  const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
 
@@ -200,6 +201,12 @@ export default function BooksPage() {
   const [newBookIsbn, setNewBookIsbn] = useState("");
   const [isSavingBook, setIsSavingBook] = useState(false);
   const [showAddBook, setShowAddBook] = useState(false);
+
+  const [requestBookTitle, setRequestBookTitle] = useState("");
+  const [requestBookAuthor, setRequestBookAuthor] = useState("");
+  const [requestBookIsbn, setRequestBookIsbn] = useState("");
+  const [isSavingRequest, setIsSavingRequest] = useState(false);
+  const [showRequestBook, setShowRequestBook] = useState(false);
 
   const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
@@ -300,6 +307,19 @@ export default function BooksPage() {
       return;
     }
 
+    const targetUserId = viewingUserId || meId;
+
+    if (!isSuperTeacher && targetUserId !== meId) {
+      const allowedStudentIds = students
+        .filter((s) => (s.role === "member" || s.role === "student") && s.id !== meId)
+        .map((s) => s.id);
+
+      if (!allowedStudentIds.includes(targetUserId)) {
+        alert("You can only add books for yourself or your own students.");
+        return;
+      }
+    }
+
     setIsSavingBook(true);
 
     try {
@@ -345,13 +365,13 @@ export default function BooksPage() {
       }
 
       const { error: userBookError } = await supabase.from("user_books").insert({
-        user_id: meId,
+        user_id: targetUserId,
         book_id: bookId,
       });
 
       if (userBookError) {
         if (userBookError.code === "23505") {
-          alert("You already added this book.");
+          alert("This user already has this book.");
           return;
         }
         throw userBookError;
@@ -369,6 +389,47 @@ export default function BooksPage() {
       alert("Could not add book.");
     } finally {
       setIsSavingBook(false);
+    }
+  }
+
+  async function handleRequestBook() {
+    if (!meId) {
+      alert("You need to be signed in to request a book.");
+      return;
+    }
+
+    const cleanTitle = requestBookTitle.trim();
+    const cleanAuthor = requestBookAuthor.trim();
+    const cleanIsbn = normalizeIsbn(requestBookIsbn);
+
+    if (!cleanTitle) {
+      alert("Please enter a title.");
+      return;
+    }
+
+    setIsSavingRequest(true);
+
+    try {
+      const { error } = await supabase.from("book_requests").insert({
+        user_id: meId,
+        title: cleanTitle,
+        author: cleanAuthor || null,
+        isbn13: cleanIsbn || null,
+      });
+
+      if (error) throw error;
+
+      setRequestBookTitle("");
+      setRequestBookAuthor("");
+      setRequestBookIsbn("");
+      setShowRequestBook(false);
+
+      alert("Book request sent!");
+    } catch (err) {
+      console.error("REQUEST BOOK ERROR:", err);
+      alert("Could not send book request.");
+    } finally {
+      setIsSavingRequest(false);
     }
   }
 
@@ -486,9 +547,10 @@ export default function BooksPage() {
       setMyUsername((meProfile as any)?.username ?? "");
 
       const role = (meProfile?.role as ProfileRole | null) ?? "member";
-      const isSuperTeacher = Boolean((meProfile as any)?.is_super_teacher);
+      const superTeacherFlag = Boolean((meProfile as any)?.is_super_teacher);
 
       setMyRole(role);
+      setIsSuperTeacher(superTeacherFlag);
 
       if (routeUsername) {
         const { data: profile } = await supabase
@@ -511,7 +573,7 @@ export default function BooksPage() {
         return;
       }
 
-      if (isSuperTeacher) {
+      if (superTeacherFlag) {
         const { data: profs, error: profErr } = await supabase
           .from("profiles")
           .select("id, display_name, username, level, role")
@@ -1039,8 +1101,17 @@ export default function BooksPage() {
             {showAddBook ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                 <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Add Book</h2>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold">
+                        Add Book {viewingLabel ? `for ${viewingLabel}` : ""}
+                      </h2>
+                      <p className="mt-1 text-sm text-stone-500">
+                        This book will be added to:{" "}
+                        <span className="font-medium text-stone-700">{viewingLabel}</span>
+                      </p>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => setShowAddBook(false)}
@@ -1109,7 +1180,90 @@ export default function BooksPage() {
               </div>
             ) : null}
           </>
-        ) : null}
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowRequestBook(true)}
+              className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
+            >
+              + Request a Book
+            </button>
+
+            {showRequestBook ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">Request a Book</h2>
+                    <button
+                      type="button"
+                      onClick={() => setShowRequestBook(false)}
+                      className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Title</label>
+                      <input
+                        type="text"
+                        value={requestBookTitle}
+                        onChange={(e) => setRequestBookTitle(e.target.value)}
+                        placeholder="Enter book title"
+                        className="w-full rounded-xl border px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Author</label>
+                      <input
+                        type="text"
+                        value={requestBookAuthor}
+                        onChange={(e) => setRequestBookAuthor(e.target.value)}
+                        placeholder="Enter author name"
+                        className="w-full rounded-xl border px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">ISBN-13</label>
+                      <input
+                        type="text"
+                        value={requestBookIsbn}
+                        onChange={(e) => setRequestBookIsbn(e.target.value)}
+                        placeholder="978..."
+                        className="w-full rounded-xl border px-3 py-2"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">
+                        Hyphens and spaces are okay. They will be removed automatically.
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowRequestBook(false)}
+                        className="rounded-xl border px-4 py-2 text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRequestBook}
+                        disabled={isSavingRequest}
+                        className="rounded-xl bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                      >
+                        {isSavingRequest ? "Sending..." : "Request Book"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
 
       </div>
     </main>
