@@ -24,7 +24,7 @@ type WordRow = {
   meaning_choice_index: number | null;
 };
 
-type ProfileRole = "teacher" | "member" | "student";
+type ProfileRole = "teacher" | "student";
 
 function normalizeJlpt(val: string | null | undefined) {
   const v = (val ?? "").toUpperCase();
@@ -43,10 +43,10 @@ function chapterDisplayParts(w: WordRow) {
       num != null && name
         ? `Chapter ${num}: ${name}`
         : num != null
-          ? `Chapter ${num}`
-          : name
-            ? name
-            : "(none)",
+        ? `Chapter ${num}`
+        : name
+        ? name
+        : "(none)",
   };
 }
 
@@ -63,7 +63,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch { }
+    } catch {}
   }
   return [];
 }
@@ -96,7 +96,7 @@ export default function BookWordsPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [myRole, setMyRole] = useState<ProfileRole>("member");
+  const [myRole, setMyRole] = useState<ProfileRole>("student");
   const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
@@ -126,16 +126,6 @@ export default function BookWordsPage() {
 
   const stickyControlsRef = useRef<HTMLDivElement | null>(null);
   const [stickyOffset, setStickyOffset] = useState(0);
-
-  type SupportMode = "full" | "reduced" | "none";
-
-  const [supportMode, setSupportMode] = useState<SupportMode>("full");
-
-  function cycleSupportMode() {
-    setSupportMode((prev) =>
-      prev === "full" ? "reduced" : prev === "reduced" ? "none" : "full"
-    );
-  }
 
   useLayoutEffect(() => {
     function measure() {
@@ -178,26 +168,26 @@ export default function BookWordsPage() {
     setEditChapterName(w.chapter_name ?? "");
 
     const choices = asStringArray(w.meaning_choices);
-    const rawIdx =
-      w.meaning_choice_index == null
-        ? null
-        : Number.isFinite(w.meaning_choice_index as any)
-          ? (w.meaning_choice_index as number)
-          : 0;
+const rawIdx =
+  w.meaning_choice_index == null
+    ? null
+    : Number.isFinite(w.meaning_choice_index as any)
+    ? (w.meaning_choice_index as number)
+    : 0;
 
-    const idx =
-      rawIdx == null
-        ? null
-        : Math.max(0, choices.length ? Math.min(rawIdx, choices.length - 1) : rawIdx);
+const idx =
+  rawIdx == null
+    ? null
+    : Math.max(0, choices.length ? Math.min(rawIdx, choices.length - 1) : rawIdx);
 
-    setEditMeaningChoices(choices);
-    setEditMeaningChoiceIndex(idx);
+setEditMeaningChoices(choices);
+setEditMeaningChoiceIndex(idx);
 
-    if (idx != null && choices.length && choices[idx]) {
-      setEditMeaning(choices[idx]);
-    } else {
-      setEditMeaning(w.meaning ?? "");
-    }
+if (idx != null && choices.length && choices[idx]) {
+  setEditMeaning(choices[idx]);
+} else {
+  setEditMeaning(w.meaning ?? "");
+}
   }
 
   function closeEdit() {
@@ -215,25 +205,25 @@ export default function BookWordsPage() {
   }
 
   function changeDefinition(newValue: string) {
-    const choices = editMeaningChoices ?? [];
+  const choices = editMeaningChoices ?? [];
 
-    if (newValue === "other") {
-      setEditMeaningChoiceIndex(null);
-      setEditMeaning("");
-      return;
-    }
-
-    const newIndex = Number(newValue);
-    const safe = Math.max(0, newIndex);
-
-    setEditMeaningChoiceIndex(safe);
-
-    if (choices.length) {
-      const clamped = Math.min(safe, choices.length - 1);
-      const chosen = choices[clamped] ?? "";
-      setEditMeaning(chosen);
-    }
+  if (newValue === "other") {
+    setEditMeaningChoiceIndex(null);
+    setEditMeaning("");
+    return;
   }
+
+  const newIndex = Number(newValue);
+  const safe = Math.max(0, newIndex);
+
+  setEditMeaningChoiceIndex(safe);
+
+  if (choices.length) {
+    const clamped = Math.min(safe, choices.length - 1);
+    const chosen = choices[clamped] ?? "";
+    setEditMeaning(chosen);
+  }
+}
 
   async function saveEdit() {
     if (!editing) return;
@@ -244,9 +234,9 @@ export default function BookWordsPage() {
     const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
 
     const patch: Partial<WordRow> & {
-      meaning_choices?: any;
-      meaning_choice_index?: number | null;
-    } = {
+  meaning_choices?: any;
+  meaning_choice_index?: number | null;
+} = {
       surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
@@ -259,9 +249,9 @@ export default function BookWordsPage() {
     };
 
     if (hasChoices && editMeaningChoiceIndex != null) {
-      const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
-      if (chosen) patch.meaning = chosen;
-    }
+  const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
+  if (chosen) patch.meaning = chosen;
+}
 
     try {
       const { error } = await supabase
@@ -276,9 +266,9 @@ export default function BookWordsPage() {
         prev.map((w) =>
           w.id === editing.id
             ? ({
-              ...w,
-              ...patch,
-            } as WordRow)
+                ...w,
+                ...patch,
+              } as WordRow)
             : w
         )
       );
@@ -373,7 +363,7 @@ export default function BookWordsPage() {
           console.error("Error loading profile role:", meProfileErr);
         }
 
-        setMyRole((meProfile?.role as ProfileRole | null) ?? "member");
+        setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
 
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")
@@ -585,30 +575,30 @@ export default function BookWordsPage() {
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Definition #</span>
-                {editMeaningChoices.length > 0 ? (
-                  <select
-                    value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
-                    onChange={(e) => changeDefinition(e.target.value)}
-                    className="border p-2 rounded bg-white"
-                  >
-                    {editMeaningChoices.map((_, i) => (
-                      <option key={i} value={i}>
-                        {i + 1}
-                      </option>
-                    ))}
-                    <option value="other">Other</option>
-                  </select>
-                ) : (
-                  <select
-                    value={editMeaningChoiceIndex == null ? "other" : "0"}
-                    onChange={(e) => changeDefinition(e.target.value)}
-                    className="border p-2 rounded bg-white"
-                  >
-                    <option value="other">Other</option>
-                  </select>
-                )}
-              </label>
+  <span className="text-xs text-gray-600">Definition #</span>
+  {editMeaningChoices.length > 0 ? (
+    <select
+      value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
+      onChange={(e) => changeDefinition(e.target.value)}
+      className="border p-2 rounded bg-white"
+    >
+      {editMeaningChoices.map((_, i) => (
+        <option key={i} value={i}>
+          {i + 1}
+        </option>
+      ))}
+      <option value="other">Other</option>
+    </select>
+  ) : (
+    <select
+      value={editMeaningChoiceIndex == null ? "other" : "0"}
+      onChange={(e) => changeDefinition(e.target.value)}
+      className="border p-2 rounded bg-white"
+    >
+      <option value="other">Other</option>
+    </select>
+  )}
+</label>
 
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-600">Meaning</span>
@@ -681,15 +671,13 @@ export default function BookWordsPage() {
       </div>
 
       <div ref={stickyControlsRef} className="sticky top-0 z-30 bg-white border-b border-gray-200">
-        <div className="flex items-start gap-3 py-3 min-w-0">
+        <div className="flex items-start gap-3 py-3">
           {bookCover ? (
             <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover shrink-0" />
           ) : null}
 
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-semibold leading-tight break-words min-w-0">
-              {bookTitle || "Words"}
-            </h1>
+            <h1 className="text-2xl font-semibold">{bookTitle || "Words"}</h1>
             <p className="text-sm text-gray-500">
               Total: {words.length} • Showing: {filtered.length}
             </p>
@@ -704,18 +692,6 @@ export default function BookWordsPage() {
               />
               Show Hidden Words
             </label>
-
-            <button
-              onClick={cycleSupportMode}
-              className="px-3 py-2 border rounded bg-white hover:bg-gray-50 text-sm whitespace-nowrap"
-            >
-              Support:{" "}
-              {supportMode === "full"
-                ? "Full"
-                : supportMode === "reduced"
-                  ? "Reduced"
-                  : "None"}
-            </button>
 
             {isTeacher ? (
               <button
@@ -769,101 +745,141 @@ export default function BookWordsPage() {
         </div>
       </div>
 
-      <div className="border rounded bg-white relative">
-        {filtered.length === 0 ? (
-          <div className="p-4 text-gray-500">
-            No words match your filters.
-          </div>
-        ) : (
-
-          <div className="w-full">
-            {filtered.map((w) => (
-              <div
-                key={w.id}
-                onClick={() =>
-                  router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
-                }
-                className={`border-t first:border-t-0 px-4 py-3 cursor-pointer hover:bg-gray-50 ${w.hidden ? "bg-gray-50 text-gray-400" : ""
-                  }`}
+      <div className="overflow-x-auto overflow-y-visible border rounded bg-white relative">
+        <table className="w-full text-sm border-separate border-spacing-0">
+          <thead className="bg-gray-50">
+            <tr className="text-left">
+              <th
+                className="p-2 w-5 sticky bg-gray-50 z-20"
+                style={headerStickyStyle}
+                title="How many times this word appears in this book (same word + same definition)"
               >
-                <div
-                  className={`grid gap-x-6 items-start ${supportMode === "full"
-                    ? "grid-cols-[1fr_1fr_2fr]"
-                    : supportMode === "reduced"
-                      ? "grid-cols-[1fr_1fr]"
-                      : "grid-cols-1"
-                    }`}
-                >
-                  <div
-                    className={`font-medium ${supportMode === "none"
-                      ? "text-xl tracking-wide text-stone-900"
-                      : "text-[17px] text-stone-900"
-                      }`}
-                  >
-                    {w.surface}
-                  </div>
+                Repeats
+              </th>
+              <th className="p-2 w-20 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Word
+              </th>
+              <th className="p-2 w-30 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Reading
+              </th>
+              <th className="p-2 w-60 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Meaning
+              </th>
+              <th className="p-2 w-10 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Def #
+              </th>
+              <th className="p-2 w-5 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Chapter
+              </th>
+              <th className="p-2 w-10 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Page
+              </th>
+              <th className="p-2 w-20 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                JLPT
+              </th>
+              <th className="p-2 w-25 sticky bg-gray-50 z-20" style={headerStickyStyle}>
+                Actions
+              </th>
+            </tr>
+          </thead>
 
-                  {supportMode !== "none" && (
-                    <div className="text-sm font-medium text-stone-600 tabular-nums">
-                      {w.reading ?? "—"}
+          <tbody>
+            {filtered.map((w) => {
+              const rep = repeatCounts.get(repeatKey(w)) ?? 0;
+
+              return (
+                <tr key={w.id} className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""}`}>
+                  <td className="p-2 text-center text-xs text-gray-600">{rep > 1 ? rep : ""}</td>
+
+                  <td className="p-2 font-medium">{w.surface}</td>
+                  <td className="p-2">{w.reading ?? "—"}</td>
+
+                  <td className="p-2">
+                    <div>{w.meaning ?? "—"}</div>
+                  </td>
+
+                  <td className="p-2 text-center">
+                    {w.meaning_choice_index != null ? w.meaning_choice_index + 1 : w.meaning ? "O" : "—"}
+                  </td>
+
+                  <td className="p-2">
+                    {(() => {
+                      const ch = chapterDisplayParts(w);
+                      if (ch.num && ch.name) {
+                        return (
+                          <span className="leading-tight">
+                            <span className="block">{ch.num}</span>
+                            <span className="block text-gray-600">{ch.name}</span>
+                          </span>
+                        );
+                      }
+                      return ch.fallback;
+                    })()}
+                  </td>
+
+                  <td className="p-2">{w.page_number ?? "—"}</td>
+                  <td className="p-2">{normalizeJlpt(w.jlpt)}</td>
+
+                  <td className="p-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() =>
+                          router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
+                        }
+                        className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
+                        title="Open word card"
+                      >
+                        Open
+                      </button>
+
+                      {isTeacher ? (
+                        <>
+                          <button
+                            onClick={() => openEdit(w)}
+                            className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
+                          >
+                            Edit
+                          </button>
+
+                          {w.hidden ? (
+                            <button
+                              onClick={() => unhideWord(w)}
+                              className="px-2 py-1 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
+                            >
+                              Unhide
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => hideWord(w)}
+                              className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                            >
+                              Hide
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => deleteWord(w)}
+                            className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : null}
                     </div>
-                  )}
+                  </td>
+                </tr>
+              );
+            })}
 
-                  {supportMode === "full" && (
-                    <div className="text-sm font-medium text-stone-500 leading-snug opacity-90">
-                      {w.meaning ?? "—"}
-                    </div>
-                  )}
-                </div>
-                {isTeacher && (
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEdit(w);
-                    }}
-                    className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
-                  >
-                    Edit
-                  </button>
-
-                  {w.hidden ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        unhideWord(w);
-                      }}
-                      className="px-2 py-1 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
-                    >
-                      Unhide
-                    </button>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        hideWord(w);
-                      }}
-                      className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs"
-                    >
-                      Hide
-                    </button>
-                  )}
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteWord(w);
-                    }}
-                    className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-              </div>
-            ))}
-          </div>
-        )}
+            {filtered.length === 0 ? (
+              <tr>
+                <td className="p-4 text-gray-500" colSpan={9}>
+                  No words match your filters.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
       </div>
 
       <div className="mt-4">

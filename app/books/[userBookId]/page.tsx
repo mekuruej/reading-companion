@@ -1459,11 +1459,11 @@ export default function BookHubPage() {
 
                 <button
                   type="button"
-                  onClick={() => router.push(`/books/${row.id}/words`)}
+                  onClick={() => router.push(`/books/${row.id}/readalong`)}
                   className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
                 >
-                  <div className="text-xs text-emerald-700">Reread</div>
-                  <div className="mt-1 font-medium text-stone-900">Vocab Support</div>
+                  <div className="text-xs text-emerald-700">Read Along</div>
+                  <div className="mt-1 font-medium text-stone-900">Book Support</div>
                 </button>
 
                 <button
@@ -1498,7 +1498,7 @@ export default function BookHubPage() {
                 ) : null}
 
                 <FilingTab active={activeTab === "study"} onClick={() => setActiveTab("study")}>
-                  Study
+                  Vocab
                 </FilingTab>
 
                 <FilingTab active={activeTab === "reading"} onClick={() => setActiveTab("reading")}>
@@ -2622,8 +2622,6 @@ export default function BookHubPage() {
               {activeTab === "study" && (
                 <div className="space-y-6">
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Study Tools</div>
-
                     <div className="grid gap-3 md:grid-cols-2">
                       <button
                         onClick={() => router.push(`/books/${row.id}/words`)}
@@ -2631,19 +2629,19 @@ export default function BookHubPage() {
                       >
                         📚 Vocab List
                       </button>
-
+                      {!isTeacher ? (
+                        <button
+                          onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
+                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                        >
+                          ➕ Add Vocab
+                        </button>
+                      ) : null}
                       <button
-                        onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
+                        onClick={() => router.push(`/vocab/dictionary?userBookId=${row.id}`)}
                         className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
                       >
-                        🈶 Reading Flashcards
-                      </button>
-
-                      <button
-                        onClick={() => router.push(`/books/${row.id}/study`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        🔁 Vocab Flashcards
+                        🔎 Explore the Word
                       </button>
                     </div>
                   </div>

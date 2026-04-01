@@ -202,6 +202,7 @@ export default function BooksPage() {
   const [isSavingBook, setIsSavingBook] = useState(false);
   const [showAddBook, setShowAddBook] = useState(false);
 
+  const [bookRequests, setBookRequests] = useState<any[]>([]);
   const [requestBookTitle, setRequestBookTitle] = useState("");
   const [requestBookAuthor, setRequestBookAuthor] = useState("");
   const [requestBookIsbn, setRequestBookIsbn] = useState("");
@@ -392,6 +393,34 @@ export default function BooksPage() {
     }
   }
 
+  async function loadPendingBookRequests() {
+    const { data, error } = await supabase
+      .from("book_requests")
+      .select(`
+      id,
+      title,
+      author,
+      isbn13,
+      status,
+      created_at,
+      user_id,
+      profiles:user_id (
+        display_name,
+        username
+      )
+    `)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      logSbError("Error loading book requests:", error);
+      setBookRequests([]);
+      return;
+    }
+
+    setBookRequests((data as any[]) ?? []);
+  }
+
   async function handleRequestBook() {
     if (!meId) {
       alert("You need to be signed in to request a book.");
@@ -415,6 +444,7 @@ export default function BooksPage() {
         title: cleanTitle,
         author: cleanAuthor || null,
         isbn13: cleanIsbn || null,
+        status: "pending",
       });
 
       if (error) throw error;
@@ -551,6 +581,10 @@ export default function BooksPage() {
 
       setMyRole(role);
       setIsSuperTeacher(superTeacherFlag);
+
+      if (superTeacherFlag) {
+        await loadPendingBookRequests();
+      }
 
       if (routeUsername) {
         const { data: profile } = await supabase
@@ -916,6 +950,47 @@ export default function BooksPage() {
         </p>
 
         <UserBar isTeacher={isTeacher} />
+
+        {isTeacher && isSuperTeacher && bookRequests.length > 0 ? (
+          <div className="mt-5 mb-6 max-w-2xl rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm">
+            <div className="text-sm font-semibold text-slate-800">📚 NEW BOOK REQUESTS</div>
+
+            <div className="mt-2 flex flex-col gap-2">
+              {bookRequests.map((req) => (
+                <div key={req.id} className="flex items-start justify-between gap-3">
+                  <div className="text-sm leading-6 text-slate-700">
+                    New book request from{" "}
+                    <span className="font-medium">
+                      {req.profiles?.display_name || "User"}
+                    </span>
+                    : <span className="font-medium">{req.title}</span>
+                    {req.author ? <span className="text-slate-500"> by {req.author}</span> : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from("book_requests")
+                        .update({ status: "done" })
+                        .eq("id", req.id);
+
+                      if (error) {
+                        logSbError("Error marking book request done:", error);
+                        return;
+                      }
+
+                      setBookRequests((prev) => prev.filter((r) => r.id !== req.id));
+                    }}
+                    className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                  >
+                    Done
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {isTeacher && viewingUserId === meId && teacherPrepAlerts.length > 0 ? (
           <div className="mt-5 mb-6 max-w-2xl rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm">

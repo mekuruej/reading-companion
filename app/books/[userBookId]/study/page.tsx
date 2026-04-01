@@ -13,7 +13,6 @@ declare global {
 }
 
 type StudySet = "READING" | "MEANING" | "FROM_READING";
-
 type StepField = "word" | "reading" | "meaning";
 
 function studySetLabel(s: StudySet) {
@@ -47,13 +46,10 @@ type WordRow = {
   chapter_name: string | null;
   seen_on: string | null;
   created_at: string;
-
   meaning_choices: any | null;
   meaning_choice_index: number | null;
-
   hidden: boolean | null;
   skipped_on: string | null;
-
   kanji_meta: KanjiMetaItem[] | null;
 };
 
@@ -132,7 +128,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch { }
+    } catch {}
   }
 
   return [];
@@ -233,7 +229,7 @@ export default function BookFlashcardsPage() {
       if (Array.isArray(parsed?.jlptSelected)) setJlptSelected(parsed.jlptSelected);
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
-    } catch { }
+    } catch {}
   }, [settingsKey, userBookId]);
 
   useEffect(() => {
@@ -251,7 +247,7 @@ export default function BookFlashcardsPage() {
           repeatsOnly,
         })
       );
-    } catch { }
+    } catch {}
   }, [
     settingsKey,
     userBookId,
@@ -328,7 +324,6 @@ export default function BookFlashcardsPage() {
         setBookCover((ub as any)?.books?.cover_url ?? "");
 
         const ownerUserId = (ub as any)?.user_id ?? "";
-
         const totalCounts = new Map<string, number>();
 
         if (ownerUserId) {
@@ -404,8 +399,8 @@ export default function BookFlashcardsPage() {
 
           const safeIdx =
             typeof w.meaning_choice_index === "number" &&
-              w.meaning_choice_index >= 0 &&
-              w.meaning_choice_index < meaningChoices.length
+            w.meaning_choice_index >= 0 &&
+            w.meaning_choice_index < meaningChoices.length
               ? w.meaning_choice_index
               : 0;
 
@@ -672,66 +667,95 @@ export default function BookFlashcardsPage() {
   function checkTypedAnswer() {
     if (!typeModeEnabled || !card) return;
 
-    const currentAnswerField = steps[typeRevealIndex + 1];
-    if (!currentAnswerField) return;
-
-    const correctRaw = getFieldValue(currentAnswerField, card);
     const userAnsRaw = typedInput.trim();
+    const userAns = kataToHira(userAnsRaw);
 
-    if (!correctRaw) {
+    if (studySet === "READING") {
+      const correctReading = card.reading ?? "";
+      const ok =
+        !!correctReading &&
+        isHiraganaOnly(userAns) &&
+        normalizeReading(userAns) === normalizeReading(correctReading);
+
       setTypedInput("");
-      const nextRevealIndex = Math.min(typeRevealIndex + 1, steps.length - 1);
-      setTypeRevealIndex(nextRevealIndex);
       setTypedFeedback({
-        ok: true,
-        message: "Answer revealed.",
+        ok,
+        message: ok ? "You got it!" : "Let's keep trying!",
       });
-      setLastTypedResult("revealed");
-      setReadyForNextCard(nextRevealIndex >= steps.length - 1);
+      setTypeRevealIndex(steps.length - 1);
+      setLastTypedResult(ok ? "correct" : "wrong");
+      setReadyForNextCard(true);
       return;
     }
 
-    const userAns = kataToHira(userAnsRaw);
-    let ok = false;
-
-    if (currentAnswerField === "reading") {
-      ok =
-        isHiraganaOnly(userAns) &&
-        normalizeReading(userAns) === normalizeReading(correctRaw);
-    } else if (currentAnswerField === "meaning") {
+    if (studySet === "MEANING") {
       const u = normalizeMeaning(userAns);
       const possible = [card.meaning, ...(card.meaningChoices ?? [])]
         .filter(Boolean)
         .map((x) => normalizeMeaning(String(x)));
 
-      ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
-    } else {
-      ok = userAns === correctRaw.trim();
+      const ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
+
+      setTypedInput("");
+      setTypedFeedback({
+        ok,
+        message: ok ? "You got it!" : "Let's keep trying!",
+      });
+      setTypeRevealIndex(steps.length - 1);
+      setLastTypedResult(ok ? "correct" : "wrong");
+      setReadyForNextCard(true);
+      return;
+    }
+
+    // FROM_READING: accept either the exact word OR a matching meaning
+    const wordOk = userAnsRaw === (card.word ?? "").trim();
+
+    const u = normalizeMeaning(userAns);
+    const possibleMeanings = [card.meaning, ...(card.meaningChoices ?? [])]
+      .filter(Boolean)
+      .map((x) => normalizeMeaning(String(x)));
+
+    const meaningOk =
+      u.length > 0 && possibleMeanings.some((m) => m.includes(u) || u.includes(m));
+
+    if (wordOk || meaningOk) {
+      setTypedInput("");
+      setTypedFeedback({
+        ok: true,
+        message: "You got it!",
+      });
+      setTypeRevealIndex(steps.length - 1);
+      setLastTypedResult("correct");
+      setReadyForNextCard(true);
+      return;
+    }
+
+    // Homophone check: if they typed another vocab word with the same reading
+    const typedAsAnotherCard = cards.find((c) => c.word === userAnsRaw && c.id !== card.id);
+
+    if (
+      typedAsAnotherCard &&
+      normalizeReading(typedAsAnotherCard.reading || "") === normalizeReading(card.reading || "")
+    ) {
+      setTypedInput("");
+      setTypedFeedback({
+        ok: true,
+        message: `You're right! They are homophones! This was our word: ${card.word}`,
+      });
+      setTypeRevealIndex(steps.length - 1);
+      setLastTypedResult("correct");
+      setReadyForNextCard(true);
+      return;
     }
 
     setTypedInput("");
-
-    const nextRevealIndex = Math.min(typeRevealIndex + 1, steps.length - 1);
-    setTypeRevealIndex(nextRevealIndex);
-
     setTypedFeedback({
-      ok,
-      message:
-        currentAnswerField === "reading"
-          ? ok
-            ? `You got it! Reading: ${card.reading || "—"}`
-            : `Better luck next time. Reading: ${card.reading || "—"}`
-          : currentAnswerField === "meaning"
-            ? ok
-              ? `You got it! Meaning: ${card.meaning || "—"}`
-              : `Better luck next time. Meaning: ${card.meaning || "—"}`
-            : ok
-              ? `You got it! Answer: ${correctRaw}`
-              : `Better luck next time. Answer: ${correctRaw}`,
+      ok: false,
+      message: "Let's keep trying!",
     });
-
-    setLastTypedResult(ok ? "correct" : "wrong");
-    setReadyForNextCard(nextRevealIndex >= steps.length - 1);
+    setTypeRevealIndex(steps.length - 1);
+    setLastTypedResult("wrong");
+    setReadyForNextCard(true);
   }
 
   function flip() {
@@ -789,13 +813,18 @@ export default function BookFlashcardsPage() {
     }
   }
 
-  const currentTypeAnswerField = typeModeEnabled ? steps[typeRevealIndex + 1] : null;
+  const currentTypeAnswerField =
+    typeModeEnabled
+      ? studySet === "READING"
+        ? "reading"
+        : studySet === "MEANING"
+        ? "meaning"
+        : "word_or_meaning"
+      : null;
 
   function startVoiceInput() {
     if (typeof window === "undefined") return;
-
-    const currentAnswerField = steps[typeRevealIndex + 1];
-    if (currentAnswerField !== "meaning") return;
+    if (studySet !== "MEANING") return;
 
     const SpeechRecognitionCtor =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -878,7 +907,17 @@ export default function BookFlashcardsPage() {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [typeModeEnabled, stepIndex, typeRevealIndex, filteredCards, sessionIndex, studyOnceMode, steps, readyForNextCard, lastTypedResult]);
+  }, [
+    typeModeEnabled,
+    stepIndex,
+    typeRevealIndex,
+    filteredCards,
+    sessionIndex,
+    studyOnceMode,
+    steps,
+    readyForNextCard,
+    lastTypedResult,
+  ]);
 
   if (loading) {
     return (
@@ -967,22 +1006,22 @@ export default function BookFlashcardsPage() {
     studySet === "READING"
       ? true
       : studySet === "MEANING"
-        ? true
-        : stepIndex >= 1;
+      ? true
+      : stepIndex >= 1;
 
   const showReading =
     studySet === "READING"
       ? stepIndex >= 1
       : studySet === "MEANING"
-        ? true
-        : true;
+      ? true
+      : true;
 
   const showMeaning =
     studySet === "READING"
       ? true
       : studySet === "MEANING"
-        ? stepIndex >= 1
-        : stepIndex >= 1;
+      ? stepIndex >= 1
+      : stepIndex >= 1;
 
   function Row({
     label,
@@ -1047,12 +1086,13 @@ export default function BookFlashcardsPage() {
             </select>
 
             <label
-              className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+              className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${
+                steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
+              }`}
               title={
                 steps.length < 2
                   ? "Type mode needs at least 2 study steps."
-                  : "Press Enter to reveal. Press Enter again to move to the next card."
+                  : "Press Enter to check. Press Enter again to move to the next card."
               }
             >
               <input
@@ -1152,7 +1192,7 @@ export default function BookFlashcardsPage() {
       {firstTouch && (
         <p className="mb-2 text-sm text-gray-500">
           {typeModeEnabled
-            ? "Press Enter to reveal. Press Enter again to move to the next card."
+            ? "Press Enter to check. Press Enter again to move to the next card."
             : "Click card, press Space, or use Review / Next."}
         </p>
       )}
@@ -1203,20 +1243,36 @@ export default function BookFlashcardsPage() {
               <Row
                 label="Word"
                 value={card.word}
-                visible={steps.includes("word") ? typeRevealIndex >= steps.indexOf("word") : false}
+                visible={
+                  studySet === "READING" || studySet === "MEANING"
+                    ? true
+                    : typeRevealIndex >= steps.indexOf("word")
+                }
                 big
                 placeholder="---"
               />
+
               <Row
                 label="Reading"
                 value={card.reading || "—"}
-                visible={steps.includes("reading") ? typeRevealIndex >= steps.indexOf("reading") : false}
+                visible={
+                  studySet === "MEANING"
+                    ? true
+                    : studySet === "FROM_READING"
+                    ? true
+                    : typeRevealIndex >= steps.indexOf("reading")
+                }
                 placeholder="---"
               />
+
               <Row
                 label="Meaning"
                 value={card.meaning || "—"}
-                visible={steps.includes("meaning") ? typeRevealIndex >= steps.indexOf("meaning") : false}
+                visible={
+                  studySet === "READING"
+                    ? true
+                    : typeRevealIndex >= steps.indexOf("meaning")
+                }
                 placeholder="---"
               />
 
@@ -1224,14 +1280,14 @@ export default function BookFlashcardsPage() {
                 <div className="w-full max-w-md">
                   <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
                     Type{" "}
-                    {currentTypeAnswerField === "word"
-                      ? "Kanji"
-                      : currentTypeAnswerField === "reading"
-                        ? "Reading"
-                        : "Meaning"}
+                    {studySet === "READING"
+                      ? "Reading"
+                      : studySet === "MEANING"
+                      ? "Meaning"
+                      : "Word or Meaning"}
                   </div>
 
-                  {currentTypeAnswerField === "reading" ? (
+                  {studySet === "READING" ? (
                     <p className="mb-2 text-xs text-gray-500">
                       Reading quizzes should be answered in hiragana only.
                     </p>
@@ -1239,7 +1295,7 @@ export default function BookFlashcardsPage() {
 
                   <div className="flex gap-2">
                     <input
-                      key={currentTypeAnswerField}
+                      key={`${studySet}-${sessionIndex}`}
                       type="text"
                       value={typedInput}
                       onChange={(e) => {
@@ -1262,7 +1318,7 @@ export default function BookFlashcardsPage() {
                         }
                       }}
                       inputMode="text"
-                      lang={currentTypeAnswerField === "reading" ? "ja" : undefined}
+                      lang={studySet === "READING" ? "ja" : undefined}
                       autoCorrect="off"
                       autoCapitalize="none"
                       spellCheck={false}
@@ -1271,15 +1327,15 @@ export default function BookFlashcardsPage() {
                       placeholder={
                         readyForNextCard
                           ? "Press Enter for next card"
-                          : currentTypeAnswerField === "meaning"
-                            ? "Type a meaning"
-                            : currentTypeAnswerField === "reading"
-                              ? "かなで入力"
-                              : "Type your answer"
+                          : studySet === "READING"
+                          ? "かなで入力"
+                          : studySet === "MEANING"
+                          ? "Type a meaning"
+                          : "Type the word or a meaning"
                       }
                     />
 
-                    {voiceSupported && currentTypeAnswerField === "meaning" ? (
+                    {voiceSupported && studySet === "MEANING" ? (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1301,8 +1357,9 @@ export default function BookFlashcardsPage() {
 
                   {typedFeedback ? (
                     <p
-                      className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"
-                        }`}
+                      className={`mt-2 text-sm ${
+                        typedFeedback.ok ? "text-green-700" : "text-red-700"
+                      }`}
                     >
                       {typedFeedback.ok ? "✅ " : "❌ "}
                       {typedFeedback.message}
@@ -1344,10 +1401,11 @@ export default function BookFlashcardsPage() {
                   type="button"
                   disabled={defSaving}
                   onClick={() => setDefinitionForCurrent(i)}
-                  className={`text-left px-3 py-2 rounded border ${active
-                    ? "bg-slate-700 text-white border-slate-700"
-                    : "bg-white hover:bg-slate-50"
-                    }`}
+                  className={`text-left px-3 py-2 rounded border ${
+                    active
+                      ? "bg-slate-700 text-white border-slate-700"
+                      : "bg-white hover:bg-slate-50"
+                  }`}
                 >
                   <span className="text-xs mr-2 opacity-70">#{i + 1}</span>
                   {choice || "—"}

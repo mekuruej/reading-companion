@@ -37,7 +37,7 @@ export default function Header() {
             }
             className="text-stone-700 transition hover:text-stone-900"
           >
-            Study
+            Daily Study
           </button>
 
           <Link
