@@ -56,19 +56,17 @@ function extractMeaningChoices(entry: any): string[] {
 
   for (const s of senses) {
     const defs: string[] = s?.english_definitions ?? [];
-    const text = defs.join(", ").trim();
+    const text = defs.join("; ").trim();
     if (text) choices.push(text);
   }
 
   const seen = new Set<string>();
-  const unique = choices.filter((c) => {
+  return choices.filter((c) => {
     const key = c.toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-
-  return unique;
 }
 
 function toNullableInt(value: string): number | null {
@@ -86,7 +84,6 @@ type BulkItem = {
   surface: string;
   reading: string;
   meaning: string;
-  otherDefinition: string;
   jlpt: string;
   isCommon: boolean;
 
@@ -100,6 +97,8 @@ type BulkItem = {
   kanjiMeta: { kanji: string; strokes: number | null }[];
 };
 
+type BulkStep = "paste" | "definitions" | "details" | "done";
+
 // -------------------------------------------------------------
 // Main Component
 // -------------------------------------------------------------
@@ -110,24 +109,23 @@ export default function BulkVocabPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
 
-  // Bulk tools
+  const [step, setStep] = useState<BulkStep>("paste");
+
   const [bulkPageNumber, setBulkPageNumber] = useState("");
   const [bulkChapterNumber, setBulkChapterNumber] = useState("");
   const [bulkChapterName, setBulkChapterName] = useState("");
 
   const [rawInput, setRawInput] = useState("");
   const [items, setItems] = useState<BulkItem[]>([]);
-  const [message, setMessage] = useState<string>("");
+
+  const [message, setMessage] = useState("");
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveComplete, setSaveComplete] = useState(false);
-
-  const [pagePaste, setPagePaste] = useState("");
 
   const wordCount = useMemo(() => parseWords(rawInput).length, [rawInput]);
 
   // -------------------------------------------------------------
-  // Get userBookId from URL (?userBookId=...)
+  // Get userBookId from URL
   // -------------------------------------------------------------
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -137,7 +135,7 @@ export default function BulkVocabPage() {
   }, []);
 
   // -------------------------------------------------------------
-  // Load book info via user_books -> books
+  // Load book info
   // -------------------------------------------------------------
   useEffect(() => {
     if (!userBookId) return;
@@ -148,7 +146,7 @@ export default function BulkVocabPage() {
         const { number, name } = JSON.parse(saved);
         setBulkChapterNumber(number || "");
         setBulkChapterName(name || "");
-      } catch {}
+      } catch { }
     }
 
     (async () => {
@@ -167,7 +165,7 @@ export default function BulkVocabPage() {
         .single();
 
       if (error) {
-        setMessage(`❌ Could not load user_books/book info: ${error.message}`);
+        setMessage(`❌ Could not load book info: ${error.message}`);
         return;
       }
 
@@ -177,7 +175,6 @@ export default function BulkVocabPage() {
     })();
   }, [userBookId]);
 
-  // Save chapter info locally
   useEffect(() => {
     if (!userBookId) return;
     localStorage.setItem(
@@ -190,15 +187,49 @@ export default function BulkVocabPage() {
   }, [bulkChapterNumber, bulkChapterName, userBookId]);
 
   // -------------------------------------------------------------
-  // Bulk apply helpers
+  // Helpers
   // -------------------------------------------------------------
+  function updateItem(index: number, field: keyof BulkItem, value: any) {
+    setItems((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  }
+
+  function chooseMeaning(index: number, rawValue: string) {
+    setItems((prev) => {
+      const copy = [...prev];
+      const item = copy[index];
+
+      if (rawValue === "other") {
+        copy[index] = {
+          ...item,
+          meaningChoiceIndex: null,
+          meaning: "",
+        };
+        return copy;
+      }
+
+      const newIndex = Number(rawValue);
+      const choices = item.meaningChoices ?? [];
+      const chosen = choices[newIndex] ?? "";
+
+      copy[index] = {
+        ...item,
+        meaningChoiceIndex: Number.isFinite(newIndex) ? newIndex : 0,
+        meaning: chosen,
+      };
+      return copy;
+    });
+  }
+
   function applyBulkField(
     field: "page" | "chapterNumber" | "chapterName",
     value: string,
     mode: "blank" | "all"
   ) {
     const trimmed = value.trim();
-
     if (!trimmed) {
       setMessage("Fill in a value first.");
       return;
@@ -225,48 +256,40 @@ export default function BulkVocabPage() {
       field === "page"
         ? "page number"
         : field === "chapterNumber"
-        ? "chapter number"
-        : "chapter name";
+          ? "chapter number"
+          : "chapter name";
 
     setMessage(
       `✅ Applied ${label} to ${changed} row${changed === 1 ? "" : "s"} (${mode === "all" ? "all" : "blanks only"}).`
     );
   }
 
-  // -------------------------------------------------------------
-  // Apply pasted page numbers to preview list (in order)
-  // -------------------------------------------------------------
-  function applyPastedPages() {
-    const nums = pagePaste
-      .split(/[\n,\t]+/)
-      .map((x) => x.trim())
-      .filter(Boolean);
+  function validateDefinitions() {
+    const missing = items.filter((i) => !i.reading.trim() || !i.meaning.trim());
+    return missing.length;
+  }
 
-    if (nums.length === 0) return;
+  function resetForMore() {
+    setRawInput("");
+    setItems([]);
+    setMessage("");
+    setStep("paste");
+  }
 
-    setItems((prev) => {
-      const copy = [...prev];
-      const n = Math.min(copy.length, nums.length);
-
-      for (let i = 0; i < n; i++) {
-        copy[i] = { ...copy[i], page: nums[i] };
-      }
-      return copy;
-    });
-
-    setMessage(`✅ Applied ${Math.min(items.length, nums.length)} page numbers to the preview list.`);
+  function goToVocabList() {
+    if (!userBookId) return;
+    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
   }
 
   // -------------------------------------------------------------
-  // Preview — fetch Jisho + strokes
+  // Step 1: Preview
   // -------------------------------------------------------------
   async function handlePreview(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    setSaveComplete(false);
 
     if (!userBookId) {
-      setMessage("❌ Missing userBookId. Open this page like: /vocab?userBookId=...");
+      setMessage("❌ Missing userBookId.");
       return;
     }
 
@@ -302,11 +325,11 @@ export default function BulkVocabPage() {
               isCommon = entry.is_common || false;
 
               meaningChoices = extractMeaningChoices(entry);
-              meaningChoiceIndex = 0;
+              meaningChoiceIndex = meaningChoices.length ? 0 : null;
               meaning = meaningChoices[0] || "";
             }
           }
-        } catch {}
+        } catch { }
 
         const kanjiMeta = await getStrokeData(w);
 
@@ -314,7 +337,6 @@ export default function BulkVocabPage() {
           surface: w,
           reading,
           meaning,
-          otherDefinition: "",
           jlpt,
           isCommon,
           meaningChoices,
@@ -326,39 +348,51 @@ export default function BulkVocabPage() {
         });
       }
 
-            setItems(results);
-      setMessage("✅ Preview ready! Now bulk apply page/chapter info if you want, then review and save.");
+      setItems(results);
       setRawInput("");
-      setPagePaste("");
-
-        } catch (err: any) {
-  console.error("PREVIEW ERROR:", err);
-  setMessage(`❌ Error generating preview: ${err?.message ?? "unknown error"}`);
-} finally {
-  setIsPreviewing(false);
-}
+      setStep("definitions");
+      setMessage("✅ Step 1 complete. Check the definitions, then save definitions to move on.");
+    } catch (err: any) {
+      console.error("PREVIEW ERROR:", err);
+      setMessage(`❌ Error generating preview: ${err?.message ?? "unknown error"}`);
+    } finally {
+      setIsPreviewing(false);
+    }
   }
 
   // -------------------------------------------------------------
-  // Save ALL items to user_book_words
+  // Step 2: Save definitions locally and move to details
+  // -------------------------------------------------------------
+  function handleSaveDefinitions() {
+    const missingCount = validateDefinitions();
+
+    if (missingCount > 0) {
+      const confirmed = window.confirm(
+        `${missingCount} word${missingCount === 1 ? "" : "s"} ${missingCount === 1 ? "is" : "are"
+        } missing a reading or definition.\n\nDo you want to continue anyway?`
+      );
+      if (!confirmed) return;
+    }
+
+    setStep("details");
+    setMessage("✅ Definitions saved for this batch. Now add page and chapter info.");
+  }
+
+  // -------------------------------------------------------------
+  // Step 3: Save ALL to DB
   // -------------------------------------------------------------
   async function handleSaveAll() {
     setMessage("");
-    setSaveComplete(false);
 
     if (!userBookId || items.length === 0) return;
 
-        const incompleteItems = items.filter(
-      (i) => !i.reading.trim() || !i.meaning.trim()
-    );
+    const incompleteItems = items.filter((i) => !i.reading.trim() || !i.meaning.trim());
 
     if (incompleteItems.length > 0) {
       const confirmed = window.confirm(
-        `${incompleteItems.length} word${
-          incompleteItems.length === 1 ? "" : "s"
+        `${incompleteItems.length} word${incompleteItems.length === 1 ? "" : "s"
         } ${incompleteItems.length === 1 ? "is" : "are"} missing a reading or definition.\n\nDo you want to save anyway?`
       );
-
       if (!confirmed) return;
     }
 
@@ -398,17 +432,11 @@ export default function BulkVocabPage() {
           .select("page_order")
           .eq("user_book_id", userBookId);
 
-        if (chNum == null) {
-          query = query.is("chapter_number", null);
-        } else {
-          query = query.eq("chapter_number", chNum);
-        }
+        if (chNum == null) query = query.is("chapter_number", null);
+        else query = query.eq("chapter_number", chNum);
 
-        if (pgNum == null) {
-          query = query.is("page_number", null);
-        } else {
-          query = query.eq("page_number", pgNum);
-        }
+        if (pgNum == null) query = query.is("page_number", null);
+        else query = query.eq("page_number", pgNum);
 
         const { data: existingRows, error: existingErr } = await query;
         if (existingErr) throw existingErr;
@@ -432,20 +460,14 @@ export default function BulkVocabPage() {
         const nextPageOrder = current + 1;
         nextOrderByCombo.set(comboKey, nextPageOrder);
 
-        const useOther = i.meaningChoiceIndex == null;
-        const chosen =
-          !useOther && i.meaningChoices?.length
-            ? i.meaningChoices[i.meaningChoiceIndex ?? 0] ?? i.meaning
-            : i.meaning;
-
         return {
           user_book_id: userBookId,
           surface: i.surface,
           reading: i.reading || null,
-          meaning: chosen?.trim() || null,
-          other_definition: i.otherDefinition?.trim() || null,
+          meaning: i.meaning?.trim() || null,
+          other_definition: i.meaningChoiceIndex == null ? i.meaning?.trim() || null : null,
           meaning_choices: i.meaningChoices ?? [],
-          meaning_choice_index: i.meaningChoiceIndex == null ? null : i.meaningChoiceIndex,
+          meaning_choice_index: i.meaningChoiceIndex,
           jlpt: normalizeJlpt(i.jlpt),
           is_common: !!i.isCommon,
           page_number: pgNum,
@@ -457,23 +479,20 @@ export default function BulkVocabPage() {
         };
       });
 
-            const { error } = await supabase
-  .from("user_book_words")
-  .upsert(payload);
+      const { error } = await supabase.from("user_book_words").upsert(payload);
 
       if (error) throw error;
 
+      setStep("done");
       setMessage(`✅ Saved ${payload.length} words!`);
-      setSaveComplete(true);
-        } catch (err: any) {
+    } catch (err: any) {
       console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
       setMessage(
-        `❌ Failed saving: ${
-          err?.message ||
-          err?.error_description ||
-          err?.details ||
-          JSON.stringify(err) ||
-          "unknown error"
+        `❌ Failed saving: ${err?.message ||
+        err?.error_description ||
+        err?.details ||
+        JSON.stringify(err) ||
+        "unknown error"
         }`
       );
     } finally {
@@ -482,54 +501,29 @@ export default function BulkVocabPage() {
   }
 
   // -------------------------------------------------------------
-  // Update item field
+  // UI helpers
   // -------------------------------------------------------------
-  function updateItem(index: number, field: keyof BulkItem, value: any) {
-    setItems((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
-    });
-  }
-
-  function chooseMeaning(index: number, rawValue: string) {
-    setItems((prev) => {
-      const copy = [...prev];
-      const item = copy[index];
-
-      if (rawValue === "other") {
-        copy[index] = {
-          ...item,
-          meaningChoiceIndex: null,
-          meaning: "",
-        };
-        return copy;
-      }
-
-      const newIndex = Number(rawValue);
-      const choices = item.meaningChoices ?? [];
-      const chosen = choices[newIndex] ?? "";
-
-      copy[index] = {
-        ...item,
-        meaningChoiceIndex: Number.isFinite(newIndex) ? newIndex : 0,
-        meaning: chosen || item.meaning,
-      };
-      return copy;
-    });
-  }
-
-  function resetForMore() {
-    setRawInput("");
-    setItems([]);
-    setPagePaste("");
-    setMessage("");
-    setSaveComplete(false);
-  }
-
-  function goToVocabList() {
-    if (!userBookId) return;
-    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+  function SaveBar({
+    label,
+    onClick,
+    disabled = false,
+  }: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+  }) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-60"
+        >
+          {label}
+        </button>
+      </div>
+    );
   }
 
   // -------------------------------------------------------------
@@ -537,400 +531,323 @@ export default function BulkVocabPage() {
   // -------------------------------------------------------------
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-semibold mb-2">🧺 Add Vocabulary</h1>
+      <div className="mx-auto max-w-5xl">
+        <h1 className="mb-2 text-2xl font-semibold">🧺 Add Vocabulary</h1>
 
         {bookTitle ? (
-          <div className="flex items-center gap-3 mb-6">
+          <div className="mb-6 flex items-center gap-3">
             {bookCover ? (
-              <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover" />
+              <img src={bookCover} alt="" className="h-16 w-12 rounded object-cover" />
             ) : null}
             <div>
               <p className="text-sm text-gray-700">
                 For book: <span className="font-medium">{bookTitle}</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Paste words first. Then apply page/chapter info in bulk.
-              </p>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-gray-500 mb-6">
-            (Tip) Open with <code className="px-1 py-0.5 bg-gray-100 rounded">?userBookId=...</code>
+          <p className="mb-6 text-sm text-gray-500">
+            Open with <code className="rounded bg-gray-100 px-1 py-0.5">?userBookId=...</code>
           </p>
         )}
 
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-lg font-medium mb-1">Step 1 — Paste Words</div>
-          <p className="text-sm text-gray-500 mb-3">
-            Paste one word per line or comma-separated. You can organize page and chapter info after preview.
-          </p>
-
-          <form onSubmit={handlePreview} className="flex flex-col gap-3">
-            <textarea
-              value={rawInput}
-              onChange={(e) => setRawInput(e.target.value)}
-              rows={8}
-              className="border p-3 rounded font-mono text-sm bg-white"
-              placeholder={`Paste one per line (or comma-separated)\n\n生意気\nメンヘラ\n都市伝説`}
-            />
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                disabled={isPreviewing}
-                className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 disabled:opacity-60"
-              >
-                {isPreviewing ? "Loading…" : `Preview Words${wordCount ? ` (${wordCount})` : ""}`}
-              </button>
-
-              {items.length > 0 ? (
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={handleSaveAll}
-                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
-                >
-                  {isSaving ? "Saving…" : "Save All"}
-                </button>
-              ) : null}
-
-              {saveComplete ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={resetForMore}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                    title="Clear the preview and start a new batch"
-                  >
-                    ➕ Add More Words
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={goToVocabList}
-                    className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-                    title="Go to the vocab list for this book"
-                  >
-                    📄 Go to Vocab List
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </form>
-        </div>
-
         {message ? (
-  <div className="mb-4">
-    {message.startsWith("❌") ? (
-      <p className="text-red-700 text-base font-medium">{message}</p>
-    ) : (
-      <p className="text-green-700 text-lg font-semibold">{message}</p>
-    )}
-  </div>
-) : null}
+          <div className="mb-4">
+            {message.startsWith("❌") ? (
+              <p className="text-base font-medium text-red-700">{message}</p>
+            ) : (
+              <p className="text-lg font-semibold text-green-700">{message}</p>
+            )}
+          </div>
+        ) : null}
 
-        {items.length > 0 && (
+        {step === "paste" && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-1 text-lg font-medium">Step 1 — Paste Words</div>
+            <p className="mb-3 text-sm text-gray-500">
+              Paste one word per line or comma-separated, then preview them.
+            </p>
+
+            <form onSubmit={handlePreview} className="flex flex-col gap-3">
+              <textarea
+                value={rawInput}
+                onChange={(e) => setRawInput(e.target.value)}
+                rows={8}
+                className="rounded border bg-white p-3 font-mono text-sm"
+                placeholder={`Paste one per line (or comma-separated)\n\n生意気\nメンヘラ\n都市伝説`}
+              />
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  disabled={isPreviewing}
+                  className="rounded bg-amber-500 px-4 py-2 text-white hover:bg-amber-600 disabled:opacity-60"
+                >
+                  {isPreviewing ? "Loading…" : `Preview Words${wordCount ? ` (${wordCount})` : ""}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {step === "definitions" && (
           <>
-            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="text-lg font-medium mb-1">Step 2 — Bulk Apply Info</div>
-              <p className="text-sm text-gray-500 mb-4">
-                Apply page or chapter info to all rows, or just to blanks. You can still edit anything row by row below.
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-1 text-lg font-medium">Step 2 — Check Definitions</div>
+              <p className="text-sm text-gray-500">
+                Choose the best definition number for each word. Use Other if needed.
               </p>
-
-              <div className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-[160px_1fr_auto_auto] items-center">
-                  <div className="text-sm font-medium text-gray-700">Page number</div>
-                  <input
-                    type="number"
-                    value={bulkPageNumber}
-                    onChange={(e) => setBulkPageNumber(e.target.value)}
-                    placeholder="e.g. 45"
-                    className="border p-2 rounded"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("page", bulkPageNumber, "blank")}
-                    className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Apply to blanks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("page", bulkPageNumber, "all")}
-                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Apply to all
-                  </button>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-[160px_1fr_auto_auto] items-center">
-                  <div className="text-sm font-medium text-gray-700">Chapter number</div>
-                  <input
-                    type="number"
-                    value={bulkChapterNumber}
-                    onChange={(e) => setBulkChapterNumber(e.target.value)}
-                    placeholder="e.g. 3"
-                    className="border p-2 rounded"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "blank")}
-                    className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Apply to blanks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "all")}
-                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Apply to all
-                  </button>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-[160px_1fr_auto_auto] items-center">
-                  <div className="text-sm font-medium text-gray-700">Chapter name</div>
-                  <input
-                    type="text"
-                    value={bulkChapterName}
-                    onChange={(e) => setBulkChapterName(e.target.value)}
-                    placeholder="e.g. Summer Festival"
-                    className="border p-2 rounded"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("chapterName", bulkChapterName, "blank")}
-                    className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Apply to blanks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("chapterName", bulkChapterName, "all")}
-                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Apply to all
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-6 border-t pt-4">
-                <div className="text-sm font-medium mb-1">Paste page numbers in order (optional)</div>
-                <p className="text-xs text-gray-500 mb-2">
-                  Paste one per line or copied from a spreadsheet. They’ll be applied to the preview list in order.
-                </p>
-
-                <textarea
-                  rows={4}
-                  value={pagePaste}
-                  onChange={(e) => setPagePaste(e.target.value)}
-                  className="border p-2 rounded font-mono text-sm w-full"
-                  placeholder={`10\n10\n11\n11\n12`}
-                />
-
-                <div className="flex gap-2 mt-2">
-                  <button
-                    type="button"
-                    onClick={applyPastedPages}
-                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Apply pages
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPagePaste("")}
-                    className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
             </div>
 
-            <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
-  <h2 className="text-xl font-medium">Step 3 — Review and Save ({items.length})</h2>
-
-  <div className="flex items-center gap-3 flex-wrap">
-    {saveComplete ? (
-      <div className="text-green-700 text-lg font-semibold">
-        {message}
-      </div>
-    ) : null}
-
-    <button
-      type="button"
-      disabled={isSaving}
-      onClick={handleSaveAll}
-      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
-    >
-      {isSaving ? "Saving…" : "Save All"}
-    </button>
-  </div>
-</div>
+            <div className="mb-4">
+              <SaveBar label="Save Definitions" onClick={handleSaveDefinitions} />
+            </div>
 
             <ul className="space-y-3">
               {items.map((i, idx) => (
-                <li key={`${i.surface}_${idx}`} className="border border-slate-200 p-3 rounded-2xl bg-white shadow-sm">
-                  <div className="flex justify-between items-start gap-3 mb-2 flex-wrap">
-                    <span className="font-semibold text-lg">{i.surface}</span>
+                <li
+                  key={`${i.surface}_${idx}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="mb-3 text-lg font-semibold">{i.surface}</div>
 
-                    <div className="flex gap-2 flex-wrap">
+                  <div className="grid gap-3">
+                    <div>
+                      <div className="mb-1 text-xs text-gray-500">Reading</div>
                       <input
-                        type="number"
-                        placeholder="Ch #"
-                        value={i.chapterNumber}
-                        onChange={(e) => updateItem(idx, "chapterNumber", e.target.value)}
-                        className="border p-1 rounded text-xs w-16 text-right"
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Chapter name"
-                        value={i.chapterName}
-                        onChange={(e) => updateItem(idx, "chapterName", e.target.value)}
-                        className="border p-1 rounded text-xs w-40"
-                      />
-
-                      <input
-                        type="number"
-                        placeholder="Page"
-                        value={i.page}
-                        onChange={(e) => updateItem(idx, "page", e.target.value)}
-                        className="border p-1 rounded text-xs w-20 text-right"
+                        value={i.reading}
+                        onChange={(e) => updateItem(idx, "reading", e.target.value)}
+                        className="w-full rounded border p-2 text-sm"
+                        placeholder="Reading"
                       />
                     </div>
-                  </div>
 
-                  <div className="grid gap-2">
-                    <input
-                      value={i.reading}
-                      onChange={(e) => updateItem(idx, "reading", e.target.value)}
-                      className="border p-2 rounded w-full text-sm"
-                      placeholder="Reading"
-                    />
-
-                    {i.meaningChoices?.length ? (
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">
-                            Definition:{" "}
-                            {i.meaningChoiceIndex == null
-                              ? "Other"
-                              : `${i.meaningChoiceIndex + 1}/${i.meaningChoices.length}`}
-                          </span>
-
-                          <select
-                            value={i.meaningChoiceIndex == null ? "other" : String(i.meaningChoiceIndex)}
-                            onChange={(e) => chooseMeaning(idx, e.target.value)}
-                            className="border p-1 rounded text-xs bg-white"
-                            title="Pick which Jisho definition to save as Meaning"
-                          >
-                            {i.meaningChoices.map((m, mi) => (
-                              <option key={mi} value={mi}>
-                                {mi + 1}
-                              </option>
-                            ))}
-                            <option value="other">Other</option>
-                          </select>
-                        </div>
+                    <div>
+                      <div className="mb-1 text-xs text-gray-500">Definition #</div>
+                      <div className="flex flex-col gap-3 md:flex-row">
+                        <select
+                          value={i.meaningChoiceIndex == null ? "other" : String(i.meaningChoiceIndex)}
+                          onChange={(e) => chooseMeaning(idx, e.target.value)}
+                          className="w-full rounded border bg-white px-3 py-2 text-sm md:w-40"
+                        >
+                          {i.meaningChoices.map((_, mi) => (
+                            <option key={mi} value={mi}>
+                              {`Def ${mi + 1}`}
+                            </option>
+                          ))}
+                          <option value="other">Other</option>
+                        </select>
 
                         <textarea
                           rows={2}
                           value={i.meaning}
                           onChange={(e) => updateItem(idx, "meaning", e.target.value)}
-                          className="border p-2 rounded w-full text-sm"
-                          placeholder={i.meaningChoiceIndex == null ? "Type your custom definition" : "Meaning"}
+                          readOnly={i.meaningChoiceIndex != null}
+                          className={`w-full rounded border p-2 text-sm ${i.meaningChoiceIndex == null
+                            ? "bg-white"
+                            : "bg-slate-100 text-slate-700"
+                            }`}
+                          placeholder={
+                            i.meaningChoiceIndex == null
+                              ? "Type your custom meaning"
+                              : "Meaning"
+                          }
                         />
-
-                        <details className="text-xs text-gray-600">
-                          <summary className="cursor-pointer select-none">Show all definitions</summary>
-                          <ol className="list-decimal ml-5 mt-1 space-y-1">
-                            {i.meaningChoices.map((m, mi) => (
-                              <li key={mi} className={mi === i.meaningChoiceIndex ? "font-medium" : ""}>
-                                {m}
-                              </li>
-                            ))}
-                          </ol>
-                        </details>
                       </div>
-                    ) : (
-                      <textarea
-                        rows={2}
-                        value={i.meaning}
-                        onChange={(e) => updateItem(idx, "meaning", e.target.value)}
-                        className="border p-2 rounded w-full text-sm"
-                        placeholder="Meaning"
-                      />
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 text-xs mt-2">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-                      {normalizeJlpt(i.jlpt)}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => updateItem(idx, "isCommon", !i.isCommon)}
-                      className={`px-2 py-1 rounded border ${
-                        i.isCommon
-                          ? "bg-green-100 text-green-700 border-green-300"
-                          : "bg-gray-100 text-gray-700 border-gray-300"
-                      }`}
-                    >
-                      {i.isCommon ? "Common" : "Rare"}
-                    </button>
-
-                    {i.kanjiMeta?.length ? (
-                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">
-                        {i.kanjiMeta.map((s) => `${s.kanji}:${s.strokes ?? "?"}`).join(" / ")} strokes
-                      </span>
-                    ) : null}
+                      <p className="mt-1 text-xs text-stone-500">
+                          Choose Other to write your own definition.
+                        </p>
+                    </div>
                   </div>
                 </li>
               ))}
             </ul>
 
             <div className="mt-6">
-  {saveComplete ? (
-    <div className="mb-3 text-green-700 text-lg font-semibold">
-      {message}
-    </div>
-  ) : null}
-
-  <div className="flex flex-wrap gap-3">
-    <button
-      type="button"
-      disabled={isSaving}
-      onClick={handleSaveAll}
-      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
-    >
-      {isSaving ? "Saving…" : "Save All"}
-    </button>
-
-    {saveComplete ? (
-      <>
-        <button
-          type="button"
-          onClick={resetForMore}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          ➕ Add More Words
-        </button>
-
-        <button
-          type="button"
-          onClick={goToVocabList}
-          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-        >
-          📄 Go to Vocab List
-        </button>
-      </>
-    ) : null}
-  </div>
-</div>
+              <SaveBar label="Save Definitions" onClick={handleSaveDefinitions} />
+            </div>
           </>
+        )}
+
+        {step === "details" && (
+          <>
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-1 text-lg font-medium">Step 3 — Add Page and Chapter Info</div>
+              <p className="text-sm text-gray-500">
+                Use the bulk tools or edit row by row, then save everything.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <SaveBar
+                label={isSaving ? "Saving…" : "Save All"}
+                onClick={handleSaveAll}
+                disabled={isSaving}
+              />
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="space-y-4">
+                <div className="grid items-center gap-3 md:grid-cols-[160px_1fr_auto_auto]">
+                  <div className="text-sm font-medium text-gray-700">Page number</div>
+                  <input
+                    type="number"
+                    value={bulkPageNumber}
+                    onChange={(e) => setBulkPageNumber(e.target.value)}
+                    placeholder="e.g. 45"
+                    className="rounded border p-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("page", bulkPageNumber, "blank")}
+                    className="rounded bg-gray-200 px-3 py-2 hover:bg-gray-300"
+                  >
+                    Apply to blanks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("page", bulkPageNumber, "all")}
+                    className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                  >
+                    Apply to all
+                  </button>
+                </div>
+
+                <div className="grid items-center gap-3 md:grid-cols-[160px_1fr_auto_auto]">
+                  <div className="text-sm font-medium text-gray-700">Chapter number</div>
+                  <input
+                    type="number"
+                    value={bulkChapterNumber}
+                    onChange={(e) => setBulkChapterNumber(e.target.value)}
+                    placeholder="e.g. 3"
+                    className="rounded border p-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "blank")}
+                    className="rounded bg-gray-200 px-3 py-2 hover:bg-gray-300"
+                  >
+                    Apply to blanks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "all")}
+                    className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                  >
+                    Apply to all
+                  </button>
+                </div>
+
+                <div className="grid items-center gap-3 md:grid-cols-[160px_1fr_auto_auto]">
+                  <div className="text-sm font-medium text-gray-700">Chapter name</div>
+                  <input
+                    type="text"
+                    value={bulkChapterName}
+                    onChange={(e) => setBulkChapterName(e.target.value)}
+                    placeholder="e.g. Summer Festival"
+                    className="rounded border p-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterName", bulkChapterName, "blank")}
+                    className="rounded bg-gray-200 px-3 py-2 hover:bg-gray-300"
+                  >
+                    Apply to blanks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyBulkField("chapterName", bulkChapterName, "all")}
+                    className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                  >
+                    Apply to all
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <ul className="space-y-3">
+              {items.map((i, idx) => (
+                <li
+                  key={`${i.surface}_${idx}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="mb-2 font-semibold text-lg">{i.surface}</div>
+                  <div className="mb-2 text-sm text-gray-600">
+                    {i.reading || "—"} · {i.meaning || "—"}
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <div className="mb-1 text-xs text-gray-500">Page</div>
+                      <input
+                        type="number"
+                        placeholder="Page"
+                        value={i.page}
+                        onChange={(e) => updateItem(idx, "page", e.target.value)}
+                        className="w-full rounded border p-2 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1 text-xs text-gray-500">Chapter #</div>
+                      <input
+                        type="number"
+                        placeholder="Chapter #"
+                        value={i.chapterNumber}
+                        onChange={(e) => updateItem(idx, "chapterNumber", e.target.value)}
+                        className="w-full rounded border p-2 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1 text-xs text-gray-500">Chapter Name</div>
+                      <input
+                        type="text"
+                        placeholder="Chapter name"
+                        value={i.chapterName}
+                        onChange={(e) => updateItem(idx, "chapterName", e.target.value)}
+                        className="w-full rounded border p-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-6">
+              <SaveBar
+                label={isSaving ? "Saving…" : "Save All"}
+                onClick={handleSaveAll}
+                disabled={isSaving}
+              />
+            </div>
+          </>
+        )}
+
+        {step === "done" && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-3 text-xl font-medium">Done</div>
+            <p className="mb-6 text-sm text-gray-600">
+              Your words have been saved. Add more words or go to the vocab list.
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={resetForMore}
+                className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+              >
+                ➕ Add More Words
+              </button>
+
+              <button
+                type="button"
+                onClick={goToVocabList}
+                className="rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-800"
+              >
+                📄 Go to Vocab List
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </main>

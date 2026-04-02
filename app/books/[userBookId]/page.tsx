@@ -1,7 +1,7 @@
 // Book Hub
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -68,6 +68,7 @@ type ReadingSession = {
 };
 
 type HubTab = "bookInfo" | "teacher" | "study" | "reading" | "story" | "rating";
+type VocabTab = "readAlong" | "bulk";
 type ProfileRole = "teacher" | "member" | "student";
 
 type Character = {
@@ -268,12 +269,16 @@ export default function BookHubPage() {
   const [savingCharacterIds, setSavingCharacterIds] = useState<string[]>([]);
   const [savedCharacterIds, setSavedCharacterIds] = useState<string[]>([]);
 
+
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [sessionDate, setSessionDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
-
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    setSessionDate(today);
+  }, []);
   const daysRead = useMemo(() => {
     if (!readingSessions.length) return null;
     return new Set(readingSessions.map((s) => s.read_on)).size;
@@ -287,6 +292,7 @@ export default function BookHubPage() {
   const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
   const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
   const [savedChapterIds, setSavedChapterIds] = useState<string[]>([]);
+  const [storyTab, setStoryTab] = useState<"characters" | "plot" | "setting" | "cultural">("characters");
 
   const [sessionStartPage, setSessionStartPage] = useState<string>("");
   const [sessionEndPage, setSessionEndPage] = useState<string>("");
@@ -297,6 +303,40 @@ export default function BookHubPage() {
   const [elapsed, setElapsed] = useState(0);
   const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+
+  const [vocabTab, setVocabTab] = useState<VocabTab>("readAlong");
+  const [quickWord, setQuickWord] = useState("");
+  const [quickLoading, setQuickLoading] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const quickWordInputRef = useRef<HTMLInputElement>(null);
+
+  const [quickPreview, setQuickPreview] = useState<{
+    surface: string;
+    reading: string;
+    meanings: string[];
+    selectedMeaningIndex: number;
+    meaning: string;
+    isCustomMeaning: boolean;
+    page: string;
+    chapterNumber: string;
+    chapterName: string;
+  } | null>(null);
+
+  const [quickSessionWords, setQuickSessionWords] = useState<
+    {
+      id: string;
+      surface: string;
+      reading: string;
+      meaning: string;
+      page: string;
+      chapterNumber: string;
+      chapterName: string;
+    }[]
+  >([]);
+
+  const [defaultVocabPage, setDefaultVocabPage] = useState("");
+  const [defaultChapterNumber, setDefaultChapterNumber] = useState("");
+  const [defaultChapterName, setDefaultChapterName] = useState("");
 
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
@@ -332,10 +372,25 @@ export default function BookHubPage() {
     return Math.max(...readingSessions.map((s) => s.end_page));
   }, [readingSessions]);
 
+  const earliestStartPage = useMemo(() => {
+    if (readingSessions.length === 0) return null;
+    return Math.min(...readingSessions.map((s) => s.start_page));
+  }, [readingSessions]);
+
+  const canFillBeginningPages = useMemo(() => {
+    return earliestStartPage != null && earliestStartPage > 1;
+  }, [earliestStartPage]);
+
+  const canFillEndingPages = useMemo(() => {
+    if (!finished || !book?.page_count || readingSessions.length === 0) return false;
+    return furthestPage != null && furthestPage < book.page_count;
+  }, [finished, book?.page_count, readingSessions.length, furthestPage]);
+
   const progressPercent = useMemo(() => {
+    if (finished) return 100;
     if (!book?.page_count || !furthestPage) return null;
     return Math.min(100, Math.round((furthestPage / book.page_count) * 100));
-  }, [book?.page_count, furthestPage]);
+  }, [book?.page_count, furthestPage, finished]);
 
   const lastReadDate = useMemo(() => {
     if (readingSessions.length === 0) return null;
@@ -644,8 +699,51 @@ export default function BookHubPage() {
     }
   }
 
+  async function fillBeginningPages() {
+    if (!row?.id || earliestStartPage == null || earliestStartPage <= 1) return;
+
+    const { error } = await supabase
+      .from("user_book_reading_sessions")
+      .insert({
+        user_book_id: row.id,
+        read_on: startedAt || new Date().toISOString().slice(0, 10),
+        start_page: 1,
+        end_page: earliestStartPage - 1,
+        minutes_read: null,
+      });
+
+    if (error) {
+      console.error("Error filling beginning pages:", error);
+      alert("Could not fill the empty beginning pages.");
+      return;
+    }
+
+    await loadReadingSessions(row.id);
+  }
+
+  async function fillEndingPages() {
+    if (!row?.id || !book?.page_count || furthestPage == null || furthestPage >= book.page_count) return;
+
+    const { error } = await supabase
+      .from("user_book_reading_sessions")
+      .insert({
+        user_book_id: row.id,
+        read_on: finishedAt || new Date().toISOString().slice(0, 10),
+        start_page: furthestPage + 1,
+        end_page: book.page_count,
+        minutes_read: null,
+      });
+
+    if (error) {
+      console.error("Error filling ending pages:", error);
+      alert("Could not fill the empty ending pages.");
+      return;
+    }
+
+    await loadReadingSessions(row.id);
+  }
+
   const renderSessionToggle = () => {
-    if (readingSessions.length <= 3) return null;
 
     return (
       <button
@@ -812,6 +910,29 @@ export default function BookHubPage() {
       console.error("Error saving reading session:", error);
       alert(`Could not save reading session.\n${error.message || "Unknown error"}`);
       return;
+    }
+
+    const existingStartedAt = row.started_at ? row.started_at.slice(0, 10) : null;
+
+    if (!existingStartedAt || sessionDate < existingStartedAt) {
+      const { error: startErr } = await supabase
+        .from("user_books")
+        .update({ started_at: sessionDate })
+        .eq("id", row.id);
+
+      if (startErr) {
+        console.error("Error setting started_at from reading session:", startErr);
+      } else {
+        setStartedAt(sessionDate);
+        setRow((prev) =>
+          prev
+            ? {
+              ...prev,
+              started_at: sessionDate,
+            }
+            : prev
+        );
+      }
     }
 
     setReadingSessions((prev) =>
@@ -1121,6 +1242,107 @@ export default function BookHubPage() {
     await load();
   };
 
+  async function pullQuickWord() {
+    const word = quickWord.trim();
+    if (!word) return;
+
+    setQuickLoading(true);
+    setQuickError(null);
+
+    try {
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
+      const json = await res.json();
+
+      const first = json?.data?.[0];
+      if (!first) {
+        setQuickPreview(null);
+        setQuickError("No result found.");
+        setQuickLoading(false);
+        return;
+      }
+
+      const surface =
+        first?.japanese?.[0]?.word ||
+        first?.slug ||
+        word;
+
+      const reading =
+        first?.japanese?.[0]?.reading || "";
+
+      const meanings =
+        (first?.senses ?? [])
+          .map((sense: any) => (sense.english_definitions ?? []).join("; "))
+          .filter(Boolean);
+
+      setQuickPreview({
+        surface,
+        reading,
+        meanings: meanings.length ? meanings : [""],
+        selectedMeaningIndex: 0,
+        meaning: meanings.length ? meanings[0] : "",
+        isCustomMeaning: false,
+        page: defaultVocabPage || (furthestPage != null ? String(furthestPage + 1) : ""),
+        chapterNumber: defaultChapterNumber,
+        chapterName: defaultChapterName,
+      });
+    } catch (err) {
+      console.error(err);
+      setQuickPreview(null);
+      setQuickError("Could not pull word data.");
+    } finally {
+      setQuickLoading(false);
+    }
+  }
+
+  async function saveQuickWord() {
+    if (!row?.id || !quickPreview) return;
+
+    const selectedMeaning = quickPreview.meaning ?? "";
+
+    const payload = {
+      user_book_id: row.id,
+      surface: quickPreview.surface || null,
+      reading: quickPreview.reading || null,
+      meaning: selectedMeaning || null,
+      meaning_choices: quickPreview.meanings,
+      meaning_choice_index: quickPreview.selectedMeaningIndex,
+      page_number: quickPreview.page ? Number(quickPreview.page) : null,
+      chapter_number: quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null,
+      chapter_name: quickPreview.chapterName || null,
+    };
+
+    const { error } = await supabase.from("user_book_words").insert(payload);
+
+    if (error) {
+      console.error("Error saving quick word:", error);
+      alert(`Could not save word.\n${error.message}`);
+      return;
+    }
+
+    setQuickSessionWords((prev) => [
+      {
+        id: `${Date.now()}`,
+        surface: quickPreview.surface,
+        reading: quickPreview.reading,
+        meaning: selectedMeaning,
+        page: quickPreview.page,
+        chapterNumber: quickPreview.chapterNumber,
+        chapterName: quickPreview.chapterName,
+      },
+      ...prev,
+    ]);
+
+    setDefaultVocabPage(quickPreview.page);
+    setDefaultChapterNumber(quickPreview.chapterNumber);
+    setDefaultChapterName(quickPreview.chapterName);
+
+    setQuickWord("");
+    setQuickPreview(null);
+
+    await loadUniqueLookupCount(row.id);
+    quickWordInputRef.current?.focus();
+  }
+
   if (loading) {
     return (
       <main className="p-6">
@@ -1216,10 +1438,10 @@ export default function BookHubPage() {
                   <div className="mb-2 text-sm text-stone-700">
                     <div className="font-medium">Progress</div>
                     <div className="mt-1 text-stone-500">
-                      {readingSessions.length > 0 && progressPercent != null && furthestPage != null
-                        ? `${progressPercent}% · page ${furthestPage}`
-                        : finished
-                          ? "100%"
+                      {finished
+                        ? "100%"
+                        : readingSessions.length > 0 && progressPercent != null && furthestPage != null
+                          ? `${progressPercent}% · page ${furthestPage}`
                           : started
                             ? "In progress"
                             : "Not started"}
@@ -1296,6 +1518,7 @@ export default function BookHubPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        setSessionDate(new Date().toISOString().slice(0, 10));
                         setStartTime(Date.now());
                         setElapsed(0);
                         setIsRunning(true);
@@ -1444,18 +1667,14 @@ export default function BookHubPage() {
               ) : null}
 
               <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-                {myRole !== "member" ? (
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
-                    className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
-                  >
-                    <div className="text-xs text-blue-700">Prepare</div>
-                    <div className="mt-1 font-medium text-stone-900">Practice Kanji</div>
-                  </button>
-                ) : (
-                  <div className="hidden sm:block" />
-                )}
+                <button
+                  type="button"
+                  onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
+                  className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
+                >
+                  <div className="text-xs text-blue-700">Prepare</div>
+                  <div className="mt-1 font-medium text-stone-900">Practice Kanji</div>
+                </button>
 
                 <button
                   type="button"
@@ -1486,817 +1705,989 @@ export default function BookHubPage() {
 
           <div className="mt-2 px-4 md:px-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div className="flex gap-2 border-b border-stone-300 px-2">
-                <FilingTab active={activeTab === "bookInfo"} onClick={() => setActiveTab("bookInfo")}>
-                  Book Info
-                </FilingTab>
-
-                {isTeacher ? (
-                  <FilingTab active={activeTab === "teacher"} onClick={() => setActiveTab("teacher")}>
-                    Teacher
+              <div className="overflow-x-auto">
+                <div className="flex w-max gap-2 border-b border-stone-300 px-2 whitespace-nowrap">
+                  <FilingTab
+                    active={activeTab === "bookInfo"}
+                    onClick={() => setActiveTab("bookInfo")}
+                  >
+                    Book Info
                   </FilingTab>
-                ) : null}
 
-                <FilingTab active={activeTab === "study"} onClick={() => setActiveTab("study")}>
-                  Vocab
-                </FilingTab>
+                  {isTeacher ? (
+                    <FilingTab
+                      active={activeTab === "teacher"}
+                      onClick={() => setActiveTab("teacher")}
+                    >
+                      Teacher
+                    </FilingTab>
+                  ) : null}
 
-                <FilingTab active={activeTab === "reading"} onClick={() => setActiveTab("reading")}>
-                  Reading
-                </FilingTab>
+                  <FilingTab
+                    active={activeTab === "study"}
+                    onClick={() => setActiveTab("study")}
+                  >
+                    Vocab
+                  </FilingTab>
 
-                <FilingTab active={activeTab === "story"} onClick={() => setActiveTab("story")}>
-                  Story
-                </FilingTab>
+                  <FilingTab
+                    active={activeTab === "reading"}
+                    onClick={() => setActiveTab("reading")}
+                  >
+                    Reading
+                  </FilingTab>
 
-                <FilingTab active={activeTab === "rating"} onClick={() => setActiveTab("rating")}>
-                  Ratings
-                </FilingTab>
+                  <FilingTab
+                    active={activeTab === "story"}
+                    onClick={() => setActiveTab("story")}
+                  >
+                    Story
+                  </FilingTab>
+
+                  <FilingTab
+                    active={activeTab === "rating"}
+                    onClick={() => setActiveTab("rating")}
+                  >
+                    Ratings
+                  </FilingTab>
+                </div>
               </div>
 
-              {isTeacher ? (
-                !editing ? (
+              {!editing ? (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                >
+                  Edit
+                </button>
+              ) : (
+                <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setEditing(true)}
-                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                    onClick={cancelEdits}
+                    className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
                   >
-                    Edit
+                    Cancel
                   </button>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={cancelEdits}
-                      className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving…" : "Save"}
-                    </button>
-                  </div>
-                )
-              ) : null}
+                  <button
+                    onClick={saveAll}
+                    disabled={saving}
+                    className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {saving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+          <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
+            {activeTab === "bookInfo" && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
 
-            <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
-              {activeTab === "bookInfo" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
-
-                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                      <Detail
-                        label="Genre"
-                        value={book.genre}
-                        editing={editing}
-                        inputValue={genre}
-                        setInputValue={setGenre}
-                        placeholder="e.g. novel, mystery, picture book..."
-                      />
-                      <Detail
-                        label="Page Count"
-                        value={book.page_count}
-                        editing={editing}
-                        inputValue={pageCount}
-                        setInputValue={setPageCount}
-                        placeholder="e.g. 352"
-                      />
-                      <Detail
-                        label="ISBN"
-                        value={book.isbn}
-                        editing={editing}
-                        inputValue={isbn}
-                        setInputValue={setIsbn}
-                        placeholder="ISBN"
-                      />
-                      <Detail
-                        label="ISBN-13"
-                        value={book.isbn13}
-                        editing={editing}
-                        inputValue={isbn13}
-                        setInputValue={setIsbn13}
-                        placeholder="ISBN-13"
-                      />
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="text-sm font-medium">Trigger Warnings</div>
-                      {!editing ? (
-                        <div className="mt-1 min-h-[40px] whitespace-pre-wrap text-sm text-stone-700">
-                          {book.trigger_warnings?.trim() ? book.trigger_warnings : "—"}
-                        </div>
-                      ) : (
-                        <textarea
-                          value={triggerWarnings}
-                          onChange={(e) => setTriggerWarnings(e.target.value)}
-                          placeholder="Anything you want to flag"
-                          className="mt-2 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                        />
-                      )}
-                    </div>
+                  <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                    <Detail
+                      label="Genre"
+                      value={book.genre}
+                      editing={editing}
+                      inputValue={genre}
+                      setInputValue={setGenre}
+                      placeholder="e.g. novel, mystery, picture book..."
+                    />
+                    <Detail
+                      label="Page Count"
+                      value={book.page_count}
+                      editing={editing}
+                      inputValue={pageCount}
+                      setInputValue={setPageCount}
+                      placeholder="e.g. 352"
+                    />
+                    <Detail
+                      label="ISBN"
+                      value={book.isbn}
+                      editing={editing}
+                      inputValue={isbn}
+                      setInputValue={setIsbn}
+                      placeholder="ISBN"
+                    />
+                    <Detail
+                      label="ISBN-13"
+                      value={book.isbn13}
+                      editing={editing}
+                      inputValue={isbn13}
+                      setInputValue={setIsbn13}
+                      placeholder="ISBN-13"
+                    />
                   </div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">People</div>
-
-                    <div className="space-y-4">
-                      <PersonRow
-                        label="Author"
-                        name={editing ? authorName : book.author}
-                        reading={editing ? authorReading : book.author_reading}
-                        img={editing ? authorImg : book.author_image_url}
-                        editing={editing}
-                        nameValue={authorName}
-                        setNameValue={setAuthorName}
-                        imgValue={authorImg}
-                        setImgValue={setAuthorImg}
-                        readingValue={authorReading}
-                        setReadingValue={setAuthorReading}
-                      />
-
-                      {(book.translator || book.translator_image_url || editing) && (
-                        <PersonRow
-                          label="Translator"
-                          name={editing ? translatorName : book.translator}
-                          reading={editing ? translatorReading : book.translator_reading}
-                          img={editing ? translatorImg : book.translator_image_url}
-                          editing={editing}
-                          nameValue={translatorName}
-                          setNameValue={setTranslatorName}
-                          imgValue={translatorImg}
-                          setImgValue={setTranslatorImg}
-                          readingValue={translatorReading}
-                          setReadingValue={setTranslatorReading}
-                        />
-                      )}
-
-                      {(book.illustrator || book.illustrator_image_url || editing) && (
-                        <PersonRow
-                          label="Illustrator"
-                          name={editing ? illustratorName : book.illustrator}
-                          reading={editing ? illustratorReading : book.illustrator_reading}
-                          img={editing ? illustratorImg : book.illustrator_image_url}
-                          editing={editing}
-                          nameValue={illustratorName}
-                          setNameValue={setIllustratorName}
-                          imgValue={illustratorImg}
-                          setImgValue={setIllustratorImg}
-                          readingValue={illustratorReading}
-                          setReadingValue={setIllustratorReading}
-                        />
-                      )}
-
-                      {(book.publisher || book.publisher_image_url || editing) && (
-                        <PersonRow
-                          label="Publisher"
-                          name={editing ? publisherName : book.publisher}
-                          reading={editing ? publisherReading : book.publisher_reading}
-                          img={editing ? publisherImg : book.publisher_image_url}
-                          editing={editing}
-                          nameValue={publisherName}
-                          setNameValue={setPublisherName}
-                          imgValue={publisherImg}
-                          setImgValue={setPublisherImg}
-                          readingValue={publisherReading}
-                          setReadingValue={setPublisherReading}
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Related Links</div>
-
+                  <div className="mt-4">
+                    <div className="text-sm font-medium">Trigger Warnings</div>
                     {!editing ? (
-                      relatedLinksArr.length > 0 ? (
-                        <ul className="space-y-2 text-sm">
-                          {relatedLinksArr.map((l: any, idx: number) => {
-                            const label = displayLinkLabel(l);
-                            const url = displayLinkUrl(l);
-                            return (
-                              <li key={idx} className="flex items-center justify-between gap-3">
-                                <span className="truncate">{label}</span>
-                                {url ? (
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="shrink-0 text-blue-600 hover:underline"
-                                  >
-                                    Open
-                                  </a>
-                                ) : (
-                                  <span className="text-stone-500">—</span>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : (
-                        <div className="text-sm text-stone-500">—</div>
-                      )
-                    ) : (
-                      <div>
-                        <div className="mb-2 text-xs text-stone-500">
-                          One per line. Optional format: <span className="font-mono">Label | URL</span>
-                        </div>
-                        <textarea
-                          value={linksText}
-                          onChange={(e) => setLinksText(e.target.value)}
-                          placeholder={`Amazon | https://...\nPublisher | https://...\nhttps://...`}
-                          className="min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "teacher" && isTeacher && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Tools</div>
-
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <button
-                        onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        ➕ Add Vocab
-                      </button>
-
-                      <button
-                        onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        📝 Prepare Readings
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!row?.id || !userId) return;
-
-                          const { data: students } = await supabase
-                            .from("teacher_students")
-                            .select("student_id")
-                            .eq("teacher_id", userId);
-
-                          for (const s of students ?? []) {
-                            await supabase.from("user_alerts").insert({
-                              user_id: s.student_id,
-                              user_book_id: row.id,
-                              type: "kanji",
-                              message: `New kanji is ready for ${book.title}`,
-                            });
-                          }
-                        }}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        🔔 Notify Kanji
-                      </button>
-
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Level (with guidance)</div>
-
-                    {!editing ? (
-                      <>
-                        <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
-                        <div className="mt-1 text-xs text-amber-600">
-                          {levelStars(row.recommended_level)}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="mt-2 grid gap-2 sm:grid-cols-5">
-                        {[
-                          { value: "N5", stars: "★☆☆☆☆" },
-                          { value: "N4", stars: "★★☆☆☆" },
-                          { value: "N3", stars: "★★★☆☆" },
-                          { value: "N2", stars: "★★★★☆" },
-                          { value: "N1", stars: "★★★★★" },
-                        ].map((opt) => {
-                          const isSelected = recommendedLevel === opt.value;
-
-                          return (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => setRecommendedLevel(opt.value)}
-                              className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
-                                ? "border-stone-900 bg-stone-100"
-                                : "border-stone-200 hover:bg-stone-50"
-                                }`}
-                            >
-                              <div className="text-amber-600">{opt.stars}</div>
-                              <div className="text-xs text-stone-600">{opt.value}</div>
-                            </button>
-                          );
-                        })}
-
-                        <button
-                          type="button"
-                          onClick={() => setRecommendedLevel("")}
-                          className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
-                        >
-                          <div className="text-xs text-stone-600">Clear</div>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Notes</div>
-                    <div className="text-sm text-stone-400">Coming next</div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "reading" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!row?.id) return;
-
-                          const today = new Date().toISOString().slice(0, 10);
-                          const isDnf = !!row.dnf_at;
-
-                          const updateValues = isDnf
-                            ? {
-                              finished_at: null,
-                              dnf_at: null,
-                            }
-                            : {
-                              started_at: today,
-                              finished_at: null,
-                              dnf_at: null,
-                            };
-
-                          const { error } = await supabase
-                            .from("user_books")
-                            .update(updateValues)
-                            .eq("id", row.id);
-
-                          if (error) {
-                            console.error("Error updating book status:", error);
-                            alert("Could not update book status.");
-                            return;
-                          }
-
-                          if (!isDnf) {
-                            setStartedAt(today);
-                          }
-
-                          setFinishedAt("");
-                          setDnfAt("");
-                          await load();
-                          alert(isDnf ? "Book resumed." : "Marked as started.");
-                        }}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        {row.dnf_at ? "Resume Book" : "Start Today"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!row?.id) return;
-
-                          const today = new Date().toISOString().slice(0, 10);
-
-                          const { error } = await supabase
-                            .from("user_books")
-                            .update({
-                              finished_at: today,
-                              dnf_at: null,
-                            })
-                            .eq("id", row.id);
-
-                          if (error) {
-                            console.error("Error marking book as finished:", error);
-                            alert("Could not update book status.");
-                            return;
-                          }
-
-                          setFinishedAt(today);
-                          setDnfAt("");
-                          await load();
-                        }}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        Mark Finished
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!row?.id) return;
-
-                          const confirmed = window.confirm("Mark this book as DNF?");
-                          if (!confirmed) return;
-
-                          const today = new Date().toISOString().slice(0, 10);
-
-                          const { error } = await supabase
-                            .from("user_books")
-                            .update({
-                              dnf_at: today,
-                              finished_at: null,
-                            })
-                            .eq("id", row.id);
-
-                          if (error) {
-                            console.error("Error marking book as DNF:", error);
-                            alert("Could not update book status.");
-                            return;
-                          }
-
-                          setFinishedAt("");
-                          setDnfAt(today);
-                          await load();
-                        }}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        Mark DNF
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading History</div>
-
-                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                      <DateField
-                        label="Started"
-                        value={safeDate(startedAt) ?? started}
-                        editing={editing}
-                        inputValue={startedAt}
-                        setInputValue={setStartedAt}
-                      />
-
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Finished / DNF</div>
-                        {!editing ? (
-                          <div className="mt-1 font-medium">
-                            {dnfAt
-                              ? `${dnfAt} (DNF)`
-                              : safeDate(finishedAt) ?? finished
-                                ? formatYmd((safeDate(finishedAt) ?? finished) as Date)
-                                : "—"}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <input
-                              type="date"
-                              value={finishedAt}
-                              onChange={(e) => setFinishedAt(e.target.value)}
-                              className="w-full rounded border px-2 py-1"
-                            />
-                            <input
-                              type="date"
-                              value={dnfAt}
-                              onChange={(e) => setDnfAt(e.target.value)}
-                              className="w-full rounded border px-2 py-1"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Date</div>
-                        <input
-                          type="date"
-                          value={sessionDate}
-                          onChange={(e) => setSessionDate(e.target.value)}
-                          className="mt-1 w-full rounded border px-2 py-1"
-                        />
-                      </div>
-
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Minutes read (optional)</div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sessionMinutesRead}
-                          onChange={(e) => setSessionMinutesRead(e.target.value)}
-                          placeholder="e.g. 25"
-                          className="mt-1 w-full rounded border px-2 py-1"
-                        />
-                      </div>
-
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">Start page</div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sessionStartPage}
-                          onChange={(e) => setSessionStartPage(e.target.value)}
-                          placeholder="e.g. 4"
-                          className="mt-1 w-full rounded border px-2 py-1"
-                        />
-                      </div>
-
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">End page</div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sessionEndPage}
-                          onChange={(e) => setSessionEndPage(e.target.value)}
-                          placeholder="e.g. 10"
-                          className="mt-1 w-full rounded border px-2 py-1"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={saveReadingSession}
-                        className="rounded-2xl !bg-stone-900 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-black"
-                      >
-                        Save Session
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
-
-                    {readingSessions.length === 0 ? (
-                      <div className="text-sm text-stone-500">No sessions yet.</div>
-                    ) : (
-                      <>
-                        {showAllSessions && <div className="mb-3">{renderSessionToggle()}</div>}
-
-                        <div className="space-y-2">
-                          {visibleReadingSessions.map((session) => {
-                            const pagesRead = session.end_page - session.start_page + 1;
-
-                            return (
-                              <div
-                                key={session.id}
-                                className="rounded-xl border bg-white p-3 text-sm text-stone-700"
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <div className="font-medium">{session.read_on}</div>
-                                    <div className="mt-1">
-                                      p. {session.start_page} → {session.end_page}
-                                    </div>
-                                    <div className="mt-1 text-stone-500">
-                                      {session.minutes_read != null
-                                        ? `${session.minutes_read} min · ${pagesRead} pages`
-                                        : `Untimed · ${pagesRead} pages`}
-                                    </div>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteReadingSession(session.id)}
-                                    className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div className="mt-3">{renderSessionToggle()}</div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "rating" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
-
-                    {!editing ? (
-                      <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
-                        {row.my_review?.trim() ? row.my_review : "—"}
+                      <div className="mt-1 min-h-[40px] whitespace-pre-wrap text-sm text-stone-700">
+                        {book.trigger_warnings?.trim() ? book.trigger_warnings : "—"}
                       </div>
                     ) : (
                       <textarea
-                        value={myReview}
-                        onChange={(e) => setMyReview(e.target.value)}
-                        placeholder="Write your review here…"
-                        className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                        value={triggerWarnings}
+                        onChange={(e) => setTriggerWarnings(e.target.value)}
+                        placeholder="Anything you want to flag"
+                        className="mt-2 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
                       />
                     )}
                   </div>
+                </div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Ratings</div>
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">People</div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <StarRatingField
-                        label="Overall Rating"
-                        value={row.rating_overall}
+                  <div className="space-y-4">
+                    <PersonRow
+                      label="Author"
+                      name={editing ? authorName : book.author}
+                      reading={editing ? authorReading : book.author_reading}
+                      img={editing ? authorImg : book.author_image_url}
+                      editing={editing}
+                      nameValue={authorName}
+                      setNameValue={setAuthorName}
+                      imgValue={authorImg}
+                      setImgValue={setAuthorImg}
+                      readingValue={authorReading}
+                      setReadingValue={setAuthorReading}
+                    />
+
+                    {(book.translator || book.translator_image_url || editing) && (
+                      <PersonRow
+                        label="Translator"
+                        name={editing ? translatorName : book.translator}
+                        reading={editing ? translatorReading : book.translator_reading}
+                        img={editing ? translatorImg : book.translator_image_url}
                         editing={editing}
-                        inputValue={ratingOverall}
-                        setInputValue={setRatingOverall}
+                        nameValue={translatorName}
+                        setNameValue={setTranslatorName}
+                        imgValue={translatorImg}
+                        setImgValue={setTranslatorImg}
+                        readingValue={translatorReading}
+                        setReadingValue={setTranslatorReading}
                       />
+                    )}
 
-                      <StarRatingField
-                        label="Would Recommend"
-                        value={row.rating_recommend}
+                    {(book.illustrator || book.illustrator_image_url || editing) && (
+                      <PersonRow
+                        label="Illustrator"
+                        name={editing ? illustratorName : book.illustrator}
+                        reading={editing ? illustratorReading : book.illustrator_reading}
+                        img={editing ? illustratorImg : book.illustrator_image_url}
                         editing={editing}
-                        inputValue={ratingRecommend}
-                        setInputValue={setRatingRecommend}
+                        nameValue={illustratorName}
+                        setNameValue={setIllustratorName}
+                        imgValue={illustratorImg}
+                        setImgValue={setIllustratorImg}
+                        readingValue={illustratorReading}
+                        setReadingValue={setIllustratorReading}
+                      />
+                    )}
+
+                    {(book.publisher || book.publisher_image_url || editing) && (
+                      <PersonRow
+                        label="Publisher"
+                        name={editing ? publisherName : book.publisher}
+                        reading={editing ? publisherReading : book.publisher_reading}
+                        img={editing ? publisherImg : book.publisher_image_url}
+                        editing={editing}
+                        nameValue={publisherName}
+                        setNameValue={setPublisherName}
+                        imgValue={publisherImg}
+                        setImgValue={setPublisherImg}
+                        readingValue={publisherReading}
+                        setReadingValue={setPublisherReading}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Related Links</div>
+
+                  {!editing ? (
+                    relatedLinksArr.length > 0 ? (
+                      <ul className="space-y-2 text-sm">
+                        {relatedLinksArr.map((l: any, idx: number) => {
+                          const label = displayLinkLabel(l);
+                          const url = displayLinkUrl(l);
+                          return (
+                            <li key={idx} className="flex items-center justify-between gap-3">
+                              <span className="truncate">{label}</span>
+                              {url ? (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="shrink-0 text-blue-600 hover:underline"
+                                >
+                                  Open
+                                </a>
+                              ) : (
+                                <span className="text-stone-500">—</span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-stone-500">—</div>
+                    )
+                  ) : (
+                    <div>
+                      <div className="mb-2 text-xs text-stone-500">
+                        One per line. Optional format: <span className="font-mono">Label | URL</span>
+                      </div>
+                      <textarea
+                        value={linksText}
+                        onChange={(e) => setLinksText(e.target.value)}
+                        placeholder={`Amazon | https://...\nPublisher | https://...\nhttps://...`}
+                        className="min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
                       />
                     </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "teacher" && isTeacher && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Tools</div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <button
+                      onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      📝 Prepare Readings
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!row?.id || !userId) return;
+
+                        const { data: students } = await supabase
+                          .from("teacher_students")
+                          .select("student_id")
+                          .eq("teacher_id", userId);
+
+                        for (const s of students ?? []) {
+                          await supabase.from("user_alerts").insert({
+                            user_id: s.student_id,
+                            user_book_id: row.id,
+                            type: "kanji",
+                            message: `New kanji is ready for ${book.title}`,
+                          });
+                        }
+                      }}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      🔔 Notify Kanji
+                    </button>
+
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Level (with guidance)</div>
+
+                  {!editing ? (
+                    <>
+                      <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
+                      <div className="mt-1 text-xs text-amber-600">
+                        {levelStars(row.recommended_level)}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-2 grid gap-2 sm:grid-cols-5">
+                      {[
+                        { value: "N5", stars: "★☆☆☆☆" },
+                        { value: "N4", stars: "★★☆☆☆" },
+                        { value: "N3", stars: "★★★☆☆" },
+                        { value: "N2", stars: "★★★★☆" },
+                        { value: "N1", stars: "★★★★★" },
+                      ].map((opt) => {
+                        const isSelected = recommendedLevel === opt.value;
+
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setRecommendedLevel(opt.value)}
+                            className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
+                              ? "border-stone-900 bg-stone-100"
+                              : "border-stone-200 hover:bg-stone-50"
+                              }`}
+                          >
+                            <div className="text-amber-600">{opt.stars}</div>
+                            <div className="text-xs text-stone-600">{opt.value}</div>
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        type="button"
+                        onClick={() => setRecommendedLevel("")}
+                        className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+                      >
+                        <div className="text-xs text-stone-600">Clear</div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Notes</div>
+                  <div className="text-sm text-stone-400">Coming next</div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "reading" && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!row?.id) return;
+
+                        const today = new Date().toISOString().slice(0, 10);
+                        const isDnf = !!row.dnf_at;
+
+                        const updateValues = isDnf
+                          ? {
+                            finished_at: null,
+                            dnf_at: null,
+                          }
+                          : {
+                            started_at: today,
+                            finished_at: null,
+                            dnf_at: null,
+                          };
+
+                        const { error } = await supabase
+                          .from("user_books")
+                          .update(updateValues)
+                          .eq("id", row.id);
+
+                        if (error) {
+                          console.error("Error updating book status:", error);
+                          alert("Could not update book status.");
+                          return;
+                        }
+
+                        if (!isDnf) {
+                          setStartedAt(today);
+                        }
+
+                        setFinishedAt("");
+                        setDnfAt("");
+                        await load();
+                        alert(isDnf ? "Book resumed." : "Marked as started.");
+                      }}
+                      className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                    >
+                      {row.dnf_at ? "Resume Book" : "Start Today"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!row?.id) return;
+
+                        const today = new Date().toISOString().slice(0, 10);
+
+                        const { error } = await supabase
+                          .from("user_books")
+                          .update({
+                            finished_at: today,
+                            dnf_at: null,
+                          })
+                          .eq("id", row.id);
+
+                        if (error) {
+                          console.error("Error marking book as finished:", error);
+                          alert("Could not update book status.");
+                          return;
+                        }
+
+                        setFinishedAt(today);
+                        setDnfAt("");
+                        await load();
+                      }}
+                      className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                    >
+                      Mark Finished
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!row?.id) return;
+
+                        const confirmed = window.confirm("Mark this book as DNF?");
+                        if (!confirmed) return;
+
+                        const today = new Date().toISOString().slice(0, 10);
+
+                        const { error } = await supabase
+                          .from("user_books")
+                          .update({
+                            dnf_at: today,
+                            finished_at: null,
+                          })
+                          .eq("id", row.id);
+
+                        if (error) {
+                          console.error("Error marking book as DNF:", error);
+                          alert("Could not update book status.");
+                          return;
+                        }
+
+                        setFinishedAt("");
+                        setDnfAt(today);
+                        await load();
+                      }}
+                      className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                    >
+                      Mark DNF
+                    </button>
                   </div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Reading Level & Difficulty</div>
+                  {canFillBeginningPages || canFillEndingPages ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {canFillBeginningPages ? (
+                        <button
+                          type="button"
+                          onClick={fillBeginningPages}
+                          className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                        >
+                          Fill the empty beginning pages
+                        </button>
+                      ) : null}
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="rounded border bg-white p-3 text-sm">
-                        <div className="text-stone-600">My Level at Time of Reading</div>
-                        {!editing ? (
-                          <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
-                        ) : (
-                          <select
-                            value={readerLevel}
-                            onChange={(e) => setReaderLevel(e.target.value)}
-                            className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                          >
-                            <option value="">—</option>
-                            {LEVEL_OPTIONS.map((lvl) => (
-                              <option key={lvl} value={lvl}>
-                                {lvl}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
+                      {canFillEndingPages ? (
+                        <button
+                          type="button"
+                          onClick={fillEndingPages}
+                          className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                        >
+                          Fill the empty ending pages
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
 
-                      <DifficultyField
-                        value={row.rating_difficulty}
-                        editing={editing}
-                        inputValue={ratingDifficulty}
-                        setInputValue={setRatingDifficulty}
-                      />
+                  {canFillBeginningPages ? (
+                    <div className="mt-2 text-xs text-stone-500">
+                      Looks like your book starts on page {earliestStartPage}. Fill pages 1–{earliestStartPage! - 1}?
+                    </div>
+                  ) : null}
 
-                      <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
-                        <div className="text-stone-600">Level (with guidance)</div>
+                  {canFillEndingPages ? (
+                    <div className="mt-2 text-xs text-stone-500">
+                      Looks like your story ends on page {furthestPage}. Fill pages {furthestPage! + 1}–{book.page_count}?
+                    </div>
+                  ) : null}
+                </div>
 
-                        {!editing ? (
-                          <>
-                            <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
-                            <div className="mt-1 text-xs text-amber-600">
-                              {levelStars(row.recommended_level)}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="mt-2 grid gap-2 sm:grid-cols-5">
-                            {[
-                              { value: "N5", stars: "★☆☆☆☆" },
-                              { value: "N4", stars: "★★☆☆☆" },
-                              { value: "N3", stars: "★★★☆☆" },
-                              { value: "N2", stars: "★★★★☆" },
-                              { value: "N1", stars: "★★★★★" },
-                            ].map((opt) => {
-                              const isSelected = recommendedLevel === opt.value;
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading History</div>
 
-                              return (
-                                <button
-                                  key={opt.value}
-                                  type="button"
-                                  onClick={() => setRecommendedLevel(opt.value)}
-                                  className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
-                                    ? "border-stone-900 bg-stone-100"
-                                    : "border-stone-200 hover:bg-stone-50"
-                                    }`}
-                                >
-                                  <div className="text-amber-600">{opt.stars}</div>
-                                  <div className="text-xs text-stone-600">{opt.value}</div>
-                                </button>
-                              );
-                            })}
+                  <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                    <DateField
+                      label="Started"
+                      value={safeDate(startedAt) ?? started}
+                      editing={editing}
+                      inputValue={startedAt}
+                      setInputValue={setStartedAt}
+                    />
 
-                            <button
-                              type="button"
-                              onClick={() => setRecommendedLevel("")}
-                              className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
-                            >
-                              <div className="text-xs text-stone-600">Clear</div>
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Finished / DNF</div>
+                      {!editing ? (
+                        <div className="mt-1 font-medium">
+                          {dnfAt
+                            ? `${dnfAt} (DNF)`
+                            : safeDate(finishedAt) ?? finished
+                              ? formatYmd((safeDate(finishedAt) ?? finished) as Date)
+                              : "—"}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            type="date"
+                            value={finishedAt}
+                            onChange={(e) => setFinishedAt(e.target.value)}
+                            className="w-full rounded border px-2 py-1"
+                          />
+                          <input
+                            type="date"
+                            value={dnfAt}
+                            onChange={(e) => setDnfAt(e.target.value)}
+                            className="w-full rounded border px-2 py-1"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              )}
 
-              {activeTab === "story" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-stone-900">Character List</div>
-                        <p className="mt-1 text-sm text-stone-400">
-                          Forgetting the readings of characters&apos; names? Jot them down here.
-                        </p>
-                      </div>
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowCharacters((prev) => !prev)}
-                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                        >
-                          {showCharacters ? "Hide" : "Show"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCharacters(true);
-                            addCharacter();
-                          }}
-                          className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
-                        >
-                          + Add
-                        </button>
-                      </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Date</div>
+                      <input
+                        type="date"
+                        value={sessionDate}
+                        onChange={(e) => setSessionDate(e.target.value)}
+                        className="mt-1 w-full rounded border px-2 py-1"
+                      />
                     </div>
 
-                    {showCharacters && (
-                      <>
-                        {characters.length === 0 ? (
-                          <div className="text-sm text-stone-400">No characters yet.</div>
-                        ) : (
-                          <div className="space-y-4">
-                            {characters.map((c) => {
-                              const isEditing =
-                                c.id.startsWith("new-character-") ||
-                                editingCharacterIds.includes(c.id);
-                              const isSaving = savingCharacterIds.includes(c.id);
-                              const wasJustSaved = savedCharacterIds.includes(c.id);
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Minutes read (optional)</div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={sessionMinutesRead}
+                        onChange={(e) => setSessionMinutesRead(e.target.value)}
+                        placeholder="e.g. 25"
+                        className="mt-1 w-full rounded border px-2 py-1"
+                      />
+                    </div>
 
-                              return (
-                                <div key={c.id} className="rounded-xl border bg-white p-3">
-                                  {!isEditing ? (
-                                    <>
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Start page</div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={sessionStartPage}
+                        onChange={(e) => setSessionStartPage(e.target.value)}
+                        placeholder="e.g. 4"
+                        className="mt-1 w-full rounded border px-2 py-1"
+                      />
+                    </div>
+
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">End page</div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={sessionEndPage}
+                        onChange={(e) => setSessionEndPage(e.target.value)}
+                        placeholder="e.g. 10"
+                        className="mt-1 w-full rounded border px-2 py-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={saveReadingSession}
+                      className="rounded-2xl !bg-stone-900 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-black"
+                    >
+                      Save Session
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
+
+                  {readingSessions.length === 0 ? (
+                    <div className="text-sm text-stone-500">No sessions yet.</div>
+                  ) : (
+                    <>
+                      {showAllSessions && <div className="mb-3">{renderSessionToggle()}</div>}
+
+                      <div className="space-y-2">
+                        {visibleReadingSessions.map((session) => {
+                          const pagesRead = session.end_page - session.start_page + 1;
+
+                          return (
+                            <div
+                              key={session.id}
+                              className="rounded-xl border bg-white p-3 text-sm text-stone-700"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-medium">{session.read_on}</div>
+                                  <div className="mt-1">
+                                    p. {session.start_page} → {session.end_page}
+                                  </div>
+                                  <div className="mt-1 text-stone-500">
+                                    {session.minutes_read != null
+                                      ? `${session.minutes_read} min · ${pagesRead} pages`
+                                      : `Untimed · ${pagesRead} pages`}
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => deleteReadingSession(session.id)}
+                                  className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-3">{renderSessionToggle()}</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "rating" && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+
+                  {!editing ? (
+                    <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
+                      {row.my_review?.trim() ? row.my_review : "—"}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={myReview}
+                      onChange={(e) => setMyReview(e.target.value)}
+                      placeholder="Write your review here…"
+                      className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                    />
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Ratings</div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <StarRatingField
+                      label="Overall Rating"
+                      value={row.rating_overall}
+                      editing={editing}
+                      inputValue={ratingOverall}
+                      setInputValue={setRatingOverall}
+                    />
+
+                    <StarRatingField
+                      label="Would Recommend"
+                      value={row.rating_recommend}
+                      editing={editing}
+                      inputValue={ratingRecommend}
+                      setInputValue={setRatingRecommend}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading Level & Difficulty</div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">My Level at Time of Reading</div>
+                      {!editing ? (
+                        <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
+                      ) : (
+                        <select
+                          value={readerLevel}
+                          onChange={(e) => setReaderLevel(e.target.value)}
+                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+                        >
+                          <option value="">—</option>
+                          {LEVEL_OPTIONS.map((lvl) => (
+                            <option key={lvl} value={lvl}>
+                              {lvl}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <DifficultyField
+                      value={row.rating_difficulty}
+                      editing={editing}
+                      inputValue={ratingDifficulty}
+                      setInputValue={setRatingDifficulty}
+                    />
+
+                    <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
+                      <div className="text-stone-600">Level (with guidance)</div>
+
+                      {!editing ? (
+                        <>
+                          <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
+                          <div className="mt-1 text-xs text-amber-600">
+                            {levelStars(row.recommended_level)}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-2 grid gap-2 sm:grid-cols-5">
+                          {[
+                            { value: "N5", stars: "★☆☆☆☆" },
+                            { value: "N4", stars: "★★☆☆☆" },
+                            { value: "N3", stars: "★★★☆☆" },
+                            { value: "N2", stars: "★★★★☆" },
+                            { value: "N1", stars: "★★★★★" },
+                          ].map((opt) => {
+                            const isSelected = recommendedLevel === opt.value;
+
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setRecommendedLevel(opt.value)}
+                                className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
+                                  ? "border-stone-900 bg-stone-100"
+                                  : "border-stone-200 hover:bg-stone-50"
+                                  }`}
+                              >
+                                <div className="text-amber-600">{opt.stars}</div>
+                                <div className="text-xs text-stone-600">{opt.value}</div>
+                              </button>
+                            );
+                          })}
+
+                          <button
+                            type="button"
+                            onClick={() => setRecommendedLevel("")}
+                            className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+                          >
+                            <div className="text-xs text-stone-600">Clear</div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "story" && (
+              <div className="space-y-6">
+                <div className="mb-4 flex gap-2 border-b border-stone-300 px-2">
+                  <button
+                    onClick={() => setStoryTab("characters")}
+                    className={`px-3 py-2 text-sm font-medium ${storyTab === "characters"
+                      ? "border-b-2 border-stone-900 text-stone-900"
+                      : "text-stone-500"
+                      }`}
+                  >
+                    Characters
+                  </button>
+
+                  <button
+                    onClick={() => setStoryTab("plot")}
+                    className={`px-3 py-2 text-sm font-medium ${storyTab === "plot"
+                      ? "border-b-2 border-stone-900 text-stone-900"
+                      : "text-stone-500"
+                      }`}
+                  >
+                    Plot
+                  </button>
+
+                  <button
+                    onClick={() => setStoryTab("setting")}
+                    className={`px-3 py-2 text-sm font-medium ${storyTab === "setting"
+                      ? "border-b-2 border-stone-900 text-stone-900"
+                      : "text-stone-500"
+                      }`}
+                  >
+                    Setting
+                  </button>
+
+                  <button
+                    onClick={() => setStoryTab("cultural")}
+                    className={`px-3 py-2 text-sm font-medium ${storyTab === "cultural"
+                      ? "border-b-2 border-stone-900 text-stone-900"
+                      : "text-stone-500"
+                      }`}
+                  >
+                    Cultural Notes
+                  </button>
+                </div>
+
+                {storyTab === "characters" && (
+                  <>
+                    {/* Your existing CHARACTER code goes here */}
+
+                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-stone-900">Character List</div>
+                          <p className="mt-1 text-sm text-stone-400">
+                            Forgetting the readings of characters&apos; names? Jot them down here.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowCharacters((prev) => !prev)}
+                            className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                          >
+                            {showCharacters ? "Hide" : "Show"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCharacters(true);
+                              addCharacter();
+                            }}
+                            className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {showCharacters && (
+                        <>
+                          {characters.length === 0 ? (
+                            <div className="text-sm text-stone-400">No characters yet.</div>
+                          ) : (
+                            <div className="space-y-4">
+                              {characters.map((c) => {
+                                const isEditing =
+                                  c.id.startsWith("new-character-") ||
+                                  editingCharacterIds.includes(c.id);
+                                const isSaving = savingCharacterIds.includes(c.id);
+                                const wasJustSaved = savedCharacterIds.includes(c.id);
+
+                                return (
+                                  <div key={c.id} className="rounded-xl border bg-white p-3">
+                                    {!isEditing ? (
+                                      <>
+                                        <div className="flex items-start justify-between gap-3">
                                           <div className="min-w-0">
-                                            <div className="text-sm font-medium text-stone-900">
-                                              {c.name || "—"}
+                                            <div className="min-w-0">
+                                              <div className="text-sm font-medium text-stone-900">
+                                                {c.name || "—"}
+                                                {c.reading ? (
+                                                  <span className="ml-2 hidden text-stone-500 sm:inline">
+                                                    （{c.reading}）
+                                                  </span>
+                                                ) : null}
+                                              </div>
+
                                               {c.reading ? (
-                                                <span className="ml-2 hidden text-stone-500 sm:inline">
-                                                  （{c.reading}）
-                                                </span>
+                                                <div className="text-xs text-stone-500 sm:hidden">
+                                                  {c.reading}
+                                                </div>
+                                              ) : null}
+
+                                              {c.role ? (
+                                                <div className="mt-1 text-xs text-stone-500">{c.role}</div>
                                               ) : null}
                                             </div>
+                                          </div>
 
-                                            {c.reading ? (
-                                              <div className="text-xs text-stone-500 sm:hidden">
-                                                {c.reading}
-                                              </div>
-                                            ) : null}
+                                          <div className="flex gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setShowCharacters(true);
+                                                startEditingCharacter(c.id);
+                                              }}
+                                              className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                            >
+                                              Edit
+                                            </button>
 
-                                            {c.role ? (
-                                              <div className="mt-1 text-xs text-stone-500">{c.role}</div>
-                                            ) : null}
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteCharacter(c.id)}
+                                              className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                            >
+                                              Delete
+                                            </button>
                                           </div>
                                         </div>
+
+                                        {c.notes ? (
+                                          <div className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
+                                            {c.notes}
+                                          </div>
+                                        ) : null}
+                                      </>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                          <input
+                                            value={c.name ?? ""}
+                                            onChange={(e) =>
+                                              updateCharacter(c.id, "name", e.target.value)
+                                            }
+                                            placeholder="Name"
+                                            className="w-1/2 rounded border px-2 py-1 text-sm"
+                                          />
+
+                                          <input
+                                            value={c.reading ?? ""}
+                                            onChange={(e) =>
+                                              updateCharacter(c.id, "reading", e.target.value)
+                                            }
+                                            placeholder="Reading"
+                                            className="w-1/2 rounded border px-2 py-1 text-sm"
+                                          />
+                                        </div>
+
+                                        <input
+                                          value={c.role ?? ""}
+                                          onChange={(e) =>
+                                            updateCharacter(c.id, "role", e.target.value)
+                                          }
+                                          placeholder="Role (e.g. 主人公, 先輩, 母)"
+                                          className="w-full rounded border px-2 py-1 text-sm"
+                                        />
+
+                                        <textarea
+                                          value={c.notes ?? ""}
+                                          onChange={(e) =>
+                                            updateCharacter(c.id, "notes", e.target.value)
+                                          }
+                                          placeholder="Notes about this character"
+                                          className="w-full rounded border p-2 text-sm"
+                                        />
 
                                         <div className="flex gap-2">
                                           <button
                                             type="button"
-                                            onClick={() => {
-                                              setShowCharacters(true);
-                                              startEditingCharacter(c.id);
-                                            }}
-                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                            onClick={() => saveCharacter(c)}
+                                            disabled={isSaving}
+                                            className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
+                                              ? "bg-green-600 hover:bg-green-700"
+                                              : "bg-blue-600 hover:bg-blue-700"
+                                              } disabled:opacity-50`}
                                           >
-                                            Edit
+                                            {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
                                           </button>
+
+                                          {!c.id.startsWith("new-character-") && (
+                                            <button
+                                              type="button"
+                                              onClick={() => stopEditingCharacter(c.id)}
+                                              className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                            >
+                                              Cancel
+                                            </button>
+                                          )}
 
                                           <button
                                             type="button"
@@ -2307,57 +2698,181 @@ export default function BookHubPage() {
                                           </button>
                                         </div>
                                       </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
 
-                                      {c.notes ? (
-                                        <div className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
-                                          {c.notes}
+                {storyTab === "plot" && (
+                  <>
+                    {/* Your existing CHAPTER SUMMARY code goes here */}
+
+                    <div className="rounded-2xl border bg-stone-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-stone-900">Chapter Summaries</div>
+                          <p className="mt-1 text-sm text-stone-400">
+                            Writing short summaries can help you remember the story later on.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowChapterSummaries((prev) => !prev)}
+                            className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                          >
+                            {showChapterSummaries ? "Hide" : "Show"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setChapterReverseOrder((prev) => !prev)}
+                            className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
+                          >
+                            {chapterReverseOrder ? "Oldest First" : "Newest First"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowChapterSummaries(true);
+                              addChapterSummary();
+                            }}
+                            className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {showChapterSummaries && (
+                        <div className="mt-4 space-y-3">
+                          {chapterSummaries.length === 0 ? (
+                            <div className="text-sm text-stone-500">No chapter summaries yet.</div>
+                          ) : (
+                            visibleChapterSummaries.map((item) => {
+                              const isEditing =
+                                item.id.startsWith("new-") || editingChapterIds.includes(item.id);
+                              const isSaving = savingChapterIds.includes(item.id);
+                              const wasJustSaved = savedChapterIds.includes(item.id);
+
+                              return (
+                                <div key={item.id} className="rounded-xl border bg-white p-4">
+                                  {!isEditing ? (
+                                    <>
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="text-sm font-semibold text-stone-900">
+                                            {item.chapter_number != null
+                                              ? `Chapter ${item.chapter_number}`
+                                              : "Untitled chapter"}
+                                            {item.chapter_title ? (
+                                              <span className="ml-2 font-normal text-stone-500">
+                                                · {item.chapter_title}
+                                              </span>
+                                            ) : null}
+                                          </div>
+
+                                          {item.sort_order != null && (
+                                            <div className="mt-1 text-xs text-stone-400">
+                                              Sort order: {item.sort_order}
+                                            </div>
+                                          )}
                                         </div>
-                                      ) : null}
+
+                                        <div className="flex shrink-0 gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => startEditingChapter(item.id)}
+                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                                          >
+                                            Edit
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => deleteChapterSummary(item.id)}
+                                            className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
+                                        {item.summary}
+                                      </div>
                                     </>
                                   ) : (
-                                    <div className="space-y-2">
-                                      <div className="flex gap-2">
+                                    <>
+                                      <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
                                         <input
-                                          value={c.name ?? ""}
+                                          type="number"
+                                          value={item.chapter_number ?? ""}
                                           onChange={(e) =>
-                                            updateCharacter(c.id, "name", e.target.value)
+                                            updateChapterSummary(
+                                              item.id,
+                                              "chapter_number",
+                                              e.target.value
+                                            )
                                           }
-                                          placeholder="Name"
-                                          className="w-1/2 rounded border px-2 py-1 text-sm"
+                                          placeholder="Chapter #"
+                                          className="rounded border px-3 py-2 text-sm"
                                         />
 
                                         <input
-                                          value={c.reading ?? ""}
+                                          value={item.chapter_title ?? ""}
                                           onChange={(e) =>
-                                            updateCharacter(c.id, "reading", e.target.value)
+                                            updateChapterSummary(
+                                              item.id,
+                                              "chapter_title",
+                                              e.target.value
+                                            )
                                           }
-                                          placeholder="Reading"
-                                          className="w-1/2 rounded border px-2 py-1 text-sm"
+                                          placeholder="Chapter title (optional)"
+                                          className="rounded border px-3 py-2 text-sm"
+                                        />
+
+                                        <input
+                                          type="number"
+                                          value={item.sort_order ?? 0}
+                                          onChange={(e) =>
+                                            updateChapterSummary(
+                                              item.id,
+                                              "sort_order",
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder="Sort order"
+                                          className="rounded border px-3 py-2 text-sm"
                                         />
                                       </div>
 
-                                      <input
-                                        value={c.role ?? ""}
-                                        onChange={(e) =>
-                                          updateCharacter(c.id, "role", e.target.value)
-                                        }
-                                        placeholder="Role (e.g. 主人公, 先輩, 母)"
-                                        className="w-full rounded border px-2 py-1 text-sm"
-                                      />
+                                      <p className="mt-2 text-xs text-stone-500">
+                                        Usually you can ignore sort order unless you want to rearrange chapters.
+                                      </p>
 
                                       <textarea
-                                        value={c.notes ?? ""}
+                                        value={item.summary}
                                         onChange={(e) =>
-                                          updateCharacter(c.id, "notes", e.target.value)
+                                          updateChapterSummary(item.id, "summary", e.target.value)
                                         }
-                                        placeholder="Notes about this character"
-                                        className="w-full rounded border p-2 text-sm"
+                                        placeholder="Write a short summary..."
+                                        className="mt-3 min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
                                       />
 
-                                      <div className="flex gap-2">
+                                      <div className="mt-3 flex gap-2">
                                         <button
                                           type="button"
-                                          onClick={() => saveCharacter(c)}
+                                          onClick={() => saveChapterSummary(item)}
                                           disabled={isSaving}
                                           className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
                                             ? "bg-green-600 hover:bg-green-700"
@@ -2367,117 +2882,15 @@ export default function BookHubPage() {
                                           {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
                                         </button>
 
-                                        {!c.id.startsWith("new-character-") && (
+                                        {!item.id.startsWith("new-") && (
                                           <button
                                             type="button"
-                                            onClick={() => stopEditingCharacter(c.id)}
+                                            onClick={() => stopEditingChapter(item.id)}
                                             className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
                                           >
                                             Cancel
                                           </button>
                                         )}
-
-                                        <button
-                                          type="button"
-                                          onClick={() => deleteCharacter(c.id)}
-                                          className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                        >
-                                          Delete
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  <div className="rounded-2xl border bg-stone-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-stone-900">Chapter Summaries</div>
-                        <p className="mt-1 text-sm text-stone-400">
-                          Writing short summaries can help you remember the story later on.
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowChapterSummaries((prev) => !prev)}
-                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                        >
-                          {showChapterSummaries ? "Hide" : "Show"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setChapterReverseOrder((prev) => !prev)}
-                          className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                        >
-                          {chapterReverseOrder ? "Oldest First" : "Newest First"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowChapterSummaries(true);
-                            addChapterSummary();
-                          }}
-                          className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
-                        >
-                          + Add
-                        </button>
-                      </div>
-                    </div>
-
-                    {showChapterSummaries && (
-                      <div className="mt-4 space-y-3">
-                        {chapterSummaries.length === 0 ? (
-                          <div className="text-sm text-stone-500">No chapter summaries yet.</div>
-                        ) : (
-                          visibleChapterSummaries.map((item) => {
-                            const isEditing =
-                              item.id.startsWith("new-") || editingChapterIds.includes(item.id);
-                            const isSaving = savingChapterIds.includes(item.id);
-                            const wasJustSaved = savedChapterIds.includes(item.id);
-
-                            return (
-                              <div key={item.id} className="rounded-xl border bg-white p-4">
-                                {!isEditing ? (
-                                  <>
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <div className="text-sm font-semibold text-stone-900">
-                                          {item.chapter_number != null
-                                            ? `Chapter ${item.chapter_number}`
-                                            : "Untitled chapter"}
-                                          {item.chapter_title ? (
-                                            <span className="ml-2 font-normal text-stone-500">
-                                              · {item.chapter_title}
-                                            </span>
-                                          ) : null}
-                                        </div>
-
-                                        {item.sort_order != null && (
-                                          <div className="mt-1 text-xs text-stone-400">
-                                            Sort order: {item.sort_order}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      <div className="flex shrink-0 gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => startEditingChapter(item.id)}
-                                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                        >
-                                          Edit
-                                        </button>
 
                                         <button
                                           type="button"
@@ -2487,118 +2900,51 @@ export default function BookHubPage() {
                                           Delete
                                         </button>
                                       </div>
-                                    </div>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
 
-                                    <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
-                                      {item.summary}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
-                                      <input
-                                        type="number"
-                                        value={item.chapter_number ?? ""}
-                                        onChange={(e) =>
-                                          updateChapterSummary(
-                                            item.id,
-                                            "chapter_number",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="Chapter #"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
+                          <button
+                            type="button"
+                            onClick={addChapterSummary}
+                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
+                          >
+                            + Add chapter summary
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  {storyTab === "setting" && (
+                    <div className="rounded-2xl border bg-white p-6 text-sm text-stone-600">
+                      <div className="font-medium text-stone-900">Setting</div>
+                      <p className="mt-2">
+                        Keep track of where and when the story takes place, including locations,
+                        time periods, and atmosphere.
+                      </p>
+                      <p className="mt-3 text-stone-400 italic">
+                        Setting notes coming soon.
+                      </p>
+                    </div>
+                  )}
 
-                                      <input
-                                        value={item.chapter_title ?? ""}
-                                        onChange={(e) =>
-                                          updateChapterSummary(
-                                            item.id,
-                                            "chapter_title",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="Chapter title (optional)"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
-
-                                      <input
-                                        type="number"
-                                        value={item.sort_order ?? 0}
-                                        onChange={(e) =>
-                                          updateChapterSummary(
-                                            item.id,
-                                            "sort_order",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="Sort order"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
-                                    </div>
-
-                                    <p className="mt-2 text-xs text-stone-500">
-                                      Usually you can ignore sort order unless you want to rearrange chapters.
-                                    </p>
-
-                                    <textarea
-                                      value={item.summary}
-                                      onChange={(e) =>
-                                        updateChapterSummary(item.id, "summary", e.target.value)
-                                      }
-                                      placeholder="Write a short summary..."
-                                      className="mt-3 min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                                    />
-
-                                    <div className="mt-3 flex gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => saveChapterSummary(item)}
-                                        disabled={isSaving}
-                                        className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
-                                          ? "bg-green-600 hover:bg-green-700"
-                                          : "bg-blue-600 hover:bg-blue-700"
-                                          } disabled:opacity-50`}
-                                      >
-                                        {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
-                                      </button>
-
-                                      {!item.id.startsWith("new-") && (
-                                        <button
-                                          type="button"
-                                          onClick={() => stopEditingChapter(item.id)}
-                                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                        >
-                                          Cancel
-                                        </button>
-                                      )}
-
-                                      <button
-                                        type="button"
-                                        onClick={() => deleteChapterSummary(item.id)}
-                                        className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                      >
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={addChapterSummary}
-                          className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
-                        >
-                          + Add chapter summary
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {storyTab === "cultural" && (
+                    <div className="rounded-2xl border bg-white p-6 text-sm text-stone-600">
+                      <div className="font-medium text-stone-900">Cultural Notes</div>
+                      <p className="mt-2">
+                        Capture cultural references, customs, and nuances that help deepen your
+                        understanding of the story.
+                      </p>
+                      <p className="mt-3 text-stone-400 italic">
+                        Cultural notes coming soon.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="text-sm font-medium">Notes</div>
@@ -2617,48 +2963,308 @@ export default function BookHubPage() {
                     )}
                   </div>
                 </div>
-              )}
 
-              {activeTab === "study" && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <button
-                        onClick={() => router.push(`/books/${row.id}/words`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        📚 Vocab List
-                      </button>
-                      {!isTeacher ? (
+                              </div>
+            )}
+
+{activeTab === "study" && (
+                  <div className="space-y-6">
+
+                    {/* TOP: Vocab actions */}
+                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                      <div className="mb-3 text-sm font-semibold text-stone-900">Vocab</div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
                         <button
-                          onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
+                          onClick={() => router.push(`/books/${row.id}/words`)}
                           className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
                         >
-                          ➕ Add Vocab
+                          📚 Vocab List
                         </button>
-                      ) : null}
-                      <button
-                        onClick={() => router.push(`/vocab/dictionary?userBookId=${row.id}`)}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        🔎 Explore the Word
-                      </button>
+
+                        <button
+                          onClick={() => router.push(`/vocab/explore?userBookId=${row.id}`)}
+                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                        >
+                          🔎 Explore the Word
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Kanji</div>
-                    <div className="text-sm text-stone-400"> </div>
-                  </div>
+                    {/* ADD VOCAB SECTION */}
+                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                      <div className="mb-3 text-sm font-semibold text-stone-900">Add Vocab</div>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Mistakes</div>
-                    <div className="text-sm text-stone-400"> </div>
+                      {/* SUB TABS */}
+                      <div className="overflow-x-auto">
+                        <div className="flex w-max gap-2 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setVocabTab("readAlong")}
+                            className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "readAlong"
+                              ? "border-stone-900 bg-stone-900 text-white"
+                              : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                              }`}
+                          >
+                            Read Along
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setVocabTab("bulk")}
+                            className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "bulk"
+                              ? "border-stone-900 bg-stone-900 text-white"
+                              : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                              }`}
+                          >
+                            Bulk Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {vocabTab === "readAlong" && (
+                        <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
+                          <div className="text-sm font-medium text-stone-900">Read Along</div>
+                          <p className="mt-1 text-sm text-stone-500">
+                            This will be your real-time vocab input during lessons or single input for members.
+                          </p>
+
+                          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                            <input
+                              ref={quickWordInputRef}
+                              type="text"
+                              value={quickWord}
+                              onChange={(e) => setQuickWord(e.target.value)}
+                              placeholder="Type a word..."
+                              className="w-full rounded border px-3 py-2 text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  pullQuickWord();
+                                }
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={pullQuickWord}
+                              disabled={quickLoading || !quickWord.trim()}
+                              className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black disabled:opacity-50"
+                            >
+                              {quickLoading ? "Pulling..." : "Pull"}
+                            </button>
+                          </div>
+
+                          {quickError ? (
+                            <div className="mt-3 text-sm text-red-600">{quickError}</div>
+                          ) : null}
+
+                          {quickPreview && (
+                            <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <div>
+                                  <div className="mb-1 text-xs text-stone-500">Word</div>
+                                  <input
+                                    value={quickPreview.surface}
+                                    onChange={(e) =>
+                                      setQuickPreview((prev) =>
+                                        prev ? { ...prev, surface: e.target.value } : prev
+                                      )
+                                    }
+                                    className="w-full rounded border px-3 py-2 text-sm"
+                                  />
+                                </div>
+
+                                <div>
+                                  <div className="mb-1 text-xs text-stone-500">Reading</div>
+                                  <input
+                                    value={quickPreview.reading}
+                                    onChange={(e) =>
+                                      setQuickPreview((prev) =>
+                                        prev ? { ...prev, reading: e.target.value } : prev
+                                      )
+                                    }
+                                    className="w-full rounded border px-3 py-2 text-sm"
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <div className="mb-1 text-xs text-stone-500">Definition</div>
+                                  <div className="flex flex-col gap-3 md:flex-row">
+                                    <select
+                                      value={quickPreview.isCustomMeaning ? "other" : String(quickPreview.selectedMeaningIndex)}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+
+                                        setQuickPreview((prev) => {
+                                          if (!prev) return prev;
+
+                                          if (value === "other") {
+                                            return {
+                                              ...prev,
+                                              isCustomMeaning: true,
+                                              meaning: "",
+                                            };
+                                          }
+
+                                          const index = Number(value);
+                                          return {
+                                            ...prev,
+                                            selectedMeaningIndex: index,
+                                            isCustomMeaning: false,
+                                            meaning: prev.meanings[index] ?? "",
+                                          };
+                                        });
+                                      }}
+                                      className="w-full rounded border bg-white px-3 py-2 text-sm md:w-56"
+                                    >
+                                      {quickPreview.meanings.map((m, i) => (
+                                        <option key={i} value={i}>
+                                          Definition {i + 1}
+                                        </option>
+                                      ))}
+                                      <option value="other">Other</option>
+                                    </select>
+
+                                    <input
+                                      value={quickPreview.meaning}
+                                      onChange={(e) =>
+                                        setQuickPreview((prev) =>
+                                          prev ? { ...prev, meaning: e.target.value } : prev
+                                        )
+                                      }
+                                      readOnly={!quickPreview.isCustomMeaning}
+                                      placeholder="Meaning"
+                                      className={`w-full rounded border px-3 py-2 text-sm ${quickPreview.isCustomMeaning
+                                        ? "bg-white"
+                                        : "bg-stone-100 text-stone-700"
+                                        }`}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="mb-1 text-xs text-stone-500">Page</div>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={quickPreview.page}
+                                    onChange={(e) =>
+                                      setQuickPreview((prev) =>
+                                        prev ? { ...prev, page: e.target.value } : prev
+                                      )
+                                    }
+                                    className="w-full rounded border px-3 py-2 text-sm"
+                                  />
+                                </div>
+
+                                <div>
+                                  <div className="mb-1 text-xs text-stone-500">Chapter #</div>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={quickPreview.chapterNumber}
+                                    onChange={(e) =>
+                                      setQuickPreview((prev) =>
+                                        prev ? { ...prev, chapterNumber: e.target.value } : prev
+                                      )
+                                    }
+                                    className="w-full rounded border px-3 py-2 text-sm"
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <div className="mb-1 text-xs text-stone-500">Chapter Name</div>
+                                  <input
+                                    value={quickPreview.chapterName}
+                                    onChange={(e) =>
+                                      setQuickPreview((prev) =>
+                                        prev ? { ...prev, chapterName: e.target.value } : prev
+                                      )
+                                    }
+                                    className="w-full rounded border px-3 py-2 text-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="mt-4 flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={saveQuickWord}
+                                  className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                                >
+                                  Save Word
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setQuickPreview(null)}
+                                  className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="mt-6">
+                            <div className="text-sm font-medium text-stone-900">
+                              Words saved into Vocab List this session
+                            </div>
+                            <p className="mt-1 text-xs text-stone-400">
+                              These words have already been saved to your Vocab List.
+                            </p>
+
+                            {quickSessionWords.length === 0 ? (
+                              <div className="mt-2 text-sm text-stone-500">No words saved yet.</div>
+                            ) : (
+                              <div className="mt-3 space-y-2">
+                                {quickSessionWords.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
+                                  >
+                                    <div className="font-medium text-stone-900">
+                                      {item.surface}
+                                      {item.reading ? (
+                                        <span className="ml-2 text-stone-500">({item.reading})</span>
+                                      ) : null}
+                                    </div>
+                                    <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                                    <div className="mt-1 text-xs text-stone-500">
+                                      Page {item.page || "—"}
+                                      {item.chapterNumber ? ` · Ch ${item.chapterNumber}` : ""}
+                                      {item.chapterName ? ` · ${item.chapterName}` : ""}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* BULK ADD */}
+                      {vocabTab === "bulk" && (
+                        <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
+                          <div className="text-sm font-medium text-stone-900">Bulk Add</div>
+                          <p className="mt-1 text-sm text-stone-500">
+                            Use the existing bulk input tool.
+                          </p>
+
+                          <button
+                            onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
+                            className="mt-4 rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                          >
+                            Open Bulk Add
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
-                </div>
-              )}
+                )}
             </div>
-          </div>
         </section>
       </div>
     </main>

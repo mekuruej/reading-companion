@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type DictionaryEntry = {
   word: string;
@@ -15,6 +15,20 @@ export default function JishoPage() {
   const [results, setResults] = useState<DictionaryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"regular" | "card">("regular");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+
+    if (view === "card") {
+      setViewMode("card");
+    } else {
+      setViewMode("regular");
+    }
+  }, []);
 
   async function runSearch() {
     const q = query.trim();
@@ -75,7 +89,7 @@ export default function JishoPage() {
   }
 
   return (
-    <main className="min-h-screen p-6 max-w-5xl mx-auto">
+    <main className="min-h-screen max-w-5xl mx-auto px-6 pb-6 pt-30">
       <h1 className="text-2xl font-semibold mb-4">Dictionary</h1>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
@@ -103,30 +117,68 @@ export default function JishoPage() {
       {errorMsg ? <p className="text-sm text-red-600 mb-3">{errorMsg}</p> : null}
 
       <div className="space-y-3">
-        {results.map((entry, idx) => (
-          <div
-            key={`${entry.word}-${entry.reading}-${idx}`}
-            className="border rounded-lg p-4 bg-white"
-          >
-            <div className="text-xl font-semibold">{entry.word || "—"}</div>
-            <div className="text-sm text-gray-600">{entry.reading || "—"}</div>
-            <div className="mt-2 text-sm text-gray-800">{entry.meaning || "—"}</div>
+        {results.map((entry, idx) =>
+          viewMode === "card" ? (
+            <div
+              key={`${entry.word}-${entry.reading}-${idx}`}
+              className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+            >
+              <div className="text-2xl font-semibold text-stone-900">
+                {entry.word || "—"}
+              </div>
 
-            <div className="mt-2 flex flex-wrap gap-2 text-xs">
-              {entry.jlpt ? (
-                <span className="px-2 py-1 rounded bg-gray-100 border">
-                  {entry.jlpt}
-                </span>
-              ) : null}
+              <div className="mt-1 text-base text-stone-500">
+                {entry.reading || "—"}
+              </div>
 
-              {entry.isCommon ? (
-                <span className="px-2 py-1 rounded bg-green-50 border text-green-700">
-                  Common
-                </span>
-              ) : null}
+              <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                  Meaning
+                </div>
+                <div className="mt-2 text-sm leading-7 text-stone-800">
+                  {entry.meaning || "—"}
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                {entry.jlpt ? (
+                  <span className="rounded-full border bg-white px-2 py-1">
+                    {entry.jlpt}
+                  </span>
+                ) : null}
+
+                {entry.isCommon ? (
+                  <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-green-700">
+                    Common
+                  </span>
+                ) : null}
+              </div>
             </div>
-          </div>
-        ))}
+          ) : (
+            <div
+              key={`${entry.word}-${entry.reading}-${idx}`}
+              className="border rounded-lg p-4 bg-white"
+            >
+              <div className="text-xl font-semibold">{entry.word || "—"}</div>
+              <div className="text-sm text-gray-600">{entry.reading || "—"}</div>
+              <div className="mt-2 text-sm text-gray-800">{entry.meaning || "—"}</div>
+
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {entry.jlpt ? (
+                  <span className="px-2 py-1 rounded bg-gray-100 border">
+                    {entry.jlpt}
+                  </span>
+                ) : null}
+
+                {entry.isCommon ? (
+                  <span className="px-2 py-1 rounded bg-green-50 border text-green-700">
+                    Common
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          )
+        )}
       </div>
     </main>
   );

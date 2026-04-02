@@ -831,8 +831,6 @@ if (idx != null && choices.length && choices[idx]) {
                       >
                         Open
                       </button>
-
-                      {isTeacher ? (
                         <>
                           <button
                             onClick={() => openEdit(w)}
@@ -864,7 +862,6 @@ if (idx != null && choices.length && choices[idx]) {
                             Delete
                           </button>
                         </>
-                      ) : null}
                     </div>
                   </td>
                 </tr>
