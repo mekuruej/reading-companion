@@ -24,7 +24,7 @@ function studySetLabel(s: StudySet) {
     case "FROM_READING":
       return "From Reading";
     case "COMPLETE":
-      return "Complete Word";
+      return "Complete Study";
     default:
       return "Reading";
   }
@@ -218,6 +218,7 @@ export default function BookFlashcardsPage() {
   const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const typeModeEnabled = typeMode && steps.length >= 2;
+  const [inputResetKey, setInputResetKey] = useState(0);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -266,6 +267,7 @@ export default function BookFlashcardsPage() {
     if (steps.length < 2 && typeMode) {
       setTypeMode(false);
       setTypedInput("");
+      setInputResetKey((k) => k + 1);
       setTypedFeedback(null);
       setTypeRevealIndex(0);
       setReadyForNextCard(false);
@@ -664,8 +666,8 @@ export default function BookFlashcardsPage() {
   }
 
   function nextCardReveal() {
-    if (stepIndex < 1) {
-      setStepIndex(1);
+    if (stepIndex < steps.length - 1) {
+      setStepIndex((prev) => prev + 1);
       return;
     }
     return goToNextWord();
@@ -673,7 +675,7 @@ export default function BookFlashcardsPage() {
 
   function prevCardReveal() {
     if (stepIndex > 0) {
-      setStepIndex(0);
+      setStepIndex((prev) => Math.max(prev - 1, 0));
       return;
     }
     return goToPrevWord();
@@ -734,7 +736,7 @@ export default function BookFlashcardsPage() {
         setTypedInput("");
         setTypedFeedback({
           ok,
-          message: ok ? "Good. Now the meaning." : "Let's reveal the reading, then do the meaning.",
+          message: ok ? "You got it! Now the meaning." : "Keep trying! Here's the reading — now try the meaning.",
         });
         setTypeRevealIndex(1);
         setLastTypedResult(ok ? null : "wrong");
@@ -754,14 +756,13 @@ export default function BookFlashcardsPage() {
       setTypedInput("");
       setTypedFeedback({
         ok,
-        message: ok ? "You got it!" : "Let's keep trying!",
+        message: ok ? "You got it!" : "Keep trying!",
       });
       setTypeRevealIndex(2);
       setLastTypedResult(finalResult);
       setReadyForNextCard(true);
       return;
     }
-
     // FROM_READING: accept either the exact word OR a matching meaning
     const wordOk = userAnsRaw === (card.word ?? "").trim();
 
@@ -1066,25 +1067,13 @@ export default function BookFlashcardsPage() {
   }
 
   const showWord =
-    studySet === "READING"
-      ? true
-      : studySet === "MEANING"
-        ? true
-        : stepIndex >= 1;
+    steps.indexOf("word") === -1 ? false : stepIndex >= steps.indexOf("word");
 
   const showReading =
-    studySet === "READING"
-      ? stepIndex >= 1
-      : studySet === "MEANING"
-        ? true
-        : true;
+    steps.indexOf("reading") === -1 ? false : stepIndex >= steps.indexOf("reading");
 
   const showMeaning =
-    studySet === "READING"
-      ? true
-      : studySet === "MEANING"
-        ? stepIndex >= 1
-        : stepIndex >= 1;
+    steps.indexOf("meaning") === -1 ? false : stepIndex >= steps.indexOf("meaning");
 
   function Row({
     label,
@@ -1167,6 +1156,13 @@ export default function BookFlashcardsPage() {
             </label>
           </div>
         </div>
+
+        <p className="text-sm text-gray-500 text-center">
+          {studySet === "READING" && "Show word + meaning → think of the reading"}
+          {studySet === "MEANING" && "Show word + reading → think of the meaning"}
+          {studySet === "FROM_READING" && "Show reading → think of the word and meaning"}
+          {studySet === "COMPLETE" && "Show word → type reading (or show reading) → type meaning (or show meaning)"}
+        </p>
 
         <div className="w-full flex flex-col items-center gap-2">
           <div className="text-sm font-medium text-gray-700">Filter By</div>
@@ -1340,7 +1336,7 @@ export default function BookFlashcardsPage() {
 
                   <div className="flex gap-2">
                     <input
-                      key={`${studySet}-${sessionIndex}`}
+                      key={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
                       type="text"
                       value={typedInput}
                       onChange={(e) => {
@@ -1458,13 +1454,6 @@ export default function BookFlashcardsPage() {
           </button>
         </div>
 
-        <p className="text-sm text-gray-500 text-center">
-          {studySet === "READING" && "Show word + meaning → think of the reading"}
-          {studySet === "MEANING" && "Show word + reading → think of the meaning"}
-          {studySet === "FROM_READING" && "Show reading → think of the word and meaning"}
-          {studySet === "COMPLETE" && "Show word → think of the reading → then the meaning"}
-        </p>
-
         <div className="flex gap-2">
           <button
             onClick={() => {
@@ -1481,13 +1470,14 @@ export default function BookFlashcardsPage() {
               if (!card) return;
               hideCardPermanently(card.id);
             }}
-            className="flex-1 rounded-xl border border-gray-300 bg-gray-100 py-3 text-gray-700 hover:bg-gray-200"
+            className="flex-1 rounded-xl border border-gray-300 bg-gray-100 px-3 py-2 text-gray-700 hover:bg-gray-200"
           >
-            Hide (for Good)
+            <div>Hide (for Good)</div>
+            <div className="text-[11px] text-gray-500">Unhide in Vocab List</div>
           </button>
         </div>
 
-                <div className="mt-4 flex justify-center gap-3">
+        <div className="mt-4 flex justify-center gap-3">
           <button
             onClick={() => router.push(`/books/${userBookId}/words`)}
             className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
