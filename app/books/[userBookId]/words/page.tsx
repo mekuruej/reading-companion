@@ -15,6 +15,7 @@ type WordRow = {
   jlpt: string | null;
   is_common: boolean | null;
   page_number: number | null;
+  page_order: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
   seen_on: string | null;
@@ -43,10 +44,10 @@ function chapterDisplayParts(w: WordRow) {
       num != null && name
         ? `Chapter ${num}: ${name}`
         : num != null
-        ? `Chapter ${num}`
-        : name
-        ? name
-        : "(none)",
+          ? `Chapter ${num}`
+          : name
+            ? name
+            : "(none)",
   };
 }
 
@@ -63,7 +64,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch {}
+    } catch { }
   }
   return [];
 }
@@ -121,6 +122,10 @@ export default function BookWordsPage() {
   const [editChapterNum, setEditChapterNum] = useState<string>("");
   const [editChapterName, setEditChapterName] = useState("");
 
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
+
   const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
   const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number | null>(0);
 
@@ -153,6 +158,76 @@ export default function BookWordsPage() {
     };
   }, []);
 
+  function sameOrderGroup(a: WordRow, b: WordRow) {
+    return (
+      (a.chapter_number ?? null) === (b.chapter_number ?? null) &&
+      (a.chapter_name ?? "").trim() === (b.chapter_name ?? "").trim() &&
+      (a.page_number ?? null) === (b.page_number ?? null)
+    );
+  }
+
+  function sortWithinGroup(list: WordRow[]) {
+    return [...list].sort((a, b) => {
+      const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = b.page_order ?? Number.MAX_SAFE_INTEGER;
+
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.created_at.localeCompare(b.created_at);
+    });
+  }
+
+  async function moveWordInGroup(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+
+    const dragged = words.find((w) => w.id === draggedId);
+    const target = words.find((w) => w.id === targetId);
+
+    if (!dragged || !target) return;
+    if (!sameOrderGroup(dragged, target)) return;
+
+    const group = sortWithinGroup(words.filter((w) => sameOrderGroup(w, dragged)));
+
+    const fromIndex = group.findIndex((w) => w.id === draggedId);
+    const toIndex = group.findIndex((w) => w.id === targetId);
+
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const reordered = [...group];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    const updatedGroup = reordered.map((w, index) => ({
+      ...w,
+      page_order: index + 1,
+    }));
+
+    setWords((prev) =>
+      prev.map((word) => {
+        const updated = updatedGroup.find((w) => w.id === word.id);
+        return updated ?? word;
+      })
+    );
+
+    setReordering(true);
+
+    try {
+      for (const w of updatedGroup) {
+        const { error } = await supabase
+          .from("user_book_words")
+          .update({ page_order: w.page_order })
+          .eq("id", w.id)
+          .eq("user_book_id", userBookId);
+
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      console.error("Failed to save reorder:", error);
+      alert(error?.message || "Failed to save new order.");
+    } finally {
+      setReordering(false);
+    }
+  }
+
   function openEdit(w: WordRow) {
     setEditErr(null);
     setEditing(w);
@@ -168,26 +243,26 @@ export default function BookWordsPage() {
     setEditChapterName(w.chapter_name ?? "");
 
     const choices = asStringArray(w.meaning_choices);
-const rawIdx =
-  w.meaning_choice_index == null
-    ? null
-    : Number.isFinite(w.meaning_choice_index as any)
-    ? (w.meaning_choice_index as number)
-    : 0;
+    const rawIdx =
+      w.meaning_choice_index == null
+        ? null
+        : Number.isFinite(w.meaning_choice_index as any)
+          ? (w.meaning_choice_index as number)
+          : 0;
 
-const idx =
-  rawIdx == null
-    ? null
-    : Math.max(0, choices.length ? Math.min(rawIdx, choices.length - 1) : rawIdx);
+    const idx =
+      rawIdx == null
+        ? null
+        : Math.max(0, choices.length ? Math.min(rawIdx, choices.length - 1) : rawIdx);
 
-setEditMeaningChoices(choices);
-setEditMeaningChoiceIndex(idx);
+    setEditMeaningChoices(choices);
+    setEditMeaningChoiceIndex(idx);
 
-if (idx != null && choices.length && choices[idx]) {
-  setEditMeaning(choices[idx]);
-} else {
-  setEditMeaning(w.meaning ?? "");
-}
+    if (idx != null && choices.length && choices[idx]) {
+      setEditMeaning(choices[idx]);
+    } else {
+      setEditMeaning(w.meaning ?? "");
+    }
   }
 
   function closeEdit() {
@@ -205,25 +280,25 @@ if (idx != null && choices.length && choices[idx]) {
   }
 
   function changeDefinition(newValue: string) {
-  const choices = editMeaningChoices ?? [];
+    const choices = editMeaningChoices ?? [];
 
-  if (newValue === "other") {
-    setEditMeaningChoiceIndex(null);
-    setEditMeaning("");
-    return;
+    if (newValue === "other") {
+      setEditMeaningChoiceIndex(null);
+      setEditMeaning("");
+      return;
+    }
+
+    const newIndex = Number(newValue);
+    const safe = Math.max(0, newIndex);
+
+    setEditMeaningChoiceIndex(safe);
+
+    if (choices.length) {
+      const clamped = Math.min(safe, choices.length - 1);
+      const chosen = choices[clamped] ?? "";
+      setEditMeaning(chosen);
+    }
   }
-
-  const newIndex = Number(newValue);
-  const safe = Math.max(0, newIndex);
-
-  setEditMeaningChoiceIndex(safe);
-
-  if (choices.length) {
-    const clamped = Math.min(safe, choices.length - 1);
-    const chosen = choices[clamped] ?? "";
-    setEditMeaning(chosen);
-  }
-}
 
   async function saveEdit() {
     if (!editing) return;
@@ -233,10 +308,7 @@ if (idx != null && choices.length && choices[idx]) {
 
     const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
 
-    const patch: Partial<WordRow> & {
-  meaning_choices?: any;
-  meaning_choice_index?: number | null;
-} = {
+    const patch: any = {
       surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
@@ -245,13 +317,20 @@ if (idx != null && choices.length && choices[idx]) {
       page_number: parseNullableInt(editPage),
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
-      meaning_choice_index: editMeaningChoiceIndex == null ? null : editMeaningChoiceIndex,
     };
 
+    if (editMeaningChoiceIndex == null) {
+      // manual override → user typed their own meaning
+      patch.meaning_choices = null;
+      patch.meaning_choice_index = null;
+    } else {
+      patch.meaning_choice_index = editMeaningChoiceIndex;
+    }
+
     if (hasChoices && editMeaningChoiceIndex != null) {
-  const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
-  if (chosen) patch.meaning = chosen;
-}
+      const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
+      if (chosen) patch.meaning = chosen;
+    }
 
     try {
       const { error } = await supabase
@@ -266,9 +345,9 @@ if (idx != null && choices.length && choices[idx]) {
         prev.map((w) =>
           w.id === editing.id
             ? ({
-                ...w,
-                ...patch,
-              } as WordRow)
+              ...w,
+              ...patch,
+            } as WordRow)
             : w
         )
       );
@@ -397,6 +476,7 @@ if (idx != null && choices.length && choices[idx]) {
             jlpt,
             is_common,
             page_number,
+            page_order,
             chapter_number,
             chapter_name,
             seen_on,
@@ -485,7 +565,28 @@ if (idx != null && choices.length && choices[idx]) {
     });
   }, [words, query, chapterFilter]);
 
-  const headerStickyStyle = { top: `${stickyOffset}px` };
+  const filteredSorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const aChapter = a.chapter_number ?? Number.MAX_SAFE_INTEGER;
+      const bChapter = b.chapter_number ?? Number.MAX_SAFE_INTEGER;
+      if (aChapter !== bChapter) return aChapter - bChapter;
+
+      const aPage = a.page_number ?? Number.MAX_SAFE_INTEGER;
+      const bPage = b.page_number ?? Number.MAX_SAFE_INTEGER;
+      if (aPage !== bPage) return aPage - bPage;
+
+      const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = b.page_order ?? Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+
+      const created = a.created_at.localeCompare(b.created_at);
+      if (created !== 0) return created;
+
+      return a.id.localeCompare(b.id);
+    });
+  }, [filtered]);
+
+  const headerStickyStyle = { top: "0px" };
 
   if (loading) {
     return (
@@ -575,30 +676,30 @@ if (idx != null && choices.length && choices[idx]) {
               </label>
 
               <label className="flex flex-col gap-1">
-  <span className="text-xs text-gray-600">Definition #</span>
-  {editMeaningChoices.length > 0 ? (
-    <select
-      value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
-      onChange={(e) => changeDefinition(e.target.value)}
-      className="border p-2 rounded bg-white"
-    >
-      {editMeaningChoices.map((_, i) => (
-        <option key={i} value={i}>
-          {i + 1}
-        </option>
-      ))}
-      <option value="other">Other</option>
-    </select>
-  ) : (
-    <select
-      value={editMeaningChoiceIndex == null ? "other" : "0"}
-      onChange={(e) => changeDefinition(e.target.value)}
-      className="border p-2 rounded bg-white"
-    >
-      <option value="other">Other</option>
-    </select>
-  )}
-</label>
+                <span className="text-xs text-gray-600">Definition #</span>
+                {editMeaningChoices.length > 0 ? (
+                  <select
+                    value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
+                    onChange={(e) => changeDefinition(e.target.value)}
+                    className="border p-2 rounded bg-white"
+                  >
+                    {editMeaningChoices.map((_, i) => (
+                      <option key={i} value={i}>
+                        {i + 1}
+                      </option>
+                    ))}
+                    <option value="other">Other</option>
+                  </select>
+                ) : (
+                  <select
+                    value={editMeaningChoiceIndex == null ? "other" : "0"}
+                    onChange={(e) => changeDefinition(e.target.value)}
+                    className="border p-2 rounded bg-white"
+                  >
+                    <option value="other">Other</option>
+                  </select>
+                )}
+              </label>
 
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-600">Meaning</span>
@@ -664,9 +765,7 @@ if (idx != null && choices.length && choices[idx]) {
 
       <div className="mt-2 mb-4 w-full border-b border-gray-300 pb-4">
         <p className="text-sm text-gray-500 text-center">
-          This page keeps track of all the vocabulary you didn’t know or had difficulty with while
-          studying with your teacher. It is arranged in book order, so you are encouraged to read
-          back over your passages with the list on hand to help you read more independently.
+          The words you’ve added from this book, organized in reading order to support your reading.
         </p>
       </div>
 
@@ -679,7 +778,7 @@ if (idx != null && choices.length && choices[idx]) {
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-semibold">{bookTitle || "Words"}</h1>
             <p className="text-sm text-gray-500">
-              Total: {words.length} • Showing: {filtered.length}
+              Total: {words.length} • Showing: {filteredSorted.length}
             </p>
           </div>
 
@@ -745,10 +844,27 @@ if (idx != null && choices.length && choices[idx]) {
         </div>
       </div>
 
+      {reordering ? (
+        <p className="mb-2 text-sm text-stone-500">Saving new order…</p>
+      ) : (
+        <p className="mb-2 text-sm text-stone-500">
+          Drag words by ☰ to adjust their reading order.
+        </p>
+      )}
+
       <div className="overflow-x-auto overflow-y-visible border rounded bg-white relative">
         <table className="w-full text-sm border-separate border-spacing-0">
+
           <thead className="bg-gray-50">
             <tr className="text-left">
+              <th
+                className="p-2 w-10 sticky bg-gray-50 z-20"
+                style={headerStickyStyle}
+                title="Drag to reorder within the same page"
+              >
+                ↕
+              </th>
+
               <th
                 className="p-2 w-5 sticky bg-gray-50 z-20"
                 style={headerStickyStyle}
@@ -756,6 +872,7 @@ if (idx != null && choices.length && choices[idx]) {
               >
                 Repeats
               </th>
+
               <th className="p-2 w-20 sticky bg-gray-50 z-20" style={headerStickyStyle}>
                 Word
               </th>
@@ -784,12 +901,58 @@ if (idx != null && choices.length && choices[idx]) {
           </thead>
 
           <tbody>
-            {filtered.map((w) => {
+            {filteredSorted.map((w) => {
               const rep = repeatCounts.get(repeatKey(w)) ?? 0;
 
               return (
-                <tr key={w.id} className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""}`}>
-                  <td className="p-2 text-center text-xs text-gray-600">{rep > 1 ? rep : ""}</td>
+                <tr
+                  key={w.id}
+                  draggable
+                  onDragStart={() => {
+                    setDraggingId(w.id);
+                    setDropTargetId(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (draggingId && draggingId !== w.id) {
+                      setDropTargetId(w.id);
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+
+                    const scrollY = window.scrollY;
+
+                    if (draggingId && draggingId !== w.id) {
+                      await moveWordInGroup(draggingId, w.id);
+                    }
+
+                    setDraggingId(null);
+                    setDropTargetId(null);
+
+                    requestAnimationFrame(() => {
+                      window.scrollTo({ top: scrollY });
+                    });
+                  }}
+                  onDragEnd={() => {
+                    setDraggingId(null);
+                    setDropTargetId(null);
+                  }}
+                  className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""
+                    } ${dropTargetId === w.id ? "bg-blue-50" : ""
+                    } ${draggingId === w.id ? "opacity-50" : ""
+                    }`}
+                >
+                  <td
+                    className="p-2 text-center text-gray-400 cursor-grab select-none"
+                    title="Drag to reorder within this page"
+                  >
+                    ☰
+                  </td>
+
+                  <td className="p-2 text-center text-xs text-gray-600">
+                    {rep > 1 ? rep : ""}
+                  </td>
 
                   <td className="p-2 font-medium">{w.surface}</td>
                   <td className="p-2">{w.reading ?? "—"}</td>
@@ -799,7 +962,11 @@ if (idx != null && choices.length && choices[idx]) {
                   </td>
 
                   <td className="p-2 text-center">
-                    {w.meaning_choice_index != null ? w.meaning_choice_index + 1 : w.meaning ? "O" : "—"}
+                    {w.meaning_choice_index != null
+                      ? w.meaning_choice_index + 1
+                      : w.meaning
+                        ? "O"
+                        : "—"}
                   </td>
 
                   <td className="p-2">
@@ -831,46 +998,47 @@ if (idx != null && choices.length && choices[idx]) {
                       >
                         Open
                       </button>
-                        <>
-                          <button
-                            onClick={() => openEdit(w)}
-                            className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
-                          >
-                            Edit
-                          </button>
 
-                          {w.hidden ? (
-                            <button
-                              onClick={() => unhideWord(w)}
-                              className="px-2 py-1 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
-                            >
-                              Unhide
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => hideWord(w)}
-                              className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs"
-                            >
-                              Hide
-                            </button>
-                          )}
+                      <>
+                        <button
+                          onClick={() => openEdit(w)}
+                          className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
+                        >
+                          Edit
+                        </button>
 
+                        {w.hidden ? (
                           <button
-                            onClick={() => deleteWord(w)}
-                            className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+                            onClick={() => unhideWord(w)}
+                            className="px-2 py-1 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
                           >
-                            Delete
+                            Unhide
                           </button>
-                        </>
+                        ) : (
+                          <button
+                            onClick={() => hideWord(w)}
+                            className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                          >
+                            Hide
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => deleteWord(w)}
+                          className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+                        >
+                          Delete
+                        </button>
+                      </>
                     </div>
                   </td>
                 </tr>
               );
             })}
 
-            {filtered.length === 0 ? (
+            {filteredSorted.length === 0 ? (
               <tr>
-                <td className="p-4 text-gray-500" colSpan={9}>
+                <td className="p-4 text-gray-500" colSpan={10}>
                   No words match your filters.
                 </td>
               </tr>

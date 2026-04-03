@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type ReadAlongWord = {
-    id: string;
-    surface: string;
-    reading: string | null;
-    meaning: string | null;
-    page_number: number | null;
+  id: string;
+  surface: string;
+  reading: string | null;
+  meaning: string | null;
+  page_number: number | null;
+  page_order: number | null;
 };
 
 type SupportMode = "full" | "reading" | "meaning";
@@ -30,11 +31,13 @@ function chunkArray<T>(arr: T[], size: number) {
 export default function ReadAlongPage() {
     const params = useParams<{ userBookId: string }>();
     const userBookId = params.userBookId;
+    const searchParams = useSearchParams();
 
     const [words, setWords] = useState<ReadAlongWord[]>([]);
     const [loading, setLoading] = useState(true);
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
     const [pageIndex, setPageIndex] = useState(0);
+    const [jumpPageInput, setJumpPageInput] = useState("");
 
     useEffect(() => {
         async function loadWords() {
@@ -44,10 +47,11 @@ export default function ReadAlongPage() {
 
             const { data, error } = await supabase
                 .from("user_book_words")
-                .select("id, surface, reading, meaning, page_number, created_at")
+                .select("id, surface, reading, meaning, page_number, page_order, created_at")
                 .eq("user_book_id", userBookId)
                 .eq("hidden", false)
                 .order("page_number", { ascending: true, nullsFirst: false })
+                .order("page_order", { ascending: true, nullsFirst: false })
                 .order("created_at", { ascending: true });
 
             if (error) {
@@ -107,6 +111,38 @@ export default function ReadAlongPage() {
         }));
     }, [words]);
 
+    useEffect(() => {
+        if (!pages.length) return;
+
+        const pageParam = searchParams.get("page");
+        if (!pageParam) return;
+
+        const pageNum = Number(pageParam);
+        if (!Number.isFinite(pageNum) || pageNum <= 0) return;
+
+        const matchIndex = pages.findIndex((p) =>
+            p.label === `Page ${pageNum}` || p.label.startsWith(`Page ${pageNum} (`)
+        );
+
+        if (matchIndex >= 0) {
+            setPageIndex(matchIndex);
+            setJumpPageInput(String(pageNum));
+        }
+    }, [pages, searchParams]);
+
+    function jumpToPage(pageNum: number) {
+        if (!Number.isFinite(pageNum) || pageNum <= 0) return;
+
+        const matchIndex = pages.findIndex((p) =>
+            p.label === `Page ${pageNum}` || p.label.startsWith(`Page ${pageNum} (`)
+        );
+
+        if (matchIndex >= 0) {
+            setPageIndex(matchIndex);
+            setJumpPageInput(String(pageNum));
+        }
+    }
+
     const currentPage = pages[pageIndex];
 
     function goPrev() {
@@ -116,6 +152,34 @@ export default function ReadAlongPage() {
     function goNext() {
         setPageIndex((prev) => Math.min(pages.length - 1, prev + 1));
     }
+
+    useEffect(() => {
+        function handleKeyDown(e: KeyboardEvent) {
+            const target = e.target as HTMLElement | null;
+            const tag = target?.tagName?.toLowerCase();
+
+            const isTyping =
+                tag === "input" ||
+                tag === "textarea" ||
+                tag === "select" ||
+                target?.isContentEditable;
+
+            if (isTyping) return;
+
+            if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                goPrev();
+            }
+
+            if (e.key === "ArrowRight") {
+                e.preventDefault();
+                goNext();
+            }
+        }
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [pageIndex, pages.length]);
 
     if (loading) {
         return (
@@ -181,6 +245,42 @@ export default function ReadAlongPage() {
                         >
                             Meaning Support
                         </button>
+                    </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <div className="text-sm font-medium text-stone-900">Jump to page</div>
+                            <p className="mt-1 text-sm text-stone-500">
+                                Go straight to a page number in your saved vocab.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <input
+                                type="number"
+                                min={1}
+                                value={jumpPageInput}
+                                onChange={(e) => setJumpPageInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        jumpToPage(Number(jumpPageInput));
+                                    }
+                                }}
+                                placeholder="e.g. 45"
+                                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm sm:w-36"
+                            />
+
+                            <button
+                                type="button"
+                                onClick={() => jumpToPage(Number(jumpPageInput))}
+                                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                            >
+                                Go
+                            </button>
+                        </div>
                     </div>
                 </div>
 

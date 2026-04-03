@@ -12,7 +12,7 @@ declare global {
   }
 }
 
-type StudySet = "READING" | "MEANING" | "FROM_READING";
+type StudySet = "READING" | "MEANING" | "FROM_READING" | "COMPLETE";
 type StepField = "word" | "reading" | "meaning";
 
 function studySetLabel(s: StudySet) {
@@ -23,6 +23,8 @@ function studySetLabel(s: StudySet) {
       return "Meaning";
     case "FROM_READING":
       return "From Reading";
+    case "COMPLETE":
+      return "Complete Word";
     default:
       return "Reading";
   }
@@ -94,7 +96,7 @@ function chapterInfoFromRow(r: WordRow): { label: string; display: string } {
 }
 
 function normalizeReading(s: string) {
-  return (s ?? "")
+  return kataToHira(s ?? "")
     .trim()
     .replace(/\s+/g, "")
     .replace(/[・･]/g, "")
@@ -102,8 +104,8 @@ function normalizeReading(s: string) {
     .toLowerCase();
 }
 
-function isHiraganaOnly(s: string) {
-  return /^[ぁ-ゖー]+$/.test(s.trim());
+function isKanaOnly(s: string) {
+  return /^[ぁ-ゖァ-ヶー]+$/.test(s.trim());
 }
 
 function kataToHira(s: string) {
@@ -128,7 +130,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch {}
+    } catch { }
   }
 
   return [];
@@ -158,7 +160,7 @@ export default function BookFlashcardsPage() {
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
 
   const [studySet, setStudySet] = useState<StudySet>("READING");
-  const [studyOnceMode, setStudyOnceMode] = useState(false);
+  const studyOnceMode = true;
 
   const [sessionOrder, setSessionOrder] = useState<number[]>([]);
   const [sessionIndex, setSessionIndex] = useState(0);
@@ -176,6 +178,8 @@ export default function BookFlashcardsPage() {
         return ["word", "reading", "meaning"];
       case "FROM_READING":
         return ["reading", "word", "meaning"];
+      case "COMPLETE":
+        return ["word", "reading", "meaning"];
       default:
         return ["word", "meaning", "reading"];
     }
@@ -225,11 +229,10 @@ export default function BookFlashcardsPage() {
       const parsed = JSON.parse(raw);
       if (parsed?.studySet) setStudySet(parsed.studySet as StudySet);
       if (typeof parsed?.typeMode === "boolean") setTypeMode(parsed.typeMode);
-      if (typeof parsed?.studyOnceMode === "boolean") setStudyOnceMode(parsed.studyOnceMode);
       if (Array.isArray(parsed?.jlptSelected)) setJlptSelected(parsed.jlptSelected);
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
-    } catch {}
+    } catch { }
   }, [settingsKey, userBookId]);
 
   useEffect(() => {
@@ -247,7 +250,7 @@ export default function BookFlashcardsPage() {
           repeatsOnly,
         })
       );
-    } catch {}
+    } catch { }
   }, [
     settingsKey,
     userBookId,
@@ -399,8 +402,8 @@ export default function BookFlashcardsPage() {
 
           const safeIdx =
             typeof w.meaning_choice_index === "number" &&
-            w.meaning_choice_index >= 0 &&
-            w.meaning_choice_index < meaningChoices.length
+              w.meaning_choice_index >= 0 &&
+              w.meaning_choice_index < meaningChoices.length
               ? w.meaning_choice_index
               : 0;
 
@@ -431,11 +434,23 @@ export default function BookFlashcardsPage() {
           };
         });
 
-        setCards(normalized);
-        setFilteredCards(normalized);
+        const dedupedMap = new Map<string, Flashcard>();
+
+        for (const c of normalized) {
+          const key = normalizeRepeatKey(c.word);
+          if (!key) continue;
+
+          if (!dedupedMap.has(key)) {
+            dedupedMap.set(key, c);
+          }
+        }
+
+        const deduped = Array.from(dedupedMap.values());
+        setCards(deduped);
+        setFilteredCards(deduped);
 
         const map = new Map<string, string>();
-        for (const c of normalized) {
+        for (const c of deduped) {
           if (!map.has(c.chapterLabel)) map.set(c.chapterLabel, c.chapterDisplay);
         }
 
@@ -674,8 +689,8 @@ export default function BookFlashcardsPage() {
       const correctReading = card.reading ?? "";
       const ok =
         !!correctReading &&
-        isHiraganaOnly(userAns) &&
-        normalizeReading(userAns) === normalizeReading(correctReading);
+        isKanaOnly(userAnsRaw) &&
+        normalizeReading(userAnsRaw) === normalizeReading(correctReading);
 
       setTypedInput("");
       setTypedFeedback({
@@ -703,6 +718,46 @@ export default function BookFlashcardsPage() {
       });
       setTypeRevealIndex(steps.length - 1);
       setLastTypedResult(ok ? "correct" : "wrong");
+      setReadyForNextCard(true);
+      return;
+    }
+
+    if (studySet === "COMPLETE") {
+      // Step 1: reading
+      if (typeRevealIndex === 0) {
+        const correctReading = card.reading ?? "";
+        const ok =
+          !!correctReading &&
+          isKanaOnly(userAnsRaw) &&
+          normalizeReading(userAnsRaw) === normalizeReading(correctReading);
+
+        setTypedInput("");
+        setTypedFeedback({
+          ok,
+          message: ok ? "Good. Now the meaning." : "Let's reveal the reading, then do the meaning.",
+        });
+        setTypeRevealIndex(1);
+        setLastTypedResult(ok ? null : "wrong");
+        setReadyForNextCard(false);
+        return;
+      }
+
+      // Step 2: meaning
+      const u = normalizeMeaning(userAnsRaw);
+      const possible = [card.meaning, ...(card.meaningChoices ?? [])]
+        .filter(Boolean)
+        .map((x) => normalizeMeaning(String(x)));
+
+      const ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
+      const finalResult = lastTypedResult === "wrong" || !ok ? "wrong" : "correct";
+
+      setTypedInput("");
+      setTypedFeedback({
+        ok,
+        message: ok ? "You got it!" : "Let's keep trying!",
+      });
+      setTypeRevealIndex(2);
+      setLastTypedResult(finalResult);
       setReadyForNextCard(true);
       return;
     }
@@ -818,8 +873,16 @@ export default function BookFlashcardsPage() {
       ? studySet === "READING"
         ? "reading"
         : studySet === "MEANING"
-        ? "meaning"
-        : "word_or_meaning"
+          ? "meaning"
+          : studySet === "FROM_READING"
+            ? "word_or_meaning"
+            : studySet === "COMPLETE"
+              ? typeRevealIndex === 0
+                ? "reading"
+                : typeRevealIndex === 1
+                  ? "meaning"
+                  : null
+              : null
       : null;
 
   function startVoiceInput() {
@@ -969,7 +1032,7 @@ export default function BookFlashcardsPage() {
       <main className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-xl border rounded-2xl bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold">Nice work!</h1>
-          <p className="mt-3 text-gray-700">You studied each card once.</p>
+          <p className="mt-3 text-gray-700">You reviewed each word once.</p>
 
           <div className="mt-6 flex justify-center gap-3">
             <button
@@ -1006,22 +1069,22 @@ export default function BookFlashcardsPage() {
     studySet === "READING"
       ? true
       : studySet === "MEANING"
-      ? true
-      : stepIndex >= 1;
+        ? true
+        : stepIndex >= 1;
 
   const showReading =
     studySet === "READING"
       ? stepIndex >= 1
       : studySet === "MEANING"
-      ? true
-      : true;
+        ? true
+        : true;
 
   const showMeaning =
     studySet === "READING"
       ? true
       : studySet === "MEANING"
-      ? stepIndex >= 1
-      : stepIndex >= 1;
+        ? stepIndex >= 1
+        : stepIndex >= 1;
 
   function Row({
     label,
@@ -1064,8 +1127,7 @@ export default function BookFlashcardsPage() {
 
         <div className="w-full md:w-[460px] md:mt-6 md:ml-4">
           <p className="text-base text-gray-500 text-left leading-8">
-            This page is intended to help you strengthen the vocabulary you are still working on.
-            Study the flashcards however you like. Vocabulary is always shown in random order.
+            Review the words from this book in a simple, random study session. Each word appears once per session.
           </p>
         </div>
       </div>
@@ -1083,16 +1145,16 @@ export default function BookFlashcardsPage() {
               <option value="READING">{studySetLabel("READING")}</option>
               <option value="MEANING">{studySetLabel("MEANING")}</option>
               <option value="FROM_READING">{studySetLabel("FROM_READING")}</option>
+              <option value="COMPLETE">{studySetLabel("COMPLETE")}</option>
             </select>
 
             <label
-              className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${
-                steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className={`flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white ${steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               title={
                 steps.length < 2
                   ? "Type mode needs at least 2 study steps."
-                  : "Press Enter to check. Press Enter again to move to the next card."
+                  : "Type your answer and press Enter."
               }
             >
               <input
@@ -1102,15 +1164,6 @@ export default function BookFlashcardsPage() {
                 onChange={() => setTypeMode((v) => !v)}
               />
               Type mode
-            </label>
-
-            <label className="flex items-center gap-2 text-sm px-2 py-1 border rounded bg-white">
-              <input
-                type="checkbox"
-                checked={studyOnceMode}
-                onChange={() => setStudyOnceMode((v) => !v)}
-              />
-              Study each card once
             </label>
           </div>
         </div>
@@ -1189,26 +1242,12 @@ export default function BookFlashcardsPage() {
         </div>
       </div>
 
-      {firstTouch && (
-        <p className="mb-2 text-sm text-gray-500">
-          {typeModeEnabled
-            ? "Press Enter to check. Press Enter again to move to the next card."
-            : "Click card, press Space, or use Review / Next."}
-        </p>
-      )}
-
       <div className="mb-3 flex flex-col items-center">
-        <p className="text-[11px] uppercase tracking-wide text-gray-400">Session Progress</p>
-        <p className="text-sm text-gray-500 text-center">
+        <p className="text-sm text-gray-500">Session Progress</p>
+        <p className="text-sm font-medium text-gray-700 text-center">
           Card {Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}/
           {studyOnceMode ? sessionOrder.length : filteredCards.length}
         </p>
-      </div>
-
-      <div className="mb-2 text-sm text-gray-500">
-        {studySet === "READING" && "Show word + meaning → think of the reading"}
-        {studySet === "MEANING" && "Show word + reading → think of the meaning"}
-        {studySet === "FROM_READING" && "Show reading → think of the word and meaning"}
       </div>
 
       <div
@@ -1216,7 +1255,7 @@ export default function BookFlashcardsPage() {
         className="
           relative
           w-[92vw] max-w-2xl
-          min-h-[38vh] sm:min-h-[44vh]
+          min-h-[32vh] sm:min-h-[38vh]
           bg-white rounded-2xl
           border border-slate-500
           shadow-2xl
@@ -1244,7 +1283,7 @@ export default function BookFlashcardsPage() {
                 label="Word"
                 value={card.word}
                 visible={
-                  studySet === "READING" || studySet === "MEANING"
+                  studySet === "READING" || studySet === "MEANING" || studySet === "COMPLETE"
                     ? true
                     : typeRevealIndex >= steps.indexOf("word")
                 }
@@ -1256,11 +1295,11 @@ export default function BookFlashcardsPage() {
                 label="Reading"
                 value={card.reading || "—"}
                 visible={
-                  studySet === "MEANING"
+                  studySet === "MEANING" || studySet === "FROM_READING"
                     ? true
-                    : studySet === "FROM_READING"
-                    ? true
-                    : typeRevealIndex >= steps.indexOf("reading")
+                    : studySet === "COMPLETE"
+                      ? typeRevealIndex >= 1
+                      : typeRevealIndex >= steps.indexOf("reading")
                 }
                 placeholder="---"
               />
@@ -1271,7 +1310,9 @@ export default function BookFlashcardsPage() {
                 visible={
                   studySet === "READING"
                     ? true
-                    : typeRevealIndex >= steps.indexOf("meaning")
+                    : studySet === "COMPLETE"
+                      ? typeRevealIndex >= 2
+                      : typeRevealIndex >= steps.indexOf("meaning")
                 }
                 placeholder="---"
               />
@@ -1283,13 +1324,17 @@ export default function BookFlashcardsPage() {
                     {studySet === "READING"
                       ? "Reading"
                       : studySet === "MEANING"
-                      ? "Meaning"
-                      : "Word or Meaning"}
+                        ? "Meaning"
+                        : studySet === "FROM_READING"
+                          ? "Word or Meaning"
+                          : typeRevealIndex === 0
+                            ? "Reading"
+                            : "Meaning"}
                   </div>
 
                   {studySet === "READING" ? (
                     <p className="mb-2 text-xs text-gray-500">
-                      Reading quizzes should be answered in hiragana only.
+                      Reading quizzes can be answered in hiragana or katakana.
                     </p>
                   ) : null}
 
@@ -1328,10 +1373,14 @@ export default function BookFlashcardsPage() {
                         readyForNextCard
                           ? "Press Enter for next card"
                           : studySet === "READING"
-                          ? "かなで入力"
-                          : studySet === "MEANING"
-                          ? "Type a meaning"
-                          : "Type the word or a meaning"
+                            ? "かなで入力（ひらがな・カタカナどちらでもOK）"
+                            : studySet === "MEANING"
+                              ? "Type a meaning"
+                              : studySet === "FROM_READING"
+                                ? "Type the word or a meaning"
+                                : typeRevealIndex === 0
+                                  ? "かなで入力（ひらがな・カタカナどちらでもOK）"
+                                  : "Type a meaning"
                       }
                     />
 
@@ -1357,9 +1406,8 @@ export default function BookFlashcardsPage() {
 
                   {typedFeedback ? (
                     <p
-                      className={`mt-2 text-sm ${
-                        typedFeedback.ok ? "text-green-700" : "text-red-700"
-                      }`}
+                      className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"
+                        }`}
                     >
                       {typedFeedback.ok ? "✅ " : "❌ "}
                       {typedFeedback.message}
@@ -1388,54 +1436,15 @@ export default function BookFlashcardsPage() {
         </div>
       </div>
 
-      {showDefPicker && card?.meaningChoices?.length ? (
-        <div className="mt-4 w-full max-w-2xl rounded-xl border bg-white p-4 shadow-sm">
-          <div className="text-sm font-medium text-slate-700 mb-2">Choose a definition</div>
-
-          <div className="flex flex-col gap-2">
-            {card.meaningChoices.map((choice, i) => {
-              const active = i === card.meaningChoiceIndex;
-              return (
-                <button
-                  key={`${card.id}-def-${i}`}
-                  type="button"
-                  disabled={defSaving}
-                  onClick={() => setDefinitionForCurrent(i)}
-                  className={`text-left px-3 py-2 rounded border ${
-                    active
-                      ? "bg-slate-700 text-white border-slate-700"
-                      : "bg-white hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="text-xs mr-2 opacity-70">#{i + 1}</span>
-                  {choice || "—"}
-                </button>
-              );
-            })}
-          </div>
-
-          {defError ? <p className="mt-2 text-sm text-red-700">{defError}</p> : null}
-
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={() => setShowDefPicker(false)}
-              className="px-3 py-1 bg-gray-200 rounded"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-6 w-full max-w-2xl space-y-2">
-        <div className="flex gap-2">
-          <button
-            onClick={() => (typeModeEnabled ? goToPrevWord() : prevCardReveal())}
-            className="flex-1 rounded-xl bg-gray-200 py-3"
-          >
-            Review
-          </button>
+      <div className="mt-3 w-full max-w-2xl space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-gray-500">
+            {typeModeEnabled
+              ? "Press Enter to check. Press Enter again to move to the next card."
+              : stepIndex === 0
+                ? "Tap once to reveal"
+                : "Tap again for the next word"}
+          </p>
 
           <button
             onClick={() =>
@@ -1443,11 +1452,18 @@ export default function BookFlashcardsPage() {
                 ? goToNextWord(readyForNextCard ? lastTypedResult ?? "revealed" : "revealed")
                 : nextCardReveal()
             }
-            className="flex-1 rounded-xl bg-gray-800 text-white py-3"
+            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            Next
+            Next Word
           </button>
         </div>
+
+        <p className="text-sm text-gray-500 text-center">
+          {studySet === "READING" && "Show word + meaning → think of the reading"}
+          {studySet === "MEANING" && "Show word + reading → think of the meaning"}
+          {studySet === "FROM_READING" && "Show reading → think of the word and meaning"}
+          {studySet === "COMPLETE" && "Show word → think of the reading → then the meaning"}
+        </p>
 
         <div className="flex gap-2">
           <button
@@ -1455,7 +1471,7 @@ export default function BookFlashcardsPage() {
               if (!card) return;
               skipCardForToday(card.id);
             }}
-            className="flex-1 rounded-xl bg-slate-200 py-3"
+            className="flex-1 rounded-xl border border-gray-300 bg-white py-3 text-gray-700 hover:bg-gray-50"
           >
             Skip (for Today)
           </button>
@@ -1465,32 +1481,25 @@ export default function BookFlashcardsPage() {
               if (!card) return;
               hideCardPermanently(card.id);
             }}
-            className="flex-1 rounded-xl bg-gray-700 text-white py-3"
+            className="flex-1 rounded-xl border border-gray-300 bg-gray-100 py-3 text-gray-700 hover:bg-gray-200"
           >
             Hide (for Good)
           </button>
         </div>
 
-        <div className="mt-5 flex justify-center gap-3">
+                <div className="mt-4 flex justify-center gap-3">
           <button
             onClick={() => router.push(`/books/${userBookId}/words`)}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
+            className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
           >
             Vocab List
           </button>
 
           <button
             onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
+            className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
           >
             Book Hub
-          </button>
-
-          <button
-            onClick={() => router.push(`/books/${userBookId}/weekly-readings`)}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
-          >
-            Practice Readings
           </button>
         </div>
       </div>
