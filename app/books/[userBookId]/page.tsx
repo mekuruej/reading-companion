@@ -298,6 +298,7 @@ export default function BookHubPage() {
   const [sessionDate, setSessionDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
+
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     setSessionDate(today);
@@ -329,12 +330,24 @@ export default function BookHubPage() {
   const [elapsed, setElapsed] = useState(0);
   const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [timerSaveMessage, setTimerSaveMessage] = useState("");
 
   const [vocabTab, setVocabTab] = useState<VocabTab>("readAlong");
   const [quickWord, setQuickWord] = useState("");
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
   const quickWordInputRef = useRef<HTMLInputElement>(null);
+
+  const kanjiReadingMemoryRef = useRef<
+    Record<
+      string,
+      {
+        reading_type: "on" | "kun" | "other" | null;
+        base: string | null;
+        realized: string | null;
+      }
+    >
+  >({});
 
   const [quickPreview, setQuickPreview] = useState<{
     surface: string;
@@ -1013,48 +1026,82 @@ export default function BookHubPage() {
 
     const rows = (data ?? []) as KanjiMapRow[];
 
+    const enrichedRows = rows.map((r) => {
+      const memory = kanjiReadingMemoryRef.current[r.kanji];
+
+      if (!memory) return r;
+
+      return {
+        ...r,
+        reading_type: r.reading_type || memory.reading_type,
+        base_reading: r.base_reading || memory.base,
+        realized_reading: r.realized_reading || memory.realized,
+      };
+    });
+
     setEditingKanjiRows((prev) => ({
       ...prev,
-      [word.id]: rows,
+      [word.id]: enrichedRows,
     }));
 
     setOpenKanjiWordId(word.id);
   }
 
   function updateKanjiMapRow(
-  vocabId: number,
-  rowId: number,
-  field: keyof Pick<KanjiMapRow, "reading_type" | "base_reading" | "realized_reading">,
-  value: string
-) {
-  setEditingKanjiRows((prev) => ({
-    ...prev,
-    [vocabId]: (prev[vocabId] ?? []).map((row) => {
-      if (row.id !== rowId) return row;
+    vocabId: number,
+    rowId: number,
+    field: keyof Pick<KanjiMapRow, "reading_type" | "base_reading" | "realized_reading">,
+    value: string
+  ) {
+    setEditingKanjiRows((prev) => ({
+      ...prev,
+      [vocabId]: (prev[vocabId] ?? []).map((row) => {
+        if (row.id !== rowId) return row;
 
-      const nextValue = value === "" ? null : value;
+        const nextValue = value === "" ? null : value;
 
-      if (field === "base_reading") {
-        const prevBase = row.base_reading ?? "";
-        const prevRealized = row.realized_reading ?? "";
+        const memory = kanjiReadingMemoryRef.current[row.kanji];
 
-        const shouldSyncRealized =
-          prevRealized.trim() === "" || prevRealized === prevBase;
+        let updatedRow: KanjiMapRow = row;
 
-        return {
-          ...row,
-          base_reading: nextValue,
-          realized_reading: shouldSyncRealized ? nextValue : row.realized_reading,
+        if (field === "reading_type") {
+          updatedRow = {
+            ...row,
+            reading_type: nextValue as "on" | "kun" | "other" | null,
+            base_reading:
+              row.base_reading || memory?.base || null,
+            realized_reading:
+              row.realized_reading || memory?.realized || null,
+          };
+        } else if (field === "base_reading") {
+          const prevBase = row.base_reading ?? "";
+          const prevRealized = row.realized_reading ?? "";
+
+          const shouldSyncRealized =
+            prevRealized.trim() === "" || prevRealized === prevBase;
+
+          updatedRow = {
+            ...row,
+            base_reading: nextValue,
+            realized_reading: shouldSyncRealized ? nextValue : row.realized_reading,
+          };
+        } else {
+          updatedRow = {
+            ...row,
+            realized_reading: nextValue,
+          };
+        }
+
+        kanjiReadingMemoryRef.current[row.kanji] = {
+          reading_type: updatedRow.reading_type,
+          base: updatedRow.base_reading,
+          realized: updatedRow.realized_reading,
         };
-      }
 
-      return {
-        ...row,
-        [field]: nextValue,
-      };
-    }),
-  }));
-}
+        return updatedRow;
+      }),
+    }));
+  }
 
   async function saveReadingSession() {
     if (!row?.id) return;
@@ -1108,6 +1155,9 @@ export default function BookHubPage() {
       alert(`Could not save reading session.\n${error.message || "Unknown error"}`);
       return;
     }
+
+    setTimerSaveMessage("Your session has been saved in the Reading Tab.");
+    setTimeout(() => setTimerSaveMessage(""), 4000);
 
     const existingStartedAt = row.started_at ? row.started_at.slice(0, 10) : null;
 
@@ -1320,6 +1370,32 @@ export default function BookHubPage() {
 
     return () => clearInterval(interval);
   }, [isRunning, startTime]);
+
+  useEffect(() => {
+    const shouldWarn = isRunning || isPaused;
+
+    if (!shouldWarn) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isRunning, isPaused]);
+
+  const confirmLeaveIfTimerActive = () => {
+    if (isRunning || isPaused) {
+      return window.confirm(
+        "Timer is active. If you leave the Book Hub or refresh the page, you may lose your session. Continue?"
+      );
+    }
+    return true;
+  };
 
   const cancelEdits = () => {
     if (!row) return;
@@ -1835,12 +1911,9 @@ export default function BookHubPage() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
-                        saveReadingSession();
-                        setShowTimedSessionForm(false);
-                        setElapsed(0);
-                        setStartTime(null);
+                        await saveReadingSession();
                         setIsPaused(false);
                       }}
                       className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
@@ -1864,10 +1937,25 @@ export default function BookHubPage() {
                 </div>
               ) : null}
 
+              {(isRunning || isPaused) ? (
+                <p className="mt-2 text-xs text-amber-600">
+                  Timer is active. If you leave the Book Hub or refresh the page, you may lose your session.
+                </p>
+              ) : null}
+
+              {timerSaveMessage ? (
+                <p className="mt-2 text-xs text-emerald-600">
+                  {timerSaveMessage}
+                </p>
+              ) : null}
+
               <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
                 <button
                   type="button"
-                  onClick={() => router.push(`/books/${row.id}/weekly-readings`)}
+                  onClick={() => {
+                    if (!confirmLeaveIfTimerActive()) return;
+                    router.push(`/books/${row.id}/weekly-readings`);
+                  }}
                   className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
                 >
                   <div className="text-xs text-blue-700">Prepare</div>
