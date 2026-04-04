@@ -94,6 +94,25 @@ type ChapterSummary = {
   updated_at: string;
 };
 
+type KanjiMapRow = {
+  id: number;
+  vocabulary_cache_id: number;
+  kanji: string;
+  kanji_position: number;
+  reading_type: "on" | "kun" | "other" | null;
+  base_reading: string | null;
+  realized_reading: string | null;
+};
+
+type VocabCacheQueueRow = {
+  id: number;
+  surface: string;
+  reading: string;
+  jlpt: string | null;
+  created_at: string;
+  vocabulary_kanji_map: KanjiMapRow[] | null;
+};
+
 const LEVEL_OPTIONS = ["N5", "N4", "N3", "N2", "N1"] as const;
 
 const DIFFICULTY_OPTIONS = [
@@ -261,6 +280,10 @@ export default function BookHubPage() {
   const [translatorReading, setTranslatorReading] = useState<string>("");
   const [illustratorReading, setIllustratorReading] = useState<string>("");
 
+  const [openKanjiWordId, setOpenKanjiWordId] = useState<number | null>(null);
+  const [editingKanjiRows, setEditingKanjiRows] = useState<Record<number, KanjiMapRow[]>>({});
+  const [savingKanjiWordId, setSavingKanjiWordId] = useState<number | null>(null);
+
   const [linksText, setLinksText] = useState<string>("");
 
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -292,6 +315,9 @@ export default function BookHubPage() {
   const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
   const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
   const [savedChapterIds, setSavedChapterIds] = useState<string[]>([]);
+  const [kanjiMapQueue, setKanjiMapQueue] = useState<VocabCacheQueueRow[]>([]);
+  const [kanjiMapLoading, setKanjiMapLoading] = useState(false);
+  const [kanjiMapError, setKanjiMapError] = useState<string | null>(null);
   const [storyTab, setStoryTab] = useState<"characters" | "plot" | "setting" | "cultural">("characters");
 
   const [sessionStartPage, setSessionStartPage] = useState<string>("");
@@ -525,6 +551,35 @@ export default function BookHubPage() {
     }, 1800);
   }
 
+  async function saveKanjiWord(vocabId: number) {
+    const rows = editingKanjiRows[vocabId] ?? [];
+    if (rows.length === 0) return;
+
+    setSavingKanjiWordId(vocabId);
+
+    for (const row of rows) {
+      const { error } = await supabase
+        .from("vocabulary_kanji_map")
+        .update({
+          reading_type: row.reading_type,
+          base_reading: row.base_reading,
+          realized_reading: row.realized_reading,
+        })
+        .eq("id", row.id);
+
+      if (error) {
+        console.error("Error saving kanji map row:", error);
+        alert(`Could not save kanji row ${row.kanji}.\n${error.message}`);
+        setSavingKanjiWordId(null);
+        return;
+      }
+    }
+
+    await loadKanjiMapQueue();
+    setOpenKanjiWordId(null);
+    setSavingKanjiWordId(null);
+  }
+
   async function loadReadingSessions(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
@@ -677,6 +732,60 @@ export default function BookHubPage() {
     }
 
     setChapterSummaries((data as ChapterSummary[]) ?? []);
+  }
+
+  async function loadKanjiMapQueue() {
+    setKanjiMapLoading(true);
+    setKanjiMapError(null);
+
+    const { data, error } = await supabase
+      .from("vocabulary_cache")
+      .select(`
+      id,
+      surface,
+      reading,
+      jlpt,
+      created_at,
+      vocabulary_kanji_map (
+        id,
+        vocabulary_cache_id,
+        kanji,
+        kanji_position,
+        reading_type,
+        base_reading,
+        realized_reading
+      )
+    `)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error loading kanji map queue:", error);
+      setKanjiMapQueue([]);
+      setKanjiMapError(error.message);
+      setKanjiMapLoading(false);
+      return;
+    }
+
+    const rows = (data ?? []) as VocabCacheQueueRow[];
+
+    const needsWork = rows.filter((word) => {
+      const hasKanji = /[\p{Script=Han}]/u.test(word.surface ?? "");
+      if (!hasKanji) return false;
+
+      const mapRows = word.vocabulary_kanji_map ?? [];
+
+      if (mapRows.length === 0) return true;
+
+      return mapRows.some(
+        (r) =>
+          !r.reading_type ||
+          !r.base_reading ||
+          !r.realized_reading
+      );
+    });
+
+    setKanjiMapQueue(needsWork);
+    setKanjiMapLoading(false);
   }
 
   async function deleteReadingSession(sessionId: string) {
@@ -858,6 +967,94 @@ export default function BookHubPage() {
     setSavingChapterIds((prev) => prev.filter((x) => x !== id));
     setSavedChapterIds((prev) => prev.filter((x) => x !== id));
   }
+
+  async function handleWorkOnKanjiWord(word: VocabCacheQueueRow) {
+    const hasRows = (word.vocabulary_kanji_map ?? []).length > 0;
+
+    if (!hasRows) {
+      const res = await fetch("/api/vocabulary-kanji-map/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ vocabulary_cache_id: word.id }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        console.error("Kanji map generate error:", json);
+        alert(json?.error ?? "Could not prepare this word.");
+        return;
+      }
+
+      await loadKanjiMapQueue();
+    }
+
+    const { data, error } = await supabase
+      .from("vocabulary_kanji_map")
+      .select(`
+      id,
+      vocabulary_cache_id,
+      kanji,
+      kanji_position,
+      reading_type,
+      base_reading,
+      realized_reading
+    `)
+      .eq("vocabulary_cache_id", word.id)
+      .order("kanji_position", { ascending: true });
+
+    if (error) {
+      console.error("Error loading kanji rows:", error);
+      alert("Could not load kanji rows.");
+      return;
+    }
+
+    const rows = (data ?? []) as KanjiMapRow[];
+
+    setEditingKanjiRows((prev) => ({
+      ...prev,
+      [word.id]: rows,
+    }));
+
+    setOpenKanjiWordId(word.id);
+  }
+
+  function updateKanjiMapRow(
+  vocabId: number,
+  rowId: number,
+  field: keyof Pick<KanjiMapRow, "reading_type" | "base_reading" | "realized_reading">,
+  value: string
+) {
+  setEditingKanjiRows((prev) => ({
+    ...prev,
+    [vocabId]: (prev[vocabId] ?? []).map((row) => {
+      if (row.id !== rowId) return row;
+
+      const nextValue = value === "" ? null : value;
+
+      if (field === "base_reading") {
+        const prevBase = row.base_reading ?? "";
+        const prevRealized = row.realized_reading ?? "";
+
+        const shouldSyncRealized =
+          prevRealized.trim() === "" || prevRealized === prevBase;
+
+        return {
+          ...row,
+          base_reading: nextValue,
+          realized_reading: shouldSyncRealized ? nextValue : row.realized_reading,
+        };
+      }
+
+      return {
+        ...row,
+        [field]: nextValue,
+      };
+    }),
+  }));
+}
 
   async function saveReadingSession() {
     if (!row?.id) return;
@@ -1104,6 +1301,7 @@ export default function BookHubPage() {
     await loadReadingSessions(r.id);
     await loadChapterSummaries(r.id);
     await loadCharacters(r.id);
+    await loadKanjiMapQueue();
 
     setLoading(false);
   };
@@ -1989,8 +2187,125 @@ export default function BookHubPage() {
                     >
                       🔔 Notify Kanji
                     </button>
-
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">
+                    Kanji Map Enrichment Queue
+                  </div>
+
+                  {kanjiMapLoading ? (
+                    <div className="text-sm text-stone-500">Loading kanji map queue...</div>
+                  ) : kanjiMapError ? (
+                    <div className="text-sm text-red-600">{kanjiMapError}</div>
+                  ) : kanjiMapQueue.length === 0 ? (
+                    <div className="text-sm text-stone-500">No words currently need kanji-map work.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {kanjiMapQueue.map((word) => {
+                        const hasRows = (word.vocabulary_kanji_map ?? []).length > 0;
+                        const isOpen = openKanjiWordId === word.id;
+                        const editRows = editingKanjiRows[word.id] ?? [];
+
+                        return (
+                          <div
+                            key={word.id}
+                            className="rounded-xl border bg-white p-3"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium text-stone-900">{word.surface}</div>
+                                <div className="text-sm text-stone-500">
+                                  {word.reading} · {word.jlpt ?? "—"}
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleWorkOnKanjiWord(word)}
+                                className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                              >
+                                {hasRows ? "Work on this word" : "Prepare this word"}
+                              </button>
+                            </div>
+
+                            {isOpen ? (
+                              <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                                <div className="mb-3">
+                                  <div className="text-sm font-semibold text-stone-900">{word.surface}</div>
+                                  <div className="text-sm text-stone-500">{word.reading}</div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {editRows.map((row) => (
+                                    <div
+                                      key={row.id}
+                                      className="grid grid-cols-1 gap-2 rounded-lg border bg-white p-3 md:grid-cols-[60px_120px_1fr_1fr]"
+                                    >
+                                      <div className="flex items-center text-lg font-medium text-stone-900">
+                                        {row.kanji}
+                                      </div>
+
+                                      <select
+                                        value={row.reading_type ?? ""}
+                                        onChange={(e) =>
+                                          updateKanjiMapRow(word.id, row.id, "reading_type", e.target.value)
+                                        }
+                                        className="rounded border px-2 py-2 text-sm"
+                                      >
+                                        <option value="">—</option>
+                                        <option value="on">on</option>
+                                        <option value="kun">kun</option>
+                                        <option value="other">other</option>
+                                      </select>
+
+                                      <input
+                                        value={row.base_reading ?? ""}
+                                        onChange={(e) =>
+                                          updateKanjiMapRow(word.id, row.id, "base_reading", e.target.value)
+                                        }
+                                        placeholder="Base reading"
+                                        className="rounded border px-3 py-2 text-sm"
+                                      />
+
+                                      <input
+                                        value={row.realized_reading ?? ""}
+                                        onChange={(e) =>
+                                          updateKanjiMapRow(word.id, row.id, "realized_reading", e.target.value)
+                                        }
+                                        placeholder="Realized reading"
+                                        className="rounded border px-3 py-2 text-sm"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="mt-4 flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => saveKanjiWord(word.id)}
+                                    disabled={savingKanjiWordId === word.id}
+                                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    {savingKanjiWordId === word.id ? "Saving..." : "Save"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenKanjiWordId(null)}
+                                    className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -2188,7 +2503,7 @@ export default function BookHubPage() {
 
                   {canFillBeginningPages ? (
                     <div className="mt-2 text-xs text-stone-500">
-                      Looks like your book starts on page {earliestStartPage}. Fill pages 1–{earliestStartPage! - 1}?
+                      Looks like you started the book on page {earliestStartPage}. Fill pages 1–{earliestStartPage! - 1}?
                     </div>
                   ) : null}
 
@@ -2964,307 +3279,307 @@ export default function BookHubPage() {
                   </div>
                 </div>
 
-                              </div>
+              </div>
             )}
 
-{activeTab === "study" && (
-                  <div className="space-y-6">
+            {activeTab === "study" && (
+              <div className="space-y-6">
 
-                    {/* TOP: Vocab actions */}
-                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                      <div className="mb-3 text-sm font-semibold text-stone-900">Vocab</div>
+                {/* TOP: Vocab actions */}
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Vocab</div>
 
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <button
-                          onClick={() => router.push(`/books/${row.id}/words`)}
-                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                        >
-                          📚 Vocab List
-                        </button>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button
+                      onClick={() => router.push(`/books/${row.id}/words`)}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      📚 Vocab List
+                    </button>
 
-                        <button
-                          onClick={() => router.push(`/vocab/explore?userBookId=${row.id}`)}
-                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                        >
-                          🔎 Explore the Word
-                        </button>
-                      </div>
+                    <button
+                      onClick={() => router.push(`/vocab/explore?userBookId=${row.id}`)}
+                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                    >
+                      🔎 Explore the Word
+                    </button>
+                  </div>
+                </div>
+
+                {/* ADD VOCAB SECTION */}
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Add Vocab</div>
+
+                  {/* SUB TABS */}
+                  <div className="overflow-x-auto">
+                    <div className="flex w-max gap-2 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setVocabTab("readAlong")}
+                        className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "readAlong"
+                          ? "border-stone-900 bg-stone-900 text-white"
+                          : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                          }`}
+                      >
+                        Read Along
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setVocabTab("bulk")}
+                        className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "bulk"
+                          ? "border-stone-900 bg-stone-900 text-white"
+                          : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                          }`}
+                      >
+                        Bulk Add
+                      </button>
                     </div>
+                  </div>
 
-                    {/* ADD VOCAB SECTION */}
-                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                      <div className="mb-3 text-sm font-semibold text-stone-900">Add Vocab</div>
+                  {vocabTab === "readAlong" && (
+                    <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
+                      <div className="text-sm font-medium text-stone-900">Read Along</div>
+                      <p className="mt-1 text-sm text-stone-500">
+                        This will be your real-time vocab input during lessons or single input for members.
+                      </p>
 
-                      {/* SUB TABS */}
-                      <div className="overflow-x-auto">
-                        <div className="flex w-max gap-2 whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => setVocabTab("readAlong")}
-                            className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "readAlong"
-                              ? "border-stone-900 bg-stone-900 text-white"
-                              : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-                              }`}
-                          >
-                            Read Along
-                          </button>
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                        <input
+                          ref={quickWordInputRef}
+                          type="text"
+                          value={quickWord}
+                          onChange={(e) => setQuickWord(e.target.value)}
+                          placeholder="Type a word..."
+                          className="w-full rounded border px-3 py-2 text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              pullQuickWord();
+                            }
+                          }}
+                        />
 
-                          <button
-                            type="button"
-                            onClick={() => setVocabTab("bulk")}
-                            className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "bulk"
-                              ? "border-stone-900 bg-stone-900 text-white"
-                              : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-                              }`}
-                          >
-                            Bulk Add
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={pullQuickWord}
+                          disabled={quickLoading || !quickWord.trim()}
+                          className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black disabled:opacity-50"
+                        >
+                          {quickLoading ? "Pulling..." : "Pull"}
+                        </button>
                       </div>
 
-                      {vocabTab === "readAlong" && (
-                        <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-                          <div className="text-sm font-medium text-stone-900">Read Along</div>
-                          <p className="mt-1 text-sm text-stone-500">
-                            This will be your real-time vocab input during lessons or single input for members.
-                          </p>
+                      {quickError ? (
+                        <div className="mt-3 text-sm text-red-600">{quickError}</div>
+                      ) : null}
 
-                          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                            <input
-                              ref={quickWordInputRef}
-                              type="text"
-                              value={quickWord}
-                              onChange={(e) => setQuickWord(e.target.value)}
-                              placeholder="Type a word..."
-                              className="w-full rounded border px-3 py-2 text-sm"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  pullQuickWord();
+                      {quickPreview && (
+                        <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div>
+                              <div className="mb-1 text-xs text-stone-500">Word</div>
+                              <input
+                                value={quickPreview.surface}
+                                onChange={(e) =>
+                                  setQuickPreview((prev) =>
+                                    prev ? { ...prev, surface: e.target.value } : prev
+                                  )
                                 }
-                              }}
-                            />
+                                className="w-full rounded border px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="mb-1 text-xs text-stone-500">Reading</div>
+                              <input
+                                value={quickPreview.reading}
+                                onChange={(e) =>
+                                  setQuickPreview((prev) =>
+                                    prev ? { ...prev, reading: e.target.value } : prev
+                                  )
+                                }
+                                className="w-full rounded border px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <div className="mb-1 text-xs text-stone-500">Definition</div>
+                              <div className="flex flex-col gap-3 md:flex-row">
+                                <select
+                                  value={quickPreview.isCustomMeaning ? "other" : String(quickPreview.selectedMeaningIndex)}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+
+                                    setQuickPreview((prev) => {
+                                      if (!prev) return prev;
+
+                                      if (value === "other") {
+                                        return {
+                                          ...prev,
+                                          isCustomMeaning: true,
+                                          meaning: "",
+                                        };
+                                      }
+
+                                      const index = Number(value);
+                                      return {
+                                        ...prev,
+                                        selectedMeaningIndex: index,
+                                        isCustomMeaning: false,
+                                        meaning: prev.meanings[index] ?? "",
+                                      };
+                                    });
+                                  }}
+                                  className="w-full rounded border bg-white px-3 py-2 text-sm md:w-56"
+                                >
+                                  {quickPreview.meanings.map((m, i) => (
+                                    <option key={i} value={i}>
+                                      Definition {i + 1}
+                                    </option>
+                                  ))}
+                                  <option value="other">Other</option>
+                                </select>
+
+                                <input
+                                  value={quickPreview.meaning}
+                                  onChange={(e) =>
+                                    setQuickPreview((prev) =>
+                                      prev ? { ...prev, meaning: e.target.value } : prev
+                                    )
+                                  }
+                                  readOnly={!quickPreview.isCustomMeaning}
+                                  placeholder="Meaning"
+                                  className={`w-full rounded border px-3 py-2 text-sm ${quickPreview.isCustomMeaning
+                                    ? "bg-white"
+                                    : "bg-stone-100 text-stone-700"
+                                    }`}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="mb-1 text-xs text-stone-500">Page</div>
+                              <input
+                                type="number"
+                                min={1}
+                                value={quickPreview.page}
+                                onChange={(e) =>
+                                  setQuickPreview((prev) =>
+                                    prev ? { ...prev, page: e.target.value } : prev
+                                  )
+                                }
+                                className="w-full rounded border px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="mb-1 text-xs text-stone-500">Chapter #</div>
+                              <input
+                                type="number"
+                                min={1}
+                                value={quickPreview.chapterNumber}
+                                onChange={(e) =>
+                                  setQuickPreview((prev) =>
+                                    prev ? { ...prev, chapterNumber: e.target.value } : prev
+                                  )
+                                }
+                                className="w-full rounded border px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <div className="mb-1 text-xs text-stone-500">Chapter Name</div>
+                              <input
+                                value={quickPreview.chapterName}
+                                onChange={(e) =>
+                                  setQuickPreview((prev) =>
+                                    prev ? { ...prev, chapterName: e.target.value } : prev
+                                  )
+                                }
+                                className="w-full rounded border px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={saveQuickWord}
+                              className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                            >
+                              Save Word
+                            </button>
 
                             <button
                               type="button"
-                              onClick={pullQuickWord}
-                              disabled={quickLoading || !quickWord.trim()}
-                              className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black disabled:opacity-50"
+                              onClick={() => setQuickPreview(null)}
+                              className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
                             >
-                              {quickLoading ? "Pulling..." : "Pull"}
+                              Cancel
                             </button>
                           </div>
+                        </div>
+                      )}
 
-                          {quickError ? (
-                            <div className="mt-3 text-sm text-red-600">{quickError}</div>
-                          ) : null}
+                      <div className="mt-6">
+                        <div className="text-sm font-medium text-stone-900">
+                          Words saved into Vocab List this session
+                        </div>
+                        <p className="mt-1 text-xs text-stone-400">
+                          These words have already been saved to your Vocab List.
+                        </p>
 
-                          {quickPreview && (
-                            <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                              <div className="grid gap-3 md:grid-cols-2">
-                                <div>
-                                  <div className="mb-1 text-xs text-stone-500">Word</div>
-                                  <input
-                                    value={quickPreview.surface}
-                                    onChange={(e) =>
-                                      setQuickPreview((prev) =>
-                                        prev ? { ...prev, surface: e.target.value } : prev
-                                      )
-                                    }
-                                    className="w-full rounded border px-3 py-2 text-sm"
-                                  />
+                        {quickSessionWords.length === 0 ? (
+                          <div className="mt-2 text-sm text-stone-500">No words saved yet.</div>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            {quickSessionWords.map((item) => (
+                              <div
+                                key={item.id}
+                                className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
+                              >
+                                <div className="font-medium text-stone-900">
+                                  {item.surface}
+                                  {item.reading ? (
+                                    <span className="ml-2 text-stone-500">({item.reading})</span>
+                                  ) : null}
                                 </div>
-
-                                <div>
-                                  <div className="mb-1 text-xs text-stone-500">Reading</div>
-                                  <input
-                                    value={quickPreview.reading}
-                                    onChange={(e) =>
-                                      setQuickPreview((prev) =>
-                                        prev ? { ...prev, reading: e.target.value } : prev
-                                      )
-                                    }
-                                    className="w-full rounded border px-3 py-2 text-sm"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <div className="mb-1 text-xs text-stone-500">Definition</div>
-                                  <div className="flex flex-col gap-3 md:flex-row">
-                                    <select
-                                      value={quickPreview.isCustomMeaning ? "other" : String(quickPreview.selectedMeaningIndex)}
-                                      onChange={(e) => {
-                                        const value = e.target.value;
-
-                                        setQuickPreview((prev) => {
-                                          if (!prev) return prev;
-
-                                          if (value === "other") {
-                                            return {
-                                              ...prev,
-                                              isCustomMeaning: true,
-                                              meaning: "",
-                                            };
-                                          }
-
-                                          const index = Number(value);
-                                          return {
-                                            ...prev,
-                                            selectedMeaningIndex: index,
-                                            isCustomMeaning: false,
-                                            meaning: prev.meanings[index] ?? "",
-                                          };
-                                        });
-                                      }}
-                                      className="w-full rounded border bg-white px-3 py-2 text-sm md:w-56"
-                                    >
-                                      {quickPreview.meanings.map((m, i) => (
-                                        <option key={i} value={i}>
-                                          Definition {i + 1}
-                                        </option>
-                                      ))}
-                                      <option value="other">Other</option>
-                                    </select>
-
-                                    <input
-                                      value={quickPreview.meaning}
-                                      onChange={(e) =>
-                                        setQuickPreview((prev) =>
-                                          prev ? { ...prev, meaning: e.target.value } : prev
-                                        )
-                                      }
-                                      readOnly={!quickPreview.isCustomMeaning}
-                                      placeholder="Meaning"
-                                      className={`w-full rounded border px-3 py-2 text-sm ${quickPreview.isCustomMeaning
-                                        ? "bg-white"
-                                        : "bg-stone-100 text-stone-700"
-                                        }`}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <div className="mb-1 text-xs text-stone-500">Page</div>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    value={quickPreview.page}
-                                    onChange={(e) =>
-                                      setQuickPreview((prev) =>
-                                        prev ? { ...prev, page: e.target.value } : prev
-                                      )
-                                    }
-                                    className="w-full rounded border px-3 py-2 text-sm"
-                                  />
-                                </div>
-
-                                <div>
-                                  <div className="mb-1 text-xs text-stone-500">Chapter #</div>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    value={quickPreview.chapterNumber}
-                                    onChange={(e) =>
-                                      setQuickPreview((prev) =>
-                                        prev ? { ...prev, chapterNumber: e.target.value } : prev
-                                      )
-                                    }
-                                    className="w-full rounded border px-3 py-2 text-sm"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <div className="mb-1 text-xs text-stone-500">Chapter Name</div>
-                                  <input
-                                    value={quickPreview.chapterName}
-                                    onChange={(e) =>
-                                      setQuickPreview((prev) =>
-                                        prev ? { ...prev, chapterName: e.target.value } : prev
-                                      )
-                                    }
-                                    className="w-full rounded border px-3 py-2 text-sm"
-                                  />
+                                <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                                <div className="mt-1 text-xs text-stone-500">
+                                  Page {item.page || "—"}
+                                  {item.chapterNumber ? ` · Ch ${item.chapterNumber}` : ""}
+                                  {item.chapterName ? ` · ${item.chapterName}` : ""}
                                 </div>
                               </div>
-
-                              <div className="mt-4 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={saveQuickWord}
-                                  className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                                >
-                                  Save Word
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setQuickPreview(null)}
-                                  className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="mt-6">
-                            <div className="text-sm font-medium text-stone-900">
-                              Words saved into Vocab List this session
-                            </div>
-                            <p className="mt-1 text-xs text-stone-400">
-                              These words have already been saved to your Vocab List.
-                            </p>
-
-                            {quickSessionWords.length === 0 ? (
-                              <div className="mt-2 text-sm text-stone-500">No words saved yet.</div>
-                            ) : (
-                              <div className="mt-3 space-y-2">
-                                {quickSessionWords.map((item) => (
-                                  <div
-                                    key={item.id}
-                                    className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
-                                  >
-                                    <div className="font-medium text-stone-900">
-                                      {item.surface}
-                                      {item.reading ? (
-                                        <span className="ml-2 text-stone-500">({item.reading})</span>
-                                      ) : null}
-                                    </div>
-                                    <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                                    <div className="mt-1 text-xs text-stone-500">
-                                      Page {item.page || "—"}
-                                      {item.chapterNumber ? ` · Ch ${item.chapterNumber}` : ""}
-                                      {item.chapterName ? ` · ${item.chapterName}` : ""}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            ))}
                           </div>
-                        </div>
-                      )}
-
-                      {/* BULK ADD */}
-                      {vocabTab === "bulk" && (
-                        <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-                          <div className="text-sm font-medium text-stone-900">Bulk Add</div>
-                          <p className="mt-1 text-sm text-stone-500">
-                            Use the existing bulk input tool.
-                          </p>
-
-                          <button
-                            onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
-                            className="mt-4 rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                          >
-                            Open Bulk Add
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
+                  )}
 
-                  </div>
-                )}
-            </div>
+                  {/* BULK ADD */}
+                  {vocabTab === "bulk" && (
+                    <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
+                      <div className="text-sm font-medium text-stone-900">Bulk Add</div>
+                      <p className="mt-1 text-sm text-stone-500">
+                        Use the existing bulk input tool.
+                      </p>
+
+                      <button
+                        onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
+                        className="mt-4 rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                      >
+                        Open Bulk Add
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </main>

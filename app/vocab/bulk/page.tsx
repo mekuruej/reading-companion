@@ -115,6 +115,10 @@ export default function BulkVocabPage() {
   const [bulkChapterNumber, setBulkChapterNumber] = useState("");
   const [bulkChapterName, setBulkChapterName] = useState("");
 
+  const [bulkPageList, setBulkPageList] = useState("");
+  const [bulkChapterNumberList, setBulkChapterNumberList] = useState("");
+  const [bulkChapterNameList, setBulkChapterNameList] = useState("");
+
   const [rawInput, setRawInput] = useState("");
   const [items, setItems] = useState<BulkItem[]>([]);
 
@@ -146,7 +150,7 @@ export default function BulkVocabPage() {
         const { number, name } = JSON.parse(saved);
         setBulkChapterNumber(number || "");
         setBulkChapterName(name || "");
-      } catch { }
+      } catch {}
     }
 
     (async () => {
@@ -264,6 +268,51 @@ export default function BulkVocabPage() {
     );
   }
 
+  function parseColumnLines(raw: string): string[] {
+    return raw
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+  }
+
+  function applyBulkColumnList(
+    field: "page" | "chapterNumber" | "chapterName",
+    raw: string
+  ) {
+    const lines = parseColumnLines(raw);
+
+    if (lines.length === 0) {
+      setMessage("Paste at least one line first.");
+      return;
+    }
+
+    let changed = 0;
+
+    setItems((prev) =>
+      prev.map((item, index) => {
+        const nextValue = lines[index];
+        if (nextValue == null) return item;
+
+        changed += 1;
+        return {
+          ...item,
+          [field]: nextValue,
+        };
+      })
+    );
+
+    const label =
+      field === "page"
+        ? "page number"
+        : field === "chapterNumber"
+          ? "chapter number"
+          : "chapter name";
+
+    setMessage(
+      `✅ Applied pasted ${label} list to ${changed} row${changed === 1 ? "" : "s"}.`
+    );
+  }
+
   function validateDefinitions() {
     const missing = items.filter((i) => !i.reading.trim() || !i.meaning.trim());
     return missing.length;
@@ -274,6 +323,9 @@ export default function BulkVocabPage() {
     setItems([]);
     setMessage("");
     setStep("paste");
+    setBulkPageList("");
+    setBulkChapterNumberList("");
+    setBulkChapterNameList("");
   }
 
   function goToVocabList() {
@@ -329,7 +381,7 @@ export default function BulkVocabPage() {
               meaning = meaningChoices[0] || "";
             }
           }
-        } catch { }
+        } catch {}
 
         const kanjiMeta = await getStrokeData(w);
 
@@ -368,8 +420,7 @@ export default function BulkVocabPage() {
 
     if (missingCount > 0) {
       const confirmed = window.confirm(
-        `${missingCount} word${missingCount === 1 ? "" : "s"} ${missingCount === 1 ? "is" : "are"
-        } missing a reading or definition.\n\nDo you want to continue anyway?`
+        `${missingCount} word${missingCount === 1 ? "" : "s"} ${missingCount === 1 ? "is" : "are"} missing a reading or definition.\n\nDo you want to continue anyway?`
       );
       if (!confirmed) return;
     }
@@ -390,8 +441,7 @@ export default function BulkVocabPage() {
 
     if (incompleteItems.length > 0) {
       const confirmed = window.confirm(
-        `${incompleteItems.length} word${incompleteItems.length === 1 ? "" : "s"
-        } ${incompleteItems.length === 1 ? "is" : "are"} missing a reading or definition.\n\nDo you want to save anyway?`
+        `${incompleteItems.length} word${incompleteItems.length === 1 ? "" : "s"} ${incompleteItems.length === 1 ? "is" : "are"} missing a reading or definition.\n\nDo you want to save anyway?`
       );
       if (!confirmed) return;
     }
@@ -488,11 +538,12 @@ export default function BulkVocabPage() {
     } catch (err: any) {
       console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
       setMessage(
-        `❌ Failed saving: ${err?.message ||
-        err?.error_description ||
-        err?.details ||
-        JSON.stringify(err) ||
-        "unknown error"
+        `❌ Failed saving: ${
+          err?.message ||
+          err?.error_description ||
+          err?.details ||
+          JSON.stringify(err) ||
+          "unknown error"
         }`
       );
     } finally {
@@ -642,10 +693,11 @@ export default function BulkVocabPage() {
                           value={i.meaning}
                           onChange={(e) => updateItem(idx, "meaning", e.target.value)}
                           readOnly={i.meaningChoiceIndex != null}
-                          className={`w-full rounded border p-2 text-sm ${i.meaningChoiceIndex == null
-                            ? "bg-white"
-                            : "bg-slate-100 text-slate-700"
-                            }`}
+                          className={`w-full rounded border p-2 text-sm ${
+                            i.meaningChoiceIndex == null
+                              ? "bg-white"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
                           placeholder={
                             i.meaningChoiceIndex == null
                               ? "Type your custom meaning"
@@ -654,8 +706,8 @@ export default function BulkVocabPage() {
                         />
                       </div>
                       <p className="mt-1 text-xs text-stone-500">
-                          Choose Other to write your own definition.
-                        </p>
+                        Choose Other to write your own definition.
+                      </p>
                     </div>
                   </div>
                 </li>
@@ -760,6 +812,75 @@ export default function BulkVocabPage() {
                   >
                     Apply to all
                   </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-1 text-lg font-medium">Paste Row-by-Row Columns</div>
+              <p className="mb-3 text-sm text-gray-500">
+                Paste one value per line. Line 1 matches word 1, line 2 matches word 2, and so on.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <div className="mb-1 text-sm font-medium text-gray-700">Page numbers</div>
+                  <textarea
+                    value={bulkPageList}
+                    onChange={(e) => setBulkPageList(e.target.value)}
+                    rows={5}
+                    placeholder={`45\n46\n46\n47`}
+                    className="w-full rounded border p-3 font-mono text-sm"
+                  />
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => applyBulkColumnList("page", bulkPageList)}
+                      className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                    >
+                      Apply page list
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1 text-sm font-medium text-gray-700">Chapter numbers</div>
+                  <textarea
+                    value={bulkChapterNumberList}
+                    onChange={(e) => setBulkChapterNumberList(e.target.value)}
+                    rows={5}
+                    placeholder={`3\n3\n3\n4`}
+                    className="w-full rounded border p-3 font-mono text-sm"
+                  />
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => applyBulkColumnList("chapterNumber", bulkChapterNumberList)}
+                      className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                    >
+                      Apply chapter # list
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1 text-sm font-medium text-gray-700">Chapter names</div>
+                  <textarea
+                    value={bulkChapterNameList}
+                    onChange={(e) => setBulkChapterNameList(e.target.value)}
+                    rows={5}
+                    placeholder={`Festival\nFestival\nFestival\nAftermath`}
+                    className="w-full rounded border p-3 font-mono text-sm"
+                  />
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => applyBulkColumnList("chapterName", bulkChapterNameList)}
+                      className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                    >
+                      Apply chapter name list
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
