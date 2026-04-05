@@ -240,7 +240,7 @@ function UserBar({
       </button>
     </div>
   ) : (
-    <div className="mb-4 flex items-center justify-end text-sm text-gray-700">
+    <div className="mr-3 flex justify-end sm:mr-6">
       <button
         onClick={handleLogout}
         className="rounded-md border px-2 py-1 hover:bg-gray-100"
@@ -1316,324 +1316,192 @@ export default function BooksPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-screen-xl">
-        <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 flex-1">
-            <h1 className="mb-2 text-2xl font-semibold">
-              📚 {viewingLabel === "Me" ? "My Library" : `${viewingLabel}'s Library`}
-            </h1>
-
-            <p className="text-sm text-gray-600">
-              All study tools live inside each book. Click a cover to open the Book Hub.
-            </p>
+        <div className="mb-5 flex items-center justify-between gap-4 pr-6 sm:pr-10">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-semibold sm:text-3xl">My</span>
+            <img
+              src="/mekuru-logo.png"
+              alt="Mekuru"
+              className="h-12 w-12 object-contain sm:h-20 sm:w-20"
+            />
+            <span className="text-2xl font-semibold sm:text-3xl">Library</span>
           </div>
 
-          <div className="w-full xl:max-w-[640px]">
-            <div className="rounded-3xl border border-slate-400/70 bg-slate-300/45 p-4 shadow-sm">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900 sm:text-base">
-                    Monthly Snapshot
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-700">
-                    Reading and study activity across all books
-                  </p>
-                </div>
+          <UserBar isTeacher={isTeacher} variant="logoutOnly" />
+        </div>
 
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
-                >
-                  {monthOptions.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                  <div className="text-[11px] text-slate-600">Pages</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                  <div className="text-[11px] text-slate-600">Days</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
-                  </div>
-                  <div className="mt-1 text-[10px] text-slate-500">Unique dates</div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                  <div className="text-[11px] text-slate-600">Words Seen</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {monthlyStatsLoading ? "…" : monthlyStats.wordsSeen}
-                  </div>
-                  <div className="mt-1 text-[10px] text-slate-500">Saved this month</div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                  <div className="text-[11px] text-slate-600">Time</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {monthlyStatsLoading ? "…" : formatMinutesAsReadableTime(monthlyStats.timeReadMinutes)}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                  <div className="text-[11px] text-slate-600">Avg min/page</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {monthlyStatsLoading ? "…" : formatAvgMinPerPage(monthlyStats.avgMinPerPage)}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                  <div className="text-[11px] text-slate-600">Avg pages/day</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {monthlyStatsLoading ? "…" : avgPagesPerDay != null ? avgPagesPerDay.toFixed(1) : "—"}
-                  </div>
-                </div>
-              </div>
-
-              {!monthlyStatsLoading ? (
-                <p className="mt-3 text-xs text-slate-700">
-                  You read across{" "}
-                  <span className="font-semibold">{monthlyStats.booksTouched}</span>{" "}
-                  {monthlyStats.booksTouched === 1 ? "book" : "books"} this month.
+        <div className="mb-6 w-full">
+          <div className="ml-14 max-w-[720px] rounded-3xl border border-slate-400/70 bg-slate-300/45 p-4 shadow-sm sm:ml-20">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 sm:text-base">
+                  Monthly Snapshot
+                </h2>
+                <p className="mt-1 text-xs text-slate-700">
+                  Reading and study activity across all books
                 </p>
-              ) : null}
-            </div>
-          </div>
+              </div>
 
-          <div className="xl:pt-1">
-            <UserBar isTeacher={isTeacher} variant="logoutOnly" />
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+              >
+                {monthOptions.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Pages</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Days</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-500">Unique dates</div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Words Seen</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading ? "…" : monthlyStats.wordsSeen}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-500">Saved this month</div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Time</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading
+                    ? "…"
+                    : formatMinutesAsReadableTime(monthlyStats.timeReadMinutes)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Avg min/page</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading ? "…" : formatAvgMinPerPage(monthlyStats.avgMinPerPage)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Avg pages/day</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading
+                    ? "…"
+                    : avgPagesPerDay != null
+                      ? avgPagesPerDay.toFixed(1)
+                      : "—"}
+                </div>
+              </div>
+            </div>
+
+            {!monthlyStatsLoading ? (
+              <p className="mt-3 text-xs text-slate-700">
+                You read across <span className="font-semibold">{monthlyStats.booksTouched}</span>{" "}
+                {monthlyStats.booksTouched === 1 ? "book" : "books"} this month.
+              </p>
+            ) : null}
           </div>
         </div>
 
         <UserBar isTeacher={isTeacher} variant="labelOnly" />
 
-        {isTeacher && isSuperTeacher && bookRequests.length > 0 ? (
-          <div className="mb-6 mt-5 max-w-2xl rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm">
-            <div className="text-sm font-semibold text-slate-800">📚 NEW BOOK REQUESTS</div>
-
-            <div className="mt-2 flex flex-col gap-2">
-              {bookRequests.map((req) => (
-                <div key={req.id} className="flex items-start justify-between gap-3">
-                  <div className="text-sm leading-6 text-slate-700">
-                    New book request from{" "}
-                    <span className="font-medium">
-                      {req.profiles?.display_name || "User"}
-                    </span>
-                    : <span className="font-medium">{req.title}</span>
-                    {req.author ? <span className="text-slate-500"> by {req.author}</span> : null}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const { error } = await supabase
-                        .from("book_requests")
-                        .update({ status: "done" })
-                        .eq("id", req.id);
-
-                      if (error) {
-                        logSbError("Error marking book request done:", error);
-                        return;
-                      }
-
-                      setBookRequests((prev) => prev.filter((r) => r.id !== req.id));
-                    }}
-                    className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                  >
-                    Done
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {isTeacher && viewingUserId === meId && teacherPrepAlerts.length > 0 ? (
-          <div className="mb-6 mt-5 max-w-2xl rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm">
-            <div className="text-sm font-semibold text-slate-800">📚 TEACHER REMINDERS</div>
-
-            <div className="mt-2 flex flex-col gap-2">
-              {teacherPrepAlerts.map((item) => (
-                <div key={item.studentId} className="flex items-start justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (item.studentUsername) {
-                        router.push(`/users/${item.studentUsername}/books`);
-                      } else {
-                        setViewingUserId(item.studentId);
-                      }
-                    }}
-                    className="text-left text-sm leading-6 text-slate-700 underline underline-offset-2 hover:text-slate-900"
-                  >
-                    {item.message}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const { error } = await supabase
-                        .from("teacher_alert_completions")
-                        .upsert(
-                          {
-                            teacher_id: meId,
-                            student_id: item.studentId,
-                            alert_key: item.alertKey,
-                          },
-                          { onConflict: "teacher_id,student_id,alert_key" }
-                        );
-
-                      if (error) {
-                        logSbError("Error saving teacher alert completion:", error);
-                        return;
-                      }
-
-                      setTeacherPrepAlerts((prev) =>
-                        prev.filter(
-                          (a) =>
-                            !(
-                              a.studentId === item.studentId &&
-                              a.alertKey === item.alertKey
-                            )
-                        )
-                      );
-                    }}
-                    className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                  >
-                    Done
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {alertBox ? (
-          <div className="mb-6 mt-5 max-w-2xl rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4 shadow-sm">
-            <div className="text-sm font-semibold text-slate-800">{alertBox.title}</div>
-            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">
-              {alertBox.message}
-            </p>
-          </div>
-        ) : null}
-
-        {hasAnyNotifyBanner ? (
-          <div className="mb-6 mt-5 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm">
-            <div className="text-sm font-semibold text-amber-900">
-              ✨ New study material is available
-            </div>
-            <p className="mt-2 text-sm leading-6 text-amber-800">
-              New vocabulary and/or reading has been added.
-            </p>
-          </div>
-        ) : null}
-
-        {isTeacher ? (
-          <div className="mb-4 flex flex-col gap-2">
-            <div className="text-sm text-gray-700">
-              Viewing: <span className="font-medium">{viewingLabel}</span>
+        <div className="mb-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
+              <button
+                onClick={() => setViewMode("cover")}
+                className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
+                  }`}
+              >
+                Cover
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
+                  }`}
+              >
+                List
+              </button>
             </div>
 
-            <select
-              value={viewingUserId || meId}
-              onChange={(e) => {
-                const nextUserId = e.target.value;
-
-                if (nextUserId === meId) {
-                  router.push(`/users/${myUsername}/books`);
-                  return;
+            {viewMode === "list" && (
+              <select
+                value={sortMode}
+                onChange={(e) =>
+                  setSortMode(e.target.value as "title" | "last_read" | "pace" | "lookups")
                 }
-
-                const selectedUser = students.find((s) => s.id === nextUserId);
-
-                if (selectedUser?.username) {
-                  router.push(`/users/${selectedUser.username}/books`);
-                } else {
-                  setViewingUserId(nextUserId);
-                }
-              }}
-              className="w-full rounded border bg-white p-2"
-              disabled={!meId}
-            >
-              <option value={meId}>Me</option>
-
-              {students.some((s) => (s.role === "member" || s.role === "student") && s.id !== meId) ? (
-                <optgroup label="Students">
-                  {students
-                    .filter((s) => (s.role === "member" || s.role === "student") && s.id !== meId)
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.display_name}
-                        {s.level ? ` (${s.level})` : ""}
-                      </option>
-                    ))}
-                </optgroup>
-              ) : null}
-
-              {students.some((s) => s.role === "teacher" && s.id !== meId) ? (
-                <optgroup label="Teachers">
-                  {students
-                    .filter((s) => s.role === "teacher" && s.id !== meId)
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.display_name}
-                      </option>
-                    ))}
-                </optgroup>
-              ) : null}
-            </select>
-          </div>
-        ) : null}
-
-        {message ? (
-          <p
-            className={`mb-4 text-sm ${messageType === "error" ? "text-red-600" : "text-green-700"}`}
-          >
-            {message}
-          </p>
-        ) : null}
-
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
-            <button
-              onClick={() => setViewMode("cover")}
-              className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
-                }`}
-            >
-              Cover
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
-                }`}
-            >
-              List
-            </button>
+                className="rounded-lg border bg-white px-3 py-1 text-sm text-stone-700"
+              >
+                <option value="title">Title</option>
+                <option value="last_read">Recently Finished</option>
+                <option value="pace">Avg Min/Page</option>
+                <option value="lookups">Saved Vocab</option>
+              </select>
+            )}
           </div>
 
-          {viewMode === "list" && (
-            <select
-              value={sortMode}
-              onChange={(e) =>
-                setSortMode(e.target.value as "title" | "last_read" | "pace" | "lookups")
-              }
-              className="rounded-lg border bg-white px-3 py-1 text-sm text-stone-700"
-            >
-              <option value="title">Title</option>
-              <option value="last_read">Recently Finished</option>
-              <option value="pace">Avg Min/Page</option>
-              <option value="lookups">Saved Vocab</option>
-            </select>
-          )}
+          {isTeacher ? (
+            <div className="mb-4 max-w-md space-y-2">
+              <div className="text-sm text-gray-700">
+                Viewing: <span className="font-medium">{viewingLabel}</span>
+              </div>
+
+              <select
+                value={viewingUserId || meId}
+                onChange={(e) => {
+                  const nextUserId = e.target.value;
+
+                  if (nextUserId === meId) {
+                    router.push(`/users/${myUsername}/books`);
+                    return;
+                  }
+
+                  const selectedUser = students.find((s) => s.id === nextUserId);
+
+                  if (selectedUser?.username) {
+                    router.push(`/users/${selectedUser.username}/books`);
+                  } else {
+                    setViewingUserId(nextUserId);
+                  }
+                }}
+                className="w-full rounded-lg border bg-white p-2"
+                disabled={!meId}
+              >
+                <option value={meId}>Me</option>
+
+                {students.some((s) => s.id !== meId) ? (
+                  <optgroup label="Users">
+                    {students
+                      .filter((s) => s.id !== meId)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.display_name}
+                          {s.level ? ` (${s.level})` : ""}
+                        </option>
+                      ))}
+                  </optgroup>
+                ) : null}
+              </select>
+            </div>
+          ) : null}
         </div>
+
+        <p className="mb-6 text-sm text-gray-600">
+          All study tools live inside each book. Click a cover to open its Book Hub.
+        </p>
 
         {viewMode === "cover" ? (
           <>
@@ -1845,6 +1713,6 @@ export default function BooksPage() {
           </>
         )}
       </div>
-    </main>
+    </main >
   );
 }

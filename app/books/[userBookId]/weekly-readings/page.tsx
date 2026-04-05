@@ -5,32 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-type ReadingSetRow = {
-  id: string;
-  user_book_id: string;
-  status: "active" | "prepared";
-  activated_at: string | null;
-};
-
-type ReadingCardRow = {
-  id: string;
-  set_id: string;
-  sort_order: number;
-  source_word: string;
-  kanji: string;
-  reading: string;
-  reading_type: "onyomi" | "kunyomi" | "other" | null;
-  created_at: string;
-  stroke_count: number | null;
-  radical: string | null;
-  radical_name: string | null;
-};
-
 type UserBookWordRow = {
+  id: string;
   surface: string;
   reading: string | null;
   meaning: string | null;
   created_at: string;
+  hidden: boolean | null;
+  vocabulary_cache_id: number | null;
 };
 
 type QuizCard = {
@@ -179,78 +161,86 @@ export default function WeeklyReadingsPage() {
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? null);
 
-        const { data: activeSet, error: setErr } = await supabase
-          .from("user_book_weekly_reading_sets")
-          .select("id,user_book_id,status,activated_at")
-          .eq("user_book_id", userBookId)
-          .eq("status", "active")
-          .maybeSingle<ReadingSetRow>();
-
-        if (setErr) throw setErr;
-
-        if (!activeSet) {
-          setBaseCards([]);
-          setDeck([]);
-          setLoading(false);
-          return;
-        }
-
         const { data: rows, error: cardsErr } = await supabase
-          .from("user_book_weekly_reading_cards")
-          .select(
-            "id, set_id, sort_order, source_word, kanji, reading, reading_type, created_at, stroke_count, radical, radical_name"
-          )
-          .eq("set_id", activeSet.id)
-          .order("sort_order", { ascending: true })
+          .from("user_book_words")
+          .select("id, surface, reading, meaning, created_at, hidden, vocabulary_cache_id")
+          .eq("user_book_id", userBookId)
+          .not("reading", "is", null)
+          .eq("hidden", false)
           .order("created_at", { ascending: true })
-          .returns<ReadingCardRow[]>();
+          .returns<UserBookWordRow[]>();
+
+        const vocabularyCacheIds = Array.from(
+          new Set(
+            (rows ?? [])
+              .map((r) => r.vocabulary_cache_id)
+              .filter((id): id is number => id != null)
+          )
+        );
+
+        const { data: kanjiMapRows, error: kanjiMapErr } = await supabase
+          .from("vocabulary_kanji_map")
+          .select(
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, created_at"
+          )
+          .in("vocabulary_cache_id", vocabularyCacheIds)
+          .order("created_at", { ascending: false })
+          .limit(100);
+
+        if (kanjiMapErr) throw kanjiMapErr;
+
+        const kanjiMapByCacheId = new Map<number, any[]>();
+
+        for (const row of kanjiMapRows ?? []) {
+          const bucket = kanjiMapByCacheId.get(row.vocabulary_cache_id) ?? [];
+          bucket.push(row);
+          kanjiMapByCacheId.set(row.vocabulary_cache_id, bucket);
+        }
 
         if (cardsErr) throw cardsErr;
 
         const sourceWords = Array.from(
-          new Set((rows ?? []).map((r) => r.source_word?.trim()).filter(Boolean))
+          new Set((rows ?? []).map((r) => r.surface?.trim()).filter(Boolean))
         ) as string[];
 
         const sourceWordMap = new Map<string, { meaning: string | null; reading: string | null }>();
 
-        if (sourceWords.length > 0) {
-          const { data: wordRows, error: wordErr } = await supabase
-            .from("user_book_words")
-            .select("surface,reading,meaning,created_at")
-            .eq("user_book_id", userBookId)
-            .in("surface", sourceWords)
-            .order("created_at", { ascending: true })
-            .returns<UserBookWordRow[]>();
+        const core: QuizCard[] = (rows ?? []).flatMap((r) => {
+          const surface = r.surface?.trim() ?? "";
+          const fallbackReading = r.reading?.trim() ?? "";
 
-          if (wordErr) throw wordErr;
-
-          for (const row of wordRows ?? []) {
-            const key = normalizeWord(row.surface);
-            if (!sourceWordMap.has(key)) {
-              sourceWordMap.set(key, {
-                meaning: row.meaning ?? null,
-                reading: row.reading ?? null,
-              });
-            }
+          if (surface.length === 0 || fallbackReading.length === 0) {
+            return [];
           }
-        }
 
-        const core: QuizCard[] = (rows ?? [])
-          .filter((r) => r.kanji?.trim() && r.reading?.trim())
-          .map((r) => ({
-            key: r.id,
-            kanji: r.kanji.trim(),
-            reading: r.reading.trim(),
-            readingType: (r.reading_type ?? null) as "onyomi" | "kunyomi" | "other" | null,
-            sourceWord: r.source_word?.trim() ?? "",
-            sourceMeaning:
-              sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.meaning ?? null,
-            sourceReading:
-              sourceWordMap.get(normalizeWord(r.source_word?.trim() ?? ""))?.reading ?? null,
-            strokeCount: r.stroke_count ?? null,
-            radical: r.radical ?? null,
-            radicalName: r.radical_name ?? null,
-          }));
+          const cacheId = r.vocabulary_cache_id;
+          const kanjiRows =
+            cacheId != null ? (kanjiMapByCacheId.get(cacheId) ?? []) : [];
+
+          if (kanjiRows.length > 0) {
+            return kanjiRows.map((km: any, i: number) => ({
+              key: `${r.id}-${km.kanji}-${i}`,
+              kanji: km.kanji,
+              reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
+              readingType:
+                km.reading_type === "on"
+                  ? "onyomi"
+                  : km.reading_type === "kun"
+                    ? "kunyomi"
+                    : km.reading_type === "other"
+                      ? "other"
+                      : null,
+              sourceWord: surface,
+              sourceMeaning: r.meaning ?? null,
+              sourceReading: r.reading ?? null,
+              strokeCount: null,
+              radical: null,
+              radicalName: null,
+            }));
+          }
+
+          return [];
+        });
 
         setBaseCards(core);
 
@@ -500,7 +490,7 @@ export default function WeeklyReadingsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="mb-8 text-2xl font-semibold text-gray-700">
-          No kanji readings available yet for this book.
+          No saved vocab with readings is available yet for this book.
         </p>
         <button
           onClick={() => router.push(`/books/${userBookId}`)}
@@ -578,9 +568,7 @@ export default function WeeklyReadingsPage() {
 
         <div className="w-full md:w-[430px] flex items-center">
           <p className="text-[15px] text-gray-500 text-left leading-7">
-            Practice kanji readings from vocabulary in this book.
-            Focus on recognizing onyomi and kunyomi readings and connecting them to words you’ve seen while reading.
-            These readings come from real words in your book to help strengthen your reading beyond individual vocabulary.
+            These readings come from words you’ve saved while reading. They’ll help you recognize patterns, reinforce what you’ve seen, and prepare you for the next words you meet.
           </p>
         </div>
       </div>
@@ -596,20 +584,25 @@ export default function WeeklyReadingsPage() {
           if (checked) nextCard();
         }}
       >
-        <div className="absolute top-3 left-4 z-10 text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
-          {readingTypeLabel(card.readingType ?? "NO TYPE")}
-        </div>
-        <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-          <div className="flex flex-col items-end leading-none">
-            <div className="text-sm font-medium">
-              {card.kanji} {card.strokeCount ?? "?"}
-            </div>
-            <div className="mt-1 text-[10px] text-slate-400">
-              radical: {card.radical ?? "—"}
-              {card.radicalName ? ` (${card.radicalName})` : ""}
+        {card.readingType ? (
+          <div className="absolute top-3 left-4 z-10 text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+            {readingTypeLabel(card.readingType)}
+          </div>
+        ) : null}
+
+        {card.strokeCount != null || card.radical || card.radicalName ? (
+          <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+            <div className="flex flex-col items-end leading-none">
+              <div className="text-sm font-medium">
+                {card.kanji} {card.strokeCount ?? ""}
+              </div>
+              <div className="mt-1 text-[10px] text-slate-400">
+                {card.radical ? `radical: ${card.radical}` : ""}
+                {card.radicalName ? ` (${card.radicalName})` : ""}
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="w-full flex flex-col items-center justify-center gap-6">
           <div className="w-full flex flex-col items-center gap-1">
@@ -824,9 +817,7 @@ export default function WeeklyReadingsPage() {
         </div>
       </div>
       <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
-        Kanji often have many different readings.
-        <br />
-        The reading you will practice here comes from an upcoming word in your book.
+        Kanji have many possible readings. These readings are just for these specific words. Focus on the connection and watch for it when you meet it again.
       </p>
       <div className="mt-4 flex flex-col items-center gap-2">
         <button

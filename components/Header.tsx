@@ -11,7 +11,7 @@ export default function Header() {
             href="/books"
             className="text-base font-semibold tracking-tight text-stone-900 sm:text-lg md:text-3xl"
           >
-            MEKURU
+            MEKURU (Beta)
           </Link>
         </div>
 

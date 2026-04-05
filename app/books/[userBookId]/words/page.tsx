@@ -793,30 +793,11 @@ export default function BookWordsPage() {
               />
               Hidden Words Only
             </label>
-
-            {isTeacher ? (
-              <button
-                onClick={() =>
-                  router.push(`/vocab/bulk?userBookId=${encodeURIComponent(userBookId)}`)
-                }
-                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
-              >
-                + Add Vocab
-              </button>
-            ) : null}
-
             <button
               onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
               className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
             >
               Book Hub
-            </button>
-
-            <button
-              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
-              className="px-3 py-2 bg-green-700 text-white rounded hover:bg-amber-600 text-sm whitespace-nowrap"
-            >
-              Study
             </button>
           </div>
         </div>
@@ -1047,15 +1028,6 @@ export default function BookWordsPage() {
             ) : null}
           </tbody>
         </table>
-      </div>
-
-      <div className="mt-4">
-        <button
-          onClick={() => router.push("/books")}
-          className="text-sm text-slate-600 hover:underline"
-        >
-          ← Back to Library
-        </button>
       </div>
     </main>
   );

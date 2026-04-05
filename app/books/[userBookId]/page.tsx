@@ -236,12 +236,15 @@ export default function BookHubPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [myRole, setMyRole] = useState<ProfileRole>("member");
-  const isTeacher = myRole === "teacher";
+  const [isSuperTeacher, setIsSuperTeacher] = useState(false);
 
-  const [editing, setEditing] = useState(false);
+  const isTeacher = myRole === "teacher";
+  const canEditBookInfo = isSuperTeacher;
+
+  const [editingTab, setEditingTab] = useState<HubTab | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<HubTab>("bookInfo");
+  const [activeTab, setActiveTab] = useState<HubTab>("study");
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
 
   const [startedAt, setStartedAt] = useState<string>("");
@@ -373,9 +376,26 @@ export default function BookHubPage() {
     }[]
   >([]);
 
+  const [editingQuickSessionId, setEditingQuickSessionId] = useState<string | null>(null);
+  const [editingQuickSessionWord, setEditingQuickSessionWord] = useState<{
+    id: string;
+    surface: string;
+    reading: string;
+    meaning: string;
+    page: string;
+    chapterNumber: string;
+    chapterName: string;
+  } | null>(null);
+
   const [defaultVocabPage, setDefaultVocabPage] = useState("");
   const [defaultChapterNumber, setDefaultChapterNumber] = useState("");
   const [defaultChapterName, setDefaultChapterName] = useState("");
+
+  const isEditingThisTab = editingTab === activeTab;
+  const canEditThisTab =
+    activeTab === "bookInfo"
+      ? canEditBookInfo
+      : true; // members can edit everything else
 
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
@@ -1244,7 +1264,7 @@ export default function BookHubPage() {
 
     const { data: meProfile, error: meProfileErr } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_super_teacher")
       .eq("id", user.id)
       .single();
 
@@ -1253,6 +1273,7 @@ export default function BookHubPage() {
     }
 
     setMyRole((meProfile?.role as ProfileRole | null) ?? "member");
+    setIsSuperTeacher(!!meProfile?.is_super_teacher);
 
     const { data, error } = await supabase
       .from("user_books")
@@ -1400,7 +1421,7 @@ export default function BookHubPage() {
   const cancelEdits = () => {
     if (!row) return;
 
-    setEditing(false);
+    setEditingTab(null);
 
     setStartedAt(row.started_at ? formatYmd(new Date(row.started_at)) : "");
     setFinishedAt(row.finished_at ? formatYmd(new Date(row.finished_at)) : "");
@@ -1511,7 +1532,7 @@ export default function BookHubPage() {
       return;
     }
 
-    setEditing(false);
+    setEditingTab(null);
     setSaving(false);
     await load();
   };
@@ -1573,19 +1594,69 @@ export default function BookHubPage() {
 
     const selectedMeaning = quickPreview.meaning ?? "";
 
+    let vocabularyCacheId: number | null = null;
+
+    const normalizedSurface = quickPreview.surface?.trim() ?? "";
+    const normalizedReading = quickPreview.reading?.trim() ?? "";
+
+    if (normalizedSurface) {
+      const { data: existingCache, error: cacheLookupError } = await supabase
+        .from("vocabulary_cache")
+        .select("id")
+        .eq("surface", normalizedSurface)
+        .eq("reading", normalizedReading || "")
+        .maybeSingle();
+
+      if (cacheLookupError) {
+        console.error("Error looking up vocabulary cache:", cacheLookupError);
+        alert(`Could not save word.\n${cacheLookupError.message}`);
+        return;
+      }
+
+      if (existingCache?.id) {
+        vocabularyCacheId = existingCache.id;
+      } else {
+        const { data: createdCache, error: cacheInsertError } = await supabase
+          .from("vocabulary_cache")
+          .insert({
+            surface: normalizedSurface,
+            reading: normalizedReading || "",
+          })
+          .select("id")
+          .single();
+
+        if (cacheInsertError) {
+          console.error("Error creating vocabulary cache row:", cacheInsertError);
+          alert(`Could not save word.\n${cacheInsertError.message}`);
+          return;
+        }
+
+        vocabularyCacheId = createdCache.id;
+      }
+    }
+
     const payload = {
       user_book_id: row.id,
+      vocabulary_cache_id: vocabularyCacheId,
       surface: quickPreview.surface || null,
       reading: quickPreview.reading || null,
       meaning: selectedMeaning || null,
       meaning_choices: quickPreview.meanings,
-      meaning_choice_index: quickPreview.selectedMeaningIndex,
+      meaning_choice_index: quickPreview.isCustomMeaning
+        ? null
+        : quickPreview.selectedMeaningIndex,
       page_number: quickPreview.page ? Number(quickPreview.page) : null,
-      chapter_number: quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null,
+      chapter_number: quickPreview.chapterNumber
+        ? Number(quickPreview.chapterNumber)
+        : null,
       chapter_name: quickPreview.chapterName || null,
     };
 
-    const { error } = await supabase.from("user_book_words").insert(payload);
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .insert(payload)
+      .select("id, surface, reading, meaning, page_number, chapter_number, chapter_name, vocabulary_cache_id")
+      .single();
 
     if (error) {
       console.error("Error saving quick word:", error);
@@ -1595,13 +1666,13 @@ export default function BookHubPage() {
 
     setQuickSessionWords((prev) => [
       {
-        id: `${Date.now()}`,
-        surface: quickPreview.surface,
-        reading: quickPreview.reading,
-        meaning: selectedMeaning,
-        page: quickPreview.page,
-        chapterNumber: quickPreview.chapterNumber,
-        chapterName: quickPreview.chapterName,
+        id: String(data.id),
+        surface: data.surface ?? "",
+        reading: data.reading ?? "",
+        meaning: data.meaning ?? "",
+        page: data.page_number != null ? String(data.page_number) : "",
+        chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
+        chapterName: data.chapter_name ?? "",
       },
       ...prev,
     ]);
@@ -1615,6 +1686,66 @@ export default function BookHubPage() {
 
     await loadUniqueLookupCount(row.id);
     quickWordInputRef.current?.focus();
+  }
+
+  function startEditingQuickSessionWord(item: {
+    id: string;
+    surface: string;
+    reading: string;
+    meaning: string;
+    page: string;
+    chapterNumber: string;
+    chapterName: string;
+  }) {
+    setEditingQuickSessionId(item.id);
+    setEditingQuickSessionWord({ ...item });
+  }
+
+  function cancelEditingQuickSessionWord() {
+    setEditingQuickSessionId(null);
+    setEditingQuickSessionWord(null);
+  }
+
+  async function saveEditedQuickSessionWord() {
+    if (!editingQuickSessionWord) return;
+
+    const payload = {
+      surface: editingQuickSessionWord.surface || null,
+      reading: editingQuickSessionWord.reading || null,
+      meaning: editingQuickSessionWord.meaning || null,
+      page_number: editingQuickSessionWord.page
+        ? Number(editingQuickSessionWord.page)
+        : null,
+      chapter_number: editingQuickSessionWord.chapterNumber
+        ? Number(editingQuickSessionWord.chapterNumber)
+        : null,
+      chapter_name: editingQuickSessionWord.chapterName || null,
+    };
+
+    const { error } = await supabase
+      .from("user_book_words")
+      .update(payload)
+      .eq("id", editingQuickSessionWord.id);
+
+    if (error) {
+      console.error("Error updating session word:", error);
+      alert(`Could not update word.\n${error.message}`);
+      return;
+    }
+
+    setQuickSessionWords((prev) =>
+      prev.map((item) =>
+        item.id === editingQuickSessionWord.id
+          ? { ...editingQuickSessionWord }
+          : item
+      )
+    );
+
+    cancelEditingQuickSessionWord();
+
+    if (row?.id) {
+      await loadUniqueLookupCount(row.id);
+    }
   }
 
   if (loading) {
@@ -1642,9 +1773,9 @@ export default function BookHubPage() {
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="flex flex-col gap-6 p-5 md:flex-row md:items-start md:gap-8 md:p-8">
             <div className="w-[140px] shrink-0 md:w-[150px]">
-              {(editing ? coverUrl : book.cover_url) ? (
+              {(isEditingThisTab ? coverUrl : book.cover_url) ? (
                 <img
-                  src={editing ? coverUrl : (book.cover_url ?? "")}
+                  src={isEditingThisTab ? coverUrl : (book.cover_url ?? "")}
                   alt={`${book.title} cover`}
                   className="w-full rounded-2xl border border-stone-200 object-cover shadow-sm"
                 />
@@ -1654,7 +1785,7 @@ export default function BookHubPage() {
                 </div>
               )}
 
-              {editing && activeTab === "bookInfo" && (
+              {isEditingThisTab && activeTab === "bookInfo" && (
                 <input
                   value={coverUrl}
                   onChange={(e) => setCoverUrl(e.target.value)}
@@ -1993,78 +2124,83 @@ export default function BookHubPage() {
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div className="overflow-x-auto">
                 <div className="flex w-max gap-2 border-b border-stone-300 px-2 whitespace-nowrap">
-                  <FilingTab
-                    active={activeTab === "bookInfo"}
-                    onClick={() => setActiveTab("bookInfo")}
-                  >
-                    Book Info
-                  </FilingTab>
+                  <div className="flex flex-wrap gap-2">
+                    {isTeacher && (
+                      <FilingTab
+                        active={activeTab === "teacher"}
+                        onClick={() => setActiveTab("teacher")}
+                      >
+                        Teacher
+                      </FilingTab>
+                    )}
 
-                  {isTeacher ? (
                     <FilingTab
-                      active={activeTab === "teacher"}
-                      onClick={() => setActiveTab("teacher")}
+                      active={activeTab === "study"}
+                      onClick={() => setActiveTab("study")}
                     >
-                      Teacher
+                      Vocab
                     </FilingTab>
-                  ) : null}
 
-                  <FilingTab
-                    active={activeTab === "study"}
-                    onClick={() => setActiveTab("study")}
-                  >
-                    Vocab
-                  </FilingTab>
+                    <FilingTab
+                      active={activeTab === "reading"}
+                      onClick={() => setActiveTab("reading")}
+                    >
+                      Reading
+                    </FilingTab>
 
-                  <FilingTab
-                    active={activeTab === "reading"}
-                    onClick={() => setActiveTab("reading")}
-                  >
-                    Reading
-                  </FilingTab>
+                    <FilingTab
+                      active={activeTab === "story"}
+                      onClick={() => setActiveTab("story")}
+                    >
+                      Story
+                    </FilingTab>
 
-                  <FilingTab
-                    active={activeTab === "story"}
-                    onClick={() => setActiveTab("story")}
-                  >
-                    Story
-                  </FilingTab>
+                    <FilingTab
+                      active={activeTab === "rating"}
+                      onClick={() => setActiveTab("rating")}
+                    >
+                      Ratings
+                    </FilingTab>
 
-                  <FilingTab
-                    active={activeTab === "rating"}
-                    onClick={() => setActiveTab("rating")}
-                  >
-                    Ratings
-                  </FilingTab>
+                    <FilingTab
+                      active={activeTab === "bookInfo"}
+                      onClick={() => setActiveTab("bookInfo")}
+                    >
+                      Book Info
+                    </FilingTab>
+                  </div>
                 </div>
               </div>
 
-              {!editing ? (
-                <button
-                  onClick={() => setEditing(true)}
-                  className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                >
-                  Edit
-                </button>
-              ) : (
-                <div className="flex flex-wrap gap-2">
+              {canEditThisTab && (
+                !isEditingThisTab ? (
                   <button
-                    onClick={cancelEdits}
-                    className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                    onClick={() => setEditingTab(activeTab)}
+                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
                   >
-                    Cancel
+                    Edit
                   </button>
-                  <button
-                    onClick={saveAll}
-                    disabled={saving}
-                    className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {saving ? "Saving…" : "Save"}
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingTab(null)}
+                      className="rounded-2xl bg-stone-200 px-4 py-2 text-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveAll}
+                      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm text-white"
+                    >
+                      Save
+                    </button>
+                  </div>
+                )
               )}
+
             </div>
           </div>
+
           <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
             {activeTab === "bookInfo" && (
               <div className="space-y-6">
@@ -2075,7 +2211,7 @@ export default function BookHubPage() {
                     <Detail
                       label="Genre"
                       value={book.genre}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={genre}
                       setInputValue={setGenre}
                       placeholder="e.g. novel, mystery, picture book..."
@@ -2083,7 +2219,7 @@ export default function BookHubPage() {
                     <Detail
                       label="Page Count"
                       value={book.page_count}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={pageCount}
                       setInputValue={setPageCount}
                       placeholder="e.g. 352"
@@ -2091,7 +2227,7 @@ export default function BookHubPage() {
                     <Detail
                       label="ISBN"
                       value={book.isbn}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={isbn}
                       setInputValue={setIsbn}
                       placeholder="ISBN"
@@ -2099,7 +2235,7 @@ export default function BookHubPage() {
                     <Detail
                       label="ISBN-13"
                       value={book.isbn13}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={isbn13}
                       setInputValue={setIsbn13}
                       placeholder="ISBN-13"
@@ -2108,7 +2244,7 @@ export default function BookHubPage() {
 
                   <div className="mt-4">
                     <div className="text-sm font-medium">Trigger Warnings</div>
-                    {!editing ? (
+                    {!isEditingThisTab ? (
                       <div className="mt-1 min-h-[40px] whitespace-pre-wrap text-sm text-stone-700">
                         {book.trigger_warnings?.trim() ? book.trigger_warnings : "—"}
                       </div>
@@ -2129,10 +2265,10 @@ export default function BookHubPage() {
                   <div className="space-y-4">
                     <PersonRow
                       label="Author"
-                      name={editing ? authorName : book.author}
-                      reading={editing ? authorReading : book.author_reading}
-                      img={editing ? authorImg : book.author_image_url}
-                      editing={editing}
+                      name={isEditingThisTab ? authorName : book.author}
+                      reading={isEditingThisTab ? authorReading : book.author_reading}
+                      img={isEditingThisTab ? authorImg : book.author_image_url}
+                      editing={isEditingThisTab}
                       nameValue={authorName}
                       setNameValue={setAuthorName}
                       imgValue={authorImg}
@@ -2141,13 +2277,13 @@ export default function BookHubPage() {
                       setReadingValue={setAuthorReading}
                     />
 
-                    {(book.translator || book.translator_image_url || editing) && (
+                    {(book.translator || book.translator_image_url || isEditingThisTab) && (
                       <PersonRow
                         label="Translator"
-                        name={editing ? translatorName : book.translator}
-                        reading={editing ? translatorReading : book.translator_reading}
-                        img={editing ? translatorImg : book.translator_image_url}
-                        editing={editing}
+                        name={isEditingThisTab ? translatorName : book.translator}
+                        reading={isEditingThisTab ? translatorReading : book.translator_reading}
+                        img={isEditingThisTab ? translatorImg : book.translator_image_url}
+                        editing={isEditingThisTab}
                         nameValue={translatorName}
                         setNameValue={setTranslatorName}
                         imgValue={translatorImg}
@@ -2157,13 +2293,13 @@ export default function BookHubPage() {
                       />
                     )}
 
-                    {(book.illustrator || book.illustrator_image_url || editing) && (
+                    {(book.illustrator || book.illustrator_image_url || isEditingThisTab) && (
                       <PersonRow
                         label="Illustrator"
-                        name={editing ? illustratorName : book.illustrator}
-                        reading={editing ? illustratorReading : book.illustrator_reading}
-                        img={editing ? illustratorImg : book.illustrator_image_url}
-                        editing={editing}
+                        name={isEditingThisTab ? illustratorName : book.illustrator}
+                        reading={isEditingThisTab ? illustratorReading : book.illustrator_reading}
+                        img={isEditingThisTab ? illustratorImg : book.illustrator_image_url}
+                        editing={isEditingThisTab}
                         nameValue={illustratorName}
                         setNameValue={setIllustratorName}
                         imgValue={illustratorImg}
@@ -2173,13 +2309,13 @@ export default function BookHubPage() {
                       />
                     )}
 
-                    {(book.publisher || book.publisher_image_url || editing) && (
+                    {(book.publisher || book.publisher_image_url || isEditingThisTab) && (
                       <PersonRow
                         label="Publisher"
-                        name={editing ? publisherName : book.publisher}
-                        reading={editing ? publisherReading : book.publisher_reading}
-                        img={editing ? publisherImg : book.publisher_image_url}
-                        editing={editing}
+                        name={isEditingThisTab ? publisherName : book.publisher}
+                        reading={isEditingThisTab ? publisherReading : book.publisher_reading}
+                        img={isEditingThisTab ? publisherImg : book.publisher_image_url}
+                        editing={isEditingThisTab}
                         nameValue={publisherName}
                         setNameValue={setPublisherName}
                         imgValue={publisherImg}
@@ -2194,7 +2330,7 @@ export default function BookHubPage() {
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                   <div className="mb-3 text-sm font-semibold text-stone-900">Related Links</div>
 
-                  {!editing ? (
+                  {!isEditingThisTab ? (
                     relatedLinksArr.length > 0 ? (
                       <ul className="space-y-2 text-sm">
                         {relatedLinksArr.map((l: any, idx: number) => {
@@ -2399,7 +2535,7 @@ export default function BookHubPage() {
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                   <div className="mb-3 text-sm font-semibold text-stone-900">Level (with guidance)</div>
 
-                  {!editing ? (
+                  {!isEditingThisTab ? (
                     <>
                       <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
                       <div className="mt-1 text-xs text-amber-600">
@@ -2609,14 +2745,14 @@ export default function BookHubPage() {
                     <DateField
                       label="Started"
                       value={safeDate(startedAt) ?? started}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={startedAt}
                       setInputValue={setStartedAt}
                     />
 
                     <div className="rounded border bg-white p-3 text-sm">
                       <div className="text-stone-600">Finished / DNF</div>
-                      {!editing ? (
+                      {!isEditingThisTab ? (
                         <div className="mt-1 font-medium">
                           {dnfAt
                             ? `${dnfAt} (DNF)`
@@ -2762,7 +2898,7 @@ export default function BookHubPage() {
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                   <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
 
-                  {!editing ? (
+                  {!isEditingThisTab ? (
                     <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
                       {row.my_review?.trim() ? row.my_review : "—"}
                     </div>
@@ -2783,7 +2919,7 @@ export default function BookHubPage() {
                     <StarRatingField
                       label="Overall Rating"
                       value={row.rating_overall}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={ratingOverall}
                       setInputValue={setRatingOverall}
                     />
@@ -2791,7 +2927,7 @@ export default function BookHubPage() {
                     <StarRatingField
                       label="Would Recommend"
                       value={row.rating_recommend}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={ratingRecommend}
                       setInputValue={setRatingRecommend}
                     />
@@ -2804,7 +2940,7 @@ export default function BookHubPage() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="rounded border bg-white p-3 text-sm">
                       <div className="text-stone-600">My Level at Time of Reading</div>
-                      {!editing ? (
+                      {!isEditingThisTab ? (
                         <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
                       ) : (
                         <select
@@ -2824,7 +2960,7 @@ export default function BookHubPage() {
 
                     <DifficultyField
                       value={row.rating_difficulty}
-                      editing={editing}
+                      editing={isEditingThisTab}
                       inputValue={ratingDifficulty}
                       setInputValue={setRatingDifficulty}
                     />
@@ -2832,7 +2968,7 @@ export default function BookHubPage() {
                     <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
                       <div className="text-stone-600">Level (with guidance)</div>
 
-                      {!editing ? (
+                      {!isEditingThisTab ? (
                         <>
                           <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
                           <div className="mt-1 text-xs text-amber-600">
@@ -3352,7 +3488,7 @@ export default function BookHubPage() {
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="text-sm font-medium">Notes</div>
 
-                    {!editing ? (
+                    {!isEditingThisTab ? (
                       <div className="mt-3 min-h-[260px] whitespace-pre-wrap text-sm text-stone-700">
                         {row.notes?.trim() ? row.notes : "—"}
                       </div>
@@ -3424,8 +3560,8 @@ export default function BookHubPage() {
                       </button>
                       <div
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${isRunning || isPaused
-                            ? "bg-red-200 text-red-900"
-                            : "bg-yellow-50 text-yellow-700"
+                          ? "bg-red-200 text-red-900"
+                          : "bg-yellow-50 text-yellow-700"
                           }`}
                       >
                         <span>●</span>
@@ -3632,25 +3768,152 @@ export default function BookHubPage() {
                           <div className="mt-2 text-sm text-stone-500">No words saved yet.</div>
                         ) : (
                           <div className="mt-3 space-y-2">
-                            {quickSessionWords.map((item) => (
-                              <div
-                                key={item.id}
-                                className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
-                              >
-                                <div className="font-medium text-stone-900">
-                                  {item.surface}
-                                  {item.reading ? (
-                                    <span className="ml-2 text-stone-500">({item.reading})</span>
-                                  ) : null}
+
+                            {quickSessionWords.map((item) => {
+                              const isEditing = editingQuickSessionId === item.id;
+                              const editItem = isEditing ? editingQuickSessionWord : null;
+
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
+                                >
+                                  {!isEditing || !editItem ? (
+                                    <>
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="font-medium text-stone-900">
+                                            {item.surface}
+                                            {item.reading ? (
+                                              <span className="ml-2 text-stone-500">({item.reading})</span>
+                                            ) : null}
+                                          </div>
+                                          <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                                          <div className="mt-1 text-xs text-stone-500">
+                                            Page {item.page || "—"}
+                                            {item.chapterNumber ? ` · Ch ${item.chapterNumber}` : ""}
+                                            {item.chapterName ? ` · ${item.chapterName}` : ""}
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => startEditingQuickSessionWord(item)}
+                                          className="rounded border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100"
+                                        >
+                                          Edit
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="space-y-3">
+                                      <div className="grid gap-3 md:grid-cols-2">
+                                        <div>
+                                          <div className="mb-1 text-xs text-stone-500">Word</div>
+                                          <input
+                                            value={editItem.surface}
+                                            onChange={(e) =>
+                                              setEditingQuickSessionWord((prev) =>
+                                                prev ? { ...prev, surface: e.target.value } : prev
+                                              )
+                                            }
+                                            className="w-full rounded border px-3 py-2 text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <div className="mb-1 text-xs text-stone-500">Reading</div>
+                                          <input
+                                            value={editItem.reading}
+                                            onChange={(e) =>
+                                              setEditingQuickSessionWord((prev) =>
+                                                prev ? { ...prev, reading: e.target.value } : prev
+                                              )
+                                            }
+                                            className="w-full rounded border px-3 py-2 text-sm"
+                                          />
+                                        </div>
+
+                                        <div className="md:col-span-2">
+                                          <div className="mb-1 text-xs text-stone-500">Meaning</div>
+                                          <input
+                                            value={editItem.meaning}
+                                            onChange={(e) =>
+                                              setEditingQuickSessionWord((prev) =>
+                                                prev ? { ...prev, meaning: e.target.value } : prev
+                                              )
+                                            }
+                                            className="w-full rounded border px-3 py-2 text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <div className="mb-1 text-xs text-stone-500">Page</div>
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            value={editItem.page}
+                                            onChange={(e) =>
+                                              setEditingQuickSessionWord((prev) =>
+                                                prev ? { ...prev, page: e.target.value } : prev
+                                              )
+                                            }
+                                            className="w-full rounded border px-3 py-2 text-sm"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <div className="mb-1 text-xs text-stone-500">Chapter #</div>
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            value={editItem.chapterNumber}
+                                            onChange={(e) =>
+                                              setEditingQuickSessionWord((prev) =>
+                                                prev ? { ...prev, chapterNumber: e.target.value } : prev
+                                              )
+                                            }
+                                            className="w-full rounded border px-3 py-2 text-sm"
+                                          />
+                                        </div>
+
+                                        <div className="md:col-span-2">
+                                          <div className="mb-1 text-xs text-stone-500">Chapter Name</div>
+                                          <input
+                                            value={editItem.chapterName}
+                                            onChange={(e) =>
+                                              setEditingQuickSessionWord((prev) =>
+                                                prev ? { ...prev, chapterName: e.target.value } : prev
+                                              )
+                                            }
+                                            className="w-full rounded border px-3 py-2 text-sm"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={saveEditedQuickSessionWord}
+                                          className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                                        >
+                                          Save
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={cancelEditingQuickSessionWord}
+                                          className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                                <div className="mt-1 text-xs text-stone-500">
-                                  Page {item.page || "—"}
-                                  {item.chapterNumber ? ` · Ch ${item.chapterNumber}` : ""}
-                                  {item.chapterName ? ` · ${item.chapterName}` : ""}
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
+
                           </div>
                         )}
                       </div>
