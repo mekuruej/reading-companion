@@ -493,7 +493,9 @@ export default function BookWordsPage() {
           .order("created_at", { ascending: true })
           .order("id", { ascending: true });
 
-        if (!showHidden) {
+        if (showHidden) {
+          wordsQuery = wordsQuery.eq("hidden", true);
+        } else {
           wordsQuery = wordsQuery.eq("hidden", false);
         }
 
@@ -789,7 +791,7 @@ export default function BookWordsPage() {
                 checked={showHidden}
                 onChange={(e) => setShowHidden(e.target.checked)}
               />
-              Show Hidden Words
+              Hidden Words Only
             </label>
 
             {isTeacher ? (

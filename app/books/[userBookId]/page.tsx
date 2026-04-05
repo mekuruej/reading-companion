@@ -1958,8 +1958,8 @@ export default function BookHubPage() {
                   }}
                   className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
                 >
-                  <div className="text-xs text-blue-700">Prepare</div>
-                  <div className="mt-1 font-medium text-stone-900">Practice Kanji</div>
+                  <div className="text-xs text-blue-700">Practice</div>
+                  <div className="mt-1 font-medium text-stone-900">Kanji Readings</div>
                 </button>
 
                 <button
@@ -2267,13 +2267,13 @@ export default function BookHubPage() {
                             user_id: s.student_id,
                             user_book_id: row.id,
                             type: "kanji",
-                            message: `New kanji is ready for ${book.title}`,
+                            message: `Custom readings are ready to practice for ${book.title}`,
                           });
                         }
                       }}
                       className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
                     >
-                      🔔 Notify Kanji
+                      🔔 Notify Custom Readings
                     </button>
                   </div>
                 </div>
@@ -2934,7 +2934,7 @@ export default function BookHubPage() {
                         <div>
                           <div className="text-sm font-semibold text-stone-900">Character List</div>
                           <p className="mt-1 text-sm text-stone-400">
-                            Forgetting the readings of characters&apos; names? Jot them down here.
+                            Forgetting the readings of characters names? Jot them down here.
                           </p>
                         </div>
 
@@ -3422,6 +3422,16 @@ export default function BookHubPage() {
                       >
                         Bulk Add
                       </button>
+                      <div
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${isRunning || isPaused
+                            ? "bg-red-200 text-red-900"
+                            : "bg-yellow-50 text-yellow-700"
+                          }`}
+                      >
+                        <span>●</span>
+                        <span>{isRunning || isPaused ? "Timer is active" : "Timer is not running"}</span>
+                        <span>●</span>
+                      </div>
                     </div>
                   </div>
 

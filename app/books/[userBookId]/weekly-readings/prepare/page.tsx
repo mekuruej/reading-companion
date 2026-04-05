@@ -190,19 +190,19 @@ export default function PrepareWeeklyReadingsPage() {
 
         const studentUserId = (ub as any)?.user_id ?? null;
 
-if (studentUserId) {
-  const { data: studentProf } = await supabase
-    .from("profiles")
-    .select("display_name, username")
-    .eq("id", studentUserId)
-    .single();
+        if (studentUserId) {
+          const { data: studentProf } = await supabase
+            .from("profiles")
+            .select("display_name, username")
+            .eq("id", studentUserId)
+            .single();
 
-  setStudentName(studentProf?.display_name ?? "");
-  setStudentUsername(studentProf?.username ?? "");
-} else {
-  setStudentName("");
-  setStudentUsername("");
-}
+          setStudentName(studentProf?.display_name ?? "");
+          setStudentUsername(studentProf?.username ?? "");
+        } else {
+          setStudentName("");
+          setStudentUsername("");
+        }
       } catch (e: any) {
         setErrorMsg(e?.message ?? "Failed to load page");
       } finally {
@@ -234,15 +234,15 @@ if (studentUserId) {
         const kanjiInfo = await getKanjiInfo(k);
 
         nextRows.push({
-  id: makeRowId(),
-  sourceWord: word,
-  kanji: k,
-  reading: r,
-  readingType: "onyomi",
-  strokeCount: kanjiInfo.strokeCount,
-  radical: kanjiInfo.radical,
-  radicalName: kanjiInfo.radicalName,
-});
+          id: makeRowId(),
+          sourceWord: word,
+          kanji: k,
+          reading: r,
+          readingType: "onyomi",
+          strokeCount: kanjiInfo.strokeCount,
+          radical: kanjiInfo.radical,
+          radicalName: kanjiInfo.radicalName,
+        });
       }
     }
 
@@ -273,7 +273,7 @@ if (studentUserId) {
 
   async function clearReadings() {
     const ok = window.confirm(
-      "Remove the currently active weekly readings for this book? Students will no longer see them."
+      "Remove the current kanji readings for this book? Students and members will no longer be able to practice them."
     );
     if (!ok) return;
 
@@ -335,7 +335,7 @@ if (studentUserId) {
       if (!user) throw new Error("You must be signed in.");
 
       if (myRole !== "teacher") {
-        throw new Error("Only teachers can prepare weekly readings.");
+        throw new Error("Only teachers can manage these kanji readings.");
       }
 
       const { data: oldSets, error: oldErr } = await supabase
@@ -386,16 +386,16 @@ if (studentUserId) {
       const setId = createdSet.id;
 
       const cardPayload = validRows.map((r, i) => ({
-  set_id: setId,
-  sort_order: i + 1,
-  source_word: r.sourceWord.trim(),
-  kanji: r.kanji.trim(),
-  reading: r.reading.trim(),
-  reading_type: r.readingType,
-  stroke_count: r.strokeCount,
-  radical: r.radical,
-  radical_name: r.radicalName,
-}));
+        set_id: setId,
+        sort_order: i + 1,
+        source_word: r.sourceWord.trim(),
+        kanji: r.kanji.trim(),
+        reading: r.reading.trim(),
+        reading_type: r.readingType,
+        stroke_count: r.strokeCount,
+        radical: r.radical,
+        radical_name: r.radicalName,
+      }));
 
       const { error: cardsErr } = await supabase
         .from("user_book_weekly_reading_cards")
@@ -410,7 +410,7 @@ if (studentUserId) {
 
       router.push(`/books/${userBookId}/weekly-readings`);
     } catch (e: any) {
-      setErrorMsg(e?.message ?? "Failed to activate weekly readings");
+      setErrorMsg(e?.message ?? "Failed to update kanji readings");
     } finally {
       setSaving(false);
     }
@@ -419,7 +419,7 @@ if (studentUserId) {
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-gray-500">Loading weekly readings prep...</p>
+        <p className="text-lg text-gray-500">Loading kanji readings…</p>
       </main>
     );
   }
@@ -522,7 +522,9 @@ if (studentUserId) {
       <div className="border rounded-xl bg-white p-4">
         <h2 className="text-lg font-medium mb-2">Step 2: Enter the readings</h2>
         <p className="text-sm text-gray-500 mb-3">
-          Confirm the exact reading you want students to study this week.
+          <p className="text-sm text-gray-500 mb-3">
+            Confirm the exact reading you want students and members to practice.
+          </p>
         </p>
 
         {rows.length === 0 ? (
@@ -581,10 +583,10 @@ if (studentUserId) {
                     </td>
 
                     <td className="p-2 text-xs text-gray-500">
-  {r.strokeCount ?? "?"}
-  {r.radical ? ` • Radical ${r.radical}` : ""}
-  {r.radicalName ? ` (${r.radicalName})` : ""}
-</td>
+                      {r.strokeCount ?? "?"}
+                      {r.radical ? ` • Radical ${r.radical}` : ""}
+                      {r.radicalName ? ` (${r.radicalName})` : ""}
+                    </td>
 
                     <td className="p-2">
                       <button

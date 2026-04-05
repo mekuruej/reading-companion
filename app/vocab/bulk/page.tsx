@@ -150,7 +150,7 @@ export default function BulkVocabPage() {
         const { number, name } = JSON.parse(saved);
         setBulkChapterNumber(number || "");
         setBulkChapterName(name || "");
-      } catch {}
+      } catch { }
     }
 
     (async () => {
@@ -318,6 +318,12 @@ export default function BulkVocabPage() {
     return missing.length;
   }
 
+  function getIncompleteWordLabels() {
+    return items
+      .filter((i) => !i.reading.trim() || !i.meaning.trim())
+      .map((i) => i.surface.trim() || "(blank word)");
+  }
+
   function resetForMore() {
     setRawInput("");
     setItems([]);
@@ -381,7 +387,7 @@ export default function BulkVocabPage() {
               meaning = meaningChoices[0] || "";
             }
           }
-        } catch {}
+        } catch { }
 
         const kanjiMeta = await getStrokeData(w);
 
@@ -416,11 +422,15 @@ export default function BulkVocabPage() {
   // Step 2: Save definitions locally and move to details
   // -------------------------------------------------------------
   function handleSaveDefinitions() {
-    const missingCount = validateDefinitions();
+    const missingWords = getIncompleteWordLabels();
+    const missingCount = missingWords.length;
 
     if (missingCount > 0) {
       const confirmed = window.confirm(
-        `${missingCount} word${missingCount === 1 ? "" : "s"} ${missingCount === 1 ? "is" : "are"} missing a reading or definition.\n\nDo you want to continue anyway?`
+        `${missingCount} word${missingCount === 1 ? "" : "s"} ${missingCount === 1 ? "is" : "are"
+        } missing a reading or definition.\n\n` +
+        `Words:\n- ${missingWords.join("\n- ")}\n\n` +
+        `Do you want to continue anyway?`
       );
       if (!confirmed) return;
     }
@@ -437,11 +447,14 @@ export default function BulkVocabPage() {
 
     if (!userBookId || items.length === 0) return;
 
-    const incompleteItems = items.filter((i) => !i.reading.trim() || !i.meaning.trim());
+    const incompleteWords = getIncompleteWordLabels();
 
-    if (incompleteItems.length > 0) {
+    if (incompleteWords.length > 0) {
       const confirmed = window.confirm(
-        `${incompleteItems.length} word${incompleteItems.length === 1 ? "" : "s"} ${incompleteItems.length === 1 ? "is" : "are"} missing a reading or definition.\n\nDo you want to save anyway?`
+        `${incompleteWords.length} word${incompleteWords.length === 1 ? "" : "s"} ${incompleteWords.length === 1 ? "is" : "are"
+        } missing a reading or definition.\n\n` +
+        `Words:\n- ${incompleteWords.join("\n- ")}\n\n` +
+        `Do you want to save anyway?`
       );
       if (!confirmed) return;
     }
@@ -538,12 +551,11 @@ export default function BulkVocabPage() {
     } catch (err: any) {
       console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
       setMessage(
-        `❌ Failed saving: ${
-          err?.message ||
-          err?.error_description ||
-          err?.details ||
-          JSON.stringify(err) ||
-          "unknown error"
+        `❌ Failed saving: ${err?.message ||
+        err?.error_description ||
+        err?.details ||
+        JSON.stringify(err) ||
+        "unknown error"
         }`
       );
     } finally {
@@ -693,11 +705,10 @@ export default function BulkVocabPage() {
                           value={i.meaning}
                           onChange={(e) => updateItem(idx, "meaning", e.target.value)}
                           readOnly={i.meaningChoiceIndex != null}
-                          className={`w-full rounded border p-2 text-sm ${
-                            i.meaningChoiceIndex == null
-                              ? "bg-white"
-                              : "bg-slate-100 text-slate-700"
-                          }`}
+                          className={`w-full rounded border p-2 text-sm ${i.meaningChoiceIndex == null
+                            ? "bg-white"
+                            : "bg-slate-100 text-slate-700"
+                            }`}
                           placeholder={
                             i.meaningChoiceIndex == null
                               ? "Type your custom meaning"

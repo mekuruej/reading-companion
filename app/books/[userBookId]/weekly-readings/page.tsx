@@ -500,7 +500,7 @@ export default function WeeklyReadingsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="mb-8 text-2xl font-semibold text-gray-700">
-          This week’s readings are not ready yet.
+          No kanji readings available yet for this book.
         </p>
         <button
           onClick={() => router.push(`/books/${userBookId}`)}
@@ -578,11 +578,13 @@ export default function WeeklyReadingsPage() {
 
         <div className="w-full md:w-[430px] flex items-center">
           <p className="text-[15px] text-gray-500 text-left leading-7">
-            This page is refreshed each week with readings from upcoming vocabulary in your book. It is designed to help you strengthen your reading skills by focusing on individual onyomi and kunyomi readings. While the kanji come from upcoming words, the goal is to notice each kanji’s reading and whether it is onyomi or kunyomi so that you can apply that knowledge to vocabulary far beyond this week’s words.
+            Practice kanji readings from vocabulary in this book.
+            Focus on recognizing onyomi and kunyomi readings and connecting them to words you’ve seen while reading.
+            These readings come from real words in your book to help strengthen your reading beyond individual vocabulary.
           </p>
         </div>
       </div>
-      <p className="mt-1 text-sm text-gray-500">This Week’s Kanji Readings</p>
+      <p className="mt-1 text-sm text-gray-500">Practice Kanji Readings</p>
       <p className="text-sm text-gray-500">
         Card {index + 1}/{deck.length}
       </p>
