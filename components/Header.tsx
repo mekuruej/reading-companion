@@ -42,13 +42,6 @@ export default function Header() {
           >
             Daily Study
           </button>
-
-          <Link
-            href="/vocab/dictionary"
-            className="leading-none text-stone-700 transition hover:text-stone-900"
-          >
-            Dictionary
-          </Link>
         </nav>
 
         <div className="mt-1 text-center text-xs text-stone-500 md:text-left">

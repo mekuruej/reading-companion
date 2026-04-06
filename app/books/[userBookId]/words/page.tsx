@@ -448,12 +448,13 @@ export default function BookWordsPage() {
           .from("user_books")
           .select(
             `
-            id,
-            books:book_id (
-              title,
-              cover_url
-            )
-          `
+              id,
+              user_id,
+              books:book_id (
+                title,
+                cover_url
+              )
+            `
           )
           .eq("id", userBookId)
           .single();

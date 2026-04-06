@@ -256,6 +256,40 @@ function stars5(value: number | null) {
   return "★".repeat(v) + "☆".repeat(5 - v);
 }
 
+function entertainmentRatingText(value: number | null) {
+  switch (value) {
+    case 5:
+      return "Exceptional! Already want to read it again!"
+    case 4:
+      return "Very good! Definitely will recommend it."
+    case 3:
+      return "Good solid book."
+    case 2:
+      return "Not bad, but I would have liked to read something else."
+    case 1:
+      return "Didn’t like it."
+    default:
+      return "—"
+  }
+}
+
+function languageLearningRatingText(value: number | null) {
+  switch (value) {
+    case 5:
+      return "This is a learner’s dream come true!"
+    case 4:
+      return "Has a lot of good material in there."
+    case 3:
+      return "You can learn some stuff, but nothing special."
+    case 2:
+      return "Not so much useful language material."
+    case 1:
+      return "I didn’t get anything out of it."
+    default:
+      return "—"
+  }
+}
+
 function formatTypeLabel(value: string | null | undefined) {
   switch (value) {
     case "paperback":
@@ -465,6 +499,12 @@ export default function BookHubPage() {
   const [quickError, setQuickError] = useState<string | null>(null);
   const quickWordInputRef = useRef<HTMLInputElement>(null);
 
+  const [showWordExplorer, setShowWordExplorer] = useState(false);
+  const [wordExplorerQuery, setWordExplorerQuery] = useState("");
+  const [wordExplorerLoading, setWordExplorerLoading] = useState(false);
+  const [wordExplorerError, setWordExplorerError] = useState<string | null>(null);
+  const [wordExplorerResults, setWordExplorerResults] = useState<any[]>([]);
+
   const kanjiReadingMemoryRef = useRef<
     Record<
       string,
@@ -607,6 +647,13 @@ export default function BookHubPage() {
 
     return chapterReverseOrder ? sorted.reverse() : sorted;
   }, [chapterSummaries, chapterReverseOrder]);
+
+  function openWordExplorer(word?: string) {
+    setWordExplorerQuery(word ?? "");
+    setWordExplorerError(null);
+    setWordExplorerResults([]);
+    setShowWordExplorer(true);
+  }
 
   function addChapterSummary() {
     if (!row?.id) return;
@@ -1765,7 +1812,6 @@ export default function BookHubPage() {
     const rd = ratingDifficulty.trim() ? clampRating5(Number(ratingDifficulty.trim())) : null;
 
     const related_links = linksText.trim() ? parseLinks(linksText) : null;
-
     const userBooksUpdate = supabase
       .from("user_books")
       .update({
@@ -1876,6 +1922,37 @@ export default function BookHubPage() {
       setQuickError("Could not pull word data.");
     } finally {
       setQuickLoading(false);
+    }
+  }
+
+  async function searchWordExplorer() {
+    const query = wordExplorerQuery.trim();
+
+    if (!query) {
+      setWordExplorerResults([]);
+      setWordExplorerError(null);
+      return;
+    }
+
+    setWordExplorerLoading(true);
+    setWordExplorerError(null);
+
+    try {
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(query)}`);
+      const json = await res.json();
+
+      const results = (json?.data ?? []).slice(0, 8);
+      setWordExplorerResults(results);
+
+      if (results.length === 0) {
+        setWordExplorerError("No results found.");
+      }
+    } catch (err) {
+      console.error(err);
+      setWordExplorerResults([]);
+      setWordExplorerError("Could not load word data.");
+    } finally {
+      setWordExplorerLoading(false);
     }
   }
 
@@ -3321,29 +3398,43 @@ export default function BookHubPage() {
                 </div>
 
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Ratings</div>
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Book Ratings</div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <StarRatingField
-                      label="Overall Rating"
+                      label="Entertainment Rating"
                       value={row.rating_overall}
                       editing={isEditingThisTab}
                       inputValue={ratingOverall}
                       setInputValue={setRatingOverall}
+                      descriptions={{
+                        5: "Exceptional! Already want to read it again!",
+                        4: "Very good! Definitely will recommend it.",
+                        3: "Good solid book.",
+                        2: "Not bad, but I would have liked to read something else.",
+                        1: "Didn’t like it.",
+                      }}
                     />
 
                     <StarRatingField
-                      label="Would Recommend"
+                      label="Language Learning Potential"
                       value={row.rating_recommend}
                       editing={isEditingThisTab}
                       inputValue={ratingRecommend}
                       setInputValue={setRatingRecommend}
+                      descriptions={{
+                        5: "This is a learner’s dream come true!",
+                        4: "Has a lot of good material in there.",
+                        3: "You can learn some stuff, but nothing special.",
+                        2: "Not so much useful language material.",
+                        1: "I didn’t get anything out of it.",
+                      }}
                     />
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading Level & Difficulty</div>
+                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading Context</div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="rounded border bg-white p-3 text-sm">
@@ -3372,54 +3463,6 @@ export default function BookHubPage() {
                       inputValue={ratingDifficulty}
                       setInputValue={setRatingDifficulty}
                     />
-
-                    <div className="rounded border bg-white p-3 text-sm sm:col-span-2">
-                      <div className="text-stone-600">Level (with guidance)</div>
-
-                      {!isEditingThisTab ? (
-                        <>
-                          <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
-                          <div className="mt-1 text-xs text-amber-600">
-                            {levelStars(row.recommended_level)}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="mt-2 grid gap-2 sm:grid-cols-5">
-                          {[
-                            { value: "N5", stars: "★☆☆☆☆" },
-                            { value: "N4", stars: "★★☆☆☆" },
-                            { value: "N3", stars: "★★★☆☆" },
-                            { value: "N2", stars: "★★★★☆" },
-                            { value: "N1", stars: "★★★★★" },
-                          ].map((opt) => {
-                            const isSelected = recommendedLevel === opt.value;
-
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => setRecommendedLevel(opt.value)}
-                                className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
-                                  ? "border-stone-900 bg-stone-100"
-                                  : "border-stone-200 hover:bg-stone-50"
-                                  }`}
-                              >
-                                <div className="text-amber-600">{opt.stars}</div>
-                                <div className="text-xs text-stone-600">{opt.value}</div>
-                              </button>
-                            );
-                          })}
-
-                          <button
-                            type="button"
-                            onClick={() => setRecommendedLevel("")}
-                            className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
-                          >
-                            <div className="text-xs text-stone-600">Clear</div>
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -4160,6 +4203,13 @@ export default function BookHubPage() {
                             >
                               Cancel
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => openWordExplorer(quickPreview.surface || quickPreview.reading || "")}
+                              className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+                            >
+                              Explore
+                            </button>
                           </div>
                         </div>
                       )}
@@ -4351,6 +4401,105 @@ export default function BookHubPage() {
           </div>
         </section>
       </div>
+      {showWordExplorer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowWordExplorer(false)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-stone-900">Word Explorer</h2>
+                <p className="mt-1 text-sm text-stone-500">
+                  Search and explore a word without leaving the page.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowWordExplorer(false)}
+                className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={wordExplorerQuery}
+                  onChange={(e) => setWordExplorerQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      searchWordExplorer();
+                    }
+                  }}
+                  placeholder="Search a word..."
+                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
+                />
+
+                <button
+                  type="button"
+                  onClick={searchWordExplorer}
+                  disabled={wordExplorerLoading || !wordExplorerQuery.trim()}
+                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                >
+                  {wordExplorerLoading ? "Searching..." : "Search"}
+                </button>
+              </div>
+
+              {wordExplorerError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {wordExplorerError}
+                </div>
+              ) : null}
+
+              {wordExplorerResults.length > 0 ? (
+                <div className="space-y-3">
+                  {wordExplorerResults.map((item, i) => {
+                    const japanese = item?.japanese?.[0];
+                    const senses = item?.senses ?? [];
+
+                    return (
+                      <div key={i} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                        <div className="text-lg font-semibold text-stone-900">
+                          {japanese?.word || item?.slug || "—"}
+                        </div>
+
+                        {japanese?.reading ? (
+                          <div className="mt-1 text-sm text-stone-500">{japanese.reading}</div>
+                        ) : null}
+
+                        <div className="mt-3 space-y-2">
+                          {senses.slice(0, 3).map((sense: any, idx: number) => (
+                            <div key={idx} className="text-sm text-stone-700">
+                              <span className="font-medium text-stone-500">{idx + 1}.</span>{" "}
+                              {(sense?.english_definitions ?? []).join("; ") || "—"}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : !wordExplorerLoading && !wordExplorerError && wordExplorerQuery.trim() ? (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                  No results yet.
+                </div>
+              ) : (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                  Type a word to explore.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -4451,12 +4600,14 @@ function StarRatingField({
   editing,
   inputValue,
   setInputValue,
+  descriptions,
 }: {
   label: string;
   value: number | null;
   editing: boolean;
   inputValue: string;
   setInputValue: (v: string) => void;
+  descriptions: Record<number, string>;
 }) {
   const selected = inputValue ? Number(inputValue) : null;
 
@@ -4468,22 +4619,26 @@ function StarRatingField({
         <>
           <div className="mt-1 font-medium">{value ? `${value}/5` : "—"}</div>
           <div className="text-amber-600">{stars5(value)}</div>
+          <div className="mt-1 text-xs text-stone-500">
+            {value ? descriptions[value] : "—"}
+          </div>
         </>
       ) : (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {[1, 2, 3, 4, 5].map((n) => {
+        <div className="mt-2 space-y-2">
+          {[5, 4, 3, 2, 1].map((n) => {
             const isSelected = selected === n;
             return (
               <button
                 key={n}
                 type="button"
                 onClick={() => setInputValue(String(n))}
-                className={`rounded-lg border px-3 py-2 transition ${isSelected
+                className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
                   ? "border-amber-500 bg-amber-50 shadow-sm"
                   : "border-stone-200 bg-white hover:bg-stone-50"
                   }`}
               >
-                <span className="font-medium text-amber-600">{stars5(n)}</span>
+                <div className="font-medium text-amber-600">{stars5(n)}</div>
+                <div className="mt-1 text-xs text-stone-600">{descriptions[n]}</div>
               </button>
             );
           })}
