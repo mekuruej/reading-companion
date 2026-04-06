@@ -5,12 +5,12 @@ import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type ReadAlongWord = {
-  id: string;
-  surface: string;
-  reading: string | null;
-  meaning: string | null;
-  page_number: number | null;
-  page_order: number | null;
+    id: string;
+    surface: string;
+    reading: string | null;
+    meaning: string | null;
+    page_number: number | null;
+    page_order: number | null;
 };
 
 type SupportMode = "full" | "reading" | "meaning";
@@ -69,34 +69,42 @@ export default function ReadAlongPage() {
     }, [userBookId]);
 
     const pages = useMemo<PageChunk[]>(() => {
-        const hasAnyPageNumbers = words.some((w) => w.page_number != null);
+        const numberedWords = words.filter((w) => w.page_number != null);
 
-        if (hasAnyPageNumbers) {
+        if (numberedWords.length > 0) {
             const grouped = new Map<number, ReadAlongWord[]>();
 
-            for (const w of words) {
-                const page = w.page_number ?? -1;
+            for (const w of numberedWords) {
+                const page = w.page_number as number;
                 if (!grouped.has(page)) grouped.set(page, []);
                 grouped.get(page)!.push(w);
             }
 
-            const sortedPages = Array.from(grouped.entries()).sort((a, b) => a[0] - b[0]);
+            const pageNumbers = Array.from(grouped.keys()).sort((a, b) => a - b);
+            const minPage = pageNumbers[0];
+            const maxPage = pageNumbers[pageNumbers.length - 1];
 
             const result: PageChunk[] = [];
 
-            for (const [pageNum, pageWords] of sortedPages) {
+            for (let pageNum = minPage; pageNum <= maxPage; pageNum++) {
+                const pageWords = grouped.get(pageNum) ?? [];
+
+                if (pageWords.length === 0) {
+                    result.push({
+                        label: `Page ${pageNum}`,
+                        words: [],
+                    });
+                    continue;
+                }
+
                 const chunks = chunkArray(pageWords, 6);
 
                 chunks.forEach((chunk, idx) => {
                     result.push({
                         label:
                             chunks.length === 1
-                                ? pageNum === -1
-                                    ? "No page"
-                                    : `Page ${pageNum}`
-                                : pageNum === -1
-                                    ? `No page (${idx + 1})`
-                                    : `Page ${pageNum} (${idx + 1})`,
+                                ? `Page ${pageNum}`
+                                : `Page ${pageNum} (${idx + 1})`,
                         words: chunk,
                     });
                 });
@@ -312,30 +320,39 @@ export default function ReadAlongPage() {
                 </div>
 
                 <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm transition-all duration-200">
-                    <div className="mx-auto max-w-2xl space-y-8 text-center">
-                        {currentPage.words.map((w) => (
-                            <div
-                                key={w.id}
-                                className="border-b border-stone-100 pb-6 last:border-b-0 last:pb-0"
-                            >
-                                <div className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-                                    {w.surface || "—"}
+                    {currentPage.words.length === 0 ? (
+                        <div className="mx-auto max-w-2xl py-16 text-center">
+                            <div className="text-2xl font-semibold text-stone-700">No saved words here.</div>
+                            <p className="mt-3 text-sm text-stone-500">
+                                You knew everything!
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="mx-auto max-w-2xl space-y-8 text-center">
+                            {currentPage.words.map((w) => (
+                                <div
+                                    key={w.id}
+                                    className="border-b border-stone-100 pb-6 last:border-b-0 last:pb-0"
+                                >
+                                    <div className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
+                                        {w.surface || "—"}
+                                    </div>
+
+                                    {(supportMode === "full" || supportMode === "reading") && (
+                                        <div className="mt-2 text-lg text-stone-500">
+                                            {w.reading || "—"}
+                                        </div>
+                                    )}
+
+                                    {(supportMode === "full" || supportMode === "meaning") && (
+                                        <div className="mt-3 mx-auto max-w-xl text-left text-base leading-7 text-stone-700 sm:text-lg">
+                                            {w.meaning || "—"}
+                                        </div>
+                                    )}
                                 </div>
-
-                                {(supportMode === "full" || supportMode === "reading") && (
-                                    <div className="mt-2 text-lg text-stone-500">
-                                        {w.reading || "—"}
-                                    </div>
-                                )}
-
-                                {(supportMode === "full" || supportMode === "meaning") && (
-                                    <div className="mt-3 mx-auto max-w-xl text-left text-base leading-7 text-stone-700 sm:text-lg">
-                                        {w.meaning || "—"}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </main>

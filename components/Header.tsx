@@ -15,8 +15,11 @@ export default function Header() {
           </Link>
         </div>
 
-        <nav className="mt-2 flex flex-wrap justify-center gap-3 text-sm md:justify-end">
-          <Link href="/books" className="text-stone-700 transition hover:text-stone-900">
+        <nav className="mt-2 flex flex-wrap items-center justify-center gap-3 text-sm md:justify-end">
+          <Link
+            href="/books"
+            className="text-base font-semibold text-stone-900 transition hover:text-black md:text-lg"
+          >
             Library
           </Link>
 
@@ -25,7 +28,7 @@ export default function Header() {
             onClick={() =>
               alert("Book Hubs are coming soon. For now, choose a book from your Library.")
             }
-            className="text-stone-700 transition hover:text-stone-900"
+            className="leading-none text-stone-700 transition hover:text-stone-900"
           >
             Book Hubs
           </button>
@@ -42,7 +45,7 @@ export default function Header() {
 
           <Link
             href="/vocab/dictionary"
-            className="text-stone-700 transition hover:text-stone-900"
+            className="leading-none text-stone-700 transition hover:text-stone-900"
           >
             Dictionary
           </Link>

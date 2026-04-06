@@ -13,6 +13,9 @@ type UserBookWordRow = {
   created_at: string;
   hidden: boolean | null;
   vocabulary_cache_id: number | null;
+  chapter_number: number | null;
+  chapter_name: string | null;
+  page_number: number | null;
 };
 
 type QuizCard = {
@@ -26,6 +29,9 @@ type QuizCard = {
   strokeCount: number | null;
   radical: string | null;
   radicalName: string | null;
+  chapterNumber: number | null;
+  chapterName: string | null;
+  pageNumber: number | null;
 };
 
 type RecallResult = "correct" | "wrong" | "shown" | null;
@@ -96,6 +102,13 @@ function getKanjiPositionHint(sourceWord: string, kanji: string) {
   return `${index + 1} of ${chars.length}`;
 }
 
+function isKunWithOkurigana(surface: string) {
+  const hasKanji = /[\p{Script=Han}]/u.test(surface);
+  const hasHiragana = /[\p{Script=Hiragana}]/u.test(surface);
+
+  return hasKanji && hasHiragana;
+}
+
 export default function WeeklyReadingsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
@@ -122,6 +135,34 @@ export default function WeeklyReadingsPage() {
   const [endedEarly, setEndedEarly] = useState(false);
   const [usedRecallWords, setUsedRecallWords] = useState<string[]>([]);
   const [cardsSinceLastRecall, setCardsSinceLastRecall] = useState(0);
+
+  const [includeOkurigana, setIncludeOkurigana] = useState(false);
+
+  const [chapterFilter, setChapterFilter] = useState<string>("all");
+  const availableChapters = useMemo(() => {
+    return Array.from(
+      new Set(
+        baseCards
+          .map((c) => c.chapterNumber)
+          .filter((n): n is number => n != null)
+      )
+    ).sort((a, b) => a - b);
+  }, [baseCards]);
+
+  const filteredBaseCards = useMemo(() => {
+    if (chapterFilter === "all") return baseCards;
+
+    const selected = Number(chapterFilter);
+    return baseCards.filter((c) => c.chapterNumber === selected);
+  }, [baseCards, chapterFilter]);
+
+  useEffect(() => {
+    buildDeckFromCards(filteredBaseCards);
+    setSkipTypingThisSession(false);
+    setEndedEarly(false);
+    setUsedRecallWords([]);
+    setCardsSinceLastRecall(0);
+  }, [filteredBaseCards]);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -163,7 +204,7 @@ export default function WeeklyReadingsPage() {
 
         const { data: rows, error: cardsErr } = await supabase
           .from("user_book_words")
-          .select("id, surface, reading, meaning, created_at, hidden, vocabulary_cache_id")
+          .select("id, surface, reading, meaning, created_at, hidden, vocabulary_cache_id, chapter_number, chapter_name, page_number")
           .eq("user_book_id", userBookId)
           .not("reading", "is", null)
           .eq("hidden", false)
@@ -184,8 +225,7 @@ export default function WeeklyReadingsPage() {
             "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, created_at"
           )
           .in("vocabulary_cache_id", vocabularyCacheIds)
-          .order("created_at", { ascending: false })
-          .limit(100);
+          .order("created_at", { ascending: false });
 
         if (kanjiMapErr) throw kanjiMapErr;
 
@@ -199,73 +239,60 @@ export default function WeeklyReadingsPage() {
 
         if (cardsErr) throw cardsErr;
 
-        const sourceWords = Array.from(
-          new Set((rows ?? []).map((r) => r.surface?.trim()).filter(Boolean))
-        ) as string[];
+        const core: QuizCard[] = (rows ?? [])
+          .flatMap((r) => {
+            const surface = r.surface?.trim() ?? "";
+            const fallbackReading = r.reading?.trim() ?? "";
 
-        const sourceWordMap = new Map<string, { meaning: string | null; reading: string | null }>();
+            if (surface.length === 0 || fallbackReading.length === 0) {
+              return [];
+            }
 
-        const core: QuizCard[] = (rows ?? []).flatMap((r) => {
-          const surface = r.surface?.trim() ?? "";
-          const fallbackReading = r.reading?.trim() ?? "";
+            const cacheId = r.vocabulary_cache_id;
+            const kanjiRows =
+              cacheId != null ? (kanjiMapByCacheId.get(cacheId) ?? []) : [];
 
-          if (surface.length === 0 || fallbackReading.length === 0) {
+            if (kanjiRows.length > 0) {
+              return kanjiRows.map((km: any, i: number) => {
+                const readingType: QuizCard["readingType"] =
+                  km.reading_type === "on"
+                    ? "onyomi"
+                    : km.reading_type === "kun"
+                      ? "kunyomi"
+                      : km.reading_type === "other"
+                        ? "other"
+                        : null;
+
+                return {
+                  key: `${r.id}-${km.kanji}-${i}`,
+                  kanji: km.kanji,
+                  reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
+                  readingType,
+                  sourceWord: surface,
+                  sourceMeaning: r.meaning ?? null,
+                  sourceReading: r.reading ?? null,
+                  strokeCount: null,
+                  radical: null,
+                  radicalName: null,
+                  chapterNumber: r.chapter_number ?? null,
+                  chapterName: r.chapter_name ?? null,
+                  pageNumber: r.page_number ?? null,
+                };
+              });
+            }
+
             return [];
-          }
+          })
+          .filter((card) => {
+            if (includeOkurigana) return true;
 
-          const cacheId = r.vocabulary_cache_id;
-          const kanjiRows =
-            cacheId != null ? (kanjiMapByCacheId.get(cacheId) ?? []) : [];
+            if (card.readingType !== "kunyomi") return true;
+            if (!card.sourceWord) return true;
 
-          if (kanjiRows.length > 0) {
-            return kanjiRows.map((km: any, i: number) => ({
-              key: `${r.id}-${km.kanji}-${i}`,
-              kanji: km.kanji,
-              reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
-              readingType:
-                km.reading_type === "on"
-                  ? "onyomi"
-                  : km.reading_type === "kun"
-                    ? "kunyomi"
-                    : km.reading_type === "other"
-                      ? "other"
-                      : null,
-              sourceWord: surface,
-              sourceMeaning: r.meaning ?? null,
-              sourceReading: r.reading ?? null,
-              strokeCount: null,
-              radical: null,
-              radicalName: null,
-            }));
-          }
-
-          return [];
-        });
+            return !isKunWithOkurigana(card.sourceWord);
+          });
 
         setBaseCards(core);
-
-        if (core.length > 0) {
-          const firstRound = shuffleArray(core).map((c, i) => ({
-            ...c,
-            key: `${c.key}-first-${i}`,
-          }));
-
-          const repeatsNeeded = Math.max(40 - firstRound.length, 0);
-          const repeatPool: QuizCard[] = [];
-
-          for (let i = 0; i < repeatsNeeded; i++) {
-            const picked = core[Math.floor(Math.random() * core.length)];
-            repeatPool.push({
-              ...picked,
-              key: `${picked.key}-repeat-${i}`,
-            });
-          }
-
-          const finalDeck = [...firstRound, ...shuffleArray(repeatPool)];
-          setDeck(finalDeck);
-        } else {
-          setDeck([]);
-        }
 
         await supabase
           .from("user_books")
@@ -282,6 +309,10 @@ export default function WeeklyReadingsPage() {
   }, [userBookId]);
 
   const card = deck[index];
+  const isSmallSet =
+    chapterFilter !== "all" &&
+    filteredBaseCards.length > 0 &&
+    filteredBaseCards.length < 8;
 
   const kanjiPositionHint =
     card ? getKanjiPositionHint(card.sourceWord, card.kanji) : "";
@@ -312,8 +343,12 @@ export default function WeeklyReadingsPage() {
     const distractorPool = Array.from(
       new Set(
         baseCards
+          .filter(
+            (c) =>
+              c.readingType === card.readingType &&
+              normalizeReading(c.reading) !== normalizeReading(correct)
+          )
           .map((c) => c.reading)
-          .filter((r) => normalizeReading(r) !== normalizeReading(correct))
       )
     );
 
@@ -322,7 +357,7 @@ export default function WeeklyReadingsPage() {
     return shuffleArray([correct, ...shuffled]).map((r) =>
       formatReadingForType(r, displayType)
     );
-  }, [card, baseCards, index]);
+  }, [card, baseCards]);
 
   function resetCardState() {
     setSelected(null);
@@ -330,6 +365,35 @@ export default function WeeklyReadingsPage() {
     setGuessInput("");
     setRecallRevealed(false);
     setRecallResult(null);
+  }
+
+  function buildDeckFromCards(cards: QuizCard[]) {
+    if (cards.length === 0) {
+      setDeck([]);
+      setIndex(0);
+      resetCardState();
+      return;
+    }
+
+    const firstRound = shuffleArray(cards).map((c, i) => ({
+      ...c,
+      key: `${c.key}-deck-first-${i}`,
+    }));
+
+    const repeatsNeeded = Math.max(40 - firstRound.length, 0);
+    const repeatPool: QuizCard[] = [];
+
+    for (let i = 0; i < repeatsNeeded; i++) {
+      const picked = cards[Math.floor(Math.random() * cards.length)];
+      repeatPool.push({
+        ...picked,
+        key: `${picked.key}-deck-repeat-${i}`,
+      });
+    }
+
+    setDeck([...firstRound, ...shuffleArray(repeatPool)]);
+    setIndex(0);
+    resetCardState();
   }
 
   function restartDeck() {
@@ -576,6 +640,40 @@ export default function WeeklyReadingsPage() {
       <p className="text-sm text-gray-500">
         Card {index + 1}/{deck.length}
       </p>
+      <div className="mt-3 flex items-center gap-2">
+        <label className="text-sm text-gray-600">Chapter:</label>
+        <select
+          value={chapterFilter}
+          onChange={(e) => setChapterFilter(e.target.value)}
+          className="rounded border px-3 py-2 text-sm bg-white"
+        >
+          <option value="all">All chapters</option>
+          {availableChapters.map((ch) => (
+            <option key={ch} value={String(ch)}>
+              Chapter {ch}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={includeOkurigana}
+          onChange={(e) => setIncludeOkurigana(e.target.checked)}
+        />
+        <label className="text-sm text-gray-600">
+          Include kunyomi words with okurigana
+        </label>
+      </div>
+
+      {isSmallSet && (
+        <p className="mt-2 text-sm text-amber-600 text-center">
+          Only {filteredBaseCards.length} card
+          {filteredBaseCards.length === 1 ? "" : "s"} in this chapter — reviewing all available.
+        </p>
+      )}
+
       <div
         className="mt-6 relative w-[90vw] max-w-xl min-h-72 bg-white rounded-2xl border border-slate-500 shadow-2xl flex items-center justify-center text-center select-none p-8"
         onClick={() => {
@@ -817,7 +915,7 @@ export default function WeeklyReadingsPage() {
         </div>
       </div>
       <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
-        Kanji have many possible readings. These readings are just for these specific words. Focus on the connection and watch for it when you meet it again.
+        Kanji have many possible readings. These readings are for specific words in your reading. Focus on the connection and watch for it when you meet it again. These are not the only fixed readings for the kanji.
       </p>
       <div className="mt-4 flex flex-col items-center gap-2">
         <button

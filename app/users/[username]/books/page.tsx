@@ -1,7 +1,7 @@
 // Library
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getLessonAlertInfo } from "@/lib/lessonAlerts";
@@ -16,6 +16,8 @@ type Book = {
   isbn13: string | null;
   cover_url: string | null;
   page_count: number | null;
+  book_type: string | null;
+  audience_category: string | null;
 };
 
 type UserBookRow = {
@@ -28,6 +30,9 @@ type UserBookRow = {
   has_new_vocab: boolean;
   has_new_reading: boolean;
   books: Book | null;
+  format_type: string | null;
+  progress_mode: string | null;
+  show_page_numbers: boolean | null;
 };
 
 type ProfileRole = "teacher" | "member" | "student";
@@ -299,8 +304,33 @@ export default function BooksPage() {
   const [isSavingRequest, setIsSavingRequest] = useState(false);
   const [showRequestBook, setShowRequestBook] = useState(false);
 
+  const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
+  const [audienceFilter, setAudienceFilter] = useState<string>("all");
+  const [formatFilter, setFormatFilter] = useState<string>("all");
+  const [statsBookTypeFilter, setStatsBookTypeFilter] = useState<string>("all");
+
   const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const matchesBookType =
+        bookTypeFilter === "all" ||
+        row.books?.book_type === bookTypeFilter;
+
+      const matchesAudience =
+        audienceFilter === "all" ||
+        row.books?.audience_category === audienceFilter;
+
+      const matchesFormat =
+        formatFilter === "all" ||
+        row.format_type === formatFilter;
+
+      return matchesBookType && matchesAudience && matchesFormat;
+    });
+  }, [rows, bookTypeFilter, audienceFilter, formatFilter]);
+
+  const validRows = filteredRows.filter((r) => !!r.books);
 
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<"title" | "last_read" | "pace" | "lookups">("title");
@@ -334,7 +364,12 @@ export default function BooksPage() {
 
       const { data: userBooksRows, error: userBooksErr } = await supabase
         .from("user_books")
-        .select("id")
+        .select(`
+    id,
+    books:book_id (
+      book_type
+    )
+  `)
         .eq("user_id", userId);
 
       if (userBooksErr) {
@@ -350,7 +385,14 @@ export default function BooksPage() {
         return;
       }
 
-      const userBookIds = (userBooksRows ?? []).map((r) => r.id).filter(Boolean);
+      const filteredUserBooks = (userBooksRows ?? []).filter((r: any) => {
+        return (
+          statsBookTypeFilter === "all" ||
+          r.books?.book_type === statsBookTypeFilter
+        );
+      });
+
+      const userBookIds = filteredUserBooks.map((r: any) => r.id).filter(Boolean);
 
       if (userBookIds.length === 0) {
         setMonthlyStats({
@@ -468,29 +510,25 @@ export default function BooksPage() {
 
     const { data, error } = await supabase
       .from("user_books")
-      .select(
-        `
+      .select(`
+        id,
+        user_id,
+        started_at,
+        finished_at,
+        dnf_at,
+        format_type,
+        progress_mode,
+        show_page_numbers,
+        books (
           id,
-          book_id,
-          started_at,
-          finished_at,
-          dnf_at,
-          notify_banner,
-          has_new_vocab,
-          has_new_reading,
-          books:book_id (
-            id,
-            title,
-            author,
-            translator,
-            illustrator,
-            publisher,
-            isbn13,
-            cover_url,
-            page_count
-          )
-        `
-      )
+          title,
+          author,
+          cover_url,
+          page_count,
+          book_type,
+          audience_category
+        )
+      `)
       .eq("user_id", targetUserId)
       .order("created_at", { ascending: false });
 
@@ -979,7 +1017,7 @@ export default function BooksPage() {
   useEffect(() => {
     if (!viewingUserId || !selectedMonth) return;
     loadMonthlyLibraryStats(viewingUserId, selectedMonth);
-  }, [viewingUserId, selectedMonth]);
+  }, [viewingUserId, selectedMonth, statsBookTypeFilter]);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -1086,8 +1124,6 @@ export default function BooksPage() {
 
     loadAlerts();
   }, [viewingUserId, meId, isTeacher, students]);
-
-  const validRows = rows.filter((r) => !!r.books);
 
   const currentlyReading = validRows.filter(
     (r) => !!r.started_at && !r.finished_at && !r.dnf_at
@@ -1342,17 +1378,36 @@ export default function BooksPage() {
                 </p>
               </div>
 
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
-              >
-                {monthOptions.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-col gap-2 sm:items-end">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                >
+                  {monthOptions.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={statsBookTypeFilter}
+                  onChange={(e) => setStatsBookTypeFilter(e.target.value)}
+                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                >
+                  <option value="all">All Book Types</option>
+                  <option value="picture_book">Picture Book</option>
+                  <option value="novel">Novel</option>
+                  <option value="short_story">Short Story</option>
+                  <option value="manga">Manga</option>
+                  <option value="nonfiction">Nonfiction</option>
+                  <option value="essay">Essay</option>
+                  <option value="memoir">Memoir</option>
+                  <option value="textbook">Textbook</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1419,39 +1474,6 @@ export default function BooksPage() {
         <UserBar isTeacher={isTeacher} variant="labelOnly" />
 
         <div className="mb-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
-              <button
-                onClick={() => setViewMode("cover")}
-                className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
-                  }`}
-              >
-                Cover
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
-                  }`}
-              >
-                List
-              </button>
-            </div>
-
-            {viewMode === "list" && (
-              <select
-                value={sortMode}
-                onChange={(e) =>
-                  setSortMode(e.target.value as "title" | "last_read" | "pace" | "lookups")
-                }
-                className="rounded-lg border bg-white px-3 py-1 text-sm text-stone-700"
-              >
-                <option value="title">Title</option>
-                <option value="last_read">Recently Finished</option>
-                <option value="pace">Avg Min/Page</option>
-                <option value="lookups">Saved Vocab</option>
-              </select>
-            )}
-          </div>
 
           {isTeacher ? (
             <div className="mb-4 max-w-md space-y-2">
@@ -1499,6 +1521,85 @@ export default function BooksPage() {
           ) : null}
         </div>
 
+        <div className="flex flex-wrap gap-3">
+          <select
+            value={bookTypeFilter}
+            onChange={(e) => setBookTypeFilter(e.target.value)}
+            className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+          >
+            <option value="all">All Book Types</option>
+            <option value="picture_book">Picture Book</option>
+            <option value="novel">Novel</option>
+            <option value="short_story">Short Story</option>
+            <option value="manga">Manga</option>
+            <option value="nonfiction">Nonfiction</option>
+            <option value="essay">Essay</option>
+            <option value="memoir">Memoir</option>
+            <option value="textbook">Textbook</option>
+            <option value="other">Other</option>
+          </select>
+
+          <select
+            value={audienceFilter}
+            onChange={(e) => setAudienceFilter(e.target.value)}
+            className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+          >
+            <option value="all">All Audiences</option>
+            <option value="children">Children</option>
+            <option value="middle_grade">Middle Grade</option>
+            <option value="ya">YA</option>
+            <option value="adult">Adult</option>
+            <option value="all_ages">All Ages</option>
+          </select>
+
+          <select
+            value={formatFilter}
+            onChange={(e) => setFormatFilter(e.target.value)}
+            className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+          >
+            <option value="all">All Formats</option>
+            <option value="paperback">Paperback</option>
+            <option value="hardcover">Hardcover</option>
+            <option value="ebook">eBook</option>
+            <option value="audiobook">Audiobook</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <br />
+        <div className="flex items-center justify-between gap-3">
+          <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
+            <button
+              onClick={() => setViewMode("cover")}
+              className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
+                }`}
+            >
+              Cover
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
+                }`}
+            >
+              List
+            </button>
+          </div>
+
+          {viewMode === "list" && (
+            <select
+              value={sortMode}
+              onChange={(e) =>
+                setSortMode(e.target.value as "title" | "last_read" | "pace" | "lookups")
+              }
+              className="rounded-lg border bg-white px-3 py-1 text-sm text-stone-700"
+            >
+              <option value="title">Title</option>
+              <option value="last_read">Recently Finished</option>
+              <option value="pace">Avg Min/Page</option>
+              <option value="lookups">Saved Vocab</option>
+            </select>
+          )}
+        </div>
+        <br />
         <p className="mb-6 text-sm text-gray-600">
           All study tools live inside each book. Click a cover to open its Book Hub.
         </p>

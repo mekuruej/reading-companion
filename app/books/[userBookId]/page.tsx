@@ -15,6 +15,8 @@ type Book = {
   cover_url: string | null;
 
   genre: string | null;
+  book_type: string | null;
+  audience_category: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
   isbn: string | null;
@@ -48,6 +50,10 @@ type UserBook = {
   rating_difficulty: number | null;
   reader_level: string | null;
   recommended_level: string | null;
+
+  format_type: string | null;
+  progress_mode: string | null;
+  show_page_numbers: boolean | null;
 
   books: Book | null;
 };
@@ -113,7 +119,65 @@ type VocabCacheQueueRow = {
   vocabulary_kanji_map: KanjiMapRow[] | null;
 };
 
+type SavedKanjiReading = {
+  kanji: string;
+  reading_type: "on" | "kun" | "other" | null;
+  base_reading: string | null;
+  realized_reading: string | null;
+  updated_at?: string | null;
+};
+
+type SessionKanjiReading = {
+  reading_type: "on" | "kun" | "other" | null;
+  base: string | null;
+  realized: string | null;
+};
+
 const LEVEL_OPTIONS = ["N5", "N4", "N3", "N2", "N1"] as const;
+
+const BOOK_TYPE_OPTIONS = [
+  { value: "picture_book", label: "Picture Book" },
+  { value: "novel", label: "Novel" },
+  { value: "short_story", label: "Short Story" },
+  { value: "manga", label: "Manga" },
+  { value: "nonfiction", label: "Nonfiction" },
+  { value: "essay", label: "Essay" },
+  { value: "memoir", label: "Memoir" },
+  { value: "textbook", label: "Textbook" },
+  { value: "other", label: "Other" },
+] as const;
+
+const GENRE_OPTIONS = [
+  { value: "fantasy", label: "Fantasy" },
+  { value: "science_fiction", label: "Science Fiction" },
+  { value: "mystery", label: "Mystery" },
+  { value: "thriller", label: "Thriller" },
+  { value: "romance", label: "Romance" },
+  { value: "historical_fiction", label: "Historical Fiction" },
+  { value: "literary_fiction", label: "Literary Fiction" },
+  { value: "adventure", label: "Adventure" },
+  { value: "horror", label: "Horror" },
+  { value: "humor", label: "Humor" },
+  { value: "slice_of_life", label: "Slice of Life" },
+  { value: "memoir", label: "Memoir" },
+  { value: "biography", label: "Biography" },
+  { value: "history", label: "History" },
+  { value: "self_help", label: "Self-Help" },
+  { value: "language_learning", label: "Language Learning" },
+  { value: "education", label: "Education" },
+  { value: "essays", label: "Essays" },
+  { value: "reference", label: "Reference" },
+  { value: "general_nonfiction", label: "General Nonfiction" },
+  { value: "other", label: "Other" },
+] as const;
+
+const AUDIENCE_CATEGORY_OPTIONS = [
+  { value: "children", label: "Children" },
+  { value: "middle_grade", label: "Middle Grade" },
+  { value: "ya", label: "YA" },
+  { value: "adult", label: "Adult" },
+  { value: "all_ages", label: "All Ages" },
+] as const;
 
 const DIFFICULTY_OPTIONS = [
   { value: 1, label: "Extremely difficult" },
@@ -192,6 +256,50 @@ function stars5(value: number | null) {
   return "★".repeat(v) + "☆".repeat(5 - v);
 }
 
+function formatTypeLabel(value: string | null | undefined) {
+  switch (value) {
+    case "paperback":
+      return "Paperback";
+    case "hardcover":
+      return "Hardcover";
+    case "ebook":
+      return "eBook";
+    case "audiobook":
+      return "Audiobook";
+    case "other":
+      return "Other";
+    default:
+      return "—";
+  }
+}
+
+function bookTypeLabel(value: string | null | undefined) {
+  return (
+    BOOK_TYPE_OPTIONS.find((opt) => opt.value === value)?.label ?? "—"
+  );
+}
+
+function audienceCategoryLabel(value: string | null | undefined) {
+  return (
+    AUDIENCE_CATEGORY_OPTIONS.find((opt) => opt.value === value)?.label ?? "—"
+  );
+}
+
+function progressModeLabel(value: string | null | undefined) {
+  switch (value) {
+    case "pages":
+      return "Pages";
+    case "percent":
+      return "Percent";
+    case "chapters":
+      return "Chapters";
+    case "time":
+      return "Time";
+    default:
+      return "—";
+  }
+}
+
 function formatMinutes(total: number | null) {
   if (!total || total <= 0) return "—";
 
@@ -209,6 +317,10 @@ function formatTimer(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function genreLabel(value: string | null | undefined) {
+  return GENRE_OPTIONS.find((opt) => opt.value === value)?.label ?? "—";
+}
+
 function levelStars(level: string | null | undefined) {
   switch ((level ?? "").toUpperCase()) {
     case "N1":
@@ -224,6 +336,12 @@ function levelStars(level: string | null | undefined) {
     default:
       return "—";
   }
+}
+
+function hiraToKata(text: string) {
+  return text.replace(/[\u3041-\u3096]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) + 0x60)
+  );
 }
 
 export default function BookHubPage() {
@@ -261,6 +379,8 @@ export default function BookHubPage() {
   const [recommendedLevel, setRecommendedLevel] = useState<string>("");
 
   const [genre, setGenre] = useState<string>("");
+  const [bookType, setBookType] = useState<string>("");
+  const [audienceCategory, setAudienceCategory] = useState<string>("");
   const [triggerWarnings, setTriggerWarnings] = useState<string>("");
   const [pageCount, setPageCount] = useState<string>("");
   const [isbn, setIsbn] = useState<string>("");
@@ -295,12 +415,16 @@ export default function BookHubPage() {
   const [savingCharacterIds, setSavingCharacterIds] = useState<string[]>([]);
   const [savedCharacterIds, setSavedCharacterIds] = useState<string[]>([]);
 
+  const [savedKanjiDefaults, setSavedKanjiDefaults] = useState<
+    Record<string, SessionKanjiReading>
+  >({});
 
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [sessionDate, setSessionDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
+
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -344,11 +468,15 @@ export default function BookHubPage() {
   const kanjiReadingMemoryRef = useRef<
     Record<
       string,
-      {
-        reading_type: "on" | "kun" | "other" | null;
-        base: string | null;
-        realized: string | null;
-      }
+      Partial<
+        Record<
+          "on" | "kun" | "other",
+          {
+            base: string | null;
+            realized: string | null;
+          }
+        >
+      >
     >
   >({});
 
@@ -400,6 +528,10 @@ export default function BookHubPage() {
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
   const book = row?.books ?? null;
+
+  const [formatType, setFormatType] = useState<string>("");
+  const [progressMode, setProgressMode] = useState<string>("");
+  const [showPageNumbers, setShowPageNumbers] = useState(true);
 
   const totalPagesRead = useMemo(
     () => readingSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0),
@@ -608,7 +740,10 @@ export default function BookHubPage() {
       }
     }
 
-    await loadKanjiMapQueue();
+    if (row?.id) {
+      await loadSavedKanjiDefaults(row.id);
+      await loadKanjiMapQueue();
+    }
     setOpenKanjiWordId(null);
     setSavingKanjiWordId(null);
   }
@@ -767,9 +902,116 @@ export default function BookHubPage() {
     setChapterSummaries((data as ChapterSummary[]) ?? []);
   }
 
+  async function loadSavedKanjiDefaults(userBookIdValue: string) {
+    const { data: bookWordRows, error: bookWordErr } = await supabase
+      .from("user_book_words")
+      .select("vocabulary_cache_id")
+      .eq("user_book_id", userBookIdValue)
+      .not("vocabulary_cache_id", "is", null);
+
+    if (bookWordErr) {
+      console.error("Error loading book vocabulary cache ids:", bookWordErr);
+      setSavedKanjiDefaults({});
+      return;
+    }
+
+    const cacheIds = Array.from(
+      new Set(
+        (bookWordRows ?? [])
+          .map((r: any) => r.vocabulary_cache_id)
+          .filter((id: number | null) => id != null)
+      )
+    );
+
+    if (cacheIds.length === 0) {
+      setSavedKanjiDefaults({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("vocabulary_kanji_map")
+      .select("kanji, reading_type, base_reading, realized_reading")
+      .in("vocabulary_cache_id", cacheIds);
+
+    if (error) {
+      console.error("Error loading saved kanji defaults:", error);
+      setSavedKanjiDefaults({});
+      return;
+    }
+
+    const rows = (data ?? []) as Array<{
+      kanji: string;
+      reading_type: "on" | "kun" | "other" | null;
+      base_reading: string | null;
+      realized_reading: string | null;
+    }>;
+
+    const byKanji: Record<string, SessionKanjiReading> = {};
+
+    for (const row of rows) {
+      if (!row.kanji) continue;
+
+      const nextValue: SessionKanjiReading = {
+        reading_type: row.reading_type,
+        base: row.base_reading,
+        realized: row.realized_reading,
+      };
+
+      const hasUsefulReading =
+        !!nextValue.base?.trim() || !!nextValue.realized?.trim();
+
+      if (!hasUsefulReading) continue;
+
+      const existing = byKanji[row.kanji];
+
+      if (!existing) {
+        byKanji[row.kanji] = nextValue;
+        continue;
+      }
+
+      if (existing.reading_type === "on") continue;
+
+      if (row.reading_type === "on") {
+        byKanji[row.kanji] = nextValue;
+      }
+    }
+
+    setSavedKanjiDefaults(byKanji);
+  }
+
   async function loadKanjiMapQueue() {
+    if (!row?.id) return;
+
     setKanjiMapLoading(true);
     setKanjiMapError(null);
+
+    const { data: bookWordRows, error: bookWordErr } = await supabase
+      .from("user_book_words")
+      .select("vocabulary_cache_id")
+      .eq("user_book_id", row.id)
+      .not("vocabulary_cache_id", "is", null);
+
+    if (bookWordErr) {
+      console.error("Error loading book vocabulary cache ids:", bookWordErr);
+      setKanjiMapQueue([]);
+      setKanjiMapError(bookWordErr.message);
+      setKanjiMapLoading(false);
+      return;
+    }
+
+    const cacheIds = Array.from(
+      new Set(
+        (bookWordRows ?? [])
+          .map((r: any) => r.vocabulary_cache_id)
+          .filter((id: number | null) => id != null)
+      )
+    );
+
+    if (cacheIds.length === 0) {
+      setKanjiMapQueue([]);
+      setKanjiMapLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("vocabulary_cache")
@@ -789,6 +1031,7 @@ export default function BookHubPage() {
         realized_reading
       )
     `)
+      .in("id", cacheIds)
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -1047,16 +1290,32 @@ export default function BookHubPage() {
     const rows = (data ?? []) as KanjiMapRow[];
 
     const enrichedRows = rows.map((r) => {
-      const memory = kanjiReadingMemoryRef.current[r.kanji];
+      const sessionMemory = kanjiReadingMemoryRef.current[r.kanji];
+      const savedDefault = savedKanjiDefaults[r.kanji];
 
-      if (!memory) return r;
+      const rememberedForType =
+        r.reading_type && sessionMemory
+          ? sessionMemory[r.reading_type]
+          : null;
 
-      return {
-        ...r,
-        reading_type: r.reading_type || memory.reading_type,
-        base_reading: r.base_reading || memory.base,
-        realized_reading: r.realized_reading || memory.realized,
-      };
+      if (rememberedForType) {
+        return {
+          ...r,
+          base_reading: r.base_reading || rememberedForType.base,
+          realized_reading: r.realized_reading || rememberedForType.realized,
+        };
+      }
+
+      if (savedDefault) {
+        return {
+          ...r,
+          reading_type: r.reading_type || savedDefault.reading_type,
+          base_reading: r.base_reading || savedDefault.base,
+          realized_reading: r.realized_reading || savedDefault.realized,
+        };
+      }
+
+      return r;
     });
 
     setEditingKanjiRows((prev) => ({
@@ -1079,19 +1338,22 @@ export default function BookHubPage() {
         if (row.id !== rowId) return row;
 
         const nextValue = value === "" ? null : value;
-
-        const memory = kanjiReadingMemoryRef.current[row.kanji];
+        const kanjiMemory = kanjiReadingMemoryRef.current[row.kanji] ?? {};
 
         let updatedRow: KanjiMapRow = row;
 
         if (field === "reading_type") {
+          const nextType = nextValue as "on" | "kun" | "other" | null;
+          const remembered =
+            nextType && kanjiMemory[nextType]
+              ? kanjiMemory[nextType]
+              : null;
+
           updatedRow = {
             ...row,
-            reading_type: nextValue as "on" | "kun" | "other" | null,
-            base_reading:
-              row.base_reading || memory?.base || null,
-            realized_reading:
-              row.realized_reading || memory?.realized || null,
+            reading_type: nextType,
+            base_reading: remembered?.base ?? null,
+            realized_reading: remembered?.realized ?? null,
           };
         } else if (field === "base_reading") {
           const prevBase = row.base_reading ?? "";
@@ -1112,11 +1374,16 @@ export default function BookHubPage() {
           };
         }
 
-        kanjiReadingMemoryRef.current[row.kanji] = {
-          reading_type: updatedRow.reading_type,
-          base: updatedRow.base_reading,
-          realized: updatedRow.realized_reading,
-        };
+        const type = updatedRow.reading_type;
+        if (type) {
+          kanjiReadingMemoryRef.current[row.kanji] = {
+            ...(kanjiReadingMemoryRef.current[row.kanji] ?? {}),
+            [type]: {
+              base: updatedRow.base_reading,
+              realized: updatedRow.realized_reading,
+            },
+          };
+        }
 
         return updatedRow;
       }),
@@ -1291,6 +1558,9 @@ export default function BookHubPage() {
         rating_difficulty,
         reader_level,
         recommended_level,
+        format_type,
+        progress_mode,
+        show_page_numbers,
         books (
           id,
           title,
@@ -1300,6 +1570,8 @@ export default function BookHubPage() {
           illustrator,
           cover_url,
           genre,
+          book_type,
+          audience_category,
           trigger_warnings,
           page_count,
           isbn,
@@ -1342,9 +1614,14 @@ export default function BookHubPage() {
 
     setReaderLevel(r.reader_level ?? "");
     setRecommendedLevel(r.recommended_level ?? "");
+    setFormatType(r.format_type ?? "");
+    setProgressMode(r.progress_mode ?? "");
+    setShowPageNumbers(r.show_page_numbers ?? true);
 
     const b = r.books as Book | null;
     setGenre(b?.genre ?? "");
+    setBookType(b?.book_type ?? "");
+    setAudienceCategory(b?.audience_category ?? "");
     setTriggerWarnings(b?.trigger_warnings ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
@@ -1372,6 +1649,7 @@ export default function BookHubPage() {
     await loadReadingSessions(r.id);
     await loadChapterSummaries(r.id);
     await loadCharacters(r.id);
+    await loadSavedKanjiDefaults(r.id);
     await loadKanjiMapQueue();
 
     setLoading(false);
@@ -1436,8 +1714,15 @@ export default function BookHubPage() {
     setReaderLevel(row.reader_level ?? "");
     setRecommendedLevel(row.recommended_level ?? "");
 
+    setFormatType(row.format_type ?? "");
+    setProgressMode(row.progress_mode ?? "");
+    setShowPageNumbers(row.show_page_numbers ?? true);
+
     const b = row.books;
     setGenre(b?.genre ?? "");
+    setBookType(b?.book_type ?? "");
+    setAudienceCategory(b?.audience_category ?? "");
+
     setTriggerWarnings(b?.trigger_warnings ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
@@ -1494,6 +1779,9 @@ export default function BookHubPage() {
         rating_difficulty: rd,
         reader_level: readerLevel || null,
         recommended_level: recommendedLevel || null,
+        format_type: formatType || null,
+        progress_mode: progressMode || null,
+        show_page_numbers: showPageNumbers,
       })
       .eq("id", row.id);
 
@@ -1505,6 +1793,8 @@ export default function BookHubPage() {
         illustrator: illustratorName || null,
         publisher: publisherName || null,
         genre: genre || null,
+        book_type: bookType || null,
+        audience_category: audienceCategory || null,
         trigger_warnings: triggerWarnings || null,
         page_count,
         isbn: isbn || null,
@@ -1632,6 +1922,14 @@ export default function BookHubPage() {
         }
 
         vocabularyCacheId = createdCache.id;
+
+        await fetch("/api/vocabulary-kanji-map/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ vocabulary_cache_id: createdCache.id }),
+        });
       }
     }
 
@@ -2208,14 +2506,65 @@ export default function BookHubPage() {
                   <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
 
                   <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                    <Detail
-                      label="Genre"
-                      value={book.genre}
-                      editing={isEditingThisTab}
-                      inputValue={genre}
-                      setInputValue={setGenre}
-                      placeholder="e.g. novel, mystery, picture book..."
-                    />
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Genre</div>
+                      {!isEditingThisTab ? (
+                        <div className="font-medium">{genreLabel(book.genre)}</div>
+                      ) : (
+                        <select
+                          value={genre}
+                          onChange={(e) => setGenre(e.target.value)}
+                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+                        >
+                          <option value="">—</option>
+                          {GENRE_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Book Type</div>
+                      {!isEditingThisTab ? (
+                        <div className="font-medium">{bookTypeLabel(book.book_type)}</div>
+                      ) : (
+                        <select
+                          value={bookType}
+                          onChange={(e) => setBookType(e.target.value)}
+                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+                        >
+                          <option value="">—</option>
+                          {BOOK_TYPE_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Audience</div>
+                      {!isEditingThisTab ? (
+                        <div className="font-medium">{audienceCategoryLabel(book.audience_category)}</div>
+                      ) : (
+                        <select
+                          value={audienceCategory}
+                          onChange={(e) => setAudienceCategory(e.target.value)}
+                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+                        >
+                          <option value="">—</option>
+                          {AUDIENCE_CATEGORY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
                     <Detail
                       label="Page Count"
                       value={book.page_count}
@@ -2458,7 +2807,9 @@ export default function BookHubPage() {
                               <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
                                 <div className="mb-3">
                                   <div className="text-sm font-semibold text-stone-900">{word.surface}</div>
-                                  <div className="text-sm text-stone-500">{word.reading}</div>
+                                  <div className="text-sm text-stone-500">
+                                    {word.reading} ・ {hiraToKata(word.reading ?? "")}
+                                  </div>
                                 </div>
 
                                 <div className="space-y-2">
@@ -2740,6 +3091,63 @@ export default function BookHubPage() {
 
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                   <div className="mb-3 text-sm font-semibold text-stone-900">Reading History</div>
+
+                  <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Format</div>
+                      {!isEditingThisTab ? (
+                        <div className="mt-1 font-medium">{formatTypeLabel(formatType)}</div>
+                      ) : (
+                        <select
+                          value={formatType}
+                          onChange={(e) => setFormatType(e.target.value)}
+                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+                        >
+                          <option value="">—</option>
+                          <option value="paperback">Paperback</option>
+                          <option value="hardcover">Hardcover</option>
+                          <option value="ebook">eBook</option>
+                          <option value="audiobook">Audiobook</option>
+                          <option value="other">Other</option>
+                        </select>
+                      )}
+                    </div>
+
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Progress Mode</div>
+                      {!isEditingThisTab ? (
+                        <div className="mt-1 font-medium">{progressModeLabel(progressMode)}</div>
+                      ) : (
+                        <select
+                          value={progressMode}
+                          onChange={(e) => setProgressMode(e.target.value)}
+                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+                        >
+                          <option value="">—</option>
+                          <option value="pages">Pages</option>
+                          <option value="percent">Percent</option>
+                          <option value="chapters">Chapters</option>
+                          <option value="time">Time</option>
+                        </select>
+                      )}
+                    </div>
+
+                    <div className="rounded border bg-white p-3 text-sm">
+                      <div className="text-stone-600">Show Page Numbers</div>
+                      {!isEditingThisTab ? (
+                        <div className="mt-1 font-medium">{showPageNumbers ? "Yes" : "No"}</div>
+                      ) : (
+                        <label className="mt-2 flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={showPageNumbers}
+                            onChange={(e) => setShowPageNumbers(e.target.checked)}
+                          />
+                          <span>Show page numbers</span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                     <DateField
