@@ -32,6 +32,7 @@ type QuizCard = {
   chapterNumber: number | null;
   chapterName: string | null;
   pageNumber: number | null;
+  baseReading: string | null;
 };
 
 type RecallResult = "correct" | "wrong" | "shown" | null;
@@ -107,6 +108,25 @@ function isKunWithOkurigana(surface: string) {
   const hasHiragana = /[\p{Script=Hiragana}]/u.test(surface);
 
   return hasKanji && hasHiragana;
+}
+
+function getTrailingReadingHint(sourceWord: string, kanji: string) {
+  if (!sourceWord || !kanji) return "";
+
+  const chars = Array.from(sourceWord);
+  const index = chars.findIndex((ch) => ch === kanji);
+
+  if (index === -1) return "";
+
+  return chars.filter((_, i) => i !== index).join("");
+}
+
+function getOkuriganaDisplay(sourceWord: string, kanji: string) {
+  if (!sourceWord || !kanji) return "";
+  const chars = Array.from(sourceWord);
+  const index = chars.findIndex((ch) => ch === kanji);
+  if (index === -1) return "";
+  return chars.filter((_, i) => i !== index).join("");
 }
 
 export default function WeeklyReadingsPage() {
@@ -267,6 +287,7 @@ export default function WeeklyReadingsPage() {
                   key: `${r.id}-${km.kanji}-${i}`,
                   kanji: km.kanji,
                   reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
+                  baseReading: km.base_reading?.trim() || null,
                   readingType,
                   sourceWord: surface,
                   sourceMeaning: r.meaning ?? null,
@@ -705,7 +726,16 @@ export default function WeeklyReadingsPage() {
         <div className="w-full flex flex-col items-center justify-center gap-6">
           <div className="w-full flex flex-col items-center gap-1">
             <div className="text-xs uppercase tracking-wide text-slate-500">Kanji</div>
-            <div className="text-5xl font-bold">{card.kanji}</div>
+            <div className="text-5xl font-bold">
+              {card.kanji}
+              {(card.readingType === "other" ||
+                (card.readingType === "kunyomi" && isKunWithOkurigana(card.sourceWord))) &&
+                card.sourceWord ? (
+                <span className="ml-1 font-medium text-slate-300">
+                  {getTrailingReadingHint(card.sourceWord, card.kanji)}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <div className="w-full max-w-sm flex flex-col gap-3">
@@ -752,11 +782,31 @@ export default function WeeklyReadingsPage() {
           {checked ? (
             <div className="mt-2 w-full max-w-sm text-sm text-center">
               {checked.ok ? (
-                <p className="text-green-700">✅ Correct!</p>
+                <>
+                  <p className="text-green-700">✅ Correct!</p>
+
+                  {card.readingType === "kunyomi" &&
+                    isKunWithOkurigana(card.sourceWord) &&
+                    card.baseReading &&
+                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
+                    <p className="mt-1 text-gray-600">
+                      Base reading: {card.baseReading}
+                    </p>
+                  ) : null}
+                </>
               ) : (
                 <>
                   <p className="text-red-700">❌ Not quite.</p>
                   <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
+
+                  {card.readingType === "kunyomi" &&
+                    isKunWithOkurigana(card.sourceWord) &&
+                    card.baseReading &&
+                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
+                    <p className="mt-1 text-gray-600">
+                      Base reading: {card.baseReading}
+                    </p>
+                  ) : null}
                 </>
               )}
 
@@ -770,11 +820,13 @@ export default function WeeklyReadingsPage() {
                       <p className="text-sm font-medium text-slate-800 text-center">
                         Can you guess the word from this week?
                       </p>
+
                       {kanjiPositionHint ? (
                         <p className="mt-1 text-xs text-slate-500 text-center">
                           Hint: This kanji is character {kanjiPositionHint} in the word.
                         </p>
                       ) : null}
+
                       <input
                         type="text"
                         value={guessInput}
@@ -826,6 +878,7 @@ export default function WeeklyReadingsPage() {
                               setRecallResult("shown");
                               setRecallRevealed(true);
                               setCardsSinceLastRecall(0);
+
                               if (card?.sourceWord) {
                                 const normalized = normalizeWord(card.sourceWord);
                                 setUsedRecallWords((prev) =>
@@ -914,6 +967,7 @@ export default function WeeklyReadingsPage() {
           ) : null}
         </div>
       </div>
+
       <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
         Kanji have many possible readings. These readings are for specific words in your reading. Focus on the connection and watch for it when you meet it again. These are not the only fixed readings for the kanji.
       </p>

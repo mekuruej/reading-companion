@@ -470,6 +470,7 @@ export default function BookHubPage() {
   }, [readingSessions]);
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [bookOptions, setBookOptions] = useState<{ id: string; title: string }[]>([]);
 
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
   const [showChapterSummaries, setShowChapterSummaries] = useState(false);
@@ -1708,6 +1709,38 @@ export default function BookHubPage() {
   }, [userBookId]);
 
   useEffect(() => {
+    async function loadBookOptions() {
+      if (!userId) return;
+
+      const { data, error } = await supabase
+        .from("user_books")
+        .select(`
+        id,
+        books (
+          title
+        )
+      `)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Error loading book options:", error);
+        setBookOptions([]);
+        return;
+      }
+
+      setBookOptions(
+        (data ?? []).map((item: any) => ({
+          id: item.id,
+          title: item.books?.title ?? "Untitled",
+        }))
+      );
+    }
+
+    loadBookOptions();
+  }, [userId]);
+
+  useEffect(() => {
     if (!isRunning || !startTime) return;
 
     const interval = setInterval(() => {
@@ -2211,6 +2244,28 @@ export default function BookHubPage() {
                     ) : null}
                   </div>
                 )}
+              </div>
+
+              <div className="mt-4 max-w-sm">
+                <div className="mb-1 text-xs uppercase tracking-wide text-stone-500">
+                  Switch Book
+                </div>
+
+                <select
+                  value={userBookId ?? ""}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    if (!newId || newId === userBookId) return;
+                    router.push(`/books/${newId}`);
+                  }}
+                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700"
+                >
+                  {bookOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.title}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="mt-6 space-y-4">
