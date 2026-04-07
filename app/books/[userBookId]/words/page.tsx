@@ -468,24 +468,25 @@ export default function BookWordsPage() {
           .from("user_book_words")
           .select(
             `
-            id,
-            user_book_id,
-            surface,
-            reading,
-            meaning,
-            other_definition,
-            jlpt,
-            is_common,
-            page_number,
-            page_order,
-            chapter_number,
-            chapter_name,
-            seen_on,
-            created_at,
-            hidden,
-            meaning_choices,
-            meaning_choice_index
-          `
+      id,
+      user_book_id,
+      surface,
+      reading,
+      meaning,
+      other_definition,
+      jlpt,
+      is_common,
+      page_number,
+      page_order,
+      chapter_number,
+      chapter_name,
+      seen_on,
+      created_at,
+      hidden,
+      meaning_choices,
+      meaning_choice_index,
+      hide_kanji_in_reading_support
+    `
           )
           .eq("user_book_id", userBookId)
           .order("chapter_number", { ascending: true, nullsFirst: false })

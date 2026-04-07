@@ -72,10 +72,12 @@ type ReadingSessionStats = {
 type MonthlyLibraryStats = {
   pagesRead: number;
   daysRead: number;
-  wordsSeen: number;
+  wordsSaved: number;
   timeReadMinutes: number;
   avgMinPerPage: number | null;
   booksTouched: number;
+  finishedBooks: number;
+  avgWordsSavedPerFinishedBook: number | null;
 };
 
 type MonthOption = {
@@ -308,6 +310,7 @@ export default function BooksPage() {
   const [audienceFilter, setAudienceFilter] = useState<string>("all");
   const [formatFilter, setFormatFilter] = useState<string>("all");
   const [statsBookTypeFilter, setStatsBookTypeFilter] = useState<string>("all");
+  const [statsAudienceFilter, setStatsAudienceFilter] = useState("all");
 
   const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
@@ -341,10 +344,12 @@ export default function BooksPage() {
   const [monthlyStats, setMonthlyStats] = useState<MonthlyLibraryStats>({
     pagesRead: 0,
     daysRead: 0,
-    wordsSeen: 0,
+    wordsSaved: 0,
     timeReadMinutes: 0,
     avgMinPerPage: null,
     booksTouched: 0,
+    finishedBooks: 0,
+    avgWordsSavedPerFinishedBook: null,
   });
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
 
@@ -365,31 +370,39 @@ export default function BooksPage() {
       const { data: userBooksRows, error: userBooksErr } = await supabase
         .from("user_books")
         .select(`
-    id,
-    books:book_id (
-      book_type
-    )
-  `)
-        .eq("user_id", userId);
+          id,
+          finished_at,
+          dnf_at,
+          books:book_id (
+            book_type
+          )
+        `)
+        .eq("user_id", userId)
+        .gte("finished_at", startStr)
+        .lt("finished_at", endStr);
 
       if (userBooksErr) {
         console.error("Error loading user_books for monthly stats:", userBooksErr);
         setMonthlyStats({
           pagesRead: 0,
           daysRead: 0,
-          wordsSeen: 0,
+          wordsSaved: 0,
           timeReadMinutes: 0,
           avgMinPerPage: null,
           booksTouched: 0,
+          finishedBooks: 0,
+          avgWordsSavedPerFinishedBook: null,
         });
         return;
       }
 
       const filteredUserBooks = (userBooksRows ?? []).filter((r: any) => {
-        return (
-          statsBookTypeFilter === "all" ||
-          r.books?.book_type === statsBookTypeFilter
-        );
+        const matchesBookType =
+          statsBookTypeFilter === "all" || r.books?.book_type === statsBookTypeFilter;
+
+        const isFinished = !!r.finished_at && !r.dnf_at;
+
+        return matchesBookType && isFinished;
       });
 
       const userBookIds = filteredUserBooks.map((r: any) => r.id).filter(Boolean);
@@ -398,10 +411,12 @@ export default function BooksPage() {
         setMonthlyStats({
           pagesRead: 0,
           daysRead: 0,
-          wordsSeen: 0,
+          wordsSaved: 0,
           timeReadMinutes: 0,
           avgMinPerPage: null,
           booksTouched: 0,
+          finishedBooks: 0,
+          avgWordsSavedPerFinishedBook: null,
         });
         return;
       }
@@ -417,10 +432,8 @@ export default function BooksPage() {
 
           supabase
             .from("user_book_words")
-            .select("user_book_id, surface, meaning, meaning_choice_index, created_at")
-            .in("user_book_id", userBookIds)
-            .gte("created_at", `${startStr}T00:00:00`)
-            .lt("created_at", `${endStr}T00:00:00`),
+            .select("user_book_id")
+            .in("user_book_id", userBookIds),
         ]);
 
       if (sessionErr) {
@@ -457,18 +470,28 @@ export default function BooksPage() {
         }
       }
 
-      const uniqueWordsSeen = new Set<string>();
+      const savedCountsByBookId: Record<string, number> = {};
+
+      for (const bookId of userBookIds) {
+        savedCountsByBookId[bookId] = 0;
+      }
 
       for (const w of words) {
-        const surface = (w.surface ?? "").trim();
-        const meaning = (w.meaning ?? "").trim();
-        const meaningIndex = w.meaning_choice_index ?? "";
-        const bookId = w.user_book_id ?? "";
+        const bookId = String(w.user_book_id ?? "");
+        if (!bookId) continue;
 
-        if (!surface) continue;
-
-        uniqueWordsSeen.add(`${bookId}::${surface}::${meaning}::${meaningIndex}`);
+        savedCountsByBookId[bookId] = (savedCountsByBookId[bookId] ?? 0) + 1;
       }
+
+      const finishedBooks = userBookIds.length;
+
+      const wordsSaved = Object.values(savedCountsByBookId).reduce(
+        (sum, count) => sum + count,
+        0
+      );
+
+      const avgWordsSavedPerFinishedBook =
+        finishedBooks > 0 ? wordsSaved / finishedBooks : null;
 
       const avgMinPerPage =
         pagesRead > 0 && timeReadMinutes > 0 ? timeReadMinutes / pagesRead : null;
@@ -476,10 +499,12 @@ export default function BooksPage() {
       setMonthlyStats({
         pagesRead,
         daysRead: uniqueDays.size,
-        wordsSeen: uniqueWordsSeen.size,
+        wordsSaved,
         timeReadMinutes,
         avgMinPerPage,
         booksTouched: uniqueBooksTouched.size,
+        finishedBooks,
+        avgWordsSavedPerFinishedBook,
       });
     } finally {
       setMonthlyStatsLoading(false);
@@ -1367,7 +1392,7 @@ export default function BooksPage() {
         </div>
 
         <div className="mb-6 w-full">
-          <div className="ml-14 max-w-[720px] rounded-3xl border border-slate-400/70 bg-slate-300/45 p-4 shadow-sm sm:ml-20">
+          <div className="max-w-[720px] rounded-3xl border border-slate-400/70 bg-slate-300/45 p-4 shadow-sm">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900 sm:text-base">
@@ -1378,7 +1403,7 @@ export default function BooksPage() {
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 sm:items-end">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
@@ -1407,6 +1432,19 @@ export default function BooksPage() {
                   <option value="textbook">Textbook</option>
                   <option value="other">Other</option>
                 </select>
+
+                <select
+                  value={statsAudienceFilter}
+                  onChange={(e) => setStatsAudienceFilter(e.target.value)}
+                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                >
+                  <option value="all">All Audiences</option>
+                  <option value="adult">Adult</option>
+                  <option value="middle_grade">Middle Grade</option>
+                  <option value="children">Children</option>
+                  <option value="young_adult">Young Adult</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
             </div>
 
@@ -1427,11 +1465,15 @@ export default function BooksPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Words Seen</div>
+                <div className="text-[11px] text-slate-600">Avg Words Saved / Book</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : monthlyStats.wordsSeen}
+                  {monthlyStatsLoading
+                    ? "…"
+                    : monthlyStats.avgWordsSavedPerFinishedBook != null
+                      ? Math.round(monthlyStats.avgWordsSavedPerFinishedBook)
+                      : "—"}
                 </div>
-                <div className="mt-1 text-[10px] text-slate-500">Saved this month</div>
+                <div className="mt-1 text-[10px] text-slate-500">Finished books this month</div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
@@ -1464,8 +1506,8 @@ export default function BooksPage() {
 
             {!monthlyStatsLoading ? (
               <p className="mt-3 text-xs text-slate-700">
-                You read across <span className="font-semibold">{monthlyStats.booksTouched}</span>{" "}
-                {monthlyStats.booksTouched === 1 ? "book" : "books"} this month.
+                Based on <span className="font-semibold">{monthlyStats.finishedBooks}</span>{" "}
+                {monthlyStats.finishedBooks === 1 ? "finished book" : "finished books"} this month.
               </p>
             ) : null}
           </div>
@@ -1474,7 +1516,6 @@ export default function BooksPage() {
         <UserBar isTeacher={isTeacher} variant="labelOnly" />
 
         <div className="mb-4 space-y-3">
-
           {isTeacher ? (
             <div className="mb-4 max-w-md space-y-2">
               <div className="text-sm text-gray-700">
@@ -1521,51 +1562,6 @@ export default function BooksPage() {
           ) : null}
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <select
-            value={bookTypeFilter}
-            onChange={(e) => setBookTypeFilter(e.target.value)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
-          >
-            <option value="all">All Book Types</option>
-            <option value="picture_book">Picture Book</option>
-            <option value="novel">Novel</option>
-            <option value="short_story">Short Story</option>
-            <option value="manga">Manga</option>
-            <option value="nonfiction">Nonfiction</option>
-            <option value="essay">Essay</option>
-            <option value="memoir">Memoir</option>
-            <option value="textbook">Textbook</option>
-            <option value="other">Other</option>
-          </select>
-
-          <select
-            value={audienceFilter}
-            onChange={(e) => setAudienceFilter(e.target.value)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
-          >
-            <option value="all">All Audiences</option>
-            <option value="children">Children</option>
-            <option value="middle_grade">Middle Grade</option>
-            <option value="ya">YA</option>
-            <option value="adult">Adult</option>
-            <option value="all_ages">All Ages</option>
-          </select>
-
-          <select
-            value={formatFilter}
-            onChange={(e) => setFormatFilter(e.target.value)}
-            className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
-          >
-            <option value="all">All Formats</option>
-            <option value="paperback">Paperback</option>
-            <option value="hardcover">Hardcover</option>
-            <option value="ebook">eBook</option>
-            <option value="audiobook">Audiobook</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <br />
         <div className="flex items-center justify-between gap-3">
           <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
             <button
@@ -1582,6 +1578,51 @@ export default function BooksPage() {
             >
               List
             </button>
+          </div>
+          <br />
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={bookTypeFilter}
+              onChange={(e) => setBookTypeFilter(e.target.value)}
+              className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+            >
+              <option value="all">All Book Types</option>
+              <option value="picture_book">Picture Book</option>
+              <option value="novel">Novel</option>
+              <option value="short_story">Short Story</option>
+              <option value="manga">Manga</option>
+              <option value="nonfiction">Nonfiction</option>
+              <option value="essay">Essay</option>
+              <option value="memoir">Memoir</option>
+              <option value="textbook">Textbook</option>
+              <option value="other">Other</option>
+            </select>
+
+            <select
+              value={audienceFilter}
+              onChange={(e) => setAudienceFilter(e.target.value)}
+              className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+            >
+              <option value="all">All Audiences</option>
+              <option value="children">Children</option>
+              <option value="middle_grade">Middle Grade</option>
+              <option value="ya">YA</option>
+              <option value="adult">Adult</option>
+              <option value="all_ages">All Ages</option>
+            </select>
+
+            <select
+              value={formatFilter}
+              onChange={(e) => setFormatFilter(e.target.value)}
+              className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+            >
+              <option value="all">All Formats</option>
+              <option value="paperback">Paperback</option>
+              <option value="hardcover">Hardcover</option>
+              <option value="ebook">eBook</option>
+              <option value="audiobook">Audiobook</option>
+              <option value="other">Other</option>
+            </select>
           </div>
 
           {viewMode === "list" && (
