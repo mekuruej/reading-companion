@@ -26,16 +26,6 @@ export default function Header() {
           <button
             type="button"
             onClick={() =>
-              alert("Book Hubs are coming soon. For now, choose a book from your Library.")
-            }
-            className="leading-none text-stone-700 transition hover:text-stone-900"
-          >
-            Book Hubs
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
               alert("Full study mode is coming soon. For now, open a book from your Library to study.")
             }
             className="text-stone-700 transition hover:text-stone-900"

@@ -470,7 +470,9 @@ export default function BookHubPage() {
   }, [readingSessions]);
 
   const [userId, setUserId] = useState<string | null>(null);
-  const [bookOptions, setBookOptions] = useState<{ id: string; title: string }[]>([]);
+  const [bookOptions, setBookOptions] = useState<
+    { id: string; title: string; started_at: string | null; finished_at: string | null; dnf_at: string | null }[]
+  >([]);
 
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
   const [showChapterSummaries, setShowChapterSummaries] = useState(false);
@@ -498,6 +500,7 @@ export default function BookHubPage() {
   const [quickWord, setQuickWord] = useState("");
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
+  const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
   const quickWordInputRef = useRef<HTMLInputElement>(null);
 
   const [showWordExplorer, setShowWordExplorer] = useState(false);
@@ -1715,13 +1718,15 @@ export default function BookHubPage() {
       const { data, error } = await supabase
         .from("user_books")
         .select(`
-        id,
-        books (
-          title
-        )
-      `)
-        .eq("user_id", userId)
-        .order("created_at", { ascending: true });
+          id,
+          started_at,
+          finished_at,
+          dnf_at,
+          books (
+            title
+          )
+        `)
+        .eq("user_id", userId);
 
       if (error) {
         console.error("Error loading book options:", error);
@@ -1733,6 +1738,9 @@ export default function BookHubPage() {
         (data ?? []).map((item: any) => ({
           id: item.id,
           title: item.books?.title ?? "Untitled",
+          started_at: item.started_at ?? null,
+          finished_at: item.finished_at ?? null,
+          dnf_at: item.dnf_at ?? null,
         }))
       );
     }
@@ -2058,6 +2066,7 @@ export default function BookHubPage() {
         ? Number(quickPreview.chapterNumber)
         : null,
       chapter_name: quickPreview.chapterName || null,
+      hide_kanji_in_reading_support: hideKanjiInReadingSupport,
     };
 
     const { data, error } = await supabase
@@ -2091,6 +2100,7 @@ export default function BookHubPage() {
 
     setQuickWord("");
     setQuickPreview(null);
+    setHideKanjiInReadingSupport(false);
 
     await loadUniqueLookupCount(row.id);
     quickWordInputRef.current?.focus();
@@ -2172,6 +2182,14 @@ export default function BookHubPage() {
       </main>
     );
   }
+
+  const currentlyReadingBooks = [...bookOptions]
+    .filter((b) => b.started_at && !b.finished_at && !b.dnf_at)
+    .sort((a, b) => a.title.localeCompare(b.title));
+
+  const otherBooks = [...bookOptions]
+    .filter((b) => !(b.started_at && !b.finished_at && !b.dnf_at))
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   const relatedLinksArr = Array.isArray(book.related_links) ? book.related_links : [];
 
@@ -2260,11 +2278,25 @@ export default function BookHubPage() {
                   }}
                   className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700"
                 >
-                  {bookOptions.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.title}
-                    </option>
-                  ))}
+                  {currentlyReadingBooks.length > 0 && (
+                    <optgroup label="Currently Reading">
+                      {currentlyReadingBooks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+
+                  {otherBooks.length > 0 && (
+                    <optgroup label="All Books">
+                      {otherBooks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
@@ -4241,6 +4273,19 @@ export default function BookHubPage() {
                               />
                             </div>
                           </div>
+
+                          <label className="md:col-span-2 flex items-start gap-2 text-sm text-stone-700">
+                            <input
+                              type="checkbox"
+                              checked={hideKanjiInReadingSupport}
+                              onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
+                              className="mt-0.5"
+                            />
+                            <span>
+                              <span className="font-medium">Hide kanji in Reading Support</span>
+                              <span className="block text-xs text-stone-500">Use kana to match the book.</span>
+                            </span>
+                          </label>
 
                           <div className="mt-4 flex gap-2">
                             <button

@@ -93,6 +93,7 @@ type BulkItem = {
   page: string;
   chapterNumber: string;
   chapterName: string;
+  hideKanjiInReadingSupport: boolean;
 
   kanjiMeta: { kanji: string; strokes: number | null }[];
 };
@@ -150,7 +151,7 @@ export default function BulkVocabPage() {
         const { number, name } = JSON.parse(saved);
         setBulkChapterNumber(number || "");
         setBulkChapterName(name || "");
-      } catch { }
+      } catch {}
     }
 
     (async () => {
@@ -313,11 +314,6 @@ export default function BulkVocabPage() {
     );
   }
 
-  function validateDefinitions() {
-    const missing = items.filter((i) => !i.reading.trim() || !i.meaning.trim());
-    return missing.length;
-  }
-
   function getIncompleteWordLabels() {
     return items
       .filter((i) => !i.reading.trim() || !i.meaning.trim())
@@ -387,7 +383,7 @@ export default function BulkVocabPage() {
               meaning = meaningChoices[0] || "";
             }
           }
-        } catch { }
+        } catch {}
 
         const kanjiMeta = await getStrokeData(w);
 
@@ -402,6 +398,7 @@ export default function BulkVocabPage() {
           page: "",
           chapterNumber: "",
           chapterName: "",
+          hideKanjiInReadingSupport: false,
           kanjiMeta,
         });
       }
@@ -427,10 +424,11 @@ export default function BulkVocabPage() {
 
     if (missingCount > 0) {
       const confirmed = window.confirm(
-        `${missingCount} word${missingCount === 1 ? "" : "s"} ${missingCount === 1 ? "is" : "are"
+        `${missingCount} word${missingCount === 1 ? "" : "s"} ${
+          missingCount === 1 ? "is" : "are"
         } missing a reading or definition.\n\n` +
-        `Words:\n- ${missingWords.join("\n- ")}\n\n` +
-        `Do you want to continue anyway?`
+          `Words:\n- ${missingWords.join("\n- ")}\n\n` +
+          `Do you want to continue anyway?`
       );
       if (!confirmed) return;
     }
@@ -451,10 +449,11 @@ export default function BulkVocabPage() {
 
     if (incompleteWords.length > 0) {
       const confirmed = window.confirm(
-        `${incompleteWords.length} word${incompleteWords.length === 1 ? "" : "s"} ${incompleteWords.length === 1 ? "is" : "are"
+        `${incompleteWords.length} word${incompleteWords.length === 1 ? "" : "s"} ${
+          incompleteWords.length === 1 ? "is" : "are"
         } missing a reading or definition.\n\n` +
-        `Words:\n- ${incompleteWords.join("\n- ")}\n\n` +
-        `Do you want to save anyway?`
+          `Words:\n- ${incompleteWords.join("\n- ")}\n\n` +
+          `Do you want to save anyway?`
       );
       if (!confirmed) return;
     }
@@ -537,6 +536,7 @@ export default function BulkVocabPage() {
           page_order: nextPageOrder,
           chapter_number: chNum,
           chapter_name: i.chapterName?.trim() || null,
+          hide_kanji_in_reading_support: i.hideKanjiInReadingSupport,
           kanji_meta: i.kanjiMeta ?? [],
           seen_on: today,
         };
@@ -551,11 +551,12 @@ export default function BulkVocabPage() {
     } catch (err: any) {
       console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
       setMessage(
-        `❌ Failed saving: ${err?.message ||
-        err?.error_description ||
-        err?.details ||
-        JSON.stringify(err) ||
-        "unknown error"
+        `❌ Failed saving: ${
+          err?.message ||
+          err?.error_description ||
+          err?.details ||
+          JSON.stringify(err) ||
+          "unknown error"
         }`
       );
     } finally {
@@ -705,10 +706,11 @@ export default function BulkVocabPage() {
                           value={i.meaning}
                           onChange={(e) => updateItem(idx, "meaning", e.target.value)}
                           readOnly={i.meaningChoiceIndex != null}
-                          className={`w-full rounded border p-2 text-sm ${i.meaningChoiceIndex == null
-                            ? "bg-white"
-                            : "bg-slate-100 text-slate-700"
-                            }`}
+                          className={`w-full rounded border p-2 text-sm ${
+                            i.meaningChoiceIndex == null
+                              ? "bg-white"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
                           placeholder={
                             i.meaningChoiceIndex == null
                               ? "Type your custom meaning"
@@ -941,6 +943,23 @@ export default function BulkVocabPage() {
                       />
                     </div>
                   </div>
+
+                  <label className="mt-3 flex items-start gap-2 text-sm text-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={i.hideKanjiInReadingSupport}
+                      onChange={(e) =>
+                        updateItem(idx, "hideKanjiInReadingSupport", e.target.checked)
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium">Hide kanji in Reading Support</span>
+                      <span className="block text-xs text-stone-500">
+                        Use kana to match the book.
+                      </span>
+                    </span>
+                  </label>
                 </li>
               ))}
             </ul>

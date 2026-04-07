@@ -81,8 +81,8 @@ type MonthlyLibraryStats = {
 };
 
 type MonthOption = {
-  value: string; // YYYY-MM
-  label: string; // April 2026
+  value: string; // YYYY-MM or "year-YYYY"
+  label: string;
 };
 
 type UserBarVariant = "full" | "logoutOnly" | "labelOnly";
@@ -90,6 +90,11 @@ type UserBarVariant = "full" | "logoutOnly" | "labelOnly";
 function getMonthOptions(count = 12): MonthOption[] {
   const opts: MonthOption[] = [];
   const now = new Date();
+
+  opts.push({
+    value: `year-${now.getFullYear()}`,
+    label: `${now.getFullYear()}`,
+  });
 
   for (let i = 0; i < count; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -105,6 +110,17 @@ function getMonthOptions(count = 12): MonthOption[] {
 }
 
 function getMonthRange(monthValue: string) {
+  if (monthValue.startsWith("year-")) {
+    const year = Number(monthValue.replace("year-", ""));
+    const start = new Date(year, 0, 1);
+    const end = new Date(year + 1, 0, 1);
+
+    const startStr = `${start.getFullYear()}-01-01`;
+    const endStr = `${end.getFullYear()}-01-01`;
+
+    return { startStr, endStr };
+  }
+
   const [year, month] = monthValue.split("-").map(Number);
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 1);
@@ -370,13 +386,14 @@ export default function BooksPage() {
       const { data: userBooksRows, error: userBooksErr } = await supabase
         .from("user_books")
         .select(`
-          id,
-          finished_at,
-          dnf_at,
-          books:book_id (
-            book_type
-          )
-        `)
+    id,
+    finished_at,
+    dnf_at,
+    books:book_id (
+      book_type,
+      audience_category
+    )
+  `)
         .eq("user_id", userId)
         .gte("finished_at", startStr)
         .lt("finished_at", endStr);
@@ -400,9 +417,13 @@ export default function BooksPage() {
         const matchesBookType =
           statsBookTypeFilter === "all" || r.books?.book_type === statsBookTypeFilter;
 
+        const matchesAudience =
+          statsAudienceFilter === "all" ||
+          r.books?.audience_category === statsAudienceFilter;
+
         const isFinished = !!r.finished_at && !r.dnf_at;
 
-        return matchesBookType && isFinished;
+        return matchesBookType && matchesAudience && isFinished;
       });
 
       const userBookIds = filteredUserBooks.map((r: any) => r.id).filter(Boolean);
@@ -1042,7 +1063,7 @@ export default function BooksPage() {
   useEffect(() => {
     if (!viewingUserId || !selectedMonth) return;
     loadMonthlyLibraryStats(viewingUserId, selectedMonth);
-  }, [viewingUserId, selectedMonth, statsBookTypeFilter]);
+  }, [viewingUserId, selectedMonth, statsBookTypeFilter, statsAudienceFilter]);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -1403,11 +1424,11 @@ export default function BooksPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <div className="flex items-center gap-2 sm:justify-end whitespace-nowrap">
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                  className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
                 >
                   {monthOptions.map((m) => (
                     <option key={m.value} value={m.value}>
@@ -1419,9 +1440,9 @@ export default function BooksPage() {
                 <select
                   value={statsBookTypeFilter}
                   onChange={(e) => setStatsBookTypeFilter(e.target.value)}
-                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                  className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
                 >
-                  <option value="all">All Book Types</option>
+                  <option value="all">All Types</option>
                   <option value="picture_book">Picture Book</option>
                   <option value="novel">Novel</option>
                   <option value="short_story">Short Story</option>
@@ -1436,7 +1457,7 @@ export default function BooksPage() {
                 <select
                   value={statsAudienceFilter}
                   onChange={(e) => setStatsAudienceFilter(e.target.value)}
-                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                  className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
                 >
                   <option value="all">All Audiences</option>
                   <option value="adult">Adult</option>
@@ -1507,7 +1528,7 @@ export default function BooksPage() {
             {!monthlyStatsLoading ? (
               <p className="mt-3 text-xs text-slate-700">
                 Based on <span className="font-semibold">{monthlyStats.finishedBooks}</span>{" "}
-                {monthlyStats.finishedBooks === 1 ? "finished book" : "finished books"} this month.
+                {monthlyStats.finishedBooks === 1 ? "finished book" : "finished books"}.
               </p>
             ) : null}
           </div>
@@ -1562,7 +1583,7 @@ export default function BooksPage() {
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="mb-4 space-y-3">
           <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
             <button
               onClick={() => setViewMode("cover")}
@@ -1579,7 +1600,7 @@ export default function BooksPage() {
               List
             </button>
           </div>
-          <br />
+
           <div className="flex flex-wrap gap-3">
             <select
               value={bookTypeFilter}
@@ -1623,24 +1644,24 @@ export default function BooksPage() {
               <option value="audiobook">Audiobook</option>
               <option value="other">Other</option>
             </select>
-          </div>
 
-          {viewMode === "list" && (
-            <select
-              value={sortMode}
-              onChange={(e) =>
-                setSortMode(e.target.value as "title" | "last_read" | "pace" | "lookups")
-              }
-              className="rounded-lg border bg-white px-3 py-1 text-sm text-stone-700"
-            >
-              <option value="title">Title</option>
-              <option value="last_read">Recently Finished</option>
-              <option value="pace">Avg Min/Page</option>
-              <option value="lookups">Saved Vocab</option>
-            </select>
-          )}
+            {viewMode === "list" && (
+              <select
+                value={sortMode}
+                onChange={(e) =>
+                  setSortMode(e.target.value as "title" | "last_read" | "pace" | "lookups")
+                }
+                className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+              >
+                <option value="title">Title</option>
+                <option value="last_read">Recently Finished</option>
+                <option value="pace">Avg Min/Page</option>
+                <option value="lookups">Saved Vocab</option>
+              </select>
+            )}
+          </div>
         </div>
-        <br />
+
         <p className="mb-6 text-sm text-gray-600">
           All study tools live inside each book. Click a cover to open its Book Hub.
         </p>

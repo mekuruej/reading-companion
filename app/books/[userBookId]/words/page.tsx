@@ -23,6 +23,7 @@ type WordRow = {
   hidden: boolean | null;
   meaning_choices: any | null;
   meaning_choice_index: number | null;
+  hide_kanji_in_reading_support?: boolean | null;
 };
 
 type ProfileRole = "teacher" | "student";
@@ -121,13 +122,13 @@ export default function BookWordsPage() {
   const [editPage, setEditPage] = useState<string>("");
   const [editChapterNum, setEditChapterNum] = useState<string>("");
   const [editChapterName, setEditChapterName] = useState("");
+  const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
+  const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number | null>(0);
+  const [editHideKanjiInReadingSupport, setEditHideKanjiInReadingSupport] = useState(false);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
-
-  const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
-  const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number | null>(0);
 
   const stickyControlsRef = useRef<HTMLDivElement | null>(null);
   const [stickyOffset, setStickyOffset] = useState(0);
@@ -241,6 +242,7 @@ export default function BookWordsPage() {
     setEditPage(w.page_number != null ? String(w.page_number) : "");
     setEditChapterNum(w.chapter_number != null ? String(w.chapter_number) : "");
     setEditChapterName(w.chapter_name ?? "");
+    setEditHideKanjiInReadingSupport(!!w.hide_kanji_in_reading_support);
 
     const choices = asStringArray(w.meaning_choices);
     const rawIdx =
@@ -317,6 +319,7 @@ export default function BookWordsPage() {
       page_number: parseNullableInt(editPage),
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
+      hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
     };
 
     if (editMeaningChoiceIndex == null) {
@@ -744,6 +747,18 @@ export default function BookWordsPage() {
                   onChange={(e) => setEditPage(e.target.value)}
                   className="border p-2 rounded"
                 />
+              </label>
+              <label className="flex items-start gap-2 text-sm text-stone-700 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={editHideKanjiInReadingSupport}
+                  onChange={(e) => setEditHideKanjiInReadingSupport(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Hide kanji in Reading Support</span>
+                  <span className="block text-xs text-stone-500">Use kana to match the book.</span>
+                </span>
               </label>
             </div>
 

@@ -11,6 +11,7 @@ type ReadAlongWord = {
     meaning: string | null;
     page_number: number | null;
     page_order: number | null;
+    hide_kanji_in_reading_support?: boolean | null;
 };
 
 type SupportMode = "full" | "reading" | "meaning";
@@ -57,7 +58,16 @@ export default function ReadAlongPage() {
 
             const { data, error } = await supabase
                 .from("user_book_words")
-                .select("id, surface, reading, meaning, page_number, page_order, created_at")
+                .select(`
+                    id,
+                    surface,
+                    reading,
+                    meaning,
+                    page_number,
+                    page_order,
+                    chapter_number,
+                    hide_kanji_in_reading_support
+                `)
                 .eq("user_book_id", userBookId)
                 .eq("hidden", false)
                 .order("page_number", { ascending: true, nullsFirst: false })
@@ -418,7 +428,7 @@ export default function ReadAlongPage() {
                                         >
                                             <div className="min-w-0">
                                                 <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
-                                                    {w.surface || "—"}
+                                                    {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
                                                 </div>
 
                                                 {(supportMode === "full" || supportMode === "reading") && (
