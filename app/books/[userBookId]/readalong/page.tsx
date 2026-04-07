@@ -305,38 +305,18 @@ export default function ReadAlongPage() {
                         <h1 className="text-2xl font-semibold text-stone-900">Read Along</h1>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setSupportMode("full")}
-                            className={`rounded-full px-4 py-2 text-sm font-medium transition ${supportMode === "full"
-                                ? "bg-stone-900 text-white"
-                                : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                }`}
-                        >
-                            Full Support
+                    <div className="grid grid-cols-3 gap-2">
+                        <button className="rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm">
+                            <span className="sm:hidden">Full</span>
+                            <span className="hidden sm:inline">Full Support</span>
                         </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setSupportMode("reading")}
-                            className={`rounded-full px-4 py-2 text-sm font-medium transition ${supportMode === "reading"
-                                ? "bg-stone-900 text-white"
-                                : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                }`}
-                        >
-                            Reading Support
+                        <button className="rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm">
+                            <span className="sm:hidden">Reading</span>
+                            <span className="hidden sm:inline">Reading Support</span>
                         </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setSupportMode("meaning")}
-                            className={`rounded-full px-4 py-2 text-sm font-medium transition ${supportMode === "meaning"
-                                ? "bg-stone-900 text-white"
-                                : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                }`}
-                        >
-                            Meaning Support
+                        <button className="rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm">
+                            <span className="sm:hidden">Meaning</span>
+                            <span className="hidden sm:inline">Meaning Support</span>
                         </button>
                     </div>
                 </div>
