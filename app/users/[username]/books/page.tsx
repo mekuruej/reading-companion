@@ -1424,7 +1424,7 @@ export default function BooksPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 sm:justify-end whitespace-nowrap">
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
