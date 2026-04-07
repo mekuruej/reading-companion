@@ -5,458 +5,770 @@ import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type ReadAlongWord = {
-    id: string;
-    surface: string;
-    reading: string | null;
-    meaning: string | null;
-    page_number: number | null;
-    page_order: number | null;
-    hide_kanji_in_reading_support?: boolean | null;
+  id: string;
+  surface: string;
+  reading: string | null;
+  meaning: string | null;
+  page_number: number | null;
+  page_order: number | null;
+  hide_kanji_in_reading_support?: boolean | null;
 };
 
 type SupportMode = "full" | "reading" | "meaning";
 
 type PageChunk = {
-    label: string;
-    words: ReadAlongWord[];
-    pageNumber?: number | null;
+  label: string;
+  words: ReadAlongWord[];
+  pageNumber?: number | null;
 };
 
 function chunkArray<T>(arr: T[], size: number) {
-    const out: T[][] = [];
-    for (let i = 0; i < arr.length; i += size) {
-        out.push(arr.slice(i, i + size));
-    }
-    return out;
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
 }
 
 function easeInOutQuad(t: number) {
-    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function formatTimer(totalSeconds: number) {
+  const safe = Math.max(0, totalSeconds);
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 export default function ReadAlongPage() {
-    const params = useParams<{ userBookId: string }>();
-    const userBookId = params.userBookId;
-    const searchParams = useSearchParams();
+  const params = useParams<{ userBookId: string }>();
+  const userBookId = params.userBookId;
+  const searchParams = useSearchParams();
 
-    const [words, setWords] = useState<ReadAlongWord[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [supportMode, setSupportMode] = useState<SupportMode>("full");
-    const [pageIndex, setPageIndex] = useState(0);
-    const [jumpPageInput, setJumpPageInput] = useState("");
-    const [fadedThroughIndex, setFadedThroughIndex] = useState<number>(-1);
+  const [words, setWords] = useState<ReadAlongWord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [supportMode, setSupportMode] = useState<SupportMode>("full");
+  const [pageIndex, setPageIndex] = useState(0);
+  const [jumpPageInput, setJumpPageInput] = useState("");
+  const [fadedThroughIndex, setFadedThroughIndex] = useState<number>(-1);
 
-    const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-    const wordRefs = useRef<Record<string, HTMLDivElement | null>>({});
-    const scrollAnimationFrame = useRef<number | null>(null);
+  const [sessionDate, setSessionDate] = useState("");
+  const [sessionStartPage, setSessionStartPage] = useState("");
+  const [sessionEndPage, setSessionEndPage] = useState("");
+  const [sessionMinutesRead, setSessionMinutesRead] = useState("");
 
-    useEffect(() => {
-        async function loadWords() {
-            if (!userBookId) return;
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
+  const [timerSaveMessage, setTimerSaveMessage] = useState("");
 
-            setLoading(true);
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const wordRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrollAnimationFrame = useRef<number | null>(null);
 
-            const { data, error } = await supabase
-                .from("user_book_words")
-                .select(`
-                    id,
-                    surface,
-                    reading,
-                    meaning,
-                    page_number,
-                    page_order,
-                    chapter_number,
-                    hide_kanji_in_reading_support
-                `)
-                .eq("user_book_id", userBookId)
-                .eq("hidden", false)
-                .order("page_number", { ascending: true, nullsFirst: false })
-                .order("page_order", { ascending: true, nullsFirst: false })
-                .order("created_at", { ascending: true });
+  useEffect(() => {
+    async function loadWords() {
+      if (!userBookId) return;
 
-            if (error) {
-                console.error("Error loading read along words:", error);
-                setWords([]);
-                setLoading(false);
-                return;
-            }
+      setLoading(true);
 
-            setWords((data as ReadAlongWord[]) ?? []);
-            setLoading(false);
-        }
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .select(`
+          id,
+          surface,
+          reading,
+          meaning,
+          page_number,
+          page_order,
+          chapter_number,
+          hide_kanji_in_reading_support
+        `)
+        .eq("user_book_id", userBookId)
+        .eq("hidden", false)
+        .order("page_number", { ascending: true, nullsFirst: false })
+        .order("page_order", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true });
 
-        loadWords();
-    }, [userBookId]);
+      if (error) {
+        console.error("Error loading read along words:", error);
+        setWords([]);
+        setLoading(false);
+        return;
+      }
 
-    const pages = useMemo<PageChunk[]>(() => {
-        const numberedWords = words.filter((w) => w.page_number != null);
-
-        if (numberedWords.length > 0) {
-            const grouped = new Map<number, ReadAlongWord[]>();
-
-            for (const w of numberedWords) {
-                const page = w.page_number as number;
-                if (!grouped.has(page)) grouped.set(page, []);
-                grouped.get(page)!.push(w);
-            }
-
-            const pageNumbers = Array.from(grouped.keys()).sort((a, b) => a - b);
-            const minPage = pageNumbers[0];
-            const maxPage = pageNumbers[pageNumbers.length - 1];
-
-            const result: PageChunk[] = [];
-
-            for (let pageNum = minPage; pageNum <= maxPage; pageNum++) {
-                result.push({
-                    label: `Page ${pageNum}`,
-                    words: grouped.get(pageNum) ?? [],
-                    pageNumber: pageNum,
-                });
-            }
-
-            return result;
-        }
-
-        return chunkArray(words, 8).map((chunk, idx) => ({
-            label: `Section ${idx + 1}`,
-            words: chunk,
-            pageNumber: null,
-        }));
-    }, [words]);
-
-    useEffect(() => {
-        if (!pages.length) return;
-
-        const pageParam = searchParams.get("page");
-        if (!pageParam) return;
-
-        const pageNum = Number(pageParam);
-        if (!Number.isFinite(pageNum) || pageNum <= 0) return;
-
-        const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum);
-
-        if (matchIndex >= 0) {
-            setPageIndex(matchIndex);
-            setJumpPageInput(String(pageNum));
-        }
-    }, [pages, searchParams]);
-
-    function jumpToPage(pageNum: number) {
-        if (!Number.isFinite(pageNum) || pageNum <= 0) return;
-
-        const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum);
-
-        if (matchIndex >= 0) {
-            setPageIndex(matchIndex);
-            setJumpPageInput(String(pageNum));
-        }
+      setWords((data as ReadAlongWord[]) ?? []);
+      setLoading(false);
     }
 
-    const currentPage = pages[pageIndex];
+    loadWords();
+  }, [userBookId]);
 
-    function goPrev() {
-        setPageIndex((prev) => Math.max(0, prev - 1));
+  const pages = useMemo<PageChunk[]>(() => {
+    const numberedWords = words.filter((w) => w.page_number != null);
+
+    if (numberedWords.length > 0) {
+      const grouped = new Map<number, ReadAlongWord[]>();
+
+      for (const w of numberedWords) {
+        const page = w.page_number as number;
+        if (!grouped.has(page)) grouped.set(page, []);
+        grouped.get(page)!.push(w);
+      }
+
+      const pageNumbers = Array.from(grouped.keys()).sort((a, b) => a - b);
+      const minPage = pageNumbers[0];
+      const maxPage = pageNumbers[pageNumbers.length - 1];
+
+      const result: PageChunk[] = [];
+
+      for (let pageNum = minPage; pageNum <= maxPage; pageNum++) {
+        result.push({
+          label: `Page ${pageNum}`,
+          words: grouped.get(pageNum) ?? [],
+          pageNumber: pageNum,
+        });
+      }
+
+      return result;
     }
 
-    function goNext() {
-        setPageIndex((prev) => Math.min(pages.length - 1, prev + 1));
+    return chunkArray(words, 8).map((chunk, idx) => ({
+      label: `Section ${idx + 1}`,
+      words: chunk,
+      pageNumber: null,
+    }));
+  }, [words]);
+
+  useEffect(() => {
+    if (!pages.length) return;
+
+    const pageParam = searchParams.get("page");
+    if (!pageParam) return;
+
+    const pageNum = Number(pageParam);
+    if (!Number.isFinite(pageNum) || pageNum <= 0) return;
+
+    const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum);
+
+    if (matchIndex >= 0) {
+      setPageIndex(matchIndex);
+      setJumpPageInput(String(pageNum));
+    }
+  }, [pages, searchParams]);
+
+  const currentPage = pages[pageIndex];
+  const currentPageNumber = currentPage?.pageNumber ?? null;
+
+  function jumpToPage(pageNum: number) {
+    if (!Number.isFinite(pageNum) || pageNum <= 0) return;
+
+    const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum);
+
+    if (matchIndex >= 0) {
+      setPageIndex(matchIndex);
+      setJumpPageInput(String(pageNum));
+    }
+  }
+
+  function goPrev() {
+    setPageIndex((prev) => Math.max(0, prev - 1));
+  }
+
+  function goNext() {
+    setPageIndex((prev) => Math.min(pages.length - 1, prev + 1));
+  }
+
+  function animateScrollTo(container: HTMLDivElement, top: number, duration = 420) {
+    if (scrollAnimationFrame.current) {
+      cancelAnimationFrame(scrollAnimationFrame.current);
     }
 
-    function animateScrollTo(container: HTMLDivElement, top: number, duration = 420) {
-        if (scrollAnimationFrame.current) {
-            cancelAnimationFrame(scrollAnimationFrame.current);
-        }
+    const startTop = container.scrollTop;
+    const distance = top - startTop;
+    const startTimeForAnimation = performance.now();
 
-        const startTop = container.scrollTop;
-        const distance = top - startTop;
-        const startTime = performance.now();
+    const step = (now: number) => {
+      const elapsedTime = now - startTimeForAnimation;
+      const progress = Math.min(elapsedTime / duration, 1);
+      const eased = easeInOutQuad(progress);
 
-        const step = (now: number) => {
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = easeInOutQuad(progress);
+      container.scrollTop = startTop + distance * eased;
 
-            container.scrollTop = startTop + distance * eased;
-
-            if (progress < 1) {
-                scrollAnimationFrame.current = requestAnimationFrame(step);
-            } else {
-                scrollAnimationFrame.current = null;
-            }
-        };
-
+      if (progress < 1) {
         scrollAnimationFrame.current = requestAnimationFrame(step);
-    }
+      } else {
+        scrollAnimationFrame.current = null;
+      }
+    };
 
-    useEffect(() => {
-        function handleKeyDown(e: KeyboardEvent) {
-            const target = e.target as HTMLElement | null;
-            const tag = target?.tagName?.toLowerCase();
+    scrollAnimationFrame.current = requestAnimationFrame(step);
+  }
 
-            const isTyping =
-                tag === "input" ||
-                tag === "textarea" ||
-                tag === "select" ||
-                target?.isContentEditable;
+  function handleProgressTap(index: number, wordId: string) {
+    setFadedThroughIndex(index);
 
-            if (isTyping) return;
+    const container = scrollAreaRef.current;
+    const target = wordRefs.current[wordId];
 
-            if (e.key === "ArrowLeft") {
-                e.preventDefault();
-                goPrev();
-            }
+    if (!container || !target) return;
 
-            if (e.key === "ArrowRight") {
-                e.preventDefault();
-                goNext();
-            }
-        }
-
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [pages.length]);
-
-    useEffect(() => {
-        setFadedThroughIndex(-1);
-
-        if (scrollAnimationFrame.current) {
-            cancelAnimationFrame(scrollAnimationFrame.current);
-            scrollAnimationFrame.current = null;
-        }
-
-        if (scrollAreaRef.current) {
-            scrollAreaRef.current.scrollTop = 0;
-        }
-    }, [pageIndex]);
-
-    useEffect(() => {
-        return () => {
-            if (scrollAnimationFrame.current) {
-                cancelAnimationFrame(scrollAnimationFrame.current);
-            }
-        };
-    }, []);
-
-    function handleProgressTap(index: number, wordId: string) {
-        setFadedThroughIndex(index);
-
-        const container = scrollAreaRef.current;
-        const target = wordRefs.current[wordId];
-
-        if (!container || !target) return;
-
-        const stickyHeaderHeight = 116;
-        const previewOfPreviousWord = 140;
-        const desiredTop = Math.max(
-            0,
-            target.offsetTop - stickyHeaderHeight - previewOfPreviousWord
-        );
-
-        animateScrollTo(container, desiredTop, 1000);
-    }
-
-    if (loading) {
-        return (
-            <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
-                    Loading Read Along…
-                </div>
-            </main>
-        );
-    }
-
-    if (!pages.length) {
-        return (
-            <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
-                    No words yet.
-                </div>
-            </main>
-        );
-    }
-
-    return (
-        <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
-            <div className="pointer-events-none fixed inset-y-0 z-30 hidden w-full xl:flex">
-                <div className="relative mx-auto w-full max-w-[68rem]">
-                    <button
-                        type="button"
-                        onClick={goPrev}
-                        disabled={pageIndex === 0}
-                        className="pointer-events-auto absolute left-0 top-1/2 -translate-x-[calc(100%+12px)] -translate-y-1/2 rounded-2xl border border-stone-300 bg-white/90 px-4 py-3 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                        ← Previous
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={goNext}
-                        disabled={pageIndex === pages.length - 1}
-                        className="pointer-events-auto absolute right-0 top-1/2 translate-x-[calc(100%+12px)] -translate-y-1/2 rounded-2xl border border-stone-300 bg-white/90 px-4 py-3 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                        Next →
-                    </button>
-                </div>
-            </div>
-
-            <div className="mx-auto max-w-4xl space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-semibold text-stone-900">Read Along</h1>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                        <button className="rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm">
-                            <span className="sm:hidden">Full</span>
-                            <span className="hidden sm:inline">Full Support</span>
-                        </button>
-                        <button className="rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm">
-                            <span className="sm:hidden">Reading</span>
-                            <span className="hidden sm:inline">Reading Support</span>
-                        </button>
-                        <button className="rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm">
-                            <span className="sm:hidden">Meaning</span>
-                            <span className="hidden sm:inline">Meaning Support</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex min-w-0 flex-col sm:flex-row sm:items-center sm:gap-3">
-                            <div className="shrink-0 text-sm font-medium text-stone-900">
-                                Jump to page
-                            </div>
-                            <p className="text-sm text-stone-500">
-                                Go straight to a page number in your saved vocab.
-                            </p>
-                        </div>
-
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <input
-                                type="number"
-                                min={1}
-                                value={jumpPageInput}
-                                onChange={(e) => setJumpPageInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        jumpToPage(Number(jumpPageInput));
-                                    }
-                                }}
-                                placeholder="e.g. 45"
-                                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm sm:w-32"
-                            />
-
-                            <button
-                                type="button"
-                                onClick={() => jumpToPage(Number(jumpPageInput))}
-                                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                            >
-                                Go
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
-                    <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-4">
-                            <div>
-                                <div className="text-base font-semibold text-stone-900">
-                                    {currentPage.label}
-                                </div>
-                                <div className="text-xs text-stone-500 sm:text-sm">
-                                    {currentPage.words.length} saved word
-                                    {currentPage.words.length === 1 ? "" : "s"}
-                                </div>
-                            </div>
-
-                            <div className="text-center text-xs text-stone-500 sm:text-sm">
-                                Follow saved words in reading order and tap to mark your place.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div
-                        ref={scrollAreaRef}
-                        className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
-                    >
-                        {currentPage.words.length === 0 ? (
-                            <div className="mx-auto max-w-2xl py-16 text-center">
-                                <div className="text-2xl font-semibold text-stone-700">
-                                    No saved words here.
-                                </div>
-                                <p className="mt-3 text-sm text-stone-500">You knew everything!</p>
-                            </div>
-                        ) : (
-                            <div className="mx-auto max-w-2xl space-y-3">
-                                {currentPage.words.map((w, index) => {
-                                    const isFaded = index <= fadedThroughIndex;
-
-                                    return (
-                                        <div
-                                            key={w.id}
-                                            ref={(el) => {
-                                                wordRefs.current[w.id] = el;
-                                            }}
-                                            onClick={() => handleProgressTap(index, w.id)}
-                                            className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
-                                                ? "border-stone-200 bg-stone-50 opacity-35"
-                                                : "border-stone-200 bg-white hover:bg-stone-50"
-                                                }`}
-                                        >
-                                            <div className="min-w-0">
-                                                <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
-                                                    {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
-                                                </div>
-
-                                                {(supportMode === "full" || supportMode === "reading") && (
-                                                    <div className="mt-1 text-sm text-stone-500 sm:text-base">
-                                                        {w.reading || "—"}
-                                                    </div>
-                                                )}
-
-                                                {(supportMode === "full" || supportMode === "meaning") && (
-                                                    <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
-                                                        {w.meaning || "—"}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="sticky bottom-0 z-10 border-t border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 xl:hidden">
-                        <div className="flex items-center justify-between gap-3">
-                            <button
-                                type="button"
-                                onClick={goPrev}
-                                disabled={pageIndex === 0}
-                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                ← Previous
-                            </button>
-
-                            <div className="text-center text-xs text-stone-500 sm:text-sm">
-                                {currentPage.label}
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={goNext}
-                                disabled={pageIndex === pages.length - 1}
-                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                Next →
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+    const stickyHeaderHeight = 116;
+    const previewOfPreviousWord = 140;
+    const desiredTop = Math.max(
+      0,
+      target.offsetTop - stickyHeaderHeight - previewOfPreviousWord
     );
+
+    animateScrollTo(container, desiredTop, 1000);
+  }
+
+  async function saveReadingSession() {
+    if (!userBookId) return;
+
+    const startPageNum = Number(sessionStartPage);
+    const endPageNum = Number(sessionEndPage);
+    const minutesNum = Number(sessionMinutesRead || Math.max(1, Math.round(elapsed / 60)));
+
+    if (!Number.isFinite(startPageNum) || !Number.isFinite(endPageNum)) {
+      alert("Please enter a valid start page and end page.");
+      return;
+    }
+
+    if (startPageNum <= 0 || endPageNum <= 0) {
+      alert("Pages must be 1 or higher.");
+      return;
+    }
+
+    if (endPageNum < startPageNum) {
+      alert("End page cannot be before start page.");
+      return;
+    }
+
+    if (!Number.isFinite(minutesNum) || minutesNum <= 0) {
+      alert("Minutes read must be at least 1.");
+      return;
+    }
+
+    const readOn = sessionDate || new Date().toISOString().slice(0, 10);
+
+    const { error } = await supabase.from("user_book_reading_sessions").insert({
+      user_book_id: userBookId,
+      read_on: readOn,
+      start_page: startPageNum,
+      end_page: endPageNum,
+      minutes_read: minutesNum,
+    });
+
+    if (error) {
+      console.error("Error saving timed reading session:", error);
+      alert(`Could not save reading session.\n${error.message}`);
+      return;
+    }
+
+    setShowTimedSessionForm(false);
+    setElapsed(0);
+    setStartTime(null);
+    setIsRunning(false);
+    setIsPaused(false);
+    setSessionMinutesRead("");
+    setTimerSaveMessage("Your session has been saved in the Reading Tab.");
+
+    setTimeout(() => {
+      setTimerSaveMessage("");
+    }, 4000);
+  }
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    if (isRunning && startTime) {
+      interval = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunning, startTime]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+
+      const isTyping =
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        target?.isContentEditable;
+
+      if (isTyping) return;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      }
+
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goNext();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pages.length]);
+
+  useEffect(() => {
+    setFadedThroughIndex(-1);
+
+    if (scrollAnimationFrame.current) {
+      cancelAnimationFrame(scrollAnimationFrame.current);
+      scrollAnimationFrame.current = null;
+    }
+
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = 0;
+    }
+  }, [pageIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollAnimationFrame.current) {
+        cancelAnimationFrame(scrollAnimationFrame.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!isRunning && !isPaused) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isRunning, isPaused]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-stone-50 p-6">
+        <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
+          Loading Read Along…
+        </div>
+      </main>
+    );
+  }
+
+  if (!pages.length) {
+    return (
+      <main className="min-h-screen bg-stone-50 p-6">
+        <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
+          No words yet.
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
+      <div className="pointer-events-none fixed inset-y-0 z-30 hidden w-full xl:flex">
+        <div className="relative mx-auto w-full max-w-[68rem]">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={pageIndex === 0}
+            className="pointer-events-auto absolute left-0 top-1/2 -translate-x-[calc(100%+12px)] -translate-y-1/2 rounded-2xl border border-stone-300 bg-white/90 px-4 py-3 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ← Previous
+          </button>
+
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={pageIndex === pages.length - 1}
+            className="pointer-events-auto absolute right-0 top-1/2 translate-x-[calc(100%+12px)] -translate-y-1/2 rounded-2xl border border-stone-300 bg-white/90 px-4 py-3 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-stone-900">Read Along</h1>
+            <p className="mt-1 text-sm text-stone-500">
+              Move to the next page using keyboard arrows or the navigation at the bottom of the page.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setSupportMode("full")}
+              className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${
+                supportMode === "full"
+                  ? "bg-stone-900 text-white"
+                  : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+              }`}
+            >
+              <span className="sm:hidden">Full</span>
+              <span className="hidden sm:inline">Full Support</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSupportMode("reading")}
+              className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${
+                supportMode === "reading"
+                  ? "bg-stone-900 text-white"
+                  : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+              }`}
+            >
+              <span className="sm:hidden">Reading</span>
+              <span className="hidden sm:inline">Reading Support</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSupportMode("meaning")}
+              className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${
+                supportMode === "meaning"
+                  ? "bg-stone-900 text-white"
+                  : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+              }`}
+            >
+              <span className="sm:hidden">Meaning</span>
+              <span className="hidden sm:inline">Meaning Support</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm text-stone-500">
+              Time your reading session and log it more easily.
+            </p>
+
+            <div className="flex flex-wrap justify-center gap-3">
+              {!isRunning && !isPaused ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const currentPageString = currentPageNumber != null ? String(currentPageNumber) : "";
+
+                    setSessionDate(today);
+                    setStartTime(Date.now());
+                    setElapsed(0);
+                    setIsRunning(true);
+                    setIsPaused(false);
+                    setShowTimedSessionForm(false);
+                    setTimerSaveMessage("");
+                    setSessionMinutesRead("");
+                    setSessionStartPage(currentPageString);
+                    setSessionEndPage(currentPageString);
+                  }}
+                  className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+                >
+                  Start Timer
+                </button>
+              ) : null}
+
+              {isRunning ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (startTime) {
+                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                      }
+                      setIsRunning(false);
+                      setIsPaused(true);
+                    }}
+                    className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
+                  >
+                    Pause
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (startTime) {
+                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                      }
+                      setIsRunning(false);
+                      setIsPaused(false);
+                      setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : sessionEndPage);
+                      setShowTimedSessionForm(true);
+                    }}
+                    className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                  >
+                    Finish
+                  </button>
+                </>
+              ) : null}
+
+              {isPaused ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartTime(Date.now() - elapsed * 1000);
+                      setIsRunning(true);
+                      setIsPaused(false);
+                    }}
+                    className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+                  >
+                    Resume
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPaused(false);
+                      setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : sessionEndPage);
+                      setShowTimedSessionForm(true);
+                    }}
+                    className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                  >
+                    Finish
+                  </button>
+                </>
+              ) : null}
+
+              <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
+                ⏱ {formatTimer(elapsed)}
+              </div>
+            </div>
+          </div>
+
+          {showTimedSessionForm && !isRunning ? (
+            <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
+              <div className="mb-3 text-sm font-medium text-stone-700">
+                Save this reading session
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="mb-1 text-sm text-stone-600">Start page</div>
+                  <input
+                    type="number"
+                    min={1}
+                    value={sessionStartPage}
+                    onChange={(e) => setSessionStartPage(e.target.value)}
+                    placeholder="e.g. 45"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-1 text-sm text-stone-600">End page</div>
+                  <input
+                    type="number"
+                    min={1}
+                    value={sessionEndPage}
+                    onChange={(e) => setSessionEndPage(e.target.value)}
+                    placeholder="e.g. 52"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 text-sm text-stone-500">
+                Time: {formatTimer(elapsed)}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
+                    await saveReadingSession();
+                  }}
+                  className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                >
+                  Save Timed Session
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTimedSessionForm(false);
+                    setElapsed(0);
+                    setStartTime(null);
+                    setIsPaused(false);
+                    setIsRunning(false);
+                  }}
+                  className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {(isRunning || isPaused) ? (
+            <p className="mt-2 text-xs text-amber-600">
+              Timer is active. If you leave Read Along or refresh the page, you may lose your session.
+            </p>
+          ) : null}
+
+          {timerSaveMessage ? (
+            <p className="mt-2 text-xs text-emerald-600">{timerSaveMessage}</p>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-col sm:flex-row sm:items-center sm:gap-3">
+              <div className="shrink-0 text-sm font-medium text-stone-900">
+                Jump to page
+              </div>
+              <p className="text-sm text-stone-500">
+                Go straight to a page number in your saved vocab.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="number"
+                min={1}
+                value={jumpPageInput}
+                onChange={(e) => setJumpPageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    jumpToPage(Number(jumpPageInput));
+                  }
+                }}
+                placeholder="e.g. 45"
+                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm sm:w-32"
+              />
+
+              <button
+                type="button"
+                onClick={() => jumpToPage(Number(jumpPageInput))}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+              >
+                Go
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
+          <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-4">
+              <div>
+                <div className="text-base font-semibold text-stone-900">
+                  {currentPage.label}
+                </div>
+                <div className="text-xs text-stone-500 sm:text-sm">
+                  {currentPage.words.length} saved word
+                  {currentPage.words.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              <div className="text-center text-xs text-stone-500 sm:text-sm">
+                Follow saved words in reading order and tap to mark your place.
+              </div>
+            </div>
+          </div>
+
+          <div
+            ref={scrollAreaRef}
+            className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
+          >
+            {currentPage.words.length === 0 ? (
+              <div className="mx-auto max-w-2xl py-16 text-center">
+                <div className="text-2xl font-semibold text-stone-700">
+                  No saved words here.
+                </div>
+                <p className="mt-3 text-sm text-stone-500">You knew everything!</p>
+              </div>
+            ) : (
+              <div className="mx-auto max-w-2xl space-y-3">
+                {currentPage.words.map((w, index) => {
+                  const isFaded = index <= fadedThroughIndex;
+
+                  return (
+                    <div
+                      key={w.id}
+                      ref={(el) => {
+                        wordRefs.current[w.id] = el;
+                      }}
+                      onClick={() => handleProgressTap(index, w.id)}
+                      className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${
+                        isFaded
+                          ? "border-stone-200 bg-stone-50 opacity-35"
+                          : "border-stone-200 bg-white hover:bg-stone-50"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
+                          {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
+                        </div>
+
+                        {(supportMode === "full" || supportMode === "reading") && (
+                          <div className="mt-1 text-sm text-stone-500 sm:text-base">
+                            {w.reading || "—"}
+                          </div>
+                        )}
+
+                        {(supportMode === "full" || supportMode === "meaning") && (
+                          <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
+                            {w.meaning || "—"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="sticky bottom-0 z-10 border-t border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 xl:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={pageIndex === 0}
+                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Previous
+              </button>
+
+              <div className="text-center text-xs text-stone-500 sm:text-sm">
+                {currentPage.label}
+              </div>
+
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={pageIndex === pages.length - 1}
+                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
 }
