@@ -320,7 +320,7 @@ export default function WeeklyReadingsPage() {
           .update({ weekly_readings_last_seen_at: new Date().toISOString() })
           .eq("id", userBookId);
       } catch (e: any) {
-        setErrorMsg(e?.message ?? "Failed to load weekly readings");
+        setErrorMsg(e?.message ?? "Failed to load readings");
       } finally {
         setLoading(false);
       }
@@ -538,7 +538,7 @@ export default function WeeklyReadingsPage() {
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-lg text-gray-500">Loading this week’s readings…</p>
+        <p className="text-lg text-gray-500">Loading your readings…</p>
       </main>
     );
   }
@@ -546,7 +546,7 @@ export default function WeeklyReadingsPage() {
   if (needsSignIn) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-gray-700">You need to sign in to view this week’s readings.</p>
+        <p className="text-gray-700">You need to sign in to view your readings.</p>
         <button
           onClick={() => router.push("/books")}
           className="px-4 py-2 bg-gray-200 rounded"
@@ -602,7 +602,7 @@ export default function WeeklyReadingsPage() {
             </>
           ) : (
             <>
-              <p className="mt-3 text-gray-700">You’re more ready for this week’s reading.</p>
+              <p className="mt-3 text-gray-700">You’re more ready for more readings.</p>
               <p className="mt-2 text-sm text-gray-500">
                 Come back tomorrow to reinforce the readings.
               </p>
@@ -799,6 +799,18 @@ export default function WeeklyReadingsPage() {
                   <p className="text-red-700">❌ Not quite.</p>
                   <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
 
+                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
+                    <div className="text-lg font-semibold">{card.sourceWord}</div>
+
+                    {card.sourceReading ? (
+                      <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
+                    ) : null}
+
+                    {card.sourceMeaning ? (
+                      <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
+                    ) : null}
+                  </div>
+
                   {card.readingType === "kunyomi" &&
                     isKunWithOkurigana(card.sourceWord) &&
                     card.baseReading &&
@@ -818,7 +830,7 @@ export default function WeeklyReadingsPage() {
                   {!recallRevealed ? (
                     <>
                       <p className="text-sm font-medium text-slate-800 text-center">
-                        Can you guess the word from this week?
+                        Can you guess the word with this kanji?
                       </p>
 
                       {kanjiPositionHint ? (

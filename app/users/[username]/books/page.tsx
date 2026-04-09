@@ -17,7 +17,6 @@ type Book = {
   cover_url: string | null;
   page_count: number | null;
   book_type: string | null;
-  audience_category: string | null;
 };
 
 type UserBookRow = {
@@ -323,10 +322,8 @@ export default function BooksPage() {
   const [showRequestBook, setShowRequestBook] = useState(false);
 
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
-  const [audienceFilter, setAudienceFilter] = useState<string>("all");
   const [formatFilter, setFormatFilter] = useState<string>("all");
   const [statsBookTypeFilter, setStatsBookTypeFilter] = useState<string>("all");
-  const [statsAudienceFilter, setStatsAudienceFilter] = useState("all");
 
   const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
@@ -337,17 +334,13 @@ export default function BooksPage() {
         bookTypeFilter === "all" ||
         row.books?.book_type === bookTypeFilter;
 
-      const matchesAudience =
-        audienceFilter === "all" ||
-        row.books?.audience_category === audienceFilter;
-
       const matchesFormat =
         formatFilter === "all" ||
         row.format_type === formatFilter;
 
-      return matchesBookType && matchesAudience && matchesFormat;
+      return matchesBookType && matchesFormat;
     });
-  }, [rows, bookTypeFilter, audienceFilter, formatFilter]);
+  }, [rows, bookTypeFilter, formatFilter]);
 
   const validRows = filteredRows.filter((r) => !!r.books);
 
@@ -355,8 +348,7 @@ export default function BooksPage() {
   const [sortMode, setSortMode] = useState<"title" | "last_read" | "pace" | "lookups">("title");
 
   const monthOptions = getMonthOptions(12);
-
-  const [selectedMonth, setSelectedMonth] = useState<string>(monthOptions[0]?.value ?? "");
+  const [selectedMonth, setSelectedMonth] = useState<string>(monthOptions[1]?.value ?? monthOptions[0]?.value ?? "");
   const [monthlyStats, setMonthlyStats] = useState<MonthlyLibraryStats>({
     pagesRead: 0,
     daysRead: 0,
@@ -383,20 +375,17 @@ export default function BooksPage() {
     try {
       const { startStr, endStr } = getMonthRange(monthValue);
 
-      const { data: userBooksRows, error: userBooksErr } = await supabase
+      const { data: allUserBooksRows, error: userBooksErr } = await supabase
         .from("user_books")
         .select(`
-    id,
-    finished_at,
-    dnf_at,
-    books:book_id (
-      book_type,
-      audience_category
-    )
-  `)
-        .eq("user_id", userId)
-        .gte("finished_at", startStr)
-        .lt("finished_at", endStr);
+        id,
+        finished_at,
+        dnf_at,
+        books:book_id (
+        book_type
+      )
+      `)
+        .eq("user_id", userId);
 
       if (userBooksErr) {
         console.error("Error loading user_books for monthly stats:", userBooksErr);
@@ -413,17 +402,11 @@ export default function BooksPage() {
         return;
       }
 
-      const filteredUserBooks = (userBooksRows ?? []).filter((r: any) => {
+      const filteredUserBooks = (allUserBooksRows ?? []).filter((r: any) => {
         const matchesBookType =
           statsBookTypeFilter === "all" || r.books?.book_type === statsBookTypeFilter;
 
-        const matchesAudience =
-          statsAudienceFilter === "all" ||
-          r.books?.audience_category === statsAudienceFilter;
-
-        const isFinished = !!r.finished_at && !r.dnf_at;
-
-        return matchesBookType && matchesAudience && isFinished;
+        return matchesBookType;
       });
 
       const userBookIds = filteredUserBooks.map((r: any) => r.id).filter(Boolean);
@@ -442,20 +425,24 @@ export default function BooksPage() {
         return;
       }
 
-      const [{ data: sessionRows, error: sessionErr }, { data: wordRows, error: wordErr }] =
-        await Promise.all([
-          supabase
-            .from("user_book_reading_sessions")
-            .select("user_book_id, read_on, start_page, end_page, minutes_read")
-            .in("user_book_id", userBookIds)
-            .gte("read_on", startStr)
-            .lt("read_on", endStr),
+      const [
+        { data: sessionRows, error: sessionErr },
+        { data: wordRows, error: wordErr },
+      ] = await Promise.all([
+        supabase
+          .from("user_book_reading_sessions")
+          .select("user_book_id, read_on, start_page, end_page, minutes_read")
+          .in("user_book_id", userBookIds)
+          .gte("read_on", startStr)
+          .lt("read_on", endStr),
 
-          supabase
-            .from("user_book_words")
-            .select("user_book_id")
-            .in("user_book_id", userBookIds),
-        ]);
+        supabase
+          .from("user_book_words")
+          .select("user_book_id, created_at")
+          .in("user_book_id", userBookIds)
+          .gte("created_at", `${startStr}T00:00:00`)
+          .lt("created_at", `${endStr}T00:00:00`),
+      ]);
 
       if (sessionErr) {
         console.error("Error loading reading sessions for monthly stats:", sessionErr);
@@ -492,27 +479,36 @@ export default function BooksPage() {
       }
 
       const savedCountsByBookId: Record<string, number> = {};
-
       for (const bookId of userBookIds) {
         savedCountsByBookId[bookId] = 0;
       }
 
       for (const w of words) {
-        const bookId = String(w.user_book_id ?? "");
+        const bookId = String((w as any).user_book_id ?? "");
         if (!bookId) continue;
 
         savedCountsByBookId[bookId] = (savedCountsByBookId[bookId] ?? 0) + 1;
+        uniqueBooksTouched.add(bookId);
       }
 
-      const finishedBooks = userBookIds.length;
+      const finishedBookIds = filteredUserBooks
+        .filter((r: any) => !!r.finished_at && !r.dnf_at && r.finished_at >= startStr && r.finished_at < endStr)
+        .map((r: any) => r.id);
+
+      const finishedBooks = finishedBookIds.length;
 
       const wordsSaved = Object.values(savedCountsByBookId).reduce(
         (sum, count) => sum + count,
         0
       );
 
+      const wordsSavedForFinishedBooks = finishedBookIds.reduce(
+        (sum, bookId) => sum + (savedCountsByBookId[bookId] ?? 0),
+        0
+      );
+
       const avgWordsSavedPerFinishedBook =
-        finishedBooks > 0 ? wordsSaved / finishedBooks : null;
+        finishedBooks > 0 ? wordsSavedForFinishedBooks / finishedBooks : null;
 
       const avgMinPerPage =
         pagesRead > 0 && timeReadMinutes > 0 ? timeReadMinutes / pagesRead : null;
@@ -566,14 +562,13 @@ export default function BooksPage() {
         progress_mode,
         show_page_numbers,
         books (
-          id,
-          title,
-          author,
-          cover_url,
-          page_count,
-          book_type,
-          audience_category
-        )
+        id,
+        title,
+        author,
+        cover_url,
+        page_count,
+        book_type
+      )
       `)
       .eq("user_id", targetUserId)
       .order("created_at", { ascending: false });
@@ -1063,7 +1058,7 @@ export default function BooksPage() {
   useEffect(() => {
     if (!viewingUserId || !selectedMonth) return;
     loadMonthlyLibraryStats(viewingUserId, selectedMonth);
-  }, [viewingUserId, selectedMonth, statsBookTypeFilter, statsAudienceFilter]);
+  }, [viewingUserId, selectedMonth, statsBookTypeFilter]);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -1442,8 +1437,12 @@ export default function BooksPage() {
                   onChange={(e) => setStatsBookTypeFilter(e.target.value)}
                   className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
                 >
-                  <option value="all">All Types</option>
+                  <option value="all">Book Types</option>
                   <option value="picture_book">Picture Book</option>
+                  <option value="early_reader">Early Reader</option>
+                  <option value="chapter_book">Chapter Book</option>
+                  <option value="middle_grade">Middle Grade</option>
+                  <option value="ya">YA</option>
                   <option value="novel">Novel</option>
                   <option value="short_story">Short Story</option>
                   <option value="manga">Manga</option>
@@ -1451,19 +1450,6 @@ export default function BooksPage() {
                   <option value="essay">Essay</option>
                   <option value="memoir">Memoir</option>
                   <option value="textbook">Textbook</option>
-                  <option value="other">Other</option>
-                </select>
-
-                <select
-                  value={statsAudienceFilter}
-                  onChange={(e) => setStatsAudienceFilter(e.target.value)}
-                  className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
-                >
-                  <option value="all">All Audiences</option>
-                  <option value="adult">Adult</option>
-                  <option value="middle_grade">Middle Grade</option>
-                  <option value="children">Children</option>
-                  <option value="young_adult">Young Adult</option>
                   <option value="other">Other</option>
                 </select>
               </div>
@@ -1534,6 +1520,53 @@ export default function BooksPage() {
           </div>
         </div>
 
+        {isSuperTeacher && bookRequests.length > 0 ? (
+          <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-amber-900">
+                  Pending Book Requests
+                </h2>
+                <p className="mt-1 text-xs text-amber-800">
+                  {bookRequests.length} pending {bookRequests.length === 1 ? "request" : "requests"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {bookRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="rounded-xl border border-amber-200 bg-white px-3 py-3"
+                >
+                  <div className="text-sm font-medium text-stone-900">
+                    {req.title || "Untitled"}
+                  </div>
+
+                  <div className="mt-1 text-xs text-stone-600">
+                    {req.author ? `Author: ${req.author}` : "Author: —"}
+                  </div>
+
+                  <div className="mt-1 text-xs text-stone-600">
+                    {req.isbn13 ? `ISBN: ${req.isbn13}` : "ISBN: —"}
+                  </div>
+
+                  <div className="mt-2 text-xs text-stone-500">
+                    Requested by{" "}
+                    <span className="font-medium text-stone-700">
+                      {req.profiles?.display_name || req.profiles?.username || "User"}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 text-[11px] text-stone-400">
+                    {req.created_at ? new Date(req.created_at).toLocaleDateString() : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        
         <UserBar isTeacher={isTeacher} variant="labelOnly" />
 
         <div className="mb-4 space-y-3">
@@ -1607,8 +1640,12 @@ export default function BooksPage() {
               onChange={(e) => setBookTypeFilter(e.target.value)}
               className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
             >
-              <option value="all">All Book Types</option>
+              <option value="all">Book Type</option>
               <option value="picture_book">Picture Book</option>
+              <option value="early_reader">Early Reader</option>
+              <option value="chapter_book">Chapter Book</option>
+              <option value="middle_grade">Middle Grade</option>
+              <option value="ya">YA</option>
               <option value="novel">Novel</option>
               <option value="short_story">Short Story</option>
               <option value="manga">Manga</option>
@@ -1617,19 +1654,6 @@ export default function BooksPage() {
               <option value="memoir">Memoir</option>
               <option value="textbook">Textbook</option>
               <option value="other">Other</option>
-            </select>
-
-            <select
-              value={audienceFilter}
-              onChange={(e) => setAudienceFilter(e.target.value)}
-              className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
-            >
-              <option value="all">All Audiences</option>
-              <option value="children">Children</option>
-              <option value="middle_grade">Middle Grade</option>
-              <option value="ya">YA</option>
-              <option value="adult">Adult</option>
-              <option value="all_ages">All Ages</option>
             </select>
 
             <select

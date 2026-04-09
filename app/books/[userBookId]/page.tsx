@@ -4,6 +4,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import BookInfoTab from "./components/BookInfoTab";
+import ReadingTab from "./components/ReadingTab";
+import RatingTab from "./components/RatingTab";
+import TeacherTab from "./components/TeacherTab";
+import StoryTab from "./components/StoryTab";
+import VocabTab from "./components/VocabTab";
 
 type Book = {
   id: string;
@@ -13,10 +19,9 @@ type Book = {
   translator: string | null;
   illustrator: string | null;
   cover_url: string | null;
-
   genre: string | null;
   book_type: string | null;
-  audience_category: string | null;
+  published_date: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
   isbn: string | null;
@@ -100,6 +105,26 @@ type ChapterSummary = {
   updated_at: string;
 };
 
+type SettingItem = {
+  id: string;
+  user_book_id: string;
+  title: string | null;
+  details: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type CulturalItem = {
+  id: string;
+  user_book_id: string;
+  title: string | null;
+  details: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 type KanjiMapRow = {
   id: number;
   vocabulary_cache_id: number;
@@ -137,6 +162,10 @@ const LEVEL_OPTIONS = ["N5", "N4", "N3", "N2", "N1"] as const;
 
 const BOOK_TYPE_OPTIONS = [
   { value: "picture_book", label: "Picture Book" },
+  { value: "early_reader", label: "Early Reader" },
+  { value: "chapter_book", label: "Chapter Book" },
+  { value: "middle_grade", label: "Middle Grade" },
+  { value: "ya", label: "YA" },
   { value: "novel", label: "Novel" },
   { value: "short_story", label: "Short Story" },
   { value: "manga", label: "Manga" },
@@ -169,14 +198,6 @@ const GENRE_OPTIONS = [
   { value: "reference", label: "Reference" },
   { value: "general_nonfiction", label: "General Nonfiction" },
   { value: "other", label: "Other" },
-] as const;
-
-const AUDIENCE_CATEGORY_OPTIONS = [
-  { value: "children", label: "Children" },
-  { value: "middle_grade", label: "Middle Grade" },
-  { value: "ya", label: "YA" },
-  { value: "adult", label: "Adult" },
-  { value: "all_ages", label: "All Ages" },
 ] as const;
 
 const DIFFICULTY_OPTIONS = [
@@ -313,12 +334,6 @@ function bookTypeLabel(value: string | null | undefined) {
   );
 }
 
-function audienceCategoryLabel(value: string | null | undefined) {
-  return (
-    AUDIENCE_CATEGORY_OPTIONS.find((opt) => opt.value === value)?.label ?? "—"
-  );
-}
-
 function progressModeLabel(value: string | null | undefined) {
   switch (value) {
     case "pages":
@@ -414,8 +429,8 @@ export default function BookHubPage() {
 
   const [genre, setGenre] = useState<string>("");
   const [bookType, setBookType] = useState<string>("");
-  const [audienceCategory, setAudienceCategory] = useState<string>("");
   const [triggerWarnings, setTriggerWarnings] = useState<string>("");
+  const [publishedDate, setPublishedDate] = useState("");
   const [pageCount, setPageCount] = useState<string>("");
   const [isbn, setIsbn] = useState<string>("");
   const [isbn13, setIsbn13] = useState<string>("");
@@ -443,11 +458,80 @@ export default function BookHubPage() {
 
   const [linksText, setLinksText] = useState<string>("");
 
+  const [settingItems, setSettingItems] = useState<SettingItem[]>([]);
+  const [showSettingItems, setShowSettingItems] = useState(true);
+
+  const [settingReverseOrder, setSettingReverseOrder] = useState(false);
+  const [editingSettingIds, setEditingSettingIds] = useState<string[]>([]);
+  const [savingSettingIds, setSavingSettingIds] = useState<string[]>([]);
+  const [savedSettingIds, setSavedSettingIds] = useState<string[]>([]);
+
+  const visibleSettingItems = useMemo(() => {
+    const copy = [...settingItems];
+    return settingReverseOrder ? copy.reverse() : copy;
+  }, [settingItems, settingReverseOrder]);
+
+  function startEditingSettingItem(id: string) {
+    setEditingSettingIds((prev) =>
+      prev.includes(id) ? prev : [...prev, id]
+    );
+  }
+
+  function stopEditingSettingItem(id: string) {
+    setEditingSettingIds((prev) =>
+      prev.filter((x) => x !== id)
+    );
+  }
+
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [showCharacters, setShowCharacters] = useState(false);
+  const [showCharacters, setShowCharacters] = useState(true);
+
+  const [charactersReverseOrder, setCharactersReverseOrder] = useState(false);
   const [editingCharacterIds, setEditingCharacterIds] = useState<string[]>([]);
   const [savingCharacterIds, setSavingCharacterIds] = useState<string[]>([]);
   const [savedCharacterIds, setSavedCharacterIds] = useState<string[]>([]);
+
+  const visibleCharacters = useMemo(() => {
+    const copy = [...characters];
+    return charactersReverseOrder ? copy.reverse() : copy;
+  }, [characters, charactersReverseOrder]);
+
+  function startEditingCharacter(id: string) {
+    setEditingCharacterIds((prev) =>
+      prev.includes(id) ? prev : [...prev, id]
+    );
+  }
+
+  function stopEditingCharacter(id: string) {
+    setEditingCharacterIds((prev) =>
+      prev.filter((x) => x !== id)
+    );
+  }
+
+  const [culturalItems, setCulturalItems] = useState<CulturalItem[]>([]);
+  const [showCulturalItems, setShowCulturalItems] = useState(true);
+
+  const [culturalReverseOrder, setCulturalReverseOrder] = useState(false);
+  const [editingCulturalIds, setEditingCulturalIds] = useState<string[]>([]);
+  const [savingCulturalIds, setSavingCulturalIds] = useState<string[]>([]);
+  const [savedCulturalIds, setSavedCulturalIds] = useState<string[]>([]);
+
+  const visibleCulturalItems = useMemo(() => {
+    const copy = [...culturalItems];
+    return culturalReverseOrder ? copy.reverse() : copy;
+  }, [culturalItems, culturalReverseOrder]);
+
+  function startEditingCulturalItem(id: string) {
+    setEditingCulturalIds((prev) =>
+      prev.includes(id) ? prev : [...prev, id]
+    );
+  }
+
+  function stopEditingCulturalItem(id: string) {
+    setEditingCulturalIds((prev) =>
+      prev.filter((x) => x !== id)
+    );
+  }
 
   const [savedKanjiDefaults, setSavedKanjiDefaults] = useState<
     Record<string, SessionKanjiReading>
@@ -659,6 +743,22 @@ export default function BookHubPage() {
     setShowWordExplorer(true);
   }
 
+  function addSettingItem() {
+    const newItem: SettingItem = {
+      id: crypto.randomUUID(),
+      user_book_id: userBookId,
+      title: "",
+      details: "",
+      sort_order: settingItems.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setSettingItems((prev) => [...prev, newItem]);
+    startEditingSettingItem(newItem.id);
+  }
+
+
   function addChapterSummary() {
     if (!row?.id) return;
 
@@ -722,6 +822,59 @@ export default function BookHubPage() {
     }, 1800);
   }
 
+  function updateSettingItem(id: string, field: keyof SettingItem, value: string) {
+    setSettingItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  }
+
+  async function saveSettingItem(item: SettingItem) {
+    setSavingSettingIds((prev) => [...prev, item.id]);
+
+    setSavingSettingIds((prev) => prev.filter((x) => x !== item.id));
+    stopEditingSettingItem(item.id);
+  }
+
+  async function deleteSettingItem(id: string) {
+    setSettingItems((prev) => prev.filter((x) => x.id !== id));
+  }
+
+  function addCulturalItem() {
+    const newItem: CulturalItem = {
+      id: crypto.randomUUID(),
+      user_book_id: userBookId,
+      title: "",
+      details: "",
+      sort_order: culturalItems.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setCulturalItems((prev) => [...prev, newItem]);
+    startEditingCulturalItem(newItem.id);
+  }
+
+  function updateCulturalItem(id: string, field: keyof CulturalItem, value: string) {
+    setCulturalItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  }
+
+  async function saveCulturalItem(item: CulturalItem) {
+    setSavingCulturalIds((prev) => [...prev, item.id]);
+
+    setSavingCulturalIds((prev) => prev.filter((x) => x !== item.id));
+    stopEditingCulturalItem(item.id);
+  }
+
+  async function deleteCulturalItem(id: string) {
+    setCulturalItems((prev) => prev.filter((x) => x.id !== id));
+  }
+
   function addCharacter() {
     if (!row?.id) return;
 
@@ -743,7 +896,6 @@ export default function BookHubPage() {
     ]);
 
     setShowCharacters(true);
-    setEditingCharacterIds((prev) => [...prev, newId]);
   }
 
   function updateCharacter(id: string, field: keyof Character, value: string) {
@@ -752,19 +904,25 @@ export default function BookHubPage() {
     );
   }
 
-  function startEditingCharacter(id: string) {
-    setEditingCharacterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  }
-
-  function stopEditingCharacter(id: string) {
-    setEditingCharacterIds((prev) => prev.filter((x) => x !== id));
-  }
-
   function markCharacterSaved(id: string) {
     setSavedCharacterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
     window.setTimeout(() => {
       setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
     }, 1800);
+  }
+
+  async function saveNotes() {
+    if (!userBookId) return;
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({ notes })
+      .eq("id", userBookId);
+
+    if (error) {
+      console.error("Error saving notes:", error);
+      alert("Failed to save notes");
+    }
   }
 
   async function saveKanjiWord(vocabId: number) {
@@ -872,11 +1030,6 @@ export default function BookHubPage() {
       const saved = data as Character;
 
       setCharacters((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
-      setEditingCharacterIds((prev) =>
-        prev.map((x) => (x === oldId ? saved.id : x))
-      );
-
-      stopEditingCharacter(saved.id);
       markCharacterSaved(saved.id);
       return;
     }
@@ -899,15 +1052,12 @@ export default function BookHubPage() {
     const saved = data as Character;
 
     setCharacters((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
-
-    stopEditingCharacter(saved.id);
     markCharacterSaved(saved.id);
   }
 
   async function deleteCharacter(id: string) {
     if (id.startsWith("new-character-")) {
       setCharacters((prev) => prev.filter((x) => x.id !== id));
-      setEditingCharacterIds((prev) => prev.filter((x) => x !== id));
       setSavingCharacterIds((prev) => prev.filter((x) => x !== id));
       setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
       return;
@@ -928,9 +1078,9 @@ export default function BookHubPage() {
     }
 
     setCharacters((prev) => prev.filter((x) => x.id !== id));
-    setEditingCharacterIds((prev) => prev.filter((x) => x !== id));
     setSavingCharacterIds((prev) => prev.filter((x) => x !== id));
     setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
+    stopEditingCharacter(id);
   }
 
   async function loadChapterSummaries(userBookIdValue: string) {
@@ -956,8 +1106,9 @@ export default function BookHubPage() {
   async function loadSavedKanjiDefaults(userBookIdValue: string) {
     const { data: bookWordRows, error: bookWordErr } = await supabase
       .from("user_book_words")
-      .select("vocabulary_cache_id")
+      .select("vocabulary_cache_id, is_manual_override")
       .eq("user_book_id", userBookIdValue)
+      .eq("is_manual_override", false)
       .not("vocabulary_cache_id", "is", null);
 
     if (bookWordErr) {
@@ -1038,7 +1189,8 @@ export default function BookHubPage() {
 
     const { data: bookWordRows, error: bookWordErr } = await supabase
       .from("user_book_words")
-      .select("vocabulary_cache_id")
+      .select("vocabulary_cache_id, is_manual_override")
+      .eq("is_manual_override", false)
       .eq("user_book_id", row.id)
       .not("vocabulary_cache_id", "is", null);
 
@@ -1377,6 +1529,33 @@ export default function BookHubPage() {
     setOpenKanjiWordId(word.id);
   }
 
+  async function removeWordFromKanjiEnrichment(vocabId: number) {
+    if (!row?.id) return;
+
+    const ok = window.confirm(
+      "Remove this word from this book's kanji enrichment area?"
+    );
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("user_book_words")
+      .update({
+        vocabulary_cache_id: null,
+        is_manual_override: true,
+      })
+      .eq("user_book_id", row.id)
+      .eq("vocabulary_cache_id", vocabId);
+
+    if (error) {
+      console.error("Error removing word from kanji enrichment:", error);
+      alert(`Could not remove word.\n${error.message}`);
+      return;
+    }
+
+    await loadSavedKanjiDefaults(row.id);
+    await loadKanjiMapQueue();
+  }
+
   function updateKanjiMapRow(
     vocabId: number,
     rowId: number,
@@ -1628,6 +1807,7 @@ export default function BookHubPage() {
           isbn,
           isbn13,
           publisher,
+          published_date,
           publisher_reading,
           publisher_image_url,
           related_links,
@@ -1672,8 +1852,8 @@ export default function BookHubPage() {
     const b = r.books as Book | null;
     setGenre(b?.genre ?? "");
     setBookType(b?.book_type ?? "");
-    setAudienceCategory(b?.audience_category ?? "");
     setTriggerWarnings(b?.trigger_warnings ?? "");
+    setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
@@ -1809,9 +1989,8 @@ export default function BookHubPage() {
     const b = row.books;
     setGenre(b?.genre ?? "");
     setBookType(b?.book_type ?? "");
-    setAudienceCategory(b?.audience_category ?? "");
-
     setTriggerWarnings(b?.trigger_warnings ?? "");
+    setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
@@ -1879,9 +2058,9 @@ export default function BookHubPage() {
         translator: translatorName || null,
         illustrator: illustratorName || null,
         publisher: publisherName || null,
+        published_date: publishedDate || null,
         genre: genre || null,
         book_type: bookType || null,
-        audience_category: audienceCategory || null,
         trigger_warnings: triggerWarnings || null,
         page_count,
         isbn: isbn || null,
@@ -2138,6 +2317,8 @@ export default function BookHubPage() {
         ? Number(editingQuickSessionWord.chapterNumber)
         : null,
       chapter_name: editingQuickSessionWord.chapterName || null,
+      is_manual_override: true,
+      vocabulary_cache_id: null,
     };
 
     const { error } = await supabase
@@ -2154,7 +2335,11 @@ export default function BookHubPage() {
     setQuickSessionWords((prev) =>
       prev.map((item) =>
         item.id === editingQuickSessionWord.id
-          ? { ...editingQuickSessionWord }
+          ? {
+            ...editingQuickSessionWord,
+            is_manual_override: true,
+            vocabulary_cache_id: null,
+          }
           : item
       )
     );
@@ -2209,15 +2394,6 @@ export default function BookHubPage() {
                 <div className="flex aspect-[2/3] w-full items-center justify-center rounded-2xl border border-stone-200 bg-stone-100 text-sm text-stone-400">
                   No cover
                 </div>
-              )}
-
-              {isEditingThisTab && activeTab === "bookInfo" && (
-                <input
-                  value={coverUrl}
-                  onChange={(e) => setCoverUrl(e.target.value)}
-                  placeholder="Cover URL"
-                  className="mt-3 w-full rounded border px-3 py-2 text-sm"
-                />
               )}
             </div>
 
@@ -2374,205 +2550,6 @@ export default function BookHubPage() {
                   </div>
                 </div>
               </div>
-
-              <div className="mt-6 flex flex-col items-center gap-2">
-                <p className="text-sm text-stone-500">
-                  Time your reading session and log it more easily.
-                </p>
-
-                <div className="flex flex-wrap justify-center gap-3">
-                  {!isRunning && !isPaused ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSessionDate(new Date().toISOString().slice(0, 10));
-                        setStartTime(Date.now());
-                        setElapsed(0);
-                        setIsRunning(true);
-                        setIsPaused(false);
-                      }}
-                      className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-                    >
-                      Start Timer
-                    </button>
-                  ) : null}
-
-                  {isRunning ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (startTime) {
-                            setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                          }
-                          setIsRunning(false);
-                          setIsPaused(true);
-                        }}
-                        className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
-                      >
-                        Pause
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (startTime) {
-                            setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                          }
-                          setIsRunning(false);
-                          setIsPaused(false);
-                          setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
-                          setShowTimedSessionForm(true);
-                        }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                      >
-                        Finish
-                      </button>
-                    </>
-                  ) : null}
-
-                  {isPaused ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStartTime(Date.now() - elapsed * 1000);
-                          setIsRunning(true);
-                          setIsPaused(false);
-                        }}
-                        className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-                      >
-                        Resume
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPaused(false);
-                          setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
-                          setShowTimedSessionForm(true);
-                        }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                      >
-                        Finish
-                      </button>
-                    </>
-                  ) : null}
-
-                  <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
-                    ⏱ {formatTimer(elapsed)}
-                  </div>
-                </div>
-              </div>
-
-              {showTimedSessionForm && !isRunning ? (
-                <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
-                  <div className="mb-3 text-sm font-medium text-stone-700">
-                    Save this reading session
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <div className="mb-1 text-sm text-stone-600">Start page</div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={sessionStartPage}
-                        onChange={(e) => setSessionStartPage(e.target.value)}
-                        placeholder="e.g. 45"
-                        className="w-full rounded border px-3 py-2 text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-1 text-sm text-stone-600">End page</div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={sessionEndPage}
-                        onChange={(e) => setSessionEndPage(e.target.value)}
-                        placeholder="e.g. 52"
-                        className="w-full rounded border px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-3 text-sm text-stone-500">
-                    Time: {formatTimer(elapsed)}
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
-                        await saveReadingSession();
-                        setIsPaused(false);
-                      }}
-                      className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                    >
-                      Save Timed Session
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTimedSessionForm(false);
-                        setElapsed(0);
-                        setStartTime(null);
-                        setIsPaused(false);
-                      }}
-                      className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              {(isRunning || isPaused) ? (
-                <p className="mt-2 text-xs text-amber-600">
-                  Timer is active. If you leave the Book Hub or refresh the page, you may lose your session.
-                </p>
-              ) : null}
-
-              {timerSaveMessage ? (
-                <p className="mt-2 text-xs text-emerald-600">
-                  {timerSaveMessage}
-                </p>
-              ) : null}
-
-              <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!confirmLeaveIfTimerActive()) return;
-                    router.push(`/books/${row.id}/weekly-readings`);
-                  }}
-                  className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
-                >
-                  <div className="text-xs text-blue-700">Practice</div>
-                  <div className="mt-1 font-medium text-stone-900">Kanji Readings</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => router.push(`/books/${row.id}/readalong`)}
-                  className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
-                >
-                  <div className="text-xs text-emerald-700">Read Along</div>
-                  <div className="mt-1 font-medium text-stone-900">Book Support</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => router.push(`/books/${row.id}/study`)}
-                  className="rounded-xl border border-stone-900 bg-amber-50 p-3 text-center transition hover:bg-amber-100"
-                >
-                  <div className="text-xs text-amber-700">Study</div>
-                  <div className="mt-1 font-medium text-stone-900">Review Words</div>
-                </button>
-              </div>
             </div>
           </div>
 
@@ -2581,6 +2558,213 @@ export default function BookHubPage() {
               {error}
             </div>
           ) : null}
+
+          <div className="px-4 pb-2 md:px-8">
+            <div className="mt-6 flex flex-col items-center gap-2">
+              <p className="text-sm text-stone-500">
+                Time your reading session and log it more easily.
+              </p>
+
+              <div className="flex flex-wrap justify-center gap-3">
+                {!isRunning && !isPaused ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSessionDate(new Date().toISOString().slice(0, 10));
+                      setStartTime(Date.now());
+                      setElapsed(0);
+                      setIsRunning(true);
+                      setIsPaused(false);
+                    }}
+                    className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+                  >
+                    Start Timer
+                  </button>
+                ) : null}
+
+                {isRunning ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (startTime) {
+                          setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                        }
+                        setIsRunning(false);
+                        setIsPaused(true);
+                      }}
+                      className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
+                    >
+                      Pause
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (startTime) {
+                          setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                        }
+                        setIsRunning(false);
+                        setIsPaused(false);
+                        setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
+                        setShowTimedSessionForm(true);
+                      }}
+                      className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                    >
+                      Finish
+                    </button>
+                  </>
+                ) : null}
+
+                {isPaused ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartTime(Date.now() - elapsed * 1000);
+                        setIsRunning(true);
+                        setIsPaused(false);
+                      }}
+                      className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+                    >
+                      Resume
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPaused(false);
+                        setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
+                        setShowTimedSessionForm(true);
+                      }}
+                      className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                    >
+                      Finish
+                    </button>
+                  </>
+                ) : null}
+
+                <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
+                  ⏱ {formatTimer(elapsed)}
+                </div>
+              </div>
+            </div>
+
+            {showTimedSessionForm && !isRunning ? (
+              <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
+                <div className="mb-3 text-sm font-medium text-stone-700">
+                  Save this reading session
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <div className="mb-1 text-sm text-stone-600">Start page</div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={sessionStartPage}
+                      onChange={(e) => setSessionStartPage(e.target.value)}
+                      placeholder="e.g. 45"
+                      className="w-full rounded border px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-1 text-sm text-stone-600">End page</div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={sessionEndPage}
+                      onChange={(e) => setSessionEndPage(e.target.value)}
+                      placeholder="e.g. 52"
+                      className="w-full rounded border px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 text-sm text-stone-500">
+                  Time: {formatTimer(elapsed)}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
+                      await saveReadingSession();
+                      setIsPaused(false);
+                    }}
+                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                  >
+                    Save Timed Session
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTimedSessionForm(false);
+                      setElapsed(0);
+                      setStartTime(null);
+                      setIsPaused(false);
+                    }}
+                    className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {(isRunning || isPaused) ? (
+              <p className="mt-2 text-xs text-amber-600">
+                Timer is active. If you leave the Book Hub or refresh the page, you may lose your session.
+              </p>
+            ) : null}
+
+            {timerSaveMessage ? (
+              <p className="mt-2 text-xs text-emerald-600">
+                {timerSaveMessage}
+              </p>
+            ) : null}
+
+            <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/weekly-readings`);
+                }}
+                className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
+              >
+                <div className="text-xs text-blue-700">Practice</div>
+                <div className="mt-1 font-medium text-stone-900">Kanji Readings</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/readalong`);
+                }}
+                className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
+              >
+                <div className="text-xs text-emerald-700">Read Along</div>
+                <div className="mt-1 font-medium text-stone-900">Book Support</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/study`);
+                }}
+                className="rounded-xl border border-stone-900 bg-amber-50 p-3 text-center transition hover:bg-amber-100"
+              >
+                <div className="text-xs text-amber-700">Study</div>
+                <div className="mt-1 font-medium text-stone-900">Study Flashcards</div>
+              </button>
+            </div>
+          </div>
 
           <div className="mt-2 px-4 md:px-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -2633,1973 +2817,563 @@ export default function BookHubPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
-              {canEditThisTab && (
-                !isEditingThisTab ? (
+          {activeTab === "bookInfo" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                <div className="text-base font-semibold text-stone-900">Book Info</div>
+
+                {!isEditingThisTab ? (
                   <button
-                    onClick={() => setEditingTab(activeTab)}
-                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+                    type="button"
+                    onClick={() => setEditingTab("bookInfo")}
+                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
                   >
                     Edit
                   </button>
                 ) : (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setEditingTab(null)}
-                      className="rounded-2xl bg-stone-200 px-4 py-2 text-sm"
+                      type="button"
+                      onClick={cancelEdits}
+                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
                     >
                       Cancel
                     </button>
                     <button
+                      type="button"
                       onClick={saveAll}
-                      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm text-white"
+                      disabled={saving}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
                     >
-                      Save
+                      {saving ? "Saving..." : "Save"}
                     </button>
                   </div>
-                )
-              )}
+                )}
+              </div>
 
+              <BookInfoTab
+                book={book}
+                isEditing={isEditingThisTab}
+                genre={genre}
+                setGenre={setGenre}
+                bookType={bookType}
+                setBookType={setBookType}
+                triggerWarnings={triggerWarnings}
+                setTriggerWarnings={setTriggerWarnings}
+                publishedDate={publishedDate}
+                setPublishedDate={setPublishedDate}
+                pageCount={pageCount}
+                setPageCount={setPageCount}
+                isbn={isbn}
+                setIsbn={setIsbn}
+                isbn13={isbn13}
+                setIsbn13={setIsbn13}
+                authorName={authorName}
+                setAuthorName={setAuthorName}
+                translatorName={translatorName}
+                setTranslatorName={setTranslatorName}
+                illustratorName={illustratorName}
+                setIllustratorName={setIllustratorName}
+                publisherName={publisherName}
+                setPublisherName={setPublisherName}
+                publisherReading={publisherReading}
+                setPublisherReading={setPublisherReading}
+                coverUrl={coverUrl}
+                setCoverUrl={setCoverUrl}
+                authorImg={authorImg}
+                setAuthorImg={setAuthorImg}
+                translatorImg={translatorImg}
+                setTranslatorImg={setTranslatorImg}
+                illustratorImg={illustratorImg}
+                setIllustratorImg={setIllustratorImg}
+                publisherImg={publisherImg}
+                setPublisherImg={setPublisherImg}
+                authorReading={authorReading}
+                setAuthorReading={setAuthorReading}
+                translatorReading={translatorReading}
+                setTranslatorReading={setTranslatorReading}
+                illustratorReading={illustratorReading}
+                setIllustratorReading={setIllustratorReading}
+                relatedLinksArr={relatedLinksArr}
+                genreLabel={genreLabel}
+                bookTypeLabel={bookTypeLabel}
+                displayLinkLabel={displayLinkLabel}
+                displayLinkUrl={displayLinkUrl}
+                GENRE_OPTIONS={GENRE_OPTIONS}
+                BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
+                Detail={Detail}
+                PersonRow={PersonRow}
+              />
             </div>
-          </div>
+          )}
 
-          <div className="rounded-b-2xl rounded-tr-2xl border border-stone-300 bg-white p-5 shadow-sm">
-            {activeTab === "bookInfo" && (
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
+          {activeTab === "study" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                <div className="text-base font-semibold text-stone-900">Vocab</div>
 
-                  <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Genre</div>
-                      {!isEditingThisTab ? (
-                        <div className="font-medium">{genreLabel(book.genre)}</div>
-                      ) : (
-                        <select
-                          value={genre}
-                          onChange={(e) => setGenre(e.target.value)}
-                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                        >
-                          <option value="">—</option>
-                          {GENRE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Book Type</div>
-                      {!isEditingThisTab ? (
-                        <div className="font-medium">{bookTypeLabel(book.book_type)}</div>
-                      ) : (
-                        <select
-                          value={bookType}
-                          onChange={(e) => setBookType(e.target.value)}
-                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                        >
-                          <option value="">—</option>
-                          {BOOK_TYPE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Audience</div>
-                      {!isEditingThisTab ? (
-                        <div className="font-medium">{audienceCategoryLabel(book.audience_category)}</div>
-                      ) : (
-                        <select
-                          value={audienceCategory}
-                          onChange={(e) => setAudienceCategory(e.target.value)}
-                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                        >
-                          <option value="">—</option>
-                          {AUDIENCE_CATEGORY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-
-                    <Detail
-                      label="Page Count"
-                      value={book.page_count}
-                      editing={isEditingThisTab}
-                      inputValue={pageCount}
-                      setInputValue={setPageCount}
-                      placeholder="e.g. 352"
-                    />
-                    <Detail
-                      label="ISBN"
-                      value={book.isbn}
-                      editing={isEditingThisTab}
-                      inputValue={isbn}
-                      setInputValue={setIsbn}
-                      placeholder="ISBN"
-                    />
-                    <Detail
-                      label="ISBN-13"
-                      value={book.isbn13}
-                      editing={isEditingThisTab}
-                      inputValue={isbn13}
-                      setInputValue={setIsbn13}
-                      placeholder="ISBN-13"
-                    />
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="text-sm font-medium">Trigger Warnings</div>
-                    {!isEditingThisTab ? (
-                      <div className="mt-1 min-h-[40px] whitespace-pre-wrap text-sm text-stone-700">
-                        {book.trigger_warnings?.trim() ? book.trigger_warnings : "—"}
-                      </div>
-                    ) : (
-                      <textarea
-                        value={triggerWarnings}
-                        onChange={(e) => setTriggerWarnings(e.target.value)}
-                        placeholder="Anything you want to flag"
-                        className="mt-2 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">People</div>
-
-                  <div className="space-y-4">
-                    <PersonRow
-                      label="Author"
-                      name={isEditingThisTab ? authorName : book.author}
-                      reading={isEditingThisTab ? authorReading : book.author_reading}
-                      img={isEditingThisTab ? authorImg : book.author_image_url}
-                      editing={isEditingThisTab}
-                      nameValue={authorName}
-                      setNameValue={setAuthorName}
-                      imgValue={authorImg}
-                      setImgValue={setAuthorImg}
-                      readingValue={authorReading}
-                      setReadingValue={setAuthorReading}
-                    />
-
-                    {(book.translator || book.translator_image_url || isEditingThisTab) && (
-                      <PersonRow
-                        label="Translator"
-                        name={isEditingThisTab ? translatorName : book.translator}
-                        reading={isEditingThisTab ? translatorReading : book.translator_reading}
-                        img={isEditingThisTab ? translatorImg : book.translator_image_url}
-                        editing={isEditingThisTab}
-                        nameValue={translatorName}
-                        setNameValue={setTranslatorName}
-                        imgValue={translatorImg}
-                        setImgValue={setTranslatorImg}
-                        readingValue={translatorReading}
-                        setReadingValue={setTranslatorReading}
-                      />
-                    )}
-
-                    {(book.illustrator || book.illustrator_image_url || isEditingThisTab) && (
-                      <PersonRow
-                        label="Illustrator"
-                        name={isEditingThisTab ? illustratorName : book.illustrator}
-                        reading={isEditingThisTab ? illustratorReading : book.illustrator_reading}
-                        img={isEditingThisTab ? illustratorImg : book.illustrator_image_url}
-                        editing={isEditingThisTab}
-                        nameValue={illustratorName}
-                        setNameValue={setIllustratorName}
-                        imgValue={illustratorImg}
-                        setImgValue={setIllustratorImg}
-                        readingValue={illustratorReading}
-                        setReadingValue={setIllustratorReading}
-                      />
-                    )}
-
-                    {(book.publisher || book.publisher_image_url || isEditingThisTab) && (
-                      <PersonRow
-                        label="Publisher"
-                        name={isEditingThisTab ? publisherName : book.publisher}
-                        reading={isEditingThisTab ? publisherReading : book.publisher_reading}
-                        img={isEditingThisTab ? publisherImg : book.publisher_image_url}
-                        editing={isEditingThisTab}
-                        nameValue={publisherName}
-                        setNameValue={setPublisherName}
-                        imgValue={publisherImg}
-                        setImgValue={setPublisherImg}
-                        readingValue={publisherReading}
-                        setReadingValue={setPublisherReading}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Related Links</div>
-
-                  {!isEditingThisTab ? (
-                    relatedLinksArr.length > 0 ? (
-                      <ul className="space-y-2 text-sm">
-                        {relatedLinksArr.map((l: any, idx: number) => {
-                          const label = displayLinkLabel(l);
-                          const url = displayLinkUrl(l);
-                          return (
-                            <li key={idx} className="flex items-center justify-between gap-3">
-                              <span className="truncate">{label}</span>
-                              {url ? (
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="shrink-0 text-blue-600 hover:underline"
-                                >
-                                  Open
-                                </a>
-                              ) : (
-                                <span className="text-stone-500">—</span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <div className="text-sm text-stone-500">—</div>
-                    )
-                  ) : (
-                    <div>
-                      <div className="mb-2 text-xs text-stone-500">
-                        One per line. Optional format: <span className="font-mono">Label | URL</span>
-                      </div>
-                      <textarea
-                        value={linksText}
-                        onChange={(e) => setLinksText(e.target.value)}
-                        placeholder={`Amazon | https://...\nPublisher | https://...\nhttps://...`}
-                        className="min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {activeTab === "teacher" && isTeacher && (
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Tools</div>
-
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <button
-                      onClick={() => router.push(`/books/${row.id}/weekly-readings/prepare`)}
-                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                    >
-                      📝 Prepare Readings
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!row?.id || !userId) return;
-
-                        const { data: students } = await supabase
-                          .from("teacher_students")
-                          .select("student_id")
-                          .eq("teacher_id", userId);
-
-                        for (const s of students ?? []) {
-                          await supabase.from("user_alerts").insert({
-                            user_id: s.student_id,
-                            user_book_id: row.id,
-                            type: "kanji",
-                            message: `Custom readings are ready to practice for ${book.title}`,
-                          });
-                        }
-                      }}
-                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                    >
-                      🔔 Notify Custom Readings
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">
-                    Kanji Map Enrichment Queue
-                  </div>
-
-                  {kanjiMapLoading ? (
-                    <div className="text-sm text-stone-500">Loading kanji map queue...</div>
-                  ) : kanjiMapError ? (
-                    <div className="text-sm text-red-600">{kanjiMapError}</div>
-                  ) : kanjiMapQueue.length === 0 ? (
-                    <div className="text-sm text-stone-500">No words currently need kanji-map work.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {kanjiMapQueue.map((word) => {
-                        const hasRows = (word.vocabulary_kanji_map ?? []).length > 0;
-                        const isOpen = openKanjiWordId === word.id;
-                        const editRows = editingKanjiRows[word.id] ?? [];
-
-                        return (
-                          <div
-                            key={word.id}
-                            className="rounded-xl border bg-white p-3"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="font-medium text-stone-900">{word.surface}</div>
-                                <div className="text-sm text-stone-500">
-                                  {word.reading} · {word.jlpt ?? "—"}
-                                </div>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => handleWorkOnKanjiWord(word)}
-                                className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-                              >
-                                {hasRows ? "Work on this word" : "Prepare this word"}
-                              </button>
-                            </div>
-
-                            {isOpen ? (
-                              <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-                                <div className="mb-3">
-                                  <div className="text-sm font-semibold text-stone-900">{word.surface}</div>
-                                  <div className="text-sm text-stone-500">
-                                    {word.reading} ・ {hiraToKata(word.reading ?? "")}
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                  {editRows.map((row) => (
-                                    <div
-                                      key={row.id}
-                                      className="grid grid-cols-1 gap-2 rounded-lg border bg-white p-3 md:grid-cols-[60px_120px_1fr_1fr]"
-                                    >
-                                      <div className="flex items-center text-lg font-medium text-stone-900">
-                                        {row.kanji}
-                                      </div>
-
-                                      <select
-                                        value={row.reading_type ?? ""}
-                                        onChange={(e) =>
-                                          updateKanjiMapRow(word.id, row.id, "reading_type", e.target.value)
-                                        }
-                                        className="rounded border px-2 py-2 text-sm"
-                                      >
-                                        <option value="">—</option>
-                                        <option value="on">on</option>
-                                        <option value="kun">kun</option>
-                                        <option value="other">other</option>
-                                      </select>
-
-                                      <input
-                                        value={row.base_reading ?? ""}
-                                        onChange={(e) =>
-                                          updateKanjiMapRow(word.id, row.id, "base_reading", e.target.value)
-                                        }
-                                        placeholder="Base reading"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
-
-                                      <input
-                                        value={row.realized_reading ?? ""}
-                                        onChange={(e) =>
-                                          updateKanjiMapRow(word.id, row.id, "realized_reading", e.target.value)
-                                        }
-                                        placeholder="Realized reading"
-                                        className="rounded border px-3 py-2 text-sm"
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-
-                                <div className="mt-4 flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => saveKanjiWord(word.id)}
-                                    disabled={savingKanjiWordId === word.id}
-                                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                                  >
-                                    {savingKanjiWordId === word.id ? "Saving..." : "Save"}
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setOpenKanjiWordId(null)}
-                                    className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Level (with guidance)</div>
-
-                  {!isEditingThisTab ? (
-                    <>
-                      <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
-                      <div className="mt-1 text-xs text-amber-600">
-                        {levelStars(row.recommended_level)}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-2 grid gap-2 sm:grid-cols-5">
-                      {[
-                        { value: "N5", stars: "★☆☆☆☆" },
-                        { value: "N4", stars: "★★☆☆☆" },
-                        { value: "N3", stars: "★★★☆☆" },
-                        { value: "N2", stars: "★★★★☆" },
-                        { value: "N1", stars: "★★★★★" },
-                      ].map((opt) => {
-                        const isSelected = recommendedLevel === opt.value;
-
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setRecommendedLevel(opt.value)}
-                            className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
-                              ? "border-stone-900 bg-stone-100"
-                              : "border-stone-200 hover:bg-stone-50"
-                              }`}
-                          >
-                            <div className="text-amber-600">{opt.stars}</div>
-                            <div className="text-xs text-stone-600">{opt.value}</div>
-                          </button>
-                        );
-                      })}
-
-                      <button
-                        type="button"
-                        onClick={() => setRecommendedLevel("")}
-                        className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
-                      >
-                        <div className="text-xs text-stone-600">Clear</div>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Teacher Notes</div>
-                  <div className="text-sm text-stone-400">Coming next</div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "reading" && (
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!row?.id) return;
-
-                        const today = new Date().toISOString().slice(0, 10);
-                        const isDnf = !!row.dnf_at;
-
-                        const updateValues = isDnf
-                          ? {
-                            finished_at: null,
-                            dnf_at: null,
-                          }
-                          : {
-                            started_at: today,
-                            finished_at: null,
-                            dnf_at: null,
-                          };
-
-                        const { error } = await supabase
-                          .from("user_books")
-                          .update(updateValues)
-                          .eq("id", row.id);
-
-                        if (error) {
-                          console.error("Error updating book status:", error);
-                          alert("Could not update book status.");
-                          return;
-                        }
-
-                        if (!isDnf) {
-                          setStartedAt(today);
-                        }
-
-                        setFinishedAt("");
-                        setDnfAt("");
-                        await load();
-                        alert(isDnf ? "Book resumed." : "Marked as started.");
-                      }}
-                      className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                    >
-                      {row.dnf_at ? "Resume Book" : "Start Today"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!row?.id) return;
-
-                        const today = new Date().toISOString().slice(0, 10);
-
-                        const { error } = await supabase
-                          .from("user_books")
-                          .update({
-                            finished_at: today,
-                            dnf_at: null,
-                          })
-                          .eq("id", row.id);
-
-                        if (error) {
-                          console.error("Error marking book as finished:", error);
-                          alert("Could not update book status.");
-                          return;
-                        }
-
-                        setFinishedAt(today);
-                        setDnfAt("");
-                        await load();
-                      }}
-                      className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                    >
-                      Mark Finished
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!row?.id) return;
-
-                        const confirmed = window.confirm("Mark this book as DNF?");
-                        if (!confirmed) return;
-
-                        const today = new Date().toISOString().slice(0, 10);
-
-                        const { error } = await supabase
-                          .from("user_books")
-                          .update({
-                            dnf_at: today,
-                            finished_at: null,
-                          })
-                          .eq("id", row.id);
-
-                        if (error) {
-                          console.error("Error marking book as DNF:", error);
-                          alert("Could not update book status.");
-                          return;
-                        }
-
-                        setFinishedAt("");
-                        setDnfAt(today);
-                        await load();
-                      }}
-                      className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                    >
-                      Mark DNF
-                    </button>
-                  </div>
-
-                  {canFillBeginningPages || canFillEndingPages ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {canFillBeginningPages ? (
-                        <button
-                          type="button"
-                          onClick={fillBeginningPages}
-                          className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                        >
-                          Fill the empty beginning pages
-                        </button>
-                      ) : null}
-
-                      {canFillEndingPages ? (
-                        <button
-                          type="button"
-                          onClick={fillEndingPages}
-                          className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                        >
-                          Fill the empty ending pages
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {canFillBeginningPages ? (
-                    <div className="mt-2 text-xs text-stone-500">
-                      Looks like you started the book on page {earliestStartPage}. Fill pages 1–{earliestStartPage! - 1}?
-                    </div>
-                  ) : null}
-
-                  {canFillEndingPages ? (
-                    <div className="mt-2 text-xs text-stone-500">
-                      Looks like your story ends on page {furthestPage}. Fill pages {furthestPage! + 1}–{book.page_count}?
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading History</div>
-
-                  <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Format</div>
-                      {!isEditingThisTab ? (
-                        <div className="mt-1 font-medium">{formatTypeLabel(formatType)}</div>
-                      ) : (
-                        <select
-                          value={formatType}
-                          onChange={(e) => setFormatType(e.target.value)}
-                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                        >
-                          <option value="">—</option>
-                          <option value="paperback">Paperback</option>
-                          <option value="hardcover">Hardcover</option>
-                          <option value="ebook">eBook</option>
-                          <option value="audiobook">Audiobook</option>
-                          <option value="other">Other</option>
-                        </select>
-                      )}
-                    </div>
-
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Progress Mode</div>
-                      {!isEditingThisTab ? (
-                        <div className="mt-1 font-medium">{progressModeLabel(progressMode)}</div>
-                      ) : (
-                        <select
-                          value={progressMode}
-                          onChange={(e) => setProgressMode(e.target.value)}
-                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                        >
-                          <option value="">—</option>
-                          <option value="pages">Pages</option>
-                          <option value="percent">Percent</option>
-                          <option value="chapters">Chapters</option>
-                          <option value="time">Time</option>
-                        </select>
-                      )}
-                    </div>
-
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Show Page Numbers</div>
-                      {!isEditingThisTab ? (
-                        <div className="mt-1 font-medium">{showPageNumbers ? "Yes" : "No"}</div>
-                      ) : (
-                        <label className="mt-2 flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={showPageNumbers}
-                            onChange={(e) => setShowPageNumbers(e.target.checked)}
-                          />
-                          <span>Show page numbers</span>
-                        </label>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                    <DateField
-                      label="Started"
-                      value={safeDate(startedAt) ?? started}
-                      editing={isEditingThisTab}
-                      inputValue={startedAt}
-                      setInputValue={setStartedAt}
-                    />
-
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Finished / DNF</div>
-                      {!isEditingThisTab ? (
-                        <div className="mt-1 font-medium">
-                          {dnfAt
-                            ? `${dnfAt} (DNF)`
-                            : safeDate(finishedAt) ?? finished
-                              ? formatYmd((safeDate(finishedAt) ?? finished) as Date)
-                              : "—"}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <input
-                            type="date"
-                            value={finishedAt}
-                            onChange={(e) => setFinishedAt(e.target.value)}
-                            className="w-full rounded border px-2 py-1"
-                          />
-                          <input
-                            type="date"
-                            value={dnfAt}
-                            onChange={(e) => setDnfAt(e.target.value)}
-                            className="w-full rounded border px-2 py-1"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Date</div>
-                      <input
-                        type="date"
-                        value={sessionDate}
-                        onChange={(e) => setSessionDate(e.target.value)}
-                        className="mt-1 w-full rounded border px-2 py-1"
-                      />
-                    </div>
-
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Minutes read (optional)</div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={sessionMinutesRead}
-                        onChange={(e) => setSessionMinutesRead(e.target.value)}
-                        placeholder="e.g. 25"
-                        className="mt-1 w-full rounded border px-2 py-1"
-                      />
-                    </div>
-
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">Start page</div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={sessionStartPage}
-                        onChange={(e) => setSessionStartPage(e.target.value)}
-                        placeholder="e.g. 4"
-                        className="mt-1 w-full rounded border px-2 py-1"
-                      />
-                    </div>
-
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">End page</div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={sessionEndPage}
-                        onChange={(e) => setSessionEndPage(e.target.value)}
-                        placeholder="e.g. 10"
-                        className="mt-1 w-full rounded border px-2 py-1"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      onClick={saveReadingSession}
-                      className="rounded-2xl !bg-stone-900 px-4 py-2 text-sm font-medium !text-white transition hover:!bg-black"
-                    >
-                      Save Session
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
-
-                  {readingSessions.length === 0 ? (
-                    <div className="text-sm text-stone-500">No sessions yet.</div>
-                  ) : (
-                    <>
-                      {showAllSessions && <div className="mb-3">{renderSessionToggle()}</div>}
-
-                      <div className="space-y-2">
-                        {visibleReadingSessions.map((session) => {
-                          const pagesRead = session.end_page - session.start_page + 1;
-
-                          return (
-                            <div
-                              key={session.id}
-                              className="rounded-xl border bg-white p-3 text-sm text-stone-700"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="font-medium">{session.read_on}</div>
-                                  <div className="mt-1">
-                                    p. {session.start_page} → {session.end_page}
-                                  </div>
-                                  <div className="mt-1 text-stone-500">
-                                    {session.minutes_read != null
-                                      ? `${session.minutes_read} min · ${pagesRead} pages`
-                                      : `Untimed · ${pagesRead} pages`}
-                                  </div>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => deleteReadingSession(session.id)}
-                                  className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <div className="mt-3">{renderSessionToggle()}</div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {activeTab === "rating" && (
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
-
-                  {!isEditingThisTab ? (
-                    <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
-                      {row.my_review?.trim() ? row.my_review : "—"}
-                    </div>
-                  ) : (
-                    <textarea
-                      value={myReview}
-                      onChange={(e) => setMyReview(e.target.value)}
-                      placeholder="Write your review here…"
-                      className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                    />
-                  )}
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Book Ratings</div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <StarRatingField
-                      label="Entertainment Rating"
-                      value={row.rating_overall}
-                      editing={isEditingThisTab}
-                      inputValue={ratingOverall}
-                      setInputValue={setRatingOverall}
-                      descriptions={{
-                        5: "Exceptional! Already want to read it again!",
-                        4: "Very good! Definitely will recommend it.",
-                        3: "Good solid book.",
-                        2: "Not bad, but I would have liked to read something else.",
-                        1: "Didn’t like it.",
-                      }}
-                    />
-
-                    <StarRatingField
-                      label="Language Learning Potential"
-                      value={row.rating_recommend}
-                      editing={isEditingThisTab}
-                      inputValue={ratingRecommend}
-                      setInputValue={setRatingRecommend}
-                      descriptions={{
-                        5: "This is a learner’s dream come true!",
-                        4: "Has a lot of good material in there.",
-                        3: "You can learn some stuff, but nothing special.",
-                        2: "Not so much useful language material.",
-                        1: "I didn’t get anything out of it.",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Reading Context</div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded border bg-white p-3 text-sm">
-                      <div className="text-stone-600">My Level at Time of Reading</div>
-                      {!isEditingThisTab ? (
-                        <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
-                      ) : (
-                        <select
-                          value={readerLevel}
-                          onChange={(e) => setReaderLevel(e.target.value)}
-                          className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-                        >
-                          <option value="">—</option>
-                          {LEVEL_OPTIONS.map((lvl) => (
-                            <option key={lvl} value={lvl}>
-                              {lvl}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-
-                    <DifficultyField
-                      value={row.rating_difficulty}
-                      editing={isEditingThisTab}
-                      inputValue={ratingDifficulty}
-                      setInputValue={setRatingDifficulty}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "story" && (
-              <div className="space-y-6">
-                <div className="mb-4 flex gap-2 border-b border-stone-300 px-2">
+                {!isEditingThisTab ? (
                   <button
-                    onClick={() => setStoryTab("characters")}
-                    className={`px-3 py-2 text-sm font-medium ${storyTab === "characters"
-                      ? "border-b-2 border-stone-900 text-stone-900"
-                      : "text-stone-500"
-                      }`}
+                    type="button"
+                    onClick={() => setEditingTab("study")}
+                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
                   >
-                    Characters
+                    Edit
                   </button>
-
-                  <button
-                    onClick={() => setStoryTab("plot")}
-                    className={`px-3 py-2 text-sm font-medium ${storyTab === "plot"
-                      ? "border-b-2 border-stone-900 text-stone-900"
-                      : "text-stone-500"
-                      }`}
-                  >
-                    Plot
-                  </button>
-
-                  <button
-                    onClick={() => setStoryTab("setting")}
-                    className={`px-3 py-2 text-sm font-medium ${storyTab === "setting"
-                      ? "border-b-2 border-stone-900 text-stone-900"
-                      : "text-stone-500"
-                      }`}
-                  >
-                    Setting
-                  </button>
-
-                  <button
-                    onClick={() => setStoryTab("cultural")}
-                    className={`px-3 py-2 text-sm font-medium ${storyTab === "cultural"
-                      ? "border-b-2 border-stone-900 text-stone-900"
-                      : "text-stone-500"
-                      }`}
-                  >
-                    Cultural Notes
-                  </button>
-                </div>
-
-                {storyTab === "characters" && (
-                  <>
-                    {/* Your existing CHARACTER code goes here */}
-
-                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-stone-900">Character List</div>
-                          <p className="mt-1 text-sm text-stone-400">
-                            Forgetting the readings of characters names? Jot them down here.
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowCharacters((prev) => !prev)}
-                            className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                          >
-                            {showCharacters ? "Hide" : "Show"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCharacters(true);
-                              addCharacter();
-                            }}
-                            className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
-                          >
-                            + Add
-                          </button>
-                        </div>
-                      </div>
-
-                      {showCharacters && (
-                        <>
-                          {characters.length === 0 ? (
-                            <div className="text-sm text-stone-400">No characters yet.</div>
-                          ) : (
-                            <div className="space-y-4">
-                              {characters.map((c) => {
-                                const isEditing =
-                                  c.id.startsWith("new-character-") ||
-                                  editingCharacterIds.includes(c.id);
-                                const isSaving = savingCharacterIds.includes(c.id);
-                                const wasJustSaved = savedCharacterIds.includes(c.id);
-
-                                return (
-                                  <div key={c.id} className="rounded-xl border bg-white p-3">
-                                    {!isEditing ? (
-                                      <>
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="min-w-0">
-                                            <div className="min-w-0">
-                                              <div className="text-sm font-medium text-stone-900">
-                                                {c.name || "—"}
-                                                {c.reading ? (
-                                                  <span className="ml-2 hidden text-stone-500 sm:inline">
-                                                    （{c.reading}）
-                                                  </span>
-                                                ) : null}
-                                              </div>
-
-                                              {c.reading ? (
-                                                <div className="text-xs text-stone-500 sm:hidden">
-                                                  {c.reading}
-                                                </div>
-                                              ) : null}
-
-                                              {c.role ? (
-                                                <div className="mt-1 text-xs text-stone-500">{c.role}</div>
-                                              ) : null}
-                                            </div>
-                                          </div>
-
-                                          <div className="flex gap-2">
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setShowCharacters(true);
-                                                startEditingCharacter(c.id);
-                                              }}
-                                              className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                            >
-                                              Edit
-                                            </button>
-
-                                            <button
-                                              type="button"
-                                              onClick={() => deleteCharacter(c.id)}
-                                              className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                            >
-                                              Delete
-                                            </button>
-                                          </div>
-                                        </div>
-
-                                        {c.notes ? (
-                                          <div className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
-                                            {c.notes}
-                                          </div>
-                                        ) : null}
-                                      </>
-                                    ) : (
-                                      <div className="space-y-2">
-                                        <div className="flex gap-2">
-                                          <input
-                                            value={c.name ?? ""}
-                                            onChange={(e) =>
-                                              updateCharacter(c.id, "name", e.target.value)
-                                            }
-                                            placeholder="Name"
-                                            className="w-1/2 rounded border px-2 py-1 text-sm"
-                                          />
-
-                                          <input
-                                            value={c.reading ?? ""}
-                                            onChange={(e) =>
-                                              updateCharacter(c.id, "reading", e.target.value)
-                                            }
-                                            placeholder="Reading"
-                                            className="w-1/2 rounded border px-2 py-1 text-sm"
-                                          />
-                                        </div>
-
-                                        <input
-                                          value={c.role ?? ""}
-                                          onChange={(e) =>
-                                            updateCharacter(c.id, "role", e.target.value)
-                                          }
-                                          placeholder="Role (e.g. 主人公, 先輩, 母)"
-                                          className="w-full rounded border px-2 py-1 text-sm"
-                                        />
-
-                                        <textarea
-                                          value={c.notes ?? ""}
-                                          onChange={(e) =>
-                                            updateCharacter(c.id, "notes", e.target.value)
-                                          }
-                                          placeholder="Notes about this character"
-                                          className="w-full rounded border p-2 text-sm"
-                                        />
-
-                                        <div className="flex gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => saveCharacter(c)}
-                                            disabled={isSaving}
-                                            className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
-                                              ? "bg-green-600 hover:bg-green-700"
-                                              : "bg-blue-600 hover:bg-blue-700"
-                                              } disabled:opacity-50`}
-                                          >
-                                            {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
-                                          </button>
-
-                                          {!c.id.startsWith("new-character-") && (
-                                            <button
-                                              type="button"
-                                              onClick={() => stopEditingCharacter(c.id)}
-                                              className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                            >
-                                              Cancel
-                                            </button>
-                                          )}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => deleteCharacter(c.id)}
-                                            className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                          >
-                                            Delete
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEdits}
+                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveAll}
+                      disabled={saving}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
                 )}
+              </div>
 
-                {storyTab === "plot" && (
-                  <>
-                    {/* Your existing CHAPTER SUMMARY code goes here */}
+              <VocabTab
+                row={row}
+                vocabTab={vocabTab}
+                setVocabTab={setVocabTab}
+                isRunning={isRunning}
+                isPaused={isPaused}
+                quickWord={quickWord}
+                setQuickWord={setQuickWord}
+                quickLoading={quickLoading}
+                quickError={quickError}
+                pullQuickWord={pullQuickWord}
+                quickPreview={quickPreview}
+                setQuickPreview={setQuickPreview}
+                hideKanjiInReadingSupport={hideKanjiInReadingSupport}
+                setHideKanjiInReadingSupport={setHideKanjiInReadingSupport}
+                saveQuickWord={saveQuickWord}
+                quickSessionWords={quickSessionWords}
+                editingQuickSessionId={editingQuickSessionId}
+                editingQuickSessionWord={editingQuickSessionWord}
+                setEditingQuickSessionWord={setEditingQuickSessionWord}
+                startEditingQuickSessionWord={startEditingQuickSessionWord}
+                cancelEditingQuickSessionWord={cancelEditingQuickSessionWord}
+                saveEditedQuickSessionWord={saveEditedQuickSessionWord}
+                quickWordInputRef={quickWordInputRef}
+              />
+            </div>
+          )}
 
-                    <div className="rounded-2xl border bg-stone-50 p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-stone-900">Chapter Summaries</div>
-                          <p className="mt-1 text-sm text-stone-400">
-                            Writing short summaries can help you remember the story later on.
-                          </p>
-                        </div>
+          {activeTab === "teacher" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                <div className="text-base font-semibold text-stone-900">Teacher</div>
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowChapterSummaries((prev) => !prev)}
-                            className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                          >
-                            {showChapterSummaries ? "Hide" : "Show"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setChapterReverseOrder((prev) => !prev)}
-                            className="rounded border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:bg-stone-50"
-                          >
-                            {chapterReverseOrder ? "Oldest First" : "Newest First"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowChapterSummaries(true);
-                              addChapterSummary();
-                            }}
-                            className="rounded !bg-stone-900 px-3 py-1 text-xs font-medium !text-white transition hover:!bg-black"
-                          >
-                            + Add
-                          </button>
-                        </div>
-                      </div>
-
-                      {showChapterSummaries && (
-                        <div className="mt-4 space-y-3">
-                          {chapterSummaries.length === 0 ? (
-                            <div className="text-sm text-stone-500">No chapter summaries yet.</div>
-                          ) : (
-                            visibleChapterSummaries.map((item) => {
-                              const isEditing =
-                                item.id.startsWith("new-") || editingChapterIds.includes(item.id);
-                              const isSaving = savingChapterIds.includes(item.id);
-                              const wasJustSaved = savedChapterIds.includes(item.id);
-
-                              return (
-                                <div key={item.id} className="rounded-xl border bg-white p-4">
-                                  {!isEditing ? (
-                                    <>
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <div className="text-sm font-semibold text-stone-900">
-                                            {item.chapter_number != null
-                                              ? `Chapter ${item.chapter_number}`
-                                              : "Untitled chapter"}
-                                            {item.chapter_title ? (
-                                              <span className="ml-2 font-normal text-stone-500">
-                                                · {item.chapter_title}
-                                              </span>
-                                            ) : null}
-                                          </div>
-
-                                          {item.sort_order != null && (
-                                            <div className="mt-1 text-xs text-stone-400">
-                                              Sort order: {item.sort_order}
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        <div className="flex shrink-0 gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => startEditingChapter(item.id)}
-                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                          >
-                                            Edit
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => deleteChapterSummary(item.id)}
-                                            className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                          >
-                                            Delete
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                      <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
-                                        {item.summary}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="grid gap-3 md:grid-cols-[120px_1fr_120px]">
-                                        <input
-                                          type="number"
-                                          value={item.chapter_number ?? ""}
-                                          onChange={(e) =>
-                                            updateChapterSummary(
-                                              item.id,
-                                              "chapter_number",
-                                              e.target.value
-                                            )
-                                          }
-                                          placeholder="Chapter #"
-                                          className="rounded border px-3 py-2 text-sm"
-                                        />
-
-                                        <input
-                                          value={item.chapter_title ?? ""}
-                                          onChange={(e) =>
-                                            updateChapterSummary(
-                                              item.id,
-                                              "chapter_title",
-                                              e.target.value
-                                            )
-                                          }
-                                          placeholder="Chapter title (optional)"
-                                          className="rounded border px-3 py-2 text-sm"
-                                        />
-
-                                        <input
-                                          type="number"
-                                          value={item.sort_order ?? 0}
-                                          onChange={(e) =>
-                                            updateChapterSummary(
-                                              item.id,
-                                              "sort_order",
-                                              e.target.value
-                                            )
-                                          }
-                                          placeholder="Sort order"
-                                          className="rounded border px-3 py-2 text-sm"
-                                        />
-                                      </div>
-
-                                      <p className="mt-2 text-xs text-stone-500">
-                                        Usually you can ignore sort order unless you want to rearrange chapters.
-                                      </p>
-
-                                      <textarea
-                                        value={item.summary}
-                                        onChange={(e) =>
-                                          updateChapterSummary(item.id, "summary", e.target.value)
-                                        }
-                                        placeholder="Write a short summary..."
-                                        className="mt-3 min-h-[120px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                                      />
-
-                                      <div className="mt-3 flex gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => saveChapterSummary(item)}
-                                          disabled={isSaving}
-                                          className={`rounded px-3 py-2 text-sm font-medium text-white transition ${wasJustSaved
-                                            ? "bg-green-600 hover:bg-green-700"
-                                            : "bg-blue-600 hover:bg-blue-700"
-                                            } disabled:opacity-50`}
-                                        >
-                                          {isSaving ? "Saving..." : wasJustSaved ? "Saved!" : "Save"}
-                                        </button>
-
-                                        {!item.id.startsWith("new-") && (
-                                          <button
-                                            type="button"
-                                            onClick={() => stopEditingChapter(item.id)}
-                                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-                                          >
-                                            Cancel
-                                          </button>
-                                        )}
-
-                                        <button
-                                          type="button"
-                                          onClick={() => deleteChapterSummary(item.id)}
-                                          className="rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                        >
-                                          Delete
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              );
-                            })
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={addChapterSummary}
-                            className="rounded border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
-                          >
-                            + Add chapter summary
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </>
+                {!isEditingThisTab ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingTab("teacher")}
+                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEdits}
+                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveAll}
+                      disabled={saving}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
                 )}
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  {storyTab === "setting" && (
-                    <div className="rounded-2xl border bg-white p-6 text-sm text-stone-600">
-                      <div className="font-medium text-stone-900">Setting</div>
-                      <p className="mt-2">
-                        Keep track of where and when the story takes place, including locations,
-                        time periods, and atmosphere.
-                      </p>
-                      <p className="mt-3 text-stone-400 italic">
-                        Setting notes coming soon.
-                      </p>
-                    </div>
-                  )}
-
-                  {storyTab === "cultural" && (
-                    <div className="rounded-2xl border bg-white p-6 text-sm text-stone-600">
-                      <div className="font-medium text-stone-900">Cultural Notes</div>
-                      <p className="mt-2">
-                        Capture cultural references, customs, and nuances that help deepen your
-                        understanding of the story.
-                      </p>
-                      <p className="mt-3 text-stone-400 italic">
-                        Cultural notes coming soon.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="text-sm font-medium">Notes</div>
-
-                    {!isEditingThisTab ? (
-                      <div className="mt-3 min-h-[260px] whitespace-pre-wrap text-sm text-stone-700">
-                        {row.notes?.trim() ? row.notes : "—"}
-                      </div>
-                    ) : (
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Story notes, interpretation notes, reminders, etc."
-                        className="mt-3 min-h-[260px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                      />
-                    )}
-                  </div>
-                </div>
-
               </div>
-            )}
 
-            {activeTab === "study" && (
-              <div className="space-y-6">
+              <TeacherTab
+                row={row}
+                book={book}
+                userId={userId}
+                isEditingThisTab={isEditingThisTab}
+                editingTab={editingTab}
+                setEditingTab={setEditingTab}
+                notes={notes}
+                setNotes={setNotes}
+                saveNotes={saveNotes}
+                recommendedLevel={recommendedLevel}
+                setRecommendedLevel={setRecommendedLevel}
+                levelStars={levelStars}
+                kanjiMapLoading={kanjiMapLoading}
+                kanjiMapError={kanjiMapError}
+                kanjiMapQueue={kanjiMapQueue}
+                openKanjiWordId={openKanjiWordId}
+                editingKanjiRows={editingKanjiRows}
+                savingKanjiWordId={savingKanjiWordId}
+                handleWorkOnKanjiWord={handleWorkOnKanjiWord}
+                updateKanjiMapRow={updateKanjiMapRow}
+                saveKanjiWord={saveKanjiWord}
+                setOpenKanjiWordId={setOpenKanjiWordId}
+                hiraToKata={hiraToKata}
+                removeWordFromKanjiEnrichment={removeWordFromKanjiEnrichment}
+              />
+            </div>
+          )}
 
-                {/* TOP: Vocab actions */}
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Vocab</div>
+          {activeTab === "reading" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                <div className="text-base font-semibold text-stone-900">Reading</div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
+                {!isEditingThisTab ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingTab("reading")}
+                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => router.push(`/books/${row.id}/words`)}
-                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      type="button"
+                      onClick={cancelEdits}
+                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
                     >
-                      📚 Vocab List
+                      Cancel
                     </button>
-
                     <button
-                      onClick={() => router.push(`/vocab/explore?userBookId=${row.id}`)}
-                      className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      type="button"
+                      onClick={saveAll}
+                      disabled={saving}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
                     >
-                      🔎 Explore the Word
+                      {saving ? "Saving..." : "Save"}
                     </button>
                   </div>
-                </div>
-
-                {/* ADD VOCAB SECTION */}
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-stone-900">Add Vocab</div>
-
-                  {/* SUB TABS */}
-                  <div className="overflow-x-auto">
-                    <div className="flex w-max gap-2 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => setVocabTab("readAlong")}
-                        className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "readAlong"
-                          ? "border-stone-900 bg-stone-900 text-white"
-                          : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-                          }`}
-                      >
-                        Read Along
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setVocabTab("bulk")}
-                        className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "bulk"
-                          ? "border-stone-900 bg-stone-900 text-white"
-                          : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-                          }`}
-                      >
-                        Bulk Add
-                      </button>
-                      <div
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${isRunning || isPaused
-                          ? "bg-red-200 text-red-900"
-                          : "bg-yellow-50 text-yellow-700"
-                          }`}
-                      >
-                        <span>●</span>
-                        <span>{isRunning || isPaused ? "Timer is active" : "Timer is not running"}</span>
-                        <span>●</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {vocabTab === "readAlong" && (
-                    <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-                      <div className="text-sm font-medium text-stone-900">Read Along</div>
-                      <p className="mt-1 text-sm text-stone-500">
-                        This will be your real-time vocab input during lessons or single input for members.
-                      </p>
-
-                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                        <input
-                          ref={quickWordInputRef}
-                          type="text"
-                          value={quickWord}
-                          onChange={(e) => setQuickWord(e.target.value)}
-                          placeholder="Type a word..."
-                          className="w-full rounded border px-3 py-2 text-sm"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              pullQuickWord();
-                            }
-                          }}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={pullQuickWord}
-                          disabled={quickLoading || !quickWord.trim()}
-                          className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black disabled:opacity-50"
-                        >
-                          {quickLoading ? "Pulling..." : "Pull"}
-                        </button>
-                      </div>
-
-                      {quickError ? (
-                        <div className="mt-3 text-sm text-red-600">{quickError}</div>
-                      ) : null}
-
-                      {quickPreview && (
-                        <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div>
-                              <div className="mb-1 text-xs text-stone-500">Word</div>
-                              <input
-                                value={quickPreview.surface}
-                                onChange={(e) =>
-                                  setQuickPreview((prev) =>
-                                    prev ? { ...prev, surface: e.target.value } : prev
-                                  )
-                                }
-                                className="w-full rounded border px-3 py-2 text-sm"
-                              />
-                            </div>
-
-                            <div>
-                              <div className="mb-1 text-xs text-stone-500">Reading</div>
-                              <input
-                                value={quickPreview.reading}
-                                onChange={(e) =>
-                                  setQuickPreview((prev) =>
-                                    prev ? { ...prev, reading: e.target.value } : prev
-                                  )
-                                }
-                                className="w-full rounded border px-3 py-2 text-sm"
-                              />
-                            </div>
-
-                            <div className="md:col-span-2">
-                              <div className="mb-1 text-xs text-stone-500">Definition</div>
-                              <div className="flex flex-col gap-3 md:flex-row">
-                                <select
-                                  value={quickPreview.isCustomMeaning ? "other" : String(quickPreview.selectedMeaningIndex)}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-
-                                    setQuickPreview((prev) => {
-                                      if (!prev) return prev;
-
-                                      if (value === "other") {
-                                        return {
-                                          ...prev,
-                                          isCustomMeaning: true,
-                                          meaning: "",
-                                        };
-                                      }
-
-                                      const index = Number(value);
-                                      return {
-                                        ...prev,
-                                        selectedMeaningIndex: index,
-                                        isCustomMeaning: false,
-                                        meaning: prev.meanings[index] ?? "",
-                                      };
-                                    });
-                                  }}
-                                  className="w-full rounded border bg-white px-3 py-2 text-sm md:w-56"
-                                >
-                                  {quickPreview.meanings.map((m, i) => (
-                                    <option key={i} value={i}>
-                                      Definition {i + 1}
-                                    </option>
-                                  ))}
-                                  <option value="other">Other</option>
-                                </select>
-
-                                <input
-                                  value={quickPreview.meaning}
-                                  onChange={(e) =>
-                                    setQuickPreview((prev) =>
-                                      prev ? { ...prev, meaning: e.target.value } : prev
-                                    )
-                                  }
-                                  readOnly={!quickPreview.isCustomMeaning}
-                                  placeholder="Meaning"
-                                  className={`w-full rounded border px-3 py-2 text-sm ${quickPreview.isCustomMeaning
-                                    ? "bg-white"
-                                    : "bg-stone-100 text-stone-700"
-                                    }`}
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className="mb-1 text-xs text-stone-500">Page</div>
-                              <input
-                                type="number"
-                                min={1}
-                                value={quickPreview.page}
-                                onChange={(e) =>
-                                  setQuickPreview((prev) =>
-                                    prev ? { ...prev, page: e.target.value } : prev
-                                  )
-                                }
-                                className="w-full rounded border px-3 py-2 text-sm"
-                              />
-                            </div>
-
-                            <div>
-                              <div className="mb-1 text-xs text-stone-500">Chapter #</div>
-                              <input
-                                type="number"
-                                min={1}
-                                value={quickPreview.chapterNumber}
-                                onChange={(e) =>
-                                  setQuickPreview((prev) =>
-                                    prev ? { ...prev, chapterNumber: e.target.value } : prev
-                                  )
-                                }
-                                className="w-full rounded border px-3 py-2 text-sm"
-                              />
-                            </div>
-
-                            <div className="md:col-span-2">
-                              <div className="mb-1 text-xs text-stone-500">Chapter Name</div>
-                              <input
-                                value={quickPreview.chapterName}
-                                onChange={(e) =>
-                                  setQuickPreview((prev) =>
-                                    prev ? { ...prev, chapterName: e.target.value } : prev
-                                  )
-                                }
-                                className="w-full rounded border px-3 py-2 text-sm"
-                              />
-                            </div>
-                          </div>
-
-                          <label className="md:col-span-2 flex items-start gap-2 text-sm text-stone-700">
-                            <input
-                              type="checkbox"
-                              checked={hideKanjiInReadingSupport}
-                              onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
-                              className="mt-0.5"
-                            />
-                            <span>
-                              <span className="font-medium">Hide kanji in Reading Support</span>
-                              <span className="block text-xs text-stone-500">Use kana to match the book.</span>
-                            </span>
-                          </label>
-
-                          <div className="mt-4 flex gap-2">
-                            <button
-                              type="button"
-                              onClick={saveQuickWord}
-                              className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                            >
-                              Save Word
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setQuickPreview(null)}
-                              className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openWordExplorer(quickPreview.surface || quickPreview.reading || "")}
-                              className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-                            >
-                              Explore
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-6">
-                        <div className="text-sm font-medium text-stone-900">
-                          Words saved into Vocab List this session
-                        </div>
-                        <p className="mt-1 text-xs text-stone-400">
-                          These words have already been saved to your Vocab List.
-                        </p>
-
-                        {quickSessionWords.length === 0 ? (
-                          <div className="mt-2 text-sm text-stone-500">No words saved yet.</div>
-                        ) : (
-                          <div className="mt-3 space-y-2">
-
-                            {quickSessionWords.map((item) => {
-                              const isEditing = editingQuickSessionId === item.id;
-                              const editItem = isEditing ? editingQuickSessionWord : null;
-
-                              return (
-                                <div
-                                  key={item.id}
-                                  className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
-                                >
-                                  {!isEditing || !editItem ? (
-                                    <>
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <div className="font-medium text-stone-900">
-                                            {item.surface}
-                                            {item.reading ? (
-                                              <span className="ml-2 text-stone-500">({item.reading})</span>
-                                            ) : null}
-                                          </div>
-                                          <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                                          <div className="mt-1 text-xs text-stone-500">
-                                            Page {item.page || "—"}
-                                            {item.chapterNumber ? ` · Ch ${item.chapterNumber}` : ""}
-                                            {item.chapterName ? ` · ${item.chapterName}` : ""}
-                                          </div>
-                                        </div>
-
-                                        <button
-                                          type="button"
-                                          onClick={() => startEditingQuickSessionWord(item)}
-                                          className="rounded border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100"
-                                        >
-                                          Edit
-                                        </button>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="space-y-3">
-                                      <div className="grid gap-3 md:grid-cols-2">
-                                        <div>
-                                          <div className="mb-1 text-xs text-stone-500">Word</div>
-                                          <input
-                                            value={editItem.surface}
-                                            onChange={(e) =>
-                                              setEditingQuickSessionWord((prev) =>
-                                                prev ? { ...prev, surface: e.target.value } : prev
-                                              )
-                                            }
-                                            className="w-full rounded border px-3 py-2 text-sm"
-                                          />
-                                        </div>
-
-                                        <div>
-                                          <div className="mb-1 text-xs text-stone-500">Reading</div>
-                                          <input
-                                            value={editItem.reading}
-                                            onChange={(e) =>
-                                              setEditingQuickSessionWord((prev) =>
-                                                prev ? { ...prev, reading: e.target.value } : prev
-                                              )
-                                            }
-                                            className="w-full rounded border px-3 py-2 text-sm"
-                                          />
-                                        </div>
-
-                                        <div className="md:col-span-2">
-                                          <div className="mb-1 text-xs text-stone-500">Meaning</div>
-                                          <input
-                                            value={editItem.meaning}
-                                            onChange={(e) =>
-                                              setEditingQuickSessionWord((prev) =>
-                                                prev ? { ...prev, meaning: e.target.value } : prev
-                                              )
-                                            }
-                                            className="w-full rounded border px-3 py-2 text-sm"
-                                          />
-                                        </div>
-
-                                        <div>
-                                          <div className="mb-1 text-xs text-stone-500">Page</div>
-                                          <input
-                                            type="number"
-                                            min={1}
-                                            value={editItem.page}
-                                            onChange={(e) =>
-                                              setEditingQuickSessionWord((prev) =>
-                                                prev ? { ...prev, page: e.target.value } : prev
-                                              )
-                                            }
-                                            className="w-full rounded border px-3 py-2 text-sm"
-                                          />
-                                        </div>
-
-                                        <div>
-                                          <div className="mb-1 text-xs text-stone-500">Chapter #</div>
-                                          <input
-                                            type="number"
-                                            min={1}
-                                            value={editItem.chapterNumber}
-                                            onChange={(e) =>
-                                              setEditingQuickSessionWord((prev) =>
-                                                prev ? { ...prev, chapterNumber: e.target.value } : prev
-                                              )
-                                            }
-                                            className="w-full rounded border px-3 py-2 text-sm"
-                                          />
-                                        </div>
-
-                                        <div className="md:col-span-2">
-                                          <div className="mb-1 text-xs text-stone-500">Chapter Name</div>
-                                          <input
-                                            value={editItem.chapterName}
-                                            onChange={(e) =>
-                                              setEditingQuickSessionWord((prev) =>
-                                                prev ? { ...prev, chapterName: e.target.value } : prev
-                                              )
-                                            }
-                                            className="w-full rounded border px-3 py-2 text-sm"
-                                          />
-                                        </div>
-                                      </div>
-
-                                      <div className="flex gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={saveEditedQuickSessionWord}
-                                          className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                                        >
-                                          Save
-                                        </button>
-
-                                        <button
-                                          type="button"
-                                          onClick={cancelEditingQuickSessionWord}
-                                          className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* BULK ADD */}
-                  {vocabTab === "bulk" && (
-                    <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-                      <div className="text-sm font-medium text-stone-900">Bulk Add</div>
-                      <p className="mt-1 text-sm text-stone-500">
-                        Use the existing bulk input tool.
-                      </p>
-
-                      <button
-                        onClick={() => router.push(`/vocab/bulk?userBookId=${row.id}`)}
-                        className="mt-4 rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                      >
-                        Open Bulk Add
-                      </button>
-                    </div>
-                  )}
-                </div>
-
+                )}
               </div>
-            )}
-          </div>
+
+              <ReadingTab
+                row={row}
+                book={book}
+                isEditingThisTab={isEditingThisTab}
+                formatType={formatType}
+                setFormatType={setFormatType}
+                progressMode={progressMode}
+                setProgressMode={setProgressMode}
+                showPageNumbers={showPageNumbers}
+                setShowPageNumbers={setShowPageNumbers}
+                startedAt={startedAt}
+                setStartedAt={setStartedAt}
+                finishedAt={finishedAt}
+                setFinishedAt={setFinishedAt}
+                dnfAt={dnfAt}
+                setDnfAt={setDnfAt}
+                started={started}
+                finished={finished}
+                sessionDate={sessionDate}
+                setSessionDate={setSessionDate}
+                sessionMinutesRead={sessionMinutesRead}
+                setSessionMinutesRead={setSessionMinutesRead}
+                sessionStartPage={sessionStartPage}
+                setSessionStartPage={setSessionStartPage}
+                sessionEndPage={sessionEndPage}
+                setSessionEndPage={setSessionEndPage}
+                saveReadingSession={saveReadingSession}
+                deleteReadingSession={deleteReadingSession}
+                readingSessions={readingSessions}
+                visibleReadingSessions={visibleReadingSessions}
+                showAllSessions={showAllSessions}
+                renderSessionToggle={renderSessionToggle}
+                canFillBeginningPages={canFillBeginningPages}
+                canFillEndingPages={canFillEndingPages}
+                fillBeginningPages={fillBeginningPages}
+                fillEndingPages={fillEndingPages}
+                earliestStartPage={earliestStartPage}
+                furthestPage={furthestPage}
+                formatTypeLabel={formatTypeLabel}
+                progressModeLabel={progressModeLabel}
+                DateField={DateField}
+              />
+            </div>
+          )}
+
+          {activeTab === "story" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                <div className="text-base font-semibold text-stone-900">Story</div>
+
+                {!isEditingThisTab ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingTab("story")}
+                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEdits}
+                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveAll}
+                      disabled={saving}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <StoryTab
+                storyTab={storyTab}
+                setStoryTab={setStoryTab}
+
+                characters={characters}
+                visibleCharacters={visibleCharacters}
+                showCharacters={showCharacters}
+                setShowCharacters={setShowCharacters}
+                charactersReverseOrder={charactersReverseOrder}
+                setCharactersReverseOrder={setCharactersReverseOrder}
+                editingCharacterIds={editingCharacterIds}
+                savingCharacterIds={savingCharacterIds}
+                savedCharacterIds={savedCharacterIds}
+                addCharacter={addCharacter}
+                updateCharacter={updateCharacter}
+                startEditingCharacter={startEditingCharacter}
+                stopEditingCharacter={stopEditingCharacter}
+                saveCharacter={saveCharacter}
+                deleteCharacter={deleteCharacter}
+
+                chapterSummaries={chapterSummaries}
+                visibleChapterSummaries={visibleChapterSummaries}
+                showChapterSummaries={showChapterSummaries}
+                setShowChapterSummaries={setShowChapterSummaries}
+                chapterReverseOrder={chapterReverseOrder}
+                setChapterReverseOrder={setChapterReverseOrder}
+                editingChapterIds={editingChapterIds}
+                savingChapterIds={savingChapterIds}
+                savedChapterIds={savedChapterIds}
+                addChapterSummary={addChapterSummary}
+                updateChapterSummary={updateChapterSummary}
+                startEditingChapter={startEditingChapter}
+                stopEditingChapter={stopEditingChapter}
+                saveChapterSummary={saveChapterSummary}
+                deleteChapterSummary={deleteChapterSummary}
+
+                settingItems={settingItems}
+                visibleSettingItems={visibleSettingItems}
+                showSettingItems={showSettingItems}
+                setShowSettingItems={setShowSettingItems}
+                settingReverseOrder={settingReverseOrder}
+                setSettingReverseOrder={setSettingReverseOrder}
+                editingSettingIds={editingSettingIds}
+                savingSettingIds={savingSettingIds}
+                savedSettingIds={savedSettingIds}
+                addSettingItem={addSettingItem}
+                updateSettingItem={updateSettingItem}
+                startEditingSettingItem={startEditingSettingItem}
+                stopEditingSettingItem={stopEditingSettingItem}
+                saveSettingItem={saveSettingItem}
+                deleteSettingItem={deleteSettingItem}
+
+                culturalItems={culturalItems}
+                visibleCulturalItems={visibleCulturalItems}
+                showCulturalItems={showCulturalItems}
+                setShowCulturalItems={setShowCulturalItems}
+                culturalReverseOrder={culturalReverseOrder}
+                setCulturalReverseOrder={setCulturalReverseOrder}
+                editingCulturalIds={editingCulturalIds}
+                savingCulturalIds={savingCulturalIds}
+                savedCulturalIds={savedCulturalIds}
+                addCulturalItem={addCulturalItem}
+                updateCulturalItem={updateCulturalItem}
+                startEditingCulturalItem={startEditingCulturalItem}
+                stopEditingCulturalItem={stopEditingCulturalItem}
+                saveCulturalItem={saveCulturalItem}
+                deleteCulturalItem={deleteCulturalItem}
+              />
+            </div>
+          )}
+
+          {activeTab === "rating" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                <div className="text-base font-semibold text-stone-900">Rating</div>
+
+                {!isEditingThisTab ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingTab("rating")}
+                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEdits}
+                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveAll}
+                      disabled={saving}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <RatingTab
+                row={row}
+                isEditingThisTab={isEditingThisTab}
+                myReview={myReview}
+                setMyReview={setMyReview}
+                ratingOverall={ratingOverall}
+                setRatingOverall={setRatingOverall}
+                ratingRecommend={ratingRecommend}
+                setRatingRecommend={setRatingRecommend}
+                ratingDifficulty={ratingDifficulty}
+                setRatingDifficulty={setRatingDifficulty}
+                readerLevel={readerLevel}
+                setReaderLevel={setReaderLevel}
+                LEVEL_OPTIONS={LEVEL_OPTIONS}
+                StarRatingField={StarRatingField}
+                DifficultyField={DifficultyField}
+              />
+            </div>
+          )}
         </section>
-      </div>
-      {showWordExplorer && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowWordExplorer(false)}
-        >
+
+        {showWordExplorer && (
           <div
-            className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setShowWordExplorer(false)}
           >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-stone-900">Word Explorer</h2>
-                <p className="mt-1 text-sm text-stone-500">
-                  Search and explore a word without leaving the page.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowWordExplorer(false)}
-                className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={wordExplorerQuery}
-                  onChange={(e) => setWordExplorerQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      searchWordExplorer();
-                    }
-                  }}
-                  placeholder="Search a word..."
-                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
-                />
+            <div
+              className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-stone-900">Word Explorer</h2>
+                  <p className="mt-1 text-sm text-stone-500">
+                    Search and explore a word without leaving the page.
+                  </p>
+                </div>
 
                 <button
                   type="button"
-                  onClick={searchWordExplorer}
-                  disabled={wordExplorerLoading || !wordExplorerQuery.trim()}
-                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                  onClick={() => setShowWordExplorer(false)}
+                  className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
                 >
-                  {wordExplorerLoading ? "Searching..." : "Search"}
+                  ✕
                 </button>
               </div>
 
-              {wordExplorerError ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {wordExplorerError}
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={wordExplorerQuery}
+                    onChange={(e) => setWordExplorerQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        searchWordExplorer();
+                      }
+                    }}
+                    placeholder="Search a word..."
+                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={searchWordExplorer}
+                    disabled={wordExplorerLoading || !wordExplorerQuery.trim()}
+                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                  >
+                    {wordExplorerLoading ? "Searching..." : "Search"}
+                  </button>
                 </div>
-              ) : null}
 
-              {wordExplorerResults.length > 0 ? (
-                <div className="space-y-3">
-                  {wordExplorerResults.map((item, i) => {
-                    const japanese = item?.japanese?.[0];
-                    const senses = item?.senses ?? [];
+                {wordExplorerError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {wordExplorerError}
+                  </div>
+                ) : null}
 
-                    return (
-                      <div key={i} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-                        <div className="text-lg font-semibold text-stone-900">
-                          {japanese?.word || item?.slug || "—"}
+                {wordExplorerResults.length > 0 ? (
+                  <div className="space-y-3">
+                    {wordExplorerResults.map((item, i) => {
+                      const japanese = item?.japanese?.[0];
+                      const senses = item?.senses ?? [];
+
+                      return (
+                        <div key={i} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                          <div className="text-lg font-semibold text-stone-900">
+                            {japanese?.word || item?.slug || "—"}
+                          </div>
+
+                          {japanese?.reading ? (
+                            <div className="mt-1 text-sm text-stone-500">{japanese.reading}</div>
+                          ) : null}
+
+                          <div className="mt-3 space-y-2">
+                            {senses.slice(0, 3).map((sense: any, idx: number) => (
+                              <div key={idx} className="text-sm text-stone-700">
+                                <span className="font-medium text-stone-500">{idx + 1}.</span>{" "}
+                                {(sense?.english_definitions ?? []).join("; ") || "—"}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-
-                        {japanese?.reading ? (
-                          <div className="mt-1 text-sm text-stone-500">{japanese.reading}</div>
-                        ) : null}
-
-                        <div className="mt-3 space-y-2">
-                          {senses.slice(0, 3).map((sense: any, idx: number) => (
-                            <div key={idx} className="text-sm text-stone-700">
-                              <span className="font-medium text-stone-500">{idx + 1}.</span>{" "}
-                              {(sense?.english_definitions ?? []).join("; ") || "—"}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : !wordExplorerLoading && !wordExplorerError && wordExplorerQuery.trim() ? (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-                  No results yet.
-                </div>
-              ) : (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-                  Type a word to explore.
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                ) : !wordExplorerLoading && !wordExplorerError && wordExplorerQuery.trim() ? (
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                    No results yet.
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                    Type a word to explore.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </main>
   );
 }
