@@ -769,6 +769,27 @@ export default function BooksPage() {
     }
   }
 
+  async function handleApproveRequest(requestId: string) {
+    try {
+      const { data, error } = await supabase.rpc("approve_book_request", {
+        request_id_input: requestId,
+      });
+
+      if (error) {
+        console.error("Approve request error:", error);
+        alert("Could not approve request.");
+        return;
+      }
+
+      alert("Book added to library!");
+      await loadPendingBookRequests();
+      await fetchBooks(viewingUserId || meId);
+    } catch (err) {
+      console.error("Approve request error:", err);
+      alert("Something went wrong.");
+    }
+  }
+
   async function loadReadingStatsForBooks(
     userBookIds: string[],
     pageCountByUserBookId: Record<string, number | null>
@@ -1551,6 +1572,15 @@ export default function BooksPage() {
                     {req.isbn13 ? `ISBN: ${req.isbn13}` : "ISBN: —"}
                   </div>
 
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => handleApproveRequest(req.id)}
+                      className="rounded-lg bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700"
+                    >
+                      Add to Library
+                    </button>
+                  </div>
+
                   <div className="mt-2 text-xs text-stone-500">
                     Requested by{" "}
                     <span className="font-medium text-stone-700">
@@ -1566,7 +1596,7 @@ export default function BooksPage() {
             </div>
           </div>
         ) : null}
-        
+
         <UserBar isTeacher={isTeacher} variant="labelOnly" />
 
         <div className="mb-4 space-y-3">
@@ -1723,14 +1753,14 @@ export default function BooksPage() {
           <div className="mt-8 text-sm text-gray-600">No books yet.</div>
         ) : null}
 
-        {isTeacher ? (
+        {isSuperTeacher ? (
           <>
             <button
               type="button"
               onClick={() => setShowAddBook(true)}
               className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
             >
-              + Add Book
+              + Add to Library
             </button>
 
             {showAddBook ? (

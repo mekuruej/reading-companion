@@ -5,28 +5,38 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-declare global {
-  interface Window {
-    SpeechRecognition?: any;
-    webkitSpeechRecognition?: any;
-  }
-}
+type StudySet =
+  | "READING"
+  | "READING_MC"
+  | "MEANING"
+  | "MEANING_MC"
+  | "FROM_READING_MEANING"
+  | "FROM_READING_MC"
+  | "FROM_READING_MEANING_MC"
+  | "COMPLETE";
 
-type StudySet = "READING" | "MEANING" | "FROM_READING" | "COMPLETE";
 type StepField = "word" | "reading" | "meaning";
 
 function studySetLabel(s: StudySet) {
   switch (s) {
     case "READING":
-      return "Reading";
+      return "Reading Typing";
     case "MEANING":
-      return "Meaning";
-    case "FROM_READING":
-      return "From Reading";
+      return "Meaning Typing";
+    case "FROM_READING_MEANING":
+      return "Reading to Meaning Typing";
+    case "READING_MC":
+      return "Reading MC";
+    case "MEANING_MC":
+      return "Meaning MC";
+    case "FROM_READING_MC":
+      return "Reading to Kanji MC";
+    case "FROM_READING_MEANING_MC":
+      return "Reading to Meaning MC";
     case "COMPLETE":
-      return "Complete Study";
+      return "Complete Review";
     default:
-      return "Reading";
+      return "Reading Typing";
   }
 }
 
@@ -95,6 +105,12 @@ function chapterInfoFromRow(r: WordRow): { label: string; display: string } {
   return { label: "(none)", display: "(none)" };
 }
 
+function kataToHira(s: string) {
+  return (s ?? "").replace(/[ァ-ヶ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
+
 function normalizeReading(s: string) {
   return kataToHira(s ?? "")
     .trim()
@@ -106,12 +122,6 @@ function normalizeReading(s: string) {
 
 function isKanaOnly(s: string) {
   return /^[ぁ-ゖァ-ヶー]+$/.test(s.trim());
-}
-
-function kataToHira(s: string) {
-  return (s ?? "").replace(/[ァ-ヶ]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
 }
 
 function normalizeMeaning(s: string) {
@@ -158,6 +168,7 @@ export default function BookFlashcardsPage() {
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
+  const [libraryCards, setLibraryCards] = useState<Flashcard[]>([]);
 
   const [studySet, setStudySet] = useState<StudySet>("READING");
   const studyOnceMode = true;
@@ -173,10 +184,14 @@ export default function BookFlashcardsPage() {
   const steps = useMemo<StepField[]>(() => {
     switch (studySet) {
       case "READING":
+      case "READING_MC":
         return ["word", "meaning", "reading"];
       case "MEANING":
+      case "MEANING_MC":
         return ["word", "reading", "meaning"];
-      case "FROM_READING":
+      case "FROM_READING_MEANING":
+      case "FROM_READING_MC":
+      case "FROM_READING_MEANING_MC":
         return ["reading", "word", "meaning"];
       case "COMPLETE":
         return ["word", "reading", "meaning"];
@@ -185,12 +200,33 @@ export default function BookFlashcardsPage() {
     }
   }, [studySet]);
 
-  const [typeMode, setTypeMode] = useState(false);
+  const isMultipleChoiceMode =
+    studySet === "READING_MC" ||
+    studySet === "MEANING_MC" ||
+    studySet === "FROM_READING_MC" ||
+    studySet === "FROM_READING_MEANING_MC";
+
+  const typeModeEnabled =
+    studySet === "READING" ||
+    studySet === "MEANING" ||
+    studySet === "FROM_READING_MEANING";
+
   const [typedInput, setTypedInput] = useState("");
-  const [typedFeedback, setTypedFeedback] = useState<null | { ok: boolean; message: string }>(null);
+  const [typedFeedback, setTypedFeedback] = useState<null | { ok: boolean; message: string }>(
+    null
+  );
   const [typeRevealIndex, setTypeRevealIndex] = useState(0);
   const [readyForNextCard, setReadyForNextCard] = useState(false);
-  const [lastTypedResult, setLastTypedResult] = useState<"revealed" | "correct" | "wrong" | null>(null);
+  const [lastTypedResult, setLastTypedResult] = useState<
+    "revealed" | "correct" | "wrong" | null
+  >(null);
+  const [inputResetKey, setInputResetKey] = useState(0);
+
+  const [mcOptions, setMcOptions] = useState<string[]>([]);
+  const [mcSelected, setMcSelected] = useState<string | null>(null);
+  const [mcCorrectAnswer, setMcCorrectAnswer] = useState<string | null>(null);
+  const [mcAnswered, setMcAnswered] = useState(false);
+  const [mcWasCorrect, setMcWasCorrect] = useState<boolean | null>(null);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [firstTouch, setFirstTouch] = useState(true);
@@ -213,13 +249,6 @@ export default function BookFlashcardsPage() {
   const [defError, setDefError] = useState<string | null>(null);
   const [showDefPicker, setShowDefPicker] = useState(false);
 
-  const [isListening, setIsListening] = useState(false);
-  const [voiceSupported, setVoiceSupported] = useState(false);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-
-  const typeModeEnabled = typeMode && steps.length >= 2;
-  const [inputResetKey, setInputResetKey] = useState(0);
-
   useEffect(() => {
     if (!userBookId) return;
 
@@ -229,7 +258,6 @@ export default function BookFlashcardsPage() {
 
       const parsed = JSON.parse(raw);
       if (parsed?.studySet) setStudySet(parsed.studySet as StudySet);
-      if (typeof parsed?.typeMode === "boolean") setTypeMode(parsed.typeMode);
       if (Array.isArray(parsed?.jlptSelected)) setJlptSelected(parsed.jlptSelected);
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
@@ -244,7 +272,6 @@ export default function BookFlashcardsPage() {
         settingsKey,
         JSON.stringify({
           studySet,
-          typeMode,
           studyOnceMode,
           jlptSelected,
           chapterFilter,
@@ -252,37 +279,7 @@ export default function BookFlashcardsPage() {
         })
       );
     } catch { }
-  }, [
-    settingsKey,
-    userBookId,
-    studySet,
-    typeMode,
-    studyOnceMode,
-    jlptSelected,
-    chapterFilter,
-    repeatsOnly,
-  ]);
-
-  useEffect(() => {
-    if (steps.length < 2 && typeMode) {
-      setTypeMode(false);
-      setTypedInput("");
-      setInputResetKey((k) => k + 1);
-      setTypedFeedback(null);
-      setTypeRevealIndex(0);
-      setReadyForNextCard(false);
-      setLastTypedResult(null);
-    }
-  }, [steps.length, typeMode]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const supported =
-      "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
-
-    setVoiceSupported(supported);
-  }, []);
+  }, [settingsKey, userBookId, studySet, studyOnceMode, jlptSelected, chapterFilter, repeatsOnly]);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -302,6 +299,7 @@ export default function BookFlashcardsPage() {
           setNeedsSignIn(true);
           setCards([]);
           setFilteredCards([]);
+          setLibraryCards([]);
           setBookTitle("");
           setBookCover("");
           setChapterOptions([]);
@@ -344,9 +342,31 @@ export default function BookFlashcardsPage() {
           if (ownedBookIds.length > 0) {
             const { data: libraryWords, error: libraryWordsErr } = await supabase
               .from("user_book_words")
-              .select("surface")
+              .select(
+                `
+                id,
+                user_book_id,
+                surface,
+                reading,
+                meaning,
+                jlpt,
+                is_common,
+                page_number,
+                chapter_number,
+                chapter_name,
+                seen_on,
+                created_at,
+                meaning_choices,
+                meaning_choice_index,
+                hidden,
+                skipped_on,
+                kanji_meta
+              `
+              )
               .in("user_book_id", ownedBookIds)
-              .eq("hidden", false);
+              .eq("hidden", false)
+              .order("page_number", { ascending: true })
+              .order("created_at", { ascending: true });
 
             if (libraryWordsErr) throw libraryWordsErr;
 
@@ -355,7 +375,65 @@ export default function BookFlashcardsPage() {
               if (!key) continue;
               totalCounts.set(key, (totalCounts.get(key) ?? 0) + 1);
             }
+
+            const libraryRepeatCounts = new Map<string, number>();
+            for (const w of (libraryWords ?? []) as WordRow[]) {
+              const key = normalizeRepeatKey(w.surface);
+              if (!key) continue;
+              libraryRepeatCounts.set(key, (libraryRepeatCounts.get(key) ?? 0) + 1);
+            }
+
+            const normalizedLibrary: Flashcard[] = ((libraryWords ?? []) as WordRow[]).map((w) => {
+              const ch = chapterInfoFromRow(w);
+              const meaningChoices = asStringArray(w.meaning_choices);
+
+              const safeIdx =
+                typeof w.meaning_choice_index === "number" &&
+                  w.meaning_choice_index >= 0 &&
+                  w.meaning_choice_index < meaningChoices.length
+                  ? w.meaning_choice_index
+                  : 0;
+
+              const chosenMeaning =
+                meaningChoices.length > 0 ? meaningChoices[safeIdx] : w.meaning ?? null;
+
+              const repeatKey = normalizeRepeatKey(w.surface);
+              const repeatCount = repeatKey ? (libraryRepeatCounts.get(repeatKey) ?? 1) : 1;
+
+              return {
+                id: w.id,
+                word: w.surface,
+                reading: w.reading ?? null,
+                meaning: chosenMeaning ?? w.meaning ?? null,
+                jlpt: normalizeJlpt(w.jlpt),
+                chapterLabel: ch.label,
+                chapterDisplay: ch.display,
+                page_number: w.page_number ?? null,
+                meaningChoices,
+                meaningChoiceIndex: safeIdx,
+                repeatKey,
+                repeatCount,
+                totalCount: repeatKey ? (totalCounts.get(repeatKey) ?? repeatCount ?? 1) : 1,
+                kanjiMeta: Array.isArray(w.kanji_meta) ? w.kanji_meta : [],
+                isCommon: w.is_common ?? null,
+              };
+            });
+
+            const dedupedLibraryMap = new Map<string, Flashcard>();
+            for (const c of normalizedLibrary) {
+              const key = normalizeRepeatKey(c.word);
+              if (!key) continue;
+              if (!dedupedLibraryMap.has(key)) {
+                dedupedLibraryMap.set(key, c);
+              }
+            }
+
+            setLibraryCards(Array.from(dedupedLibraryMap.values()));
+          } else {
+            setLibraryCards([]);
           }
+        } else {
+          setLibraryCards([]);
         }
 
         const today = new Date().toISOString().slice(0, 10);
@@ -410,9 +488,7 @@ export default function BookFlashcardsPage() {
               : 0;
 
           const chosenMeaning =
-            meaningChoices.length > 0
-              ? meaningChoices[safeIdx]
-              : w.meaning ?? null;
+            meaningChoices.length > 0 ? meaningChoices[safeIdx] : w.meaning ?? null;
 
           const repeatKey = normalizeRepeatKey(w.surface);
           const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;
@@ -437,11 +513,9 @@ export default function BookFlashcardsPage() {
         });
 
         const dedupedMap = new Map<string, Flashcard>();
-
         for (const c of normalized) {
           const key = normalizeRepeatKey(c.word);
           if (!key) continue;
-
           if (!dedupedMap.has(key)) {
             dedupedMap.set(key, c);
           }
@@ -477,7 +551,6 @@ export default function BookFlashcardsPage() {
         setLastTypedResult(null);
         setDefError(null);
         setShowDefPicker(false);
-        setVoiceError(null);
       } catch (e: any) {
         setErrorMsg(
           e?.message?.includes("single JSON object")
@@ -486,6 +559,7 @@ export default function BookFlashcardsPage() {
         );
         setCards([]);
         setFilteredCards([]);
+        setLibraryCards([]);
         setChapterOptions([]);
       } finally {
         setLoading(false);
@@ -520,7 +594,6 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
-    setVoiceError(null);
   }, [cards, jlptSelected, chapterFilter, repeatsOnly]);
 
   useEffect(() => {
@@ -535,19 +608,18 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
-    setVoiceError(null);
     setFirstTouch(true);
   }, [filteredCards, studyOnceMode]);
 
   useEffect(() => {
     setShowDefPicker(false);
     setDefError(null);
-    setVoiceError(null);
     setTypedInput("");
     setTypedFeedback(null);
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
+    resetMcState();
   }, [sessionIndex]);
 
   useEffect(() => {
@@ -557,17 +629,222 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setVoiceError(null);
+    resetMcState();
   }, [studySet]);
 
-  function getFieldValue(field: StepField, c: Flashcard) {
-    if (field === "word") return c.word || "";
-    if (field === "reading") return c.reading || "";
-    return c.meaning || "";
+  function getFirstKana(s: string) {
+    const normalized = normalizeReading(s);
+    return normalized ? normalized[0] : "";
+  }
+
+  function getLastKana(s: string) {
+    const normalized = normalizeReading(s);
+    return normalized ? normalized[normalized.length - 1] : "";
+  }
+
+  function getReadingLength(s: string) {
+    return normalizeReading(s).length;
+  }
+
+  function buildReadingMcOptions(card: Flashcard, cardsPool: Flashcard[], libraryPool: Flashcard[]) {
+    const correct = normalizeReading(card.reading || "");
+    if (!correct) return [];
+
+    const pools = [
+      cardsPool.filter((c) => c.id !== card.id),
+      libraryPool.filter((c) => c.id !== card.id),
+    ];
+
+    const seen = new Set<string>();
+    const distractors: string[] = [];
+
+    for (const pool of pools) {
+      const tier1: string[] = [];
+      const tier2: string[] = [];
+      const tier3: string[] = [];
+      const fallback: string[] = [];
+
+      for (const candidate of pool) {
+        const reading = normalizeReading(candidate.reading || "");
+        if (!reading || reading === correct || seen.has(reading)) continue;
+
+        if (
+          getFirstKana(reading) === getFirstKana(correct) &&
+          getLastKana(reading) === getLastKana(correct)
+        ) {
+          tier1.push(reading);
+        } else if (getFirstKana(reading) === getFirstKana(correct)) {
+          tier2.push(reading);
+        } else if (Math.abs(getReadingLength(reading) - getReadingLength(correct)) <= 1) {
+          tier3.push(reading);
+        } else {
+          fallback.push(reading);
+        }
+      }
+
+      for (const reading of [...tier1, ...tier2, ...tier3, ...fallback]) {
+        if (seen.has(reading)) continue;
+        seen.add(reading);
+        distractors.push(reading);
+        if (distractors.length === 3) break;
+      }
+
+      if (distractors.length === 3) break;
+    }
+
+    return shuffleArray([correct, ...distractors]);
+  }
+
+  function buildMeaningMcOptions(card: Flashcard, cardsPool: Flashcard[], libraryPool: Flashcard[]) {
+    const correct = (card.meaning || "").trim();
+    if (!correct) return [];
+
+    const pools = [
+      cardsPool.filter((c) => c.id !== card.id),
+      libraryPool.filter((c) => c.id !== card.id),
+    ];
+
+    const seen = new Set<string>([correct.toLowerCase()]);
+    const distractors: string[] = [];
+
+    for (const pool of pools) {
+      for (const candidate of pool) {
+        const meaning = (candidate.meaning || "").trim();
+        if (!meaning) continue;
+
+        const key = meaning.toLowerCase();
+        if (seen.has(key)) continue;
+
+        seen.add(key);
+        distractors.push(meaning);
+
+        if (distractors.length === 3) break;
+      }
+
+      if (distractors.length === 3) break;
+    }
+
+    return shuffleArray([correct, ...distractors]);
+  }
+
+  function buildWordMcOptions(card: Flashcard, cardsPool: Flashcard[], libraryPool: Flashcard[]) {
+    const correctWord = (card.word || "").trim();
+    const normalizedReading = normalizeReading(card.reading || "");
+    if (!correctWord) return [];
+
+    const pools = [
+      cardsPool.filter((c) => c.id !== card.id),
+      libraryPool.filter((c) => c.id !== card.id),
+    ];
+
+    const seen = new Set<string>([correctWord]);
+    const distractors: string[] = [];
+
+    for (const pool of pools) {
+      const sameReading: string[] = [];
+      const sameFirstKana: string[] = [];
+      const fallback: string[] = [];
+
+      for (const candidate of pool) {
+        const candidateWord = (candidate.word || "").trim();
+        if (!candidateWord || seen.has(candidateWord)) continue;
+
+        const candidateReading = normalizeReading(candidate.reading || "");
+
+        if (candidateReading && candidateReading === normalizedReading) {
+          sameReading.push(candidateWord);
+        } else if (
+          candidateReading &&
+          normalizedReading &&
+          getFirstKana(candidateReading) === getFirstKana(normalizedReading)
+        ) {
+          sameFirstKana.push(candidateWord);
+        } else {
+          fallback.push(candidateWord);
+        }
+      }
+
+      for (const word of [...sameReading, ...sameFirstKana, ...fallback]) {
+        if (seen.has(word)) continue;
+        seen.add(word);
+        distractors.push(word);
+        if (distractors.length === 3) break;
+      }
+
+      if (distractors.length === 3) break;
+    }
+
+    return shuffleArray([correctWord, ...distractors]);
   }
 
   const currentCardIndex = sessionOrder[sessionIndex] ?? 0;
   const card = filteredCards[currentCardIndex];
+
+  useEffect(() => {
+    if (!card || !isMultipleChoiceMode) {
+      resetMcState();
+      return;
+    }
+
+    if (studySet === "READING_MC") {
+      const options = buildReadingMcOptions(card, cards, libraryCards);
+      setMcOptions(options);
+      setMcCorrectAnswer(normalizeReading(card.reading || ""));
+      setMcSelected(null);
+      setMcAnswered(false);
+      setMcWasCorrect(null);
+      return;
+    }
+
+    if (studySet === "MEANING_MC") {
+      const options = buildMeaningMcOptions(card, cards, libraryCards);
+      setMcOptions(options);
+      setMcCorrectAnswer((card.meaning || "").trim().toLowerCase());
+      setMcSelected(null);
+      setMcAnswered(false);
+      setMcWasCorrect(null);
+      return;
+    }
+
+    if (studySet === "FROM_READING_MC") {
+      const options = buildWordMcOptions(card, cards, libraryCards);
+      setMcOptions(options);
+      setMcCorrectAnswer((card.word || "").trim());
+      setMcSelected(null);
+      setMcAnswered(false);
+      setMcWasCorrect(null);
+      return;
+    }
+
+    if (studySet === "FROM_READING_MEANING_MC") {
+      const options = buildMeaningMcOptions(card, cards, libraryCards);
+      setMcOptions(options);
+      setMcCorrectAnswer((card.meaning || "").trim().toLowerCase());
+      setMcSelected(null);
+      setMcAnswered(false);
+      setMcWasCorrect(null);
+      return;
+    }
+
+    resetMcState();
+  }, [card, isMultipleChoiceMode, studySet, cards, libraryCards]);
+
+  useEffect(() => {
+    if (!isMultipleChoiceMode) return;
+    if (
+      studySet !== "READING_MC" &&
+      studySet !== "MEANING_MC" &&
+      studySet !== "FROM_READING_MC" &&
+      studySet !== "FROM_READING_MEANING_MC"
+    ) return;
+    if (!mcAnswered || !mcWasCorrect) return;
+
+    const timer = window.setTimeout(() => {
+      goToNextWord("correct");
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect]);
 
   async function logStudyEvent(result: "revealed" | "correct" | "wrong") {
     if (!card || !meId) return;
@@ -584,9 +861,7 @@ export default function BookFlashcardsPage() {
     ]);
   }
 
-  async function goToNextWord(
-    result: "revealed" | "correct" | "wrong" = "revealed"
-  ) {
+  async function goToNextWord(result: "revealed" | "correct" | "wrong" = "revealed") {
     if (filteredCards.length === 0 || !card) return;
 
     await logStudyEvent(result);
@@ -609,7 +884,7 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
-    setVoiceError(null);
+    resetMcState();
   }
 
   function goToPrevWord() {
@@ -630,7 +905,15 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
-    setVoiceError(null);
+    resetMcState();
+  }
+
+  function resetMcState() {
+    setMcOptions([]);
+    setMcSelected(null);
+    setMcCorrectAnswer(null);
+    setMcAnswered(false);
+    setMcWasCorrect(null);
   }
 
   async function skipCardForToday(cardId: string) {
@@ -689,19 +972,33 @@ export default function BookFlashcardsPage() {
 
     if (studySet === "READING") {
       const correctReading = card.reading ?? "";
+      const normalizedCorrect = normalizeReading(correctReading);
+      const normalizedUser = normalizeReading(userAnsRaw);
+
       const ok =
         !!correctReading &&
         isKanaOnly(userAnsRaw) &&
-        normalizeReading(userAnsRaw) === normalizeReading(correctReading);
+        normalizedUser === normalizedCorrect;
+
+      if (ok) {
+        setTypedFeedback({ ok: true, message: "You got it!" });
+        setLastTypedResult("correct");
+
+        window.setTimeout(() => {
+          goToNextWord("correct");
+        }, 500);
+
+        return;
+      }
 
       setTypedInput("");
+      setInputResetKey((k) => k + 1);
       setTypedFeedback({
-        ok,
-        message: ok ? "You got it!" : "Let's keep trying!",
+        ok: false,
+        message: `Correct: ${correctReading}`,
       });
-      setTypeRevealIndex(steps.length - 1);
-      setLastTypedResult(ok ? "correct" : "wrong");
-      setReadyForNextCard(true);
+      setLastTypedResult("wrong");
+      setReadyForNextCard(false);
       return;
     }
 
@@ -713,53 +1010,66 @@ export default function BookFlashcardsPage() {
 
       const ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
 
+      if (ok) {
+        setTypedFeedback({
+          ok: true,
+          message: `Correct: ${card.meaning || "—"}`,
+        });
+        setTypeRevealIndex(steps.length - 1);
+        setLastTypedResult("correct");
+        setReadyForNextCard(false);
+
+        window.setTimeout(() => {
+          goToNextWord("correct");
+        }, 1200);
+
+        return;
+      }
+
       setTypedInput("");
+      setInputResetKey((k) => k + 1);
       setTypedFeedback({
-        ok,
-        message: ok ? "You got it!" : "Let's keep trying!",
+        ok: false,
+        message: `✓ Your answer works. Full meaning: ${card.meaning || "—"}`,
       });
       setTypeRevealIndex(steps.length - 1);
-      setLastTypedResult(ok ? "correct" : "wrong");
+      setLastTypedResult("wrong");
       setReadyForNextCard(true);
       return;
     }
 
-    if (studySet === "COMPLETE") {
-      if (typeRevealIndex === 0) {
-        const correctReading = card.reading ?? "";
-        const ok =
-          !!correctReading &&
-          isKanaOnly(userAnsRaw) &&
-          normalizeReading(userAnsRaw) === normalizeReading(correctReading);
-
-        setTypedInput("");
-        setTypedFeedback({
-          ok,
-          message: ok
-            ? "You got it! Now the meaning."
-            : "Keep trying! Here's the reading — now try the meaning.",
-        });
-        setTypeRevealIndex(1);
-        setLastTypedResult(ok ? null : "wrong");
-        setReadyForNextCard(false);
-        return;
-      }
-
+    if (studySet === "FROM_READING_MEANING") {
       const u = normalizeMeaning(userAnsRaw);
       const possible = [card.meaning, ...(card.meaningChoices ?? [])]
         .filter(Boolean)
         .map((x) => normalizeMeaning(String(x)));
 
       const ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
-      const finalResult = lastTypedResult === "wrong" || !ok ? "wrong" : "correct";
+
+      if (ok) {
+        setTypedFeedback({
+          ok: true,
+          message: `Correct: ${card.meaning || "—"}`,
+        });
+        setTypeRevealIndex(steps.length - 1);
+        setLastTypedResult("correct");
+        setReadyForNextCard(false);
+
+        window.setTimeout(() => {
+          goToNextWord("correct");
+        }, 1200);
+
+        return;
+      }
 
       setTypedInput("");
+      setInputResetKey((k) => k + 1);
       setTypedFeedback({
-        ok,
-        message: ok ? "You got it!" : "Keep trying!",
+        ok: false,
+        message: `Correct: ${card.meaning || "—"}`,
       });
-      setTypeRevealIndex(2);
-      setLastTypedResult(finalResult);
+      setTypeRevealIndex(steps.length - 1);
+      setLastTypedResult("wrong");
       setReadyForNextCard(true);
       return;
     }
@@ -811,6 +1121,26 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(steps.length - 1);
     setLastTypedResult("wrong");
     setReadyForNextCard(true);
+  }
+
+  function handleMcAnswer(selected: string) {
+    if (!card || !mcCorrectAnswer || mcAnswered) return;
+
+    let isCorrect = false;
+
+    if (studySet === "READING_MC") {
+      isCorrect = normalizeReading(selected) === mcCorrectAnswer;
+    } else if (studySet === "MEANING_MC") {
+      isCorrect = selected.trim().toLowerCase() === mcCorrectAnswer;
+    } else if (studySet === "FROM_READING_MC") {
+      isCorrect = selected.trim() === mcCorrectAnswer;
+    } else if (studySet === "FROM_READING_MEANING_MC") {
+      isCorrect = selected.trim().toLowerCase() === mcCorrectAnswer;
+    }
+
+    setMcSelected(selected);
+    setMcAnswered(true);
+    setMcWasCorrect(isCorrect);
   }
 
   function flip() {
@@ -868,67 +1198,22 @@ export default function BookFlashcardsPage() {
     }
   }
 
+  const showWrongNextButton =
+    ((studySet === "MEANING" || studySet === "FROM_READING_MEANING") &&
+      typedFeedback &&
+      !typedFeedback.ok) ||
+    (isMultipleChoiceMode && mcAnswered && !mcWasCorrect);
+
   const currentTypeAnswerField =
     typeModeEnabled
       ? studySet === "READING"
         ? "reading"
         : studySet === "MEANING"
           ? "meaning"
-          : studySet === "FROM_READING"
-            ? "word_or_meaning"
-            : studySet === "COMPLETE"
-              ? typeRevealIndex === 0
-                ? "reading"
-                : typeRevealIndex === 1
-                  ? "meaning"
-                  : null
-              : null
+          : studySet === "FROM_READING_MEANING"
+            ? "meaning"
+            : null
       : null;
-
-  function startVoiceInput() {
-    if (typeof window === "undefined") return;
-    if (studySet !== "MEANING") return;
-
-    const SpeechRecognitionCtor =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognitionCtor) {
-      setVoiceError("Voice input is not supported in this browser.");
-      return;
-    }
-
-    setVoiceError(null);
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.onerror = (event: any) => {
-      setIsListening(false);
-      setVoiceError(
-        event?.error ? `Voice input error: ${event.error}` : "Voice input failed."
-      );
-    };
-
-    recognition.onresult = (event: any) => {
-      const transcript = event?.results?.[0]?.[0]?.transcript ?? "";
-      setTypedInput(transcript);
-      setTypedFeedback(null);
-      setReadyForNextCard(false);
-      setLastTypedResult(null);
-    };
-
-    recognition.start();
-  }
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -1230,7 +1515,7 @@ export default function BookFlashcardsPage() {
       </div>
 
       <div
-        onClick={flip}
+        onClick={isMultipleChoiceMode ? undefined : flip}
         className="
           relative
           w-full max-w-2xl
@@ -1256,16 +1541,122 @@ export default function BookFlashcardsPage() {
         </div>
 
         <div className="w-full flex flex-col items-center justify-center gap-3">
-          {typeModeEnabled && card ? (
+          {isMultipleChoiceMode &&
+            (
+              studySet === "READING_MC" ||
+              studySet === "MEANING_MC" ||
+              studySet === "FROM_READING_MC" ||
+              studySet === "FROM_READING_MEANING_MC"
+            ) &&
+            card ? (
+            <>
+              {(studySet === "READING_MC" || studySet === "MEANING_MC") ? (
+                <>
+                  <Row label="Word" value={card.word} visible big placeholder="---" />
+                  {studySet === "READING_MC" ? (
+                    <Row label="Meaning" value={card.meaning || "—"} visible placeholder="---" />
+                  ) : (
+                    <Row label="Reading" value={card.reading || "—"} visible placeholder="---" />
+                  )}
+                </>
+              ) : studySet === "FROM_READING_MC" ? (
+                <>
+                  <Row label="Reading" value={card.reading || "—"} visible big placeholder="---" />
+                  <Row label="Meaning" value={card.meaning || "—"} visible placeholder="---" />
+                </>
+              ) : (
+                <>
+                  <Row label="Reading" value={card.reading || "—"} visible big placeholder="---" />
+                </>
+              )}
+
+              <div className="w-full max-w-md pt-2">
+                <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
+                  {studySet === "READING_MC"
+                    ? "Choose the Reading"
+                    : studySet === "MEANING_MC"
+                      ? "Choose the Meaning"
+                      : studySet === "FROM_READING_MC"
+                        ? "Choose the Kanji"
+                        : "Choose the Meaning"}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {mcOptions.map((option) => {
+                    const isSelected = mcSelected === option;
+                    const isCorrect =
+                      mcAnswered &&
+                      (
+                        studySet === "READING_MC"
+                          ? normalizeReading(option) === mcCorrectAnswer
+                          : studySet === "FROM_READING_MC"
+                            ? option.trim() === mcCorrectAnswer
+                            : option.trim().toLowerCase() === mcCorrectAnswer
+                      );
+                    const isWrongSelected = mcAnswered && isSelected && !isCorrect;
+
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMcAnswer(option);
+                        }}
+                        disabled={mcAnswered}
+                        className={[
+                          "rounded-xl border px-3 py-3 text-sm font-medium transition",
+                          isCorrect
+                            ? "border-green-600 bg-green-50 text-green-800"
+                            : isWrongSelected
+                              ? "border-red-600 bg-red-50 text-red-800"
+                              : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50",
+                          mcAnswered ? "cursor-default" : "",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {mcAnswered ? (
+                  <div className="mt-3 w-full">
+                    <p className={`text-sm ${mcWasCorrect ? "text-green-700" : "text-red-700"}`}>
+                      {mcWasCorrect
+                        ? "✅ You got it!"
+                        : `❌ Not quite. Correct answer: ${studySet === "READING_MC"
+                          ? card.reading || "—"
+                          : studySet === "MEANING_MC"
+                            ? card.meaning || "—"
+                            : studySet === "FROM_READING_MC"
+                              ? card.word || "—"
+                              : card.meaning || "—"
+                        }`}
+                    </p>
+
+                    {!mcWasCorrect ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          goToNextWord("wrong");
+                        }}
+                        className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900"
+                      >
+                        Next
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : typeModeEnabled && card ? (
             <>
               <Row
                 label="Word"
                 value={card.word}
-                visible={
-                  studySet === "READING" || studySet === "MEANING" || studySet === "COMPLETE"
-                    ? true
-                    : typeRevealIndex >= steps.indexOf("word")
-                }
+                visible={studySet === "READING" || studySet === "MEANING"}
                 big
                 placeholder="---"
               />
@@ -1274,11 +1665,8 @@ export default function BookFlashcardsPage() {
                 label="Reading"
                 value={card.reading || "—"}
                 visible={
-                  studySet === "MEANING" || studySet === "FROM_READING"
-                    ? true
-                    : studySet === "COMPLETE"
-                      ? typeRevealIndex >= 1
-                      : typeRevealIndex >= steps.indexOf("reading")
+                  studySet === "MEANING" ||
+                  studySet === "FROM_READING_MEANING"
                 }
                 placeholder="---"
               />
@@ -1286,112 +1674,128 @@ export default function BookFlashcardsPage() {
               <Row
                 label="Meaning"
                 value={card.meaning || "—"}
-                visible={
-                  studySet === "READING"
-                    ? true
-                    : studySet === "COMPLETE"
-                      ? typeRevealIndex >= 2
-                      : typeRevealIndex >= steps.indexOf("meaning")
-                }
+                visible={studySet === "READING"}
                 placeholder="---"
               />
 
               {currentTypeAnswerField ? (
-                <div className="w-full max-w-md">
-                  <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                    Type{" "}
-                    {studySet === "READING"
-                      ? "Reading"
-                      : studySet === "MEANING"
-                        ? "Meaning"
-                        : studySet === "FROM_READING"
-                          ? "Word or Meaning"
-                          : typeRevealIndex === 0
-                            ? "Reading"
-                            : "Meaning"}
-                  </div>
+                !(studySet === "MEANING" && typedFeedback && !typedFeedback.ok) ? (
+                  <div className="w-full max-w-md">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+                      Type{" "}
+                      {studySet === "READING"
+                        ? "Reading"
+                        : studySet === "MEANING"
+                          ? "Meaning"
+                          : studySet === "FROM_READING_MEANING"
+                            ? "Meaning"
+                            : "Answer"}
+                    </div>
 
-                  {studySet === "READING" ? (
-                    <p className="mb-2 text-xs text-gray-500">
-                      Reading quizzes can be answered in hiragana or katakana.
-                    </p>
-                  ) : null}
+                    {studySet === "READING" ? (
+                      <p className="mb-2 text-xs text-gray-500">
+                        Reading quizzes can be answered in hiragana or katakana.
+                      </p>
+                    ) : null}
 
-                  <div className="flex gap-2">
-                    <input
-                      key={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
-                      type="text"
-                      value={typedInput}
-                      onChange={(e) => {
-                        setTypedInput(e.target.value);
-                        setTypedFeedback(null);
-                        setReadyForNextCard(false);
-                        setLastTypedResult(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          e.stopPropagation();
+                    <div className="flex gap-2">
+                      <input
+                        key={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
+                        type="text"
+                        value={typedInput}
+                        onChange={(e) => {
+                          setTypedInput(e.target.value);
 
-                          if (readyForNextCard) {
-                            goToNextWord(lastTypedResult ?? "revealed");
-                            return;
+                          if (!(studySet === "READING" && typedFeedback && !typedFeedback.ok)) {
+                            setTypedFeedback(null);
+                            setLastTypedResult(null);
                           }
 
-                          checkTypedAnswer();
-                        }
-                      }}
-                      inputMode="text"
-                      lang={studySet === "READING" ? "ja" : undefined}
-                      autoCorrect="off"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      autoFocus
-                      className="border p-2 rounded w-full"
-                      placeholder={
-                        readyForNextCard
-                          ? "Press Enter for next card"
-                          : studySet === "READING"
-                            ? "かなで入力（ひらがな・カタカナどちらでもOK）"
-                            : studySet === "MEANING"
-                              ? "Type a meaning"
-                              : studySet === "FROM_READING"
-                                ? "Type the word or a meaning"
-                                : typeRevealIndex === 0
-                                  ? "かなで入力（ひらがな・カタカナどちらでもOK）"
-                                  : "Type a meaning"
-                      }
-                    />
-
-                    {voiceSupported && studySet === "MEANING" ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startVoiceInput();
+                          setReadyForNextCard(false);
                         }}
-                        disabled={isListening}
-                        className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-                        title="Voice input"
-                      >
-                        {isListening ? "Listening..." : "🎤"}
-                      </button>
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            if (readyForNextCard) {
+                              goToNextWord(lastTypedResult ?? "revealed");
+                              return;
+                            }
+
+                            checkTypedAnswer();
+                          }
+                        }}
+                        inputMode="text"
+                        lang={studySet === "READING" ? "ja" : undefined}
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        autoFocus
+                        className="border p-2 rounded w-full"
+                        placeholder={
+                          readyForNextCard
+                            ? "Press Enter for next card"
+                            : studySet === "READING"
+                              ? "かなで入力（ひらがな・カタカナどちらでもOK）"
+                              : studySet === "MEANING"
+                                ? "Type a meaning"
+                                : studySet === "FROM_READING_MEANING"
+                                  ? "Type a meaning"
+                                  : "Type your answer"
+                        }
+                      />
+                    </div>
+
+                    {typedFeedback ? (
+                      <div className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"}`}>
+                        <p>
+                          {typedFeedback.ok ? "✅ " : "❌ "}
+                          {typedFeedback.message}
+                        </p>
+
+                        {!typedFeedback.ok && studySet === "READING" ? (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Type the correct reading to continue.
+                          </p>
+                        ) : null}
+
+                        {!typedFeedback.ok && studySet === "MEANING" ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              goToNextWord("wrong");
+                            }}
+                            className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900"
+                          >
+                            Next
+                          </button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
+                ) : null
+              ) : null}
 
-                  {voiceError ? (
-                    <p className="mt-2 text-xs text-red-700">{voiceError}</p>
-                  ) : null}
-
-                  {typedFeedback ? (
-                    <p
-                      className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"
-                        }`}
-                    >
-                      {typedFeedback.ok ? "✅ " : "❌ "}
-                      {typedFeedback.message}
+              {studySet === "MEANING" && typedFeedback && !typedFeedback.ok ? (
+                <div className="w-full max-w-md">
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>
+                      ❌ {typedFeedback.message}
                     </p>
-                  ) : null}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        goToNextWord("wrong");
+                      }}
+                      className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </>
@@ -1407,7 +1811,10 @@ export default function BookFlashcardsPage() {
               <Row
                 label="Meaning"
                 value={card.meaning || "—"}
-                visible={showMeaning}
+                visible={
+                  studySet === "READING" ||
+                  (studySet === "FROM_READING_MEANING" && typeRevealIndex >= steps.length - 1)
+                }
                 placeholder="---"
               />
             </>
@@ -1431,60 +1838,45 @@ export default function BookFlashcardsPage() {
                 >
                   <option value="READING">{studySetLabel("READING")}</option>
                   <option value="MEANING">{studySetLabel("MEANING")}</option>
-                  <option value="FROM_READING">{studySetLabel("FROM_READING")}</option>
+                  <option value="FROM_READING_MEANING">{studySetLabel("FROM_READING_MEANING")}</option>
+
+                  <option disabled>──────────</option>
+
+                  <option value="READING_MC">{studySetLabel("READING_MC")}</option>
+                  <option value="MEANING_MC">{studySetLabel("MEANING_MC")}</option>
+                  <option value="FROM_READING_MC">{studySetLabel("FROM_READING_MC")}</option>
+                  <option value="FROM_READING_MEANING_MC">
+                    {studySetLabel("FROM_READING_MEANING_MC")}
+                  </option>
+
+                  <option disabled>──────────</option>
+
                   <option value="COMPLETE">{studySetLabel("COMPLETE")}</option>
                 </select>
-
-                <label
-                  className={`flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white ${steps.length < 2 ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  title={
-                    steps.length < 2
-                      ? "Type mode needs at least 2 study steps."
-                      : "Type your answer and press Enter."
-                  }
-                >
-                  <input
-                    type="checkbox"
-                    checked={typeModeEnabled}
-                    disabled={steps.length < 2}
-                    onChange={() => setTypeMode((v) => !v)}
-                  />
-                  Type mode
-                </label>
               </div>
 
               <p className="mt-3 text-sm leading-6 text-gray-600">
-                {studySet === "READING" && "Show word + meaning → think of the reading"}
-                {studySet === "MEANING" && "Show word + reading → think of the meaning"}
-                {studySet === "FROM_READING" && "Show reading → think of the word and meaning"}
-                {studySet === "COMPLETE" &&
-                  "Show word → type reading (or show reading) → type meaning (or show meaning)"}
+                {studySet === "READING" && "Show word + meaning → type the reading"}
+                {studySet === "MEANING" && "Show word + reading → type the meaning"}
+                {studySet === "FROM_READING_MEANING" && "Show reading → type the meaning"}
+                {studySet === "READING_MC" && "Show word + meaning → choose the reading"}
+                {studySet === "MEANING_MC" && "Show word + reading → choose the meaning"}
+                {studySet === "FROM_READING_MC" && "Show reading + meaning → choose the kanji"}
+                {studySet === "FROM_READING_MEANING_MC" && "Show reading → choose the meaning"}
+                {studySet === "COMPLETE" && "Tap and reveal only — no typing"}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 md:w-[220px]">
-              <button
-                onClick={() => {
-                  if (!card) return;
-                  skipCardForToday(card.id);
-                }}
-                className="rounded-xl border border-slate-700 bg-slate-700 px-3 py-3 text-sm font-medium text-white hover:bg-slate-800 transition"
-              >
-                Skip
-              </button>
-
+            <div className="md:w-[220px]">
               <button
                 onClick={() => {
                   if (!card) return;
                   hideCardPermanently(card.id);
                 }}
-                className="rounded-xl border border-slate-700 bg-slate-700 px-3 py-3 text-sm font-medium text-white hover:bg-slate-800 transition"
+                className="w-full rounded-xl border border-slate-700 bg-slate-700 px-3 py-3 text-sm font-medium text-white hover:bg-slate-800 transition"
               >
                 <div className="leading-tight">Hide</div>
-                <div className="text-[10px] font-normal text-slate-200">
-                  Vocab List
-                </div>
+                <div className="text-[10px] font-normal text-slate-200">Vocab List</div>
               </button>
             </div>
           </div>
@@ -1492,23 +1884,24 @@ export default function BookFlashcardsPage() {
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-gray-500">
-            {typeModeEnabled
-              ? "Press Enter to check. Press Enter again to move to the next card."
-              : stepIndex === 0
-                ? "Tap once to reveal"
-                : "Tap again for the next word"}
+            {isMultipleChoiceMode
+              ? mcAnswered
+                ? mcWasCorrect
+                  ? "Moving to next card..."
+                  : "Choose Next below to continue"
+                : studySet === "READING_MC"
+                  ? "Choose the correct reading"
+                  : studySet === "MEANING_MC"
+                    ? "Choose the correct meaning"
+                    : studySet === "FROM_READING_MC"
+                      ? "Choose the correct kanji"
+                      : "Choose the correct meaning"
+              : typeModeEnabled
+                ? "Press Enter to check."
+                : stepIndex === 0
+                  ? "Tap once to reveal"
+                  : "Tap again for the next word"}
           </p>
-
-          <button
-            onClick={() =>
-              typeModeEnabled
-                ? goToNextWord(readyForNextCard ? lastTypedResult ?? "revealed" : "revealed")
-                : nextCardReveal()
-            }
-            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Next Word
-          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
