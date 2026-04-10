@@ -135,14 +135,27 @@ export default function StudyTab({
             className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
           >
             📚 Vocab List
+            <p className="mt-1 text-sm text-stone-500">
+              Your saved words from this book, in book order.
+            </p>
+            <p className="text-sm text-stone-500">
+              Review, reorder, and edit each entry.
+            </p>
           </a>
 
           <a
             href={`/vocab/explore?userBookId=${row.id}`}
             className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
           >
-            🔎 Explore the Word
+            🔎 Word History Search
+            <p className="mt-1 text-sm text-stone-500">
+             Search your library to see where a word appeared
+            </p>
+            <p className="text-sm text-stone-500">
+              and how it was used.
+            </p>
           </a>
+
         </div>
       </div>
 

@@ -7,33 +7,12 @@ import { supabase } from "@/lib/supabaseClient";
 // -------------------------------------------------------------
 // Types
 // -------------------------------------------------------------
-type ExploreEntry = {
+type DictionaryEntry = {
   word: string;
   reading: string;
   meanings: string[];
   jlpt: string | null;
   isCommon: boolean | null;
-};
-
-type SeenInstance = {
-  id: string;
-  user_book_id: string;
-  page_number: number | null;
-  chapter_number: number | null;
-  chapter_name: string | null;
-  created_at: string;
-  book_title: string;
-};
-
-type KanjiStroke = {
-  kanji: string;
-  strokes: number | null;
-};
-
-type RelatedWord = {
-  word: string;
-  reading: string;
-  meaning: string;
 };
 
 // -------------------------------------------------------------
@@ -45,43 +24,10 @@ function normalizeJlpt(val: string | null | undefined) {
   return "NON-JLPT";
 }
 
-function chapterDisplay(chNum: number | null, chName: string | null) {
-  const name = (chName ?? "").trim();
-  if (chNum != null && name) return `Chapter ${chNum}: ${name}`;
-  if (chNum != null) return `Chapter ${chNum}`;
-  if (name) return name;
-  return "";
-}
-
-function firstKanjiOf(word: string) {
-  return word.match(/[一-龯]/)?.[0] ?? null;
-}
-
-async function getStrokeData(word: string): Promise<KanjiStroke[]> {
-  const chars = Array.from(new Set(word.match(/[\u3400-\u9FFF]/g) || []));
-  const results: KanjiStroke[] = [];
-
-  for (const ch of chars) {
-    try {
-      const r = await fetch(`https://kanjiapi.dev/v1/kanji/${encodeURIComponent(ch)}`);
-      if (!r.ok) {
-        results.push({ kanji: ch, strokes: null });
-        continue;
-      }
-      const data = await r.json();
-      results.push({ kanji: ch, strokes: data.stroke_count ?? null });
-    } catch {
-      results.push({ kanji: ch, strokes: null });
-    }
-  }
-
-  return results;
-}
-
 // -------------------------------------------------------------
 // Main Component
 // -------------------------------------------------------------
-export default function ExploreWordPage() {
+export default function WordHistorySearchPage() {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
@@ -90,23 +36,11 @@ export default function ExploreWordPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [mainEntry, setMainEntry] = useState<ExploreEntry | null>(null);
-  const [otherMatches, setOtherMatches] = useState<ExploreEntry[]>([]);
-
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
 
-  const [selectedMeaningIndex, setSelectedMeaningIndex] = useState(0);
-
-  const [repeatsInThisBook, setRepeatsInThisBook] = useState<number>(0);
-  const [totalLookupCount, setTotalLookupCount] = useState<number>(0);
-  const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
-
-  const [kanjiStrokes, setKanjiStrokes] = useState<KanjiStroke[]>([]);
-  const [relatedWords, setRelatedWords] = useState<RelatedWord[]>([]);
-
-  const selectedMeaning =
-    mainEntry?.meanings?.[selectedMeaningIndex] ?? null;
+  const [notFoundEntry, setNotFoundEntry] = useState<DictionaryEntry | null>(null);
+  const [otherMatches, setOtherMatches] = useState<DictionaryEntry[]>([]);
 
   // -------------------------------------------------------------
   // Pull userBookId from URL
@@ -118,7 +52,7 @@ export default function ExploreWordPage() {
   }, []);
 
   // -------------------------------------------------------------
-  // Load book info
+  // Load optional book info
   // -------------------------------------------------------------
   useEffect(() => {
     if (!userBookId) {
@@ -162,18 +96,46 @@ export default function ExploreWordPage() {
 
     setLoading(true);
     setErrorMsg(null);
-
-    setMainEntry(null);
+    setNotFoundEntry(null);
     setOtherMatches([]);
-    setSelectedMeaningIndex(0);
-
-    setRepeatsInThisBook(0);
-    setTotalLookupCount(0);
-    setSeenInstances([]);
-    setKanjiStrokes([]);
-    setRelatedWords([]);
 
     try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) throw authError;
+      if (!user) {
+        throw new Error("You need to sign in to search your word history.");
+      }
+
+      // 1) Search saved library first
+      const { data: savedRows, error: savedError } = await supabase
+        .from("user_book_words")
+        .select(
+          `
+          id,
+          user_book_id,
+          surface,
+          user_books!inner (
+            user_id
+          )
+        `
+        )
+        .eq("surface", q)
+        .eq("user_books.user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (savedError) throw savedError;
+
+      if (savedRows && savedRows.length > 0) {
+        router.push(`/vocab/history?word=${encodeURIComponent(q)}`);
+        return;
+      }
+
+      // 2) If not found in saved history, show lightweight dictionary fallback
       const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`);
       if (!res.ok) {
         throw new Error(`Search failed (${res.status})`);
@@ -182,7 +144,7 @@ export default function ExploreWordPage() {
       const json = await res.json();
       const data = Array.isArray(json?.data) ? json.data : [];
 
-      const mapped: ExploreEntry[] = data.map((item: any) => {
+      const mapped: DictionaryEntry[] = data.map((item: any) => {
         const japanese0 = item?.japanese?.[0] ?? {};
         const senses = Array.isArray(item?.senses) ? item.senses : [];
 
@@ -217,168 +179,31 @@ export default function ExploreWordPage() {
         return;
       }
 
-      const first = mapped[0];
-      const firstMeaning = first.meanings[0] ?? null;
-
-      setMainEntry(first);
+      setNotFoundEntry(mapped[0]);
       setOtherMatches(mapped.slice(1, 5));
-      setSelectedMeaningIndex(0);
-
-      await loadBookAwareInfo(first.word, firstMeaning);
-      await loadKanjiInfo(first.word);
     } catch (e: any) {
       console.error(e);
-      setErrorMsg(e?.message ?? "Could not search dictionary.");
+      setErrorMsg(e?.message ?? "Could not search word history.");
     } finally {
       setLoading(false);
     }
   }
 
-  // -------------------------------------------------------------
-  // Book-aware info
-  // -------------------------------------------------------------
-  async function loadBookAwareInfo(surface: string, meaning: string | null) {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      if (userBookId) {
-        const { count: repeatCount, error: repeatErr } = await supabase
-          .from("user_book_words")
-          .select("id", { count: "exact", head: true })
-          .eq("user_book_id", userBookId)
-          .eq("surface", surface)
-          .eq("meaning", meaning);
-
-        if (!repeatErr) {
-          setRepeatsInThisBook(repeatCount ?? 0);
-        } else {
-          setRepeatsInThisBook(0);
-        }
-      } else {
-        setRepeatsInThisBook(0);
-      }
-
-      const { data: seen, error: seenErr } = await supabase
-        .from("user_book_words")
-        .select(
-          `
-          id,
-          user_book_id,
-          page_number,
-          chapter_number,
-          chapter_name,
-          created_at,
-          user_books!inner (
-            user_id,
-            books:book_id (
-              title
-            )
-          )
-        `
-        )
-        .eq("surface", surface)
-        .eq("meaning", meaning)
-        .eq("user_books.user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (!seenErr) {
-        const normalizedSeen: SeenInstance[] = (seen ?? []).map((row: any) => ({
-          id: row.id,
-          user_book_id: row.user_book_id,
-          page_number: row.page_number ?? null,
-          chapter_number: row.chapter_number ?? null,
-          chapter_name: row.chapter_name ?? null,
-          created_at: row.created_at,
-          book_title: row.user_books?.books?.title ?? "(unknown book)",
-        }));
-
-        setSeenInstances(normalizedSeen);
-      } else {
-        setSeenInstances([]);
-      }
-
-      const { data: allSeen, error: allSeenErr } = await supabase
-        .from("user_book_words")
-        .select(
-          `
-          id,
-          user_books!inner (
-            user_id
-          )
-        `
-        )
-        .eq("surface", surface)
-        .eq("meaning", meaning)
-        .eq("user_books.user_id", user.id);
-
-      if (!allSeenErr) {
-        setTotalLookupCount((allSeen ?? []).length);
-      } else {
-        setTotalLookupCount(0);
-      }
-    } catch (e) {
-      console.error("Failed to load book-aware info:", e);
-      setRepeatsInThisBook(0);
-      setTotalLookupCount(0);
-      setSeenInstances([]);
-    }
+  function clearSearch() {
+    setQuery("");
+    setErrorMsg(null);
+    setNotFoundEntry(null);
+    setOtherMatches([]);
   }
-
-  // -------------------------------------------------------------
-  // Kanji info
-  // -------------------------------------------------------------
-  async function loadKanjiInfo(surface: string) {
-    try {
-      const strokes = await getStrokeData(surface);
-      setKanjiStrokes(strokes);
-
-      const firstKanji = firstKanjiOf(surface);
-      if (!firstKanji) {
-        setRelatedWords([]);
-        return;
-      }
-
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(firstKanji)}`);
-      if (!res.ok) {
-        setRelatedWords([]);
-        return;
-      }
-
-      const data = await res.json();
-      const results: RelatedWord[] = (data?.data ?? [])
-        .slice(0, 5)
-        .map((item: any) => ({
-          word: item?.japanese?.[0]?.word ?? item?.japanese?.[0]?.reading ?? "",
-          reading: item?.japanese?.[0]?.reading ?? "",
-          meaning: item?.senses?.[0]?.english_definitions?.join("; ") ?? "",
-        }))
-        .filter((x: RelatedWord) => x.word);
-
-      setRelatedWords(results);
-    } catch (e) {
-      console.error("Failed to load kanji info:", e);
-      setKanjiStrokes([]);
-      setRelatedWords([]);
-    }
-  }
-
-  // -------------------------------------------------------------
-  // When selected definition changes, refresh counts/Seen in
-  // -------------------------------------------------------------
-  useEffect(() => {
-    if (!mainEntry || selectedMeaning == null) return;
-
-    loadBookAwareInfo(mainEntry.word, selectedMeaning);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMeaningIndex]);
 
   return (
-    <main className="min-h-screen max-w-5xl mx-auto px-6 pb-10 pt-30">
-      <h1 className="mb-4 text-2xl font-semibold">Explore the Word</h1>
+    <main className="mx-auto min-h-screen max-w-4xl px-6 pb-10 pt-30">
+      <h1 className="mb-1 text-2xl font-semibold">Word History</h1>
+      <p className="mb-4 text-sm text-stone-500">
+        {userBookId
+          ? "Search to see how a word was used in this book and across your library."
+          : "Search your library to see where a word appeared and how it was used."}
+      </p>
 
       {bookTitle ? (
         <div className="mb-6 flex items-center gap-3">
@@ -390,7 +215,7 @@ export default function ExploreWordPage() {
               In book: <span className="font-medium">{bookTitle}</span>
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              Search a word and explore it more deeply in the context of this book.
+              Search this word in the context of your saved reading history.
             </p>
           </div>
         </div>
@@ -420,135 +245,54 @@ export default function ExploreWordPage() {
 
       {errorMsg ? <p className="mb-4 text-sm text-red-600">{errorMsg}</p> : null}
 
-      {mainEntry ? (
+      {notFoundEntry ? (
         <section className="w-full rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="mb-4 text-lg font-semibold">Not found in your reading history</div>
+
           <div className="flex flex-col gap-4">
             <div>
               <div className="text-xs uppercase tracking-wide text-slate-500">Word</div>
-              <div className="break-words text-4xl font-bold">{mainEntry.word || "—"}</div>
+              <div className="break-words text-4xl font-bold">{notFoundEntry.word || "—"}</div>
             </div>
 
             <div>
               <div className="text-xs uppercase tracking-wide text-slate-500">Reading</div>
-              <div className="text-2xl font-medium">{mainEntry.reading || "—"}</div>
+              <div className="text-2xl font-medium">{notFoundEntry.reading || "—"}</div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Definition
+              <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Definitions</div>
+
+              {notFoundEntry.meanings.length > 0 ? (
+                <div className="space-y-2">
+                  {notFoundEntry.meanings.map((meaning, i) => (
+                    <div key={`${meaning}-${i}`} className="rounded-xl border p-3">
+                      <div className="text-sm font-semibold text-stone-700">Def {i + 1}</div>
+                      <div className="mt-1 text-base text-stone-900">{meaning}</div>
+                    </div>
+                  ))}
                 </div>
-
-                {mainEntry.meanings.length > 1 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {mainEntry.meanings.map((_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setSelectedMeaningIndex(i)}
-                        className={`rounded border px-2 py-1 text-xs ${
-                          i === selectedMeaningIndex
-                            ? "border-stone-900 bg-stone-900 text-white"
-                            : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                        }`}
-                      >
-                        Def {i + 1}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-2 text-lg">{selectedMeaning || "—"}</div>
+              ) : (
+                <div className="text-lg">—</div>
+              )}
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              {normalizeJlpt(mainEntry.jlpt) !== "NON-JLPT" ? (
+              {normalizeJlpt(notFoundEntry.jlpt) !== "NON-JLPT" ? (
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-[17px] font-medium leading-none text-gray-800">
-                  {normalizeJlpt(mainEntry.jlpt)}
+                  {normalizeJlpt(notFoundEntry.jlpt)}
                 </span>
               ) : null}
 
-              {mainEntry.isCommon ? (
+              {notFoundEntry.isCommon ? (
                 <span className="text-gray-500">Common</span>
               ) : null}
             </div>
 
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border p-3">
-                <div className="text-xs text-gray-500">Repeats in this book</div>
-                <div className="text-2xl font-semibold">{repeatsInThisBook}</div>
-              </div>
-
-              <div className="rounded-xl border p-3">
-                <div className="text-xs text-gray-500">Total lookup count</div>
-                <div className="text-2xl font-semibold">{totalLookupCount}</div>
-                <div className="mt-1 text-xs text-gray-400">Across all your books</div>
-              </div>
-            </div>
+            <p className="text-sm text-stone-500">
+              You haven’t saved this word in your reading yet.
+            </p>
           </div>
-        </section>
-      ) : null}
-
-      {mainEntry && seenInstances.length > 0 ? (
-        <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Seen in:</div>
-
-          <ul className="space-y-2">
-            {seenInstances.map((instance) => (
-              <li key={instance.id} className="text-sm text-stone-700">
-                {instance.book_title}
-                {chapterDisplay(instance.chapter_number, instance.chapter_name)
-                  ? ` • ${chapterDisplay(instance.chapter_number, instance.chapter_name)}`
-                  : ""}
-                {instance.page_number != null ? ` • p. ${instance.page_number}` : ""}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {mainEntry && (kanjiStrokes.length > 0 || relatedWords.length > 0) ? (
-        <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Related Information</div>
-
-          {kanjiStrokes.length > 0 ? (
-            <div className="mb-6">
-              <div className="mb-2 text-sm font-semibold">Kanji Stroke Count</div>
-              <div className="flex flex-wrap gap-2">
-                {kanjiStrokes.map((k) => (
-                  <span
-                    key={k.kanji}
-                    className="rounded-full border bg-stone-50 px-3 py-1 text-sm"
-                  >
-                    {k.kanji}: {k.strokes ?? "?"}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {relatedWords.length > 0 ? (
-            <div>
-              <div className="mb-2 text-sm font-semibold">
-                Words with {firstKanjiOf(mainEntry.word) ?? "this kanji"}
-              </div>
-
-              <div className="space-y-2">
-                {relatedWords.map((kw, i) => (
-                  <div key={`${kw.word}-${i}`} className="text-sm">
-                    <span className="font-medium text-stone-900">{kw.word}</span>
-                    {kw.reading ? (
-                      <span className="ml-2 text-stone-600">（{kw.reading}）</span>
-                    ) : null}
-                    {kw.meaning ? (
-                      <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </section>
       ) : null}
 
@@ -558,32 +302,14 @@ export default function ExploreWordPage() {
 
           <div className="space-y-3">
             {otherMatches.map((entry, idx) => (
-              <button
+              <div
                 key={`${entry.word}-${entry.reading}-${idx}`}
-                type="button"
-                onClick={async () => {
-                  const nextMeaning = entry.meanings[0] ?? null;
-
-                  setMainEntry(entry);
-                  setSelectedMeaningIndex(0);
-                  setErrorMsg(null);
-
-                  setRepeatsInThisBook(0);
-                  setTotalLookupCount(0);
-                  setSeenInstances([]);
-                  setKanjiStrokes([]);
-                  setRelatedWords([]);
-
-                  await loadBookAwareInfo(entry.word, nextMeaning);
-                  await loadKanjiInfo(entry.word);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="w-full rounded-xl border p-4 text-left hover:bg-stone-50"
+                className="w-full rounded-xl border p-4"
               >
                 <div className="font-medium text-stone-900">{entry.word}</div>
                 <div className="mt-1 text-sm text-stone-500">{entry.reading || "—"}</div>
                 <div className="mt-2 text-sm text-stone-700">{entry.meanings[0] || "—"}</div>
-              </button>
+              </div>
             ))}
           </div>
         </section>
@@ -598,18 +324,7 @@ export default function ExploreWordPage() {
         </button>
 
         <button
-          onClick={() => {
-            setQuery("");
-            setMainEntry(null);
-            setOtherMatches([]);
-            setSelectedMeaningIndex(0);
-            setErrorMsg(null);
-            setRepeatsInThisBook(0);
-            setTotalLookupCount(0);
-            setSeenInstances([]);
-            setKanjiStrokes([]);
-            setRelatedWords([]);
-          }}
+          onClick={clearSearch}
           className="rounded bg-gray-100 px-4 py-2"
         >
           Clear
