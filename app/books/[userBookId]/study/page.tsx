@@ -585,6 +585,10 @@ export default function BookFlashcardsPage() {
       result = result.filter((c) => (c.repeatCount ?? 1) >= 2);
     }
 
+    if (studySet === "READING_MC") {
+      result = result.filter((c) => !isKanaOnly(c.word));
+    }
+
     setFilteredCards(result);
     setStepIndex(0);
     setTypedInput("");
@@ -594,7 +598,7 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
-  }, [cards, jlptSelected, chapterFilter, repeatsOnly]);
+  }, [cards, jlptSelected, chapterFilter, repeatsOnly, studySet]);
 
   useEffect(() => {
     const order = filteredCards.map((_, i) => i);
@@ -727,10 +731,50 @@ export default function BookFlashcardsPage() {
     return shuffleArray([correct, ...distractors]);
   }
 
+  function countKanji(text: string) {
+    return (text.match(/[\p{Script=Han}]/gu) ?? []).length;
+  }
+
+  function countKana(text: string) {
+    return (text.match(/[ぁ-ゖァ-ヶー]/g) ?? []).length;
+  }
+
+  function getOkurigana(text: string) {
+    const match = text.match(/[ぁ-ゖァ-ヶー]+$/);
+    return match ? match[0] : "";
+  }
+
+  function getWordShape(text: string) {
+    const kanjiCount = countKanji(text);
+    const kanaCount = countKana(text);
+
+    if (kanjiCount > 0 && kanaCount === 0) {
+      return `kanji-only-${kanjiCount}`;
+    }
+
+    if (kanjiCount > 0 && kanaCount > 0) {
+      return `mixed-${kanjiCount}-${kanaCount}`;
+    }
+
+    if (kanjiCount === 0 && kanaCount > 0) {
+      return `kana-only-${kanaCount}`;
+    }
+
+    return "other";
+  }
+
   function buildWordMcOptions(card: Flashcard, cardsPool: Flashcard[], libraryPool: Flashcard[]) {
     const correctWord = (card.word || "").trim();
     const normalizedReading = normalizeReading(card.reading || "");
     if (!correctWord) return [];
+
+    const correctShape = getWordShape(correctWord);
+    const correctOkurigana = getOkurigana(correctWord);
+    const correctEndingKana = correctOkurigana
+      ? normalizeReading(correctOkurigana)
+      : normalizedReading
+        ? normalizedReading[normalizedReading.length - 1] ?? ""
+        : "";
 
     const pools = [
       cardsPool.filter((c) => c.id !== card.id),
@@ -741,30 +785,52 @@ export default function BookFlashcardsPage() {
     const distractors: string[] = [];
 
     for (const pool of pools) {
-      const sameReading: string[] = [];
-      const sameFirstKana: string[] = [];
+      const sameOkurigana: string[] = [];
+      const sameEndingKana: string[] = [];
+      const sameShape: string[] = [];
+      const closeShape: string[] = [];
       const fallback: string[] = [];
 
       for (const candidate of pool) {
         const candidateWord = (candidate.word || "").trim();
         if (!candidateWord || seen.has(candidateWord)) continue;
 
+        const candidateShape = getWordShape(candidateWord);
+        const candidateOkurigana = getOkurigana(candidateWord);
         const candidateReading = normalizeReading(candidate.reading || "");
+        const candidateEndingKana = candidateOkurigana
+          ? normalizeReading(candidateOkurigana)
+          : candidateReading
+            ? candidateReading[candidateReading.length - 1] ?? ""
+            : "";
 
-        if (candidateReading && candidateReading === normalizedReading) {
-          sameReading.push(candidateWord);
+        if (correctOkurigana && candidateOkurigana && candidateOkurigana === correctOkurigana) {
+          sameOkurigana.push(candidateWord);
         } else if (
-          candidateReading &&
-          normalizedReading &&
-          getFirstKana(candidateReading) === getFirstKana(normalizedReading)
+          correctEndingKana &&
+          candidateEndingKana &&
+          candidateEndingKana === correctEndingKana
         ) {
-          sameFirstKana.push(candidateWord);
+          sameEndingKana.push(candidateWord);
+        } else if (candidateShape === correctShape) {
+          sameShape.push(candidateWord);
+        } else if (
+          countKanji(candidateWord) === countKanji(correctWord) &&
+          countKana(candidateWord) === countKana(correctWord)
+        ) {
+          closeShape.push(candidateWord);
         } else {
           fallback.push(candidateWord);
         }
       }
 
-      for (const word of [...sameReading, ...sameFirstKana, ...fallback]) {
+      for (const word of [
+        ...sameOkurigana,
+        ...sameEndingKana,
+        ...sameShape,
+        ...closeShape,
+        ...fallback,
+      ]) {
         if (seen.has(word)) continue;
         seen.add(word);
         distractors.push(word);
@@ -1021,7 +1087,7 @@ export default function BookFlashcardsPage() {
 
         window.setTimeout(() => {
           goToNextWord("correct");
-        }, 1200);
+        }, 1800);
 
         return;
       }
@@ -1434,10 +1500,6 @@ export default function BookFlashcardsPage() {
 
         <div className="mb-2 w-full max-w-2xl space-y-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-              JLPT
-            </div>
-
             <div className="flex flex-wrap gap-2">
               {JLPT_LEVELS.map((lvl) => {
                 const checkedLvl = jlptSelected.includes(lvl);
@@ -1480,10 +1542,6 @@ export default function BookFlashcardsPage() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-              Chapters + Repeats
-            </div>
-
             <div className="flex flex-col gap-3 sm:flex-row">
               <select
                 value={chapterFilter}
@@ -1642,7 +1700,7 @@ export default function BookFlashcardsPage() {
                           e.stopPropagation();
                           goToNextWord("wrong");
                         }}
-                        className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900"
+                        className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
                       >
                         Next
                       </button>
@@ -1767,7 +1825,7 @@ export default function BookFlashcardsPage() {
                               e.stopPropagation();
                               goToNextWord("wrong");
                             }}
-                            className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900"
+                            className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
                           >
                             Next
                           </button>
@@ -1791,7 +1849,7 @@ export default function BookFlashcardsPage() {
                         e.stopPropagation();
                         goToNextWord("wrong");
                       }}
-                      className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900"
+                      className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
                     >
                       Next
                     </button>
@@ -1811,10 +1869,7 @@ export default function BookFlashcardsPage() {
               <Row
                 label="Meaning"
                 value={card.meaning || "—"}
-                visible={
-                  studySet === "READING" ||
-                  (studySet === "FROM_READING_MEANING" && typeRevealIndex >= steps.length - 1)
-                }
+                visible={showMeaning}
                 placeholder="---"
               />
             </>
@@ -1873,10 +1928,10 @@ export default function BookFlashcardsPage() {
                   if (!card) return;
                   hideCardPermanently(card.id);
                 }}
-                className="w-full rounded-xl border border-slate-700 bg-slate-700 px-3 py-3 text-sm font-medium text-white hover:bg-slate-800 transition"
+                className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-200 transition"
               >
                 <div className="leading-tight">Hide</div>
-                <div className="text-[10px] font-normal text-slate-200">Vocab List</div>
+                <div className="text-[10px] font-normal text-slate-500">Vocab List</div>
               </button>
             </div>
           </div>

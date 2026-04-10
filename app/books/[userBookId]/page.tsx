@@ -610,11 +610,14 @@ export default function BookHubPage() {
 
   const [quickPreview, setQuickPreview] = useState<{
     surface: string;
+    cacheSurface: string; // ✅ ADD THIS
     reading: string;
     meanings: string[];
     selectedMeaningIndex: number;
     meaning: string;
     isCustomMeaning: boolean;
+    useAlternateSurface: boolean;
+    alternateSurface: string;
     page: string;
     chapterNumber: string;
     chapterName: string;
@@ -821,6 +824,7 @@ export default function BookHubPage() {
       setSavedChapterIds((prev) => prev.filter((x) => x !== id));
     }, 1800);
   }
+
 
   function updateSettingItem(id: string, field: keyof SettingItem, value: string) {
     setSettingItems((prev) =>
@@ -2127,11 +2131,14 @@ export default function BookHubPage() {
 
       setQuickPreview({
         surface,
+        cacheSurface: surface,
         reading,
         meanings: meanings.length ? meanings : [""],
         selectedMeaningIndex: 0,
         meaning: meanings.length ? meanings[0] : "",
         isCustomMeaning: false,
+        useAlternateSurface: false,
+        alternateSurface: "",
         page: defaultVocabPage || (furthestPage != null ? String(furthestPage + 1) : ""),
         chapterNumber: defaultChapterNumber,
         chapterName: defaultChapterName,
@@ -2183,14 +2190,22 @@ export default function BookHubPage() {
 
     let vocabularyCacheId: number | null = null;
 
-    const normalizedSurface = quickPreview.surface?.trim() ?? "";
+    const normalizedSurface = (
+      quickPreview.useAlternateSurface
+        ? quickPreview.alternateSurface
+        : quickPreview.surface
+    )?.trim() ?? "";
+    const normalizedCacheSurface =
+      quickPreview.cacheSurface?.trim() || normalizedSurface;
     const normalizedReading = quickPreview.reading?.trim() ?? "";
+    const isManualEntry =
+      quickPreview.isCustomMeaning && quickPreview.meanings.length === 0;
 
-    if (normalizedSurface) {
+    if (normalizedCacheSurface && !isManualEntry) {
       const { data: existingCache, error: cacheLookupError } = await supabase
         .from("vocabulary_cache")
         .select("id")
-        .eq("surface", normalizedSurface)
+        .eq("surface", normalizedCacheSurface)
         .eq("reading", normalizedReading || "")
         .maybeSingle();
 
@@ -2206,7 +2221,7 @@ export default function BookHubPage() {
         const { data: createdCache, error: cacheInsertError } = await supabase
           .from("vocabulary_cache")
           .insert({
-            surface: normalizedSurface,
+            surface: normalizedCacheSurface,
             reading: normalizedReading || "",
           })
           .select("id")

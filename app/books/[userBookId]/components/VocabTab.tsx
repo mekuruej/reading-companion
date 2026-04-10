@@ -19,11 +19,14 @@ type StudyTabProps = {
 
   quickPreview: {
     surface: string;
+    cacheSurface: string;
     reading: string;
     meanings: string[];
     selectedMeaningIndex: number;
     meaning: string;
     isCustomMeaning: boolean;
+    useAlternateSurface: boolean;
+    alternateSurface: string;
     page: string;
     chapterNumber: string;
     chapterName: string;
@@ -31,11 +34,14 @@ type StudyTabProps = {
   setQuickPreview: React.Dispatch<
     React.SetStateAction<{
       surface: string;
+      cacheSurface: string;
       reading: string;
       meanings: string[];
       selectedMeaningIndex: number;
       meaning: string;
       isCustomMeaning: boolean;
+      useAlternateSurface: boolean;
+      alternateSurface: string;
       page: string;
       chapterNumber: string;
       chapterName: string;
@@ -148,11 +154,10 @@ export default function StudyTab({
             <button
               type="button"
               onClick={() => setVocabTab("readAlong")}
-              className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${
-                vocabTab === "readAlong"
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-              }`}
+              className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "readAlong"
+                ? "border-stone-900 bg-stone-900 text-white"
+                : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                }`}
             >
               Single Add
             </button>
@@ -160,21 +165,19 @@ export default function StudyTab({
             <button
               type="button"
               onClick={() => setVocabTab("bulk")}
-              className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${
-                vocabTab === "bulk"
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-              }`}
+              className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${vocabTab === "bulk"
+                ? "border-stone-900 bg-stone-900 text-white"
+                : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                }`}
             >
               Bulk Add
             </button>
 
             <div
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
-                isRunning || isPaused
-                  ? "bg-red-200 text-red-900"
-                  : "bg-yellow-50 text-yellow-700"
-              }`}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${isRunning || isPaused
+                ? "bg-red-200 text-red-900"
+                : "bg-yellow-50 text-yellow-700"
+                }`}
             >
               <span>●</span>
               <span>{isRunning || isPaused ? "Timer is active" : "Timer is not running"}</span>
@@ -187,7 +190,7 @@ export default function StudyTab({
           <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
             <div className="mb-3 text-sm font-medium text-stone-900">Single Add</div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 ref={quickWordInputRef}
                 type="text"
@@ -211,6 +214,28 @@ export default function StudyTab({
               >
                 {quickLoading ? "Searching..." : "Search"}
               </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setQuickPreview({
+                    surface: quickWord.trim(),
+                    cacheSurface: "",
+                    reading: "",
+                    meanings: [],
+                    selectedMeaningIndex: 0,
+                    meaning: "",
+                    isCustomMeaning: true,
+                    useAlternateSurface: false,
+                    alternateSurface: "",
+                    page: "",
+                    chapterNumber: "",
+                    chapterName: "",
+                  })
+                }
+                className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+              >
+                Manual Entry
+              </button>
             </div>
 
             {quickError ? (
@@ -221,12 +246,66 @@ export default function StudyTab({
 
             {quickPreview ? (
               <div className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-                <div>
-                  <div className="text-lg font-semibold text-stone-900">
-                    {quickPreview.surface || "—"}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
+                    <input
+                      value={quickPreview.surface}
+                      onChange={(e) =>
+                        setQuickPreview((prev) =>
+                          prev ? { ...prev, surface: e.target.value } : prev
+                        )
+                      }
+                      placeholder="Word"
+                      className="w-full rounded border px-3 py-2 text-sm"
+                    />
+
+                    <label className="mt-2 flex items-center gap-2 text-sm text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={quickPreview.useAlternateSurface}
+                        onChange={(e) =>
+                          setQuickPreview((prev) =>
+                            prev
+                              ? {
+                                ...prev,
+                                useAlternateSurface: e.target.checked,
+                              }
+                              : prev
+                          )
+                        }
+                      />
+                      <span>Alternate kanji (in this book)</span>
+                    </label>
+
+                    {quickPreview.useAlternateSurface ? (
+                      <input
+                        value={quickPreview.alternateSurface}
+                        onChange={(e) =>
+                          setQuickPreview((prev) =>
+                            prev
+                              ? { ...prev, alternateSurface: e.target.value }
+                              : prev
+                          )
+                        }
+                        placeholder="Book form (e.g. 愉しい)"
+                        className="mt-2 w-full rounded border px-3 py-2 text-sm"
+                      />
+                    ) : null}
                   </div>
-                  <div className="mt-1 text-sm text-stone-500">
-                    {quickPreview.reading || "—"}
+
+                  <div>
+                    <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
+                    <input
+                      value={quickPreview.reading}
+                      onChange={(e) =>
+                        setQuickPreview((prev) =>
+                          prev ? { ...prev, reading: e.target.value } : prev
+                        )
+                      }
+                      placeholder="Reading"
+                      className="w-full rounded border px-3 py-2 text-sm"
+                    />
                   </div>
                 </div>
 
@@ -234,30 +313,36 @@ export default function StudyTab({
                   <div className="mb-2 text-sm font-medium text-stone-700">Meaning</div>
 
                   <div className="space-y-2">
-                    {quickPreview.meanings.map((meaning, index) => (
-                      <label key={index} className="flex items-start gap-2 text-sm text-stone-700">
-                        <input
-                          type="radio"
-                          checked={
-                            !quickPreview.isCustomMeaning &&
-                            quickPreview.selectedMeaningIndex === index
-                          }
-                          onChange={() =>
-                            setQuickPreview((prev) =>
-                              prev
-                                ? {
+                    {quickPreview.meanings.length > 0 ? (
+                      quickPreview.meanings.map((meaning, index) => (
+                        <label key={index} className="flex items-start gap-2 text-sm text-stone-700">
+                          <input
+                            type="radio"
+                            checked={
+                              !quickPreview.isCustomMeaning &&
+                              quickPreview.selectedMeaningIndex === index
+                            }
+                            onChange={() =>
+                              setQuickPreview((prev) =>
+                                prev
+                                  ? {
                                     ...prev,
                                     selectedMeaningIndex: index,
                                     meaning,
                                     isCustomMeaning: false,
                                   }
-                                : prev
-                            )
-                          }
-                        />
-                        <span>{meaning || "—"}</span>
-                      </label>
-                    ))}
+                                  : prev
+                              )
+                            }
+                          />
+                          <span>{meaning || "—"}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-stone-500">
+                        No dictionary meanings loaded. Enter your own meaning below.
+                      </p>
+                    )}
 
                     <textarea
                       value={quickPreview.isCustomMeaning ? quickPreview.meaning : ""}
@@ -265,14 +350,14 @@ export default function StudyTab({
                         setQuickPreview((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                meaning: e.target.value,
-                                isCustomMeaning: true,
-                              }
+                              ...prev,
+                              meaning: e.target.value,
+                              isCustomMeaning: true,
+                            }
                             : prev
                         )
                       }
-                      placeholder="Or type your own meaning"
+                      placeholder="Type your meaning"
                       className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
                     />
                   </div>
@@ -481,6 +566,6 @@ export default function StudyTab({
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 }

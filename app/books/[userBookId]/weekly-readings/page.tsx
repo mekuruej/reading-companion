@@ -360,25 +360,68 @@ export default function WeeklyReadingsPage() {
 
     const correct = card.reading;
     const displayType = card.readingType;
+    const normalizedCorrect = normalizeReading(correct);
 
-    const distractorPool = Array.from(
+    const sameTypePool = Array.from(
       new Set(
         baseCards
           .filter(
             (c) =>
+              c.key !== card.key &&
+              !!c.reading &&
               c.readingType === card.readingType &&
-              normalizeReading(c.reading) !== normalizeReading(correct)
+              normalizeReading(c.reading) !== normalizedCorrect
           )
-          .map((c) => c.reading)
+          .map((c) => c.reading.trim())
+          .filter(Boolean)
       )
     );
 
-    const shuffled = shuffleArray(distractorPool).slice(0, 2);
-
-    return shuffleArray([correct, ...shuffled]).map((r) =>
-      formatReadingForType(r, displayType)
+    const broaderPool = Array.from(
+      new Set(
+        baseCards
+          .filter(
+            (c) =>
+              c.key !== card.key &&
+              !!c.reading &&
+              normalizeReading(c.reading) !== normalizedCorrect
+          )
+          .map((c) => c.reading.trim())
+          .filter(Boolean)
+      )
     );
+
+    const distractors: string[] = [];
+
+    for (const r of shuffleArray(sameTypePool)) {
+      if (!distractors.includes(r)) distractors.push(r);
+      if (distractors.length >= 2) break;
+    }
+
+    if (distractors.length < 2) {
+      for (const r of shuffleArray(broaderPool)) {
+        if (!distractors.includes(r)) distractors.push(r);
+        if (distractors.length >= 2) break;
+      }
+    }
+
+    const finalOptions = shuffleArray([correct, ...distractors])
+      .filter(Boolean)
+      .map((r) => formatReadingForType(r, displayType));
+
+    return finalOptions;
   }, [card, baseCards]);
+
+  useEffect(() => {
+    if (!checked?.ok) return;
+    if (inRecallFlow) return;
+
+    const timer = window.setTimeout(() => {
+      nextCard();
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [checked, inRecallFlow]);
 
   function resetCardState() {
     setSelected(null);
@@ -739,44 +782,50 @@ export default function WeeklyReadingsPage() {
           </div>
 
           <div className="w-full max-w-sm flex flex-col gap-3">
-            {options.map((opt, i) => {
-              const displayedCorrect = formatReadingForType(card.reading, card.readingType);
+            {options.length < 2 ? (
+              <div className="text-sm text-amber-700">
+                Not enough answer choices for this card. Skip to the next one.
+              </div>
+            ) : (
+              options.map((opt, i) => {
+                const displayedCorrect = formatReadingForType(card.reading, card.readingType);
 
-              const isCorrect =
-                !!checked && normalizeReading(opt) === normalizeReading(displayedCorrect);
-              const isChosen =
-                !!selected && normalizeReading(opt) === normalizeReading(selected);
+                const isCorrect =
+                  !!checked && normalizeReading(opt) === normalizeReading(displayedCorrect);
+                const isChosen =
+                  !!selected && normalizeReading(opt) === normalizeReading(selected);
 
-              let className = "w-full px-4 py-3 rounded border text-base ";
+                let className = "w-full px-4 py-3 rounded border text-base ";
 
-              if (!checked) {
-                className += "bg-white hover:bg-gray-50";
-              } else if (isCorrect && isChosen) {
-                className += "bg-green-100 border-green-400";
-              } else if (isCorrect) {
-                className += "bg-green-100 border-green-400";
-              } else if (isChosen) {
-                className += "bg-red-100 border-red-400";
-              } else {
-                className += "bg-white";
-              }
+                if (!checked) {
+                  className += "bg-white hover:bg-gray-50";
+                } else if (isCorrect && isChosen) {
+                  className += "bg-green-100 border-green-400";
+                } else if (isCorrect) {
+                  className += "bg-green-100 border-green-400";
+                } else if (isChosen) {
+                  className += "bg-red-100 border-red-400";
+                } else {
+                  className += "bg-white";
+                }
 
-              return (
-                <button
-                  key={`${opt}-${i}`}
-                  type="button"
-                  disabled={!!checked}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    checkAnswer(opt);
-                  }}
-                  className={className}
-                >
-                  <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                  {opt}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={`${opt}-${i}`}
+                    type="button"
+                    disabled={!!checked}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      checkAnswer(opt);
+                    }}
+                    className={className}
+                  >
+                    <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
+                    {opt}
+                  </button>
+                );
+              })
+            )}
           </div>
 
           {checked ? (
@@ -799,18 +848,6 @@ export default function WeeklyReadingsPage() {
                   <p className="text-red-700">❌ Not quite.</p>
                   <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
 
-                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                    <div className="text-lg font-semibold">{card.sourceWord}</div>
-
-                    {card.sourceReading ? (
-                      <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
-                    ) : null}
-
-                    {card.sourceMeaning ? (
-                      <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
-                    ) : null}
-                  </div>
-
                   {card.readingType === "kunyomi" &&
                     isKunWithOkurigana(card.sourceWord) &&
                     card.baseReading &&
@@ -821,6 +858,20 @@ export default function WeeklyReadingsPage() {
                   ) : null}
                 </>
               )}
+
+              {!inRecallFlow ? (
+                <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
+                  <div className="text-lg font-semibold">{card.sourceWord}</div>
+
+                  {card.sourceReading ? (
+                    <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
+                  ) : null}
+
+                  {card.sourceMeaning ? (
+                    <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {inRecallFlow ? (
                 <div
@@ -963,7 +1014,7 @@ export default function WeeklyReadingsPage() {
                     </>
                   )}
                 </div>
-              ) : (
+              ) : !checked.ok ? (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -974,11 +1025,11 @@ export default function WeeklyReadingsPage() {
                 >
                   Continue
                 </button>
-              )}
+              ) : null}
             </div>
           ) : null}
-        </div>
-      </div>
+        </div >
+      </div >
 
       <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
         Kanji have many possible readings. These readings are for specific words in your reading. Focus on the connection and watch for it when you meet it again. These are not the only fixed readings for the kanji.
@@ -1014,6 +1065,6 @@ export default function WeeklyReadingsPage() {
           </button>
         </div>
       </div>
-    </main>
+    </main >
   );
 }

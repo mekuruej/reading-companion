@@ -24,6 +24,8 @@ type WordRow = {
   meaning_choices: any | null;
   meaning_choice_index: number | null;
   hide_kanji_in_reading_support?: boolean | null;
+  vocabulary_cache_id?: number | null;
+  cache_surface?: string | null; //
 };
 
 type ProfileRole = "teacher" | "student";
@@ -488,9 +490,12 @@ export default function BookWordsPage() {
       hidden,
       meaning_choices,
       meaning_choice_index,
-      hide_kanji_in_reading_support
-    `
-          )
+      hide_kanji_in_reading_support,
+      vocabulary_cache_id,
+      vocabulary_cache: vocabulary_cache_id (
+        surface
+      )
+  `)
           .eq("user_book_id", userBookId)
           .order("chapter_number", { ascending: true, nullsFirst: false })
           .order("page_number", { ascending: true, nullsFirst: false })
@@ -508,7 +513,10 @@ export default function BookWordsPage() {
 
         if (wErr) throw wErr;
 
-        const list = rows ?? [];
+        const list = (rows ?? []).map((w: any) => ({
+          ...w,
+          cache_surface: w.vocabulary_cache?.surface ?? null,
+        }));
         setWords(list);
 
         const optMap = new Map<string, string>();
@@ -649,12 +657,18 @@ export default function BookWordsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Word</span>
+                <span className="text-xs text-gray-600">Word (book form)</span>
                 <input
                   value={editSurface}
                   onChange={(e) => setEditSurface(e.target.value)}
                   className="border p-2 rounded"
                 />
+
+                {editing?.cache_surface && editing.cache_surface !== editSurface ? (
+                  <span className="text-[11px] text-gray-500">
+                    Dictionary form: {editing.cache_surface}
+                  </span>
+                ) : null}
               </label>
 
               <label className="flex flex-col gap-1">

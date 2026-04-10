@@ -388,28 +388,6 @@ export default function ReadAlongPage() {
 
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
-            <div className="pointer-events-none fixed inset-y-0 z-30 hidden w-full xl:flex">
-                <div className="relative mx-auto w-full max-w-[68rem]">
-                    <button
-                        type="button"
-                        onClick={goPrev}
-                        disabled={pageIndex === 0}
-                        className="pointer-events-auto absolute left-0 top-1/2 -translate-x-[calc(100%+12px)] -translate-y-1/2 rounded-2xl border border-stone-300 bg-white/90 px-4 py-3 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                        ← Previous
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={goNext}
-                        disabled={pageIndex === pages.length - 1}
-                        className="pointer-events-auto absolute right-0 top-1/2 translate-x-[calc(100%+12px)] -translate-y-1/2 rounded-2xl border border-stone-300 bg-white/90 px-4 py-3 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                        Next →
-                    </button>
-                </div>
-            </div>
-
             <div className="mx-auto max-w-4xl space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
@@ -626,46 +604,68 @@ export default function ReadAlongPage() {
 
                 <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
                     <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-4">
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div className="text-base font-semibold text-stone-900">
-                                    {currentPage.label}
+                                {currentPage.label}
                                 </div>
                                 <div className="text-xs text-stone-500 sm:text-sm">
-                                    {currentPage.words.length} saved word
-                                    {currentPage.words.length === 1 ? "" : "s"}
+                                {currentPage.words.length} saved word
+                                {currentPage.words.length === 1 ? "" : "s"}
                                 </div>
                             </div>
 
                             <div className="text-center text-xs text-stone-500 sm:text-sm">
-                                Follow saved words in reading order and tap to mark your place.
+                                Tap the words to follow along with the book.
+                            </div>
                             </div>
 
-                            <div className="flex items-center gap-2 sm:justify-end">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                            <button
+                                type="button"
+                                onClick={goPrev}
+                                disabled={pageIndex === 0}
+                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                ← Previous
+                            </button>
+
+                            <div className="flex items-center gap-2">
                                 <input
-                                    type="number"
-                                    min={1}
-                                    value={jumpPageInput}
-                                    onChange={(e) => setJumpPageInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.preventDefault();
-                                            jumpToPage(Number(jumpPageInput));
-                                        }
-                                    }}
-                                    placeholder="Page"
-                                    className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
+                                type="number"
+                                min={1}
+                                value={jumpPageInput}
+                                onChange={(e) => setJumpPageInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    jumpToPage(Number(jumpPageInput));
+                                    }
+                                }}
+                                placeholder="Page"
+                                className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
                                 />
                                 <button
-                                    type="button"
-                                    onClick={() => jumpToPage(Number(jumpPageInput))}
-                                    className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
+                                type="button"
+                                onClick={() => jumpToPage(Number(jumpPageInput))}
+                                className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
                                 >
-                                    Go
+                                Go
                                 </button>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={goNext}
+                                disabled={pageIndex === pages.length - 1}
+                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                Next →
+                            </button>
+                            </div>
                         </div>
-                    </div>
+                        </div>
 
                     <div
                         ref={scrollAreaRef}
@@ -719,32 +719,6 @@ export default function ReadAlongPage() {
                                 })}
                             </div>
                         )}
-                    </div>
-
-                    <div className="sticky bottom-0 z-10 border-t border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 xl:hidden">
-                        <div className="flex items-center justify-between gap-3">
-                            <button
-                                type="button"
-                                onClick={goPrev}
-                                disabled={pageIndex === 0}
-                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                ← Previous
-                            </button>
-
-                            <div className="text-center text-xs text-stone-500 sm:text-sm">
-                                {currentPage.label}
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={goNext}
-                                disabled={pageIndex === pages.length - 1}
-                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                Next →
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
