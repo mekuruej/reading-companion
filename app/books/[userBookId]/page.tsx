@@ -1,4 +1,5 @@
-// Book Hub
+// Single Book Hub
+//
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -75,6 +76,7 @@ type ReadingSession = {
   start_page: number;
   end_page: number;
   minutes_read: number | null;
+  is_filler: boolean;
   created_at: string;
 };
 
@@ -548,10 +550,15 @@ export default function BookHubPage() {
     const today = new Date().toISOString().slice(0, 10);
     setSessionDate(today);
   }, []);
-  const daysRead = useMemo(() => {
-    if (!readingSessions.length) return null;
-    return new Set(readingSessions.map((s) => s.read_on)).size;
+
+  const realReadingSessions = useMemo(() => {
+    return readingSessions.filter((s) => !s.is_filler);
   }, [readingSessions]);
+
+  const daysRead = useMemo(() => {
+    if (!realReadingSessions.length) return null;
+    return new Set(realReadingSessions.map((s) => s.read_on)).size;
+  }, [realReadingSessions]);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [bookOptions, setBookOptions] = useState<
@@ -664,25 +671,23 @@ export default function BookHubPage() {
   const [progressMode, setProgressMode] = useState<string>("");
   const [showPageNumbers, setShowPageNumbers] = useState(true);
 
-  const totalPagesRead = useMemo(
-    () => readingSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0),
-    [readingSessions]
-  );
+  const totalPagesRead = useMemo(() => {
+    return realReadingSessions.reduce((sum, s) => {
+      return sum + (s.end_page - s.start_page + 1);
+    }, 0);
+  }, [realReadingSessions]);
 
-  const timedSessions = useMemo(
-    () => readingSessions.filter((s) => s.minutes_read != null),
-    [readingSessions]
-  );
+  const timedSessions = useMemo(() => {
+    return realReadingSessions.filter((s) => s.minutes_read != null);
+  }, [realReadingSessions]);
 
-  const totalTimedMinutes = useMemo(
-    () => timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0),
-    [timedSessions]
-  );
+  const totalTimedMinutes = useMemo(() => {
+    return timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  }, [timedSessions]);
 
-  const totalTimedPages = useMemo(
-    () => timedSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0),
-    [timedSessions]
-  );
+  const totalTimedPages = useMemo(() => {
+    return timedSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
+  }, [timedSessions]);
 
   const averageMinutesPerPage = useMemo(() => {
     if (!totalTimedPages) return null;
@@ -715,9 +720,9 @@ export default function BookHubPage() {
   }, [book?.page_count, furthestPage, finished]);
 
   const lastReadDate = useMemo(() => {
-    if (readingSessions.length === 0) return null;
-    return readingSessions[0]?.read_on ?? null;
-  }, [readingSessions]);
+    if (realReadingSessions.length === 0) return null;
+    return realReadingSessions[0]?.read_on ?? null;
+  }, [realReadingSessions]);
 
   const visibleReadingSessions = useMemo(() => {
     return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
@@ -964,7 +969,7 @@ export default function BookHubPage() {
   async function loadReadingSessions(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, created_at")
+      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at")
       .eq("user_book_id", userBookIdValue)
       .order("read_on", { ascending: false })
       .order("created_at", { ascending: false });
@@ -1302,6 +1307,7 @@ export default function BookHubPage() {
         start_page: 1,
         end_page: earliestStartPage - 1,
         minutes_read: null,
+        is_filler: true,
       });
 
     if (error) {
@@ -1324,6 +1330,7 @@ export default function BookHubPage() {
         start_page: furthestPage + 1,
         end_page: book.page_count,
         minutes_read: null,
+        is_filler: true,
       });
 
     if (error) {
@@ -1624,6 +1631,31 @@ export default function BookHubPage() {
     }));
   }
 
+  function markStartedToday() {
+    const today = new Date().toISOString().slice(0, 10);
+    setStartedAt(today);
+    setFinishedAt("");
+    setDnfAt("");
+  }
+
+  function markFinishedToday() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!startedAt) {
+      setStartedAt(today);
+    }
+    setFinishedAt(today);
+    setDnfAt("");
+  }
+
+  function markDnfToday() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!startedAt) {
+      setStartedAt(today);
+    }
+    setDnfAt(today);
+    setFinishedAt("");
+  }
+
   async function saveReadingSession() {
     if (!row?.id) return;
 
@@ -1682,25 +1714,37 @@ export default function BookHubPage() {
 
     const existingStartedAt = row.started_at ? row.started_at.slice(0, 10) : null;
 
-    if (!existingStartedAt || sessionDate < existingStartedAt) {
-      const { error: startErr } = await supabase
-        .from("user_books")
-        .update({ started_at: sessionDate })
-        .eq("id", row.id);
+    const nextStartedAt =
+      !existingStartedAt || sessionDate < existingStartedAt
+        ? sessionDate
+        : existingStartedAt;
 
-      if (startErr) {
-        console.error("Error setting started_at from reading session:", startErr);
-      } else {
-        setStartedAt(sessionDate);
-        setRow((prev) =>
-          prev
-            ? {
-              ...prev,
-              started_at: sessionDate,
-            }
-            : prev
-        );
-      }
+    const { error: startErr } = await supabase
+      .from("user_books")
+      .update({
+        status: "reading",
+        started_at: nextStartedAt,
+        finished_at: null,
+        dnf_at: null,
+      })
+      .eq("id", row.id);
+
+    if (startErr) {
+      console.error("Error updating user_books from reading session:", startErr);
+    } else {
+      setStartedAt(nextStartedAt);
+      setFinishedAt("");
+      setDnfAt("");
+      setRow((prev) =>
+        prev
+          ? {
+            ...prev,
+            started_at: nextStartedAt,
+            finished_at: null,
+            dnf_at: null,
+          }
+          : prev
+      );
     }
 
     setReadingSessions((prev) =>
@@ -2028,6 +2072,12 @@ export default function BookHubPage() {
     const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
     const dnf_at = dnfAt.trim() ? dnfAt.trim() : null;
 
+    const status =
+      dnf_at ? "did_not_finish" :
+        finished_at ? "finished" :
+          started_at ? "reading" :
+            "what_to_read";
+
     const pc = pageCount.trim() ? Number(pageCount.trim()) : null;
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
 
@@ -2039,6 +2089,7 @@ export default function BookHubPage() {
     const userBooksUpdate = supabase
       .from("user_books")
       .update({
+        status,
         started_at,
         finished_at,
         dnf_at,
@@ -2499,7 +2550,7 @@ export default function BookHubPage() {
                       {finished
                         ? "100%"
                         : readingSessions.length > 0 && progressPercent != null && furthestPage != null
-                          ? `${progressPercent}% · page ${furthestPage}`
+                          ? `${progressPercent}% · On page ${furthestPage}`
                           : started
                             ? "In progress"
                             : "Not started"}
@@ -2531,22 +2582,28 @@ export default function BookHubPage() {
                   <div className="rounded-xl border bg-white p-3 text-center">
                     <div className="text-xs text-stone-500">Pages Read</div>
                     <div className="mt-1 font-medium">{totalPagesRead || "—"}</div>
+                    <div className="mt-1 text-[10px] text-stone-400">
+                      Logged sessions only (first reads + rereads)
+                    </div>
                   </div>
 
                   <div className="rounded-xl border bg-white p-3 text-center">
                     <div className="text-xs text-stone-500">Days Read</div>
                     <div className="mt-1 font-medium">{daysRead != null ? daysRead : "—"}</div>
+                    <div className="mt-1 text-[10px] text-stone-400">
+                      Logged dates only
+                    </div>
                   </div>
 
                   <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Words Looked Up</div>
+                    <div className="text-xs text-stone-500">Words Saved</div>
                     <div className="mt-1 font-medium">
                       {uniqueLookupCount != null ? uniqueLookupCount : "—"}
                     </div>
                   </div>
 
                   <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Time Read</div>
+                    <div className="text-xs text-stone-500">Logged Time Read</div>
                     <div className="mt-1 font-medium">{formatMinutes(totalTimedMinutes)}</div>
                   </div>
 
@@ -2560,7 +2617,9 @@ export default function BookHubPage() {
                   <div className="rounded-xl border bg-white p-3 text-center">
                     <div className="text-xs text-stone-500">Avg Pages/Session</div>
                     <div className="mt-1 font-medium">
-                      {readingSessions.length > 0 ? (totalPagesRead / readingSessions.length).toFixed(1) : "—"}
+                      {realReadingSessions.length > 0
+                        ? (totalPagesRead / realReadingSessions.length).toFixed(1)
+                        : "—"}
                     </div>
                   </div>
                 </div>
@@ -3088,6 +3147,9 @@ export default function BookHubPage() {
                 row={row}
                 book={book}
                 isEditingThisTab={isEditingThisTab}
+                markStartedToday={markStartedToday}
+                markFinishedToday={markFinishedToday}
+                markDnfToday={markDnfToday}
                 formatType={formatType}
                 setFormatType={setFormatType}
                 progressMode={progressMode}

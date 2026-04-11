@@ -131,7 +131,10 @@ export default function WordHistorySearchPage() {
       if (savedError) throw savedError;
 
       if (savedRows && savedRows.length > 0) {
-        router.push(`/vocab/history?word=${encodeURIComponent(q)}`);
+        router.push(
+          `/vocab/history?word=${encodeURIComponent(q)}${userBookId ? `&userBookId=${encodeURIComponent(userBookId)}` : ""
+          }`
+        );
         return;
       }
 

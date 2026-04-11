@@ -1,5 +1,3 @@
-import type { ComponentType } from "react";
-
 type UserBook = {
   my_review: string | null;
   rating_overall: number | null;

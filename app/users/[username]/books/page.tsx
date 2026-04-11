@@ -1501,7 +1501,7 @@ export default function BooksPage() {
                       ? Math.round(monthlyStats.avgWordsSavedPerFinishedBook)
                       : "—"}
                 </div>
-                <div className="mt-1 text-[10px] text-slate-500">Finished books this month</div>
+                <div className="mt-1 text-[10px] text-slate-500">From your finished books this month</div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">

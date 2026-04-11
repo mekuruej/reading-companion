@@ -29,6 +29,10 @@ type ReadingTabProps = {
   book: Book;
   isEditingThisTab: boolean;
 
+  markStartedToday: () => void;
+  markFinishedToday: () => void;
+  markDnfToday: () => void;
+
   formatType: string;
   setFormatType: (value: string) => void;
   progressMode: string;
@@ -87,6 +91,10 @@ export default function ReadingTab({
   book,
   isEditingThisTab,
 
+  markStartedToday,
+  markFinishedToday,
+  markDnfToday,
+
   formatType,
   setFormatType,
   progressMode,
@@ -141,24 +149,24 @@ export default function ReadingTab({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            onClick={markStartedToday}
             className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-            disabled
           >
             Start Today
           </button>
 
           <button
             type="button"
+            onClick={markFinishedToday}
             className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-            disabled
           >
             Mark Finished
           </button>
 
           <button
             type="button"
+            onClick={markDnfToday}
             className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-            disabled
           >
             Mark DNF
           </button>
@@ -190,13 +198,20 @@ export default function ReadingTab({
 
         {canFillBeginningPages && earliestStartPage != null ? (
           <div className="mt-2 text-xs text-stone-500">
-            Looks like you started the book on page {earliestStartPage}. Fill pages 1–{earliestStartPage - 1}?
+            Looks like you started logging the book on page {earliestStartPage}. Fill pages 1–{earliestStartPage - 1}?
+            <p className="mt-2 text-xs text-stone-500">
+              This will not affect your stats.
+            </p>
           </div>
+
         ) : null}
 
         {canFillEndingPages && furthestPage != null ? (
           <div className="mt-2 text-xs text-stone-500">
-            Looks like your story ends on page {furthestPage}. Fill pages {furthestPage + 1}–{book.page_count}?
+            Looks like your story ended on page {furthestPage}. Fill pages {furthestPage + 1}–{book.page_count}?
+            <p className="mt-2 text-xs text-stone-500">
+              This will not affect your stats.
+            </p>
           </div>
         ) : null}
       </div>

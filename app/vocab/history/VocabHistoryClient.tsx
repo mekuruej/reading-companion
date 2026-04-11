@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -60,7 +60,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch {}
+    } catch { }
   }
 
   return [];
@@ -120,10 +120,8 @@ export default function VocabHistoryClient() {
   const [kanjiGroups, setKanjiGroups] = useState<KanjiGroup[]>([]);
   const [extraLoading, setExtraLoading] = useState(false);
 
-  const uniqueBookCount = useMemo(
-    () => new Set(seenInstances.map((x) => x.user_book_id)).size,
-    [seenInstances]
-  );
+  const uniqueBookCount = new Set(seenInstances.map((x) => x.user_book_id)).size;
+  ;
 
   useEffect(() => {
     if (!initialWord) return;
@@ -400,7 +398,7 @@ export default function VocabHistoryClient() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-6 pb-10 pt-30">
+    <main className="mx-auto min-h-screen max-w-6xl px-6 pb-10 pt-15">
       <h1 className="mb-1 text-2xl font-semibold">Word History</h1>
       <p className="mb-4 text-sm text-stone-500">
         Search your library to see where a word appeared and how it was used.
