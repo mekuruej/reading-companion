@@ -32,15 +32,22 @@ function getBookTitle(
 
 export default function Header() {
   const [showVocabMenu, setShowVocabMenu] = useState(false);
+  const [showBookHubMenu, setShowBookHubMenu] = useState(false);
   const [books, setBooks] = useState<HeaderBook[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const bookHubMenuRef = useRef<HTMLDivElement | null>(null);
+  const vocabMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (bookHubMenuRef.current && !bookHubMenuRef.current.contains(target)) {
+        setShowBookHubMenu(false);
+      }
+
+      if (vocabMenuRef.current && !vocabMenuRef.current.contains(target)) {
         setShowVocabMenu(false);
       }
     }
@@ -175,130 +182,152 @@ export default function Header() {
                 Library
               </Link>
 
-              <Link
-                href="/book-hubs"
-                className="text-stone-700 transition hover:text-stone-900"
-              >
-                Book Hubs
-              </Link>
+              <>
+                <Link
+                  href="/book-hubs"
+                  className="text-stone-700 transition hover:text-stone-900 md:hidden"
+                >
+                  Book Hubs
+                </Link>
+
+                <div className="relative hidden md:block" ref={bookHubMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBookHubMenu((prev) => !prev);
+                      setShowVocabMenu(false);
+                    }}
+                    className="text-stone-700 transition hover:text-stone-900"
+                  >
+                    Book Hubs
+                  </button>
+
+                  {showBookHubMenu ? (
+                    <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                      <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500">
+                        Book Hubs
+                      </div>
+
+                      {loadingBooks ? (
+                        <div className="px-2 py-2 text-sm text-stone-500">
+                          Loading...
+                        </div>
+                      ) : hasReadingBooks ? (
+                        <div className="mb-2">
+                          <div className="px-3 py-1 text-xs text-stone-400">
+                            Currently Reading
+                          </div>
+
+                          {quickReadingBooks.slice(0, 5).map((book) => {
+                            const title = getBookTitle(book.books);
+
+                            return (
+                              <Link
+                                key={book.id}
+                                href={`/books/${encodeURIComponent(book.id)}`}
+                                className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                                onClick={() => setShowBookHubMenu(false)}
+                              >
+                                {title || "Untitled Book"}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="px-2 py-2 text-sm text-stone-500">
+                          No active books
+                        </div>
+                      )}
+
+                      <div className="border-t border-stone-200 pt-2">
+                        <Link
+                          href="/book-hubs"
+                          className="block rounded-xl px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                          onClick={() => setShowBookHubMenu(false)}
+                        >
+                          All Book Hubs
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </>
             </div>
 
             {/* Row 2 — Words */}
             <div className="flex w-full items-center justify-center gap-4 md:w-auto md:justify-end">
-              <div className="relative" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowVocabMenu((prev) => !prev)}
-                  className="text-stone-700 transition hover:text-stone-900"
+              <>
+                {/* Mobile / tablet: simple link */}
+                <Link
+                  href="/vocab"
+                  className="text-stone-700 transition hover:text-stone-900 md:hidden"
                 >
                   Vocab Lists
-                </button>
+                </Link>
 
-                {showVocabMenu ? (
-                  <div className="absolute left-1/2 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:left-auto md:right-0 md:w-72 md:translate-x-0">
-                    <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500">
-                      Jump to Vocab List
-                    </div>
+                {/* Desktop: dropdown */}
+                <div className="relative hidden md:block" ref={vocabMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowVocabMenu((prev) => !prev);
+                      setShowBookHubMenu(false);
+                    }}
+                    className="text-stone-700 transition hover:text-stone-900"
+                  >
+                    Vocab Lists
+                  </button>
 
-                    {loadingBooks ? (
-                      <div className="px-2 py-2 text-sm text-stone-500">
-                        Loading books...
+                  {showVocabMenu ? (
+                    <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                      <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500">
+                        Vocab Lists
                       </div>
-                    ) : books.length === 0 ? (
-                      <div className="px-2 py-2 text-sm text-stone-500">
-                        No books yet.
-                      </div>
-                    ) : (
-                      <div className="max-h-80 overflow-y-auto">
-                        {hasReadingBooks ? (
-                          <div className="mb-2">
-                            <div className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-stone-400">
-                              Currently Reading
-                            </div>
 
-                            {quickReadingBooks.map((book) => {
-                              const title = getBookTitle(book.books);
-
-                              return (
-                                <Link
-                                  key={book.id}
-                                  href={`/books/${encodeURIComponent(book.id)}/words`}
-                                  className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
-                                  onClick={() => setShowVocabMenu(false)}
-                                >
-                                  <div className="font-medium text-stone-900">
-                                    {title || "Untitled Book"}
-                                  </div>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-
-                        {hasFinishedBooks ? (
-                          <div className="mb-2">
-                            <div className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-stone-400">
-                              Recently Finished
-                            </div>
-
-                            {quickFinishedBooks.map((book) => {
-                              const title = getBookTitle(book.books);
-
-                              return (
-                                <Link
-                                  key={book.id}
-                                  href={`/books/${encodeURIComponent(book.id)}/words`}
-                                  className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
-                                  onClick={() => setShowVocabMenu(false)}
-                                >
-                                  <div className="font-medium text-stone-900">
-                                    {title || "Untitled Book"}
-                                  </div>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-
-                        {hasDnfBooks ? (
-                          <div className="mb-2">
-                            <div className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-stone-400">
-                              DNF
-                            </div>
-
-                            {quickDnfBooks.map((book) => {
-                              const title = getBookTitle(book.books);
-
-                              return (
-                                <Link
-                                  key={book.id}
-                                  href={`/books/${encodeURIComponent(book.id)}/words`}
-                                  className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
-                                  onClick={() => setShowVocabMenu(false)}
-                                >
-                                  <div className="font-medium text-stone-900">
-                                    {title || "Untitled Book"}
-                                  </div>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-1 border-t border-stone-200 pt-2">
-                          <Link
-                            href="/vocab"
-                            className="block rounded-xl px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                            onClick={() => setShowVocabMenu(false)}
-                          >
-                            All Vocab Lists
-                          </Link>
+                      {loadingBooks ? (
+                        <div className="px-2 py-2 text-sm text-stone-500">
+                          Loading...
                         </div>
+                      ) : hasReadingBooks ? (
+                        <div className="mb-2">
+                          <div className="px-3 py-1 text-xs text-stone-400">
+                            Currently Reading
+                          </div>
+
+                          {quickReadingBooks.slice(0, 5).map((book) => {
+                            const title = getBookTitle(book.books);
+
+                            return (
+                              <Link
+                                key={book.id}
+                                href={`/books/${encodeURIComponent(book.id)}/words`}
+                                className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                                onClick={() => setShowVocabMenu(false)}
+                              >
+                                {title || "Untitled Book"}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="px-2 py-2 text-sm text-stone-500">
+                          No active books
+                        </div>
+                      )}
+
+                      <div className="border-t border-stone-200 pt-2">
+                        <Link
+                          href="/vocab"
+                          className="block rounded-xl px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                          onClick={() => setShowVocabMenu(false)}
+                        >
+                          All Vocab Lists
+                        </Link>
                       </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
+                    </div>
+                  ) : null}
+                </div>
+              </>
 
               <Link
                 href="/vocab/history"

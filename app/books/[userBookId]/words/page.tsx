@@ -1,4 +1,5 @@
-// Vocab Hub
+// Vocab List
+//
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -803,20 +804,24 @@ export default function BookWordsPage() {
       </div>
 
       <div ref={stickyControlsRef} className="sticky top-0 z-30 bg-white border-b border-gray-200">
-        <div className="flex items-start gap-3 py-3">
-          {bookCover ? (
-            <img src={bookCover} alt="" className="w-12 h-16 rounded object-cover shrink-0" />
-          ) : null}
+        <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start">
+          <div className="flex min-w-0 items-start gap-3">
+            {bookCover ? (
+              <img src={bookCover} alt="" className="h-16 w-12 shrink-0 rounded object-cover" />
+            ) : null}
 
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-semibold">{bookTitle || "Words"}</h1>
-            <p className="text-sm text-gray-500">
-              Total: {words.length} • Showing: {filteredSorted.length}
-            </p>
+            <div className="min-w-0 flex-1">
+              <h1 className="break-words text-2xl font-semibold leading-tight">
+                {bookTitle || "Words"}
+              </h1>
+              <p className="text-sm text-gray-500">
+                Total: {words.length} • Showing: {filteredSorted.length}
+              </p>
+            </div>
           </div>
 
-          <div className="flex gap-2 flex-wrap items-center justify-end">
-            <label className="flex items-center gap-2 text-sm px-3 py-2 border rounded bg-white whitespace-nowrap">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <label className="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
               <input
                 type="checkbox"
                 checked={showHidden}
@@ -824,9 +829,10 @@ export default function BookWordsPage() {
               />
               Hidden Words Only
             </label>
+
             <button
               onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-              className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
+              className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-800 sm:w-auto"
             >
               Book Hub
             </button>
