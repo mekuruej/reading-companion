@@ -466,7 +466,7 @@ export default function ReadAlongPage() {
                 <div>
                     <h1 className="text-2xl font-semibold text-stone-900">Fluid Reading</h1>
                     <p className="mt-1 text-sm text-stone-600">
-                        Review with your saved words or simply time your fluid reading.
+                        Use this for a quicker, smoother reading experience while you read along with your saved words or simply time your fluid reading.
                     </p>
                 </div>
 

@@ -78,6 +78,7 @@ type ReadingSession = {
   minutes_read: number | null;
   is_filler: boolean;
   created_at: string;
+  session_mode: string | null;
 };
 
 type HubTab = "bookInfo" | "teacher" | "study" | "reading" | "story" | "rating";
@@ -592,28 +593,13 @@ export default function BookHubPage() {
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
-  const quickWordInputRef = useRef<HTMLInputElement>(null);
+
 
   const [showWordExplorer, setShowWordExplorer] = useState(false);
   const [wordExplorerQuery, setWordExplorerQuery] = useState("");
   const [wordExplorerLoading, setWordExplorerLoading] = useState(false);
   const [wordExplorerError, setWordExplorerError] = useState<string | null>(null);
   const [wordExplorerResults, setWordExplorerResults] = useState<any[]>([]);
-
-  const kanjiReadingMemoryRef = useRef<
-    Record<
-      string,
-      Partial<
-        Record<
-          "on" | "kun" | "other",
-          {
-            base: string | null;
-            realized: string | null;
-          }
-        >
-      >
-    >
-  >({});
 
   const [quickPreview, setQuickPreview] = useState<{
     surface: string;
@@ -657,6 +643,26 @@ export default function BookHubPage() {
   const [defaultChapterNumber, setDefaultChapterNumber] = useState("");
   const [defaultChapterName, setDefaultChapterName] = useState("");
 
+  const [formatType, setFormatType] = useState<string>("");
+  const [progressMode, setProgressMode] = useState<string>("");
+  const [showPageNumbers, setShowPageNumbers] = useState(true);
+
+  const quickWordInputRef = useRef<HTMLInputElement>(null);
+  const kanjiReadingMemoryRef = useRef<
+    Record<
+      string,
+      Partial<
+        Record<
+          "on" | "kun" | "other",
+          {
+            base: string | null;
+            realized: string | null;
+          }
+        >
+      >
+    >
+  >({});
+
   const isEditingThisTab = editingTab === activeTab;
   const canEditThisTab =
     activeTab === "bookInfo"
@@ -666,10 +672,6 @@ export default function BookHubPage() {
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
   const book = row?.books ?? null;
-
-  const [formatType, setFormatType] = useState<string>("");
-  const [progressMode, setProgressMode] = useState<string>("");
-  const [showPageNumbers, setShowPageNumbers] = useState(true);
 
   const totalPagesRead = useMemo(() => {
     return realReadingSessions.reduce((sum, s) => {
@@ -969,7 +971,7 @@ export default function BookHubPage() {
   async function loadReadingSessions(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at")
+      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode")
       .eq("user_book_id", userBookIdValue)
       .order("read_on", { ascending: false })
       .order("created_at", { ascending: false });
@@ -2354,6 +2356,15 @@ export default function BookHubPage() {
     quickWordInputRef.current?.focus();
   }
 
+  function StatBox({ label, value }: { label: string; value: string | number }) {
+    return (
+      <div className="rounded-xl border bg-white p-3 text-center">
+        <div className="text-xs text-stone-500">{label}</div>
+        <div className="mt-1 font-medium text-stone-900">{value}</div>
+      </div>
+    );
+  }
+
   function startEditingQuickSessionWord(item: {
     id: string;
     surface: string;
@@ -2420,6 +2431,40 @@ export default function BookHubPage() {
     }
   }
 
+  const curiositySessions = useMemo(() => {
+    return realReadingSessions.filter((s: any) => s.session_mode === "curiosity");
+  }, [realReadingSessions]);
+
+  const fluidSessions = useMemo(() => {
+    return realReadingSessions.filter((s: any) => s.session_mode === "fluid");
+  }, [realReadingSessions]);
+
+  const curiosityMinutes = useMemo(() => {
+    return curiositySessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  }, [curiositySessions]);
+
+  const fluidMinutes = useMemo(() => {
+    return fluidSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  }, [fluidSessions]);
+
+  const curiosityPages = useMemo(() => {
+    return curiositySessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
+  }, [curiositySessions]);
+
+  const fluidPages = useMemo(() => {
+    return fluidSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
+  }, [fluidSessions]);
+
+  const curiosityMinPerPage = useMemo(() => {
+    if (!curiosityPages) return null;
+    return curiosityMinutes / curiosityPages;
+  }, [curiosityMinutes, curiosityPages]);
+
+  const fluidMinPerPage = useMemo(() => {
+    if (!fluidPages) return null;
+    return fluidMinutes / fluidPages;
+  }, [fluidMinutes, fluidPages]);
+
   if (loading) {
     return (
       <main className="p-6">
@@ -2451,265 +2496,282 @@ export default function BookHubPage() {
     <main className="min-h-screen bg-stone-50 p-6">
       <div className="mx-auto max-w-6xl">
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-6 p-5 md:flex-row md:items-start md:gap-8 md:p-8">
-            <div className="w-[140px] shrink-0 md:w-[150px]">
-              {(isEditingThisTab ? coverUrl : book.cover_url) ? (
-                <img
-                  src={isEditingThisTab ? coverUrl : (book.cover_url ?? "")}
-                  alt={`${book.title} cover`}
-                  className="w-full rounded-2xl border border-stone-200 object-cover shadow-sm"
-                />
-              ) : (
-                <div className="flex aspect-[2/3] w-full items-center justify-center rounded-2xl border border-stone-200 bg-stone-100 text-sm text-stone-400">
-                  No cover
+          <div className="p-5 md:p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+              <div className="w-[140px] shrink-0 md:w-[150px]">
+                {(isEditingThisTab ? coverUrl : book.cover_url) ? (
+                  <img
+                    src={isEditingThisTab ? coverUrl : (book.cover_url ?? "")}
+                    alt={`${book.title} cover`}
+                    className="w-full rounded-2xl border border-stone-200 object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="flex aspect-[2/3] w-full items-center justify-center rounded-2xl border border-stone-200 bg-stone-100 text-sm text-stone-400">
+                    No cover
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="space-y-3">
+                  <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
+                      {book.title}
+                    </h1>
+
+                    {book.title_reading ? (
+                      <div className="mt-1 text-lg text-stone-500 md:text-xl">
+                        {book.title_reading}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {book.author && (
+                    <div>
+                      <div className="text-xl font-semibold text-stone-900 md:text-2xl">
+                        {book.author}
+                      </div>
+
+                      {book.author_reading ? (
+                        <div className="mt-1 text-base text-stone-500 md:text-lg">
+                          {book.author_reading}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {book.translator && (
+                    <div>
+                      <div className="text-base font-medium text-stone-700 md:text-lg">
+                        Translated by {book.translator}
+                      </div>
+
+                      {book.translator_reading ? (
+                        <div className="mt-1 text-sm text-stone-500 md:text-base">
+                          {book.translator_reading}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                <div className="mt-4 max-w-sm">
+                  <div className="mb-1 text-xs uppercase tracking-wide text-stone-500">
+                    Switch Book
+                  </div>
+
+                  <select
+                    value={userBookId ?? ""}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      if (!newId) return;
+
+                      if (newId === "all-book-hubs") {
+                        router.push("/books");
+                        return;
+                      }
+
+                      if (newId === userBookId) return;
+                      router.push(`/books/${newId}`);
+                    }}
+                    className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700"
+                  >
+                    <option value="all-book-hubs">All Book Hubs</option>
+
+                    {currentlyReadingBooks.length > 0 && (
+                      <optgroup label="Currently Reading">
+                        {currentlyReadingBooks.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {otherBooks.length > 0 && (
+                      <optgroup label="All Books">
+                        {otherBooks.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+              </div>
             </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="space-y-3">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
-                    {book.title}
-                  </h1>
-
-                  {book.title_reading ? (
-                    <div className="mt-1 text-lg text-stone-500 md:text-xl">
-                      {book.title_reading}
-                    </div>
-                  ) : null}
+            <div className="mt-6 space-y-4">
+              <div>
+                <div className="mb-2 text-sm text-stone-700">
+                  <div className="font-medium">Progress</div>
+                  <div className="mt-1 text-stone-500">
+                    {finished
+                      ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · 100%`
+                      : readingSessions.length > 0 && progressPercent != null && furthestPage != null
+                        ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · ${progressPercent}% · On page ${furthestPage}`
+                        : started
+                          ? "In progress"
+                          : "Not started"}
+                  </div>
                 </div>
 
-                {book.author && (
-                  <div>
-                    <div className="text-xl font-semibold text-stone-900 md:text-2xl">
-                      {book.author}
-                    </div>
-
-                    {book.author_reading ? (
-                      <div className="mt-1 text-base text-stone-500 md:text-lg">
-                        {book.author_reading}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-
-                {book.translator && (
-                  <div>
-                    <div className="text-base font-medium text-stone-700 md:text-lg">
-                      Translated by {book.translator}
-                    </div>
-
-                    {book.translator_reading ? (
-                      <div className="mt-1 text-sm text-stone-500 md:text-base">
-                        {book.translator_reading}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
+                <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
+                  <div
+                    className="h-full rounded-full bg-stone-700 transition-all"
+                    style={{
+                      width:
+                        progressPercent != null
+                          ? `${progressPercent}%`
+                          : finished
+                            ? "100%"
+                            : started
+                              ? "8%"
+                              : "0%",
+                    }}
+                  />
+                </div>
               </div>
 
-              <div className="mt-4 max-w-sm">
-                <div className="mb-1 text-xs uppercase tracking-wide text-stone-500">
-                  Switch Book
+              <p className="mt-2 mb-4 text-xs text-stone-500">
+                Last read: {lastReadDate ?? "—"}
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Days Read</div>
+                  <div className="mt-1 font-medium">{daysRead != null ? daysRead : "—"}</div>
+                  <div className="mt-1 text-[10px] text-stone-400">
+                    Logged dates only
+                  </div>
                 </div>
 
-                <select
-                  value={userBookId ?? ""}
-                  onChange={(e) => {
-                    const newId = e.target.value;
-                    if (!newId || newId === userBookId) return;
-                    router.push(`/books/${newId}`);
-                  }}
-                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700"
-                >
-                  {currentlyReadingBooks.length > 0 && (
-                    <optgroup label="Currently Reading">
-                      {currentlyReadingBooks.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.title}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Pages Read</div>
+                  <div className="mt-1 font-medium">{totalPagesRead || "—"}</div>
+                  <div className="mt-1 text-[10px] text-stone-400">
+                    Logged sessions only
+                  </div>
+                </div>
 
-                  {otherBooks.length > 0 && (
-                    <optgroup label="All Books">
-                      {otherBooks.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.title}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Avg Pages/Session</div>
+                  <div className="mt-1 font-medium">
+                    {realReadingSessions.length > 0
+                      ? (totalPagesRead / realReadingSessions.length).toFixed(1)
+                      : "—"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Total Time Read</div>
+                  <div className="mt-1 font-medium">{formatMinutes(totalTimedMinutes)}</div>
+                </div>
+
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Curiosity Time</div>
+                  <div className="mt-1 font-medium">{formatMinutes(curiosityMinutes)}</div>
+                </div>
+
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Curiosity Min/Page</div>
+                  <div className="mt-1 font-medium">
+                    {curiosityMinPerPage != null ? curiosityMinPerPage.toFixed(2) : "—"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Fluid Time</div>
+                  <div className="mt-1 font-medium">{formatMinutes(fluidMinutes)}</div>
+                </div>
+
+                <div className="rounded-xl border bg-white p-3 text-center">
+                  <div className="text-xs text-stone-500">Fluid Min/Page</div>
+                  <div className="mt-1 font-medium">
+                    {fluidMinPerPage != null ? fluidMinPerPage.toFixed(2) : "—"}
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-6 space-y-4">
-                <div>
-                  <div className="mb-2 text-sm text-stone-700">
-                    <div className="font-medium">Progress</div>
-                    <div className="mt-1 text-stone-500">
-                      {finished
-                        ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · 100%`
-                        : readingSessions.length > 0 && progressPercent != null && furthestPage != null
-                          ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · ${progressPercent}% · On page ${furthestPage}`
-                          : started
-                            ? "In progress"
-                            : "Not started"}
-                    </div>
-                  </div>
-
-                  <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
-                    <div
-                      className="h-full rounded-full bg-stone-700 transition-all"
-                      style={{
-                        width:
-                          progressPercent != null
-                            ? `${progressPercent}%`
-                            : finished
-                              ? "100%"
-                              : started
-                                ? "8%"
-                                : "0%",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <p className="mt-2 mb-4 text-xs text-stone-500">
-                  Last read: {lastReadDate ?? "—"}
+              <div className="mb-3 text-center">
+                <h2 className="text-base font-semibold text-stone-900 sm:text-lg">
+                  What do you want to do with your book today?
+                </h2>
+                <p className="mt-1 text-sm text-stone-500">
+                  Choose how you want to read, review, or study.
                 </p>
+              </div>
 
-                <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-                  <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Pages Read</div>
-                    <div className="mt-1 font-medium">{totalPagesRead || "—"}</div>
-                    <div className="mt-1 text-[10px] text-stone-400">
-                      Logged sessions only (first reads + rereads)
+              {error ? (
+                <div className="border-t border-stone-200 px-5 py-3 text-sm text-red-600 md:px-8">
+                  {error}
+                </div>
+              ) : null}
+
+              <div className="pb-2">
+                <div className="mt-6 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirmLeaveIfTimerActive()) return;
+                      router.push(`/vocab/single-add?userBookId=${row.id}`);
+                    }}
+                    className="rounded-xl border border-stone-900 bg-rose-50 p-3 text-center transition hover:bg-rose-100"
+                  >
+                    <div className="font-medium text-stone-900">Curiosity Reading</div>
+                    <div className="mt-2 text-xs leading-5 text-stone-700">
+                      Read while saving vocab and logging a slower, mindful session.
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Days Read</div>
-                    <div className="mt-1 font-medium">{daysRead != null ? daysRead : "—"}</div>
-                    <div className="mt-1 text-[10px] text-stone-400">
-                      Logged dates only
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirmLeaveIfTimerActive()) return;
+                      router.push(`/books/${row.id}/study`);
+                    }}
+                    className="rounded-xl border border-stone-900 bg-amber-50 p-3 text-center transition hover:bg-amber-100"
+                  >
+                    <div className="font-medium text-stone-900">Study Flashcards</div>
+                    <div className="mt-2 text-xs leading-5 text-stone-700">
+                      Review the words you saved from this book.
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Words Saved</div>
-                    <div className="mt-1 font-medium">
-                      {uniqueLookupCount != null ? uniqueLookupCount : "—"}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirmLeaveIfTimerActive()) return;
+                      router.push(`/books/${row.id}/readalong`);
+                    }}
+                    className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
+                  >
+                    <div className="font-medium text-stone-900">Fluid Reading</div>
+                    <div className="mt-2 text-xs leading-5 text-stone-700">
+                      Read without lookups, use saved-word support, and log a quicker session.
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Logged Time Read</div>
-                    <div className="mt-1 font-medium">{formatMinutes(totalTimedMinutes)}</div>
-                  </div>
-
-                  <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Avg Min/Page</div>
-                    <div className="mt-1 font-medium">
-                      {averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(2) : "—"}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirmLeaveIfTimerActive()) return;
+                      router.push(`/books/${row.id}/weekly-readings`);
+                    }}
+                    className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
+                  >
+                    <div className="font-medium text-stone-900">Kanji Readings</div>
+                    <div className="mt-2 text-xs leading-5 text-stone-700">
+                      Practice onyomi and kunyomi from your saved vocabulary.
                     </div>
-                  </div>
-
-                  <div className="rounded-xl border bg-white p-3 text-center">
-                    <div className="text-xs text-stone-500">Avg Pages/Session</div>
-                    <div className="mt-1 font-medium">
-                      {realReadingSessions.length > 0
-                        ? (totalPagesRead / realReadingSessions.length).toFixed(1)
-                        : "—"}
-                    </div>
-                  </div>
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="mb-3 text-center">
-            <h2 className="text-base font-semibold text-stone-900 sm:text-lg">
-              What do you want to do with your book today?
-            </h2>
-            <p className="mt-1 text-sm text-stone-500">
-              Choose how you want to read, review, or study.
-            </p>
-          </div>
-
-          {error ? (
-            <div className="border-t border-stone-200 px-5 py-3 text-sm text-red-600 md:px-8">
-              {error}
-            </div>
-          ) : null}
-
-          <div className="px-4 pb-2 md:px-8">
-            <div className="mt-6 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/vocab/single-add?userBookId=${row.id}`);
-                }}
-                className="rounded-xl border border-stone-900 bg-rose-50 p-3 text-center transition hover:bg-rose-100"
-              >
-                <div className="font-medium text-stone-900">Curiosity Reading</div>
-                <div className="mt-2 text-xs leading-5 text-stone-700">
-                  Read while saving vocab and logging a slower, mindful session.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/study`);
-                }}
-                className="rounded-xl border border-stone-900 bg-amber-50 p-3 text-center transition hover:bg-amber-100"
-              >
-                <div className="font-medium text-stone-900">Study Flashcards</div>
-                <div className="mt-2 text-xs leading-5 text-stone-700">
-                  Review the words you saved from this book.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/readalong`);
-                }}
-                className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
-              >
-                <div className="font-medium text-stone-900">Fluid Reading</div>
-                <div className="mt-2 text-xs leading-5 text-stone-700">
-                  Read without lookups, use saved-word support, and log a quicker session.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/weekly-readings`);
-                }}
-                className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
-              >
-                <div className="font-medium text-stone-900">Kanji Readings</div>
-                <div className="mt-2 text-xs leading-5 text-stone-700">
-                  Practice onyomi and kunyomi from your saved vocabulary.
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-2 px-4 md:px-8">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div className="overflow-x-auto">
-                <div className="flex w-max gap-2 border-b border-stone-300 px-2 whitespace-nowrap">
-                  <div className="flex flex-wrap gap-2">
+              <div className="mt-2">
+                <div className="mb-4 w-full border-b border-stone-300 px-2">
+                  <div className="flex flex-wrap items-end gap-3">
                     {isTeacher && (
                       <FilingTab
                         active={activeTab === "teacher"}
@@ -2756,519 +2818,519 @@ export default function BookHubPage() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {activeTab === "bookInfo" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
-                <div className="text-base font-semibold text-stone-900">Book Info</div>
+              {activeTab === "bookInfo" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                    <div className="text-base font-semibold text-stone-900">Book Info</div>
 
-                {!isEditingThisTab ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingTab("bookInfo")}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelEdits}
-                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
+                    {!isEditingThisTab ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingTab("bookInfo")}
+                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEdits}
+                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveAll}
+                          disabled={saving}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {saving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <BookInfoTab
-                book={book}
-                isEditing={isEditingThisTab}
-                genre={genre}
-                setGenre={setGenre}
-                bookType={bookType}
-                setBookType={setBookType}
-                triggerWarnings={triggerWarnings}
-                setTriggerWarnings={setTriggerWarnings}
-                publishedDate={publishedDate}
-                setPublishedDate={setPublishedDate}
-                pageCount={pageCount}
-                setPageCount={setPageCount}
-                isbn={isbn}
-                setIsbn={setIsbn}
-                isbn13={isbn13}
-                setIsbn13={setIsbn13}
-                authorName={authorName}
-                setAuthorName={setAuthorName}
-                translatorName={translatorName}
-                setTranslatorName={setTranslatorName}
-                illustratorName={illustratorName}
-                setIllustratorName={setIllustratorName}
-                publisherName={publisherName}
-                setPublisherName={setPublisherName}
-                publisherReading={publisherReading}
-                setPublisherReading={setPublisherReading}
-                coverUrl={coverUrl}
-                setCoverUrl={setCoverUrl}
-                authorImg={authorImg}
-                setAuthorImg={setAuthorImg}
-                translatorImg={translatorImg}
-                setTranslatorImg={setTranslatorImg}
-                illustratorImg={illustratorImg}
-                setIllustratorImg={setIllustratorImg}
-                publisherImg={publisherImg}
-                setPublisherImg={setPublisherImg}
-                authorReading={authorReading}
-                setAuthorReading={setAuthorReading}
-                translatorReading={translatorReading}
-                setTranslatorReading={setTranslatorReading}
-                illustratorReading={illustratorReading}
-                setIllustratorReading={setIllustratorReading}
-                relatedLinksArr={relatedLinksArr}
-                genreLabel={genreLabel}
-                bookTypeLabel={bookTypeLabel}
-                displayLinkLabel={displayLinkLabel}
-                displayLinkUrl={displayLinkUrl}
-                GENRE_OPTIONS={GENRE_OPTIONS}
-                BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
-                Detail={Detail}
-                PersonRow={PersonRow}
-              />
-            </div>
-          )}
-
-          {activeTab === "study" && (
-            <div className="space-y-4">
-              <div className="px-4 md:px-6">
-                <div className="text-base font-semibold text-stone-900">Vocab</div>
-              </div>
-
-              <VocabTab
-                row={row}
-                vocabTab={vocabTab}
-                setVocabTab={setVocabTab}
-              />
-            </div>
-          )}
-
-          {activeTab === "teacher" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
-                <div className="text-base font-semibold text-stone-900">Teacher</div>
-
-                {!isEditingThisTab ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingTab("teacher")}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelEdits}
-                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <TeacherTab
-                row={row}
-                book={book}
-                userId={userId}
-                isEditingThisTab={isEditingThisTab}
-                editingTab={editingTab}
-                setEditingTab={setEditingTab}
-                notes={notes}
-                setNotes={setNotes}
-                saveNotes={saveNotes}
-                recommendedLevel={recommendedLevel}
-                setRecommendedLevel={setRecommendedLevel}
-                levelStars={levelStars}
-                kanjiMapLoading={kanjiMapLoading}
-                kanjiMapError={kanjiMapError}
-                kanjiMapQueue={kanjiMapQueue}
-                openKanjiWordId={openKanjiWordId}
-                editingKanjiRows={editingKanjiRows}
-                savingKanjiWordId={savingKanjiWordId}
-                handleWorkOnKanjiWord={handleWorkOnKanjiWord}
-                updateKanjiMapRow={updateKanjiMapRow}
-                saveKanjiWord={saveKanjiWord}
-                setOpenKanjiWordId={setOpenKanjiWordId}
-                hiraToKata={hiraToKata}
-                removeWordFromKanjiEnrichment={removeWordFromKanjiEnrichment}
-              />
-            </div>
-          )}
-
-          {activeTab === "reading" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
-                <div className="text-base font-semibold text-stone-900">Reading</div>
-
-                {!isEditingThisTab ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingTab("reading")}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelEdits}
-                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <ReadingTab
-                row={row}
-                book={book}
-                isEditingThisTab={isEditingThisTab}
-                markStartedToday={markStartedToday}
-                markFinishedToday={markFinishedToday}
-                markDnfToday={markDnfToday}
-                formatType={formatType}
-                setFormatType={setFormatType}
-                progressMode={progressMode}
-                setProgressMode={setProgressMode}
-                showPageNumbers={showPageNumbers}
-                setShowPageNumbers={setShowPageNumbers}
-                startedAt={startedAt}
-                setStartedAt={setStartedAt}
-                finishedAt={finishedAt}
-                setFinishedAt={setFinishedAt}
-                dnfAt={dnfAt}
-                setDnfAt={setDnfAt}
-                started={started}
-                finished={finished}
-                sessionDate={sessionDate}
-                setSessionDate={setSessionDate}
-                sessionMinutesRead={sessionMinutesRead}
-                setSessionMinutesRead={setSessionMinutesRead}
-                sessionStartPage={sessionStartPage}
-                setSessionStartPage={setSessionStartPage}
-                sessionEndPage={sessionEndPage}
-                setSessionEndPage={setSessionEndPage}
-                saveReadingSession={saveReadingSession}
-                deleteReadingSession={deleteReadingSession}
-                readingSessions={readingSessions}
-                visibleReadingSessions={visibleReadingSessions}
-                showAllSessions={showAllSessions}
-                renderSessionToggle={renderSessionToggle}
-                canFillBeginningPages={canFillBeginningPages}
-                canFillEndingPages={canFillEndingPages}
-                fillBeginningPages={fillBeginningPages}
-                fillEndingPages={fillEndingPages}
-                earliestStartPage={earliestStartPage}
-                furthestPage={furthestPage}
-                formatTypeLabel={formatTypeLabel}
-                progressModeLabel={progressModeLabel}
-                DateField={DateField}
-              />
-            </div>
-          )}
-
-          {activeTab === "story" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
-                <div className="text-base font-semibold text-stone-900">Story</div>
-
-                {!isEditingThisTab ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingTab("story")}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelEdits}
-                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <StoryTab
-                storyTab={storyTab}
-                setStoryTab={setStoryTab}
-
-                characters={characters}
-                visibleCharacters={visibleCharacters}
-                showCharacters={showCharacters}
-                setShowCharacters={setShowCharacters}
-                charactersReverseOrder={charactersReverseOrder}
-                setCharactersReverseOrder={setCharactersReverseOrder}
-                editingCharacterIds={editingCharacterIds}
-                savingCharacterIds={savingCharacterIds}
-                savedCharacterIds={savedCharacterIds}
-                addCharacter={addCharacter}
-                updateCharacter={updateCharacter}
-                startEditingCharacter={startEditingCharacter}
-                stopEditingCharacter={stopEditingCharacter}
-                saveCharacter={saveCharacter}
-                deleteCharacter={deleteCharacter}
-
-                chapterSummaries={chapterSummaries}
-                visibleChapterSummaries={visibleChapterSummaries}
-                showChapterSummaries={showChapterSummaries}
-                setShowChapterSummaries={setShowChapterSummaries}
-                chapterReverseOrder={chapterReverseOrder}
-                setChapterReverseOrder={setChapterReverseOrder}
-                editingChapterIds={editingChapterIds}
-                savingChapterIds={savingChapterIds}
-                savedChapterIds={savedChapterIds}
-                addChapterSummary={addChapterSummary}
-                updateChapterSummary={updateChapterSummary}
-                startEditingChapter={startEditingChapter}
-                stopEditingChapter={stopEditingChapter}
-                saveChapterSummary={saveChapterSummary}
-                deleteChapterSummary={deleteChapterSummary}
-
-                settingItems={settingItems}
-                visibleSettingItems={visibleSettingItems}
-                showSettingItems={showSettingItems}
-                setShowSettingItems={setShowSettingItems}
-                settingReverseOrder={settingReverseOrder}
-                setSettingReverseOrder={setSettingReverseOrder}
-                editingSettingIds={editingSettingIds}
-                savingSettingIds={savingSettingIds}
-                savedSettingIds={savedSettingIds}
-                addSettingItem={addSettingItem}
-                updateSettingItem={updateSettingItem}
-                startEditingSettingItem={startEditingSettingItem}
-                stopEditingSettingItem={stopEditingSettingItem}
-                saveSettingItem={saveSettingItem}
-                deleteSettingItem={deleteSettingItem}
-
-                culturalItems={culturalItems}
-                visibleCulturalItems={visibleCulturalItems}
-                showCulturalItems={showCulturalItems}
-                setShowCulturalItems={setShowCulturalItems}
-                culturalReverseOrder={culturalReverseOrder}
-                setCulturalReverseOrder={setCulturalReverseOrder}
-                editingCulturalIds={editingCulturalIds}
-                savingCulturalIds={savingCulturalIds}
-                savedCulturalIds={savedCulturalIds}
-                addCulturalItem={addCulturalItem}
-                updateCulturalItem={updateCulturalItem}
-                startEditingCulturalItem={startEditingCulturalItem}
-                stopEditingCulturalItem={stopEditingCulturalItem}
-                saveCulturalItem={saveCulturalItem}
-                deleteCulturalItem={deleteCulturalItem}
-              />
-            </div>
-          )}
-
-          {activeTab === "rating" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
-                <div className="text-base font-semibold text-stone-900">Rating</div>
-
-                {!isEditingThisTab ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingTab("rating")}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelEdits}
-                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <RatingTab
-                row={row}
-                isEditingThisTab={isEditingThisTab}
-                myReview={myReview}
-                setMyReview={setMyReview}
-                ratingOverall={ratingOverall}
-                setRatingOverall={setRatingOverall}
-                ratingRecommend={ratingRecommend}
-                setRatingRecommend={setRatingRecommend}
-                ratingDifficulty={ratingDifficulty}
-                setRatingDifficulty={setRatingDifficulty}
-                readerLevel={readerLevel}
-                setReaderLevel={setReaderLevel}
-                LEVEL_OPTIONS={LEVEL_OPTIONS}
-                StarRatingField={StarRatingField}
-                DifficultyField={DifficultyField}
-              />
-            </div>
-          )}
-        </section>
-
-        {showWordExplorer && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            onClick={() => setShowWordExplorer(false)}
-          >
-            <div
-              className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-stone-900">Word Explorer</h2>
-                  <p className="mt-1 text-sm text-stone-500">
-                    Search and explore a word without leaving the page.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowWordExplorer(false)}
-                  className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={wordExplorerQuery}
-                    onChange={(e) => setWordExplorerQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        searchWordExplorer();
-                      }
-                    }}
-                    placeholder="Search a word..."
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
+                  <BookInfoTab
+                    book={book}
+                    isEditing={isEditingThisTab}
+                    genre={genre}
+                    setGenre={setGenre}
+                    bookType={bookType}
+                    setBookType={setBookType}
+                    triggerWarnings={triggerWarnings}
+                    setTriggerWarnings={setTriggerWarnings}
+                    publishedDate={publishedDate}
+                    setPublishedDate={setPublishedDate}
+                    pageCount={pageCount}
+                    setPageCount={setPageCount}
+                    isbn={isbn}
+                    setIsbn={setIsbn}
+                    isbn13={isbn13}
+                    setIsbn13={setIsbn13}
+                    authorName={authorName}
+                    setAuthorName={setAuthorName}
+                    translatorName={translatorName}
+                    setTranslatorName={setTranslatorName}
+                    illustratorName={illustratorName}
+                    setIllustratorName={setIllustratorName}
+                    publisherName={publisherName}
+                    setPublisherName={setPublisherName}
+                    publisherReading={publisherReading}
+                    setPublisherReading={setPublisherReading}
+                    coverUrl={coverUrl}
+                    setCoverUrl={setCoverUrl}
+                    authorImg={authorImg}
+                    setAuthorImg={setAuthorImg}
+                    translatorImg={translatorImg}
+                    setTranslatorImg={setTranslatorImg}
+                    illustratorImg={illustratorImg}
+                    setIllustratorImg={setIllustratorImg}
+                    publisherImg={publisherImg}
+                    setPublisherImg={setPublisherImg}
+                    authorReading={authorReading}
+                    setAuthorReading={setAuthorReading}
+                    translatorReading={translatorReading}
+                    setTranslatorReading={setTranslatorReading}
+                    illustratorReading={illustratorReading}
+                    setIllustratorReading={setIllustratorReading}
+                    relatedLinksArr={relatedLinksArr}
+                    genreLabel={genreLabel}
+                    bookTypeLabel={bookTypeLabel}
+                    displayLinkLabel={displayLinkLabel}
+                    displayLinkUrl={displayLinkUrl}
+                    GENRE_OPTIONS={GENRE_OPTIONS}
+                    BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
+                    Detail={Detail}
+                    PersonRow={PersonRow}
                   />
-
-                  <button
-                    type="button"
-                    onClick={searchWordExplorer}
-                    disabled={wordExplorerLoading || !wordExplorerQuery.trim()}
-                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                  >
-                    {wordExplorerLoading ? "Searching..." : "Search"}
-                  </button>
                 </div>
+              )}
 
-                {wordExplorerError ? (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {wordExplorerError}
+              {activeTab === "study" && (
+                <div className="space-y-4">
+                  <div className="px-4 md:px-6">
+                    <div className="text-base font-semibold text-stone-900">Vocab</div>
                   </div>
-                ) : null}
 
-                {wordExplorerResults.length > 0 ? (
-                  <div className="space-y-3">
-                    {wordExplorerResults.map((item, i) => {
-                      const japanese = item?.japanese?.[0];
-                      const senses = item?.senses ?? [];
+                  <VocabTab
+                    row={row}
+                    vocabTab={vocabTab}
+                    setVocabTab={setVocabTab}
+                  />
+                </div>
+              )}
 
-                      return (
-                        <div key={i} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-                          <div className="text-lg font-semibold text-stone-900">
-                            {japanese?.word || item?.slug || "—"}
-                          </div>
+              {activeTab === "teacher" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                    <div className="text-base font-semibold text-stone-900">Teacher</div>
 
-                          {japanese?.reading ? (
-                            <div className="mt-1 text-sm text-stone-500">{japanese.reading}</div>
-                          ) : null}
-
-                          <div className="mt-3 space-y-2">
-                            {senses.slice(0, 3).map((sense: any, idx: number) => (
-                              <div key={idx} className="text-sm text-stone-700">
-                                <span className="font-medium text-stone-500">{idx + 1}.</span>{" "}
-                                {(sense?.english_definitions ?? []).join("; ") || "—"}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {!isEditingThisTab ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingTab("teacher")}
+                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEdits}
+                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveAll}
+                          disabled={saving}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {saving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : !wordExplorerLoading && !wordExplorerError && wordExplorerQuery.trim() ? (
-                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-                    No results yet.
+
+                  <TeacherTab
+                    row={row}
+                    book={book}
+                    userId={userId}
+                    isEditingThisTab={isEditingThisTab}
+                    editingTab={editingTab}
+                    setEditingTab={setEditingTab}
+                    notes={notes}
+                    setNotes={setNotes}
+                    saveNotes={saveNotes}
+                    recommendedLevel={recommendedLevel}
+                    setRecommendedLevel={setRecommendedLevel}
+                    levelStars={levelStars}
+                    kanjiMapLoading={kanjiMapLoading}
+                    kanjiMapError={kanjiMapError}
+                    kanjiMapQueue={kanjiMapQueue}
+                    openKanjiWordId={openKanjiWordId}
+                    editingKanjiRows={editingKanjiRows}
+                    savingKanjiWordId={savingKanjiWordId}
+                    handleWorkOnKanjiWord={handleWorkOnKanjiWord}
+                    updateKanjiMapRow={updateKanjiMapRow}
+                    saveKanjiWord={saveKanjiWord}
+                    setOpenKanjiWordId={setOpenKanjiWordId}
+                    hiraToKata={hiraToKata}
+                    removeWordFromKanjiEnrichment={removeWordFromKanjiEnrichment}
+                  />
+                </div>
+              )}
+
+              {activeTab === "reading" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                    <div className="text-base font-semibold text-stone-900">Reading</div>
+
+                    {!isEditingThisTab ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingTab("reading")}
+                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEdits}
+                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveAll}
+                          disabled={saving}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {saving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-                    Type a word to explore.
+
+                  <ReadingTab
+                    row={row}
+                    book={book}
+                    isEditingThisTab={isEditingThisTab}
+                    markStartedToday={markStartedToday}
+                    markFinishedToday={markFinishedToday}
+                    markDnfToday={markDnfToday}
+                    formatType={formatType}
+                    setFormatType={setFormatType}
+                    progressMode={progressMode}
+                    setProgressMode={setProgressMode}
+                    showPageNumbers={showPageNumbers}
+                    setShowPageNumbers={setShowPageNumbers}
+                    startedAt={startedAt}
+                    setStartedAt={setStartedAt}
+                    finishedAt={finishedAt}
+                    setFinishedAt={setFinishedAt}
+                    dnfAt={dnfAt}
+                    setDnfAt={setDnfAt}
+                    started={started}
+                    finished={finished}
+                    sessionDate={sessionDate}
+                    setSessionDate={setSessionDate}
+                    sessionMinutesRead={sessionMinutesRead}
+                    setSessionMinutesRead={setSessionMinutesRead}
+                    sessionStartPage={sessionStartPage}
+                    setSessionStartPage={setSessionStartPage}
+                    sessionEndPage={sessionEndPage}
+                    setSessionEndPage={setSessionEndPage}
+                    saveReadingSession={saveReadingSession}
+                    deleteReadingSession={deleteReadingSession}
+                    readingSessions={readingSessions}
+                    visibleReadingSessions={visibleReadingSessions}
+                    showAllSessions={showAllSessions}
+                    renderSessionToggle={renderSessionToggle}
+                    canFillBeginningPages={canFillBeginningPages}
+                    canFillEndingPages={canFillEndingPages}
+                    fillBeginningPages={fillBeginningPages}
+                    fillEndingPages={fillEndingPages}
+                    earliestStartPage={earliestStartPage}
+                    furthestPage={furthestPage}
+                    formatTypeLabel={formatTypeLabel}
+                    progressModeLabel={progressModeLabel}
+                    DateField={DateField}
+                  />
+                </div>
+              )}
+
+              {activeTab === "story" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                    <div className="text-base font-semibold text-stone-900">Story</div>
+
+                    {!isEditingThisTab ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingTab("story")}
+                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEdits}
+                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveAll}
+                          disabled={saving}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {saving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  <StoryTab
+                    storyTab={storyTab}
+                    setStoryTab={setStoryTab}
+
+                    characters={characters}
+                    visibleCharacters={visibleCharacters}
+                    showCharacters={showCharacters}
+                    setShowCharacters={setShowCharacters}
+                    charactersReverseOrder={charactersReverseOrder}
+                    setCharactersReverseOrder={setCharactersReverseOrder}
+                    editingCharacterIds={editingCharacterIds}
+                    savingCharacterIds={savingCharacterIds}
+                    savedCharacterIds={savedCharacterIds}
+                    addCharacter={addCharacter}
+                    updateCharacter={updateCharacter}
+                    startEditingCharacter={startEditingCharacter}
+                    stopEditingCharacter={stopEditingCharacter}
+                    saveCharacter={saveCharacter}
+                    deleteCharacter={deleteCharacter}
+
+                    chapterSummaries={chapterSummaries}
+                    visibleChapterSummaries={visibleChapterSummaries}
+                    showChapterSummaries={showChapterSummaries}
+                    setShowChapterSummaries={setShowChapterSummaries}
+                    chapterReverseOrder={chapterReverseOrder}
+                    setChapterReverseOrder={setChapterReverseOrder}
+                    editingChapterIds={editingChapterIds}
+                    savingChapterIds={savingChapterIds}
+                    savedChapterIds={savedChapterIds}
+                    addChapterSummary={addChapterSummary}
+                    updateChapterSummary={updateChapterSummary}
+                    startEditingChapter={startEditingChapter}
+                    stopEditingChapter={stopEditingChapter}
+                    saveChapterSummary={saveChapterSummary}
+                    deleteChapterSummary={deleteChapterSummary}
+
+                    settingItems={settingItems}
+                    visibleSettingItems={visibleSettingItems}
+                    showSettingItems={showSettingItems}
+                    setShowSettingItems={setShowSettingItems}
+                    settingReverseOrder={settingReverseOrder}
+                    setSettingReverseOrder={setSettingReverseOrder}
+                    editingSettingIds={editingSettingIds}
+                    savingSettingIds={savingSettingIds}
+                    savedSettingIds={savedSettingIds}
+                    addSettingItem={addSettingItem}
+                    updateSettingItem={updateSettingItem}
+                    startEditingSettingItem={startEditingSettingItem}
+                    stopEditingSettingItem={stopEditingSettingItem}
+                    saveSettingItem={saveSettingItem}
+                    deleteSettingItem={deleteSettingItem}
+
+                    culturalItems={culturalItems}
+                    visibleCulturalItems={visibleCulturalItems}
+                    showCulturalItems={showCulturalItems}
+                    setShowCulturalItems={setShowCulturalItems}
+                    culturalReverseOrder={culturalReverseOrder}
+                    setCulturalReverseOrder={setCulturalReverseOrder}
+                    editingCulturalIds={editingCulturalIds}
+                    savingCulturalIds={savingCulturalIds}
+                    savedCulturalIds={savedCulturalIds}
+                    addCulturalItem={addCulturalItem}
+                    updateCulturalItem={updateCulturalItem}
+                    startEditingCulturalItem={startEditingCulturalItem}
+                    stopEditingCulturalItem={stopEditingCulturalItem}
+                    saveCulturalItem={saveCulturalItem}
+                    deleteCulturalItem={deleteCulturalItem}
+                  />
+                </div>
+              )}
+
+              {activeTab === "rating" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                    <div className="text-base font-semibold text-stone-900">Rating</div>
+
+                    {!isEditingThisTab ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingTab("rating")}
+                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEdits}
+                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveAll}
+                          disabled={saving}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {saving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <RatingTab
+                    row={row}
+                    isEditingThisTab={isEditingThisTab}
+                    myReview={myReview}
+                    setMyReview={setMyReview}
+                    ratingOverall={ratingOverall}
+                    setRatingOverall={setRatingOverall}
+                    ratingRecommend={ratingRecommend}
+                    setRatingRecommend={setRatingRecommend}
+                    ratingDifficulty={ratingDifficulty}
+                    setRatingDifficulty={setRatingDifficulty}
+                    readerLevel={readerLevel}
+                    setReaderLevel={setReaderLevel}
+                    LEVEL_OPTIONS={LEVEL_OPTIONS}
+                    StarRatingField={StarRatingField}
+                    DifficultyField={DifficultyField}
+                  />
+                </div>
+              )}
             </div>
+
+            {showWordExplorer && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                onClick={() => setShowWordExplorer(false)}
+              >
+                <div
+                  className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-stone-900">Word Explorer</h2>
+                      <p className="mt-1 text-sm text-stone-500">
+                        Search and explore a word without leaving the page.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowWordExplorer(false)}
+                      className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={wordExplorerQuery}
+                        onChange={(e) => setWordExplorerQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            searchWordExplorer();
+                          }
+                        }}
+                        placeholder="Search a word..."
+                        className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={searchWordExplorer}
+                        disabled={wordExplorerLoading || !wordExplorerQuery.trim()}
+                        className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                      >
+                        {wordExplorerLoading ? "Searching..." : "Search"}
+                      </button>
+                    </div>
+
+                    {wordExplorerError ? (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {wordExplorerError}
+                      </div>
+                    ) : null}
+
+                    {wordExplorerResults.length > 0 ? (
+                      <div className="space-y-3">
+                        {wordExplorerResults.map((item, i) => {
+                          const japanese = item?.japanese?.[0];
+                          const senses = item?.senses ?? [];
+
+                          return (
+                            <div key={i} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                              <div className="text-lg font-semibold text-stone-900">
+                                {japanese?.word || item?.slug || "—"}
+                              </div>
+
+                              {japanese?.reading ? (
+                                <div className="mt-1 text-sm text-stone-500">{japanese.reading}</div>
+                              ) : null}
+
+                              <div className="mt-3 space-y-2">
+                                {senses.slice(0, 3).map((sense: any, idx: number) => (
+                                  <div key={idx} className="text-sm text-stone-700">
+                                    <span className="font-medium text-stone-500">{idx + 1}.</span>{" "}
+                                    {(sense?.english_definitions ?? []).join("; ") || "—"}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : !wordExplorerLoading && !wordExplorerError && wordExplorerQuery.trim() ? (
+                      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                        No results yet.
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                        Type a word to explore.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </main>
+        </section>
+      </div >
+    </main >
   );
 }
 

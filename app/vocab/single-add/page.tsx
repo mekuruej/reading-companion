@@ -459,7 +459,7 @@ export default function SingleAddPage() {
 
                 <h1 className="mb-2, mt-4 text-2xl font-semibold">Curiosity Reading</h1>
                 <p className="mt-2 text-sm text-stone-700">
-                    Add vocabulary as you read along.
+                    Use this for a slower, exploratory reading experience. Lookup time is included in the time.
                 </p>
 
                 {userBookId ? (
