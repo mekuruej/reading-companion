@@ -2670,7 +2670,7 @@ export default function BookHubPage() {
                 </div>
 
                 <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Curiosity Time</div>
+                  <div className="text-xs text-stone-500">Curiosity Time (Intensive Reading)</div>
                   <div className="mt-1 font-medium">{formatMinutes(curiosityMinutes)}</div>
                 </div>
 
@@ -2682,7 +2682,7 @@ export default function BookHubPage() {
                 </div>
 
                 <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Fluid Time</div>
+                  <div className="text-xs text-stone-500">Fluid Time (Extensive Reading)</div>
                   <div className="mt-1 font-medium">{formatMinutes(fluidMinutes)}</div>
                 </div>
 
@@ -2719,7 +2719,7 @@ export default function BookHubPage() {
                     }}
                     className="rounded-xl border border-stone-900 bg-rose-50 p-3 text-center transition hover:bg-rose-100"
                   >
-                    <div className="font-medium text-stone-900">Curiosity Reading</div>
+                    <div className="font-medium text-stone-900">Curiosity Reading (Intensive)</div>
                     <div className="mt-2 text-xs leading-5 text-stone-700">
                       Read while saving vocab and logging a slower, mindful session.
                     </div>
@@ -2747,7 +2747,7 @@ export default function BookHubPage() {
                     }}
                     className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
                   >
-                    <div className="font-medium text-stone-900">Fluid Reading</div>
+                    <div className="font-medium text-stone-900">Fluid Reading (Extensive) </div>
                     <div className="mt-2 text-xs leading-5 text-stone-700">
                       Read without lookups, use saved-word support, and log a quicker session.
                     </div>

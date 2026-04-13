@@ -53,17 +53,17 @@ export default function StudyTab({
         <div className="overflow-x-auto">
           <div className="flex w-max gap-2 whitespace-nowrap">
             <a
-              href={`/vocab/single-add?userBookId=${row.id}`}
+              href={`/books/${encodeURIComponent(row.id)}/add-word`}
               className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
             >
               Single Add
             </a>
             <a
-  href={`/vocab/bulk?userBookId=${row.id}`}
-  className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
->
-  Bulk Add
-</a>
+              href={`/vocab/bulk?userBookId=${row.id}`}
+              className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+            >
+              Bulk Add
+            </a>
           </div>
         </div>
 
