@@ -133,7 +133,7 @@ export default function AddWordPage() {
         const parsed = JSON.parse(saved);
         setChapterNumber(parsed?.number || "");
         setChapterName(parsed?.name || "");
-      } catch {}
+      } catch { }
     }
 
     async function loadBookInfo() {
@@ -519,6 +519,28 @@ export default function AddWordPage() {
     }
   }
 
+  async function deleteSessionWord(id: string) {
+    const { error } = await supabase
+      .from("user_book_words")
+      .delete()
+      .eq("id", id)
+      .eq("user_book_id", userBookId);
+
+    if (error) {
+      console.error("Error deleting word:", error);
+      setMessage(`❌ Could not delete word: ${error.message}`);
+      return;
+    }
+
+    setSessionWords((prev) => prev.filter((item) => item.id !== id));
+
+    if (editingSessionWordId === id) {
+      clearForm(true);
+    }
+
+    setMessage("✅ Word deleted from Vocab List.");
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-4xl">
@@ -659,9 +681,8 @@ export default function AddWordPage() {
                   placeholder={
                     meaningChoiceIndex == null ? "Type your custom meaning" : "Meaning"
                   }
-                  className={`w-full rounded border p-3 text-sm ${
-                    meaningChoiceIndex == null ? "bg-white" : "bg-slate-100 text-slate-700"
-                  }`}
+                  className={`w-full rounded border p-3 text-sm ${meaningChoiceIndex == null ? "bg-white" : "bg-slate-100 text-slate-700"
+                    }`}
                 />
                 <p className="mt-1 text-xs text-stone-500">
                   Choose Other to write your own definition.
@@ -770,13 +791,23 @@ export default function AddWordPage() {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => loadSessionWordIntoForm(item)}
-                        className="shrink-0 rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => loadSessionWordIntoForm(item)}
+                          className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void deleteSessionWord(item.id)}
+                          className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

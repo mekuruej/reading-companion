@@ -580,6 +580,7 @@ export default function BookHubPage() {
   const [sessionStartPage, setSessionStartPage] = useState<string>("");
   const [sessionEndPage, setSessionEndPage] = useState<string>("");
   const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
+  const [sessionMode, setSessionMode] = useState<"fluid" | "curiosity">("fluid");
 
   const [isRunning, setIsRunning] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -680,7 +681,7 @@ export default function BookHubPage() {
   }, [realReadingSessions]);
 
   const timedSessions = useMemo(() => {
-    return realReadingSessions.filter((s) => s.minutes_read != null);
+    return realReadingSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
   }, [realReadingSessions]);
 
   const totalTimedMinutes = useMemo(() => {
@@ -1668,6 +1669,7 @@ export default function BookHubPage() {
     const minutesFromInput =
       sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
 
+
     const minutes =
       showTimedSessionForm
         ? Math.max(1, Math.round(elapsed / 60))
@@ -1699,7 +1701,7 @@ export default function BookHubPage() {
       start_page: start,
       end_page: end,
       minutes_read: minutes,
-      session_mode: "fluid",
+      session_mode: sessionMode,
     };
 
     const { data, error } = await supabase
@@ -1766,6 +1768,7 @@ export default function BookHubPage() {
     setShowTimedSessionForm(false);
     setElapsed(0);
     setStartTime(null);
+    setSessionMode("curiosity");
   }
 
   const loadUniqueLookupCount = async (id: string) => {
@@ -2439,21 +2442,29 @@ export default function BookHubPage() {
     return realReadingSessions.filter((s: any) => s.session_mode === "fluid");
   }, [realReadingSessions]);
 
-  const curiosityMinutes = useMemo(() => {
-    return curiositySessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  const timedCuriositySessions = useMemo(() => {
+    return curiositySessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
   }, [curiositySessions]);
+
+  const timedFluidSessions = useMemo(() => {
+    return fluidSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
+  }, [fluidSessions]);
+
+  const curiosityMinutes = useMemo(() => {
+    return timedCuriositySessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  }, [timedCuriositySessions]);
 
   const fluidMinutes = useMemo(() => {
-    return fluidSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
-  }, [fluidSessions]);
+    return timedFluidSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  }, [timedFluidSessions]);
 
   const curiosityPages = useMemo(() => {
-    return curiositySessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
-  }, [curiositySessions]);
+    return timedCuriositySessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
+  }, [timedCuriositySessions]);
 
   const fluidPages = useMemo(() => {
-    return fluidSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
-  }, [fluidSessions]);
+    return timedFluidSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
+  }, [timedFluidSessions]);
 
   const curiosityMinPerPage = useMemo(() => {
     if (!curiosityPages) return null;
@@ -3045,6 +3056,8 @@ export default function BookHubPage() {
                     setSessionDate={setSessionDate}
                     sessionMinutesRead={sessionMinutesRead}
                     setSessionMinutesRead={setSessionMinutesRead}
+                    sessionMode={sessionMode}
+                    setSessionMode={setSessionMode}
                     sessionStartPage={sessionStartPage}
                     setSessionStartPage={setSessionStartPage}
                     sessionEndPage={sessionEndPage}

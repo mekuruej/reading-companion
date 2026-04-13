@@ -58,6 +58,8 @@ type ReadingTabProps = {
   setSessionStartPage: (value: string) => void;
   sessionEndPage: string;
   setSessionEndPage: (value: string) => void;
+  sessionMode: "fluid" | "curiosity";
+  setSessionMode: (value: "fluid" | "curiosity") => void;
 
   saveReadingSession: () => Promise<void>;
   deleteReadingSession: (sessionId: string) => Promise<void>;
@@ -120,6 +122,8 @@ export default function ReadingTab({
   setSessionStartPage,
   sessionEndPage,
   setSessionEndPage,
+  sessionMode,
+  setSessionMode,
 
   saveReadingSession,
   deleteReadingSession,
@@ -363,6 +367,19 @@ export default function ReadingTab({
               placeholder="e.g. 10"
               className="mt-1 w-full rounded border px-2 py-1"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Session Type
+            </label>
+            <select
+              value={sessionMode}
+              onChange={(e) => setSessionMode(e.target.value as "fluid" | "curiosity")}
+              className="w-full rounded border bg-white p-3 text-sm"
+            >
+              <option value="fluid">Fluid Reading</option>
+              <option value="curiosity">Curiosity Reading</option>
+            </select>
           </div>
         </div>
 

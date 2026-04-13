@@ -802,11 +802,29 @@ export default function BooksPage() {
       .select("user_book_id, start_page, end_page, minutes_read, session_mode: mode")
       .in("user_book_id", userBookIds);
 
-    if (error) {
-      console.error("Error loading reading stats for library:", error);
-      setReadingStatsByUserBookId({});
-      return;
-    }
+    try {
+  const { data, error } = await supabase
+    .from("user_book_reading_sessions")
+    .select("user_book_id, minutes_read, start_page, end_page, read_on")
+    .in("user_book_id", userBookIds);
+
+  if (error) {
+    console.error("Error loading reading stats for library");
+    console.error("raw error:", error);
+    console.error("keys:", Object.keys(error || {}));
+    console.error("entries:", Object.entries(error || {}));
+    console.error("stringified:", JSON.stringify(error, null, 2));
+    console.error("prototype:", Object.getPrototypeOf(error));
+    setReadingStatsByUserBookId({});
+    return;
+  }
+
+  // continue...
+} catch (err) {
+  console.error("Caught exception loading reading stats:", err);
+  setReadingStatsByUserBookId({});
+}
+
 
     const { data: wordRows, error: wordErr } = await supabase
       .from("user_book_words")
@@ -1322,7 +1340,7 @@ export default function BooksPage() {
             <div className="space-y-1">
               <div className="text-[11px] text-gray-600">
                 {readingStatsByUserBookId[row.id]?.progressPercent != null &&
-                readingStatsByUserBookId[row.id]?.furthestPage != null
+                  readingStatsByUserBookId[row.id]?.furthestPage != null
                   ? `${readingStatsByUserBookId[row.id].progressPercent}% · p.${readingStatsByUserBookId[row.id].furthestPage}`
                   : "In progress"}
               </div>
@@ -1489,7 +1507,7 @@ export default function BooksPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Curiosity Reading Time</div>
+                <div className="text-[11px] text-slate-600">Intensive Reading Time</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading
                     ? "…"
@@ -1498,7 +1516,7 @@ export default function BooksPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Fluid Reading Time</div>
+                <div className="text-[11px] text-slate-600">Extensive Reading Time</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading
                     ? "…"

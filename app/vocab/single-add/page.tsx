@@ -549,6 +549,30 @@ export default function SingleAddPage() {
     quickWordInputRef.current?.focus();
   }
 
+  async function deleteQuickWordById(id: string) {
+    if (!userBookId) return;
+
+    const { error } = await supabase
+      .from("user_book_words")
+      .delete()
+      .eq("id", id)
+      .eq("user_book_id", userBookId);
+
+    if (error) {
+      console.error("Error deleting quick word:", error);
+      setMessage(`❌ Could not delete word: ${error.message}`);
+      return;
+    }
+
+    setQuickSessionWords((prev) => prev.filter((item) => item.id !== id));
+
+    if (quickPreview?.id === id) {
+      clearQuickPreview();
+    }
+
+    setMessage("✅ Word deleted from Vocab List.");
+  }
+
   async function saveReadingSession() {
     if (!userBookId) return;
 
@@ -675,9 +699,8 @@ export default function SingleAddPage() {
         {message ? (
           <div className="mb-4">
             <p
-              className={`text-base font-medium ${
-                message.startsWith("❌") ? "text-red-700" : "text-green-700"
-              }`}
+              className={`text-base font-medium ${message.startsWith("❌") ? "text-red-700" : "text-green-700"
+                }`}
             >
               {message}
             </p>
@@ -913,40 +936,6 @@ export default function SingleAddPage() {
             </div>
           </div>
 
-          {quickSessionWords.length > 0 ? (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <div className="mb-3 text-sm font-medium text-stone-900">
-                Words saved into Vocab List this session
-              </div>
-
-              <div className="space-y-3">
-                {quickSessionWords.map((item) => (
-                  <div key={item.id} className="rounded-lg border bg-white p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 text-sm">
-                        <div className="font-medium text-stone-900">{item.surface}</div>
-                        <div className="text-stone-500">{item.reading || "—"}</div>
-                        <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                        <div className="mt-1 text-xs text-stone-500">
-                          Page {item.page || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
-                          {item.chapterName || "—"}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => loadQuickSessionWordIntoPreview(item)}
-                        className="shrink-0 rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
           {quickError ? (
             <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {quickError}
@@ -1024,11 +1013,11 @@ export default function SingleAddPage() {
                             setQuickPreview((prev) =>
                               prev
                                 ? {
-                                    ...prev,
-                                    selectedMeaningIndex: index,
-                                    meaning,
-                                    isCustomMeaning: false,
-                                  }
+                                  ...prev,
+                                  selectedMeaningIndex: index,
+                                  meaning,
+                                  isCustomMeaning: false,
+                                }
                                 : prev
                             )
                           }
@@ -1097,7 +1086,7 @@ export default function SingleAddPage() {
                 <span>Hide kanji in reading support</span>
               </label>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void saveQuickWord()}
@@ -1116,8 +1105,51 @@ export default function SingleAddPage() {
               </div>
             </div>
           ) : null}
+          {quickSessionWords.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+              <div className="mb-3 text-sm font-medium text-stone-900">
+                Words saved into Vocab List this session
+              </div>
+
+              <div className="space-y-3">
+                {quickSessionWords.map((item) => (
+                  <div key={item.id} className="rounded-lg border bg-white p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 text-sm">
+                        <div className="font-medium text-stone-900">{item.surface}</div>
+                        <div className="text-stone-500">{item.reading || "—"}</div>
+                        <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                        <div className="mt-1 text-xs text-stone-500">
+                          Page {item.page || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
+                          {item.chapterName || "—"}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => loadQuickSessionWordIntoPreview(item)}
+                          className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void deleteQuickWordById(item.id)}
+                          className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
-    </main>
+    </main >
   );
 }
