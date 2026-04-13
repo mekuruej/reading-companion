@@ -596,7 +596,7 @@ export default function BulkVocabPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-2 text-2xl font-semibold">🧺 Add Vocabulary</h1>
+        <h1 className="mb-2 text-2xl font-semibold">🧺 Add Vocabularyin Bulk</h1>
 
         {bookTitle ? (
           <div className="mb-6 flex items-center gap-3">

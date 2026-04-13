@@ -1308,6 +1308,7 @@ export default function BookHubPage() {
         end_page: earliestStartPage - 1,
         minutes_read: null,
         is_filler: true,
+        session_mode: "fluid",
       });
 
     if (error) {
@@ -1331,6 +1332,7 @@ export default function BookHubPage() {
         end_page: book.page_count,
         minutes_read: null,
         is_filler: true,
+        session_mode: "fluid",
       });
 
     if (error) {
@@ -1695,6 +1697,7 @@ export default function BookHubPage() {
       start_page: start,
       end_page: end,
       minutes_read: minutes,
+      session_mode: "fluid",
     };
 
     const { data, error } = await supabase
@@ -2548,9 +2551,9 @@ export default function BookHubPage() {
                     <div className="font-medium">Progress</div>
                     <div className="mt-1 text-stone-500">
                       {finished
-                        ? "100%"
+                        ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · 100%`
                         : readingSessions.length > 0 && progressPercent != null && furthestPage != null
-                          ? `${progressPercent}% · On page ${furthestPage}`
+                          ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · ${progressPercent}% · On page ${furthestPage}`
                           : started
                             ? "In progress"
                             : "Not started"}
@@ -2627,6 +2630,15 @@ export default function BookHubPage() {
             </div>
           </div>
 
+          <div className="mb-3 text-center">
+            <h2 className="text-base font-semibold text-stone-900 sm:text-lg">
+              What do you want to do with your book today?
+            </h2>
+            <p className="mt-1 text-sm text-stone-500">
+              Choose how you want to read, review, or study.
+            </p>
+          </div>
+
           {error ? (
             <div className="border-t border-stone-200 px-5 py-3 text-sm text-red-600 md:px-8">
               {error}
@@ -2634,196 +2646,19 @@ export default function BookHubPage() {
           ) : null}
 
           <div className="px-4 pb-2 md:px-8">
-            <div className="mt-6 flex flex-col items-center gap-2">
-              <p className="text-sm text-stone-500">
-                Time your reading session and log it more easily.
-              </p>
-
-              <div className="flex flex-wrap justify-center gap-3">
-                {!isRunning && !isPaused ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSessionDate(new Date().toISOString().slice(0, 10));
-                      setStartTime(Date.now());
-                      setElapsed(0);
-                      setIsRunning(true);
-                      setIsPaused(false);
-                    }}
-                    className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-                  >
-                    Start Timer
-                  </button>
-                ) : null}
-
-                {isRunning ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (startTime) {
-                          setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                        }
-                        setIsRunning(false);
-                        setIsPaused(true);
-                      }}
-                      className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
-                    >
-                      Pause
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (startTime) {
-                          setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                        }
-                        setIsRunning(false);
-                        setIsPaused(false);
-                        setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
-                        setShowTimedSessionForm(true);
-                      }}
-                      className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                    >
-                      Finish
-                    </button>
-                  </>
-                ) : null}
-
-                {isPaused ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStartTime(Date.now() - elapsed * 1000);
-                        setIsRunning(true);
-                        setIsPaused(false);
-                      }}
-                      className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-                    >
-                      Resume
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPaused(false);
-                        setSessionStartPage(furthestPage != null ? String(furthestPage + 1) : "");
-                        setShowTimedSessionForm(true);
-                      }}
-                      className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                    >
-                      Finish
-                    </button>
-                  </>
-                ) : null}
-
-                <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
-                  ⏱ {formatTimer(elapsed)}
-                </div>
-              </div>
-            </div>
-
-            {showTimedSessionForm && !isRunning ? (
-              <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
-                <div className="mb-3 text-sm font-medium text-stone-700">
-                  Save this reading session
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <div className="mb-1 text-sm text-stone-600">Start page</div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={sessionStartPage}
-                      onChange={(e) => setSessionStartPage(e.target.value)}
-                      placeholder="e.g. 45"
-                      className="w-full rounded border px-3 py-2 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="mb-1 text-sm text-stone-600">End page</div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={sessionEndPage}
-                      onChange={(e) => setSessionEndPage(e.target.value)}
-                      placeholder="e.g. 52"
-                      className="w-full rounded border px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 text-sm text-stone-500">
-                  Time: {formatTimer(elapsed)}
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
-                      await saveReadingSession();
-                      setIsPaused(false);
-                    }}
-                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                  >
-                    Save Timed Session
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowTimedSessionForm(false);
-                      setElapsed(0);
-                      setStartTime(null);
-                      setIsPaused(false);
-                    }}
-                    className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {(isRunning || isPaused) ? (
-              <p className="mt-2 text-xs text-amber-600">
-                Timer is active. If you leave the Book Hub or refresh the page, you may lose your session.
-              </p>
-            ) : null}
-
-            {timerSaveMessage ? (
-              <p className="mt-2 text-xs text-emerald-600">
-                {timerSaveMessage}
-              </p>
-            ) : null}
-
-            <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+            <div className="mt-6 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
               <button
                 type="button"
                 onClick={() => {
                   if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/weekly-readings`);
+                  router.push(`/vocab/single-add?userBookId=${row.id}`);
                 }}
-                className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
+                className="rounded-xl border border-stone-900 bg-rose-50 p-3 text-center transition hover:bg-rose-100"
               >
-                <div className="text-xs text-blue-700">Practice</div>
-                <div className="mt-1 font-medium text-stone-900">Kanji Readings</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/readalong`);
-                }}
-                className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
-              >
-                <div className="text-xs text-emerald-700">Read Along</div>
-                <div className="mt-1 font-medium text-stone-900">Book Support</div>
+                <div className="font-medium text-stone-900">Curiosity Reading</div>
+                <div className="mt-2 text-xs leading-5 text-stone-700">
+                  Read while saving vocab and logging a slower, mindful session.
+                </div>
               </button>
 
               <button
@@ -2834,8 +2669,38 @@ export default function BookHubPage() {
                 }}
                 className="rounded-xl border border-stone-900 bg-amber-50 p-3 text-center transition hover:bg-amber-100"
               >
-                <div className="text-xs text-amber-700">Study</div>
-                <div className="mt-1 font-medium text-stone-900">Study Flashcards</div>
+                <div className="font-medium text-stone-900">Study Flashcards</div>
+                <div className="mt-2 text-xs leading-5 text-stone-700">
+                  Review the words you saved from this book.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/readalong`);
+                }}
+                className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
+              >
+                <div className="font-medium text-stone-900">Fluid Reading</div>
+                <div className="mt-2 text-xs leading-5 text-stone-700">
+                  Read without lookups, use saved-word support, and log a quicker session.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/weekly-readings`);
+                }}
+                className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
+              >
+                <div className="font-medium text-stone-900">Kanji Readings</div>
+                <div className="mt-2 text-xs leading-5 text-stone-700">
+                  Practice onyomi and kunyomi from your saved vocabulary.
+                </div>
               </button>
             </div>
           </div>
@@ -2986,62 +2851,14 @@ export default function BookHubPage() {
 
           {activeTab === "study" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+              <div className="px-4 md:px-6">
                 <div className="text-base font-semibold text-stone-900">Vocab</div>
-
-                {!isEditingThisTab ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingTab("study")}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelEdits}
-                      className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveAll}
-                      disabled={saving}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                )}
               </div>
 
               <VocabTab
                 row={row}
                 vocabTab={vocabTab}
                 setVocabTab={setVocabTab}
-                isRunning={isRunning}
-                isPaused={isPaused}
-                quickWord={quickWord}
-                setQuickWord={setQuickWord}
-                quickLoading={quickLoading}
-                quickError={quickError}
-                pullQuickWord={pullQuickWord}
-                quickPreview={quickPreview}
-                setQuickPreview={setQuickPreview}
-                hideKanjiInReadingSupport={hideKanjiInReadingSupport}
-                setHideKanjiInReadingSupport={setHideKanjiInReadingSupport}
-                saveQuickWord={saveQuickWord}
-                quickSessionWords={quickSessionWords}
-                editingQuickSessionId={editingQuickSessionId}
-                editingQuickSessionWord={editingQuickSessionWord}
-                setEditingQuickSessionWord={setEditingQuickSessionWord}
-                startEditingQuickSessionWord={startEditingQuickSessionWord}
-                cancelEditingQuickSessionWord={cancelEditingQuickSessionWord}
-                saveEditedQuickSessionWord={saveEditedQuickSessionWord}
-                quickWordInputRef={quickWordInputRef}
               />
             </div>
           )}

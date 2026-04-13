@@ -1,3 +1,6 @@
+// Global Search Page
+// 
+
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";

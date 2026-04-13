@@ -1,3 +1,6 @@
+//Global Serach helper page
+// 
+
 "use client";
 
 import Link from "next/link";

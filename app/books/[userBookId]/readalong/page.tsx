@@ -1,3 +1,6 @@
+// Read Along Page
+// 
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -74,6 +77,9 @@ export default function ReadAlongPage() {
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const wordRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const scrollAnimationFrame = useRef<number | null>(null);
+
+    const [bookTitle, setBookTitle] = useState("");
+    const [bookCover, setBookCover] = useState("");
 
     useEffect(() => {
         async function loadWords() {
@@ -271,6 +277,7 @@ export default function ReadAlongPage() {
             start_page: startPageNum,
             end_page: endPageNum,
             minutes_read: minutesNum,
+            session_mode: "fluid",
         });
 
         if (error) {
@@ -285,7 +292,7 @@ export default function ReadAlongPage() {
         setIsRunning(false);
         setIsPaused(false);
         setSessionMinutesRead("");
-        setTimerSaveMessage("Your session has been saved in the Reading Tab.");
+        setTimerSaveMessage("Your fluid reading session has been saved in the Reading Tab.");
 
         setTimeout(() => {
             setTimerSaveMessage("");
@@ -356,6 +363,49 @@ export default function ReadAlongPage() {
     }, []);
 
     useEffect(() => {
+        async function loadBookInfo() {
+            if (!userBookId) return;
+
+            const { data: userBook, error: userBookError } = await supabase
+                .from("user_books")
+                .select("id, book_id")
+                .eq("id", userBookId)
+                .maybeSingle();
+
+            if (userBookError) {
+                console.error("Error loading user book info:", userBookError);
+                setBookTitle("");
+                setBookCover("");
+                return;
+            }
+
+            if (!userBook) {
+                setBookTitle("");
+                setBookCover("");
+                return;
+            }
+
+            const { data: book, error: bookError } = await supabase
+                .from("books")
+                .select("title, cover_url")
+                .eq("id", userBook.book_id)
+                .maybeSingle();
+
+            if (bookError) {
+                console.error("Error loading book details:", bookError);
+                setBookTitle("");
+                setBookCover("");
+                return;
+            }
+
+            setBookTitle(book?.title ?? "");
+            setBookCover(book?.cover_url ?? "");
+        }
+
+        loadBookInfo();
+    }, [userBookId]);
+
+    useEffect(() => {
         function handleBeforeUnload(e: BeforeUnloadEvent) {
             if (!isRunning && !isPaused) return;
             e.preventDefault();
@@ -389,49 +439,54 @@ export default function ReadAlongPage() {
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
             <div className="mx-auto max-w-4xl space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                        <h1 className="text-2xl font-semibold text-stone-900">Read Along</h1>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setSupportMode("full")}
-                            className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "full"
-                                ? "bg-stone-900 text-white"
-                                : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                }`}
-                        >
-                            <span className="sm:hidden">Full</span>
-                            <span className="hidden sm:inline">Full Support</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setSupportMode("reading")}
-                            className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "reading"
-                                ? "bg-stone-900 text-white"
-                                : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                }`}
-                        >
-                            <span className="sm:hidden">Reading</span>
-                            <span className="hidden sm:inline">Reading Support</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setSupportMode("meaning")}
-                            className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "meaning"
-                                ? "bg-stone-900 text-white"
-                                : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                }`}
-                        >
-                            <span className="sm:hidden">Meaning</span>
-                            <span className="hidden sm:inline">Meaning Support</span>
-                        </button>
-                    </div>
+                <div className="mb-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">
+                    <div className="text-sm font-semibold text-stone-900">non-looker-upper</div>
+                    <div className="mt-1 text-sm text-stone-500">noun · official Mekuru book club term</div>
+                    <p className="mt-2 text-sm text-stone-700">
+                        A reader who wants to immerse themselves in the story, keep reading, and practice fluid reading with their saved vocabulary.
+                    </p>
                 </div>
+
+                <div>
+                    <p className="text-sm text-stone-700">
+                        If that is you, Fluid Reading is your place!
+                    </p>
+
+                    <p className="mt-1 text-xs text-stone-500">
+                        Want to look up words while reading?{" "}
+                        <a
+                            href={`/vocab/single-add?userBookId=${userBookId}`}
+                            className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800"
+                        >
+                            Head to Curiosity Reading
+                        </a>
+                    </p>
+                </div>
+
+                <div>
+                    <h1 className="text-2xl font-semibold text-stone-900">Fluid Reading</h1>
+                    <p className="mt-1 text-sm text-stone-600">
+                        Review with your saved words or simply time your fluid reading.
+                    </p>
+                </div>
+
+                {bookTitle ? (
+                    <div className="flex items-center gap-3">
+                        {bookCover ? (
+                            <img
+                                src={bookCover}
+                                alt=""
+                                className="h-16 w-12 rounded object-cover"
+                            />
+                        ) : null}
+
+                        <div>
+                            <p className="text-sm text-gray-700">
+                                For book: <span className="font-medium">{bookTitle}</span>
+                            </p>
+                        </div>
+                    </div>
+                ) : null}
 
                 <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
                     <div className="flex flex-wrap items-center justify-center gap-2">
@@ -602,70 +657,108 @@ export default function ReadAlongPage() {
                     ) : null}
                 </div>
 
+                <div className="grid grid-cols-3 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setSupportMode("full")}
+                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "full"
+                            ? "bg-stone-900 text-white"
+                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                            }`}
+                    >
+                        <span className="sm:hidden">Full</span>
+                        <span className="hidden sm:inline">Full Support</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSupportMode("reading")}
+                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "reading"
+                            ? "bg-stone-900 text-white"
+                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                            }`}
+                    >
+                        <span className="sm:hidden">Reading</span>
+                        <span className="hidden sm:inline">Reading Support</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSupportMode("meaning")}
+                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "meaning"
+                            ? "bg-stone-900 text-white"
+                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                            }`}
+                    >
+                        <span className="sm:hidden">Meaning</span>
+                        <span className="hidden sm:inline">Meaning Support</span>
+                    </button>
+                </div>
+
                 <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
                     <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
                         <div className="space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <div className="text-base font-semibold text-stone-900">
-                                {currentPage.label}
+                                <div>
+                                    <div className="text-base font-semibold text-stone-900">
+                                        {currentPage.label}
+                                    </div>
+                                    <div className="text-xs text-stone-500 sm:text-sm">
+                                        {currentPage.words.length} saved word
+                                        {currentPage.words.length === 1 ? "" : "s"}
+                                    </div>
                                 </div>
-                                <div className="text-xs text-stone-500 sm:text-sm">
-                                {currentPage.words.length} saved word
-                                {currentPage.words.length === 1 ? "" : "s"}
-                                </div>
-                            </div>
 
-                            <div className="text-center text-xs text-stone-500 sm:text-sm">
-                                Tap the words to follow along with the book.
-                            </div>
+                                <div className="text-center text-xs text-stone-500 sm:text-sm">
+                                    Tap the words to follow along with the book.
+                                </div>
                             </div>
 
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                            <button
-                                type="button"
-                                onClick={goPrev}
-                                disabled={pageIndex === 0}
-                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                ← Previous
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                                <input
-                                type="number"
-                                min={1}
-                                value={jumpPageInput}
-                                onChange={(e) => setJumpPageInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    jumpToPage(Number(jumpPageInput));
-                                    }
-                                }}
-                                placeholder="Page"
-                                className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
-                                />
                                 <button
-                                type="button"
-                                onClick={() => jumpToPage(Number(jumpPageInput))}
-                                className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
+                                    type="button"
+                                    onClick={goPrev}
+                                    disabled={pageIndex === 0}
+                                    className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
-                                Go
+                                    ← Previous
+                                </button>
+
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={jumpPageInput}
+                                        onChange={(e) => setJumpPageInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                jumpToPage(Number(jumpPageInput));
+                                            }
+                                        }}
+                                        placeholder="Page"
+                                        className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => jumpToPage(Number(jumpPageInput))}
+                                        className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
+                                    >
+                                        Go
+                                    </button>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={goNext}
+                                    disabled={pageIndex === pages.length - 1}
+                                    className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    Next →
                                 </button>
                             </div>
-
-                            <button
-                                type="button"
-                                onClick={goNext}
-                                disabled={pageIndex === pages.length - 1}
-                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                Next →
-                            </button>
-                            </div>
                         </div>
-                        </div>
+                    </div>
 
                     <div
                         ref={scrollAreaRef}

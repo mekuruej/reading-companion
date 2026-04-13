@@ -431,7 +431,7 @@ export default function BooksPage() {
       ] = await Promise.all([
         supabase
           .from("user_book_reading_sessions")
-          .select("user_book_id, read_on, start_page, end_page, minutes_read")
+          .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode: mode")
           .in("user_book_id", userBookIds)
           .gte("read_on", startStr)
           .lt("read_on", endStr),
@@ -801,7 +801,7 @@ export default function BooksPage() {
 
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("user_book_id, start_page, end_page, minutes_read")
+      .select("user_book_id, start_page, end_page, minutes_read, session_mode: mode")
       .in("user_book_id", userBookIds);
 
     if (error) {
@@ -1717,7 +1717,7 @@ export default function BooksPage() {
         </div>
 
         <p className="mb-6 text-sm text-gray-600">
-          All study tools live inside each book. Click a cover to open its Book Hub.
+          All reading/study tools live inside each book. Click a cover to open its Book Hub.
         </p>
 
         {viewMode === "cover" ? (

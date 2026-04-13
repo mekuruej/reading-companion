@@ -1,3 +1,6 @@
+//Book Hub Word History Search Page
+// 
+
 "use client";
 
 import { useEffect, useState } from "react";

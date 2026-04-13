@@ -214,7 +214,7 @@ export default function StoryTab({
 }: StoryTabProps) {
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 pl-2">
         <StorySubTab active={storyTab === "characters"} onClick={() => setStoryTab("characters")}>
           Characters
         </StorySubTab>
