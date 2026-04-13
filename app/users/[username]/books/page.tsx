@@ -71,12 +71,11 @@ type ReadingSessionStats = {
 type MonthlyLibraryStats = {
   pagesRead: number;
   daysRead: number;
-  wordsSaved: number;
-  timeReadMinutes: number;
-  avgMinPerPage: number | null;
-  booksTouched: number;
   finishedBooks: number;
   avgWordsSavedPerFinishedBook: number | null;
+  curiosityTimeMinutes: number;
+  fluidTimeMinutes: number;
+  avgPagesPerSession: number | null;
 };
 
 type MonthOption = {
@@ -140,11 +139,6 @@ function formatMinutesAsReadableTime(totalMinutes: number) {
 
   if (minutes === 0) return `${hours} hr`;
   return `${hours} hr ${minutes} min`;
-}
-
-function formatAvgMinPerPage(value: number | null) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return value.toFixed(2);
 }
 
 function UserBar({
@@ -348,16 +342,17 @@ export default function BooksPage() {
   const [sortMode, setSortMode] = useState<"title" | "last_read" | "pace" | "lookups">("title");
 
   const monthOptions = getMonthOptions(12);
-  const [selectedMonth, setSelectedMonth] = useState<string>(monthOptions[1]?.value ?? monthOptions[0]?.value ?? "");
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    monthOptions[1]?.value ?? monthOptions[0]?.value ?? ""
+  );
   const [monthlyStats, setMonthlyStats] = useState<MonthlyLibraryStats>({
     pagesRead: 0,
     daysRead: 0,
-    wordsSaved: 0,
-    timeReadMinutes: 0,
-    avgMinPerPage: null,
-    booksTouched: 0,
     finishedBooks: 0,
     avgWordsSavedPerFinishedBook: null,
+    curiosityTimeMinutes: 0,
+    fluidTimeMinutes: 0,
+    avgPagesPerSession: null,
   });
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
 
@@ -365,9 +360,6 @@ export default function BooksPage() {
     viewingUserId && viewingUserId === meId
       ? "Me"
       : students.find((s) => s.id === viewingUserId)?.display_name || "Member";
-
-  const avgPagesPerDay =
-    monthlyStats.daysRead > 0 ? monthlyStats.pagesRead / monthlyStats.daysRead : null;
 
   async function loadMonthlyLibraryStats(userId: string, monthValue: string) {
     setMonthlyStatsLoading(true);
@@ -378,13 +370,13 @@ export default function BooksPage() {
       const { data: allUserBooksRows, error: userBooksErr } = await supabase
         .from("user_books")
         .select(`
-        id,
-        finished_at,
-        dnf_at,
-        books:book_id (
-        book_type
-      )
-      `)
+          id,
+          finished_at,
+          dnf_at,
+          books:book_id (
+            book_type
+          )
+        `)
         .eq("user_id", userId);
 
       if (userBooksErr) {
@@ -392,12 +384,11 @@ export default function BooksPage() {
         setMonthlyStats({
           pagesRead: 0,
           daysRead: 0,
-          wordsSaved: 0,
-          timeReadMinutes: 0,
-          avgMinPerPage: null,
-          booksTouched: 0,
           finishedBooks: 0,
           avgWordsSavedPerFinishedBook: null,
+          curiosityTimeMinutes: 0,
+          fluidTimeMinutes: 0,
+          avgPagesPerSession: null,
         });
         return;
       }
@@ -415,12 +406,11 @@ export default function BooksPage() {
         setMonthlyStats({
           pagesRead: 0,
           daysRead: 0,
-          wordsSaved: 0,
-          timeReadMinutes: 0,
-          avgMinPerPage: null,
-          booksTouched: 0,
           finishedBooks: 0,
           avgWordsSavedPerFinishedBook: null,
+          curiosityTimeMinutes: 0,
+          fluidTimeMinutes: 0,
+          avgPagesPerSession: null,
         });
         return;
       }
@@ -431,7 +421,7 @@ export default function BooksPage() {
       ] = await Promise.all([
         supabase
           .from("user_book_reading_sessions")
-          .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode: mode")
+          .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode")
           .in("user_book_id", userBookIds)
           .gte("read_on", startStr)
           .lt("read_on", endStr),
@@ -456,51 +446,60 @@ export default function BooksPage() {
       const words = wordRows ?? [];
 
       let pagesRead = 0;
-      let timeReadMinutes = 0;
+      let curiosityTimeMinutes = 0;
+      let fluidTimeMinutes = 0;
+      let totalSessionPages = 0;
+      let totalSessionCount = 0;
 
       const uniqueDays = new Set<string>();
-      const uniqueBooksTouched = new Set<string>();
-
-      for (const s of sessions) {
-        if (s.read_on) uniqueDays.add(s.read_on);
-        if (s.user_book_id) uniqueBooksTouched.add(String(s.user_book_id));
-
-        const startPage = Number(s.start_page);
-        const endPage = Number(s.end_page);
-
-        if (Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage) {
-          pagesRead += endPage - startPage + 1;
-        }
-
-        const minutes = Number(s.minutes_read);
-        if (Number.isFinite(minutes) && minutes > 0) {
-          timeReadMinutes += minutes;
-        }
-      }
-
       const savedCountsByBookId: Record<string, number> = {};
+
       for (const bookId of userBookIds) {
         savedCountsByBookId[bookId] = 0;
       }
 
-      for (const w of words) {
-        const bookId = String((w as any).user_book_id ?? "");
-        if (!bookId) continue;
+      for (const s of sessions as any[]) {
+        if (s.read_on) uniqueDays.add(s.read_on);
 
+        const startPage = Number(s.start_page);
+        const endPage = Number(s.end_page);
+        const minutes = s.minutes_read == null ? null : Number(s.minutes_read);
+        const sessionMode = (s.session_mode ?? "fluid") as string;
+
+        if (Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage) {
+          const sessionPages = endPage - startPage + 1;
+
+          pagesRead += sessionPages;
+          totalSessionPages += sessionPages;
+          totalSessionCount += 1;
+
+          if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
+            if (sessionMode === "curiosity") {
+              curiosityTimeMinutes += minutes;
+            } else {
+              fluidTimeMinutes += minutes;
+            }
+          }
+        }
+      }
+
+      for (const w of words as any[]) {
+        const bookId = String(w.user_book_id ?? "");
+        if (!bookId) continue;
         savedCountsByBookId[bookId] = (savedCountsByBookId[bookId] ?? 0) + 1;
-        uniqueBooksTouched.add(bookId);
       }
 
       const finishedBookIds = filteredUserBooks
-        .filter((r: any) => !!r.finished_at && !r.dnf_at && r.finished_at >= startStr && r.finished_at < endStr)
+        .filter(
+          (r: any) =>
+            !!r.finished_at &&
+            !r.dnf_at &&
+            r.finished_at >= startStr &&
+            r.finished_at < endStr
+        )
         .map((r: any) => r.id);
 
       const finishedBooks = finishedBookIds.length;
-
-      const wordsSaved = Object.values(savedCountsByBookId).reduce(
-        (sum, count) => sum + count,
-        0
-      );
 
       const wordsSavedForFinishedBooks = finishedBookIds.reduce(
         (sum, bookId) => sum + (savedCountsByBookId[bookId] ?? 0),
@@ -510,18 +509,17 @@ export default function BooksPage() {
       const avgWordsSavedPerFinishedBook =
         finishedBooks > 0 ? wordsSavedForFinishedBooks / finishedBooks : null;
 
-      const avgMinPerPage =
-        pagesRead > 0 && timeReadMinutes > 0 ? timeReadMinutes / pagesRead : null;
+      const avgPagesPerSession =
+        totalSessionCount > 0 ? totalSessionPages / totalSessionCount : null;
 
       setMonthlyStats({
         pagesRead,
         daysRead: uniqueDays.size,
-        wordsSaved,
-        timeReadMinutes,
-        avgMinPerPage,
-        booksTouched: uniqueBooksTouched.size,
         finishedBooks,
         avgWordsSavedPerFinishedBook,
+        curiosityTimeMinutes,
+        fluidTimeMinutes,
+        avgPagesPerSession,
       });
     } finally {
       setMonthlyStatsLoading(false);
@@ -562,13 +560,13 @@ export default function BooksPage() {
         progress_mode,
         show_page_numbers,
         books (
-        id,
-        title,
-        author,
-        cover_url,
-        page_count,
-        book_type
-      )
+          id,
+          title,
+          author,
+          cover_url,
+          page_count,
+          book_type
+        )
       `)
       .eq("user_id", targetUserId)
       .order("created_at", { ascending: false });
@@ -703,18 +701,18 @@ export default function BooksPage() {
     const { data, error } = await supabase
       .from("book_requests")
       .select(`
-      id,
-      title,
-      author,
-      isbn13,
-      status,
-      created_at,
-      user_id,
-      profiles:user_id (
-        display_name,
-        username
-      )
-    `)
+        id,
+        title,
+        author,
+        isbn13,
+        status,
+        created_at,
+        user_id,
+        profiles:user_id (
+          display_name,
+          username
+        )
+      `)
       .eq("status", "pending")
       .order("created_at", { ascending: false });
 
@@ -819,9 +817,6 @@ export default function BooksPage() {
       console.error("Error loading lookup stats for library:", wordErr);
     }
 
-    console.log("userBookIds from library", userBookIds);
-    console.log("wordRows sample", wordRows?.slice(0, 20));
-
     const grouped: Record<
       string,
       {
@@ -897,9 +892,6 @@ export default function BooksPage() {
         wordsLookedUp: lookupCountsByUserBookId[userBookId] ?? 0,
       };
     }
-
-    console.log("lookupCountsByUserBookId", lookupCountsByUserBookId);
-    console.log("stats", stats);
 
     setReadingStatsByUserBookId(stats);
   }
@@ -1321,12 +1313,6 @@ export default function BooksPage() {
                 <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
               ) : null}
               <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
-              <div>
-                Avg:{" "}
-                {readingStatsByUserBookId[row.id]?.averageMinutesPerPage != null
-                  ? `${readingStatsByUserBookId[row.id].averageMinutesPerPage!.toFixed(2)} min/page`
-                  : "—"}
-              </div>
             </div>
           ) : row.dnf_at ? (
             <div className="text-[11px] text-gray-400">
@@ -1336,7 +1322,7 @@ export default function BooksPage() {
             <div className="space-y-1">
               <div className="text-[11px] text-gray-600">
                 {readingStatsByUserBookId[row.id]?.progressPercent != null &&
-                  readingStatsByUserBookId[row.id]?.furthestPage != null
+                readingStatsByUserBookId[row.id]?.furthestPage != null
                   ? `${readingStatsByUserBookId[row.id].progressPercent}% · p.${readingStatsByUserBookId[row.id].furthestPage}`
                   : "In progress"}
               </div>
@@ -1366,7 +1352,6 @@ export default function BooksPage() {
     if (!book) return null;
 
     const stats = readingStatsByUserBookId[row.id];
-    console.log("book row", row.id, row.books?.title, stats?.wordsLookedUp);
     const status = getStatusLabel(row);
 
     return (
@@ -1478,14 +1463,14 @@ export default function BooksPage() {
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Pages</div>
+                <div className="text-[11px] text-slate-600">Total Pages</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Days</div>
+                <div className="text-[11px] text-slate-600">Total Days</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
                 </div>
@@ -1493,7 +1478,7 @@ export default function BooksPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Avg Words Saved / Book</div>
+                <div className="text-[11px] text-slate-600">Avg Words / Finished Book</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading
                     ? "…"
@@ -1501,32 +1486,33 @@ export default function BooksPage() {
                       ? Math.round(monthlyStats.avgWordsSavedPerFinishedBook)
                       : "—"}
                 </div>
-                <div className="mt-1 text-[10px] text-slate-500">From your finished books this month</div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Time</div>
+                <div className="text-[11px] text-slate-600">Curiosity Reading Time</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading
                     ? "…"
-                    : formatMinutesAsReadableTime(monthlyStats.timeReadMinutes)}
+                    : formatMinutesAsReadableTime(monthlyStats.curiosityTimeMinutes)}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Avg min/page</div>
+                <div className="text-[11px] text-slate-600">Fluid Reading Time</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : formatAvgMinPerPage(monthlyStats.avgMinPerPage)}
+                  {monthlyStatsLoading
+                    ? "…"
+                    : formatMinutesAsReadableTime(monthlyStats.fluidTimeMinutes)}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Avg pages/day</div>
+                <div className="text-[11px] text-slate-600">Pages / Session</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading
                     ? "…"
-                    : avgPagesPerDay != null
-                      ? avgPagesPerDay.toFixed(1)
+                    : monthlyStats.avgPagesPerSession != null
+                      ? monthlyStats.avgPagesPerSession.toFixed(1)
                       : "—"}
                 </div>
               </div>
@@ -1650,15 +1636,13 @@ export default function BooksPage() {
           <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
             <button
               onClick={() => setViewMode("cover")}
-              className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
-                }`}
+              className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"}`}
             >
               Cover
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
-                }`}
+              className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"}`}
             >
               List
             </button>
@@ -1930,6 +1914,6 @@ export default function BooksPage() {
           </>
         )}
       </div>
-    </main >
+    </main>
   );
 }
