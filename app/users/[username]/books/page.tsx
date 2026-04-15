@@ -1,4 +1,5 @@
 // Library
+//
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -73,12 +74,13 @@ type MonthlyLibraryStats = {
   pagesRead: number;
   daysRead: number;
   finishedBooks: number;
-  avgWordsSavedPerFinishedBook: number | null;
   curiosityTimeMinutes: number;
   fluidTimeMinutes: number;
   listeningTimeMinutes: number;
   avgPagesPerSession: number | null;
   totalWordsLookedUp: number;
+  mostEngagedTitle: string | null;
+  mostEngagedDetail: string | null;
 };
 
 type MonthOption = {
@@ -367,12 +369,13 @@ export default function BooksPage() {
     pagesRead: 0,
     daysRead: 0,
     finishedBooks: 0,
-    avgWordsSavedPerFinishedBook: null,
     curiosityTimeMinutes: 0,
     fluidTimeMinutes: 0,
     listeningTimeMinutes: 0,
     avgPagesPerSession: null,
     totalWordsLookedUp: 0,
+    mostEngagedTitle: null,
+    mostEngagedDetail: null,
   });
 
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
@@ -391,13 +394,14 @@ export default function BooksPage() {
       const { data: allUserBooksRows, error: userBooksErr } = await supabase
         .from("user_books")
         .select(`
-          id,
-          finished_at,
-          dnf_at,
-          books:book_id (
-            book_type
-          )
-        `)
+        id,
+        finished_at,
+        dnf_at,
+        books:book_id (
+          title,
+          book_type
+        )
+      `)
         .eq("user_id", userId);
 
       if (userBooksErr) {
@@ -406,12 +410,13 @@ export default function BooksPage() {
           pagesRead: 0,
           daysRead: 0,
           finishedBooks: 0,
-          avgWordsSavedPerFinishedBook: null,
           curiosityTimeMinutes: 0,
           fluidTimeMinutes: 0,
           listeningTimeMinutes: 0,
           avgPagesPerSession: null,
           totalWordsLookedUp: 0,
+          mostEngagedTitle: null,
+          mostEngagedDetail: null,
         });
         return;
       }
@@ -430,12 +435,13 @@ export default function BooksPage() {
           pagesRead: 0,
           daysRead: 0,
           finishedBooks: 0,
-          avgWordsSavedPerFinishedBook: null,
           curiosityTimeMinutes: 0,
           fluidTimeMinutes: 0,
           listeningTimeMinutes: 0,
           avgPagesPerSession: null,
           totalWordsLookedUp: 0,
+          mostEngagedTitle: null,
+          mostEngagedDetail: null,
         });
         return;
       }
@@ -453,7 +459,7 @@ export default function BooksPage() {
 
         supabase
           .from("user_book_words")
-          .select("user_book_id, created_at")
+          .select("user_book_id, created_at, surface, meaning")
           .in("user_book_id", userBookIds)
           .gte("created_at", `${startStr}T00:00:00`)
           .lt("created_at", `${endStr}T00:00:00`),
@@ -469,7 +475,41 @@ export default function BooksPage() {
 
       const sessions = sessionRows ?? [];
       const words = wordRows ?? [];
-      const totalWordsLookedUp = words.length;
+
+      const engagementByUserBookId: Record<
+        string,
+        {
+          title: string;
+          sessionCount: number;
+          wordCount: number;
+          distinctDays: Set<string>;
+        }
+      > = {};
+
+      for (const row of filteredUserBooks as any[]) {
+        engagementByUserBookId[row.id] = {
+          title: row.books?.title ?? "Untitled",
+          sessionCount: 0,
+          wordCount: 0,
+          distinctDays: new Set<string>(),
+        };
+      }
+
+      const uniqueWordSet = new Set<string>();
+
+      for (const w of words as any[]) {
+        const surface = (w.surface ?? "").trim();
+        const meaning = (w.meaning ?? "").trim();
+        if (!surface && !meaning) continue;
+
+        uniqueWordSet.add(`${surface}|||${meaning}`);
+
+        if (engagementByUserBookId[w.user_book_id]) {
+          engagementByUserBookId[w.user_book_id].wordCount += 1;
+        }
+      }
+
+      const totalWordsLookedUp = uniqueWordSet.size;
 
       let pagesRead = 0;
       let curiosityTimeMinutes = 0;
@@ -479,11 +519,6 @@ export default function BooksPage() {
       let totalSessionCount = 0;
 
       const uniqueDays = new Set<string>();
-      const savedCountsByBookId: Record<string, number> = {};
-
-      for (const bookId of userBookIds) {
-        savedCountsByBookId[bookId] = 0;
-      }
 
       for (const s of sessions as any[]) {
         if (s.read_on) uniqueDays.add(s.read_on);
@@ -492,6 +527,13 @@ export default function BooksPage() {
         const endPage = Number(s.end_page);
         const minutes = s.minutes_read == null ? null : Number(s.minutes_read);
         const sessionMode = (s.session_mode ?? "fluid") as string;
+
+        if (engagementByUserBookId[s.user_book_id]) {
+          engagementByUserBookId[s.user_book_id].sessionCount += 1;
+          if (s.read_on) {
+            engagementByUserBookId[s.user_book_id].distinctDays.add(s.read_on);
+          }
+        }
 
         if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
           if (sessionMode === "curiosity") {
@@ -511,12 +553,6 @@ export default function BooksPage() {
         }
       }
 
-      for (const w of words as any[]) {
-        const bookId = String(w.user_book_id ?? "");
-        if (!bookId) continue;
-        savedCountsByBookId[bookId] = (savedCountsByBookId[bookId] ?? 0) + 1;
-      }
-
       const finishedBookIds = filteredUserBooks
         .filter(
           (r: any) =>
@@ -529,27 +565,37 @@ export default function BooksPage() {
 
       const finishedBooks = finishedBookIds.length;
 
-      const wordsSavedForFinishedBooks = finishedBookIds.reduce(
-        (sum, bookId) => sum + (savedCountsByBookId[bookId] ?? 0),
-        0
-      );
-
-      const avgWordsSavedPerFinishedBook =
-        finishedBooks > 0 ? wordsSavedForFinishedBooks / finishedBooks : null;
-
       const avgPagesPerSession =
         totalSessionCount > 0 ? totalSessionPages / totalSessionCount : null;
+
+      let mostEngagedTitle: string | null = null;
+      let mostEngagedDetail: string | null = null;
+      let bestScore = -1;
+
+      for (const entry of Object.values(engagementByUserBookId)) {
+        const distinctDayCount = entry.distinctDays.size;
+        const score = distinctDayCount * 100 + entry.sessionCount * 10 + entry.wordCount;
+
+        if (score > bestScore) {
+          bestScore = score;
+          mostEngagedTitle = entry.title;
+          mostEngagedDetail = `${distinctDayCount} day${distinctDayCount === 1 ? "" : "s"
+            } active · ${entry.sessionCount} session${entry.sessionCount === 1 ? "" : "s"
+            } · ${entry.wordCount} word${entry.wordCount === 1 ? "" : "s"} saved`;
+        }
+      }
 
       setMonthlyStats({
         pagesRead,
         daysRead: uniqueDays.size,
         finishedBooks,
-        avgWordsSavedPerFinishedBook,
         curiosityTimeMinutes,
         fluidTimeMinutes,
         listeningTimeMinutes,
         avgPagesPerSession,
         totalWordsLookedUp,
+        mostEngagedTitle,
+        mostEngagedDetail,
       });
     } finally {
       setMonthlyStatsLoading(false);
@@ -891,16 +937,30 @@ export default function BooksPage() {
       }
     }
 
-    const lookupCountsByUserBookId: Record<string, number> = {};
+    const lookupSetsByUserBookId: Record<string, Set<string>> = {};
 
     if (wordRows) {
       for (const row of wordRows as any[]) {
         const userBookId = row.user_book_id as string;
         if (!userBookId) continue;
 
-        lookupCountsByUserBookId[userBookId] =
-          (lookupCountsByUserBookId[userBookId] ?? 0) + 1;
+        const surface = (row.surface ?? "").trim();
+        const meaning = (row.meaning ?? "").trim();
+        if (!surface && !meaning) continue;
+
+        if (!lookupSetsByUserBookId[userBookId]) {
+          lookupSetsByUserBookId[userBookId] = new Set<string>();
+        }
+
+        lookupSetsByUserBookId[userBookId].add(`${surface}|||${meaning}`);
       }
+    }
+
+    const lookupCountsByUserBookId: Record<string, number> = {};
+
+    for (const userBookId of Object.keys(lookupSetsByUserBookId)) {
+      lookupCountsByUserBookId[userBookId] =
+        lookupSetsByUserBookId[userBookId].size;
     }
 
     const stats: Record<string, ReadingSessionStats> = {};
@@ -1509,7 +1569,26 @@ export default function BooksPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Time Spent</div>
+                <div className="text-[11px] text-slate-600">Words Saved</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading ? "…" : monthlyStats.totalWordsLookedUp}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
+                <div className="text-xs text-slate-600">Books Finished</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {monthlyStats.finishedBooks === 0
+                    ? "All books still in progress"
+                    : `${monthlyStats.finishedBooks} ${monthlyStats.finishedBooks === 1 ? "book" : "books"
+                    }`}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
+                <div className="text-xs text-slate-600">Time Spent</div>
                 <div className="mt-1 space-y-0.5 text-sm text-slate-900">
                   {monthlyStatsLoading ? (
                     <div>…</div>
@@ -1545,28 +1624,19 @@ export default function BooksPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Words Looked Up</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : monthlyStats.totalWordsLookedUp}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
-                <div className="text-xs text-slate-600">Books Finished</div>
-                <div className="mt-1 text-sm font-medium text-slate-900">
-                  {monthlyStats.finishedBooks === 0
-                    ? "All books still in progress"
-                    : `${monthlyStats.finishedBooks} ${monthlyStats.finishedBooks === 1 ? "book" : "books"
-                    }`}
-                </div>
-              </div>
-
               <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
                 <div className="text-xs text-slate-600">Most Engaged</div>
-                <div className="mt-1 text-sm font-medium text-slate-900">Coming soon…</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {monthlyStatsLoading
+                    ? "…"
+                    : monthlyStats.mostEngagedTitle ?? "No activity yet"}
+                </div>
+
+                {!monthlyStatsLoading && monthlyStats.mostEngagedDetail ? (
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    {monthlyStats.mostEngagedDetail}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

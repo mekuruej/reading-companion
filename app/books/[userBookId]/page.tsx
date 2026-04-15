@@ -704,9 +704,14 @@ export default function BookHubPage() {
   }, [totalTimedMinutes, totalTimedPages]);
 
   const furthestPage = useMemo(() => {
-    if (visualReadingSessions.length === 0) return null;
-    return Math.max(...visualReadingSessions.map((s) => s.end_page));
-  }, [visualReadingSessions]);
+    const sessionsWithEndPage = realReadingSessions.filter(
+      (s) => s.end_page != null
+    );
+
+    if (sessionsWithEndPage.length === 0) return null;
+
+    return Math.max(...sessionsWithEndPage.map((s) => s.end_page));
+  }, [realReadingSessions]);
 
   const earliestStartPage = useMemo(() => {
     if (visualReadingSessions.length === 0) return null;
@@ -1670,8 +1675,14 @@ export default function BookHubPage() {
   async function saveReadingSession() {
     if (!row?.id) return;
 
-    const start = sessionStartPage.trim() === "" ? null : Number(sessionStartPage);
-    const end = sessionEndPage.trim() === "" ? null : Number(sessionEndPage);
+    const start =
+      sessionMode === "listening" || sessionStartPage.trim() === ""
+        ? null
+        : Number(sessionStartPage);
+
+    const end =
+      sessionEndPage.trim() === "" ? null : Number(sessionEndPage);
+
     const minutesFromInput =
       sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
 
@@ -1700,6 +1711,11 @@ export default function BookHubPage() {
         alert("End page must be greater than or equal to start page.");
         return;
       }
+    } else {
+      if (end !== null && (!Number.isFinite(end) || end <= 0)) {
+        alert("Listening end page must be greater than 0 if provided.");
+        return;
+      }
     }
 
     if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
@@ -1711,7 +1727,7 @@ export default function BookHubPage() {
       user_book_id: row.id,
       read_on: sessionDate,
       start_page: sessionMode === "listening" ? null : start,
-      end_page: sessionMode === "listening" ? null : end,
+      end_page: end,
       minutes_read: minutes,
       session_mode: sessionMode,
     };

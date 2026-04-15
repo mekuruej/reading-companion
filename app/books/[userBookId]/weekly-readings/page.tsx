@@ -21,6 +21,7 @@ type UserBookWordRow = {
 
 type QuizCard = {
   key: string;
+  kanjiMapId: number;
   kanji: string;
   reading: string;
   readingType: "onyomi" | "kunyomi" | "other" | null;
@@ -157,6 +158,8 @@ export default function WeeklyReadingsPage() {
   const [usedRecallWords, setUsedRecallWords] = useState<string[]>([]);
   const [cardsSinceLastRecall, setCardsSinceLastRecall] = useState(0);
 
+  const [notice, setNotice] = useState<string | null>(null);
+
   const [includeOkurigana, setIncludeOkurigana] = useState(false);
 
   const [chapterFilter, setChapterFilter] = useState<string>("all");
@@ -184,6 +187,47 @@ export default function WeeklyReadingsPage() {
     setUsedRecallWords([]);
     setCardsSinceLastRecall(0);
   }, [filteredBaseCards]);
+
+  async function flagKanjiCardForReview(card: QuizCard) {
+
+    const flaggedAt = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("vocabulary_kanji_map")
+      .update({
+        flagged_for_review: true,
+        excluded_from_kanji_practice: true,
+        flagged_by_user_id: null,
+        flagged_at: flaggedAt,
+      })
+      .eq("id", card.kanjiMapId)
+
+    if (error) {
+      console.error("Error flagging kanji card:", error);
+      return;
+    }
+
+    // Assumes you already know the super teacher user id.
+    // Replace this with your real super teacher id for now.
+    const { data: authForAlert } = await supabase.auth.getUser();
+    const SUPER_TEACHER_ID = authForAlert?.user?.id;
+    if (!SUPER_TEACHER_ID) return;
+
+    const { error: alertError } = await supabase.from("user_alerts").insert({
+      user_id: SUPER_TEACHER_ID,
+      user_book_id: userBookId,
+      type: "kanji_flag",
+      message: `Kanji reading flagged: ${card.kanji} in ${card.sourceWord}`,
+    });
+
+    if (alertError) {
+      console.error("Error creating kanji flag alert:", alertError);
+    }
+
+    setNotice("✅ Flagged for review");
+    setDeck((prev) => prev.filter((c) => c.kanjiMapId !== card.kanjiMapId));
+    setBaseCards((prev) => prev.filter((c) => c.kanjiMapId !== card.kanjiMapId));
+  }
 
   useEffect(() => {
     if (!userBookId) return;
@@ -243,9 +287,10 @@ export default function WeeklyReadingsPage() {
         const { data: kanjiMapRows, error: kanjiMapErr } = await supabase
           .from("vocabulary_kanji_map")
           .select(
-            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, created_at"
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, created_at, flagged_for_review, excluded_from_kanji_practice"
           )
           .in("vocabulary_cache_id", vocabularyCacheIds)
+          .eq("excluded_from_kanji_practice", false)
           .order("created_at", { ascending: false });
 
         if (kanjiMapErr) throw kanjiMapErr;
@@ -286,6 +331,7 @@ export default function WeeklyReadingsPage() {
 
                 return {
                   key: `${r.id}-${km.kanji}-${i}`,
+                  kanjiMapId: km.id,
                   kanji: km.kanji,
                   reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
                   baseReading: km.base_reading?.trim() || null,
@@ -1035,7 +1081,20 @@ export default function WeeklyReadingsPage() {
       <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
         Kanji have many possible readings. These readings are for specific words in your reading. Focus on the connection and watch for it when you meet it again. These are not the only fixed readings for the kanji.
       </p>
+
       <div className="mt-4 flex flex-col items-center gap-2">
+        <button
+          onClick={() => {
+            if (!card) return;
+            flagKanjiCardForReview(card);
+          }}
+          className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-800 rounded hover:bg-amber-100 transition"
+        >
+          Flag this reading
+        </button>
+        {notice && (
+          <p className="text-sm text-green-700">{notice}</p>
+        )}
         <button
           onClick={finishForToday}
           className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"

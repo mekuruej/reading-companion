@@ -64,6 +64,13 @@ type WordRow = {
   hidden: boolean | null;
   skipped_on: string | null;
   kanji_meta: KanjiMetaItem[] | null;
+  flagged_for_review: boolean | null;
+  excluded_from_flashcards: boolean | null;
+  flag_note: string | null;
+  flagged_by_user_id: string | null;
+  flagged_at: string | null;
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
 };
 
 type Flashcard = {
@@ -361,10 +368,18 @@ export default function BookFlashcardsPage() {
                 meaning_choice_index,
                 hidden,
                 skipped_on,
+                flagged_for_review,
+                excluded_from_flashcards,
+                flag_note,
+                flagged_by_user_id,
+                flagged_at,
+                reviewed_by_user_id,
+                reviewed_at,
                 kanji_meta
               `
               )
               .in("user_book_id", ownedBookIds)
+              .eq("excluded_from_flashcards", false)
               .eq("hidden", false)
               .order("page_number", { ascending: true })
               .order("created_at", { ascending: true });
@@ -459,11 +474,19 @@ export default function BookFlashcardsPage() {
             meaning_choice_index,
             hidden,
             skipped_on,
+            flagged_for_review,
+            excluded_from_flashcards,
+            flag_note,
+            flagged_by_user_id,
+            flagged_at,
+            reviewed_by_user_id,
+            reviewed_at,
             kanji_meta
           `
           )
           .eq("user_book_id", userBookId)
           .eq("hidden", false)
+          .eq("excluded_from_flashcards", false)
           .or(`skipped_on.is.null,skipped_on.neq.${today}`)
           .order("page_number", { ascending: true })
           .order("created_at", { ascending: true });
@@ -1000,6 +1023,27 @@ export default function BookFlashcardsPage() {
     setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
   }
 
+  async function flagCardForReview(cardId: string) {
+    const { error } = await supabase
+      .from("user_book_words")
+      .update({
+        flagged_for_review: true,
+        excluded_from_flashcards: true,
+        flagged_by_user_id: meId || null,
+        flagged_at: new Date().toISOString(),
+      })
+      .eq("id", cardId);
+
+    if (error) {
+      console.error("Error flagging card for review:", error);
+      return;
+    }
+
+    setCards((prev) => prev.filter((c) => c.id !== cardId));
+    setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
+    setLibraryCards((prev) => prev.filter((c) => c.id !== cardId));
+  }
+
   async function hideCardPermanently(cardId: string) {
     const { error } = await supabase
       .from("user_book_words")
@@ -1093,15 +1137,13 @@ export default function BookFlashcardsPage() {
         return;
       }
 
-      setTypedInput("");
-      setInputResetKey((k) => k + 1);
       setTypedFeedback({
         ok: false,
-        message: `✓ Your answer works. Full meaning: ${card.meaning || "—"}`,
+        message: `Correct: ${card.meaning || "—"}`,
       });
       setTypeRevealIndex(steps.length - 1);
       setLastTypedResult("wrong");
-      setReadyForNextCard(true);
+      setReadyForNextCard(false);
       return;
     }
 
@@ -1129,15 +1171,13 @@ export default function BookFlashcardsPage() {
         return;
       }
 
-      setTypedInput("");
-      setInputResetKey((k) => k + 1);
       setTypedFeedback({
         ok: false,
         message: `Correct: ${card.meaning || "—"}`,
       });
       setTypeRevealIndex(steps.length - 1);
       setLastTypedResult("wrong");
-      setReadyForNextCard(true);
+      setReadyForNextCard(false);
       return;
     }
 
@@ -1742,126 +1782,109 @@ export default function BookFlashcardsPage() {
               />
 
               {currentTypeAnswerField ? (
-                !(studySet === "MEANING" && typedFeedback && !typedFeedback.ok) ? (
-                  <div className="w-full max-w-md">
-                    <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                      Type{" "}
-                      {studySet === "READING"
-                        ? "Reading"
-                        : studySet === "MEANING"
-                          ? "Meaning"
-                          : studySet === "FROM_READING_MEANING"
-                            ? "Meaning"
-                            : "Answer"}
-                    </div>
-
-                    {studySet === "READING" ? (
-                      <p className="mb-2 text-xs text-gray-500">
-                        Reading quizzes can be answered in hiragana or katakana.
-                      </p>
-                    ) : null}
-
-                    <div className="flex gap-2">
-                      <input
-                        key={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
-                        type="text"
-                        value={typedInput}
-                        onChange={(e) => {
-                          setTypedInput(e.target.value);
-
-                          if (!(studySet === "READING" && typedFeedback && !typedFeedback.ok)) {
-                            setTypedFeedback(null);
-                            setLastTypedResult(null);
-                          }
-
-                          setReadyForNextCard(false);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            if (readyForNextCard) {
-                              goToNextWord(lastTypedResult ?? "revealed");
-                              return;
-                            }
-
-                            checkTypedAnswer();
-                          }
-                        }}
-                        inputMode="text"
-                        lang={studySet === "READING" ? "ja" : undefined}
-                        autoCorrect="off"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        autoFocus
-                        className="border p-2 rounded w-full"
-                        placeholder={
-                          readyForNextCard
-                            ? "Press Enter for next card"
-                            : studySet === "READING"
-                              ? "かなで入力（ひらがな・カタカナどちらでもOK）"
-                              : studySet === "MEANING"
-                                ? "Type a meaning"
-                                : studySet === "FROM_READING_MEANING"
-                                  ? "Type a meaning"
-                                  : "Type your answer"
-                        }
-                      />
-                    </div>
-
-                    {typedFeedback ? (
-                      <div className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"}`}>
-                        <p>
-                          {typedFeedback.ok ? "✅ " : "❌ "}
-                          {typedFeedback.message}
-                        </p>
-
-                        {!typedFeedback.ok && studySet === "READING" ? (
-                          <p className="mt-1 text-xs text-slate-500">
-                            Type the correct reading to continue.
-                          </p>
-                        ) : null}
-
-                        {!typedFeedback.ok && studySet === "MEANING" ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              goToNextWord("wrong");
-                            }}
-                            className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
-                          >
-                            Next
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null
-              ) : null}
-
-              {studySet === "MEANING" && typedFeedback && !typedFeedback.ok ? (
                 <div className="w-full max-w-md">
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>
-                      ❌ {typedFeedback.message}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        goToNextWord("wrong");
-                      }}
-                      className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
-                    >
-                      Next
-                    </button>
+                  <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+                    Type{" "}
+                    {studySet === "READING"
+                      ? "Reading"
+                      : studySet === "MEANING"
+                        ? "Meaning"
+                        : studySet === "FROM_READING_MEANING"
+                          ? "Meaning"
+                          : "Answer"}
                   </div>
+
+                  {studySet === "READING" ? (
+                    <p className="mb-2 text-xs text-gray-500">
+                      Reading quizzes can be answered in hiragana or katakana.
+                    </p>
+                  ) : null}
+
+                  <div className="flex gap-2">
+                    <input
+                      key={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
+                      type="text"
+                      value={typedInput}
+                      onChange={(e) => {
+                        setTypedInput(e.target.value);
+
+                        if (!typedFeedback) {
+                          setLastTypedResult(null);
+                        } else if (studySet === "READING" && typedFeedback && typedFeedback.ok) {
+                          setTypedFeedback(null);
+                          setLastTypedResult(null);
+                        }
+
+                        setReadyForNextCard(false);
+                      }}
+
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          if (readyForNextCard) {
+                            goToNextWord(lastTypedResult ?? "revealed");
+                            return;
+                          }
+
+                          checkTypedAnswer();
+                        }
+                      }}
+                      inputMode="text"
+                      lang={studySet === "READING" ? "ja" : undefined}
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      autoFocus
+                      className="border p-2 rounded w-full"
+                      placeholder={
+                        readyForNextCard
+                          ? "Press Enter for next card"
+                          : studySet === "READING"
+                            ? "かなで入力（ひらがな・カタカナどちらでもOK）"
+                            : studySet === "MEANING"
+                              ? "Type a meaning"
+                              : studySet === "FROM_READING_MEANING"
+                                ? "Type a meaning"
+                                : "Type your answer"
+                      }
+                    />
+                  </div>
+
+                  {typedFeedback ? (
+                    <div className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"}`}>
+                      <p>
+                        {typedFeedback.ok ? "✅ " : "❌ "}
+                        {typedFeedback.message}
+                      </p>
+
+                      {!typedFeedback.ok && studySet === "READING" ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Type the correct reading to continue.
+                        </p>
+                      ) : null}
+
+                      {!typedFeedback.ok &&
+                        (studySet === "MEANING" || studySet === "FROM_READING_MEANING") ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            goToNextWord("wrong");
+                          }}
+                          className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
+                        >
+                          Next
+                        </button>
+                      ) : null}
+
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </>
+            
           ) : card ? (
             <>
               <Row label="Word" value={card.word} visible={showWord} big placeholder="---" />
@@ -1927,7 +1950,20 @@ export default function BookFlashcardsPage() {
               </p>
             </div>
 
-            <div className="md:w-[220px]">
+            <div className="md:w-[220px] space-y-2">
+              <button
+                onClick={() => {
+                  if (!card) return;
+                  flagCardForReview(card.id);
+                }}
+                className="w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 hover:bg-amber-100 transition"
+              >
+                <div className="leading-tight">Flag</div>
+                <div className="text-[10px] font-normal text-amber-700">
+                  Problem card
+                </div>
+              </button>
+
               <button
                 onClick={() => {
                   if (!card) return;
@@ -1936,7 +1972,9 @@ export default function BookFlashcardsPage() {
                 className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-200 transition"
               >
                 <div className="leading-tight">Hide</div>
-                <div className="text-[10px] font-normal text-slate-500">Vocab List</div>
+                <div className="text-[10px] font-normal text-slate-500">
+                  I know this word
+                </div>
               </button>
             </div>
           </div>

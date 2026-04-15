@@ -325,6 +325,23 @@ export default function ReadingTab({
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 text-sm font-semibold text-stone-900">Log a Session</div>
 
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Session Type
+          </label>
+          <select
+            value={sessionMode}
+            onChange={(e) =>
+              setSessionMode(e.target.value as "fluid" | "curiosity" | "listening")
+            }
+            className="w-full rounded border bg-white px-2 py-1 text-sm sm:w-auto"
+          >
+            <option value="fluid">Fluid Reading</option>
+            <option value="curiosity">Curiosity Reading</option>
+            <option value="listening">Listening</option>
+          </select>
+        </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded border bg-white p-3 text-sm">
             <div className="text-stone-600">Date</div>
@@ -378,21 +395,22 @@ export default function ReadingTab({
             </>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Session Type
-            </label>
-            <select
-              value={sessionMode}
-              onChange={(e) =>
-                setSessionMode(e.target.value as "fluid" | "curiosity" | "listening")
-              }
-            >
-              <option value="fluid">Fluid Reading</option>
-              <option value="curiosity">Curiosity Reading</option>
-              <option value="listening">Listening</option>
-            </select>
-          </div>
+          {sessionMode === "listening" && (
+            <div className="rounded border bg-white p-3 text-sm">
+              <div className="text-stone-600">Listening end page (optional)</div>
+              <input
+                type="number"
+                min={1}
+                value={sessionEndPage}
+                onChange={(e) => setSessionEndPage(e.target.value)}
+                placeholder="e.g. 45"
+                className="mt-1 w-full rounded border px-2 py-1"
+              />
+              <p className="mt-2 text-xs text-stone-500">
+                Fill this in only if you want to update your book progress. It does not affect reading stats.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-3">
@@ -431,20 +449,37 @@ export default function ReadingTab({
                       <div>
                         <div className="font-medium">{session.read_on}</div>
                         <div className="mt-1">
-                          {session.start_page != null && session.end_page != null
-                            ? `p. ${session.start_page} → ${session.end_page}`
-                            : session.session_mode === "listening"
-                              ? "Listening session"
-                              : "Pages not recorded"}
+                          {session.session_mode === "listening" ? (
+                            session.end_page != null ? (
+                              `Listening · up to p. ${session.end_page}`
+                            ) : (
+                              "Listening session"
+                            )
+                          ) : session.start_page != null && session.end_page != null ? (
+                            `p. ${session.start_page} → ${session.end_page}`
+                          ) : (
+                            "Pages not recorded"
+                          )}
                         </div>
+
                         <div className="mt-1 text-stone-500">
-                          {pagesRead != null
-                            ? session.minutes_read != null
+                          {session.session_mode === "listening" ? (
+                            session.minutes_read != null
+                              ? session.end_page != null
+                                ? `${session.minutes_read} min · progress only`
+                                : `${session.minutes_read} min`
+                              : session.end_page != null
+                                ? "Progress only"
+                                : "Untimed"
+                          ) : pagesRead != null ? (
+                            session.minutes_read != null
                               ? `${session.minutes_read} min · ${pagesRead} pages`
                               : `Untimed · ${pagesRead} pages`
-                            : session.minutes_read != null
-                              ? `${session.minutes_read} min`
-                              : "Untimed"}
+                          ) : session.minutes_read != null ? (
+                            `${session.minutes_read} min`
+                          ) : (
+                            "Untimed"
+                          )}
                         </div>
                       </div>
 
