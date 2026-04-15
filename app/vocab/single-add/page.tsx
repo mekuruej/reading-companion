@@ -1,7 +1,10 @@
+//Curiosity Reading Page
+//
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import { KANJI_DATA } from "@/lib/kanjiData";
 
 type QuickPreview = {
   id: string | null;
@@ -36,6 +39,11 @@ type QuickSessionWord = {
   alternateSurface: string;
   hideKanjiInReadingSupport: boolean;
   pageOrder: number | null;
+};
+
+type KanjiEntry = {
+  kanji: string;
+  pieces: string[];
 };
 
 function formatTimer(seconds: number) {
@@ -104,6 +112,8 @@ export default function SingleAddPage() {
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [selectedPieces, setSelectedPieces] = useState<string[]>([]);
+
   const isEditingQuickWord = useMemo(() => !!quickPreview?.id, [quickPreview]);
 
   // Timer
@@ -117,6 +127,17 @@ export default function SingleAddPage() {
   const [sessionEndPage, setSessionEndPage] = useState("");
 
   const quickMetaStorageKey = `single-add-meta:${userBookId}`;
+
+  const PIECE_NORMALIZATION: Record<string, string> = {
+    氵: "水",
+    扌: "手",
+    亻: "人",
+    忄: "心",
+  };
+
+  function normalizePiece(piece: string) {
+    return PIECE_NORMALIZATION[piece] ?? piece;
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -637,6 +658,19 @@ export default function SingleAddPage() {
     setIsPaused(false);
     setMessage("");
   }
+
+
+
+  const filteredKanji = KANJI_DATA.filter((entry: KanjiEntry) => {
+    if (selectedPieces.length === 0) return false;
+
+    const normalizedSelected = selectedPieces.map(normalizePiece);
+    const normalizedEntryPieces = entry.pieces.map(normalizePiece);
+
+    return normalizedSelected.every((piece) =>
+      normalizedEntryPieces.includes(piece)
+    );
+  });
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">

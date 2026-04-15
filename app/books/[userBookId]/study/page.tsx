@@ -1715,7 +1715,11 @@ export default function BookFlashcardsPage() {
               <Row
                 label="Word"
                 value={card.word}
-                visible={studySet === "READING" || studySet === "MEANING"}
+                visible={
+                  studySet === "READING" ||
+                  studySet === "MEANING" ||
+                  (studySet === "FROM_READING_MEANING" && typedFeedback != null)
+                }
                 big
                 placeholder="---"
               />

@@ -580,7 +580,7 @@ export default function BookHubPage() {
   const [sessionStartPage, setSessionStartPage] = useState<string>("");
   const [sessionEndPage, setSessionEndPage] = useState<string>("");
   const [sessionMinutesRead, setSessionMinutesRead] = useState<string>("");
-  const [sessionMode, setSessionMode] = useState<"fluid" | "curiosity">("fluid");
+  const [sessionMode, setSessionMode] = useState<"fluid" | "curiosity" | "listening">("fluid");
 
   const [isRunning, setIsRunning] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -674,15 +674,21 @@ export default function BookHubPage() {
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
   const book = row?.books ?? null;
 
-  const totalPagesRead = useMemo(() => {
-    return realReadingSessions.reduce((sum, s) => {
-      return sum + (s.end_page - s.start_page + 1);
-    }, 0);
+  const visualReadingSessions = useMemo(() => {
+    return realReadingSessions.filter(
+      (s) => s.session_mode === "fluid" || s.session_mode === "curiosity"
+    );
   }, [realReadingSessions]);
 
   const timedSessions = useMemo(() => {
-    return realReadingSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
-  }, [realReadingSessions]);
+    return visualReadingSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
+  }, [visualReadingSessions]);
+
+  const totalPagesRead = useMemo(() => {
+    return visualReadingSessions.reduce((sum, s) => {
+      return sum + (s.end_page - s.start_page + 1);
+    }, 0);
+  }, [visualReadingSessions]);
 
   const totalTimedMinutes = useMemo(() => {
     return timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
@@ -698,23 +704,23 @@ export default function BookHubPage() {
   }, [totalTimedMinutes, totalTimedPages]);
 
   const furthestPage = useMemo(() => {
-    if (readingSessions.length === 0) return null;
-    return Math.max(...readingSessions.map((s) => s.end_page));
-  }, [readingSessions]);
+    if (visualReadingSessions.length === 0) return null;
+    return Math.max(...visualReadingSessions.map((s) => s.end_page));
+  }, [visualReadingSessions]);
 
   const earliestStartPage = useMemo(() => {
-    if (readingSessions.length === 0) return null;
-    return Math.min(...readingSessions.map((s) => s.start_page));
-  }, [readingSessions]);
+    if (visualReadingSessions.length === 0) return null;
+    return Math.min(...visualReadingSessions.map((s) => s.start_page));
+  }, [visualReadingSessions]);
 
   const canFillBeginningPages = useMemo(() => {
     return earliestStartPage != null && earliestStartPage > 1;
   }, [earliestStartPage]);
 
   const canFillEndingPages = useMemo(() => {
-    if (!finished || !book?.page_count || readingSessions.length === 0) return false;
+    if (!finished || !book?.page_count || visualReadingSessions.length === 0) return false;
     return furthestPage != null && furthestPage < book.page_count;
-  }, [finished, book?.page_count, readingSessions.length, furthestPage]);
+  }, [finished, book?.page_count, visualReadingSessions.length, furthestPage]);
 
   const progressPercent = useMemo(() => {
     if (finished) return 100;
@@ -723,9 +729,9 @@ export default function BookHubPage() {
   }, [book?.page_count, furthestPage, finished]);
 
   const lastReadDate = useMemo(() => {
-    if (realReadingSessions.length === 0) return null;
-    return realReadingSessions[0]?.read_on ?? null;
-  }, [realReadingSessions]);
+    if (visualReadingSessions.length === 0) return null;
+    return visualReadingSessions[0]?.read_on ?? null;
+  }, [visualReadingSessions]);
 
   const visibleReadingSessions = useMemo(() => {
     return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
@@ -1664,25 +1670,36 @@ export default function BookHubPage() {
   async function saveReadingSession() {
     if (!row?.id) return;
 
-    const start = Number(sessionStartPage);
-    const end = Number(sessionEndPage);
+    const start = sessionStartPage.trim() === "" ? null : Number(sessionStartPage);
+    const end = sessionEndPage.trim() === "" ? null : Number(sessionEndPage);
     const minutesFromInput =
       sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
-
 
     const minutes =
       showTimedSessionForm
         ? Math.max(1, Math.round(elapsed / 60))
         : minutesFromInput;
 
-    if (!sessionDate || !Number.isFinite(start) || !Number.isFinite(end)) {
-      alert("Please fill in date, start page, and end page.");
+    if (!sessionDate) {
+      alert("Please fill in the date.");
       return;
     }
 
-    if (start <= 0 || end <= 0) {
-      alert("Pages must be greater than 0.");
-      return;
+    if (sessionMode !== "listening") {
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        alert("Please fill in date, start page, and end page.");
+        return;
+      }
+
+      if ((start as number) <= 0 || (end as number) <= 0) {
+        alert("Pages must be greater than 0.");
+        return;
+      }
+
+      if ((end as number) < (start as number)) {
+        alert("End page must be greater than or equal to start page.");
+        return;
+      }
     }
 
     if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
@@ -1690,16 +1707,11 @@ export default function BookHubPage() {
       return;
     }
 
-    if (end < start) {
-      alert("End page must be greater than or equal to start page.");
-      return;
-    }
-
     const newSession = {
       user_book_id: row.id,
       read_on: sessionDate,
-      start_page: start,
-      end_page: end,
+      start_page: sessionMode === "listening" ? null : start,
+      end_page: sessionMode === "listening" ? null : end,
       minutes_read: minutes,
       session_mode: sessionMode,
     };
@@ -2442,6 +2454,18 @@ export default function BookHubPage() {
     return realReadingSessions.filter((s: any) => s.session_mode === "fluid");
   }, [realReadingSessions]);
 
+  const listeningSessions = useMemo(() => {
+    return realReadingSessions.filter((s: any) => s.session_mode === "listening");
+  }, [realReadingSessions]);
+
+  const timedListeningSessions = useMemo(() => {
+    return listeningSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
+  }, [listeningSessions]);
+
+  const listeningMinutes = useMemo(() => {
+    return timedListeningSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  }, [timedListeningSessions]);
+
   const timedCuriositySessions = useMemo(() => {
     return curiositySessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
   }, [curiositySessions]);
@@ -2669,15 +2693,17 @@ export default function BookHubPage() {
                 <div className="rounded-xl border bg-white p-3 text-center">
                   <div className="text-xs text-stone-500">Avg Pages/Session</div>
                   <div className="mt-1 font-medium">
-                    {realReadingSessions.length > 0
-                      ? (totalPagesRead / realReadingSessions.length).toFixed(1)
+                    {visualReadingSessions.length > 0
+                      ? (totalPagesRead / visualReadingSessions.length).toFixed(1)
                       : "—"}
                   </div>
                 </div>
 
                 <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Total Time Read</div>
-                  <div className="mt-1 font-medium">{formatMinutes(totalTimedMinutes)}</div>
+                  <div className="text-xs text-stone-500">Listening Time</div>
+                  <div className="mt-1 font-medium">
+                    {listeningMinutes > 0 ? formatMinutes(listeningMinutes) : "—"}
+                  </div>
                 </div>
 
                 <div className="rounded-xl border bg-white p-3 text-center">

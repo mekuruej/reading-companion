@@ -66,6 +66,7 @@ type ReadingSessionStats = {
   averageMinutesPerPage: number | null;
   furthestPage: number | null;
   wordsLookedUp: number | null;
+  lastEngagedAt: string | null; // ✅ NEW
 };
 
 type MonthlyLibraryStats = {
@@ -75,7 +76,9 @@ type MonthlyLibraryStats = {
   avgWordsSavedPerFinishedBook: number | null;
   curiosityTimeMinutes: number;
   fluidTimeMinutes: number;
+  listeningTimeMinutes: number;
   avgPagesPerSession: number | null;
+  totalWordsLookedUp: number;
 };
 
 type MonthOption = {
@@ -139,6 +142,21 @@ function formatMinutesAsReadableTime(totalMinutes: number) {
 
   if (minutes === 0) return `${hours} hr`;
   return `${hours} hr ${minutes} min`;
+}
+
+function formatRelativeDate(dateStr: string) {
+  const d = new Date(dateStr);
+  const now = new Date();
+
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+
+  return d.toLocaleDateString();
 }
 
 function UserBar({
@@ -319,18 +337,15 @@ export default function BooksPage() {
   const [formatFilter, setFormatFilter] = useState<string>("all");
   const [statsBookTypeFilter, setStatsBookTypeFilter] = useState<string>("all");
 
-  const hasAnyNotifyBanner = rows.some((row) => row.notify_banner);
   const isTeacher = myRole === "teacher";
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       const matchesBookType =
-        bookTypeFilter === "all" ||
-        row.books?.book_type === bookTypeFilter;
+        bookTypeFilter === "all" || row.books?.book_type === bookTypeFilter;
 
       const matchesFormat =
-        formatFilter === "all" ||
-        row.format_type === formatFilter;
+        formatFilter === "all" || row.format_type === formatFilter;
 
       return matchesBookType && matchesFormat;
     });
@@ -339,12 +354,15 @@ export default function BooksPage() {
   const validRows = filteredRows.filter((r) => !!r.books);
 
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
-  const [sortMode, setSortMode] = useState<"title" | "last_read" | "pace" | "lookups">("title");
+  const [sortMode, setSortMode] = useState<
+    "title" | "last_engaged" | "last_read"
+  >("title");
 
   const monthOptions = getMonthOptions(12);
   const [selectedMonth, setSelectedMonth] = useState<string>(
     monthOptions[1]?.value ?? monthOptions[0]?.value ?? ""
   );
+
   const [monthlyStats, setMonthlyStats] = useState<MonthlyLibraryStats>({
     pagesRead: 0,
     daysRead: 0,
@@ -352,8 +370,11 @@ export default function BooksPage() {
     avgWordsSavedPerFinishedBook: null,
     curiosityTimeMinutes: 0,
     fluidTimeMinutes: 0,
+    listeningTimeMinutes: 0,
     avgPagesPerSession: null,
+    totalWordsLookedUp: 0,
   });
+
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
 
   const viewingLabel =
@@ -388,7 +409,9 @@ export default function BooksPage() {
           avgWordsSavedPerFinishedBook: null,
           curiosityTimeMinutes: 0,
           fluidTimeMinutes: 0,
+          listeningTimeMinutes: 0,
           avgPagesPerSession: null,
+          totalWordsLookedUp: 0,
         });
         return;
       }
@@ -410,7 +433,9 @@ export default function BooksPage() {
           avgWordsSavedPerFinishedBook: null,
           curiosityTimeMinutes: 0,
           fluidTimeMinutes: 0,
+          listeningTimeMinutes: 0,
           avgPagesPerSession: null,
+          totalWordsLookedUp: 0,
         });
         return;
       }
@@ -444,10 +469,12 @@ export default function BooksPage() {
 
       const sessions = sessionRows ?? [];
       const words = wordRows ?? [];
+      const totalWordsLookedUp = words.length;
 
       let pagesRead = 0;
       let curiosityTimeMinutes = 0;
       let fluidTimeMinutes = 0;
+      let listeningTimeMinutes = 0;
       let totalSessionPages = 0;
       let totalSessionCount = 0;
 
@@ -466,20 +493,21 @@ export default function BooksPage() {
         const minutes = s.minutes_read == null ? null : Number(s.minutes_read);
         const sessionMode = (s.session_mode ?? "fluid") as string;
 
+        if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
+          if (sessionMode === "curiosity") {
+            curiosityTimeMinutes += minutes;
+          } else if (sessionMode === "listening") {
+            listeningTimeMinutes += minutes;
+          } else {
+            fluidTimeMinutes += minutes;
+          }
+        }
+
         if (Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage) {
           const sessionPages = endPage - startPage + 1;
-
           pagesRead += sessionPages;
           totalSessionPages += sessionPages;
           totalSessionCount += 1;
-
-          if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
-            if (sessionMode === "curiosity") {
-              curiosityTimeMinutes += minutes;
-            } else {
-              fluidTimeMinutes += minutes;
-            }
-          }
         }
       }
 
@@ -519,7 +547,9 @@ export default function BooksPage() {
         avgWordsSavedPerFinishedBook,
         curiosityTimeMinutes,
         fluidTimeMinutes,
+        listeningTimeMinutes,
         avgPagesPerSession,
+        totalWordsLookedUp,
       });
     } finally {
       setMonthlyStatsLoading(false);
@@ -769,7 +799,7 @@ export default function BooksPage() {
 
   async function handleApproveRequest(requestId: string) {
     try {
-      const { data, error } = await supabase.rpc("approve_book_request", {
+      const { error } = await supabase.rpc("approve_book_request", {
         request_id_input: requestId,
       });
 
@@ -799,32 +829,14 @@ export default function BooksPage() {
 
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("user_book_id, start_page, end_page, minutes_read, session_mode: mode")
+      .select("user_book_id, start_page, end_page, minutes_read, read_on")
       .in("user_book_id", userBookIds);
 
-    try {
-  const { data, error } = await supabase
-    .from("user_book_reading_sessions")
-    .select("user_book_id, minutes_read, start_page, end_page, read_on")
-    .in("user_book_id", userBookIds);
-
-  if (error) {
-    console.error("Error loading reading stats for library");
-    console.error("raw error:", error);
-    console.error("keys:", Object.keys(error || {}));
-    console.error("entries:", Object.entries(error || {}));
-    console.error("stringified:", JSON.stringify(error, null, 2));
-    console.error("prototype:", Object.getPrototypeOf(error));
-    setReadingStatsByUserBookId({});
-    return;
-  }
-
-  // continue...
-} catch (err) {
-  console.error("Caught exception loading reading stats:", err);
-  setReadingStatsByUserBookId({});
-}
-
+    if (error) {
+      console.error("Error loading reading stats for library:", error);
+      setReadingStatsByUserBookId({});
+      return;
+    }
 
     const { data: wordRows, error: wordErr } = await supabase
       .from("user_book_words")
@@ -841,6 +853,7 @@ export default function BooksPage() {
         furthestPage: number;
         totalTimedPages: number;
         totalTimedMinutes: number;
+        lastEngagedAt: string | null;
       }
     > = {};
 
@@ -849,15 +862,26 @@ export default function BooksPage() {
       const startPage = Number((row as any).start_page);
       const endPage = Number((row as any).end_page);
       const rawMinutes = (row as any).minutes_read;
-      const minutesRead = rawMinutes == null ? null : Number(rawMinutes);
+      const readOn = (row as any).read_on as string | null;
 
       if (!grouped[userBookId]) {
         grouped[userBookId] = {
           furthestPage: 0,
           totalTimedPages: 0,
           totalTimedMinutes: 0,
+          lastEngagedAt: null,
         };
       }
+
+      if (readOn) {
+        if (
+          !grouped[userBookId].lastEngagedAt ||
+          readOn > grouped[userBookId].lastEngagedAt
+        ) {
+          grouped[userBookId].lastEngagedAt = readOn;
+        }
+      }
+      const minutesRead = rawMinutes == null ? null : Number(rawMinutes);
 
       grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
 
@@ -891,6 +915,7 @@ export default function BooksPage() {
           averageMinutesPerPage: null,
           furthestPage: null,
           wordsLookedUp: lookupCountsByUserBookId[userBookId] ?? 0,
+          lastEngagedAt: null,
         };
         continue;
       }
@@ -908,6 +933,7 @@ export default function BooksPage() {
         averageMinutesPerPage,
         furthestPage: g.furthestPage,
         wordsLookedUp: lookupCountsByUserBookId[userBookId] ?? 0,
+        lastEngagedAt: g.lastEngagedAt ?? null,
       };
     }
 
@@ -1263,24 +1289,22 @@ export default function BooksPage() {
         return aBook.title.localeCompare(bBook.title);
       }
 
-      if (sortMode === "pace") {
-        const aPace =
-          readingStatsByUserBookId[a.id]?.averageMinutesPerPage ?? Number.MAX_SAFE_INTEGER;
-        const bPace =
-          readingStatsByUserBookId[b.id]?.averageMinutesPerPage ?? Number.MAX_SAFE_INTEGER;
-        return aPace - bPace;
+      if (sortMode === "last_engaged") {
+        const aDate = readingStatsByUserBookId[a.id]?.lastEngagedAt
+          ? new Date(readingStatsByUserBookId[a.id].lastEngagedAt!).getTime()
+          : 0;
+
+        const bDate = readingStatsByUserBookId[b.id]?.lastEngagedAt
+          ? new Date(readingStatsByUserBookId[b.id].lastEngagedAt!).getTime()
+          : 0;
+
+        return bDate - aDate;
       }
 
       if (sortMode === "last_read") {
         const aDate = a.finished_at ? new Date(a.finished_at).getTime() : 0;
         const bDate = b.finished_at ? new Date(b.finished_at).getTime() : 0;
         return bDate - aDate;
-      }
-
-      if (sortMode === "lookups") {
-        const aLookups = readingStatsByUserBookId[a.id]?.wordsLookedUp ?? -1;
-        const bLookups = readingStatsByUserBookId[b.id]?.wordsLookedUp ?? -1;
-        return bLookups - aLookups;
       }
 
       return getStatusOrder(a) - getStatusOrder(b);
@@ -1356,6 +1380,13 @@ export default function BooksPage() {
                   }}
                 />
               </div>
+              {readingStatsByUserBookId[row.id]?.lastEngagedAt ? (
+                <div className="mt-1 text-[10px] text-gray-500">
+                  Last engaged with{" "}
+                  {formatRelativeDate(readingStatsByUserBookId[row.id].lastEngagedAt!)
+                  }
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="text-[11px] text-gray-400">Not started</div>
@@ -1392,26 +1423,8 @@ export default function BooksPage() {
           <div className="truncate text-sm font-medium text-stone-900">{book.title}</div>
           <div className="mt-1 text-xs text-stone-500">{status}</div>
         </div>
-
-        <div className="w-32 shrink-0 text-right text-xs text-stone-600">
-          {sortMode === "lookups"
-            ? stats?.wordsLookedUp && stats.wordsLookedUp > 0
-              ? row.finished_at
-                ? `${stats.wordsLookedUp} saved`
-                : `${stats.wordsLookedUp} saved so far`
-              : "—"
-            : stats?.averageMinutesPerPage && stats.averageMinutesPerPage > 0
-              ? row.finished_at
-                ? `${stats.averageMinutesPerPage.toFixed(2)} min/page`
-                : `${stats.averageMinutesPerPage.toFixed(2)} min/page so far`
-              : "—"}
-        </div>
       </li>
     );
-  }
-
-  function getLastReadValue(stats: ReadingSessionStats | undefined) {
-    return stats?.furthestPage ?? -1;
   }
 
   return (
@@ -1479,69 +1492,83 @@ export default function BooksPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Total Pages</div>
+                <div className="text-[11px] text-slate-600">Pages Read</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Total Days</div>
+                <div className="text-[11px] text-slate-600">Days Engaged</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
                 </div>
-                <div className="mt-1 text-[10px] text-slate-500">Unique dates</div>
+                <div className="mt-1 text-[10px] text-slate-500">Read or listened</div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Avg Words / Finished Book</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading
-                    ? "…"
-                    : monthlyStats.avgWordsSavedPerFinishedBook != null
-                      ? Math.round(monthlyStats.avgWordsSavedPerFinishedBook)
-                      : "—"}
+                <div className="text-[11px] text-slate-600">Time Spent</div>
+                <div className="mt-1 space-y-0.5 text-sm text-slate-900">
+                  {monthlyStatsLoading ? (
+                    <div>…</div>
+                  ) : (
+                    <>
+                      {monthlyStats.fluidTimeMinutes > 0 ? (
+                        <div>
+                          Extensive: {formatMinutesAsReadableTime(monthlyStats.fluidTimeMinutes)}
+                        </div>
+                      ) : null}
+
+                      {monthlyStats.curiosityTimeMinutes > 0 ? (
+                        <div>
+                          Intensive:{" "}
+                          {formatMinutesAsReadableTime(monthlyStats.curiosityTimeMinutes)}
+                        </div>
+                      ) : null}
+
+                      {monthlyStats.listeningTimeMinutes > 0 ? (
+                        <div>
+                          Listening:{" "}
+                          {formatMinutesAsReadableTime(monthlyStats.listeningTimeMinutes)}
+                        </div>
+                      ) : null}
+
+                      {monthlyStats.fluidTimeMinutes === 0 &&
+                        monthlyStats.curiosityTimeMinutes === 0 &&
+                        monthlyStats.listeningTimeMinutes === 0 ? (
+                        <div>—</div>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Intensive Reading Time</div>
+                <div className="text-[11px] text-slate-600">Words Looked Up</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading
-                    ? "…"
-                    : formatMinutesAsReadableTime(monthlyStats.curiosityTimeMinutes)}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Extensive Reading Time</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading
-                    ? "…"
-                    : formatMinutesAsReadableTime(monthlyStats.fluidTimeMinutes)}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Pages / Session</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading
-                    ? "…"
-                    : monthlyStats.avgPagesPerSession != null
-                      ? monthlyStats.avgPagesPerSession.toFixed(1)
-                      : "—"}
+                  {monthlyStatsLoading ? "…" : monthlyStats.totalWordsLookedUp}
                 </div>
               </div>
             </div>
 
-            {!monthlyStatsLoading ? (
-              <p className="mt-3 text-xs text-slate-700">
-                Based on <span className="font-semibold">{monthlyStats.finishedBooks}</span>{" "}
-                {monthlyStats.finishedBooks === 1 ? "finished book" : "finished books"}.
-              </p>
-            ) : null}
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
+                <div className="text-xs text-slate-600">Books Finished</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {monthlyStats.finishedBooks === 0
+                    ? "All books still in progress"
+                    : `${monthlyStats.finishedBooks} ${monthlyStats.finishedBooks === 1 ? "book" : "books"
+                    }`}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
+                <div className="text-xs text-slate-600">Most Engaged</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">Coming soon…</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1549,11 +1576,10 @@ export default function BooksPage() {
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-amber-900">
-                  Pending Book Requests
-                </h2>
+                <h2 className="text-sm font-semibold text-amber-900">Pending Book Requests</h2>
                 <p className="mt-1 text-xs text-amber-800">
-                  {bookRequests.length} pending {bookRequests.length === 1 ? "request" : "requests"}
+                  {bookRequests.length} pending{" "}
+                  {bookRequests.length === 1 ? "request" : "requests"}
                 </p>
               </div>
             </div>
@@ -1654,13 +1680,15 @@ export default function BooksPage() {
           <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
             <button
               onClick={() => setViewMode("cover")}
-              className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"}`}
+              className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
+                }`}
             >
               Cover
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"}`}
+              className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
+                }`}
             >
               List
             </button>
@@ -1689,32 +1717,16 @@ export default function BooksPage() {
             </select>
 
             <select
-              value={formatFilter}
-              onChange={(e) => setFormatFilter(e.target.value)}
+              value={sortMode}
+              onChange={(e) =>
+                setSortMode(e.target.value as "title" | "last_engaged" | "last_read")
+              }
               className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
             >
-              <option value="all">All Formats</option>
-              <option value="paperback">Paperback</option>
-              <option value="hardcover">Hardcover</option>
-              <option value="ebook">eBook</option>
-              <option value="audiobook">Audiobook</option>
-              <option value="other">Other</option>
+              <option value="title">Title</option>
+              <option value="last_read">Recently Finished</option>
+              <option value="last_engaged">Last Engaged with</option>
             </select>
-
-            {viewMode === "list" && (
-              <select
-                value={sortMode}
-                onChange={(e) =>
-                  setSortMode(e.target.value as "title" | "last_read" | "pace" | "lookups")
-                }
-                className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
-              >
-                <option value="title">Title</option>
-                <option value="last_read">Recently Finished</option>
-                <option value="pace">Avg Min/Page</option>
-                <option value="lookups">Saved Vocab</option>
-              </select>
-            )}
           </div>
         </div>
 
@@ -1729,21 +1741,9 @@ export default function BooksPage() {
               subtitle="Started but not finished yet"
               items={currentlyReading}
             />
-            <Section
-              title="Want to Read"
-              subtitle="Not started yet"
-              items={notStarted}
-            />
-            <Section
-              title="Finished"
-              subtitle="Completed books"
-              items={finished}
-            />
-            <Section
-              title="DNF"
-              subtitle="Did not finish"
-              items={dnf}
-            />
+            <Section title="Want to Read" subtitle="Not started yet" items={notStarted} />
+            <Section title="Finished" subtitle="Completed books" items={finished} />
+            <Section title="DNF" subtitle="Did not finish" items={dnf} />
           </>
         ) : (
           <ul className="overflow-hidden rounded-xl border bg-white">

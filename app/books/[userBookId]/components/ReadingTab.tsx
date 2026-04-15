@@ -18,10 +18,11 @@ type ReadingSession = {
   id: string;
   user_book_id: string;
   read_on: string;
-  start_page: number;
-  end_page: number;
+  start_page: number | null;
+  end_page: number | null;
   minutes_read: number | null;
   created_at: string;
+  session_mode?: string | null;
 };
 
 type ReadingTabProps = {
@@ -58,8 +59,10 @@ type ReadingTabProps = {
   setSessionStartPage: (value: string) => void;
   sessionEndPage: string;
   setSessionEndPage: (value: string) => void;
-  sessionMode: "fluid" | "curiosity";
-  setSessionMode: (value: "fluid" | "curiosity") => void;
+  sessionMode: "fluid" | "curiosity" | "listening";
+  setSessionMode: React.Dispatch<
+    React.SetStateAction<"fluid" | "curiosity" | "listening">
+  >;
 
   saveReadingSession: () => Promise<void>;
   deleteReadingSession: (sessionId: string) => Promise<void>;
@@ -320,7 +323,7 @@ export default function ReadingTab({
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
+        <div className="mb-3 text-sm font-semibold text-stone-900">Log a Session</div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded border bg-white p-3 text-sm">
@@ -334,7 +337,9 @@ export default function ReadingTab({
           </div>
 
           <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Minutes read (optional)</div>
+            <div className="text-stone-600">
+              {sessionMode === "listening" ? "Minutes listened" : "Minutes read"}
+            </div>
             <input
               type="number"
               min={1}
@@ -345,40 +350,47 @@ export default function ReadingTab({
             />
           </div>
 
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Start page</div>
-            <input
-              type="number"
-              min={1}
-              value={sessionStartPage}
-              onChange={(e) => setSessionStartPage(e.target.value)}
-              placeholder="e.g. 4"
-              className="mt-1 w-full rounded border px-2 py-1"
-            />
-          </div>
+          {sessionMode !== "listening" && (
+            <>
+              <div className="rounded border bg-white p-3 text-sm">
+                <div className="text-stone-600">Start page</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={sessionStartPage}
+                  onChange={(e) => setSessionStartPage(e.target.value)}
+                  placeholder="e.g. 4"
+                  className="mt-1 w-full rounded border px-2 py-1"
+                />
+              </div>
 
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">End page</div>
-            <input
-              type="number"
-              min={1}
-              value={sessionEndPage}
-              onChange={(e) => setSessionEndPage(e.target.value)}
-              placeholder="e.g. 10"
-              className="mt-1 w-full rounded border px-2 py-1"
-            />
-          </div>
+              <div className="rounded border bg-white p-3 text-sm">
+                <div className="text-stone-600">End page</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={sessionEndPage}
+                  onChange={(e) => setSessionEndPage(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="mt-1 w-full rounded border px-2 py-1"
+                />
+              </div>
+            </>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Session Type
             </label>
             <select
               value={sessionMode}
-              onChange={(e) => setSessionMode(e.target.value as "fluid" | "curiosity")}
-              className="w-full rounded border bg-white p-3 text-sm"
+              onChange={(e) =>
+                setSessionMode(e.target.value as "fluid" | "curiosity" | "listening")
+              }
             >
               <option value="fluid">Fluid Reading</option>
               <option value="curiosity">Curiosity Reading</option>
+              <option value="listening">Listening</option>
             </select>
           </div>
         </div>
@@ -405,7 +417,10 @@ export default function ReadingTab({
 
             <div className="space-y-2">
               {visibleReadingSessions.map((session) => {
-                const pagesRead = session.end_page - session.start_page + 1;
+                const pagesRead =
+                  session.start_page != null && session.end_page != null
+                    ? session.end_page - session.start_page + 1
+                    : null;
 
                 return (
                   <div
@@ -416,12 +431,20 @@ export default function ReadingTab({
                       <div>
                         <div className="font-medium">{session.read_on}</div>
                         <div className="mt-1">
-                          p. {session.start_page} → {session.end_page}
+                          {session.start_page != null && session.end_page != null
+                            ? `p. ${session.start_page} → ${session.end_page}`
+                            : session.session_mode === "listening"
+                              ? "Listening session"
+                              : "Pages not recorded"}
                         </div>
                         <div className="mt-1 text-stone-500">
-                          {session.minutes_read != null
-                            ? `${session.minutes_read} min · ${pagesRead} pages`
-                            : `Untimed · ${pagesRead} pages`}
+                          {pagesRead != null
+                            ? session.minutes_read != null
+                              ? `${session.minutes_read} min · ${pagesRead} pages`
+                              : `Untimed · ${pagesRead} pages`
+                            : session.minutes_read != null
+                              ? `${session.minutes_read} min`
+                              : "Untimed"}
                         </div>
                       </div>
 

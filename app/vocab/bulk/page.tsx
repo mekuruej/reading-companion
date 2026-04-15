@@ -1,3 +1,5 @@
+// Bulk Add Page
+// 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -129,6 +131,8 @@ export default function BulkVocabPage() {
 
   const wordCount = useMemo(() => parseWords(rawInput).length, [rawInput]);
 
+  const [recentAction, setRecentAction] = useState<string | null>(null);
+
   // -------------------------------------------------------------
   // Get userBookId from URL
   // -------------------------------------------------------------
@@ -151,7 +155,7 @@ export default function BulkVocabPage() {
         const { number, name } = JSON.parse(saved);
         setBulkChapterNumber(number || "");
         setBulkChapterName(name || "");
-      } catch {}
+      } catch { }
     }
 
     (async () => {
@@ -194,6 +198,12 @@ export default function BulkVocabPage() {
   // -------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------
+  function flashAction(actionKey: string) {
+    setRecentAction(actionKey);
+    window.setTimeout(() => {
+      setRecentAction((current) => (current === actionKey ? null : current));
+    }, 1200);
+  }
   function updateItem(index: number, field: keyof BulkItem, value: any) {
     setItems((prev) => {
       const copy = [...prev];
@@ -232,8 +242,9 @@ export default function BulkVocabPage() {
   function applyBulkField(
     field: "page" | "chapterNumber" | "chapterName",
     value: string,
-    mode: "blank" | "all"
-  ) {
+    mode: "blank" | "all",
+    actionKey?: string
+  ): void {
     const trimmed = value.trim();
     if (!trimmed) {
       setMessage("Fill in a value first.");
@@ -242,20 +253,29 @@ export default function BulkVocabPage() {
 
     let changed = 0;
 
-    setItems((prev) =>
-      prev.map((item) => {
-        const currentValue = (item[field] ?? "").toString().trim();
-        const shouldUpdate = mode === "all" || currentValue === "";
+    const nextItems = items.map((item) => {
+      const currentValue = (item[field] ?? "").toString().trim();
+      const shouldUpdate = mode === "all" || currentValue === "";
 
-        if (!shouldUpdate) return item;
+      if (!shouldUpdate) return item;
 
-        changed += 1;
-        return {
-          ...item,
-          [field]: value,
-        };
-      })
-    );
+      changed += 1;
+      return {
+        ...item,
+        [field]: value,
+      };
+    });
+
+    setItems(nextItems);
+
+    if (changed === 0) {
+      setMessage("No rows were updated.");
+      return;
+    }
+
+    if (actionKey) {
+      flashAction(actionKey);
+    }
 
     const label =
       field === "page"
@@ -265,7 +285,7 @@ export default function BulkVocabPage() {
           : "chapter name";
 
     setMessage(
-      `✅ Applied ${label} to ${changed} row${changed === 1 ? "" : "s"} (${mode === "all" ? "all" : "blanks only"}).`
+      `✅ Applied ${label} to ${changed} row${changed === 1 ? "" : "s"}.`
     );
   }
 
@@ -278,8 +298,9 @@ export default function BulkVocabPage() {
 
   function applyBulkColumnList(
     field: "page" | "chapterNumber" | "chapterName",
-    raw: string
-  ) {
+    raw: string,
+    actionKey?: string
+  ): void {
     const lines = parseColumnLines(raw);
 
     if (lines.length === 0) {
@@ -289,18 +310,27 @@ export default function BulkVocabPage() {
 
     let changed = 0;
 
-    setItems((prev) =>
-      prev.map((item, index) => {
-        const nextValue = lines[index];
-        if (nextValue == null) return item;
+    const nextItems = items.map((item, index) => {
+      const nextValue = lines[index];
+      if (nextValue == null) return item;
 
-        changed += 1;
-        return {
-          ...item,
-          [field]: nextValue,
-        };
-      })
-    );
+      changed += 1;
+      return {
+        ...item,
+        [field]: nextValue,
+      };
+    });
+
+    setItems(nextItems);
+
+    if (changed === 0) {
+      setMessage("No rows were updated.");
+      return;
+    }
+
+    if (actionKey) {
+      flashAction(actionKey);
+    }
 
     const label =
       field === "page"
@@ -383,7 +413,7 @@ export default function BulkVocabPage() {
               meaning = meaningChoices[0] || "";
             }
           }
-        } catch {}
+        } catch { }
 
         const kanjiMeta = await getStrokeData(w);
 
@@ -424,11 +454,10 @@ export default function BulkVocabPage() {
 
     if (missingCount > 0) {
       const confirmed = window.confirm(
-        `${missingCount} word${missingCount === 1 ? "" : "s"} ${
-          missingCount === 1 ? "is" : "are"
+        `${missingCount} word${missingCount === 1 ? "" : "s"} ${missingCount === 1 ? "is" : "are"
         } missing a reading or definition.\n\n` +
-          `Words:\n- ${missingWords.join("\n- ")}\n\n` +
-          `Do you want to continue anyway?`
+        `Words:\n- ${missingWords.join("\n- ")}\n\n` +
+        `Do you want to continue anyway?`
       );
       if (!confirmed) return;
     }
@@ -449,11 +478,10 @@ export default function BulkVocabPage() {
 
     if (incompleteWords.length > 0) {
       const confirmed = window.confirm(
-        `${incompleteWords.length} word${incompleteWords.length === 1 ? "" : "s"} ${
-          incompleteWords.length === 1 ? "is" : "are"
+        `${incompleteWords.length} word${incompleteWords.length === 1 ? "" : "s"} ${incompleteWords.length === 1 ? "is" : "are"
         } missing a reading or definition.\n\n` +
-          `Words:\n- ${incompleteWords.join("\n- ")}\n\n` +
-          `Do you want to save anyway?`
+        `Words:\n- ${incompleteWords.join("\n- ")}\n\n` +
+        `Do you want to save anyway?`
       );
       if (!confirmed) return;
     }
@@ -551,12 +579,11 @@ export default function BulkVocabPage() {
     } catch (err: any) {
       console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
       setMessage(
-        `❌ Failed saving: ${
-          err?.message ||
-          err?.error_description ||
-          err?.details ||
-          JSON.stringify(err) ||
-          "unknown error"
+        `❌ Failed saving: ${err?.message ||
+        err?.error_description ||
+        err?.details ||
+        JSON.stringify(err) ||
+        "unknown error"
         }`
       );
     } finally {
@@ -596,7 +623,7 @@ export default function BulkVocabPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-2 text-2xl font-semibold">🧺 Add Vocabularyin Bulk</h1>
+        <h1 className="mb-2 text-2xl font-semibold">🧺 Add Vocabulary in Bulk</h1>
 
         {bookTitle ? (
           <div className="mb-6 flex items-center gap-3">
@@ -706,11 +733,10 @@ export default function BulkVocabPage() {
                           value={i.meaning}
                           onChange={(e) => updateItem(idx, "meaning", e.target.value)}
                           readOnly={i.meaningChoiceIndex != null}
-                          className={`w-full rounded border p-2 text-sm ${
-                            i.meaningChoiceIndex == null
-                              ? "bg-white"
-                              : "bg-slate-100 text-slate-700"
-                          }`}
+                          className={`w-full rounded border p-2 text-sm ${i.meaningChoiceIndex == null
+                            ? "bg-white"
+                            : "bg-slate-100 text-slate-700"
+                            }`}
                           placeholder={
                             i.meaningChoiceIndex == null
                               ? "Type your custom meaning"
@@ -752,7 +778,7 @@ export default function BulkVocabPage() {
 
             <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="space-y-4">
-                <div className="grid items-center gap-3 md:grid-cols-[160px_1fr_auto_auto]">
+                <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
                   <div className="text-sm font-medium text-gray-700">Page number</div>
                   <input
                     type="number"
@@ -763,21 +789,14 @@ export default function BulkVocabPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => applyBulkField("page", bulkPageNumber, "blank")}
-                    className="rounded bg-gray-200 px-3 py-2 hover:bg-gray-300"
-                  >
-                    Apply to blanks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("page", bulkPageNumber, "all")}
+                    onClick={() => applyBulkField("page", bulkPageNumber, "all", "page-all")}
                     className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
                   >
-                    Apply to all
+                    {recentAction === "page-all" ? "Added!" : "Apply to all"}
                   </button>
                 </div>
 
-                <div className="grid items-center gap-3 md:grid-cols-[160px_1fr_auto_auto]">
+                <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
                   <div className="text-sm font-medium text-gray-700">Chapter number</div>
                   <input
                     type="number"
@@ -788,21 +807,14 @@ export default function BulkVocabPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "blank")}
-                    className="rounded bg-gray-200 px-3 py-2 hover:bg-gray-300"
-                  >
-                    Apply to blanks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "all")}
+                    onClick={() => applyBulkField("chapterNumber", bulkChapterNumber, "all", "chapter-number-all")}
                     className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
                   >
-                    Apply to all
+                    {recentAction === "chapter-number-all" ? "Added!" : "Apply to all"}
                   </button>
                 </div>
 
-                <div className="grid items-center gap-3 md:grid-cols-[160px_1fr_auto_auto]">
+                <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
                   <div className="text-sm font-medium text-gray-700">Chapter name</div>
                   <input
                     type="text"
@@ -813,17 +825,10 @@ export default function BulkVocabPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => applyBulkField("chapterName", bulkChapterName, "blank")}
-                    className="rounded bg-gray-200 px-3 py-2 hover:bg-gray-300"
-                  >
-                    Apply to blanks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyBulkField("chapterName", bulkChapterName, "all")}
+                    onClick={() => applyBulkField("chapterName", bulkChapterName, "all", "chapter-name-all")}
                     className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
                   >
-                    Apply to all
+                    {recentAction === "chapter-name-all" ? "Added!" : "Apply to all"}
                   </button>
                 </div>
               </div>
@@ -848,10 +853,10 @@ export default function BulkVocabPage() {
                   <div className="mt-2">
                     <button
                       type="button"
-                      onClick={() => applyBulkColumnList("page", bulkPageList)}
+                      onClick={() => applyBulkColumnList("page", bulkPageList, "page-list")}
                       className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
                     >
-                      Apply page list
+                      {recentAction === "page-list" ? "Added!" : "Apply page list"}
                     </button>
                   </div>
                 </div>
@@ -868,10 +873,10 @@ export default function BulkVocabPage() {
                   <div className="mt-2">
                     <button
                       type="button"
-                      onClick={() => applyBulkColumnList("chapterNumber", bulkChapterNumberList)}
+                      onClick={() => applyBulkColumnList("chapterNumber", bulkChapterNumberList, "chapter-number-list")}
                       className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
                     >
-                      Apply chapter # list
+                      {recentAction === "chapter-number-list" ? "Added!" : "Apply chapter # list"}
                     </button>
                   </div>
                 </div>
@@ -888,10 +893,10 @@ export default function BulkVocabPage() {
                   <div className="mt-2">
                     <button
                       type="button"
-                      onClick={() => applyBulkColumnList("chapterName", bulkChapterNameList)}
+                      onClick={() => applyBulkColumnList("chapterName", bulkChapterNameList, "chapter-name-list")}
                       className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
                     >
-                      Apply chapter name list
+                      {recentAction === "chapter-name-list" ? "Added!" : "Apply chapter name list"}
                     </button>
                   </div>
                 </div>
