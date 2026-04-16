@@ -1697,7 +1697,7 @@ export default function BooksPage() {
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
                 <div className="text-xs text-slate-600">Books Finished</div>
-                <div className="mt-1 text-sm font-medium text-slate-900">
+                <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStats.finishedBooks === 0
                     ? "All books still in progress"
                     : `${monthlyStats.finishedBooks} ${monthlyStats.finishedBooks === 1 ? "book" : "books"

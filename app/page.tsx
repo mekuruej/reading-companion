@@ -25,7 +25,7 @@ export default function MekuruLandingPage() {
             alt="MEKURU banner"
             className="mb-6 w-full max-w-2xl rounded-xl object-cover mx-auto"
           />
-          <div className="max-w-3xl space-y-6">
+          <div className="mx-auto max-w-3xl space-y-6 text-center">
             <h1 className="text-3xl font-semibold leading-tight md:text-5xl">
               Reading Japanese doesn’t have to feel impossible.
             </h1>
