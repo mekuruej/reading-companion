@@ -519,7 +519,7 @@ export default function SingleAddPage() {
         pageOrder: data.page_order ?? null,
       };
 
-      setQuickSessionWords((prev) => sortQuickSessionWords([...prev, newItem]));
+      setQuickSessionWords((prev) => [newItem, ...prev]);
       setMessage("✅ Word saved to Vocab List.");
     } else {
       const { data, error } = await supabase
@@ -557,11 +557,10 @@ export default function SingleAddPage() {
         pageOrder: data.page_order ?? null,
       };
 
-      setQuickSessionWords((prev) =>
-        sortQuickSessionWords(
-          prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
-        )
-      );
+      setQuickSessionWords((prev) => [
+        updatedItem,
+        ...prev.filter((item) => item.id !== updatedItem.id),
+      ]);
       setMessage("✅ Word updated.");
     }
 

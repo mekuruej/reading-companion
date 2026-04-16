@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -72,24 +72,6 @@ function toDisplayString(value: number | null | undefined) {
   return value == null ? "" : String(value);
 }
 
-function sortSessionWords(words: SessionWord[]) {
-  return [...words].sort((a, b) => {
-    const aChapter = toNullableInt(a.chapterNumber) ?? Number.MAX_SAFE_INTEGER;
-    const bChapter = toNullableInt(b.chapterNumber) ?? Number.MAX_SAFE_INTEGER;
-    if (aChapter !== bChapter) return aChapter - bChapter;
-
-    const aPage = toNullableInt(a.pageNumber) ?? Number.MAX_SAFE_INTEGER;
-    const bPage = toNullableInt(b.pageNumber) ?? Number.MAX_SAFE_INTEGER;
-    if (aPage !== bPage) return aPage - bPage;
-
-    const aOrder = a.pageOrder ?? Number.MAX_SAFE_INTEGER;
-    const bOrder = b.pageOrder ?? Number.MAX_SAFE_INTEGER;
-    if (aOrder !== bOrder) return aOrder - bOrder;
-
-    return a.surface.localeCompare(b.surface);
-  });
-}
-
 export default function AddWordPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -121,8 +103,12 @@ export default function AddWordPage() {
 
   const [editingSessionWordId, setEditingSessionWordId] = useState<string | null>(null);
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
+  const [showEditor, setShowEditor] = useState(false);
+
+  const wordInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasWord = useMemo(() => word.trim().length > 0, [word]);
+
 
   useEffect(() => {
     if (!userBookId) return;
@@ -187,6 +173,7 @@ export default function AddWordPage() {
     setMeaningChoiceIndex(0);
     setHideKanjiInReadingSupport(false);
     setEditingSessionWordId(null);
+    setShowEditor(false);
 
     if (!keepLocation) {
       setPageNumber("");
@@ -219,6 +206,7 @@ export default function AddWordPage() {
     setChapterNumber(sessionWord.chapterNumber);
     setChapterName(sessionWord.chapterName);
     setHideKanjiInReadingSupport(sessionWord.hideKanjiInReadingSupport);
+    setShowEditor(true);
     setMessage(`Editing "${sessionWord.surface}"`);
   }
 
@@ -250,6 +238,7 @@ export default function AddWordPage() {
         setMeaning("");
         setJlpt("NON-JLPT");
         setIsCommon(false);
+        setShowEditor(true);
         setMessage("❌ No dictionary result found. You can still enter it manually.");
         return;
       }
@@ -264,26 +253,15 @@ export default function AddWordPage() {
         defaultMeaning: choices[0] || "",
       });
 
+      setShowEditor(true);
       setMessage("✅ Dictionary info loaded.");
+
     } catch (err: any) {
       console.error("Lookup error:", err);
       setMessage("❌ Could not load dictionary data.");
     } finally {
       setLookupLoading(false);
     }
-  }
-
-  function handleDefinitionChange(rawValue: string) {
-    if (rawValue === "other") {
-      setMeaningChoiceIndex(null);
-      setMeaning("");
-      return;
-    }
-
-    const idx = Number(rawValue);
-    const safeIdx = Number.isFinite(idx) ? idx : 0;
-    setMeaningChoiceIndex(safeIdx);
-    setMeaning(meaningChoices[safeIdx] ?? "");
   }
 
   async function getNextPageOrder(
@@ -457,7 +435,7 @@ export default function AddWordPage() {
           pageOrder: insertedRow.page_order ?? null,
         };
 
-        setSessionWords((prev) => sortSessionWords([...prev, newSessionWord]));
+        setSessionWords((prev) => [newSessionWord, ...prev]);
         setMessage(`✅ Saved "${finalSurface}".`);
       } else {
         const { data: updatedRow, error } = await supabase
@@ -502,15 +480,15 @@ export default function AddWordPage() {
           pageOrder: updatedRow.page_order ?? null,
         };
 
-        setSessionWords((prev) =>
-          sortSessionWords(
-            prev.map((item) => (item.id === updatedSessionWord.id ? updatedSessionWord : item))
-          )
-        );
+        setSessionWords((prev) => [
+          updatedSessionWord,
+          ...prev.filter((item) => item.id !== updatedSessionWord.id),
+        ]);
         setMessage(`✅ Updated "${finalSurface}".`);
       }
 
       clearForm(true);
+      wordInputRef.current?.focus();
     } catch (err: any) {
       console.error("Save error:", err);
       setMessage(`❌ Failed saving: ${err?.message ?? "unknown error"}`);
@@ -543,7 +521,7 @@ export default function AddWordPage() {
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-5xl">
         <h1 className="mb-2 text-2xl font-semibold">Add Word</h1>
 
         {bookTitle ? (
@@ -571,19 +549,14 @@ export default function AddWordPage() {
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-1 text-lg font-medium">
-            {editingSessionWordId ? "Edit word" : "Add a word"}
-          </div>
-          <p className="mb-4 text-sm text-gray-500">
-            Look up a word, adjust anything you want, then save it to this book.
-          </p>
+        <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
+          <div className="mb-3 text-sm font-medium text-stone-900">Single Add</div>
 
           <div className="grid gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Word</label>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-wrap gap-2">
                 <input
+                  ref={wordInputRef}
                   value={word}
                   onChange={(e) => setWord(e.target.value)}
                   onKeyDown={(e) => {
@@ -592,228 +565,243 @@ export default function AddWordPage() {
                       void handleLookup();
                     }
                   }}
-                  placeholder="Enter a word"
-                  className="w-full rounded border p-3 text-sm"
+                  placeholder="Search a word..."
+                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
                 />
+
                 <button
                   type="button"
                   onClick={() => void handleLookup()}
                   disabled={!hasWord || lookupLoading}
-                  className="rounded bg-amber-500 px-4 py-3 text-sm text-white hover:bg-amber-600 disabled:opacity-60"
+                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
                 >
-                  {lookupLoading ? "Looking up…" : "Look Up"}
+                  {lookupLoading ? "Searching..." : "Search"}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReading("");
+                    setMeaning("");
+                    setMeaningChoices([]);
+                    setMeaningChoiceIndex(null);
+                    setJlpt("NON-JLPT");
+                    setIsCommon(false);
+                    setShowEditor(true);
+                    setMessage("");
+                  }}
+                  className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+                >
+                  Manual Entry
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
+                  >
+                    Grammar
+                  </button>
+
+                  <span className="select-none text-sm text-stone-400">(coming soon...)</span>
+                </div>
               </div>
 
-              <label className="mt-2 flex items-center gap-2 text-sm text-stone-700">
-                <input
-                  type="checkbox"
-                  checked={useAlternateSurface}
-                  onChange={(e) => setUseAlternateSurface(e.target.checked)}
-                />
-                <span>Alternate kanji (in this book)</span>
-              </label>
+              {showEditor ? (
+                <div className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                  <label className="flex items-center gap-2 text-sm text-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={useAlternateSurface}
+                      onChange={(e) => setUseAlternateSurface(e.target.checked)}
+                    />
+                    <span>Alternate kanji (in this book)</span>
+                  </label>
 
-              {useAlternateSurface ? (
-                <input
-                  value={alternateSurface}
-                  onChange={(e) => setAlternateSurface(e.target.value)}
-                  placeholder="Book form (e.g. 愉しい)"
-                  className="mt-2 w-full rounded border px-3 py-2 text-sm"
-                />
+                  {useAlternateSurface ? (
+                    <input
+                      value={alternateSurface}
+                      onChange={(e) => setAlternateSurface(e.target.value)}
+                      placeholder="Book form (e.g. 愉しい)"
+                      className="mt-2 w-full rounded border px-3 py-2 text-sm"
+                    />
+                  ) : null}
+
+                  <div>
+                    <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
+                    <input
+                      value={reading}
+                      onChange={(e) => setReading(e.target.value)}
+                      placeholder="Reading"
+                      className="w-full rounded border px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-2 text-sm font-medium text-stone-700">Meaning</div>
+
+                    <div className="space-y-2">
+                      {meaningChoices.length > 0 ? (
+                        meaningChoices.map((choice, index) => (
+                          <label key={index} className="flex items-start gap-2 text-sm text-stone-700">
+                            <input
+                              type="radio"
+                              checked={meaningChoiceIndex === index}
+                              onChange={() => {
+                                setMeaningChoiceIndex(index);
+                                setMeaning(choice);
+                              }}
+                            />
+                            <span>{choice || "—"}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <p className="text-sm text-stone-500">
+                          No dictionary meanings loaded. Enter your own meaning below.
+                        </p>
+                      )}
+
+                      <textarea
+                        value={meaningChoiceIndex == null ? meaning : ""}
+                        onChange={(e) => {
+                          setMeaningChoiceIndex(null);
+                          setMeaning(e.target.value);
+                        }}
+                        placeholder="Type your meaning"
+                        className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Page</label>
+                      <input
+                        type="number"
+                        value={pageNumber}
+                        onChange={(e) => setPageNumber(e.target.value)}
+                        placeholder="e.g. 45"
+                        className="w-full rounded border p-3 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Chapter #
+                      </label>
+                      <input
+                        type="number"
+                        value={chapterNumber}
+                        onChange={(e) => setChapterNumber(e.target.value)}
+                        placeholder="e.g. 3"
+                        className="w-full rounded border p-3 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Chapter Name
+                      </label>
+                      <input
+                        value={chapterName}
+                        onChange={(e) => setChapterName(e.target.value)}
+                        placeholder="e.g. Summer Festival"
+                        className="w-full rounded border p-3 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2 text-sm text-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={hideKanjiInReadingSupport}
+                      onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium">Hide kanji in Reading Support</span>
+                      <span className="block text-xs text-stone-500">
+                        Use kana to match the book.
+                      </span>
+                    </span>
+                  </label>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleSave()}
+                      disabled={saving}
+                      className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : editingSessionWordId ? "Update Word" : "Save to Vocab List"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => clearForm(true)}
+                      className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+                    >
+                      {editingSessionWordId ? "Cancel Edit" : "Cancel"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
+                      className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+                    >
+                      Vocab List
+                    </button>
+                  </div>
+                </div>
               ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Reading</label>
-                <input
-                  value={reading}
-                  onChange={(e) => setReading(e.target.value)}
-                  placeholder="Reading"
-                  className="w-full rounded border p-3 text-sm"
-                />
-              </div>
+            {sessionWords.length > 0 ? (
+              <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-3 text-sm font-medium text-stone-900">
+                  Words saved into Vocab List this session
+                </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">JLPT</label>
-                <select
-                  value={jlpt}
-                  onChange={(e) => setJlpt(e.target.value)}
-                  className="w-full rounded border bg-white p-3 text-sm"
-                >
-                  <option value="NON-JLPT">NON-JLPT</option>
-                  <option value="N5">N5</option>
-                  <option value="N4">N4</option>
-                  <option value="N3">N3</option>
-                  <option value="N2">N2</option>
-                  <option value="N1">N1</option>
-                </select>
-              </div>
-            </div>
+                <div className="space-y-3">
+                  {sessionWords.map((item) => (
+                    <div key={item.id} className="rounded-lg border bg-white p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 text-sm">
+                          <div className="font-medium text-stone-900">{item.surface}</div>
+                          <div className="text-stone-500">{item.reading || "—"}</div>
+                          <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                          <div className="mt-1 text-xs text-stone-500">
+                            Page {item.pageNumber || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
+                            {item.chapterName || "—"}
+                          </div>
+                        </div>
 
-            <div className="grid gap-4 md:grid-cols-[180px_1fr]">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Definition #
-                </label>
-                <select
-                  value={meaningChoiceIndex == null ? "other" : String(meaningChoiceIndex)}
-                  onChange={(e) => handleDefinitionChange(e.target.value)}
-                  className="w-full rounded border bg-white p-3 text-sm"
-                >
-                  {meaningChoices.map((_, i) => (
-                    <option key={i} value={i}>
-                      Def {i + 1}
-                    </option>
-                  ))}
-                  <option value="other">Other</option>
-                </select>
-              </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => loadSessionWordIntoForm(item)}
+                            className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                          >
+                            Edit
+                          </button>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Meaning</label>
-                <textarea
-                  rows={3}
-                  value={meaning}
-                  onChange={(e) => setMeaning(e.target.value)}
-                  readOnly={meaningChoiceIndex != null}
-                  placeholder={
-                    meaningChoiceIndex == null ? "Type your custom meaning" : "Meaning"
-                  }
-                  className={`w-full rounded border p-3 text-sm ${meaningChoiceIndex == null ? "bg-white" : "bg-slate-100 text-slate-700"
-                    }`}
-                />
-                <p className="mt-1 text-xs text-stone-500">
-                  Choose Other to write your own definition.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Page</label>
-                <input
-                  type="number"
-                  value={pageNumber}
-                  onChange={(e) => setPageNumber(e.target.value)}
-                  placeholder="e.g. 45"
-                  className="w-full rounded border p-3 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Chapter #
-                </label>
-                <input
-                  type="number"
-                  value={chapterNumber}
-                  onChange={(e) => setChapterNumber(e.target.value)}
-                  placeholder="e.g. 3"
-                  className="w-full rounded border p-3 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Chapter Name
-                </label>
-                <input
-                  value={chapterName}
-                  onChange={(e) => setChapterName(e.target.value)}
-                  placeholder="e.g. Summer Festival"
-                  className="w-full rounded border p-3 text-sm"
-                />
-              </div>
-            </div>
-
-            <label className="flex items-start gap-2 text-sm text-stone-700">
-              <input
-                type="checkbox"
-                checked={hideKanjiInReadingSupport}
-                onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="font-medium">Hide kanji in Reading Support</span>
-                <span className="block text-xs text-stone-500">
-                  Use kana to match the book.
-                </span>
-              </span>
-            </label>
-
-            <div className="flex flex-wrap gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={saving}
-                className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-60"
-              >
-                {saving ? "Saving…" : editingSessionWordId ? "Update Word" : "Save Word"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => clearForm(true)}
-                className="rounded bg-gray-200 px-4 py-2 text-gray-900 hover:bg-gray-300"
-              >
-                {editingSessionWordId ? "Cancel Edit" : "Clear"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
-                className="rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-800"
-              >
-                Go to Vocab List
-              </button>
-            </div>
-          </div>
-
-          {sessionWords.length > 0 ? (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <div className="mb-3 text-sm font-medium text-stone-900">
-                Words saved into Vocab List this session
-              </div>
-
-              <div className="space-y-3">
-                {sessionWords.map((item) => (
-                  <div key={item.id} className="rounded-lg border bg-white p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 text-sm">
-                        <div className="font-medium text-stone-900">{item.surface}</div>
-                        <div className="text-stone-500">{item.reading || "—"}</div>
-                        <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                        <div className="mt-1 text-xs text-stone-500">
-                          Page {item.pageNumber || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
-                          {item.chapterName || "—"}
+                          <button
+                            type="button"
+                            onClick={() => void deleteSessionWord(item.id)}
+                            className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => loadSessionWordIntoForm(item)}
-                          className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void deleteSessionWord(item.id)}
-                          className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                        >
-                          Delete
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </div>
     </main>

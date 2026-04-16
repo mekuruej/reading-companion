@@ -79,8 +79,9 @@ type MonthlyLibraryStats = {
   listeningTimeMinutes: number;
   avgPagesPerSession: number | null;
   totalWordsLookedUp: number;
-  mostEngagedTitle: string | null;
-  mostEngagedDetail: string | null;
+  weeklySpotlightLabel: string | null;
+  weeklySpotlightValue: string | null;
+  weeklySpotlightTitle: string | null;
 };
 
 type MonthOption = {
@@ -357,8 +358,8 @@ export default function BooksPage() {
 
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<
-    "title" | "last_engaged" | "last_read"
-  >("title");
+    "status" | "title" | "last_engaged" | "last_read"
+  >("status");
 
   const monthOptions = getMonthOptions(12);
   const [selectedMonth, setSelectedMonth] = useState<string>(
@@ -374,8 +375,9 @@ export default function BooksPage() {
     listeningTimeMinutes: 0,
     avgPagesPerSession: null,
     totalWordsLookedUp: 0,
-    mostEngagedTitle: null,
-    mostEngagedDetail: null,
+    weeklySpotlightLabel: null,
+    weeklySpotlightValue: null,
+    weeklySpotlightTitle: null,
   });
 
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
@@ -415,8 +417,9 @@ export default function BooksPage() {
           listeningTimeMinutes: 0,
           avgPagesPerSession: null,
           totalWordsLookedUp: 0,
-          mostEngagedTitle: null,
-          mostEngagedDetail: null,
+          weeklySpotlightLabel: null,
+          weeklySpotlightValue: null,
+          weeklySpotlightTitle: null,
         });
         return;
       }
@@ -440,8 +443,9 @@ export default function BooksPage() {
           listeningTimeMinutes: 0,
           avgPagesPerSession: null,
           totalWordsLookedUp: 0,
-          mostEngagedTitle: null,
-          mostEngagedDetail: null,
+          weeklySpotlightLabel: null,
+          weeklySpotlightValue: null,
+          weeklySpotlightTitle: null,
         });
         return;
       }
@@ -476,22 +480,33 @@ export default function BooksPage() {
       const sessions = sessionRows ?? [];
       const words = wordRows ?? [];
 
-      const engagementByUserBookId: Record<
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      const weekStartStr = weekStart.toISOString().slice(0, 10);
+      const weekStartDateTime = weekStart.toISOString();
+
+      const spotlightByUserBookId: Record<
         string,
         {
           title: string;
-          sessionCount: number;
-          wordCount: number;
-          distinctDays: Set<string>;
+          daysRead: Set<string>;
+          wordsSaved: number;
+          listeningMinutes: number;
+          pagesRead: number;
+          totalMinutes: number;
+          sessions: number;
         }
       > = {};
 
       for (const row of filteredUserBooks as any[]) {
-        engagementByUserBookId[row.id] = {
+        spotlightByUserBookId[row.id] = {
           title: row.books?.title ?? "Untitled",
-          sessionCount: 0,
-          wordCount: 0,
-          distinctDays: new Set<string>(),
+          daysRead: new Set<string>(),
+          wordsSaved: 0,
+          listeningMinutes: 0,
+          pagesRead: 0,
+          totalMinutes: 0,
+          sessions: 0,
         };
       }
 
@@ -504,8 +519,14 @@ export default function BooksPage() {
 
         uniqueWordSet.add(`${surface}|||${meaning}`);
 
-        if (engagementByUserBookId[w.user_book_id]) {
-          engagementByUserBookId[w.user_book_id].wordCount += 1;
+        const createdAt = w.created_at as string | null;
+
+        if (
+          createdAt &&
+          createdAt >= weekStartDateTime &&
+          spotlightByUserBookId[w.user_book_id]
+        ) {
+          spotlightByUserBookId[w.user_book_id].wordsSaved += 1;
         }
       }
 
@@ -528,10 +549,24 @@ export default function BooksPage() {
         const minutes = s.minutes_read == null ? null : Number(s.minutes_read);
         const sessionMode = (s.session_mode ?? "fluid") as string;
 
-        if (engagementByUserBookId[s.user_book_id]) {
-          engagementByUserBookId[s.user_book_id].sessionCount += 1;
-          if (s.read_on) {
-            engagementByUserBookId[s.user_book_id].distinctDays.add(s.read_on);
+        if (
+          s.read_on &&
+          s.read_on >= weekStartStr &&
+          spotlightByUserBookId[s.user_book_id]
+        ) {
+          spotlightByUserBookId[s.user_book_id].sessions += 1;
+          spotlightByUserBookId[s.user_book_id].daysRead.add(s.read_on);
+
+          if (Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage) {
+            spotlightByUserBookId[s.user_book_id].pagesRead += endPage - startPage + 1;
+          }
+
+          if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
+            spotlightByUserBookId[s.user_book_id].totalMinutes += minutes;
+
+            if (sessionMode === "listening") {
+              spotlightByUserBookId[s.user_book_id].listeningMinutes += minutes;
+            }
           }
         }
 
@@ -568,22 +603,102 @@ export default function BooksPage() {
       const avgPagesPerSession =
         totalSessionCount > 0 ? totalSessionPages / totalSessionCount : null;
 
-      let mostEngagedTitle: string | null = null;
-      let mostEngagedDetail: string | null = null;
-      let bestScore = -1;
+      const spotlightOptions: {
+        label: string;
+        value: string;
+        title: string;
+      }[] = [];
 
-      for (const entry of Object.values(engagementByUserBookId)) {
-        const distinctDayCount = entry.distinctDays.size;
-        const score = distinctDayCount * 100 + entry.sessionCount * 10 + entry.wordCount;
+      let bestConsistent: { title: string; count: number } | null = null;
+      let bestWords: { title: string; count: number } | null = null;
+      let bestListening: { title: string; count: number } | null = null;
+      let bestPages: { title: string; count: number } | null = null;
+      let bestTime: { title: string; count: number } | null = null;
+      let bestSessions: { title: string; count: number } | null = null;
 
-        if (score > bestScore) {
-          bestScore = score;
-          mostEngagedTitle = entry.title;
-          mostEngagedDetail = `${distinctDayCount} day${distinctDayCount === 1 ? "" : "s"
-            } active · ${entry.sessionCount} session${entry.sessionCount === 1 ? "" : "s"
-            } · ${entry.wordCount} word${entry.wordCount === 1 ? "" : "s"} saved`;
+      for (const entry of Object.values(spotlightByUserBookId)) {
+        const daysCount = entry.daysRead.size;
+
+        if (daysCount > 0 && (!bestConsistent || daysCount > bestConsistent.count)) {
+          bestConsistent = { title: entry.title, count: daysCount };
+        }
+
+        if (entry.wordsSaved > 0 && (!bestWords || entry.wordsSaved > bestWords.count)) {
+          bestWords = { title: entry.title, count: entry.wordsSaved };
+        }
+
+        if (
+          entry.listeningMinutes > 0 &&
+          (!bestListening || entry.listeningMinutes > bestListening.count)
+        ) {
+          bestListening = { title: entry.title, count: entry.listeningMinutes };
+        }
+
+        if (entry.pagesRead > 0 && (!bestPages || entry.pagesRead > bestPages.count)) {
+          bestPages = { title: entry.title, count: entry.pagesRead };
+        }
+
+        if (entry.totalMinutes > 0 && (!bestTime || entry.totalMinutes > bestTime.count)) {
+          bestTime = { title: entry.title, count: entry.totalMinutes };
+        }
+
+        if (entry.sessions > 0 && (!bestSessions || entry.sessions > bestSessions.count)) {
+          bestSessions = { title: entry.title, count: entry.sessions };
         }
       }
+
+      if (bestConsistent) {
+        spotlightOptions.push({
+          label: "Most Consistent",
+          value: `${bestConsistent.count} day${bestConsistent.count === 1 ? "" : "s"}`,
+          title: bestConsistent.title,
+        });
+      }
+
+      if (bestWords) {
+        spotlightOptions.push({
+          label: "Most Words Saved",
+          value: `${bestWords.count} word${bestWords.count === 1 ? "" : "s"}`,
+          title: bestWords.title,
+        });
+      }
+
+      if (bestListening) {
+        spotlightOptions.push({
+          label: "Most Listened To",
+          value: formatMinutesAsReadableTime(bestListening.count),
+          title: bestListening.title,
+        });
+      }
+
+      if (bestPages) {
+        spotlightOptions.push({
+          label: "Most Pages Read",
+          value: `${bestPages.count} page${bestPages.count === 1 ? "" : "s"}`,
+          title: bestPages.title,
+        });
+      }
+
+      if (bestTime) {
+        spotlightOptions.push({
+          label: "Most Time Spent",
+          value: formatMinutesAsReadableTime(bestTime.count),
+          title: bestTime.title,
+        });
+      }
+
+      if (bestSessions) {
+        spotlightOptions.push({
+          label: "Most Sessions",
+          value: `${bestSessions.count} session${bestSessions.count === 1 ? "" : "s"}`,
+          title: bestSessions.title,
+        });
+      }
+
+      const randomSpotlight =
+        spotlightOptions.length > 0
+          ? spotlightOptions[Math.floor(Math.random() * spotlightOptions.length)]
+          : null;
 
       setMonthlyStats({
         pagesRead,
@@ -594,8 +709,9 @@ export default function BooksPage() {
         listeningTimeMinutes,
         avgPagesPerSession,
         totalWordsLookedUp,
-        mostEngagedTitle,
-        mostEngagedDetail,
+        weeklySpotlightLabel: randomSpotlight?.label ?? null,
+        weeklySpotlightValue: randomSpotlight?.value ?? null,
+        weeklySpotlightTitle: randomSpotlight?.title ?? null,
       });
     } finally {
       setMonthlyStatsLoading(false);
@@ -1292,6 +1408,10 @@ export default function BooksPage() {
   const finished = validRows.filter((r) => !!r.finished_at && !r.dnf_at);
   const dnf = validRows.filter((r) => !!r.dnf_at);
 
+  const sortedValidRows = useMemo(() => {
+    return sortLibraryItems(validRows);
+  }, [validRows, sortMode, readingStatsByUserBookId]);
+
   const gridClass =
     "grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
@@ -1534,7 +1654,7 @@ export default function BooksPage() {
                   onChange={(e) => setStatsBookTypeFilter(e.target.value)}
                   className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
                 >
-                  <option value="all">Book Types</option>
+                  <option value="all">All Book Types</option>
                   <option value="picture_book">Picture Book</option>
                   <option value="early_reader">Early Reader</option>
                   <option value="chapter_book">Chapter Book</option>
@@ -1625,16 +1745,23 @@ export default function BooksPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
-                <div className="text-xs text-slate-600">Most Engaged</div>
-                <div className="mt-1 text-sm font-medium text-slate-900">
+                <div className="text-[11px] text-slate-500">This Week</div>
+
+                <div className="mt-1 text-xs text-slate-600">
                   {monthlyStatsLoading
                     ? "…"
-                    : monthlyStats.mostEngagedTitle ?? "No activity yet"}
+                    : monthlyStats.weeklySpotlightLabel ?? "No activity yet"}
                 </div>
 
-                {!monthlyStatsLoading && monthlyStats.mostEngagedDetail ? (
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    {monthlyStats.mostEngagedDetail}
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading
+                    ? "…"
+                    : monthlyStats.weeklySpotlightValue ?? "—"}
+                </div>
+
+                {!monthlyStatsLoading && monthlyStats.weeklySpotlightTitle ? (
+                  <div className="mt-1 text-sm font-medium text-slate-900">
+                    {monthlyStats.weeklySpotlightTitle}
                   </div>
                 ) : null}
               </div>
@@ -1789,10 +1916,13 @@ export default function BooksPage() {
             <select
               value={sortMode}
               onChange={(e) =>
-                setSortMode(e.target.value as "title" | "last_engaged" | "last_read")
+                setSortMode(
+                  e.target.value as "status" | "title" | "last_engaged" | "last_read"
+                )
               }
               className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
             >
+              <option value="status">Book Status</option>
               <option value="title">Title</option>
               <option value="last_read">Recently Finished</option>
               <option value="last_engaged">Last Engaged with</option>
@@ -1805,19 +1935,25 @@ export default function BooksPage() {
         </p>
 
         {viewMode === "cover" ? (
-          <>
-            <Section
-              title="Currently Reading"
-              subtitle="Started but not finished yet"
-              items={currentlyReading}
-            />
-            <Section title="Want to Read" subtitle="Not started yet" items={notStarted} />
-            <Section title="Finished" subtitle="Completed books" items={finished} />
-            <Section title="DNF" subtitle="Did not finish" items={dnf} />
-          </>
+          sortMode === "status" ? (
+            <>
+              <Section
+                title="Currently Reading"
+                subtitle="Started but not finished yet"
+                items={currentlyReading}
+              />
+              <Section title="Want to Read" subtitle="Not started yet" items={notStarted} />
+              <Section title="Finished" subtitle="Completed books" items={finished} />
+              <Section title="DNF" subtitle="Did not finish" items={dnf} />
+            </>
+          ) : (
+            <ul className={gridClass}>
+              {sortedValidRows.map((row) => renderBookCard(row))}
+            </ul>
+          )
         ) : (
           <ul className="overflow-hidden rounded-xl border bg-white">
-            {sortLibraryItems(validRows).map((row) => renderBookRow(row))}
+            {sortedValidRows.map((row) => renderBookRow(row))}
           </ul>
         )}
 

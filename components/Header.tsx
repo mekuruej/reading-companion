@@ -159,16 +159,19 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
       <div className="mx-auto max-w-6xl px-4 py-3">
-        <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div className="text-center md:text-left">
             <Link
               href={libraryHref}
-              className="block text-lg font-semibold tracking-tight text-stone-900 sm:text-2xl md:text-4xl"
+              className="block text-m font-semibold tracking-tight text-stone-900 sm:text-2xl md:text-4xl"
             >
-              MEKURU (Beta)
+              MEKURU <span className="align-middle text-xs font-semibold text-red-600 md:text-sm">(Beta)</span>
             </Link>
             <div className="mt-0 text-xs text-stone-500">
-              ページをめくって、話しまくろう
+              ページをめくって、話しまくろう！
+            </div>
+            <div className="mt-1 text-xs text-stone-500">
+              Every word carries the memory of where you met it.
             </div>
           </div>
 
@@ -335,18 +338,6 @@ export default function Header() {
               >
                 Word History
               </Link>
-
-              <button
-                type="button"
-                onClick={() =>
-                  alert(
-                    "Full study mode is coming soon. For now, open a book from your Library to study."
-                  )
-                }
-                className="text-stone-700 transition hover:text-stone-900"
-              >
-                Daily Study
-              </button>
             </div>
           </nav>
         </div>
