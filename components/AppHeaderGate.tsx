@@ -6,7 +6,7 @@ import Header from "./Header";
 export default function AppHeaderGate() {
   const pathname = usePathname();
 
-  if (pathname === "/") return null;
+  if (pathname === "/" || pathname === "/legal") return null;
 
   return <Header />;
 }
