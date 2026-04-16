@@ -14,7 +14,7 @@ export default function DashboardPage() {
       />
 
       <div className="max-w-xl">
-        <h1 className="text-3xl font-semibold">Welcome to MEKURU</h1>
+        <h1 className="text-3xl font-semibold">Welcome to Mekuru</h1>
         <p className="mt-3 text-gray-500">
           Every word carries the memory of where you met it.
           <br />
