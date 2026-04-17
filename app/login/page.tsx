@@ -8,6 +8,7 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
   const [hasSession, setHasSession] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -20,6 +21,26 @@ export default function LoginPage() {
       if (!alive) return;
 
       setHasSession(!!session);
+
+      if (session?.user?.id) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (!alive) return;
+
+        if (error) {
+          console.error("Error loading username:", error);
+          setUsername(null);
+        } else {
+          setUsername(data?.username ?? null);
+        }
+      } else {
+        setUsername(null);
+      }
+
       setChecking(false);
     };
 
@@ -27,9 +48,30 @@ export default function LoginPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!alive) return;
+
       setHasSession(!!session);
+
+      if (session?.user?.id) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (!alive) return;
+
+        if (error) {
+          console.error("Error loading username:", error);
+          setUsername(null);
+        } else {
+          setUsername(data?.username ?? null);
+        }
+      } else {
+        setUsername(null);
+      }
+
       setChecking(false);
     });
 
@@ -53,12 +95,12 @@ export default function LoginPage() {
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-md border rounded-lg p-6 shadow-sm text-center">
-          <p className="text-gray-700 mb-4">You are signed in.</p>
+          <p className="mb-4 text-gray-700">You are signed in.</p>
           <a
-            href="/books"
-            className="inline-block px-4 py-2 bg-gray-800 text-white rounded hover:bg-black transition"
+            href={username ? `/users/${username}/books` : "/books"}
+            className="inline-block rounded bg-gray-800 px-4 py-2 text-white transition hover:bg-black"
           >
-            Continue to Books
+            Continue to My Library
           </a>
         </div>
       </main>
