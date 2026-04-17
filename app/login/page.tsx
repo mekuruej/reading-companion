@@ -4,13 +4,25 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
   const [hasSession, setHasSession] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
+  if (!checking && hasSession) {
+    if (username) {
+      router.replace(`/users/${username}/books`);
+    } else {
+      router.replace("/books");
+    }
+  }
+}, [checking, hasSession, username, router]);
+
+useEffect(() => {
     let alive = true;
 
     const run = async () => {
@@ -86,22 +98,6 @@ export default function LoginPage() {
       <main className="min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-md border rounded-lg p-6 shadow-sm text-center">
           <p className="text-gray-600">Checking sign-in...</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (hasSession) {
-    return (
-      <main className="min-h-screen flex items-center justify-center p-6">
-        <div className="w-full max-w-md border rounded-lg p-6 shadow-sm text-center">
-          <p className="mb-4 text-gray-700">You are signed in.</p>
-          <a
-            href={username ? `/users/${username}/books` : "/books"}
-            className="inline-block rounded bg-gray-800 px-4 py-2 text-white transition hover:bg-black"
-          >
-            Continue to My Library
-          </a>
         </div>
       </main>
     );
