@@ -13,16 +13,16 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-  if (!checking && hasSession) {
-    if (username) {
-      router.replace(`/users/${username}/books`);
-    } else {
-      router.replace("/books");
+    if (!checking && hasSession) {
+      if (username) {
+        router.replace(`/users/${username}/books`);
+      } else {
+        router.replace("/books");
+      }
     }
-  }
-}, [checking, hasSession, username, router]);
+  }, [checking, hasSession, username, router]);
 
-useEffect(() => {
+  useEffect(() => {
     let alive = true;
 
     const run = async () => {
@@ -31,8 +31,6 @@ useEffect(() => {
       } = await supabase.auth.getSession();
 
       if (!alive) return;
-
-      setHasSession(!!session);
 
       if (session?.user?.id) {
         const { data, error } = await supabase
@@ -43,16 +41,16 @@ useEffect(() => {
 
         if (!alive) return;
 
-        if (error) {
-          console.error("Error loading username:", error);
-          setUsername(null);
+        if (!error && data?.username) {
+          router.replace(`/users/${data.username}/books`);
+          return;
         } else {
-          setUsername(data?.username ?? null);
+          router.replace("/books");
+          return;
         }
-      } else {
-        setUsername(null);
       }
 
+      setHasSession(false);
       setChecking(false);
     };
 
@@ -63,8 +61,6 @@ useEffect(() => {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!alive) return;
 
-      setHasSession(!!session);
-
       if (session?.user?.id) {
         const { data, error } = await supabase
           .from("profiles")
@@ -74,17 +70,15 @@ useEffect(() => {
 
         if (!alive) return;
 
-        if (error) {
-          console.error("Error loading username:", error);
-          setUsername(null);
+        if (!error && data?.username) {
+          router.replace(`/users/${data.username}/books`);
         } else {
-          setUsername(data?.username ?? null);
+          router.replace("/books");
         }
       } else {
-        setUsername(null);
+        setHasSession(false);
+        setChecking(false);
       }
-
-      setChecking(false);
     });
 
     return () => {

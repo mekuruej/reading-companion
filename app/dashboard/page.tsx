@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -27,7 +29,7 @@ export default function DashboardPage() {
           onClick={() => router.push("/books")}
           className="rounded bg-gray-800 px-4 py-2 text-white transition hover:bg-black"
         >
-          Go to My Books
+          Go to My Library
         </button>
       </div>
     </div>
