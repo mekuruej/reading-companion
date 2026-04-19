@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HomePage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-12 space-y-12">
@@ -14,7 +16,7 @@ export default function HomePage() {
         </h1>
 
         <p className="mx-auto max-w-2xl text-base leading-7 text-[#4f473d]">
-          You're not alone in thinking that kanji, complex sentences, or large amounts of vocabulary are overwhelming.
+          You're not alone in finding kanji, complex sentences, or large amounts of vocabulary overwhelming.
           <br />
           I help learners work through real texts in English to help you understand what’s happening, point out grammar you may easily miss alone, and build your confidence page by page.
         </p>
@@ -57,62 +59,15 @@ export default function HomePage() {
           <li>• Begin building familiarity with vocabulary, grammar, and kanji through repeated exposure, even if you don’t remember it right away</li>
         </ul>
 
-        <div className="pt-2 text-center">
-          <button className="rounded-full bg-[#2f2a24] px-6 py-3 text-sm text-white hover:opacity-90">
-            Book a Trial Lesson
-          </button>
-        </div>
-      </section>
-
-      {/* ABOUT ME */}
-      <section className="mx-auto max-w-5xl px-6 pt-6 pb-6">
-        <div className="space-y-3">
-          <h2 className="text-2xl font-semibold">About Me</h2>
-
-          <img
-            src="/devon.jpg"
-            alt="Devon - Japanese reading coach"
-            className="mx-auto mb-4 w-full max-w-sm rounded-2xl object-cover shadow-md md:float-left md:mr-6 md:mb-4"
-          />
-<br />
-          <p className="text-base leading-7 text-[#4f473d]">
-            I grew up in Denver, Colorado, and eventually found my way to the countryside of Hokuto in Yamanashi, Japan. I&apos;ve now been in Japan for over 16 years.
-          </p>
-
-          <p className="text-base leading-7 text-[#4f473d]">
-            I didn’t start learning Japanese when I was young. I came to it later, and for the most part, I had to figure it out on my own.
-          </p>
-
-          <p className="text-base leading-7 text-[#4f473d]">
-            Because of that, I understand how frustrating it can feel, especially when things don’t click the way you expect them to.
-          </p>
-<br />
-<br />
-          <p className="text-base leading-7 text-[#4f473d]">
-            Over time, I realized something important:
-          </p>
-
-          <p className="text-base leading-7 font-medium text-[#2f2a24]">
-            • Perfection or complete understanding shouldn’t be the goal, especially in the early stages.
-          </p>
-
-          <p className="text-base leading-7 text-[#4f473d]">
-            • A lot of learning comes from sitting in what you don’t understand yet and slowly watching it become clearer.
-          </p>
-
-          <p className="text-base leading-7 text-[#4f473d]">
-            • That process — the unknown becoming known — is where real progress happens. And it&apos;s the fun part!
-          </p>
-
-          <p className="text-base leading-7 text-[#4f473d]">
-            My background is in music, which taught me the importance of consistency and showing up even when things feel difficult. And with my over 16 years of teaching English, I know that while a teacher may have certain things they want to teach, it’s essential to approach them differently depending on the student.
-          </p>
-
-          <p className="text-base leading-7 text-[#4f473d]">
-            That same mindset carries into how I approach reading and teaching Japanese.
-          </p>
-
-          <div className="clear-both" />
+        <div className="pt-6 text-center">
+          <a
+            href="https://scheduler.zoom.us/mekuru/free-trial-japanese-reading-lesson"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
+          >
+            Book a Free Trial Lesson
+          </a>
         </div>
       </section>
 
@@ -143,11 +98,148 @@ export default function HomePage() {
         <p className="text-base leading-7 text-[#4f473d]">
           I offer a variety of lesson plans, so there are options for different schedules and budgets.
         </p>
-
-        <button className="mt-2 rounded-full bg-[#2f2a24] px-6 py-3 text-sm text-white hover:opacity-90">
-          Book a Trial Lesson
-        </button>
       </section>
+
+      <section className="mt-16">
+        <div className="mx-auto max-w-3xl px-6">
+          <div className="max-w-2xl">
+            <h2 className="text-base font-semibold text-stone-900">
+              Pricing
+            </h2>
+
+            <div className="mt-4 space-y-4 text-sm text-stone-700">
+              <div>
+                <p className="font-medium">Term Plan — 16 Lessons</p>
+                <p>16 lessons (approx. 4/month)</p>
+                <p className="mt-1">¥64,000 per term</p>
+                <p className="text-xs text-stone-500">Approx. ¥4,000 per lesson</p>
+              </div>
+
+              <div>
+                <p className="font-medium">Flexible Plan — 12 Lessons</p>
+                <p>12 lessons (approx. 3/month)</p>
+                <p className="mt-1">¥54,000 per term</p>
+                <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
+              </div>
+
+              <div>
+                <p className="font-medium">Light Plan — 8 Lessons</p>
+                <p>8 lessons (approx. 2/month)</p>
+                <p className="mt-1">¥36,000 per term</p>
+                <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-xs text-stone-500">
+              Monthly and annual payment options are also available.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto mt-12 max-w-3xl px-6">
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6">
+          <h3 className="text-base font-semibold text-stone-900">
+            Included with Every Lesson
+          </h3>
+
+          <p className="mt-2 text-sm text-stone-700">
+            All students get access to the Mekuru Reading Companion — a private tool designed to support your reading outside of lessons.
+          </p>
+
+          <ul className="mt-4 space-y-2 text-sm text-stone-700">
+            <li>• Review words saved during your lessons</li>
+            <li>• Save your own words while reading (optional)</li>
+            <li>• Track your reading progress over time</li>
+            <li>• Study vocabulary in context</li>
+            <li>• Prepare readings between lessons</li>
+          </ul>
+
+          <div className="mt-6">
+            <p className="text-xs text-stone-500 mb-2">
+              Inside the Mekuru Reading Companion
+            </p>
+            <img
+              src="/app-preview.jpg"
+              alt="Mekuru Reading Companion preview"
+              className="rounded-xl border border-stone-200 shadow-sm"
+            />
+            <p className="mt-2 text-xs text-stone-500">
+              Track your reading, review vocabulary, and study between lessons.
+            </p>
+          </div>
+
+          <p className="mt-2 text-xs text-stone-500">
+            Interested in trying it with your own books? Access may be available to a limited number of individuals — feel free to ask.
+          </p>
+
+          <p className="text-xs text-stone-500">
+            Contact: mekuru.ej@gmail.com
+          </p>
+        </div>
+      </div>
+
+      {/* ABOUT ME */}
+      <section className="mx-auto max-w-5xl px-6 pt-6 pb-6">
+        <div className="space-y-3">
+          <h2 className="text-2xl font-semibold">About Me</h2>
+
+          <img
+            src="/devon.jpg"
+            alt="Devon - Japanese reading coach"
+            className="mx-auto mb-4 w-full max-w-sm rounded-2xl object-cover shadow-md md:float-left md:mr-6 md:mb-4"
+          />
+          <br />
+          <p className="text-base leading-7 text-[#4f473d]">
+            I grew up in Denver, Colorado, and eventually found my way to the countryside of Hokuto in Yamanashi, Japan. I&apos;ve now been in Japan for over 16 years.
+          </p>
+
+          <p className="text-base leading-7 text-[#4f473d]">
+            I didn’t start learning Japanese when I was young. I came to it later, and for the most part, I had to figure it out on my own.
+          </p>
+
+          <p className="text-base leading-7 text-[#4f473d]">
+            Because of that, I understand how frustrating it can feel, especially when things don’t click the way you expect them to.
+          </p>
+          <br />
+          <br />
+          <p className="text-base leading-7 text-[#4f473d]">
+            Over time, I realized something important:
+          </p>
+
+          <p className="text-base leading-7 font-medium text-[#2f2a24]">
+            • Perfection or complete understanding shouldn’t be the goal, especially in the early stages.
+          </p>
+
+          <p className="text-base leading-7 text-[#4f473d]">
+            • A lot of learning comes from sitting in what you don’t understand yet and slowly watching it become clearer.
+          </p>
+
+          <p className="text-base leading-7 text-[#4f473d]">
+            • That process — the unknown becoming known — is where real progress happens. And it&apos;s the fun part!
+          </p>
+
+          <p className="text-base leading-7 text-[#4f473d]">
+            My background is in music, which taught me the importance of consistency and showing up even when things feel difficult. And with my over 16 years of teaching English, I know that while a teacher may have certain things they want to teach, it’s essential to approach them differently depending on the student.
+          </p>
+
+          <p className="text-base leading-7 text-[#4f473d]">
+            That same mindset carries into how I approach reading and teaching Japanese.
+          </p>
+
+          <div className="clear-both" />
+        </div>
+      </section>
+      <div className="pt-2 text-center">
+        <a
+          href="https://scheduler.zoom.us/mekuru/free-trial-japanese-reading-lesson"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
+        >
+          Book a Free Trial Lesson
+        </a>
+      </div>
 
       {/* FACEBOOK */}
       <section className="space-y-3">
@@ -175,6 +267,20 @@ export default function HomePage() {
           If this approach feels right, feel free to reach out!
         </p>
       </section>
-    </main>
+
+      <footer className="mt-16 border-t border-stone-200">
+        <div className="mt-12 text-center text-xs text-stone-500 space-x-4">
+          <Link href="/legal" className="hover:underline">
+            Commercial Disclosure
+          </Link>
+          <Link href="/terms" className="hover:underline">
+            Terms of Service
+          </Link>
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+        </div>
+      </footer>
+    </main >
   );
 }

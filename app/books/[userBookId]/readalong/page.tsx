@@ -242,6 +242,38 @@ export default function ReadAlongPage() {
         animateScrollTo(container, desiredTop, 1000);
     }
 
+    async function openTimedSessionFormWithDefaults() {
+        if (!userBookId) {
+            setShowTimedSessionForm(true);
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from("user_book_reading_sessions")
+            .select("end_page, read_on, created_at")
+            .eq("user_book_id", userBookId)
+            .order("read_on", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+        if (error) {
+            console.error("Error loading latest reading session:", error);
+            setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : "");
+            setShowTimedSessionForm(true);
+            return;
+        }
+
+        const latest = data?.[0];
+        const nextStart =
+            latest?.end_page != null && Number.isFinite(Number(latest.end_page))
+                ? String(Number(latest.end_page) + 1)
+                : "";
+
+        setSessionStartPage(nextStart);
+        setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : nextStart);
+        setShowTimedSessionForm(true);
+    }
+
     async function saveReadingSession() {
         if (!userBookId) return;
 
@@ -495,8 +527,6 @@ export default function ReadAlongPage() {
                                     setShowTimedSessionForm(false);
                                     setTimerSaveMessage("");
                                     setSessionMinutesRead("");
-                                    setSessionStartPage(currentPageString);
-                                    setSessionEndPage(currentPageString);
                                 }}
                                 className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
                             >
@@ -528,8 +558,7 @@ export default function ReadAlongPage() {
                                         }
                                         setIsRunning(false);
                                         setIsPaused(false);
-                                        setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : sessionEndPage);
-                                        setShowTimedSessionForm(true);
+                                        void openTimedSessionFormWithDefaults();
                                     }}
                                     className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
                                 >
@@ -556,8 +585,36 @@ export default function ReadAlongPage() {
                                     type="button"
                                     onClick={() => {
                                         setIsPaused(false);
-                                        setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : sessionEndPage);
-                                        setShowTimedSessionForm(true);
+                                        setIsRunning(false);
+                                        void openTimedSessionFormWithDefaults();
+                                    }}
+                                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                                >
+                                    Finish
+                                </button>
+                            </>
+                        ) : null}
+
+                        {isPaused ? (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setStartTime(Date.now() - elapsed * 1000);
+                                        setIsRunning(true);
+                                        setIsPaused(false);
+                                    }}
+                                    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+                                >
+                                    Resume
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsPaused(false);
+                                        setIsRunning(false);
+                                        void openTimedSessionFormWithDefaults();
                                     }}
                                     className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
                                 >
@@ -764,7 +821,7 @@ export default function ReadAlongPage() {
                                 </div>
 
                                 <p className="mt-3 text-sm text-stone-500">
-                                    Enjoy the story! 
+                                    Enjoy the story!
                                 </p>
                             </div>
                         ) : (

@@ -593,6 +593,36 @@ export default function SingleAddPage() {
     setMessage("✅ Word deleted from Vocab List.");
   }
 
+  async function openTimedSessionFormWithDefaults() {
+    if (!userBookId) {
+      setShowTimedSessionForm(true);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_reading_sessions")
+      .select("end_page, read_on, created_at")
+      .eq("user_book_id", userBookId)
+      .order("read_on", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("Error loading latest reading session:", error);
+      setShowTimedSessionForm(true);
+      return;
+    }
+
+    const latest = data?.[0];
+    const nextStart =
+      latest?.end_page != null && Number.isFinite(Number(latest.end_page))
+        ? String(Number(latest.end_page) + 1)
+        : "";
+
+    setSessionStartPage(nextStart);
+    setShowTimedSessionForm(true);
+  }
+
   async function saveReadingSession() {
     if (!userBookId) return;
 
@@ -748,85 +778,86 @@ export default function SingleAddPage() {
           </p>
 
           <div className="mt-4 flex flex-wrap justify-center gap-3 sm:justify-start">
-            {!isRunning && !isPaused ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setStartTime(Date.now());
-                  setElapsed(0);
-                  setIsRunning(true);
-                  setIsPaused(false);
-                }}
-                className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-              >
-                Start Timer
-              </button>
-            ) : null}
+  {!isRunning && !isPaused ? (
+    <button
+      type="button"
+      onClick={() => {
+        setStartTime(Date.now());
+        setElapsed(0);
+        setIsRunning(true);
+        setIsPaused(false);
+      }}
+      className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+    >
+      Start Timer
+    </button>
+  ) : null}
 
-            {isRunning ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (startTime) {
-                      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                    }
-                    setIsRunning(false);
-                    setIsPaused(true);
-                  }}
-                  className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
-                >
-                  Pause
-                </button>
+  {isRunning ? (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          if (startTime) {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+          }
+          setIsRunning(false);
+          setIsPaused(true);
+        }}
+        className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
+      >
+        Pause
+      </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (startTime) {
-                      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                    }
-                    setIsRunning(false);
-                    setIsPaused(false);
-                    setShowTimedSessionForm(true);
-                  }}
-                  className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                >
-                  Finish
-                </button>
-              </>
-            ) : null}
+      <button
+        type="button"
+        onClick={() => {
+          if (startTime) {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+          }
+          setIsRunning(false);
+          setIsPaused(false);
+          void openTimedSessionFormWithDefaults();
+        }}
+        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+      >
+        Finish
+      </button>
+    </>
+  ) : null}
 
-            {isPaused ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStartTime(Date.now() - elapsed * 1000);
-                    setIsRunning(true);
-                    setIsPaused(false);
-                  }}
-                  className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-                >
-                  Resume
-                </button>
+  {isPaused ? (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setStartTime(Date.now() - elapsed * 1000);
+          setIsPaused(false);
+          setIsRunning(true);
+        }}
+        className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+      >
+        Resume
+      </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPaused(false);
-                    setShowTimedSessionForm(true);
-                  }}
-                  className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                >
-                  Finish
-                </button>
-              </>
-            ) : null}
+      <button
+        type="button"
+        onClick={() => {
+          setIsPaused(false);
+          setIsRunning(false);
+          void openTimedSessionFormWithDefaults();
+        }}
+        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+      >
+        Finish
+      </button>
+    </>
+  ) : null}
 
-            <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
-              ⏱ {formatTimer(elapsed)}
-            </div>
-          </div>
+  <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
+    ⏱ {formatTimer(elapsed)}
+  </div>
+</div>
 
           {showTimedSessionForm && !isRunning ? (
             <div className="mt-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">

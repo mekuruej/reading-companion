@@ -556,26 +556,18 @@ export default function AddWordPage() {
             <div>
               <div className="flex flex-wrap gap-2">
                 <input
-                  ref={wordInputRef}
                   value={word}
                   onChange={(e) => setWord(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void handleLookup();
-                    }
-                  }}
-                  placeholder="Search a word..."
-                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
+                  placeholder="Search for a word"
+                  className="flex-1 rounded-xl border px-3 py-2 text-sm"
                 />
 
                 <button
                   type="button"
                   onClick={() => void handleLookup()}
-                  disabled={!hasWord || lookupLoading}
-                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
                 >
-                  {lookupLoading ? "Searching..." : "Search"}
+                  Search
                 </button>
 
                 <button
@@ -594,49 +586,61 @@ export default function AddWordPage() {
                 >
                   Manual Entry
                 </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
-                  >
-                    Grammar
-                  </button>
-
-                  <span className="select-none text-sm text-stone-400">(coming soon...)</span>
-                </div>
               </div>
+
+              {message ? (
+                <div className="mt-2 text-sm text-stone-600">{message}</div>
+              ) : null}
 
               {showEditor ? (
                 <div className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-                  <label className="flex items-center gap-2 text-sm text-stone-700">
-                    <input
-                      type="checkbox"
-                      checked={useAlternateSurface}
-                      onChange={(e) => setUseAlternateSurface(e.target.checked)}
-                    />
-                    <span>Alternate kanji (in this book)</span>
-                  </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div>
+                        <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
+                        <input
+                          value={useAlternateSurface ? alternateSurface : word}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            if (useAlternateSurface) {
+                              setAlternateSurface(next);
+                            } else {
+                              setWord(next);
+                            }
+                          }}
+                          placeholder="Word"
+                          className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                      </div>
 
-                  {useAlternateSurface ? (
-                    <input
-                      value={alternateSurface}
-                      onChange={(e) => setAlternateSurface(e.target.value)}
-                      placeholder="Book form (e.g. 愉しい)"
-                      className="mt-2 w-full rounded border px-3 py-2 text-sm"
-                    />
-                  ) : null}
+                      <label className="flex items-center gap-2 text-sm text-stone-700">
+                        <input
+                          type="checkbox"
+                          checked={useAlternateSurface}
+                          onChange={(e) => setUseAlternateSurface(e.target.checked)}
+                        />
+                        <span>Alternate kanji (in this book)</span>
+                      </label>
 
-                  <div>
-                    <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
-                    <input
-                      value={reading}
-                      onChange={(e) => setReading(e.target.value)}
-                      placeholder="Reading"
-                      className="w-full rounded border px-3 py-2 text-sm"
-                    />
+                      {useAlternateSurface ? (
+                        <input
+                          value={alternateSurface}
+                          onChange={(e) => setAlternateSurface(e.target.value)}
+                          placeholder="Book form (e.g. 愉しい)"
+                          className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
+                      <input
+                        value={reading}
+                        onChange={(e) => setReading(e.target.value)}
+                        placeholder="Reading"
+                        className="w-full rounded border px-3 py-2 text-sm"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -645,7 +649,10 @@ export default function AddWordPage() {
                     <div className="space-y-2">
                       {meaningChoices.length > 0 ? (
                         meaningChoices.map((choice, index) => (
-                          <label key={index} className="flex items-start gap-2 text-sm text-stone-700">
+                          <label
+                            key={index}
+                            className="flex items-start gap-2 text-sm text-stone-700"
+                          >
                             <input
                               type="radio"
                               checked={meaningChoiceIndex === index}
@@ -677,38 +684,32 @@ export default function AddWordPage() {
 
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Page</label>
+                      <div className="mb-1 text-sm font-medium text-stone-700">Page</div>
                       <input
-                        type="number"
                         value={pageNumber}
                         onChange={(e) => setPageNumber(e.target.value)}
-                        placeholder="e.g. 45"
-                        className="w-full rounded border p-3 text-sm"
+                        placeholder="Page"
+                        className="w-full rounded border px-3 py-2 text-sm"
                       />
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Chapter #
-                      </label>
+                      <div className="mb-1 text-sm font-medium text-stone-700">Chapter</div>
                       <input
-                        type="number"
                         value={chapterNumber}
                         onChange={(e) => setChapterNumber(e.target.value)}
-                        placeholder="e.g. 3"
-                        className="w-full rounded border p-3 text-sm"
+                        placeholder="Chapter"
+                        className="w-full rounded border px-3 py-2 text-sm"
                       />
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Chapter Name
-                      </label>
+                      <div className="mb-1 text-sm font-medium text-stone-700">Chapter Name</div>
                       <input
                         value={chapterName}
                         onChange={(e) => setChapterName(e.target.value)}
-                        placeholder="e.g. Summer Festival"
-                        className="w-full rounded border p-3 text-sm"
+                        placeholder="Chapter name"
+                        className="w-full rounded border px-3 py-2 text-sm"
                       />
                     </div>
                   </div>
@@ -718,14 +719,8 @@ export default function AddWordPage() {
                       type="checkbox"
                       checked={hideKanjiInReadingSupport}
                       onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
-                      className="mt-0.5"
                     />
-                    <span>
-                      <span className="font-medium">Hide kanji in Reading Support</span>
-                      <span className="block text-xs text-stone-500">
-                        Use kana to match the book.
-                      </span>
-                    </span>
+                    <span>Hide this word in reading support</span>
                   </label>
 
                   <div className="flex flex-wrap gap-2">
@@ -804,6 +799,6 @@ export default function AddWordPage() {
           </div>
         </div>
       </div>
-    </main>
+    </main >
   );
 }
