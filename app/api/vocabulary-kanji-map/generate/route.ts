@@ -13,9 +13,14 @@ function extractKanjiChars(surface: string): string[] {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const vocabularyCacheId = body?.vocabulary_cache_id;
 
-    if (!vocabularyCacheId) {
+    const rawVocabularyCacheId =
+      body?.vocabulary_cache_id ?? body?.vocabularyCacheId ?? null;
+
+    const vocabularyCacheId =
+      rawVocabularyCacheId == null ? null : Number(rawVocabularyCacheId);
+
+    if (!vocabularyCacheId || Number.isNaN(vocabularyCacheId)) {
       return NextResponse.json(
         { error: "vocabulary_cache_id is required" },
         { status: 400 }

@@ -100,41 +100,35 @@ export default function HomePage() {
         </p>
       </section>
 
-      <section className="mt-16">
-        <div className="mx-auto max-w-3xl px-6">
-          <div className="max-w-2xl">
-            <h2 className="text-base font-semibold text-stone-900">
-              Pricing
-            </h2>
+      <section className="mt-16 space-y-4">
+        <h2 className="text-2xl font-semibold">Pricing</h2>
 
-            <div className="mt-4 space-y-4 text-sm text-stone-700">
-              <div>
-                <p className="font-medium">Term Plan — 16 Lessons</p>
-                <p>16 lessons (approx. 4/month)</p>
-                <p className="mt-1">¥64,000 per term</p>
-                <p className="text-xs text-stone-500">Approx. ¥4,000 per lesson</p>
-              </div>
+        <div className="space-y-4 text-sm text-stone-700">
+          <div>
+            <p className="font-medium">Term Plan — 16 Lessons</p>
+            <p>16 lessons (approx. 4/month)</p>
+            <p className="mt-1">¥64,000 per term</p>
+            <p className="text-xs text-stone-500">Approx. ¥4,000 per lesson</p>
+          </div>
 
-              <div>
-                <p className="font-medium">Flexible Plan — 12 Lessons</p>
-                <p>12 lessons (approx. 3/month)</p>
-                <p className="mt-1">¥54,000 per term</p>
-                <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
-              </div>
+          <div>
+            <p className="font-medium">Flexible Plan — 12 Lessons</p>
+            <p>12 lessons (approx. 3/month)</p>
+            <p className="mt-1">¥54,000 per term</p>
+            <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
+          </div>
 
-              <div>
-                <p className="font-medium">Light Plan — 8 Lessons</p>
-                <p>8 lessons (approx. 2/month)</p>
-                <p className="mt-1">¥36,000 per term</p>
-                <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
-              </div>
-            </div>
-
-            <p className="mt-4 text-xs text-stone-500">
-              Monthly and annual payment options are also available.
-            </p>
+          <div>
+            <p className="font-medium">Light Plan — 8 Lessons</p>
+            <p>8 lessons (approx. 2/month)</p>
+            <p className="mt-1">¥36,000 per term</p>
+            <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
           </div>
         </div>
+
+        <p className="text-xs text-stone-500">
+          Monthly and annual payment options are also available.
+        </p>
       </section>
 
       <div className="mx-auto mt-12 max-w-3xl px-6">
@@ -170,7 +164,7 @@ export default function HomePage() {
           </div>
 
           <p className="mt-2 text-xs text-stone-500">
-            Interested in trying it with your own books? Access may be available to a limited number of individuals — feel free to ask.
+           Interested in trying it on your own? Access may be available to a limited number of people outside of my private lessons — feel free to ask.
           </p>
 
           <p className="text-xs text-stone-500">

@@ -22,10 +22,13 @@ type KanjiMapRow = {
 
 type VocabCacheQueueRow = {
   id: number;
+  userBookWordId: string;
+  vocabularyCacheId: number | null;
   surface: string;
   reading: string;
   jlpt: string | null;
   created_at: string;
+  enrichmentStatus: "missing" | "partial" | "ready";
   vocabulary_kanji_map: KanjiMapRow[] | null;
 };
 
@@ -49,6 +52,7 @@ type TeacherTabProps = {
   kanjiMapLoading: boolean;
   kanjiMapError: string | null;
   kanjiMapQueue: VocabCacheQueueRow[];
+  needsKanjiEnrichmentCount: number;
   openKanjiWordId: number | null;
   editingKanjiRows: Record<number, KanjiMapRow[]>;
   savingKanjiWordId: number | null;
@@ -83,6 +87,7 @@ export default function TeacherTab({
   kanjiMapLoading,
   kanjiMapError,
   kanjiMapQueue,
+  needsKanjiEnrichmentCount,
   openKanjiWordId,
   editingKanjiRows,
   savingKanjiWordId,
@@ -202,6 +207,10 @@ export default function TeacherTab({
         )}
       </div>
 
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Kanji enrichment needed: {needsKanjiEnrichmentCount}
+      </div>
+
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 text-sm font-semibold text-stone-900">
           Kanji Map Enrichment Queue
@@ -221,7 +230,11 @@ export default function TeacherTab({
               const editRows = editingKanjiRows[word.id] ?? [];
 
               return (
-                <div key={word.id} className="rounded-xl border bg-white p-3">
+                <div
+                  id={`kanji-word-${word.id}`}
+                  key={word.userBookWordId || String(word.id)}
+                  className="rounded-xl border bg-white p-3"
+                >
                   <div className="rounded-2xl border border-stone-300 bg-stone-100 px-5 py-4">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <div className="min-w-0 flex-1">

@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BookInfoTab from "./components/BookInfoTab";
 import ReadingTab from "./components/ReadingTab";
@@ -44,6 +44,7 @@ type Book = {
 
 type UserBook = {
   id: string;
+  user_id: string;
   book_id: string;
   started_at: string | null;
   finished_at: string | null;
@@ -140,10 +141,13 @@ type KanjiMapRow = {
 
 type VocabCacheQueueRow = {
   id: number;
+  userBookWordId: string;
+  vocabularyCacheId: number | null;
   surface: string;
   reading: string;
   jlpt: string | null;
   created_at: string;
+  enrichmentStatus: "missing" | "partial" | "ready";
   vocabulary_kanji_map: KanjiMapRow[] | null;
 };
 
@@ -398,6 +402,7 @@ function hiraToKata(text: string) {
 
 export default function BookHubPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ userBookId: string }>();
   const userBookId = params?.userBookId;
 
@@ -407,6 +412,7 @@ export default function BookHubPage() {
 
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
+  const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
 
   const isTeacher = myRole === "teacher";
   const canEditBookInfo = isSuperTeacher;
@@ -414,7 +420,15 @@ export default function BookHubPage() {
   const [editingTab, setEditingTab] = useState<HubTab | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<HubTab>("study");
+  const [activeTab, setActiveTab] = useState<HubTab>(
+    searchParams.get("tab") === "teacher" ? "teacher" : "study"
+  );
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "teacher") {
+      setActiveTab("teacher");
+    }
+  }, [searchParams]);
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
 
   const [startedAt, setStartedAt] = useState<string>("");
@@ -576,6 +590,7 @@ export default function BookHubPage() {
   const [kanjiMapLoading, setKanjiMapLoading] = useState(false);
   const [kanjiMapError, setKanjiMapError] = useState<string | null>(null);
   const [storyTab, setStoryTab] = useState<"characters" | "plot" | "setting" | "cultural">("characters");
+  const [needsKanjiEnrichmentCount, setNeedsKanjiEnrichmentCount] = useState(0);
 
   const [sessionStartPage, setSessionStartPage] = useState<string>("");
   const [sessionEndPage, setSessionEndPage] = useState<string>("");
@@ -601,6 +616,9 @@ export default function BookHubPage() {
   const [wordExplorerLoading, setWordExplorerLoading] = useState(false);
   const [wordExplorerError, setWordExplorerError] = useState<string | null>(null);
   const [wordExplorerResults, setWordExplorerResults] = useState<any[]>([]);
+
+  const canAccessKanjiReadings =
+    isSuperTeacher || isTeacher || isLinkedStudentToAnyTeacher;
 
   const [quickPreview, setQuickPreview] = useState<{
     surface: string;
@@ -974,7 +992,7 @@ export default function BookHubPage() {
 
     if (row?.id) {
       await loadSavedKanjiDefaults(row.id);
-      await loadKanjiMapQueue();
+      await loadKanjiMapQueue(row.id);
     }
     setOpenKanjiWordId(null);
     setSavingKanjiWordId(null);
@@ -1127,12 +1145,14 @@ export default function BookHubPage() {
   }
 
   async function loadSavedKanjiDefaults(userBookIdValue: string) {
+    const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
+
     const { data: bookWordRows, error: bookWordErr } = await supabase
       .from("user_book_words")
-      .select("vocabulary_cache_id, is_manual_override")
-      .eq("user_book_id", userBookIdValue)
+      .select("id, surface, reading, vocabulary_cache_id, is_manual_override, created_at")
       .eq("is_manual_override", false)
-      .not("vocabulary_cache_id", "is", null);
+      .eq("user_book_id", userBookIdValue)
+      .gte("created_at", KANJI_ENRICHMENT_TEST_START);
 
     if (bookWordErr) {
       console.error("Error loading book vocabulary cache ids:", bookWordErr);
@@ -1140,9 +1160,13 @@ export default function BookHubPage() {
       return;
     }
 
+    const kanjiBookWordRows = (bookWordRows ?? []).filter((r: any) =>
+      /[\p{Script=Han}]/u.test(r.surface ?? "")
+    );
+
     const cacheIds = Array.from(
       new Set(
-        (bookWordRows ?? [])
+        kanjiBookWordRows
           .map((r: any) => r.vocabulary_cache_id)
           .filter((id: number | null) => id != null)
       )
@@ -1204,37 +1228,72 @@ export default function BookHubPage() {
     setSavedKanjiDefaults(byKanji);
   }
 
-  async function loadKanjiMapQueue() {
-    if (!row?.id) return;
+  async function loadKanjiMapQueue(userBookIdValue: string) {
+    const currentUserBookId = userBookIdValue;
 
     setKanjiMapLoading(true);
     setKanjiMapError(null);
 
-    const { data: bookWordRows, error: bookWordErr } = await supabase
+    const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
+
+    const LEGACY_KANJI_BOOK_IDS = [
+      "e4934e68-b374-4c11-8702-8efafcecc0e7",
+    ];
+
+    let bookWordQuery = supabase
       .from("user_book_words")
-      .select("vocabulary_cache_id, is_manual_override")
+      .select("id, surface, reading, vocabulary_cache_id, is_manual_override, created_at")
       .eq("is_manual_override", false)
-      .eq("user_book_id", row.id)
-      .not("vocabulary_cache_id", "is", null);
+      .eq("user_book_id", userBookIdValue);
+
+    if (!LEGACY_KANJI_BOOK_IDS.includes(userBookIdValue)) {
+      bookWordQuery = bookWordQuery.gte("created_at", KANJI_ENRICHMENT_TEST_START);
+    }
+
+    const { data: bookWordRows, error: bookWordErr } = await bookWordQuery;
 
     if (bookWordErr) {
       console.error("Error loading book vocabulary cache ids:", bookWordErr);
       setKanjiMapQueue([]);
+      setNeedsKanjiEnrichmentCount(0);
       setKanjiMapError(bookWordErr.message);
       setKanjiMapLoading(false);
       return;
     }
 
+    const kanjiBookWordRows = (bookWordRows ?? []).filter((r: any) =>
+      /[\p{Script=Han}]/u.test(r.surface ?? "")
+    );
+
+    const missingCacheCount = kanjiBookWordRows.filter(
+      (r: any) => r.vocabulary_cache_id == null
+    ).length;
+
     const cacheIds = Array.from(
       new Set(
-        (bookWordRows ?? [])
+        kanjiBookWordRows
           .map((r: any) => r.vocabulary_cache_id)
           .filter((id: number | null) => id != null)
       )
     );
 
     if (cacheIds.length === 0) {
-      setKanjiMapQueue([]);
+      const missingCacheWords: VocabCacheQueueRow[] = kanjiBookWordRows
+        .filter((r: any) => r.vocabulary_cache_id == null)
+        .map((r: any, index: number) => ({
+          id: -(index + 1),
+          userBookWordId: String(r.id),
+          vocabularyCacheId: null,
+          surface: r.surface ?? "",
+          reading: r.reading ?? "",
+          jlpt: null,
+          created_at: "",
+          enrichmentStatus: "missing",
+          vocabulary_kanji_map: [],
+        }));
+
+      setKanjiMapQueue(missingCacheWords);
+      setNeedsKanjiEnrichmentCount(missingCacheWords.length);
       setKanjiMapLoading(false);
       return;
     }
@@ -1263,30 +1322,76 @@ export default function BookHubPage() {
     if (error) {
       console.error("Error loading kanji map queue:", error);
       setKanjiMapQueue([]);
+      setNeedsKanjiEnrichmentCount(0);
       setKanjiMapError(error.message);
       setKanjiMapLoading(false);
       return;
     }
 
-    const rows = (data ?? []) as VocabCacheQueueRow[];
+    const rows: VocabCacheQueueRow[] = (data ?? []).map((item: any) => ({
+      id: item.id,
+      userBookWordId: "",
+      vocabularyCacheId: item.id,
+      surface: item.surface ?? "",
+      reading: item.reading ?? "",
+      jlpt: item.jlpt ?? null,
+      created_at: item.created_at ?? "",
+      enrichmentStatus: "partial",
+      vocabulary_kanji_map: item.vocabulary_kanji_map ?? [],
+    }));
 
-    const needsWork = rows.filter((word) => {
+    const missingCacheWords: VocabCacheQueueRow[] = kanjiBookWordRows
+      .filter((r: any) => r.vocabulary_cache_id == null)
+      .map((r: any, index: number) => ({
+        id: -(index + 1),
+        userBookWordId: String(r.id),
+        vocabularyCacheId: null,
+        surface: r.surface ?? "",
+        reading: r.reading ?? "",
+        jlpt: null,
+        created_at: "",
+        enrichmentStatus: "missing",
+        vocabulary_kanji_map: [],
+      }));
+
+    const needsWork = rows.flatMap((word) => {
       const hasKanji = /[\p{Script=Han}]/u.test(word.surface ?? "");
-      if (!hasKanji) return false;
+      if (!hasKanji) return [];
 
       const mapRows = word.vocabulary_kanji_map ?? [];
 
-      if (mapRows.length === 0) return true;
+      const needsWorkForThisWord =
+        mapRows.length === 0 ||
+        mapRows.some(
+          (r) =>
+            !r.reading_type ||
+            !r.base_reading ||
+            !r.realized_reading
+        );
 
-      return mapRows.some(
-        (r) =>
-          !r.reading_type ||
-          !r.base_reading ||
-          !r.realized_reading
+      if (!needsWorkForThisWord) return [];
+
+      const enrichmentStatus: VocabCacheQueueRow["enrichmentStatus"] =
+        mapRows.length === 0
+          ? "missing"
+          : "partial";
+
+      const matchingBookWords = kanjiBookWordRows.filter(
+        (r: any) => r.vocabulary_cache_id === word.id
       );
+
+      return matchingBookWords.map((bookWord: any) => ({
+        ...word,
+        userBookWordId: String(bookWord.id),
+        vocabularyCacheId: word.id,
+        enrichmentStatus,
+      }));
     });
 
-    setKanjiMapQueue(needsWork);
+    const combinedQueue = [...missingCacheWords, ...needsWork];
+
+    setKanjiMapQueue(combinedQueue);
+    setNeedsKanjiEnrichmentCount(combinedQueue.length);
     setKanjiMapLoading(false);
   }
 
@@ -1373,6 +1478,7 @@ export default function BookHubPage() {
 
   async function saveChapterSummary(item: ChapterSummary) {
     if (!row?.id) return;
+    const currentUserBookId = row.id;
 
     const payload = {
       user_book_id: row.id,
@@ -1475,26 +1581,119 @@ export default function BookHubPage() {
   }
 
   async function handleWorkOnKanjiWord(word: VocabCacheQueueRow) {
-    const hasRows = (word.vocabulary_kanji_map ?? []).length > 0;
+    if (!row?.id) return;
+    const currentUserBookId = row.id;
 
-    if (!hasRows) {
-      const res = await fetch("/api/vocabulary-kanji-map/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ vocabulary_cache_id: word.id }),
-      });
+    let workingWord = word;
 
-      const json = await res.json();
+    if (word.id < 0) {
+      let cacheRow: {
+        id: number;
+        surface: string | null;
+        reading: string | null;
+        jlpt: string | null;
+        created_at: string | null;
+      } | null = null;
 
-      if (!res.ok) {
-        console.error("Kanji map generate error:", json);
-        alert(json?.error ?? "Could not prepare this word.");
+      const { data: existingCache, error: cacheLookupError } = await supabase
+        .from("vocabulary_cache")
+        .select("id, surface, reading, jlpt, created_at")
+        .eq("surface", word.surface)
+        .eq("reading", word.reading || "")
+        .maybeSingle();
+
+      if (cacheLookupError) {
+        console.error("Error looking up vocabulary cache row:", cacheLookupError);
+        alert("Could not prepare this word.");
         return;
       }
 
-      await loadKanjiMapQueue();
+      if (existingCache) {
+        cacheRow = existingCache;
+      } else {
+        const { data: createdCache, error: cacheInsertError } = await supabase
+          .from("vocabulary_cache")
+          .insert({
+            surface: word.surface,
+            reading: word.reading || "",
+          })
+          .select("id, surface, reading, jlpt, created_at")
+          .single();
+
+        if (cacheInsertError || !createdCache) {
+          console.error("Error creating vocabulary cache row:", cacheInsertError);
+          alert("Could not prepare this word.");
+          return;
+        }
+
+        cacheRow = createdCache;
+      }
+
+      const { error: updateWordError } = await supabase
+        .from("user_book_words")
+        .update({
+          vocabulary_cache_id: cacheRow.id,
+          is_manual_override: false,
+        })
+        .eq("id", word.userBookWordId);
+
+      if (updateWordError) {
+        console.error("Error linking user_book_words to cache row:", updateWordError);
+        alert("Could not link this word to kanji enrichment.");
+        return;
+      }
+
+      workingWord = {
+        id: cacheRow.id,
+        userBookWordId: word.userBookWordId,
+        vocabularyCacheId: cacheRow.id,
+        surface: cacheRow.surface ?? word.surface,
+        reading: cacheRow.reading ?? word.reading,
+        jlpt: cacheRow.jlpt ?? null,
+        created_at: cacheRow.created_at ?? "",
+        enrichmentStatus: "missing",
+        vocabulary_kanji_map: [],
+      };
+    }
+
+    const hasRows = (workingWord.vocabulary_kanji_map ?? []).length > 0;
+
+    if (!hasRows) {
+      const currentVocabularyCacheId =
+        workingWord.vocabularyCacheId ?? (workingWord.id > 0 ? workingWord.id : null);
+
+      if (!currentVocabularyCacheId) {
+        alert("Could not prepare this word because no vocabulary cache id was found.");
+        return;
+      }
+
+      const kanjiChars = Array.from(workingWord.surface ?? "").filter((ch) =>
+        /\p{Script=Han}/u.test(ch)
+      );
+
+      const rowsToInsert = kanjiChars.map((kanji, index) => ({
+        vocabulary_cache_id: currentVocabularyCacheId,
+        kanji,
+        kanji_position: index,
+      }));
+
+      if (rowsToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from("vocabulary_kanji_map")
+          .insert(rowsToInsert);
+
+        if (insertError) {
+          console.error("Error inserting kanji map rows:", insertError);
+          alert(insertError.message || "Could not prepare this word.");
+          return;
+        }
+      }
+
+      await loadKanjiMapQueue(row.id);
+      workingWord = {
+        ...workingWord,
+        vocabulary_kanji_map: [],
+      };
     }
 
     const { data, error } = await supabase
@@ -1508,7 +1707,7 @@ export default function BookHubPage() {
       base_reading,
       realized_reading
     `)
-      .eq("vocabulary_cache_id", word.id)
+      .eq("vocabulary_cache_id", workingWord.id)
       .order("kanji_position", { ascending: true });
 
     if (error) {
@@ -1550,13 +1749,20 @@ export default function BookHubPage() {
 
     setEditingKanjiRows((prev) => ({
       ...prev,
-      [word.id]: enrichedRows,
+      [workingWord.id]: enrichedRows,
     }));
 
-    setOpenKanjiWordId(word.id);
+    setOpenKanjiWordId(workingWord.id);
+    setTimeout(() => {
+      const el = document.getElementById(`kanji-word-${workingWord.id}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   async function removeWordFromKanjiEnrichment(vocabId: number) {
+    if (!row?.id) return;
+    const currentUserBookId = row.id;
+
     if (!row?.id) return;
 
     const ok = window.confirm(
@@ -1570,7 +1776,7 @@ export default function BookHubPage() {
         vocabulary_cache_id: null,
         is_manual_override: true,
       })
-      .eq("user_book_id", row.id)
+      .eq("user_book_id", currentUserBookId)
       .eq("vocabulary_cache_id", vocabId);
 
     if (error) {
@@ -1580,7 +1786,7 @@ export default function BookHubPage() {
     }
 
     await loadSavedKanjiDefaults(row.id);
-    await loadKanjiMapQueue();
+    await loadKanjiMapQueue(row.id);
   }
 
   function updateKanjiMapRow(
@@ -1916,6 +2122,20 @@ export default function BookHubPage() {
 
     const r = data as unknown as UserBook;
     setRow(r);
+    
+    const { data: teacherLink, error: teacherLinkError } = await supabase
+      .from("teacher_students")
+      .select("id")
+      .eq("student_id", r.user_id)
+      .limit(1)
+      .maybeSingle();
+
+    if (teacherLinkError) {
+      console.error("Error checking teacher_students link:", teacherLinkError);
+      setIsLinkedStudentToAnyTeacher(false);
+    } else {
+      setIsLinkedStudentToAnyTeacher(!!teacherLink);
+    }
 
     setStartedAt(r.started_at ? formatYmd(new Date(r.started_at)) : "");
     setFinishedAt(r.finished_at ? formatYmd(new Date(r.finished_at)) : "");
@@ -1965,7 +2185,7 @@ export default function BookHubPage() {
     await loadChapterSummaries(r.id);
     await loadCharacters(r.id);
     await loadSavedKanjiDefaults(r.id);
-    await loadKanjiMapQueue();
+    await loadKanjiMapQueue(r.id);
 
     setLoading(false);
   };
@@ -1983,6 +2203,7 @@ export default function BookHubPage() {
         .from("user_books")
         .select(`
           id,
+          user_id,
           started_at,
           finished_at,
           dnf_at,
@@ -2772,7 +2993,8 @@ export default function BookHubPage() {
                     }}
                     className="rounded-xl border border-stone-900 bg-rose-50 p-3 text-center transition hover:bg-rose-100"
                   >
-                    <div className="font-medium text-stone-900">Curiosity Reading (Intensive)</div>
+                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Curiosity Reading</div>
+                    <div className="text-base font-semibold text-stone-900 sm:text-lg">(Intensive)</div>
                     <div className="mt-2 text-xs leading-5 text-stone-700">
                       Read while saving vocab and logging a slower, mindful session.
                     </div>
@@ -2784,12 +3006,12 @@ export default function BookHubPage() {
                       if (!confirmLeaveIfTimerActive()) return;
                       router.push(`/books/${row.id}/study`);
                     }}
-                    className="rounded-xl border border-stone-900 bg-amber-50 p-3 text-center transition hover:bg-amber-100"
+                    className="rounded-xl border border-stone-900 bg-yellow-50 p-3 text-center transition hover:bg-emerald-100"
                   >
-                    <div className="font-medium text-stone-900">Study Flashcards</div>
-                    <div className="mt-2 text-xs leading-5 text-stone-700">
-                      Review the words you saved from this book.
-                    </div>
+                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Study</div>
+                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Flashcards</div>
+                    <div className="mt-1 text-xs leading-4 text-stone-700">Review the words</div>
+                    <div className="mt-1 text-xs leading-4 text-stone-700">you saved from this book.</div>
                   </button>
 
                   <button
@@ -2800,25 +3022,43 @@ export default function BookHubPage() {
                     }}
                     className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
                   >
-                    <div className="font-medium text-stone-900">Fluid Reading (Extensive) </div>
+                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Fluid Reading</div>
+                    <div className="text-base font-semibold text-stone-900 sm:text-lg">(Extensive) </div>
                     <div className="mt-2 text-xs leading-5 text-stone-700">
                       Read without lookups, use saved-word support, and log a quicker session.
                     </div>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeaveIfTimerActive()) return;
-                      router.push(`/books/${row.id}/weekly-readings`);
-                    }}
-                    className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
-                  >
-                    <div className="font-medium text-stone-900">Kanji Readings</div>
-                    <div className="mt-2 text-xs leading-5 text-stone-700">
-                      Practice onyomi and kunyomi from your saved vocabulary.
-                    </div>
-                  </button>
+                  {canAccessKanjiReadings ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirmLeaveIfTimerActive()) return;
+                        router.push(`/books/${row.id}/weekly-readings`);
+                      }}
+                      className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
+                    >
+                      <div className="text-base font-semibold text-stone-900 sm:text-lg">Kanji</div>
+                      <div className="text-base font-semibold text-stone-900 sm:text-lg">Readings</div>
+                      <div className="mt-2 text-xs leading-5 text-stone-700">
+                        Practice onyomi and kunyomi from your saved vocabulary.
+                      </div>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        alert("Kanji Readings is available to teachers and enrolled students.");
+                      }}
+                      className="rounded-xl border border-stone-300 bg-stone-100 p-3 text-center opacity-80 transition hover:bg-stone-200"
+                    >
+                      <div className="text-base font-semibold text-stone-700 sm:text-lg">Kanji 🔒</div>
+                      <div className="text-base font-semibold text-stone-700 sm:text-lg">Readings</div>
+                      <div className="mt-2 text-xs leading-5 text-stone-600">
+                        Available to teachers and enrolled students.
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -3026,8 +3266,9 @@ export default function BookHubPage() {
                     kanjiMapLoading={kanjiMapLoading}
                     kanjiMapError={kanjiMapError}
                     kanjiMapQueue={kanjiMapQueue}
-                    openKanjiWordId={openKanjiWordId}
+                    needsKanjiEnrichmentCount={needsKanjiEnrichmentCount}
                     editingKanjiRows={editingKanjiRows}
+                    openKanjiWordId={openKanjiWordId}
                     savingKanjiWordId={savingKanjiWordId}
                     handleWorkOnKanjiWord={handleWorkOnKanjiWord}
                     updateKanjiMapRow={updateKanjiMapRow}

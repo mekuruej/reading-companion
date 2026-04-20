@@ -1,5 +1,3 @@
-// Readings Flashcards
-//
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -101,14 +99,12 @@ function getKanjiPositionHint(sourceWord: string, kanji: string) {
   const index = chars.findIndex((ch) => ch === kanji);
 
   if (index === -1) return "";
-
   return `${index + 1} of ${chars.length}`;
 }
 
 function isKunWithOkurigana(surface: string) {
   const hasKanji = /[\p{Script=Han}]/u.test(surface);
   const hasHiragana = /[\p{Script=Hiragana}]/u.test(surface);
-
   return hasKanji && hasHiragana;
 }
 
@@ -118,15 +114,6 @@ function getTrailingReadingHint(sourceWord: string, kanji: string) {
   const chars = Array.from(sourceWord);
   const index = chars.findIndex((ch) => ch === kanji);
 
-  if (index === -1) return "";
-
-  return chars.filter((_, i) => i !== index).join("");
-}
-
-function getOkuriganaDisplay(sourceWord: string, kanji: string) {
-  if (!sourceWord || !kanji) return "";
-  const chars = Array.from(sourceWord);
-  const index = chars.findIndex((ch) => ch === kanji);
   if (index === -1) return "";
   return chars.filter((_, i) => i !== index).join("");
 }
@@ -160,9 +147,12 @@ export default function WeeklyReadingsPage() {
 
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [includeOkurigana, setIncludeOkurigana] = useState(false);
-
+  const [studyOnyomi, setStudyOnyomi] = useState(false);
+  const [studyKunyomi, setStudyKunyomi] = useState(false);
   const [chapterFilter, setChapterFilter] = useState<string>("all");
+
+  const canAccessKanjiPractice = true;
+
   const availableChapters = useMemo(() => {
     return Array.from(
       new Set(
@@ -173,12 +163,56 @@ export default function WeeklyReadingsPage() {
     ).sort((a, b) => a - b);
   }, [baseCards]);
 
-  const filteredBaseCards = useMemo(() => {
-    if (chapterFilter === "all") return baseCards;
+  const wordReadingKinds = useMemo(() => {
+    const byWord = new Map<string, Set<"onyomi" | "kunyomi">>();
 
-    const selected = Number(chapterFilter);
-    return baseCards.filter((c) => c.chapterNumber === selected);
-  }, [baseCards, chapterFilter]);
+    for (const card of baseCards) {
+      const word = (card.sourceWord ?? "").trim();
+      if (!word) continue;
+      if (card.readingType !== "onyomi" && card.readingType !== "kunyomi") continue;
+
+      const bucket = byWord.get(word) ?? new Set<"onyomi" | "kunyomi">();
+      bucket.add(card.readingType);
+      byWord.set(word, bucket);
+    }
+
+    return byWord;
+  }, [baseCards]);
+
+  const filteredBaseCards = useMemo(() => {
+    return baseCards.filter((card) => {
+      if (chapterFilter !== "all" && String(card.chapterNumber ?? "") !== chapterFilter) {
+        return false;
+      }
+
+      if (!studyOnyomi && !studyKunyomi) {
+        return true;
+      }
+
+      const word = (card.sourceWord ?? "").trim();
+      const kinds = word ? wordReadingKinds.get(word) : null;
+      const isMixed =
+        !!kinds && kinds.has("onyomi") && kinds.has("kunyomi");
+
+      if (isMixed) {
+        return false;
+      }
+
+      if (studyOnyomi && studyKunyomi) {
+        return card.readingType === "onyomi" || card.readingType === "kunyomi";
+      }
+
+      if (studyOnyomi) {
+        return card.readingType === "onyomi";
+      }
+
+      if (studyKunyomi) {
+        return card.readingType === "kunyomi";
+      }
+
+      return true;
+    });
+  }, [baseCards, chapterFilter, studyOnyomi, studyKunyomi, wordReadingKinds]);
 
   useEffect(() => {
     buildDeckFromCards(filteredBaseCards);
@@ -187,47 +221,6 @@ export default function WeeklyReadingsPage() {
     setUsedRecallWords([]);
     setCardsSinceLastRecall(0);
   }, [filteredBaseCards]);
-
-  async function flagKanjiCardForReview(card: QuizCard) {
-
-    const flaggedAt = new Date().toISOString();
-
-    const { error } = await supabase
-      .from("vocabulary_kanji_map")
-      .update({
-        flagged_for_review: true,
-        excluded_from_kanji_practice: true,
-        flagged_by_user_id: null,
-        flagged_at: flaggedAt,
-      })
-      .eq("id", card.kanjiMapId)
-
-    if (error) {
-      console.error("Error flagging kanji card:", error);
-      return;
-    }
-
-    // Assumes you already know the super teacher user id.
-    // Replace this with your real super teacher id for now.
-    const { data: authForAlert } = await supabase.auth.getUser();
-    const SUPER_TEACHER_ID = authForAlert?.user?.id;
-    if (!SUPER_TEACHER_ID) return;
-
-    const { error: alertError } = await supabase.from("user_alerts").insert({
-      user_id: SUPER_TEACHER_ID,
-      user_book_id: userBookId,
-      type: "kanji_flag",
-      message: `Kanji reading flagged: ${card.kanji} in ${card.sourceWord}`,
-    });
-
-    if (alertError) {
-      console.error("Error creating kanji flag alert:", alertError);
-    }
-
-    setNotice("✅ Flagged for review");
-    setDeck((prev) => prev.filter((c) => c.kanjiMapId !== card.kanjiMapId));
-    setBaseCards((prev) => prev.filter((c) => c.kanjiMapId !== card.kanjiMapId));
-  }
 
   useEffect(() => {
     if (!userBookId) return;
@@ -269,12 +262,16 @@ export default function WeeklyReadingsPage() {
 
         const { data: rows, error: cardsErr } = await supabase
           .from("user_book_words")
-          .select("id, surface, reading, meaning, created_at, hidden, vocabulary_cache_id, chapter_number, chapter_name, page_number")
+          .select(
+            "id, surface, reading, meaning, created_at, hidden, vocabulary_cache_id, chapter_number, chapter_name, page_number"
+          )
           .eq("user_book_id", userBookId)
           .not("reading", "is", null)
           .eq("hidden", false)
           .order("created_at", { ascending: true })
           .returns<UserBookWordRow[]>();
+
+        if (cardsErr) throw cardsErr;
 
         const vocabularyCacheIds = Array.from(
           new Set(
@@ -287,11 +284,10 @@ export default function WeeklyReadingsPage() {
         const { data: kanjiMapRows, error: kanjiMapErr } = await supabase
           .from("vocabulary_kanji_map")
           .select(
-            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, created_at, flagged_for_review, excluded_from_kanji_practice"
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, excluded_from_kanji_practice"
           )
           .in("vocabulary_cache_id", vocabularyCacheIds)
-          .eq("excluded_from_kanji_practice", false)
-          .order("created_at", { ascending: false });
+          .eq("excluded_from_kanji_practice", false);
 
         if (kanjiMapErr) throw kanjiMapErr;
 
@@ -303,62 +299,46 @@ export default function WeeklyReadingsPage() {
           kanjiMapByCacheId.set(row.vocabulary_cache_id, bucket);
         }
 
-        if (cardsErr) throw cardsErr;
+        const core: QuizCard[] = (rows ?? []).flatMap((r) => {
+          const surface = r.surface?.trim() ?? "";
+          const fallbackReading = r.reading?.trim() ?? "";
 
-        const core: QuizCard[] = (rows ?? [])
-          .flatMap((r) => {
-            const surface = r.surface?.trim() ?? "";
-            const fallbackReading = r.reading?.trim() ?? "";
+          if (!surface || !fallbackReading) return [];
 
-            if (surface.length === 0 || fallbackReading.length === 0) {
-              return [];
-            }
+          const cacheId = r.vocabulary_cache_id;
+          const kanjiRows = cacheId != null ? kanjiMapByCacheId.get(cacheId) ?? [] : [];
 
-            const cacheId = r.vocabulary_cache_id;
-            const kanjiRows =
-              cacheId != null ? (kanjiMapByCacheId.get(cacheId) ?? []) : [];
+          if (kanjiRows.length === 0) return [];
 
-            if (kanjiRows.length > 0) {
-              return kanjiRows.map((km: any, i: number) => {
-                const readingType: QuizCard["readingType"] =
-                  km.reading_type === "on"
-                    ? "onyomi"
-                    : km.reading_type === "kun"
-                      ? "kunyomi"
-                      : km.reading_type === "other"
-                        ? "other"
-                        : null;
+          return kanjiRows.map((km: any, i: number) => {
+            const readingType: QuizCard["readingType"] =
+              km.reading_type === "on"
+                ? "onyomi"
+                : km.reading_type === "kun"
+                  ? "kunyomi"
+                  : km.reading_type === "other"
+                    ? "other"
+                    : null;
 
-                return {
-                  key: `${r.id}-${km.kanji}-${i}`,
-                  kanjiMapId: km.id,
-                  kanji: km.kanji,
-                  reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
-                  baseReading: km.base_reading?.trim() || null,
-                  readingType,
-                  sourceWord: surface,
-                  sourceMeaning: r.meaning ?? null,
-                  sourceReading: r.reading ?? null,
-                  strokeCount: null,
-                  radical: null,
-                  radicalName: null,
-                  chapterNumber: r.chapter_number ?? null,
-                  chapterName: r.chapter_name ?? null,
-                  pageNumber: r.page_number ?? null,
-                };
-              });
-            }
-
-            return [];
-          })
-          .filter((card) => {
-            if (includeOkurigana) return true;
-
-            if (card.readingType !== "kunyomi") return true;
-            if (!card.sourceWord) return true;
-
-            return !isKunWithOkurigana(card.sourceWord);
+            return {
+              key: `${r.id}-${km.kanji}-${i}`,
+              kanjiMapId: km.id,
+              kanji: km.kanji,
+              reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
+              baseReading: km.base_reading?.trim() || null,
+              readingType,
+              sourceWord: surface,
+              sourceMeaning: r.meaning ?? null,
+              sourceReading: r.reading ?? null,
+              strokeCount: null,
+              radical: null,
+              radicalName: null,
+              chapterNumber: r.chapter_number ?? null,
+              chapterName: r.chapter_name ?? null,
+              pageNumber: r.page_number ?? null,
+            };
           });
+        });
 
         setBaseCards(core);
 
@@ -377,6 +357,7 @@ export default function WeeklyReadingsPage() {
   }, [userBookId]);
 
   const card = deck[index];
+
   const isSmallSet =
     chapterFilter !== "all" &&
     filteredBaseCards.length > 0 &&
@@ -403,7 +384,7 @@ export default function WeeklyReadingsPage() {
     (recallRevealed || canStartRecall);
 
   const options = useMemo(() => {
-    if (!card || baseCards.length === 0) return [];
+    if (!card || filteredBaseCards.length === 0) return [];
 
     const correct = card.reading;
     const displayType = card.readingType;
@@ -411,7 +392,7 @@ export default function WeeklyReadingsPage() {
 
     const sameTypePool = Array.from(
       new Set(
-        baseCards
+        filteredBaseCards
           .filter(
             (c) =>
               c.key !== card.key &&
@@ -426,7 +407,7 @@ export default function WeeklyReadingsPage() {
 
     const broaderPool = Array.from(
       new Set(
-        baseCards
+        filteredBaseCards
           .filter(
             (c) =>
               c.key !== card.key &&
@@ -452,12 +433,10 @@ export default function WeeklyReadingsPage() {
       }
     }
 
-    const finalOptions = shuffleArray([correct, ...distractors])
+    return shuffleArray([correct, ...distractors])
       .filter(Boolean)
       .map((r) => formatReadingForType(r, displayType));
-
-    return finalOptions;
-  }, [card, baseCards]);
+  }, [card, filteredBaseCards]);
 
   useEffect(() => {
     if (!checked?.ok) return;
@@ -469,6 +448,66 @@ export default function WeeklyReadingsPage() {
 
     return () => window.clearTimeout(timer);
   }, [checked, inRecallFlow]);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (!card) return;
+      if (inRecallFlow) return;
+
+      if (checked && e.key === "Enter") {
+        e.preventDefault();
+        nextCard();
+        return;
+      }
+
+      if (!checked) {
+        if (e.key === "1" && options[0]) checkAnswer(options[0]);
+        if (e.key === "2" && options[1]) checkAnswer(options[1]);
+        if (e.key === "3" && options[2]) checkAnswer(options[2]);
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [card, checked, options, inRecallFlow]);
+
+  async function flagKanjiCardForReview(cardToFlag: QuizCard) {
+    const flaggedAt = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("vocabulary_kanji_map")
+      .update({
+        flagged_for_review: true,
+        excluded_from_kanji_practice: true,
+        flagged_by_user_id: null,
+        flagged_at: flaggedAt,
+      })
+      .eq("id", cardToFlag.kanjiMapId);
+
+    if (error) {
+      console.error("Error flagging kanji card:", error);
+      return;
+    }
+
+    const { data: authForAlert } = await supabase.auth.getUser();
+    const superTeacherId = authForAlert?.user?.id;
+    if (!superTeacherId) return;
+
+    const { error: alertError } = await supabase.from("user_alerts").insert({
+      user_id: superTeacherId,
+      user_book_id: userBookId,
+      type: "kanji_flag",
+      message: `Kanji reading flagged: ${cardToFlag.kanji} in ${cardToFlag.sourceWord}`,
+    });
+
+    if (alertError) {
+      console.error("Error creating kanji flag alert:", alertError);
+    }
+
+    setNotice("✅ Flagged for review");
+    setDeck((prev) => prev.filter((c) => c.kanjiMapId !== cardToFlag.kanjiMapId));
+    setBaseCards((prev) => prev.filter((c) => c.kanjiMapId !== cardToFlag.kanjiMapId));
+  }
 
   function resetCardState() {
     setSelected(null);
@@ -508,25 +547,7 @@ export default function WeeklyReadingsPage() {
   }
 
   function restartDeck() {
-    const firstRound = shuffleArray(baseCards).map((c, i) => ({
-      ...c,
-      key: `${c.key}-restart-first-${i}`,
-    }));
-
-    const repeatsNeeded = Math.max(40 - firstRound.length, 0);
-    const repeatPool: QuizCard[] = [];
-
-    for (let i = 0; i < repeatsNeeded; i++) {
-      const picked = baseCards[Math.floor(Math.random() * baseCards.length)];
-      repeatPool.push({
-        ...picked,
-        key: `${picked.key}-restart-repeat-${i}`,
-      });
-    }
-
-    setDeck([...firstRound, ...shuffleArray(repeatPool)]);
-    setIndex(0);
-    resetCardState();
+    buildDeckFromCards(filteredBaseCards);
     setSkipTypingThisSession(false);
     setEndedEarly(false);
     setUsedRecallWords([]);
@@ -539,7 +560,7 @@ export default function WeeklyReadingsPage() {
     const displayedCorrect = formatReadingForType(card.reading, card.readingType);
     const ok = normalizeReading(choice) === normalizeReading(displayedCorrect);
     setSelected(choice);
-    setChecked({ ok, correct: formatReadingForType(card.reading, card.readingType) });
+    setChecked({ ok, correct: displayedCorrect });
     setGuessInput("");
     setRecallRevealed(false);
     setRecallResult(null);
@@ -600,31 +621,6 @@ export default function WeeklyReadingsPage() {
     resetCardState();
   }
 
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (!card) return;
-
-      if (inRecallFlow) {
-        return;
-      }
-
-      if (checked && e.key === "Enter") {
-        e.preventDefault();
-        nextCard();
-        return;
-      }
-
-      if (!checked) {
-        if (e.key === "1" && options[0]) checkAnswer(options[0]);
-        if (e.key === "2" && options[1]) checkAnswer(options[1]);
-        if (e.key === "3" && options[2]) checkAnswer(options[2]);
-      }
-    }
-
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [card, checked, options, inRecallFlow]);
-
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
@@ -639,7 +635,7 @@ export default function WeeklyReadingsPage() {
         <p className="text-gray-700">You need to sign in to view your readings.</p>
         <button
           onClick={() => router.push("/books")}
-          className="px-4 py-2 bg-gray-200 rounded"
+          className="rounded bg-gray-200 px-4 py-2"
         >
           Back to Books
         </button>
@@ -653,7 +649,7 @@ export default function WeeklyReadingsPage() {
         <p className="text-red-700">{errorMsg}</p>
         <button
           onClick={() => router.push(`/books/${userBookId}/study`)}
-          className="px-4 py-2 bg-gray-200 rounded"
+          className="rounded bg-gray-200 px-4 py-2"
         >
           Back to Study
         </button>
@@ -669,7 +665,7 @@ export default function WeeklyReadingsPage() {
         </p>
         <button
           onClick={() => router.push(`/books/${userBookId}`)}
-          className="px-4 py-2 bg-gray-200 rounded"
+          className="rounded bg-gray-200 px-4 py-2"
         >
           Back to Book Hub
         </button>
@@ -677,10 +673,94 @@ export default function WeeklyReadingsPage() {
     );
   }
 
+  if (!canAccessKanjiPractice) {
+    return (
+      <main className="min-h-screen bg-stone-50 px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-3xl space-y-6">
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-stone-900">
+                Kanji Readings Practice
+              </h1>
+              <span className="rounded-full border border-stone-300 bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-700">
+                Preview
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              Practice kanji readings based on the vocabulary saved from your book.
+              This study area helps learners notice how readings show up inside real
+              words, not just in isolation.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-stone-500">
+              Example Exercise
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5">
+              <div className="text-2xl font-semibold text-stone-900">気配</div>
+              <div className="mt-2 text-sm text-stone-500">
+                What is the reading of this word?
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled
+                  className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-left text-sm text-stone-700"
+                >
+                  きはい
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-left text-sm text-stone-700"
+                >
+                  けはい
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-left text-sm text-stone-700"
+                >
+                  きばい
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-left text-sm text-stone-700"
+                >
+                  けばい
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-xl">🔒</div>
+              <div>
+                <h2 className="text-lg font-semibold text-stone-900">
+                  Available to students
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  Kanji Readings Practice is part of Mekuru student study support and
+                  includes teacher-guided enrichment based on your book’s vocabulary.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (index >= deck.length) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-xl border rounded-2xl bg-white p-8 text-center shadow-sm">
+        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold">
             {endedEarly ? "Nice work today!" : "Nice work!"}
           </h1>
@@ -702,26 +782,25 @@ export default function WeeklyReadingsPage() {
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <button
               onClick={() => router.push(`/books`)}
-              className="px-4 py-2 bg-gray-200 rounded"
+              className="rounded bg-gray-200 px-4 py-2"
             >
               Back to Library
             </button>
             <button
               onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-              className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
+              className="whitespace-nowrap rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-800"
             >
               Book Hub
             </button>
             <button
               onClick={() => router.push(`/books/${userBookId}/study`)}
-              className="px-4 py-2 bg-gray-200 rounded"
+              className="rounded bg-gray-200 px-4 py-2"
             >
               Back to Study
             </button>
-
             <button
               onClick={restartDeck}
-              className="px-4 py-2 bg-gray-700 text-white rounded"
+              className="rounded bg-gray-700 px-4 py-2 text-white"
             >
               {endedEarly ? "Do More Today" : "Do It Again"}
             </button>
@@ -732,31 +811,35 @@ export default function WeeklyReadingsPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center px-6 py-4 bg-slate-100">
-      <div className="w-full max-w-5xl mb-1 flex flex-col md:flex-row items-center justify-center gap-8">
-        <div className="flex flex-col items-center shrink-0 md:mt-4">
+    <main className="min-h-screen flex flex-col items-center bg-slate-100 px-6 py-4">
+      <div className="mb-1 flex w-full max-w-5xl flex-col items-center justify-center gap-8 md:flex-row">
+        <div className="flex shrink-0 flex-col items-center md:mt-4">
           {bookCover ? (
-            <img src={bookCover} alt="" className="w-24 h-32 rounded mb-2 object-cover" />
+            <img src={bookCover} alt="" className="mb-2 h-32 w-24 rounded object-cover" />
           ) : null}
-          <h1 className="text-2xl font-semibold text-center">{bookTitle}</h1>
+          <h1 className="text-center text-2xl font-semibold">{bookTitle}</h1>
         </div>
 
-        <div className="w-full md:w-[430px] flex items-center">
-          <p className="text-[15px] text-gray-500 text-left leading-7">
-            These readings come from words you’ve saved while reading. They’ll help you recognize patterns, reinforce what you’ve seen, and prepare you for the next words you meet.
+        <div className="flex w-full items-center md:w-[430px]">
+          <p className="text-left text-[15px] leading-7 text-gray-500">
+            These readings come from words you’ve saved while reading. They’ll help you
+            recognize patterns, reinforce what you’ve seen, and prepare you for the next
+            words you meet.
           </p>
         </div>
       </div>
+
       <p className="mt-1 text-sm text-gray-500">Practice Kanji Readings</p>
       <p className="text-sm text-gray-500">
         Card {index + 1}/{deck.length}
       </p>
+
       <div className="mt-3 flex items-center gap-2">
         <label className="text-sm text-gray-600">Chapter:</label>
         <select
           value={chapterFilter}
           onChange={(e) => setChapterFilter(e.target.value)}
-          className="rounded border px-3 py-2 text-sm bg-white"
+          className="rounded border bg-white px-3 py-2 text-sm"
         >
           <option value="all">All chapters</option>
           {availableChapters.map((ch) => (
@@ -767,26 +850,44 @@ export default function WeeklyReadingsPage() {
         </select>
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={includeOkurigana}
-          onChange={(e) => setIncludeOkurigana(e.target.checked)}
-        />
-        <label className="text-sm text-gray-600">
-          Include kunyomi words with okurigana
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+        <span className="font-medium text-stone-700">Study:</span>
+
+        <label className="inline-flex items-center gap-2 text-stone-700">
+          <input
+            type="checkbox"
+            checked={studyOnyomi}
+            onChange={(e) => setStudyOnyomi(e.target.checked)}
+          />
+          <span>Onyomi</span>
+        </label>
+
+        <label className="inline-flex items-center gap-2 text-stone-700">
+          <input
+            type="checkbox"
+            checked={studyKunyomi}
+            onChange={(e) => setStudyKunyomi(e.target.checked)}
+          />
+          <span>Kunyomi</span>
         </label>
       </div>
 
       {isSmallSet && (
-        <p className="mt-2 text-sm text-amber-600 text-center">
+        <p className="mt-2 text-center text-sm text-amber-600">
           Only {filteredBaseCards.length} card
-          {filteredBaseCards.length === 1 ? "" : "s"} in this chapter — reviewing all available.
+          {filteredBaseCards.length === 1 ? "" : "s"} in this chapter — reviewing all
+          available.
         </p>
       )}
 
+      {notice ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          {notice}
+        </div>
+      ) : null}
+
       <div
-        className="mt-6 relative w-[90vw] max-w-xl min-h-72 bg-white rounded-2xl border border-slate-500 shadow-2xl flex items-center justify-center text-center select-none p-8"
+        className="relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl"
         onClick={() => {
           if (!checked && !inRecallFlow) return;
           if (inRecallFlow) return;
@@ -794,13 +895,13 @@ export default function WeeklyReadingsPage() {
         }}
       >
         {card.readingType ? (
-          <div className="absolute top-3 left-4 z-10 text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+          <div className="absolute left-4 top-3 z-10 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
             {readingTypeLabel(card.readingType)}
           </div>
         ) : null}
 
         {card.strokeCount != null || card.radical || card.radicalName ? (
-          <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+          <div className="absolute right-4 top-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
             <div className="flex flex-col items-end leading-none">
               <div className="text-sm font-medium">
                 {card.kanji} {card.strokeCount ?? ""}
@@ -813,14 +914,14 @@ export default function WeeklyReadingsPage() {
           </div>
         ) : null}
 
-        <div className="w-full flex flex-col items-center justify-center gap-6">
-          <div className="w-full flex flex-col items-center gap-1">
+        <div className="flex w-full flex-col items-center justify-center gap-6">
+          <div className="flex w-full flex-col items-center gap-1">
             <div className="text-xs uppercase tracking-wide text-slate-500">Kanji</div>
             <div className="text-5xl font-bold">
               {card.kanji}
               {(card.readingType === "other" ||
                 (card.readingType === "kunyomi" && isKunWithOkurigana(card.sourceWord))) &&
-                card.sourceWord ? (
+              card.sourceWord ? (
                 <span className="ml-1 font-medium text-slate-300">
                   {getTrailingReadingHint(card.sourceWord, card.kanji)}
                 </span>
@@ -828,7 +929,7 @@ export default function WeeklyReadingsPage() {
             </div>
           </div>
 
-          <div className="w-full max-w-sm flex flex-col gap-3">
+          <div className="flex w-full max-w-sm flex-col gap-3">
             {options.length < 2 ? (
               <div className="text-sm text-amber-700">
                 Not enough answer choices for this card. Skip to the next one.
@@ -842,16 +943,16 @@ export default function WeeklyReadingsPage() {
                 const isChosen =
                   !!selected && normalizeReading(opt) === normalizeReading(selected);
 
-                let className = "w-full px-4 py-3 rounded border text-base ";
+                let className = "w-full rounded border px-4 py-3 text-base ";
 
                 if (!checked) {
                   className += "bg-white hover:bg-gray-50";
                 } else if (isCorrect && isChosen) {
-                  className += "bg-green-100 border-green-400";
+                  className += "border-green-400 bg-green-100";
                 } else if (isCorrect) {
-                  className += "bg-green-100 border-green-400";
+                  className += "border-green-400 bg-green-100";
                 } else if (isChosen) {
-                  className += "bg-red-100 border-red-400";
+                  className += "border-red-400 bg-red-100";
                 } else {
                   className += "bg-white";
                 }
@@ -876,32 +977,26 @@ export default function WeeklyReadingsPage() {
           </div>
 
           {checked ? (
-            <div className="mt-2 w-full max-w-sm text-sm text-center">
+            <div className="mt-2 w-full max-w-sm text-center text-sm">
               {checked.ok ? (
                 <>
                   <p className="text-green-700">✅ Correct!</p>
-
                   {card.readingType === "kunyomi" &&
-                    isKunWithOkurigana(card.sourceWord) &&
-                    card.baseReading &&
-                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
-                    <p className="mt-1 text-gray-600">
-                      Base reading: {card.baseReading}
-                    </p>
+                  isKunWithOkurigana(card.sourceWord) &&
+                  card.baseReading &&
+                  normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
+                    <p className="mt-1 text-gray-600">Base reading: {card.baseReading}</p>
                   ) : null}
                 </>
               ) : (
                 <>
                   <p className="text-red-700">❌ Not quite.</p>
                   <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
-
                   {card.readingType === "kunyomi" &&
-                    isKunWithOkurigana(card.sourceWord) &&
-                    card.baseReading &&
-                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
-                    <p className="mt-1 text-gray-600">
-                      Base reading: {card.baseReading}
-                    </p>
+                  isKunWithOkurigana(card.sourceWord) &&
+                  card.baseReading &&
+                  normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
+                    <p className="mt-1 text-gray-600">Base reading: {card.baseReading}</p>
                   ) : null}
                 </>
               )}
@@ -909,11 +1004,9 @@ export default function WeeklyReadingsPage() {
               {!inRecallFlow ? (
                 <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
                   <div className="text-lg font-semibold">{card.sourceWord}</div>
-
                   {card.sourceReading ? (
                     <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
                   ) : null}
-
                   {card.sourceMeaning ? (
                     <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
                   ) : null}
@@ -922,17 +1015,17 @@ export default function WeeklyReadingsPage() {
 
               {inRecallFlow ? (
                 <div
-                  className="mt-4 border rounded-xl bg-slate-50 p-4 text-left"
+                  className="mt-4 rounded-xl border bg-slate-50 p-4 text-left"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {!recallRevealed ? (
                     <>
-                      <p className="text-sm font-medium text-slate-800 text-center">
+                      <p className="text-center text-sm font-medium text-slate-800">
                         Can you guess the word with this kanji?
                       </p>
 
                       {kanjiPositionHint ? (
-                        <p className="mt-1 text-xs text-slate-500 text-center">
+                        <p className="mt-1 text-center text-xs text-slate-500">
                           Hint: This kanji is character {kanjiPositionHint} in the word.
                         </p>
                       ) : null}
@@ -952,14 +1045,14 @@ export default function WeeklyReadingsPage() {
                         className="mt-3 w-full rounded border px-3 py-2 text-base"
                       />
 
-                      <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                      <div className="mt-3 flex flex-wrap justify-center gap-2">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             submitGuess();
                           }}
-                          className="px-4 py-2 bg-gray-700 text-white rounded"
+                          className="rounded bg-gray-700 px-4 py-2 text-white"
                         >
                           Check
                         </button>
@@ -970,161 +1063,86 @@ export default function WeeklyReadingsPage() {
                             e.stopPropagation();
                             revealRecallCard("shown");
                           }}
-                          className="px-4 py-2 bg-gray-200 rounded"
+                          className="rounded bg-gray-200 px-4 py-2"
                         >
                           Show me
                         </button>
                       </div>
-
-                      {cardsSinceLastRecall >= 4 &&
-                        !skipTypingThisSession &&
-                        usedRecallWords.length === 0 ? (
-                        <div className="mt-3 text-center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSkipTypingThisSession(true);
-                              setRecallResult("shown");
-                              setRecallRevealed(true);
-                              setCardsSinceLastRecall(0);
-
-                              if (card?.sourceWord) {
-                                const normalized = normalizeWord(card.sourceWord);
-                                setUsedRecallWords((prev) =>
-                                  prev.includes(normalized) ? prev : [...prev, normalized]
-                                );
-                              }
-                            }}
-                            className="text-xs text-slate-500 hover:underline"
-                          >
-                            Skip typing questions this session
-                          </button>
-                        </div>
-                      ) : null}
                     </>
                   ) : (
                     <>
-                      {recallResult === "correct" ? (
-                        <p className="text-green-700 text-center font-medium">
-                          ピンポーン！ You got it!
-                        </p>
-                      ) : recallResult === "wrong" ? (
-                        <p className="text-amber-700 text-center font-medium">
-                          Good guess, but not that one!
-                        </p>
-                      ) : null}
+                      <p className="text-center text-sm font-medium text-slate-800">
+                        {recallResult === "correct"
+                          ? "✅ Nice!"
+                          : recallResult === "wrong"
+                            ? "❌ Not quite."
+                            : "Shown"}
+                      </p>
 
-                      <div className="mt-3 rounded-xl border bg-white p-4 text-center">
-                        {recallResult === "correct" ? (
-                          <div className="mb-3 text-sm text-slate-700">
-                            <div>
-                              <span className="font-medium">⭕️ Your guess:</span> {guessInput.trim()}
-                            </div>
-                          </div>
-                        ) : recallResult === "wrong" ? (
-                          <div className="mb-3 text-sm text-slate-700 space-y-1">
-                            <div>
-                              <span className="font-medium">△ Your guess:</span> {guessInput.trim()}
-                            </div>
-                            <div>
-                              <span className="font-medium">⭕️ Correct word:</span> {card.sourceWord}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {recallResult !== "wrong" ? (
-                          <div className="text-lg font-semibold">{card.sourceWord}</div>
-                        ) : null}
-
+                      <div className="mt-3 rounded-xl border bg-white p-3 text-center">
+                        <div className="text-lg font-semibold">{card.sourceWord}</div>
                         {card.sourceReading ? (
                           <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
                         ) : null}
-
                         {card.sourceMeaning ? (
-                          <div className="mt-2 text-sm text-slate-700">{card.sourceMeaning}</div>
+                          <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
                         ) : null}
                       </div>
 
-                      <div className="mt-3 text-center">
+                      <div className="mt-3 flex justify-center">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             nextCard();
                           }}
-                          className="px-4 py-2 bg-gray-200 rounded"
+                          className="rounded bg-gray-700 px-4 py-2 text-white"
                         >
-                          Continue
+                          Next
                         </button>
                       </div>
                     </>
                   )}
                 </div>
-              ) : !checked.ok ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    nextCard();
-                  }}
-                  className="mt-3 px-4 py-2 bg-gray-200 rounded"
-                >
-                  Continue
-                </button>
               ) : null}
             </div>
           ) : null}
-        </div >
-      </div >
-
-      <p className="text-sm text-gray-500 mt-4 text-center max-w-2xl">
-        Kanji have many possible readings. These readings are for specific words in your reading. Focus on the connection and watch for it when you meet it again. These are not the only fixed readings for the kanji.
-      </p>
-
-      <div className="mt-4 flex flex-col items-center gap-2">
-        <button
-          onClick={() => {
-            if (!card) return;
-            flagKanjiCardForReview(card);
-          }}
-          className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-800 rounded hover:bg-amber-100 transition"
-        >
-          Flag this reading
-        </button>
-        {notice && (
-          <p className="text-sm text-green-700">{notice}</p>
-        )}
-        <button
-          onClick={finishForToday}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
-        >
-          That’s enough for today
-        </button>
-
-        <div className="mt-8 flex justify-center gap-3">
-          <button
-            onClick={() => router.push(`/books/${userBookId}/words`)}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
-          >
-            Vocab List
-          </button>
-
-          <button
-            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 text-sm whitespace-nowrap"
-          >
-            Book Hub
-          </button>
-
-          <button
-            onClick={() => router.push(`/books/${userBookId}/study`)}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-800 transition"
-          >
-            Study Vocab
-          </button>
         </div>
       </div>
-    </main >
+
+      <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <button
+          type="button"
+          onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+          className="rounded bg-gray-200 px-4 py-2"
+        >
+          Book Hub
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/study`)}
+          className="rounded bg-gray-200 px-4 py-2"
+        >
+          Back to Study
+        </button>
+
+        <button
+          type="button"
+          onClick={finishForToday}
+          className="rounded bg-gray-700 px-4 py-2 text-white"
+        >
+          Finish for Today
+        </button>
+
+        <button
+          type="button"
+          onClick={() => flagKanjiCardForReview(card)}
+          className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-amber-800"
+        >
+          Flag for Review
+        </button>
+      </div>
+    </main>
   );
 }

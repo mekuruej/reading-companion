@@ -62,6 +62,12 @@ type TeacherPrepItem = {
   alertKey: string;
 };
 
+type KanjiEnrichmentAlertItem = {
+  userBookId: string;
+  title: string;
+  count: number;
+};
+
 type ReadingSessionStats = {
   progressPercent: number | null;
   averageMinutesPerPage: number | null;
@@ -312,6 +318,7 @@ export default function BooksPage() {
 
   const [alertBox, setAlertBox] = useState<AlertBoxState>(null);
   const [teacherPrepAlerts, setTeacherPrepAlerts] = useState<TeacherPrepItem[]>([]);
+  const [kanjiEnrichmentAlerts, setKanjiEnrichmentAlerts] = useState<KanjiEnrichmentAlertItem[]>([]);
 
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
@@ -782,6 +789,12 @@ export default function BooksPage() {
     }
 
     await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
+
+    if (isTeacher && targetUserId === meId) {
+      await loadKanjiEnrichmentAlerts(targetUserId);
+    } else {
+      setKanjiEnrichmentAlerts([]);
+    }
   }
 
   async function handleAddBook() {
@@ -978,6 +991,128 @@ export default function BooksPage() {
       console.error("Approve request error:", err);
       alert("Something went wrong.");
     }
+  }
+
+  async function loadKanjiEnrichmentAlerts(userIdToView: string) {
+    const { data: userBooks, error: userBooksError } = await supabase
+      .from("user_books")
+      .select(`
+      id,
+      books (
+        title
+      )
+    `)
+      .eq("user_id", userIdToView);
+
+    if (userBooksError) {
+      console.error("Error loading user books for kanji alerts:", userBooksError);
+      setKanjiEnrichmentAlerts([]);
+      return;
+    }
+
+    const userBookIds = (userBooks ?? []).map((r: any) => r.id).filter(Boolean);
+
+    if (userBookIds.length === 0) {
+      setKanjiEnrichmentAlerts([]);
+      return;
+    }
+
+    const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
+
+    const { data: wordRows, error: wordError } = await supabase
+      .from("user_book_words")
+      .select("user_book_id, vocabulary_cache_id, surface, is_manual_override, created_at")
+      .in("user_book_id", userBookIds)
+      .eq("is_manual_override", false)
+      .gte("created_at", KANJI_ENRICHMENT_TEST_START);
+
+    if (wordError) {
+      console.error("Error loading user_book_words for kanji alerts:", wordError);
+      setKanjiEnrichmentAlerts([]);
+      return;
+    }
+
+    const cacheIds = Array.from(
+      new Set(
+        (wordRows ?? [])
+          .map((r: any) => r.vocabulary_cache_id)
+          .filter((id: number | null) => id != null)
+      )
+    );
+
+    const mapStatusByCacheId = new Map<number, { hasAny: boolean; hasIncomplete: boolean }>();
+
+    if (cacheIds.length > 0) {
+      const { data: mapRows, error: mapError } = await supabase
+        .from("vocabulary_kanji_map")
+        .select("vocabulary_cache_id, reading_type, base_reading, realized_reading")
+        .in("vocabulary_cache_id", cacheIds);
+
+      if (mapError) {
+        console.error("Error loading kanji map rows for alerts:", mapError);
+        setKanjiEnrichmentAlerts([]);
+        return;
+      }
+
+      for (const row of mapRows ?? []) {
+        const cacheId = (row as any).vocabulary_cache_id as number;
+        const existing = mapStatusByCacheId.get(cacheId) ?? {
+          hasAny: false,
+          hasIncomplete: false,
+        };
+
+        existing.hasAny = true;
+
+        if (
+          !(row as any).reading_type ||
+          !(row as any).base_reading ||
+          !(row as any).realized_reading
+        ) {
+          existing.hasIncomplete = true;
+        }
+
+        mapStatusByCacheId.set(cacheId, existing);
+      }
+    }
+
+    const titleByUserBookId = new Map<string, string>();
+    for (const row of userBooks ?? []) {
+      const bookTitle = Array.isArray((row as any).books)
+        ? (row as any).books[0]?.title ?? "Untitled"
+        : (row as any).books?.title ?? "Untitled";
+
+      titleByUserBookId.set(row.id, bookTitle);
+    }
+
+    const countsByUserBookId = new Map<string, number>();
+
+    for (const row of wordRows ?? []) {
+      const surface = (row as any).surface ?? "";
+      const hasKanji = /[\p{Script=Han}]/u.test(surface);
+      if (!hasKanji) continue;
+
+      const cacheId = (row as any).vocabulary_cache_id as number | null;
+      const mapStatus = cacheId != null ? mapStatusByCacheId.get(cacheId) : null;
+
+      const needsEnrichment =
+        cacheId == null || !mapStatus?.hasAny || mapStatus.hasIncomplete;
+
+      if (needsEnrichment) {
+        const userBookId = (row as any).user_book_id as string;
+        countsByUserBookId.set(userBookId, (countsByUserBookId.get(userBookId) ?? 0) + 1);
+      }
+    }
+
+    const alerts = Array.from(countsByUserBookId.entries())
+      .map(([userBookId, count]) => ({
+        userBookId,
+        title: titleByUserBookId.get(userBookId) ?? "Untitled",
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    setKanjiEnrichmentAlerts(alerts);
+    console.log("kanjiEnrichmentAlerts", alerts);
   }
 
   async function loadReadingStatsForBooks(
@@ -1769,6 +1904,35 @@ export default function BooksPage() {
           </div>
         </div>
 
+        {isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
+          <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-amber-900">
+              Kanji Enrichment Needed
+            </h2>
+            <p className="mt-1 text-xs text-amber-800">
+              Books with saved kanji words that still need enrichment
+            </p>
+
+            <div className="mt-3 space-y-2">
+              {kanjiEnrichmentAlerts.map((alert) => (
+                <button
+                  key={alert.userBookId}
+                  type="button"
+                  onClick={() => router.push(`/books/${alert.userBookId}?tab=teacher`)}
+                  className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-white px-3 py-3 text-left hover:bg-amber-100"
+                >
+                  <div className="text-sm font-medium text-stone-900">
+                    {alert.title}
+                  </div>
+                  <div className="text-xs text-amber-900">
+                    {alert.count} need{alert.count === 1 ? "s" : ""}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {isSuperTeacher && bookRequests.length > 0 ? (
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -2137,6 +2301,16 @@ export default function BooksPage() {
             ) : null}
           </>
         )}
+        <div className="mt-12 border-t border-slate-300 pt-6 text-center">
+          <a
+            href="https://ko-fi.com/japanesemekuru"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+          >
+            Support this project
+          </a>
+        </div>
       </div>
     </main>
   );
