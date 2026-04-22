@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type JishoChoice = {
+  surface: string;
   reading: string;
   jlpt: string;
   isCommon: boolean;
@@ -106,9 +107,8 @@ export default function AddWordPage() {
   const [showEditor, setShowEditor] = useState(false);
 
   const wordInputRef = useRef<HTMLInputElement | null>(null);
-
-  const hasWord = useMemo(() => word.trim().length > 0, [word]);
-
+  const editorCardRef = useRef<HTMLDivElement | null>(null);
+  const editorWordInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -161,6 +161,16 @@ export default function AddWordPage() {
     );
   }, [chapterNumber, chapterName, userBookId]);
 
+  function jumpToEditor() {
+    window.setTimeout(() => {
+      editorCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      editorWordInputRef.current?.focus();
+    }, 0);
+  }
+
   function clearForm(keepLocation = true) {
     setWord("");
     setAlternateSurface("");
@@ -183,6 +193,7 @@ export default function AddWordPage() {
   }
 
   function applyJisho(entry: JishoChoice) {
+    setWord(entry.surface);
     setReading(entry.reading);
     setJlpt(entry.jlpt);
     setIsCommon(entry.isCommon);
@@ -208,6 +219,7 @@ export default function AddWordPage() {
     setHideKanjiInReadingSupport(sessionWord.hideKanjiInReadingSupport);
     setShowEditor(true);
     setMessage(`Editing "${sessionWord.surface}"`);
+    jumpToEditor();
   }
 
   async function handleLookup() {
@@ -240,21 +252,30 @@ export default function AddWordPage() {
         setIsCommon(false);
         setShowEditor(true);
         setMessage("❌ No dictionary result found. You can still enter it manually.");
+        jumpToEditor();
         return;
       }
 
       const choices = extractMeaningChoices(entry);
 
+      const jishoSurface =
+        entry?.japanese?.find((j: any) => j?.word)?.word ||
+        entry?.japanese?.[0]?.word ||
+        entry?.slug ||
+        cleanWord;
+
       applyJisho({
-        reading: entry.japanese?.[0]?.reading || "",
-        jlpt: normalizeJlpt(entry.jlpt?.[0] || ""),
-        isCommon: !!entry.is_common,
+        surface: jishoSurface,
+        reading: entry?.japanese?.[0]?.reading || "",
+        jlpt: normalizeJlpt(entry?.jlpt?.[0] || ""),
+        isCommon: !!entry?.is_common,
         meaningChoices: choices,
         defaultMeaning: choices[0] || "",
       });
 
       setShowEditor(true);
       setMessage("✅ Dictionary info loaded.");
+      jumpToEditor();
 
     } catch (err: any) {
       console.error("Lookup error:", err);
@@ -527,7 +548,18 @@ export default function AddWordPage() {
         {bookTitle ? (
           <div className="mb-6 flex items-center gap-3">
             {bookCover ? (
-              <img src={bookCover} alt="" className="h-16 w-12 rounded object-cover" />
+              <button
+                type="button"
+                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                className="shrink-0 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
+                title="Back to Book Hub"
+              >
+                <img
+                  src={bookCover}
+                  alt={`Go to ${bookTitle} Book Hub`}
+                  className="h-16 w-12 rounded object-cover hover:opacity-90"
+                />
+              </button>
             ) : null}
             <div>
               <p className="text-sm text-gray-700">
@@ -556,6 +588,7 @@ export default function AddWordPage() {
             <div>
               <div className="flex flex-wrap gap-2">
                 <input
+                  ref={wordInputRef}
                   value={word}
                   onChange={(e) => setWord(e.target.value)}
                   placeholder="Search for a word"
@@ -581,6 +614,7 @@ export default function AddWordPage() {
                     setIsCommon(false);
                     setShowEditor(true);
                     setMessage("");
+                    jumpToEditor();
                   }}
                   className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
                 >
@@ -593,12 +627,22 @@ export default function AddWordPage() {
               ) : null}
 
               {showEditor ? (
-                <div className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <div
+                  ref={editorCardRef}
+                  className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4"
+                >
+                  {editingSessionWordId ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                      Editing "{word}"
+                    </div>
+                  ) : null}
+
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <div>
                         <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
                         <input
+                          ref={editorWordInputRef}
                           value={useAlternateSurface ? alternateSurface : word}
                           onChange={(e) => {
                             const next = e.target.value;
@@ -720,7 +764,7 @@ export default function AddWordPage() {
                       checked={hideKanjiInReadingSupport}
                       onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
                     />
-                    <span>Hide this word in reading support</span>
+                    <span>Hide kanji in Read Along (does not affect Vocab List)</span>
                   </label>
 
                   <div className="flex flex-wrap gap-2">

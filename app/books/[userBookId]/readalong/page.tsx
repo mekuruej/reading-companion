@@ -715,71 +715,71 @@ export default function ReadAlongPage() {
                 </div>
 
                 <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
-  <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-    <div className="space-y-3">
-      {pages.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={pageIndex === 0}
-            className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            ← Previous
-          </button>
+                    <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+                        <div className="space-y-3">
+                            {pages.length > 0 ? (
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={goPrev}
+                                        disabled={pageIndex === 0}
+                                        className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        ← Previous
+                                    </button>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              value={jumpPageInput}
-              onChange={(e) => setJumpPageInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  jumpToPage(Number(jumpPageInput));
-                }
-              }}
-              placeholder="Page"
-              className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => jumpToPage(Number(jumpPageInput))}
-              className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
-            >
-              Go
-            </button>
-          </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={jumpPageInput}
+                                            onChange={(e) => setJumpPageInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    jumpToPage(Number(jumpPageInput));
+                                                }
+                                            }}
+                                            placeholder="Page"
+                                            className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => jumpToPage(Number(jumpPageInput))}
+                                            className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
+                                        >
+                                            Go
+                                        </button>
+                                    </div>
 
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={pageIndex === pages.length - 1}
-            className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next →
-          </button>
-        </div>
-      ) : null}
+                                    <button
+                                        type="button"
+                                        onClick={goNext}
+                                        disabled={pageIndex === pages.length - 1}
+                                        className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        Next →
+                                    </button>
+                                </div>
+                            ) : null}
 
-      <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
-        <div className="order-2 text-sm text-stone-500 sm:order-1">
-          {currentPage
-            ? `${currentPage.words.length} saved word${currentPage.words.length === 1 ? "" : "s"}`
-            : "No saved words yet"}
-        </div>
+                            <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
+                                <div className="order-2 text-sm text-stone-500 sm:order-1">
+                                    {currentPage
+                                        ? `${currentPage.words.length} saved word${currentPage.words.length === 1 ? "" : "s"}`
+                                        : "No saved words yet"}
+                                </div>
 
-        <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">
-          {currentPage ? currentPage.label : "Fluid Reading"}
-        </div>
+                                <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">
+                                    {currentPage ? currentPage.label : "Fluid Reading"}
+                                </div>
 
-        <div className="order-3 text-sm text-stone-500 sm:text-right">
-          Tap the words to follow along with the book.
-        </div>
-      </div>
-    </div>
-  </div>
+                                <div className="order-3 text-sm text-stone-500 sm:text-right">
+                                    Tap the words to follow along with the book.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div
                         ref={scrollAreaRef}

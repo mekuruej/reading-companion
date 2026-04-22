@@ -35,6 +35,7 @@ type Option = {
 type BookInfoTabProps = {
   book: Book;
   isEditing: boolean;
+
   genre: string;
   setGenre: (value: string) => void;
   bookType: string;
@@ -49,6 +50,7 @@ type BookInfoTabProps = {
   setIsbn: (value: string) => void;
   isbn13: string;
   setIsbn13: (value: string) => void;
+
   authorName: string;
   setAuthorName: (value: string) => void;
   translatorName: string;
@@ -59,6 +61,7 @@ type BookInfoTabProps = {
   setPublisherName: (value: string) => void;
   publisherReading: string;
   setPublisherReading: (value: string) => void;
+
   coverUrl: string;
   setCoverUrl: (value: string) => void;
   authorImg: string;
@@ -69,19 +72,33 @@ type BookInfoTabProps = {
   setIllustratorImg: (value: string) => void;
   publisherImg: string;
   setPublisherImg: (value: string) => void;
+
   authorReading: string;
   setAuthorReading: (value: string) => void;
   translatorReading: string;
   setTranslatorReading: (value: string) => void;
   illustratorReading: string;
   setIllustratorReading: (value: string) => void;
+
+  formatType: string;
+  setFormatType: (value: string) => void;
+  progressMode: string;
+  setProgressMode: (value: string) => void;
+  showPageNumbers: boolean;
+  setShowPageNumbers: (value: boolean) => void;
+
   relatedLinksArr: any[];
+
   genreLabel: (value: string | null | undefined) => string;
   bookTypeLabel: (value: string | null | undefined) => string;
+  formatTypeLabel: (value: string | null | undefined) => string;
+  progressModeLabel: (value: string | null | undefined) => string;
   displayLinkLabel: (value: any) => string;
   displayLinkUrl: (value: any) => string;
+
   GENRE_OPTIONS: readonly Option[];
   BOOK_TYPE_OPTIONS: readonly Option[];
+
   Detail: ComponentType<{
     label: string;
     value: any;
@@ -90,6 +107,7 @@ type BookInfoTabProps = {
     setInputValue: (v: string) => void;
     placeholder?: string;
   }>;
+
   PersonRow: ComponentType<{
     label: string;
     name: string | null | undefined;
@@ -108,6 +126,7 @@ type BookInfoTabProps = {
 export default function BookInfoTab({
   book,
   isEditing,
+
   genre,
   setGenre,
   bookType,
@@ -122,6 +141,7 @@ export default function BookInfoTab({
   setIsbn,
   isbn13,
   setIsbn13,
+
   authorName,
   setAuthorName,
   translatorName,
@@ -132,6 +152,7 @@ export default function BookInfoTab({
   setPublisherName,
   publisherReading,
   setPublisherReading,
+
   coverUrl,
   setCoverUrl,
   authorImg,
@@ -142,19 +163,33 @@ export default function BookInfoTab({
   setIllustratorImg,
   publisherImg,
   setPublisherImg,
+
   authorReading,
   setAuthorReading,
   translatorReading,
   setTranslatorReading,
   illustratorReading,
   setIllustratorReading,
+
+  formatType,
+  setFormatType,
+  progressMode,
+  setProgressMode,
+  showPageNumbers,
+  setShowPageNumbers,
+
   relatedLinksArr,
+
   genreLabel,
   bookTypeLabel,
+  formatTypeLabel,
+  progressModeLabel,
   displayLinkLabel,
   displayLinkUrl,
+
   GENRE_OPTIONS,
   BOOK_TYPE_OPTIONS,
+
   Detail,
   PersonRow,
 }: BookInfoTabProps) {
@@ -374,6 +409,67 @@ export default function BookInfoTab({
             Related link editing is not wired into this extracted component yet.
           </p>
         ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+        <div className="mb-3 text-sm font-semibold text-stone-900">My Copy</div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded border bg-white p-3 text-sm">
+            <div className="text-stone-600">Format</div>
+            {!isEditing ? (
+              <div className="mt-1 font-medium">{formatTypeLabel(formatType)}</div>
+            ) : (
+              <select
+                value={formatType}
+                onChange={(e) => setFormatType(e.target.value)}
+                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+              >
+                <option value="">—</option>
+                <option value="paperback">Paperback</option>
+                <option value="hardcover">Hardcover</option>
+                <option value="ebook">eBook</option>
+                <option value="audiobook">Audiobook</option>
+                <option value="other">Other</option>
+              </select>
+            )}
+          </div>
+
+          <div className="rounded border bg-white p-3 text-sm">
+            <div className="text-stone-600">Progress Mode</div>
+            {!isEditing ? (
+              <div className="mt-1 font-medium">{progressModeLabel(progressMode)}</div>
+            ) : (
+              <select
+                value={progressMode}
+                onChange={(e) => setProgressMode(e.target.value)}
+                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+              >
+                <option value="">—</option>
+                <option value="pages">Pages</option>
+                <option value="percent">Percent</option>
+                <option value="chapters">Chapters</option>
+                <option value="time">Time</option>
+              </select>
+            )}
+          </div>
+
+          <div className="rounded border bg-white p-3 text-sm">
+            <div className="text-stone-600">Show Page Numbers</div>
+            {!isEditing ? (
+              <div className="mt-1 font-medium">{showPageNumbers ? "Yes" : "No"}</div>
+            ) : (
+              <label className="mt-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showPageNumbers}
+                  onChange={(e) => setShowPageNumbers(e.target.checked)}
+                />
+                <span>Show page numbers</span>
+              </label>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

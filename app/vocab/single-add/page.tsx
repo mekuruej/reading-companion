@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 import { KANJI_DATA } from "@/lib/kanjiData";
 
@@ -97,6 +98,7 @@ function sortQuickSessionWords(words: QuickSessionWord[]) {
 }
 
 export default function SingleAddPage() {
+  const router = useRouter();
   const [userBookId, setUserBookId] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -111,6 +113,8 @@ export default function SingleAddPage() {
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
+  const quickEditorCardRef = useRef<HTMLDivElement | null>(null);
+  const quickEditorWordInputRef = useRef<HTMLInputElement | null>(null);
 
   const [selectedPieces, setSelectedPieces] = useState<string[]>([]);
 
@@ -255,6 +259,16 @@ export default function SingleAddPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isRunning, isPaused]);
 
+  function jumpToQuickEditor() {
+    window.setTimeout(() => {
+      quickEditorCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      quickEditorWordInputRef.current?.focus();
+    }, 0);
+  }
+
   function getSavedQuickMeta() {
     if (typeof window === "undefined") {
       return { page: "", chapterNumber: "", chapterName: "" };
@@ -341,6 +355,7 @@ export default function SingleAddPage() {
     setHideKanjiInReadingSupport(item.hideKanjiInReadingSupport);
     setQuickError(null);
     setMessage(`Editing "${item.surface}"`);
+    jumpToQuickEditor();
   }
 
   async function pullQuickWord() {
@@ -361,7 +376,11 @@ export default function SingleAddPage() {
         return;
       }
 
-      const surface = first?.japanese?.[0]?.word || first?.slug || word;
+      const surface =
+        first?.japanese?.find((j: any) => j?.word)?.word ||
+        first?.japanese?.[0]?.word ||
+        first?.slug ||
+        word;
       const reading = first?.japanese?.[0]?.reading || "";
       const meanings = (first?.senses ?? [])
         .map((sense: any) => (sense.english_definitions ?? []).join("; "))
@@ -385,6 +404,8 @@ export default function SingleAddPage() {
         chapterName: savedMeta.chapterName,
         pageOrder: null,
       });
+      jumpToQuickEditor();
+
     } catch (err) {
       console.error(err);
       setQuickPreview(null);
@@ -704,7 +725,7 @@ export default function SingleAddPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-stone-50 p-4">
           <div className="text-sm font-semibold text-stone-900">looker-upper</div>
           <div className="mt-1 text-sm text-stone-500">
             noun · official Mekuru book club term
@@ -733,7 +754,7 @@ export default function SingleAddPage() {
           )}
         </p>
 
-        <h1 className="mb-2 mt-4 text-2xl font-semibold">Curiosity Reading</h1>
+        <h1 className="mb-4 mt-4 text-2xl font-semibold">Curiosity Reading</h1>
         <p className="mt-2 text-sm text-stone-700">
           Use this for a slower, exploratory reading experience. Lookup time is included in the
           time.
@@ -743,7 +764,22 @@ export default function SingleAddPage() {
           bookTitle ? (
             <div className="mb-6 flex items-center gap-3">
               {bookCover ? (
-                <img src={bookCover} alt="" className="h-16 w-12 rounded object-cover" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (userBookId) {
+                      router.push(`/books/${encodeURIComponent(userBookId)}`);
+                    }
+                  }}
+                  className="shrink-0 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
+                  title="Back to Book Hub"
+                >
+                  <img
+                    src={bookCover}
+                    alt={`Go to ${bookTitle} Book Hub`}
+                    className="h-16 w-12 rounded object-cover hover:opacity-90"
+                  />
+                </button>
               ) : null}
 
               <div>
@@ -778,86 +814,86 @@ export default function SingleAddPage() {
           </p>
 
           <div className="mt-4 flex flex-wrap justify-center gap-3 sm:justify-start">
-  {!isRunning && !isPaused ? (
-    <button
-      type="button"
-      onClick={() => {
-        setStartTime(Date.now());
-        setElapsed(0);
-        setIsRunning(true);
-        setIsPaused(false);
-      }}
-      className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-    >
-      Start Timer
-    </button>
-  ) : null}
+            {!isRunning && !isPaused ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStartTime(Date.now());
+                  setElapsed(0);
+                  setIsRunning(true);
+                  setIsPaused(false);
+                }}
+                className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+              >
+                Start Timer
+              </button>
+            ) : null}
 
-  {isRunning ? (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          if (startTime) {
-            setElapsed(Math.floor((Date.now() - startTime) / 1000));
-          }
-          setIsRunning(false);
-          setIsPaused(true);
-        }}
-        className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
-      >
-        Pause
-      </button>
+            {isRunning ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (startTime) {
+                      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                    }
+                    setIsRunning(false);
+                    setIsPaused(true);
+                  }}
+                  className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
+                >
+                  Pause
+                </button>
 
-      <button
-        type="button"
-        onClick={() => {
-          if (startTime) {
-            setElapsed(Math.floor((Date.now() - startTime) / 1000));
-          }
-          setIsRunning(false);
-          setIsPaused(false);
-          void openTimedSessionFormWithDefaults();
-        }}
-        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-      >
-        Finish
-      </button>
-    </>
-  ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (startTime) {
+                      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                    }
+                    setIsRunning(false);
+                    setIsPaused(false);
+                    void openTimedSessionFormWithDefaults();
+                  }}
+                  className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                >
+                  Finish
+                </button>
+              </>
+            ) : null}
 
-  {isPaused ? (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setStartTime(Date.now() - elapsed * 1000);
-          setIsPaused(false);
-          setIsRunning(true);
-        }}
-        className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-      >
-        Resume
-      </button>
+            {isPaused ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartTime(Date.now() - elapsed * 1000);
+                    setIsPaused(false);
+                    setIsRunning(true);
+                  }}
+                  className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
+                >
+                  Resume
+                </button>
 
-      <button
-        type="button"
-        onClick={() => {
-          setIsPaused(false);
-          setIsRunning(false);
-          void openTimedSessionFormWithDefaults();
-        }}
-        className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-      >
-        Finish
-      </button>
-    </>
-  ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPaused(false);
+                    setIsRunning(false);
+                    void openTimedSessionFormWithDefaults();
+                  }}
+                  className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                >
+                  Finish
+                </button>
+              </>
+            ) : null}
 
-  <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
-    ⏱ {formatTimer(elapsed)}
-  </div>
-</div>
+            <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
+              ⏱ {formatTimer(elapsed)}
+            </div>
+          </div>
 
           {showTimedSessionForm && !isRunning ? (
             <div className="mt-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">
@@ -980,6 +1016,7 @@ export default function SingleAddPage() {
                   pageOrder: null,
                 });
                 setQuickError(null);
+                jumpToQuickEditor();
               }}
               className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
             >
@@ -1007,11 +1044,21 @@ export default function SingleAddPage() {
           ) : null}
 
           {quickPreview ? (
-            <div className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div
+              ref={quickEditorCardRef}
+              className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4"
+            >
+              {quickPreview.id ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                  Editing "{quickPreview.surface}"
+                </div>
+              ) : null}
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
                   <input
+                    ref={quickEditorWordInputRef}
                     value={quickPreview.surface}
                     onChange={(e) =>
                       setQuickPreview((prev) => (prev ? { ...prev, surface: e.target.value } : prev))
@@ -1147,7 +1194,7 @@ export default function SingleAddPage() {
                   checked={hideKanjiInReadingSupport}
                   onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
                 />
-                <span>Hide kanji in reading support</span>
+                <span>Hide kanji in Read Along (does not affect Vocab List)</span>
               </label>
 
               <div className="flex flex-wrap gap-2">

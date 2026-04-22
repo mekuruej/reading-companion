@@ -560,7 +560,6 @@ export default function BookHubPage() {
     new Date().toISOString().split("T")[0]
   );
 
-
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     setSessionDate(today);
@@ -574,6 +573,25 @@ export default function BookHubPage() {
     if (!realReadingSessions.length) return null;
     return new Set(realReadingSessions.map((s) => s.read_on)).size;
   }, [realReadingSessions]);
+
+  const coverageReadingSessions = useMemo(() => {
+    return readingSessions.filter(
+      (s) =>
+        (s.session_mode === "fluid" || s.session_mode === "curiosity") &&
+        s.start_page != null &&
+        s.end_page != null
+    );
+  }, [readingSessions]);
+
+  const earliestTrackedStartPage = useMemo(() => {
+    if (coverageReadingSessions.length === 0) return null;
+    return Math.min(...coverageReadingSessions.map((s) => s.start_page));
+  }, [coverageReadingSessions]);
+
+  const furthestTrackedPage = useMemo(() => {
+    if (coverageReadingSessions.length === 0) return null;
+    return Math.max(...coverageReadingSessions.map((s) => s.end_page));
+  }, [coverageReadingSessions]);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [bookOptions, setBookOptions] = useState<
@@ -609,6 +627,7 @@ export default function BookHubPage() {
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
+  const [editingReadingSessionId, setEditingReadingSessionId] = useState<string | null>(null);
 
 
   const [showWordExplorer, setShowWordExplorer] = useState(false);
@@ -731,19 +750,14 @@ export default function BookHubPage() {
     return Math.max(...sessionsWithEndPage.map((s) => s.end_page));
   }, [realReadingSessions]);
 
-  const earliestStartPage = useMemo(() => {
-    if (visualReadingSessions.length === 0) return null;
-    return Math.min(...visualReadingSessions.map((s) => s.start_page));
-  }, [visualReadingSessions]);
-
   const canFillBeginningPages = useMemo(() => {
-    return earliestStartPage != null && earliestStartPage > 1;
-  }, [earliestStartPage]);
+    return earliestTrackedStartPage != null && earliestTrackedStartPage > 1;
+  }, [earliestTrackedStartPage]);
 
   const canFillEndingPages = useMemo(() => {
-    if (!finished || !book?.page_count || visualReadingSessions.length === 0) return false;
-    return furthestPage != null && furthestPage < book.page_count;
-  }, [finished, book?.page_count, visualReadingSessions.length, furthestPage]);
+    if (!finished || !book?.page_count || coverageReadingSessions.length === 0) return false;
+    return furthestTrackedPage != null && furthestTrackedPage < book.page_count;
+  }, [finished, book?.page_count, coverageReadingSessions.length, furthestTrackedPage]);
 
   const progressPercent = useMemo(() => {
     if (finished) return 100;
@@ -775,6 +789,34 @@ export default function BookHubPage() {
 
     return chapterReverseOrder ? sorted.reverse() : sorted;
   }, [chapterSummaries, chapterReverseOrder]);
+
+  function startEditingReadingSession(session: ReadingSession) {
+    setEditingReadingSessionId(session.id);
+    setSessionDate(session.read_on);
+    setSessionMode(
+      session.session_mode === "curiosity" ||
+        session.session_mode === "fluid" ||
+        session.session_mode === "listening"
+        ? session.session_mode
+        : "fluid"
+    );
+    setSessionStartPage(session.start_page != null ? String(session.start_page) : "");
+    setSessionEndPage(session.end_page != null ? String(session.end_page) : "");
+    setSessionMinutesRead(
+      session.minutes_read != null ? String(session.minutes_read) : ""
+    );
+    setShowTimedSessionForm(false);
+  }
+
+  function cancelEditingReadingSession() {
+    setEditingReadingSessionId(null);
+    setSessionDate(new Date().toISOString().slice(0, 10));
+    setSessionStartPage("");
+    setSessionEndPage("");
+    setSessionMinutesRead("");
+    setSessionMode("fluid");
+    setShowTimedSessionForm(false);
+  }
 
   function openWordExplorer(word?: string) {
     setWordExplorerQuery(word ?? "");
@@ -1416,7 +1458,7 @@ export default function BookHubPage() {
   }
 
   async function fillBeginningPages() {
-    if (!row?.id || earliestStartPage == null || earliestStartPage <= 1) return;
+    if (!row?.id || earliestTrackedStartPage == null || earliestTrackedStartPage <= 1) return;
 
     const { error } = await supabase
       .from("user_book_reading_sessions")
@@ -1424,7 +1466,7 @@ export default function BookHubPage() {
         user_book_id: row.id,
         read_on: startedAt || new Date().toISOString().slice(0, 10),
         start_page: 1,
-        end_page: earliestStartPage - 1,
+        end_page: earliestTrackedStartPage - 1,
         minutes_read: null,
         is_filler: true,
         session_mode: "fluid",
@@ -1440,14 +1482,14 @@ export default function BookHubPage() {
   }
 
   async function fillEndingPages() {
-    if (!row?.id || !book?.page_count || furthestPage == null || furthestPage >= book.page_count) return;
+    if (!row?.id || !book?.page_count || furthestTrackedPage == null || furthestTrackedPage >= book.page_count) return;
 
     const { error } = await supabase
       .from("user_book_reading_sessions")
       .insert({
         user_book_id: row.id,
         read_on: finishedAt || new Date().toISOString().slice(0, 10),
-        start_page: furthestPage + 1,
+        start_page: furthestTrackedPage + 1,
         end_page: book.page_count,
         minutes_read: null,
         is_filler: true,
@@ -1929,7 +1971,7 @@ export default function BookHubPage() {
       return;
     }
 
-    const newSession = {
+    const payload = {
       user_book_id: row.id,
       read_on: sessionDate,
       start_page: sessionMode === "listening" ? null : start,
@@ -1938,20 +1980,29 @@ export default function BookHubPage() {
       session_mode: sessionMode,
     };
 
-    const { data, error } = await supabase
-      .from("user_book_reading_sessions")
-      .insert(newSession)
-      .select()
-      .single();
+    if (editingReadingSessionId) {
+      const { error } = await supabase
+        .from("user_book_reading_sessions")
+        .update(payload)
+        .eq("id", editingReadingSessionId)
+        .eq("user_book_id", row.id);
 
-    if (error) {
-      console.error("Error saving reading session:", error);
-      alert(`Could not save reading session.\n${error.message || "Unknown error"}`);
-      return;
+      if (error) {
+        console.error("Error updating reading session:", error);
+        alert(`Could not update reading session.\n${error.message || "Unknown error"}`);
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("user_book_reading_sessions")
+        .insert(payload);
+
+      if (error) {
+        console.error("Error saving reading session:", error);
+        alert(`Could not save reading session.\n${error.message || "Unknown error"}`);
+        return;
+      }
     }
-
-    setTimerSaveMessage("Your session has been saved in the Reading Tab.");
-    setTimeout(() => setTimerSaveMessage(""), 4000);
 
     const existingStartedAt = row.started_at ? row.started_at.slice(0, 10) : null;
 
@@ -1988,14 +2039,16 @@ export default function BookHubPage() {
       );
     }
 
-    setReadingSessions((prev) =>
-      [data as ReadingSession, ...prev].sort((a, b) => {
-        const dateCompare = b.read_on.localeCompare(a.read_on);
-        if (dateCompare !== 0) return dateCompare;
-        return b.created_at.localeCompare(a.created_at);
-      })
-    );
+    await loadReadingSessions(row.id);
 
+    setTimerSaveMessage(
+      editingReadingSessionId
+        ? "Your session has been updated."
+        : "Your session has been saved in the Reading Tab."
+    );
+    setTimeout(() => setTimerSaveMessage(""), 4000);
+
+    setEditingReadingSessionId(null);
     setSessionStartPage("");
     setSessionEndPage("");
     setSessionMinutesRead("");
@@ -2122,19 +2175,18 @@ export default function BookHubPage() {
 
     const r = data as unknown as UserBook;
     setRow(r);
-    
-    const { data: teacherLink, error: teacherLinkError } = await supabase
+
+    const { data: teacherLinks, error: teacherLinkError } = await supabase
       .from("teacher_students")
       .select("id")
       .eq("student_id", r.user_id)
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (teacherLinkError) {
       console.error("Error checking teacher_students link:", teacherLinkError);
       setIsLinkedStudentToAnyTeacher(false);
     } else {
-      setIsLinkedStudentToAnyTeacher(!!teacherLink);
+      setIsLinkedStudentToAnyTeacher((teacherLinks?.length ?? 0) > 0);
     }
 
     setStartedAt(r.started_at ? formatYmd(new Date(r.started_at)) : "");
@@ -2769,7 +2821,7 @@ export default function BookHubPage() {
       <div className="mx-auto max-w-6xl">
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="p-5 md:p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+            <div className="grid gap-6 md:grid-cols-[150px_minmax(0,1fr)_380px] md:items-start md:gap-8">
               <div className="w-[140px] shrink-0 md:w-[150px]">
                 {(isEditingThisTab ? coverUrl : book.cover_url) ? (
                   <img
@@ -2784,7 +2836,7 @@ export default function BookHubPage() {
                 )}
               </div>
 
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <div className="space-y-3">
                   <div>
                     <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
@@ -2871,6 +2923,98 @@ export default function BookHubPage() {
                     )}
                   </select>
                 </div>
+              </div>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
+                <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
+
+                <div className="space-y-2 text-sm text-stone-700">
+                  <div>
+                    <span className="font-medium">Status:</span>{" "}
+                    {dnfAt ? "DNF" : finishedAt ? "Finished" : startedAt ? "Reading" : "Not started"}
+                  </div>
+                  <div>
+                    <span className="font-medium">Started:</span> {startedAt || "—"}
+                  </div>
+                  <div>
+                    <span className="font-medium">Finished:</span> {finishedAt || "—"}
+                  </div>
+                  <div>
+                    <span className="font-medium">DNF:</span> {dnfAt || "—"}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {!started && realReadingSessions.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={markStartedToday}
+                      className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
+                    >
+                      Start Today
+                    </button>
+                  ) : null}
+
+                  {!finishedAt && !dnfAt ? (
+                    <button
+                      type="button"
+                      onClick={markFinishedToday}
+                      className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
+                    >
+                      Mark Finished
+                    </button>
+                  ) : null}
+
+                  {!finishedAt && !dnfAt ? (
+                    <button
+                      type="button"
+                      onClick={markDnfToday}
+                      className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
+                    >
+                      Mark DNF
+                    </button>
+                  ) : null}
+                  <p className="mt-2 text-xs text-stone-500">
+                    You can edit these in the Reading Tab.
+                  </p>
+                </div>
+
+                {canFillBeginningPages || canFillEndingPages ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {canFillBeginningPages ? (
+                      <button
+                        type="button"
+                        onClick={fillBeginningPages}
+                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                      >
+                        Fill beginning pages
+                      </button>
+                    ) : null}
+
+                    {canFillEndingPages ? (
+                      <button
+                        type="button"
+                        onClick={fillEndingPages}
+                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
+                      >
+                        Fill ending pages
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {canFillBeginningPages && earliestTrackedStartPage != null ? (
+                  <div className="mt-2 text-xs text-stone-500">
+                    Looks like you started logging on page {earliestTrackedStartPage}. Fill pages 1–
+                    {earliestTrackedStartPage - 1}?
+                  </div>
+                ) : null}
+
+                {canFillEndingPages && furthestTrackedPage != null && book.page_count != null ? (
+                  <div className="mt-2 text-xs text-stone-500">
+                    Looks like your story ended on page {furthestTrackedPage}. Fill pages {furthestTrackedPage + 1}–
+                    {book.page_count}?
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -3198,6 +3342,14 @@ export default function BookHubPage() {
                     BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
                     Detail={Detail}
                     PersonRow={PersonRow}
+                    formatType={formatType}
+                    setFormatType={setFormatType}
+                    progressMode={progressMode}
+                    setProgressMode={setProgressMode}
+                    showPageNumbers={showPageNumbers}
+                    setShowPageNumbers={setShowPageNumbers}
+                    formatTypeLabel={formatTypeLabel}
+                    progressModeLabel={progressModeLabel}
                   />
                 </div>
               )}
@@ -3282,45 +3434,14 @@ export default function BookHubPage() {
 
               {activeTab === "reading" && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                  <div className="px-4 md:px-6">
                     <div className="text-base font-semibold text-stone-900">Reading</div>
-
-                    {!isEditingThisTab ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditingTab("reading")}
-                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                      >
-                        Edit
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={cancelEdits}
-                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveAll}
-                          disabled={saving}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {saving ? "Saving..." : "Save"}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   <ReadingTab
                     row={row}
                     book={book}
                     isEditingThisTab={isEditingThisTab}
-                    markStartedToday={markStartedToday}
-                    markFinishedToday={markFinishedToday}
-                    markDnfToday={markDnfToday}
                     formatType={formatType}
                     setFormatType={setFormatType}
                     progressMode={progressMode}
@@ -3347,16 +3468,13 @@ export default function BookHubPage() {
                     setSessionEndPage={setSessionEndPage}
                     saveReadingSession={saveReadingSession}
                     deleteReadingSession={deleteReadingSession}
+                    editingReadingSessionId={editingReadingSessionId}
+                    startEditingReadingSession={startEditingReadingSession}
+                    cancelEditingReadingSession={cancelEditingReadingSession}
                     readingSessions={readingSessions}
                     visibleReadingSessions={visibleReadingSessions}
                     showAllSessions={showAllSessions}
                     renderSessionToggle={renderSessionToggle}
-                    canFillBeginningPages={canFillBeginningPages}
-                    canFillEndingPages={canFillEndingPages}
-                    fillBeginningPages={fillBeginningPages}
-                    fillEndingPages={fillEndingPages}
-                    earliestStartPage={earliestStartPage}
-                    furthestPage={furthestPage}
                     formatTypeLabel={formatTypeLabel}
                     progressModeLabel={progressModeLabel}
                     DateField={DateField}
