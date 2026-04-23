@@ -1,14 +1,25 @@
+"use client";
+
+import { useState, type ComponentType } from "react";
+
 type UserBook = {
   my_review: string | null;
   rating_overall: number | null;
   rating_recommend: number | null;
   rating_difficulty: number | null;
   reader_level: string | null;
+  favorite_quotes?: string | null;
+  memorable_words?: string | null;
 };
 
 type RatingTabProps = {
   row: UserBook;
-  isEditingThisTab: boolean;
+
+  // kept for compatibility with your current parent usage
+  isEditingThisTab?: boolean;
+
+  onSave: () => void | Promise<void>;
+  saving?: boolean;
 
   myReview: string;
   setMyReview: (value: string) => void;
@@ -25,9 +36,15 @@ type RatingTabProps = {
   readerLevel: string;
   setReaderLevel: (value: string) => void;
 
+  favoriteQuotes: string;
+  setFavoriteQuotes: (value: string) => void;
+
+  memorableWords: string;
+  setMemorableWords: (value: string) => void;
+
   LEVEL_OPTIONS: readonly string[];
 
-  StarRatingField: React.ComponentType<{
+  StarRatingField: ComponentType<{
     label: string;
     value: number | null;
     editing: boolean;
@@ -36,7 +53,7 @@ type RatingTabProps = {
     descriptions: Record<number, string>;
   }>;
 
-  DifficultyField: React.ComponentType<{
+  DifficultyField: ComponentType<{
     value: number | null;
     editing: boolean;
     inputValue: string;
@@ -44,9 +61,60 @@ type RatingTabProps = {
   }>;
 };
 
+function CardHeader({
+  title,
+  editing,
+  onEdit,
+  onCancel,
+  onSave,
+  saving = false,
+}: {
+  title: string;
+  editing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void | Promise<void>;
+  saving?: boolean;
+}) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="text-sm font-semibold text-stone-900">{title}</div>
+
+      {!editing ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+        >
+          Edit
+        </button>
+      ) : (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RatingTab({
   row,
-  isEditingThisTab,
+  onSave,
+  saving = false,
   myReview,
   setMyReview,
   ratingOverall,
@@ -57,16 +125,77 @@ export default function RatingTab({
   setRatingDifficulty,
   readerLevel,
   setReaderLevel,
+  favoriteQuotes,
+  setFavoriteQuotes,
+  memorableWords,
+  setMemorableWords,
   LEVEL_OPTIONS,
   StarRatingField,
   DifficultyField,
 }: RatingTabProps) {
+  const [editingReview, setEditingReview] = useState(false);
+  const [editingRatings, setEditingRatings] = useState(false);
+  const [editingContext, setEditingContext] = useState(false);
+  const [editingMemory, setEditingMemory] = useState(false);
+
+  function cancelReview() {
+    setMyReview(row.my_review ?? "");
+    setEditingReview(false);
+  }
+
+  function cancelRatings() {
+    setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
+    setRatingRecommend(row.rating_recommend != null ? String(row.rating_recommend) : "");
+    setEditingRatings(false);
+  }
+
+  function cancelContext() {
+    setReaderLevel(row.reader_level ?? "");
+    setRatingDifficulty(
+      row.rating_difficulty != null ? String(row.rating_difficulty) : ""
+    );
+    setEditingContext(false);
+  }
+
+  function cancelMemory() {
+    setFavoriteQuotes(row.favorite_quotes ?? "");
+    setMemorableWords(row.memorable_words ?? "");
+    setEditingMemory(false);
+  }
+
+  async function saveReview() {
+    await onSave();
+    setEditingReview(false);
+  }
+
+  async function saveRatings() {
+    await onSave();
+    setEditingRatings(false);
+  }
+
+  async function saveContext() {
+    await onSave();
+    setEditingContext(false);
+  }
+
+  async function saveMemory() {
+    await onSave();
+    setEditingMemory(false);
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+        <CardHeader
+          title="My Review"
+          editing={editingReview}
+          onEdit={() => setEditingReview(true)}
+          onCancel={cancelReview}
+          onSave={saveReview}
+          saving={saving}
+        />
 
-        {!isEditingThisTab ? (
+        {!editingReview ? (
           <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
             {row.my_review?.trim() ? row.my_review : "—"}
           </div>
@@ -81,13 +210,20 @@ export default function RatingTab({
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">Book Ratings</div>
+        <CardHeader
+          title="Book Ratings"
+          editing={editingRatings}
+          onEdit={() => setEditingRatings(true)}
+          onCancel={cancelRatings}
+          onSave={saveRatings}
+          saving={saving}
+        />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <StarRatingField
             label="Entertainment Rating"
             value={row.rating_overall}
-            editing={isEditingThisTab}
+            editing={editingRatings}
             inputValue={ratingOverall}
             setInputValue={setRatingOverall}
             descriptions={{
@@ -102,7 +238,7 @@ export default function RatingTab({
           <StarRatingField
             label="Language Learning Potential"
             value={row.rating_recommend}
-            editing={isEditingThisTab}
+            editing={editingRatings}
             inputValue={ratingRecommend}
             setInputValue={setRatingRecommend}
             descriptions={{
@@ -117,12 +253,19 @@ export default function RatingTab({
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">Reading Context</div>
+        <CardHeader
+          title="Reading Context"
+          editing={editingContext}
+          onEdit={() => setEditingContext(true)}
+          onCancel={cancelContext}
+          onSave={saveContext}
+          saving={saving}
+        />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded border bg-white p-3 text-sm">
             <div className="text-stone-600">My Level at Time of Reading</div>
-            {!isEditingThisTab ? (
+            {!editingContext ? (
               <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
             ) : (
               <select
@@ -142,11 +285,68 @@ export default function RatingTab({
 
           <DifficultyField
             value={row.rating_difficulty}
-            editing={isEditingThisTab}
+            editing={editingContext}
             inputValue={ratingDifficulty}
             setInputValue={setRatingDifficulty}
           />
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+        <CardHeader
+          title="Reading Memory"
+          editing={editingMemory}
+          onEdit={() => setEditingMemory(true)}
+          onCancel={cancelMemory}
+          onSave={saveMemory}
+          saving={saving}
+        />
+
+        {!editingMemory ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded border bg-white p-3 text-sm">
+              <div className="text-stone-600">Favorite Quotes</div>
+              <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
+                {row.favorite_quotes?.trim() ? row.favorite_quotes : "—"}
+              </div>
+            </div>
+
+            <div className="rounded border bg-white p-3 text-sm">
+              <div className="text-stone-600">Memorable Words</div>
+              <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
+                {row.memorable_words?.trim() ? row.memorable_words : "—"}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded border bg-white p-3 text-sm">
+              <div className="mb-2 text-stone-600">Favorite Quotes</div>
+              <textarea
+                value={favoriteQuotes}
+                onChange={(e) => setFavoriteQuotes(e.target.value)}
+                placeholder="Add favorite quotes here…"
+                className="min-h-[140px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+              />
+              <div className="mt-2 text-xs text-stone-500">
+                One quote per line works nicely.
+              </div>
+            </div>
+
+            <div className="rounded border bg-white p-3 text-sm">
+              <div className="mb-2 text-stone-600">5 Memorable Words</div>
+              <textarea
+                value={memorableWords}
+                onChange={(e) => setMemorableWords(e.target.value)}
+                placeholder="List memorable words here…"
+                className="min-h-[140px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+              />
+              <div className="mt-2 text-xs text-stone-500">
+                One word per line is easiest.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

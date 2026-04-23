@@ -95,6 +95,7 @@ export default function TeacherTab({
   saveKanjiWord,
   removeWordFromKanjiEnrichment,
   setOpenKanjiWordId,
+  hiraToKata,
 }: TeacherTabProps) {
   const [isEditingLevelGuidance, setIsEditingLevelGuidance] = useState(false);
 
@@ -130,11 +131,10 @@ export default function TeacherTab({
                   key={opt}
                   type="button"
                   onClick={() => setRecommendedLevel(opt)}
-                  className={`rounded-lg border px-3 py-2 text-left transition ${
-                    isSelected
+                  className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
                       ? "border-stone-900 bg-stone-100"
                       : "border-stone-200 hover:bg-stone-50"
-                  }`}
+                    }`}
                 >
                   <div className="text-amber-600">{levelStars(opt)}</div>
                   <div className="text-xs text-stone-600">{opt}</div>
@@ -235,7 +235,7 @@ export default function TeacherTab({
                           {word.surface}
                         </div>
                         <div className="mt-1 text-lg text-stone-500">
-                          {word.reading}・—
+                          {word.reading} ・ {hiraToKata(word.reading ?? "")}
                         </div>
                       </div>
 

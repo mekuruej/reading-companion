@@ -57,6 +57,8 @@ type UserBook = {
   rating_difficulty: number | null;
   reader_level: string | null;
   recommended_level: string | null;
+  favorite_quotes: string | null;
+  memorable_words: string | null;
 
   format_type: string | null;
   progress_mode: string | null;
@@ -209,10 +211,10 @@ const GENRE_OPTIONS = [
 
 const DIFFICULTY_OPTIONS = [
   { value: 1, label: "Extremely difficult" },
-  { value: 2, label: "Very hard" },
+  { value: 2, label: "Very difficult" },
   { value: 3, label: "Challenging but manageable" },
-  { value: 4, label: "Comfortable" },
-  { value: 5, label: "Easy" },
+  { value: 4, label: "Pretty comfortable" },
+  { value: 5, label: "Very easy" },
 ] as const;
 
 function safeDate(s: string | null) {
@@ -464,6 +466,9 @@ export default function BookHubPage() {
   const [translatorImg, setTranslatorImg] = useState<string>("");
   const [illustratorImg, setIllustratorImg] = useState<string>("");
   const [publisherImg, setPublisherImg] = useState<string>("");
+  const [publisherEnglishName, setPublisherEnglishName] = useState("");
+  const [selectedPublisherId, setSelectedPublisherId] = useState<string | null>(null);
+  const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
 
   const [authorReading, setAuthorReading] = useState<string>("");
   const [translatorReading, setTranslatorReading] = useState<string>("");
@@ -482,6 +487,9 @@ export default function BookHubPage() {
   const [editingSettingIds, setEditingSettingIds] = useState<string[]>([]);
   const [savingSettingIds, setSavingSettingIds] = useState<string[]>([]);
   const [savedSettingIds, setSavedSettingIds] = useState<string[]>([]);
+
+  const [favoriteQuotes, setFavoriteQuotes] = useState("");
+  const [memorableWords, setMemorableWords] = useState("");
 
   const visibleSettingItems = useMemo(() => {
     const copy = [...settingItems];
@@ -910,6 +918,47 @@ export default function BookHubPage() {
       prev.map((item) =>
         item.id === id ? { ...item, [field]: value } : item
       )
+    );
+  }
+
+  async function saveReadingDates() {
+    if (!row?.id) return;
+
+    const started_at = startedAt.trim() ? startedAt.trim() : null;
+    const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
+    const dnf_at = dnfAt.trim() ? dnfAt.trim() : null;
+
+    const status =
+      dnf_at ? "did_not_finish" :
+        finished_at ? "finished" :
+          started_at ? "reading" :
+            "what_to_read";
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        status,
+        started_at,
+        finished_at,
+        dnf_at,
+      })
+      .eq("id", row.id);
+
+    if (error) {
+      console.error("Error saving reading dates:", error);
+      alert(`Could not save reading dates.\n${error.message || "Unknown error"}`);
+      return;
+    }
+
+    setRow((prev) =>
+      prev
+        ? {
+          ...prev,
+          started_at,
+          finished_at,
+          dnf_at,
+        }
+        : prev
     );
   }
 
@@ -1895,29 +1944,70 @@ export default function BookHubPage() {
     }));
   }
 
-  function markStartedToday() {
-    const today = new Date().toISOString().slice(0, 10);
-    setStartedAt(today);
-    setFinishedAt("");
-    setDnfAt("");
+  async function saveBookStatusDates(
+    nextStartedAt: string,
+    nextFinishedAt: string,
+    nextDnfAt: string
+  ) {
+    if (!row?.id) return;
+
+    const started_at = nextStartedAt.trim() ? nextStartedAt.trim() : null;
+    const finished_at = nextFinishedAt.trim() ? nextFinishedAt.trim() : null;
+    const dnf_at = nextDnfAt.trim() ? nextDnfAt.trim() : null;
+
+    const status =
+      dnf_at ? "did_not_finish" :
+        finished_at ? "finished" :
+          started_at ? "reading" :
+            "what_to_read";
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        status,
+        started_at,
+        finished_at,
+        dnf_at,
+      })
+      .eq("id", row.id);
+
+    if (error) {
+      console.error("Error saving dashboard book status:", error);
+      alert(`Could not save book status.\n${error.message || "Unknown error"}`);
+      return;
+    }
+
+    setStartedAt(started_at ?? "");
+    setFinishedAt(finished_at ?? "");
+    setDnfAt(dnf_at ?? "");
+
+    setRow((prev) =>
+      prev
+        ? {
+          ...prev,
+          started_at,
+          finished_at,
+          dnf_at,
+        }
+        : prev
+    );
   }
 
-  function markFinishedToday() {
+  async function markStartedToday() {
     const today = new Date().toISOString().slice(0, 10);
-    if (!startedAt) {
-      setStartedAt(today);
-    }
-    setFinishedAt(today);
-    setDnfAt("");
+    await saveBookStatusDates(today, "", "");
   }
 
-  function markDnfToday() {
+  async function markFinishedToday() {
     const today = new Date().toISOString().slice(0, 10);
-    if (!startedAt) {
-      setStartedAt(today);
-    }
-    setDnfAt(today);
-    setFinishedAt("");
+    const nextStartedAt = startedAt || today;
+    await saveBookStatusDates(nextStartedAt, today, "");
+  }
+
+  async function markDnfToday() {
+    const today = new Date().toISOString().slice(0, 10);
+    const nextStartedAt = startedAt || today;
+    await saveBookStatusDates(nextStartedAt, "", today);
   }
 
   async function saveReadingSession() {
@@ -2198,6 +2288,8 @@ export default function BookHubPage() {
     setRatingOverall(r.rating_overall != null ? String(r.rating_overall) : "");
     setRatingRecommend(r.rating_recommend != null ? String(r.rating_recommend) : "");
     setRatingDifficulty(r.rating_difficulty != null ? String(r.rating_difficulty) : "");
+    setFavoriteQuotes((r as any).favorite_quotes ?? "");
+    setMemorableWords((r as any).memorable_words ?? "");
 
     setReaderLevel(r.reader_level ?? "");
     setRecommendedLevel(r.recommended_level ?? "");
@@ -2335,6 +2427,8 @@ export default function BookHubPage() {
     setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
     setRatingRecommend(row.rating_recommend != null ? String(row.rating_recommend) : "");
     setRatingDifficulty(row.rating_difficulty != null ? String(row.rating_difficulty) : "");
+    setFavoriteQuotes((row as any).favorite_quotes ?? "");
+    setMemorableWords((row as any).memorable_words ?? "");
 
     setReaderLevel(row.reader_level ?? "");
     setRecommendedLevel(row.recommended_level ?? "");
@@ -2371,6 +2465,143 @@ export default function BookHubPage() {
     setLinksText(linksToText(b?.related_links));
   };
 
+  function normalizeName(value: string) {
+    return value.trim().replace(/\s+/g, " ").toLowerCase();
+  }
+
+  async function upsertPublisherRecord() {
+    const cleanedName = publisherName.trim().replace(/\s+/g, " ");
+    if (!cleanedName) return null;
+
+    if (selectedPublisherId) {
+      const { data, error } = await supabase
+        .from("publishers")
+        .update({
+          name_ja: cleanedName,
+          name_en: publisherEnglishName.trim() || null,
+          reading: publisherReading.trim() || null,
+          logo_url: publisherImg.trim() || null,
+        })
+        .eq("id", selectedPublisherId)
+        .select("id, name_ja")
+        .single();
+
+      if (error) {
+        console.error("Error updating selected publisher:", error);
+        return null;
+      }
+
+      return data;
+    }
+
+    const normalized = normalizeName(cleanedName);
+
+    const { data, error } = await supabase
+      .from("publishers")
+      .upsert(
+        {
+          name_ja: cleanedName,
+          name_en: publisherEnglishName.trim() || null,
+          reading: publisherReading.trim() || null,
+          logo_url: publisherImg.trim() || null,
+          normalized_name: normalized,
+        },
+        {
+          onConflict: "normalized_name",
+          ignoreDuplicates: false,
+        }
+      )
+      .select("id, name_ja")
+      .single();
+
+    if (error) {
+      console.error("Error upserting publisher:", error);
+      return null;
+    }
+
+    return data;
+  }
+
+  async function upsertAuthorPerson() {
+    const cleanedName = authorName.trim().replace(/\s+/g, " ");
+    if (!cleanedName) return null;
+
+    if (selectedAuthorId) {
+      const { data, error } = await supabase
+        .from("people")
+        .update({
+          name_ja: cleanedName,
+          reading: authorReading.trim() || null,
+          image_url: authorImg.trim() || null,
+        })
+        .eq("id", selectedAuthorId)
+        .select("id")
+        .single();
+
+      if (error) {
+        console.error("Error updating selected author:", error);
+        return null;
+      }
+
+      return data;
+    }
+
+    const normalized = normalizeName(cleanedName);
+
+    const { data, error } = await supabase
+      .from("people")
+      .upsert(
+        {
+          name_ja: cleanedName,
+          reading: authorReading.trim() || null,
+          image_url: authorImg.trim() || null,
+          normalized_name: normalized,
+        },
+        {
+          onConflict: "normalized_name",
+          ignoreDuplicates: false,
+        }
+      )
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Error upserting author:", error);
+      return null;
+    }
+
+    return data;
+  }
+
+  async function syncAuthorContributor(bookId: string) {
+    const { error: deleteError } = await supabase
+      .from("book_contributors")
+      .delete()
+      .eq("book_id", bookId)
+      .eq("role", "author");
+
+    if (deleteError) {
+      console.error("Error clearing existing author contributor:", deleteError);
+      return;
+    }
+
+    const person = await upsertAuthorPerson();
+    if (!person) return;
+
+    const { error: insertError } = await supabase
+      .from("book_contributors")
+      .insert({
+        book_id: bookId,
+        person_id: person.id,
+        role: "author",
+        display_order: 1,
+      });
+
+    if (insertError) {
+      console.error("Error linking author contributor:", insertError);
+    }
+  }
+
   const saveAll = async () => {
     if (!row?.id || !row.books?.id) return;
 
@@ -2395,6 +2626,7 @@ export default function BookHubPage() {
     const rd = ratingDifficulty.trim() ? clampRating5(Number(ratingDifficulty.trim())) : null;
 
     const related_links = linksText.trim() ? parseLinks(linksText) : null;
+    const publisherRecord = await upsertPublisherRecord();
     const userBooksUpdate = supabase
       .from("user_books")
       .update({
@@ -2407,6 +2639,8 @@ export default function BookHubPage() {
         rating_overall: ro,
         rating_recommend: rr,
         rating_difficulty: rd,
+        favorite_quotes: favoriteQuotes || null,
+        memorable_words: memorableWords || null,
         reader_level: readerLevel || null,
         recommended_level: recommendedLevel || null,
         format_type: formatType || null,
@@ -2421,7 +2655,8 @@ export default function BookHubPage() {
         author: authorName || null,
         translator: translatorName || null,
         illustrator: illustratorName || null,
-        publisher: publisherName || null,
+        publisher: publisherRecord?.name_ja ?? (publisherName || null),
+        publisher_id: publisherRecord?.id ?? null,
         published_date: publishedDate || null,
         genre: genre || null,
         book_type: bookType || null,
@@ -2451,6 +2686,8 @@ export default function BookHubPage() {
       setSaving(false);
       return;
     }
+
+    await syncAuthorContributor(row.books.id);
 
     setEditingTab(null);
     setSaving(false);
@@ -2947,7 +3184,7 @@ export default function BookHubPage() {
                   {!started && realReadingSessions.length === 0 ? (
                     <button
                       type="button"
-                      onClick={markStartedToday}
+                      onClick={() => void markStartedToday()}
                       className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
                     >
                       Start Today
@@ -2957,7 +3194,7 @@ export default function BookHubPage() {
                   {!finishedAt && !dnfAt ? (
                     <button
                       type="button"
-                      onClick={markFinishedToday}
+                      onClick={() => void markFinishedToday()}
                       className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
                     >
                       Mark Finished
@@ -2967,7 +3204,7 @@ export default function BookHubPage() {
                   {!finishedAt && !dnfAt ? (
                     <button
                       type="button"
-                      onClick={markDnfToday}
+                      onClick={() => void markDnfToday()}
                       className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
                     >
                       Mark DNF
@@ -3135,7 +3372,7 @@ export default function BookHubPage() {
                       if (!confirmLeaveIfTimerActive()) return;
                       router.push(`/vocab/single-add?userBookId=${row.id}`);
                     }}
-                    className="rounded-xl border border-stone-900 bg-rose-50 p-3 text-center transition hover:bg-rose-100"
+                    className="rounded-xl border border-stone-900 bg-rose-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-rose-100 hover:shadow-md"
                   >
                     <div className="text-base font-semibold text-stone-900 sm:text-lg">Curiosity Reading</div>
                     <div className="text-base font-semibold text-stone-900 sm:text-lg">(Intensive)</div>
@@ -3150,7 +3387,7 @@ export default function BookHubPage() {
                       if (!confirmLeaveIfTimerActive()) return;
                       router.push(`/books/${row.id}/study`);
                     }}
-                    className="rounded-xl border border-stone-900 bg-yellow-50 p-3 text-center transition hover:bg-emerald-100"
+                    className="rounded-xl border border-stone-900 bg-yellow-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-yellow-100 hover:shadow-md"
                   >
                     <div className="text-base font-semibold text-stone-900 sm:text-lg">Study</div>
                     <div className="text-base font-semibold text-stone-900 sm:text-lg">Flashcards</div>
@@ -3164,7 +3401,7 @@ export default function BookHubPage() {
                       if (!confirmLeaveIfTimerActive()) return;
                       router.push(`/books/${row.id}/readalong`);
                     }}
-                    className="rounded-xl border border-stone-900 bg-emerald-50 p-3 text-center transition hover:bg-emerald-100"
+                    className="rounded-xl border border-stone-900 bg-emerald-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-emerald-100 hover:shadow-md"
                   >
                     <div className="text-base font-semibold text-stone-900 sm:text-lg">Fluid Reading</div>
                     <div className="text-base font-semibold text-stone-900 sm:text-lg">(Extensive) </div>
@@ -3180,7 +3417,7 @@ export default function BookHubPage() {
                         if (!confirmLeaveIfTimerActive()) return;
                         router.push(`/books/${row.id}/weekly-readings`);
                       }}
-                      className="rounded-xl border border-stone-900 bg-blue-50 p-3 text-center transition hover:bg-blue-100"
+                      className="rounded-xl border border-stone-900 bg-blue-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-blue-100 hover:shadow-md"
                     >
                       <div className="text-base font-semibold text-stone-900 sm:text-lg">Kanji</div>
                       <div className="text-base font-semibold text-stone-900 sm:text-lg">Readings</div>
@@ -3194,7 +3431,7 @@ export default function BookHubPage() {
                       onClick={() => {
                         alert("Kanji Readings is available to teachers and enrolled students.");
                       }}
-                      className="rounded-xl border border-stone-300 bg-stone-100 p-3 text-center opacity-80 transition hover:bg-stone-200"
+                      className="rounded-xl border border-stone-300 bg-stone-100 px-3.5 py-3 text-center opacity-80 shadow-sm transition-all hover:bg-stone-200 hover:shadow-md"
                     >
                       <div className="text-base font-semibold text-stone-700 sm:text-lg">Kanji 🔒</div>
                       <div className="text-base font-semibold text-stone-700 sm:text-lg">Readings</div>
@@ -3207,7 +3444,7 @@ export default function BookHubPage() {
               </div>
 
               <div className="mt-2">
-                <div className="mb-4 w-full border-b border-stone-300 px-2">
+                <div className="mb-4 w-full border-b border-stone-400 px-2">
                   <div className="flex flex-wrap items-end gap-3">
                     {isTeacher && (
                       <FilingTab
@@ -3317,6 +3554,12 @@ export default function BookHubPage() {
                     setPublisherName={setPublisherName}
                     publisherReading={publisherReading}
                     setPublisherReading={setPublisherReading}
+                    publisherEnglishName={publisherEnglishName}
+                    setPublisherEnglishName={setPublisherEnglishName}
+                    selectedPublisherId={selectedPublisherId}
+                    setSelectedPublisherId={setSelectedPublisherId}
+                    selectedAuthorId={selectedAuthorId}
+                    setSelectedAuthorId={setSelectedAuthorId}
                     coverUrl={coverUrl}
                     setCoverUrl={setCoverUrl}
                     authorImg={authorImg}
@@ -3370,36 +3613,8 @@ export default function BookHubPage() {
 
               {activeTab === "teacher" && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                  <div className="px-4 md:px-6">
                     <div className="text-base font-semibold text-stone-900">Teacher</div>
-
-                    {!isEditingThisTab ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditingTab("teacher")}
-                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                      >
-                        Edit
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={cancelEdits}
-                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveAll}
-                          disabled={saving}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {saving ? "Saving..." : "Save"}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   <TeacherTab
@@ -3467,6 +3682,7 @@ export default function BookHubPage() {
                     sessionEndPage={sessionEndPage}
                     setSessionEndPage={setSessionEndPage}
                     saveReadingSession={saveReadingSession}
+                    saveReadingDates={saveReadingDates}
                     deleteReadingSession={deleteReadingSession}
                     editingReadingSessionId={editingReadingSessionId}
                     startEditingReadingSession={startEditingReadingSession}
@@ -3484,36 +3700,8 @@ export default function BookHubPage() {
 
               {activeTab === "story" && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                  <div className="px-4 md:px-6">
                     <div className="text-base font-semibold text-stone-900">Story</div>
-
-                    {!isEditingThisTab ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditingTab("story")}
-                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                      >
-                        Edit
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={cancelEdits}
-                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveAll}
-                          disabled={saving}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {saving ? "Saving..." : "Save"}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   <StoryTab
@@ -3589,41 +3777,14 @@ export default function BookHubPage() {
 
               {activeTab === "rating" && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                  <div className="px-4 md:px-6">
                     <div className="text-base font-semibold text-stone-900">Rating</div>
-
-                    {!isEditingThisTab ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditingTab("rating")}
-                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                      >
-                        Edit
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={cancelEdits}
-                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveAll}
-                          disabled={saving}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {saving ? "Saving..." : "Save"}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   <RatingTab
                     row={row}
-                    isEditingThisTab={isEditingThisTab}
+                    onSave={saveAll}
+                    saving={saving}
                     myReview={myReview}
                     setMyReview={setMyReview}
                     ratingOverall={ratingOverall}
@@ -3634,6 +3795,10 @@ export default function BookHubPage() {
                     setRatingDifficulty={setRatingDifficulty}
                     readerLevel={readerLevel}
                     setReaderLevel={setReaderLevel}
+                    favoriteQuotes={favoriteQuotes}
+                    setFavoriteQuotes={setFavoriteQuotes}
+                    memorableWords={memorableWords}
+                    setMemorableWords={setMemorableWords}
                     LEVEL_OPTIONS={LEVEL_OPTIONS}
                     StarRatingField={StarRatingField}
                     DifficultyField={DifficultyField}
@@ -3641,7 +3806,6 @@ export default function BookHubPage() {
                 </div>
               )}
             </div>
-
             {showWordExplorer && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -3762,10 +3926,10 @@ function FilingTab({
       type="button"
       onClick={onClick}
       className={[
-        "relative -mb-px rounded-t-2xl border px-6 py-3 text-base font-medium transition",
+        "relative -mb-px rounded-t-2xl border px-5 py-3 text-base font-semibold transition-all",
         active
-          ? "z-10 border-stone-300 border-b-white bg-white text-stone-900 shadow-sm"
-          : "border-stone-200 bg-stone-100 text-stone-600 hover:bg-stone-200",
+          ? "z-10 border-stone-600 border-b-white bg-stone-700 text-white shadow-sm"
+          : "border-stone-300 bg-stone-200 text-stone-700 hover:bg-stone-300",
       ].join(" ")}
     >
       {children}
@@ -3908,16 +4072,17 @@ function DifficultyField({
 
   return (
     <div className="rounded border bg-white p-3 text-sm">
-      <div className="text-stone-600">Difficulty (for me)</div>
+      <div className="text-stone-600">Difficulty for Me</div>
+      <div className="mt-1 text-xs text-stone-500">1 = hardest · 5 = easiest</div>
 
       {!editing ? (
         <>
-          <div className="mt-1 font-medium">{value ? `${value}/5` : "—"}</div>
+          <div className="mt-2 font-medium">{value ? `${value}/5` : "—"}</div>
           <div className="text-amber-600">{stars5(value)}</div>
-          <div className="mt-1 text-xs text-stone-500">{label}</div>
+          <div className="mt-1 text-xs text-stone-500">{label || "—"}</div>
         </>
       ) : (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 space-y-2">
           {DIFFICULTY_OPTIONS.map((opt) => {
             const isSelected = selected === opt.value;
             return (

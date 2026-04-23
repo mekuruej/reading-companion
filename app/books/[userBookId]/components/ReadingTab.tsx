@@ -62,6 +62,7 @@ type ReadingTabProps = {
   >;
 
   saveReadingSession: () => Promise<void>;
+  saveReadingDates: () => Promise<void>;
   deleteReadingSession: (sessionId: string) => Promise<void>;
   editingReadingSessionId: string | null;
   startEditingReadingSession: (session: ReadingSession) => void;
@@ -118,6 +119,7 @@ export default function ReadingTab({
   setSessionMode,
 
   saveReadingSession,
+  saveReadingDates,
   deleteReadingSession,
   editingReadingSessionId,
   startEditingReadingSession,
@@ -134,20 +136,42 @@ export default function ReadingTab({
   DateField,
 }: ReadingTabProps) {
   const [isEditingDates, setIsEditingDates] = useState(false);
-  <div className="space-y-6"></div>
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-stone-900">Book Dates</div>
 
-          <button
-            type="button"
-            onClick={() => setIsEditingDates((prev: boolean) => !prev)}
-            className="rounded-lg bg-stone-200 px-3 py-1 text-sm font-medium text-stone-800 hover:bg-stone-300"
-          >
-            {isEditingDates ? "Done" : "Edit"}
-          </button>
+          {!isEditingDates ? (
+            <button
+              type="button"
+              onClick={() => setIsEditingDates(true)}
+              className="rounded-lg bg-stone-200 px-3 py-1 text-sm font-medium text-stone-800 hover:bg-stone-300"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  await saveReadingDates();
+                  setIsEditingDates(false);
+                }}
+                className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-black"
+              >
+                Save
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsEditingDates(false)}
+                className="rounded-lg bg-stone-200 px-3 py-1 text-sm font-medium text-stone-800 hover:bg-stone-300"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

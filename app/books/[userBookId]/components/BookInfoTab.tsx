@@ -1,4 +1,7 @@
-import type { ComponentType } from "react";
+"use client";
+
+import { useEffect, useState, type ComponentType } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 type Book = {
   id: string;
@@ -32,6 +35,24 @@ type Option = {
   label: string;
 };
 
+type PublisherRecord = {
+  id: string;
+  name_ja: string;
+  name_en: string | null;
+  reading: string | null;
+  logo_url: string | null;
+  normalized_name: string;
+};
+
+type PersonRecord = {
+  id: string;
+  name_ja: string;
+  name_en: string | null;
+  reading: string | null;
+  image_url: string | null;
+  normalized_name: string;
+};
+
 type BookInfoTabProps = {
   book: Book;
   isEditing: boolean;
@@ -57,10 +78,18 @@ type BookInfoTabProps = {
   setTranslatorName: (value: string) => void;
   illustratorName: string;
   setIllustratorName: (value: string) => void;
+
   publisherName: string;
   setPublisherName: (value: string) => void;
+  publisherEnglishName: string;
+  setPublisherEnglishName: (value: string) => void;
   publisherReading: string;
   setPublisherReading: (value: string) => void;
+
+  selectedAuthorId: string | null;
+  setSelectedAuthorId: (value: string | null) => void;
+  selectedPublisherId: string | null;
+  setSelectedPublisherId: (value: string | null) => void;
 
   coverUrl: string;
   setCoverUrl: (value: string) => void;
@@ -148,10 +177,18 @@ export default function BookInfoTab({
   setTranslatorName,
   illustratorName,
   setIllustratorName,
+
   publisherName,
   setPublisherName,
+  publisherEnglishName,
+  setPublisherEnglishName,
   publisherReading,
   setPublisherReading,
+
+  selectedAuthorId,
+  setSelectedAuthorId,
+  selectedPublisherId,
+  setSelectedPublisherId,
 
   coverUrl,
   setCoverUrl,
@@ -193,6 +230,131 @@ export default function BookInfoTab({
   Detail,
   PersonRow,
 }: BookInfoTabProps) {
+  const [authorSearch, setAuthorSearch] = useState("");
+  const [authorResults, setAuthorResults] = useState<PersonRecord[]>([]);
+  const [authorSearchLoading, setAuthorSearchLoading] = useState(false);
+
+  const [publisherSearch, setPublisherSearch] = useState("");
+  const [publisherResults, setPublisherResults] = useState<PublisherRecord[]>([]);
+  const [publisherSearchLoading, setPublisherSearchLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function runAuthorSearch() {
+      const cleaned = authorSearch.trim();
+
+      if (!isEditing || !cleaned) {
+        setAuthorResults([]);
+        return;
+      }
+
+      setAuthorSearchLoading(true);
+
+      const { data, error } = await supabase
+        .from("people")
+        .select("id, name_ja, name_en, reading, image_url, normalized_name")
+        .or(
+          [
+            `name_ja.ilike.%${cleaned}%`,
+            `name_en.ilike.%${cleaned}%`,
+            `reading.ilike.%${cleaned}%`,
+          ].join(",")
+        )
+        .order("name_ja", { ascending: true })
+        .limit(8);
+
+      if (!cancelled) {
+        if (error) {
+          console.error("Error searching authors:", error);
+          setAuthorResults([]);
+        } else {
+          setAuthorResults((data ?? []) as PersonRecord[]);
+        }
+        setAuthorSearchLoading(false);
+      }
+    }
+
+    runAuthorSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authorSearch, isEditing]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function runPublisherSearch() {
+      const cleaned = publisherSearch.trim();
+
+      if (!isEditing || !cleaned) {
+        setPublisherResults([]);
+        return;
+      }
+
+      setPublisherSearchLoading(true);
+
+      const { data, error } = await supabase
+        .from("publishers")
+        .select("id, name_ja, name_en, reading, logo_url, normalized_name")
+        .or(
+          [
+            `name_ja.ilike.%${cleaned}%`,
+            `name_en.ilike.%${cleaned}%`,
+            `reading.ilike.%${cleaned}%`,
+          ].join(",")
+        )
+        .order("name_ja", { ascending: true })
+        .limit(8);
+
+      if (!cancelled) {
+        if (error) {
+          console.error("Error searching publishers:", error);
+          setPublisherResults([]);
+        } else {
+          setPublisherResults((data ?? []) as PublisherRecord[]);
+        }
+        setPublisherSearchLoading(false);
+      }
+    }
+
+    runPublisherSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [publisherSearch, isEditing]);
+
+  function handleSelectAuthor(person: PersonRecord) {
+    setSelectedAuthorId(person.id);
+    setAuthorSearch(person.name_ja);
+    setAuthorName(person.name_ja);
+    setAuthorReading(person.reading ?? "");
+    setAuthorImg(person.image_url ?? "");
+    setAuthorResults([]);
+  }
+
+  function clearSelectedAuthor() {
+    setSelectedAuthorId(null);
+    setAuthorSearch("");
+  }
+
+  function handleSelectPublisher(publisher: PublisherRecord) {
+    setSelectedPublisherId(publisher.id);
+    setPublisherSearch(publisher.name_ja);
+    setPublisherName(publisher.name_ja);
+    setPublisherEnglishName(publisher.name_en ?? "");
+    setPublisherReading(publisher.reading ?? "");
+    setPublisherImg(publisher.logo_url ?? "");
+    setPublisherResults([]);
+  }
+
+  function clearSelectedPublisher() {
+    setSelectedPublisherId(null);
+    setPublisherSearch("");
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -309,19 +471,78 @@ export default function BookInfoTab({
         <div className="mb-3 text-sm font-semibold text-stone-900">People</div>
 
         <div className="space-y-4">
-          <PersonRow
-            label="Author"
-            name={isEditing ? authorName : book.author}
-            reading={isEditing ? authorReading : book.author_reading}
-            img={isEditing ? authorImg : book.author_image_url}
-            editing={isEditing}
-            nameValue={authorName}
-            setNameValue={setAuthorName}
-            imgValue={authorImg}
-            setImgValue={setAuthorImg}
-            readingValue={authorReading}
-            setReadingValue={setAuthorReading}
-          />
+          <div className="space-y-2">
+            {isEditing ? (
+              <div className="rounded border bg-white p-3 text-sm">
+                <label className="mb-1 block text-sm font-medium text-stone-700">
+                  Search existing author
+                </label>
+                <input
+                  value={authorSearch}
+                  onChange={(e) => {
+                    setAuthorSearch(e.target.value);
+                    setSelectedAuthorId(null);
+                  }}
+                  placeholder="宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ"
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+
+                {authorSearchLoading ? (
+                  <div className="mt-2 text-xs text-stone-500">Searching…</div>
+                ) : null}
+
+                {authorResults.length > 0 ? (
+                  <div className="mt-2 rounded border border-stone-200">
+                    {authorResults.map((person) => (
+                      <button
+                        key={person.id}
+                        type="button"
+                        onClick={() => handleSelectAuthor(person)}
+                        className="block w-full border-b border-stone-200 px-3 py-2 text-left last:border-b-0 hover:bg-stone-50"
+                      >
+                        <div className="font-medium text-stone-900">{person.name_ja}</div>
+                        <div className="text-xs text-stone-600">
+                          {person.name_en || "—"} · {person.reading || "—"}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {selectedAuthorId ? (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
+                    <span className="rounded-full bg-stone-100 px-2 py-1">
+                      Linked to person record
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearSelectedAuthor}
+                      className="text-stone-500 underline hover:text-stone-700"
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <PersonRow
+              label="Author"
+              name={isEditing ? authorName : book.author}
+              reading={isEditing ? authorReading : book.author_reading}
+              img={isEditing ? authorImg : book.author_image_url}
+              editing={isEditing}
+              nameValue={authorName}
+              setNameValue={(value) => {
+                setAuthorName(value);
+                setSelectedAuthorId(null);
+              }}
+              imgValue={authorImg}
+              setImgValue={setAuthorImg}
+              readingValue={authorReading}
+              setReadingValue={setAuthorReading}
+            />
+          </div>
 
           {(book.translator || book.translator_image_url || isEditing) && (
             <PersonRow
@@ -356,19 +577,92 @@ export default function BookInfoTab({
           )}
 
           {(book.publisher || book.publisher_image_url || isEditing) && (
-            <PersonRow
-              label="Publisher"
-              name={isEditing ? publisherName : book.publisher}
-              reading={isEditing ? publisherReading : book.publisher_reading}
-              img={isEditing ? publisherImg : book.publisher_image_url}
-              editing={isEditing}
-              nameValue={publisherName}
-              setNameValue={setPublisherName}
-              imgValue={publisherImg}
-              setImgValue={setPublisherImg}
-              readingValue={publisherReading}
-              setReadingValue={setPublisherReading}
-            />
+            <div className="space-y-2">
+              {isEditing ? (
+                <div className="rounded border bg-white p-3 text-sm">
+                  <label className="mb-1 block text-sm font-medium text-stone-700">
+                    Search existing publisher
+                  </label>
+                  <input
+                    value={publisherSearch}
+                    onChange={(e) => {
+                      setPublisherSearch(e.target.value);
+                      setSelectedPublisherId(null);
+                    }}
+                    placeholder="講談社 / Kodansha / こうだんしゃ"
+                    className="w-full rounded border px-2 py-1 text-sm"
+                  />
+
+                  {publisherSearchLoading ? (
+                    <div className="mt-2 text-xs text-stone-500">Searching…</div>
+                  ) : null}
+
+                  {publisherResults.length > 0 ? (
+                    <div className="mt-2 rounded border border-stone-200">
+                      {publisherResults.map((publisher) => (
+                        <button
+                          key={publisher.id}
+                          type="button"
+                          onClick={() => handleSelectPublisher(publisher)}
+                          className="block w-full border-b border-stone-200 px-3 py-2 text-left last:border-b-0 hover:bg-stone-50"
+                        >
+                          <div className="font-medium text-stone-900">
+                            {publisher.name_ja}
+                          </div>
+                          <div className="text-xs text-stone-600">
+                            {publisher.name_en || "—"} · {publisher.reading || "—"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {selectedPublisherId ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
+                      <span className="rounded-full bg-stone-100 px-2 py-1">
+                        Linked to publisher record
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearSelectedPublisher}
+                        className="text-stone-500 underline hover:text-stone-700"
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-3">
+                    <label className="mb-1 block text-sm font-medium text-stone-700">
+                      Publisher name (English)
+                    </label>
+                    <input
+                      value={publisherEnglishName}
+                      onChange={(e) => setPublisherEnglishName(e.target.value)}
+                      placeholder="Kodansha"
+                      className="w-full rounded border px-2 py-1 text-sm"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <PersonRow
+                label="Publisher"
+                name={isEditing ? publisherName : book.publisher}
+                reading={isEditing ? publisherReading : book.publisher_reading}
+                img={isEditing ? publisherImg : book.publisher_image_url}
+                editing={isEditing}
+                nameValue={publisherName}
+                setNameValue={(value) => {
+                  setPublisherName(value);
+                  setSelectedPublisherId(null);
+                }}
+                imgValue={publisherImg}
+                setImgValue={setPublisherImg}
+                readingValue={publisherReading}
+                setReadingValue={setPublisherReading}
+              />
+            </div>
           )}
         </div>
       </div>
