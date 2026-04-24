@@ -66,6 +66,7 @@ type KanjiEnrichmentAlertItem = {
   userBookId: string;
   title: string;
   count: number;
+  studentName: string | null;
 };
 
 type ReadingSessionStats = {
@@ -791,7 +792,13 @@ export default function BooksPage() {
     await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
 
     if (isTeacher && targetUserId === meId) {
-      await loadKanjiEnrichmentAlerts(targetUserId);
+      const alertUserIds = isSuperTeacher
+        ? students.filter((s) => s.id).map((s) => s.id)
+        : students
+            .filter((s) => s.id && (s.role === "member" || s.role === "student"))
+            .map((s) => s.id);
+
+      await loadKanjiEnrichmentAlerts(alertUserIds);
     } else {
       setKanjiEnrichmentAlerts([]);
     }
@@ -993,16 +1000,38 @@ export default function BooksPage() {
     }
   }
 
-  async function loadKanjiEnrichmentAlerts(userIdToView: string) {
+  async function loadKanjiEnrichmentAlerts(userIdsToView: string[]) {
+    if (userIdsToView.length === 0) {
+      setKanjiEnrichmentAlerts([]);
+      return;
+    }
+
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", userIdsToView);
+
+    if (profilesError) {
+      console.error("Error loading profiles for kanji alerts:", profilesError);
+      setKanjiEnrichmentAlerts([]);
+      return;
+    }
+
+    const displayNameByUserId = new Map<string, string>();
+    for (const profile of profiles ?? []) {
+      displayNameByUserId.set((profile as any).id, (profile as any).display_name ?? "Student");
+    }
+
     const { data: userBooks, error: userBooksError } = await supabase
       .from("user_books")
       .select(`
       id,
+      user_id,
       books (
         title
       )
     `)
-      .eq("user_id", userIdToView);
+      .in("user_id", userIdsToView);
 
     if (userBooksError) {
       console.error("Error loading user books for kanji alerts:", userBooksError);
@@ -1075,13 +1104,16 @@ export default function BooksPage() {
       }
     }
 
-    const titleByUserBookId = new Map<string, string>();
+    const metaByUserBookId = new Map<string, { title: string; studentName: string | null }>();
     for (const row of userBooks ?? []) {
       const bookTitle = Array.isArray((row as any).books)
         ? (row as any).books[0]?.title ?? "Untitled"
         : (row as any).books?.title ?? "Untitled";
 
-      titleByUserBookId.set(row.id, bookTitle);
+      metaByUserBookId.set(row.id, {
+        title: bookTitle,
+        studentName: displayNameByUserId.get((row as any).user_id) ?? null,
+      });
     }
 
     const countsByUserBookId = new Map<string, number>();
@@ -1106,8 +1138,9 @@ export default function BooksPage() {
     const alerts = Array.from(countsByUserBookId.entries())
       .map(([userBookId, count]) => ({
         userBookId,
-        title: titleByUserBookId.get(userBookId) ?? "Untitled",
+        title: metaByUserBookId.get(userBookId)?.title ?? "Untitled",
         count,
+        studentName: metaByUserBookId.get(userBookId)?.studentName ?? null,
       }))
       .sort((a, b) => b.count - a.count);
 
@@ -1921,8 +1954,15 @@ export default function BooksPage() {
                   onClick={() => router.push(`/books/${alert.userBookId}?tab=teacher`)}
                   className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-white px-3 py-3 text-left hover:bg-amber-100"
                 >
-                  <div className="text-sm font-medium text-stone-900">
-                    {alert.title}
+                  <div>
+                    {alert.studentName ? (
+                      <div className="text-[11px] uppercase tracking-wide text-amber-800">
+                        {alert.studentName}
+                      </div>
+                    ) : null}
+                    <div className="text-sm font-medium text-stone-900">
+                      {alert.title}
+                    </div>
                   </div>
                   <div className="text-xs text-amber-900">
                     {alert.count} need{alert.count === 1 ? "s" : ""}

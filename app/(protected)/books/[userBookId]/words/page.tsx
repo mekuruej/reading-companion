@@ -857,100 +857,112 @@ export default function BookWordsPage() {
         <p className="text-sm text-gray-500 text-center">
           The words you’ve added from this book, organized in reading order to support your reading.
         </p>
+        <p className="mt-1 text-sm text-stone-500 text-center">
+          Use search, chapter filters, and hidden-word mode to focus the list.
+        </p>
       </div>
 
       <div ref={stickyControlsRef} className="sticky top-0 z-30 bg-white border-b border-gray-200">
         <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start">
-          <div className="flex min-w-0 items-start gap-3">
+          <button
+            type="button"
+            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+            className="flex min-w-0 items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-left transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-400"
+            title="Open Book Hub"
+          >
             {bookCover ? (
-              <img src={bookCover} alt="" className="h-16 w-12 shrink-0 rounded object-cover" />
+              <img
+                src={bookCover}
+                alt={bookTitle || "Book cover"}
+                className="h-16 w-12 shrink-0 rounded-md object-cover shadow-sm"
+              />
             ) : null}
 
             <div className="min-w-0 flex-1">
-              <h1 className="break-words text-2xl font-semibold leading-tight">
+              <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+              <h1 className="break-words text-xl font-semibold leading-tight text-stone-900">
                 {bookTitle || "Words"}
               </h1>
-              <p className="text-sm text-gray-500">
+              <p className="mt-0.5 text-sm text-gray-500">
                 Total: {words.length} • Showing: {filteredSorted.length}
               </p>
+              <p className="mt-0.5 text-sm text-emerald-700">Open Book Hub</p>
             </div>
-          </div>
+          </button>
 
-          <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:items-end sm:justify-end">
-            <div className="min-w-[260px]">
-              <div className="mb-1 text-xs uppercase tracking-wide text-gray-500">
-                Switch Book
+          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:ml-auto">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-end">
+              <div className="min-w-[260px] lg:flex-[0_0_360px]">
+                <div className="mb-1 text-xs uppercase tracking-wide text-gray-500">
+                  Switch Book
+                </div>
+                <select
+                  value={userBookId}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    if (!newValue) return;
+
+                    if (newValue === "all-vocab") {
+                      router.push("/vocab");
+                      return;
+                    }
+
+                    if (newValue === userBookId) return;
+                    router.push(`/books/${encodeURIComponent(newValue)}/words`);
+                  }}
+                  className="w-full rounded border bg-white px-3 py-2 text-sm"
+                >
+                  <option value="all-vocab">All Vocab Lists</option>
+
+                  {currentlyReadingOptions.length > 0 ? (
+                    <optgroup label="Currently Reading">
+                      {currentlyReadingOptions.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+
+                  {otherBookOptions.length > 0 ? (
+                    <optgroup label="Other Books">
+                      {otherBookOptions.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                </select>
               </div>
-              <select
-                value={userBookId}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  if (!newValue) return;
 
-                  if (newValue === "all-vocab") {
-                    router.push("/vocab");
-                    return;
-                  }
-
-                  if (newValue === userBookId) return;
-                  router.push(`/books/${encodeURIComponent(newValue)}/words`);
-                }}
-                className="w-full rounded border bg-white px-3 py-2 text-sm"
-              >
-                <option value="all-vocab">All Vocab Lists</option>
-
-                {currentlyReadingOptions.length > 0 ? (
-                  <optgroup label="Currently Reading">
-                    {currentlyReadingOptions.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.title}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null}
-
-                {otherBookOptions.length > 0 ? (
-                  <optgroup label="Other Books">
-                    {otherBookOptions.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.title}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null}
-              </select>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 text-xs uppercase tracking-wide text-gray-500">
+                  Search
+                </div>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search (word/reading/meaning/def #/page/chapter)…"
+                  className="w-full rounded border p-2"
+                />
+              </div>
             </div>
 
-            <label className="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
-              <input
-                type="checkbox"
-                checked={showHidden}
-                onChange={(e) => setShowHidden(e.target.checked)}
-              />
-              Hidden Words Only
-            </label>
-
-            <button
-              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-              className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-800"
-            >
-              Book Hub
-            </button>
-          </div>
-
-          <div className="border-t border-gray-200 py-3">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search (word/reading/meaning/def #/page/chapter)…"
-                className="border p-2 rounded w-full"
-              />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <label className="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={showHidden}
+                  onChange={(e) => setShowHidden(e.target.checked)}
+                />
+                Hidden Words Only
+              </label>
 
               <select
                 value={chapterFilter}
                 onChange={(e) => setChapterFilter(e.target.value)}
-                className="border p-2 rounded bg-white"
+                className="rounded border bg-white p-2 sm:min-w-[220px]"
               >
                 <option value="all">All chapters</option>
                 {chapterOptions.map((c) => (
@@ -961,6 +973,7 @@ export default function BookWordsPage() {
               </select>
             </div>
           </div>
+
         </div>
 
         {reordering ? (

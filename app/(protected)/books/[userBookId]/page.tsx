@@ -474,7 +474,7 @@ export default function BookHubPage() {
   const [translatorReading, setTranslatorReading] = useState<string>("");
   const [illustratorReading, setIllustratorReading] = useState<string>("");
 
-  const [openKanjiWordId, setOpenKanjiWordId] = useState<number | null>(null);
+  const [openKanjiWordIds, setOpenKanjiWordIds] = useState<Record<number, boolean>>({});
   const [editingKanjiRows, setEditingKanjiRows] = useState<Record<number, KanjiMapRow[]>>({});
   const [savingKanjiWordId, setSavingKanjiWordId] = useState<number | null>(null);
 
@@ -1057,6 +1057,32 @@ export default function BookHubPage() {
     }
   }
 
+  async function saveRecommendedLevel() {
+    if (!userBookId) return;
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        recommended_level: recommendedLevel || null,
+      })
+      .eq("id", userBookId);
+
+    if (error) {
+      console.error("Error saving recommended level:", error);
+      alert("Failed to save level");
+      return;
+    }
+
+    setRow((prev) =>
+      prev
+        ? {
+          ...prev,
+          recommended_level: recommendedLevel || null,
+        }
+        : prev
+    );
+  }
+
   async function saveKanjiWord(vocabId: number) {
     const rows = editingKanjiRows[vocabId] ?? [];
     if (rows.length === 0) return;
@@ -1085,7 +1111,6 @@ export default function BookHubPage() {
       await loadSavedKanjiDefaults(row.id);
       await loadKanjiMapQueue(row.id);
     }
-    setOpenKanjiWordId(null);
     setSavingKanjiWordId(null);
   }
 
@@ -1316,7 +1341,38 @@ export default function BookHubPage() {
       }
     }
 
-    setSavedKanjiDefaults(byKanji);
+  setSavedKanjiDefaults(byKanji);
+  }
+
+  function buildPreparedKanjiRows(rows: KanjiMapRow[]) {
+    return rows.map((r) => {
+      const sessionMemory = kanjiReadingMemoryRef.current[r.kanji];
+      const savedDefault = savedKanjiDefaults[r.kanji];
+
+      const rememberedForType =
+        r.reading_type && sessionMemory
+          ? sessionMemory[r.reading_type]
+          : null;
+
+      if (rememberedForType) {
+        return {
+          ...r,
+          base_reading: r.base_reading || rememberedForType.base,
+          realized_reading: r.realized_reading || rememberedForType.realized,
+        };
+      }
+
+      if (savedDefault) {
+        return {
+          ...r,
+          reading_type: r.reading_type || savedDefault.reading_type,
+          base_reading: r.base_reading || savedDefault.base,
+          realized_reading: r.realized_reading || savedDefault.realized,
+        };
+      }
+
+      return r;
+    });
   }
 
   async function loadKanjiMapQueue(userBookIdValue: string) {
@@ -1480,7 +1536,20 @@ export default function BookHubPage() {
     });
 
     const combinedQueue = [...missingCacheWords, ...needsWork];
+    const nextEditingRows: Record<number, KanjiMapRow[]> = {};
+    const nextOpenKanjiWordIds: Record<number, boolean> = {};
 
+    for (const word of combinedQueue) {
+      const mapRows = word.vocabulary_kanji_map ?? [];
+
+      if (mapRows.length > 0) {
+        nextEditingRows[word.id] = buildPreparedKanjiRows(mapRows);
+        nextOpenKanjiWordIds[word.id] = true;
+      }
+    }
+
+    setEditingKanjiRows(nextEditingRows);
+    setOpenKanjiWordIds(nextOpenKanjiWordIds);
     setKanjiMapQueue(combinedQueue);
     setNeedsKanjiEnrichmentCount(combinedQueue.length);
     setKanjiMapLoading(false);
@@ -1769,18 +1838,38 @@ export default function BookHubPage() {
       }));
 
       if (rowsToInsert.length > 0) {
-        const { error: insertError } = await supabase
+        const { data: existingRows, error: existingRowsError } = await supabase
           .from("vocabulary_kanji_map")
-          .insert(rowsToInsert);
+          .select("kanji_position")
+          .eq("vocabulary_cache_id", currentVocabularyCacheId);
 
-        if (insertError) {
-          console.error("Error inserting kanji map rows:", insertError);
-          alert(insertError.message || "Could not prepare this word.");
+        if (existingRowsError) {
+          console.error("Error checking existing kanji map rows:", existingRowsError);
+          alert("Could not prepare this word.");
           return;
+        }
+
+        const existingPositions = new Set(
+          (existingRows ?? []).map((item: any) => Number(item.kanji_position))
+        );
+
+        const missingRows = rowsToInsert.filter(
+          (item) => !existingPositions.has(item.kanji_position)
+        );
+
+        if (missingRows.length > 0) {
+          const { error: insertError } = await supabase
+            .from("vocabulary_kanji_map")
+            .insert(missingRows);
+
+          if (insertError) {
+            console.error("Error inserting kanji map rows:", insertError);
+            alert(insertError.message || "Could not prepare this word.");
+            return;
+          }
         }
       }
 
-      await loadKanjiMapQueue(row.id);
       workingWord = {
         ...workingWord,
         vocabulary_kanji_map: [],
@@ -1809,41 +1898,29 @@ export default function BookHubPage() {
 
     const rows = (data ?? []) as KanjiMapRow[];
 
-    const enrichedRows = rows.map((r) => {
-      const sessionMemory = kanjiReadingMemoryRef.current[r.kanji];
-      const savedDefault = savedKanjiDefaults[r.kanji];
-
-      const rememberedForType =
-        r.reading_type && sessionMemory
-          ? sessionMemory[r.reading_type]
-          : null;
-
-      if (rememberedForType) {
-        return {
-          ...r,
-          base_reading: r.base_reading || rememberedForType.base,
-          realized_reading: r.realized_reading || rememberedForType.realized,
-        };
-      }
-
-      if (savedDefault) {
-        return {
-          ...r,
-          reading_type: r.reading_type || savedDefault.reading_type,
-          base_reading: r.base_reading || savedDefault.base,
-          realized_reading: r.realized_reading || savedDefault.realized,
-        };
-      }
-
-      return r;
-    });
+    const enrichedRows = buildPreparedKanjiRows(rows);
 
     setEditingKanjiRows((prev) => ({
       ...prev,
       [workingWord.id]: enrichedRows,
     }));
 
-    setOpenKanjiWordId(workingWord.id);
+    upsertKanjiQueueWord({
+      ...workingWord,
+      vocabularyCacheId:
+        workingWord.vocabularyCacheId ?? (workingWord.id > 0 ? workingWord.id : null),
+      vocabulary_kanji_map: rows,
+      enrichmentStatus: rows.some(
+        (r) => !r.reading_type || !r.base_reading || !r.realized_reading
+      )
+        ? "partial"
+        : "ready",
+    });
+
+    setOpenKanjiWordIds((prev) => ({
+      ...prev,
+      [workingWord.id]: true,
+    }));
     setTimeout(() => {
       const el = document.getElementById(`kanji-word-${workingWord.id}`);
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1942,6 +2019,39 @@ export default function BookHubPage() {
         return updatedRow;
       }),
     }));
+  }
+
+  function setKanjiWordOpen(vocabId: number, isOpen: boolean) {
+    setOpenKanjiWordIds((prev) => {
+      if (isOpen) {
+        return {
+          ...prev,
+          [vocabId]: true,
+        };
+      }
+
+      const next = { ...prev };
+      delete next[vocabId];
+      return next;
+    });
+  }
+
+  function upsertKanjiQueueWord(nextWord: VocabCacheQueueRow) {
+    setKanjiMapQueue((prev) => {
+      const next = [...prev];
+      const existingIndex = next.findIndex(
+        (item) =>
+          item.userBookWordId === nextWord.userBookWordId ||
+          item.id === nextWord.id
+      );
+
+      if (existingIndex >= 0) {
+        next[existingIndex] = nextWord;
+        return next;
+      }
+
+      return [nextWord, ...next];
+    });
   }
 
   async function saveBookStatusDates(
@@ -2180,9 +2290,11 @@ export default function BookHubPage() {
     setError(null);
 
     const {
-      data: { user },
+      data: { session },
       error: authErr,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getSession();
+
+    const user = session?.user ?? null;
 
     if (authErr || !user) {
       setError("Please sign in.");
@@ -2210,6 +2322,7 @@ export default function BookHubPage() {
       .select(
         `
         id,
+        user_id,
         book_id,
         started_at,
         finished_at,
@@ -2266,11 +2379,21 @@ export default function BookHubPage() {
     const r = data as unknown as UserBook;
     setRow(r);
 
+    const studentUserId = r.user_id ?? null;
+
+    const isUuid =
+      typeof studentUserId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(studentUserId);
+
+    if (!isUuid) {
+      setIsLinkedStudentToAnyTeacher(false);
+      return;
+    }
+
     const { data: teacherLinks, error: teacherLinkError } = await supabase
       .from("teacher_students")
       .select("id")
-      .eq("student_id", r.user_id)
-      .limit(1);
+      .eq("student_id", studentUserId);
 
     if (teacherLinkError) {
       console.error("Error checking teacher_students link:", teacherLinkError);
@@ -2524,7 +2647,7 @@ export default function BookHubPage() {
 
   async function upsertAuthorPerson() {
     const cleanedName = authorName.trim().replace(/\s+/g, " ");
-    if (!cleanedName) return null;
+    if (!cleanedName) return { data: null, error: null };
 
     if (selectedAuthorId) {
       const { data, error } = await supabase
@@ -2540,10 +2663,10 @@ export default function BookHubPage() {
 
       if (error) {
         console.error("Error updating selected author:", error);
-        return null;
+        return { data: null, error };
       }
 
-      return data;
+      return { data, error: null };
     }
 
     const normalized = normalizeName(cleanedName);
@@ -2567,10 +2690,10 @@ export default function BookHubPage() {
 
     if (error) {
       console.error("Error upserting author:", error);
-      return null;
+      return { data: null, error };
     }
 
-    return data;
+    return { data, error: null };
   }
 
   async function syncAuthorContributor(bookId: string) {
@@ -2582,11 +2705,12 @@ export default function BookHubPage() {
 
     if (deleteError) {
       console.error("Error clearing existing author contributor:", deleteError);
-      return;
+      return deleteError;
     }
 
-    const person = await upsertAuthorPerson();
-    if (!person) return;
+    const { data: person, error: personError } = await upsertAuthorPerson();
+    if (personError) return personError;
+    if (!person) return null;
 
     const { error: insertError } = await supabase
       .from("book_contributors")
@@ -2599,7 +2723,10 @@ export default function BookHubPage() {
 
     if (insertError) {
       console.error("Error linking author contributor:", insertError);
+      return insertError;
     }
+
+    return null;
   }
 
   const saveAll = async () => {
@@ -2687,7 +2814,12 @@ export default function BookHubPage() {
       return;
     }
 
-    await syncAuthorContributor(row.books.id);
+    const authorSyncError = await syncAuthorContributor(row.books.id);
+    if (authorSyncError) {
+      setError(`author: ${authorSyncError.message}`);
+      setSaving(false);
+      return;
+    }
 
     setEditingTab(null);
     setSaving(false);
@@ -3128,7 +3260,7 @@ export default function BookHubPage() {
                       if (!newId) return;
 
                       if (newId === "all-book-hubs") {
-                        router.push("/books");
+                        router.push("/book-hubs");
                         return;
                       }
 
@@ -3627,6 +3759,7 @@ export default function BookHubPage() {
                     notes={notes}
                     setNotes={setNotes}
                     saveNotes={saveNotes}
+                    saveRecommendedLevel={saveRecommendedLevel}
                     recommendedLevel={recommendedLevel}
                     setRecommendedLevel={setRecommendedLevel}
                     levelStars={levelStars}
@@ -3635,12 +3768,12 @@ export default function BookHubPage() {
                     kanjiMapQueue={kanjiMapQueue}
                     needsKanjiEnrichmentCount={needsKanjiEnrichmentCount}
                     editingKanjiRows={editingKanjiRows}
-                    openKanjiWordId={openKanjiWordId}
+                    openKanjiWordIds={openKanjiWordIds}
                     savingKanjiWordId={savingKanjiWordId}
                     handleWorkOnKanjiWord={handleWorkOnKanjiWord}
                     updateKanjiMapRow={updateKanjiMapRow}
                     saveKanjiWord={saveKanjiWord}
-                    setOpenKanjiWordId={setOpenKanjiWordId}
+                    setKanjiWordOpen={setKanjiWordOpen}
                     hiraToKata={hiraToKata}
                     removeWordFromKanjiEnrichment={removeWordFromKanjiEnrichment}
                   />

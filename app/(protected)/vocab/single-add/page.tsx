@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { KANJI_DATA } from "@/lib/kanjiData";
 
 type QuickPreview = {
@@ -97,9 +97,20 @@ function sortQuickSessionWords(words: QuickSessionWord[]) {
   });
 }
 
+function upsertAndSortQuickSessionWords(
+  words: QuickSessionWord[],
+  nextItem: QuickSessionWord
+) {
+  return sortQuickSessionWords([
+    nextItem,
+    ...words.filter((item) => item.id !== nextItem.id),
+  ]);
+}
+
 export default function SingleAddPage() {
   const router = useRouter();
   const [userBookId, setUserBookId] = useState("");
+  const [username, setUsername] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
   const [message, setMessage] = useState("");
@@ -127,6 +138,7 @@ export default function SingleAddPage() {
   const [elapsed, setElapsed] = useState(0);
   const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
   const [timerSaveMessage, setTimerSaveMessage] = useState("");
+  const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
   const [sessionStartPage, setSessionStartPage] = useState("");
   const [sessionEndPage, setSessionEndPage] = useState("");
 
@@ -148,6 +160,34 @@ export default function SingleAddPage() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("userBookId") || "";
     setUserBookId(id);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUsername() {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (cancelled || userError || !user) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled || error) return;
+      setUsername(data?.username ?? "");
+    }
+
+    loadUsername();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -263,7 +303,7 @@ export default function SingleAddPage() {
     window.setTimeout(() => {
       quickEditorCardRef.current?.scrollIntoView({
         behavior: "smooth",
-        block: "start",
+        block: "nearest",
       });
       quickEditorWordInputRef.current?.focus();
     }, 0);
@@ -540,7 +580,7 @@ export default function SingleAddPage() {
         pageOrder: data.page_order ?? null,
       };
 
-      setQuickSessionWords((prev) => [newItem, ...prev]);
+      setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, newItem));
       setMessage("✅ Word saved to Vocab List.");
     } else {
       const { data, error } = await supabase
@@ -578,10 +618,7 @@ export default function SingleAddPage() {
         pageOrder: data.page_order ?? null,
       };
 
-      setQuickSessionWords((prev) => [
-        updatedItem,
-        ...prev.filter((item) => item.id !== updatedItem.id),
-      ]);
+      setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, updatedItem));
       setMessage("✅ Word updated.");
     }
 
@@ -762,8 +799,35 @@ export default function SingleAddPage() {
 
         {userBookId ? (
           bookTitle ? (
-            <div className="mb-6 flex items-center gap-3">
-              {bookCover ? (
+            <div className="mb-8 mt-6 flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                }}
+                className="flex items-center gap-4 rounded-xl px-1 text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                title={`Go to ${bookTitle} Vocab List`}
+              >
+                {bookCover ? (
+                  <img
+                    src={bookCover}
+                    alt={`Go to ${bookTitle} Vocab List`}
+                    className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
+                  />
+                ) : null}
+
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+                  <div className="text-base font-semibold text-stone-900 hover:text-emerald-700">
+                    {bookTitle}
+                  </div>
+                  {hasFinishedTimer ? (
+                    <p className="mt-1 text-sm text-emerald-700">Open Vocab List</p>
+                  ) : null}
+                </div>
+              </button>
+
+              {hasFinishedTimer ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -771,22 +835,11 @@ export default function SingleAddPage() {
                       router.push(`/books/${encodeURIComponent(userBookId)}`);
                     }
                   }}
-                  className="shrink-0 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
-                  title="Back to Book Hub"
+                  className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-700"
                 >
-                  <img
-                    src={bookCover}
-                    alt={`Go to ${bookTitle} Book Hub`}
-                    className="h-16 w-12 rounded object-cover hover:opacity-90"
-                  />
+                  Open Book Hub
                 </button>
               ) : null}
-
-              <div>
-                <p className="text-sm text-gray-700">
-                  For book: <span className="font-medium">{bookTitle}</span>
-                </p>
-              </div>
             </div>
           ) : null
         ) : (
@@ -822,6 +875,7 @@ export default function SingleAddPage() {
                   setElapsed(0);
                   setIsRunning(true);
                   setIsPaused(false);
+                  setHasFinishedTimer(false);
                 }}
                 className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
               >
@@ -853,6 +907,7 @@ export default function SingleAddPage() {
                     }
                     setIsRunning(false);
                     setIsPaused(false);
+                    setHasFinishedTimer(true);
                     void openTimedSessionFormWithDefaults();
                   }}
                   className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
@@ -881,6 +936,7 @@ export default function SingleAddPage() {
                   onClick={() => {
                     setIsPaused(false);
                     setIsRunning(false);
+                    setHasFinishedTimer(true);
                     void openTimedSessionFormWithDefaults();
                   }}
                   className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
@@ -969,71 +1025,79 @@ export default function SingleAddPage() {
         <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
           <div className="mb-3 text-sm font-medium text-stone-900">Single Add</div>
 
-          <div className="flex flex-wrap gap-2">
-            <input
-              ref={quickWordInputRef}
-              type="text"
-              value={quickWord}
-              onChange={(e) => setQuickWord(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void pullQuickWord();
-                }
-              }}
-              placeholder="Search a word..."
-              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
-            />
+          <div className="sticky top-4 z-10 -mx-1 rounded-2xl border border-sky-200 bg-sky-50/95 p-4 shadow-sm backdrop-blur">
+            <div className="mb-1 text-sm font-semibold text-sky-950">Search for a new word</div>
+            <p className="mb-3 text-sm text-sky-800">
+              This blue box is only for new lookups. It will not overwrite the word you are
+              editing below.
+            </p>
 
-            <button
-              type="button"
-              onClick={() => void pullQuickWord()}
-              disabled={quickLoading || !quickWord.trim()}
-              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-            >
-              {quickLoading ? "Searching..." : "Search"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={quickWordInputRef}
+                type="text"
+                value={quickWord}
+                onChange={(e) => setQuickWord(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void pullQuickWord();
+                  }
+                }}
+                placeholder="Search a word..."
+                className="w-full rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+              />
 
-            <button
-              type="button"
-              onClick={() => {
-                const savedMeta = getSavedQuickMeta();
-
-                setQuickPreview({
-                  id: null,
-                  surface: quickWord.trim(),
-                  cacheSurface: "",
-                  reading: "",
-                  meanings: [],
-                  selectedMeaningIndex: 0,
-                  meaning: "",
-                  isCustomMeaning: true,
-                  useAlternateSurface: false,
-                  alternateSurface: "",
-                  page: savedMeta.page,
-                  chapterNumber: savedMeta.chapterNumber,
-                  chapterName: savedMeta.chapterName,
-                  pageOrder: null,
-                });
-                setQuickError(null);
-                jumpToQuickEditor();
-              }}
-              className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-            >
-              Manual Entry
-            </button>
-
-            <div className="flex items-center gap-2">
               <button
                 type="button"
-                disabled
-                aria-disabled="true"
-                className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
+                onClick={() => void pullQuickWord()}
+                disabled={quickLoading || !quickWord.trim()}
+                className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-50"
               >
-                Grammar
+                {quickLoading ? "Searching..." : "Search"}
               </button>
 
-              <span className="select-none text-sm text-stone-400">(coming soon...)</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const savedMeta = getSavedQuickMeta();
+
+                  setQuickPreview({
+                    id: null,
+                    surface: quickWord.trim(),
+                    cacheSurface: "",
+                    reading: "",
+                    meanings: [],
+                    selectedMeaningIndex: 0,
+                    meaning: "",
+                    isCustomMeaning: true,
+                    useAlternateSurface: false,
+                    alternateSurface: "",
+                    page: savedMeta.page,
+                    chapterNumber: savedMeta.chapterNumber,
+                    chapterName: savedMeta.chapterName,
+                    pageOrder: null,
+                  });
+                  setQuickError(null);
+                  jumpToQuickEditor();
+                }}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-sky-900 ring-1 ring-sky-300 hover:bg-sky-100"
+              >
+                Manual Entry
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className="cursor-not-allowed rounded-xl bg-sky-100 px-4 py-2 text-sm font-medium text-sky-300 select-none"
+                >
+                  Grammar
+                </button>
+
+                <span className="select-none text-sm text-sky-500">(coming soon...)</span>
+              </div>
             </div>
           </div>
 
@@ -1046,8 +1110,23 @@ export default function SingleAddPage() {
           {quickPreview ? (
             <div
               ref={quickEditorCardRef}
-              className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4"
+              className={`mt-4 scroll-mt-28 space-y-4 rounded-xl border p-4 ${
+                quickPreview.id
+                  ? "border-amber-200 bg-amber-50"
+                  : "border-stone-200 bg-stone-50"
+              }`}
             >
+              <div>
+                <div className="text-sm font-semibold text-stone-900">
+                  {quickPreview.id ? "Edit selected word" : "Review before saving"}
+                </div>
+                <p className="mt-1 text-sm text-stone-600">
+                  {quickPreview.id
+                    ? "You are editing an existing saved word. The blue search box above is still for new lookups."
+                    : "Check the result here before saving it into your Vocab List."}
+                </p>
+              </div>
+
               {quickPreview.id ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
                   Editing "{quickPreview.surface}"
@@ -1221,6 +1300,10 @@ export default function SingleAddPage() {
               <div className="mb-3 text-sm font-medium text-stone-900">
                 Words saved into Vocab List this session
               </div>
+              <p className="mb-3 text-sm text-stone-500">
+                This list stays in page order so editing one word does not make everything jump
+                around.
+              </p>
 
               <div className="space-y-3">
                 {quickSessionWords.map((item) => (

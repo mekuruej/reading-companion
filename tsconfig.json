@@ -17,7 +17,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    /* ⭐️ Absolute imports enabled */
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -40,6 +39,6 @@
   ],
   "exclude": [
     "node_modules",
-    ".next"
+    ".next/dev"
   ]
 }

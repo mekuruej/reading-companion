@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type ReadAlongWord = {
@@ -51,6 +51,7 @@ function formatTimer(totalSeconds: number) {
 }
 
 export default function ReadAlongPage() {
+    const router = useRouter();
     const params = useParams<{ userBookId: string }>();
     const userBookId = params.userBookId;
     const searchParams = useSearchParams();
@@ -73,6 +74,7 @@ export default function ReadAlongPage() {
     const [isPaused, setIsPaused] = useState(false);
     const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
     const [timerSaveMessage, setTimerSaveMessage] = useState("");
+    const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
 
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const wordRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -80,6 +82,35 @@ export default function ReadAlongPage() {
 
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
+    const [username, setUsername] = useState("");
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadUsername() {
+            const {
+                data: { user },
+                error: userError,
+            } = await supabase.auth.getUser();
+
+            if (cancelled || userError || !user) return;
+
+            const { data, error } = await supabase
+                .from("profiles")
+                .select("username")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (cancelled || error) return;
+            setUsername(data?.username ?? "");
+        }
+
+        loadUsername();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         async function loadWords() {
@@ -493,20 +524,47 @@ export default function ReadAlongPage() {
                 </div>
 
                 {bookTitle ? (
-                    <div className="flex items-center gap-3">
-                        {bookCover ? (
-                            <img
-                                src={bookCover}
-                                alt=""
-                                className="h-16 w-12 rounded object-cover"
-                            />
-                        ) : null}
+                    <div className="mb-2 mt-2 flex items-center gap-4">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                            }}
+                            className="flex items-center gap-4 rounded-xl px-1 text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            title={`Go to ${bookTitle} Vocab List`}
+                        >
+                            {bookCover ? (
+                                <img
+                                    src={bookCover}
+                                    alt={`Go to ${bookTitle} Vocab List`}
+                                    className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
+                                />
+                            ) : null}
 
-                        <div>
-                            <p className="text-sm text-gray-700">
-                                For book: <span className="font-medium">{bookTitle}</span>
-                            </p>
-                        </div>
+                            <div>
+                                <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+                                <div className="text-base font-semibold text-stone-900 hover:text-emerald-700">
+                                    {bookTitle}
+                                </div>
+                                {hasFinishedTimer ? (
+                                    <p className="mt-1 text-sm text-emerald-700">Open Vocab List</p>
+                                ) : null}
+                            </div>
+                        </button>
+
+                        {hasFinishedTimer ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (userBookId) {
+                                        router.push(`/books/${encodeURIComponent(userBookId)}`);
+                                    }
+                                }}
+                                className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-700"
+                            >
+                                Open Book Hub
+                            </button>
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -517,13 +575,13 @@ export default function ReadAlongPage() {
                                 type="button"
                                 onClick={() => {
                                     const today = new Date().toISOString().slice(0, 10);
-                                    const currentPageString = currentPageNumber != null ? String(currentPageNumber) : "";
 
                                     setSessionDate(today);
                                     setStartTime(Date.now());
                                     setElapsed(0);
                                     setIsRunning(true);
                                     setIsPaused(false);
+                                    setHasFinishedTimer(false);
                                     setShowTimedSessionForm(false);
                                     setTimerSaveMessage("");
                                     setSessionMinutesRead("");
@@ -558,6 +616,7 @@ export default function ReadAlongPage() {
                                         }
                                         setIsRunning(false);
                                         setIsPaused(false);
+                                        setHasFinishedTimer(true);
                                         void openTimedSessionFormWithDefaults();
                                     }}
                                     className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
@@ -586,6 +645,7 @@ export default function ReadAlongPage() {
                                     onClick={() => {
                                         setIsPaused(false);
                                         setIsRunning(false);
+                                        setHasFinishedTimer(true);
                                         void openTimedSessionFormWithDefaults();
                                     }}
                                     className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"

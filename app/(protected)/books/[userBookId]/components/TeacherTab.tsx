@@ -46,6 +46,7 @@ type TeacherTabProps = {
   notes: string;
   setNotes: (value: string) => void;
   saveNotes: () => Promise<void>;
+  saveRecommendedLevel: () => Promise<void>;
 
   recommendedLevel: string;
   setRecommendedLevel: (value: string) => void;
@@ -55,7 +56,7 @@ type TeacherTabProps = {
   kanjiMapError: string | null;
   kanjiMapQueue: VocabCacheQueueRow[];
   needsKanjiEnrichmentCount: number;
-  openKanjiWordId: number | null;
+  openKanjiWordIds: Record<number, boolean>;
   editingKanjiRows: Record<number, KanjiMapRow[]>;
   savingKanjiWordId: number | null;
   removeWordFromKanjiEnrichment: (vocabId: number) => Promise<void>;
@@ -68,7 +69,7 @@ type TeacherTabProps = {
     value: string
   ) => void;
   saveKanjiWord: (vocabId: number) => Promise<void>;
-  setOpenKanjiWordId: (value: number | null) => void;
+  setKanjiWordOpen: (vocabId: number, isOpen: boolean) => void;
 
   hiraToKata: (text: string) => string;
 };
@@ -80,6 +81,7 @@ export default function TeacherTab({
   notes,
   setNotes,
   saveNotes,
+  saveRecommendedLevel,
   recommendedLevel,
   setRecommendedLevel,
   levelStars,
@@ -87,14 +89,14 @@ export default function TeacherTab({
   kanjiMapError,
   kanjiMapQueue,
   needsKanjiEnrichmentCount,
-  openKanjiWordId,
+  openKanjiWordIds,
   editingKanjiRows,
   savingKanjiWordId,
   handleWorkOnKanjiWord,
   updateKanjiMapRow,
   saveKanjiWord,
   removeWordFromKanjiEnrichment,
-  setOpenKanjiWordId,
+  setKanjiWordOpen,
   hiraToKata,
 }: TeacherTabProps) {
   const [isEditingLevelGuidance, setIsEditingLevelGuidance] = useState(false);
@@ -105,13 +107,26 @@ export default function TeacherTab({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-stone-900">Level (with guidance)</div>
 
-          <button
-            type="button"
-            onClick={() => setIsEditingLevelGuidance((prev) => !prev)}
-            className="rounded-lg bg-stone-200 px-3 py-1 text-sm font-medium text-stone-800 hover:bg-stone-300"
-          >
-            {isEditingLevelGuidance ? "Done" : "Edit"}
-          </button>
+          {!isEditingLevelGuidance ? (
+            <button
+              type="button"
+              onClick={() => setIsEditingLevelGuidance(true)}
+              className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-black"
+            >
+              Edit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={async () => {
+                await saveRecommendedLevel();
+                setIsEditingLevelGuidance(false);
+              }}
+              className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-black"
+            >
+              Save
+            </button>
+          )}
         </div>
 
         {!isEditingLevelGuidance ? (
@@ -132,8 +147,8 @@ export default function TeacherTab({
                   type="button"
                   onClick={() => setRecommendedLevel(opt)}
                   className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
-                      ? "border-stone-900 bg-stone-100"
-                      : "border-stone-200 hover:bg-stone-50"
+                    ? "border-stone-900 bg-stone-100"
+                    : "border-stone-200 hover:bg-stone-50"
                     }`}
                 >
                   <div className="text-amber-600">{levelStars(opt)}</div>
@@ -219,8 +234,10 @@ export default function TeacherTab({
         ) : (
           <div className="space-y-2">
             {kanjiMapQueue.map((word) => {
-              const isOpen = openKanjiWordId === word.id;
+              const isOpen = !!openKanjiWordIds[word.id];
               const editRows = editingKanjiRows[word.id] ?? [];
+              const hasPreparedRows =
+                editRows.length > 0 || (word.vocabulary_kanji_map ?? []).length > 0;
 
               return (
                 <div
@@ -237,18 +254,37 @@ export default function TeacherTab({
                         <div className="mt-1 text-lg text-stone-500">
                           {word.reading} ・ {hiraToKata(word.reading ?? "")}
                         </div>
+                        {word.enrichmentStatus === "ready" ? (
+                          <div className="mt-2 text-sm text-emerald-700">
+                            Prefilled from saved kanji readings. Review and save if it looks right.
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="flex flex-col gap-2 sm:flex-row md:shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleWorkOnKanjiWord(word)}
-                          className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-emerald-700"
-                        >
-                          {openKanjiWordId === word.id
-                            ? "Working on this word"
-                            : "Prepare this word"}
-                        </button>
+                        {hasPreparedRows ? (
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                            Ready to review
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void handleWorkOnKanjiWord(word)}
+                            className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-emerald-700"
+                          >
+                            Prepare this word
+                          </button>
+                        )}
+
+                        {hasPreparedRows ? (
+                          <button
+                            type="button"
+                            onClick={() => setKanjiWordOpen(word.id, !isOpen)}
+                            className="rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700 transition hover:bg-stone-50"
+                          >
+                            {isOpen ? "Hide details" : "Show details"}
+                          </button>
+                        ) : null}
 
                         <button
                           type="button"
@@ -264,62 +300,68 @@ export default function TeacherTab({
                   {isOpen ? (
                     <div className="mt-4 space-y-3">
                       <div className="grid gap-2">
-                        {editRows.map((rowItem) => (
-                          <div
-                            key={rowItem.id}
-                            className="grid grid-cols-1 gap-2 rounded-lg border bg-white p-3 md:grid-cols-[60px_120px_1fr_1fr]"
-                          >
-                            <div className="flex items-center text-lg font-medium text-stone-900">
-                              {rowItem.kanji}
-                            </div>
-
-                            <select
-                              value={rowItem.reading_type ?? ""}
-                              onChange={(e) =>
-                                updateKanjiMapRow(
-                                  word.id,
-                                  rowItem.id,
-                                  "reading_type",
-                                  e.target.value
-                                )
-                              }
-                              className="rounded border px-2 py-2 text-sm"
+                        {editRows.length > 0 ? (
+                          editRows.map((rowItem) => (
+                            <div
+                              key={rowItem.id}
+                              className="grid grid-cols-1 gap-2 rounded-lg border bg-white p-3 md:grid-cols-[60px_120px_1fr_1fr]"
                             >
-                              <option value="">—</option>
-                              <option value="on">on</option>
-                              <option value="kun">kun</option>
-                              <option value="other">other</option>
-                            </select>
+                              <div className="flex items-center text-lg font-medium text-stone-900">
+                                {rowItem.kanji}
+                              </div>
 
-                            <input
-                              value={rowItem.base_reading ?? ""}
-                              onChange={(e) =>
-                                updateKanjiMapRow(
-                                  word.id,
-                                  rowItem.id,
-                                  "base_reading",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Base reading"
-                              className="rounded border px-3 py-2 text-sm"
-                            />
+                              <select
+                                value={rowItem.reading_type ?? ""}
+                                onChange={(e) =>
+                                  updateKanjiMapRow(
+                                    word.id,
+                                    rowItem.id,
+                                    "reading_type",
+                                    e.target.value
+                                  )
+                                }
+                                className="rounded border px-2 py-2 text-sm"
+                              >
+                                <option value="">—</option>
+                                <option value="on">on</option>
+                                <option value="kun">kun</option>
+                                <option value="other">other</option>
+                              </select>
 
-                            <input
-                              value={rowItem.realized_reading ?? ""}
-                              onChange={(e) =>
-                                updateKanjiMapRow(
-                                  word.id,
-                                  rowItem.id,
-                                  "realized_reading",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Realized reading"
-                              className="rounded border px-3 py-2 text-sm"
-                            />
+                              <input
+                                value={rowItem.base_reading ?? ""}
+                                onChange={(e) =>
+                                  updateKanjiMapRow(
+                                    word.id,
+                                    rowItem.id,
+                                    "base_reading",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Base reading"
+                                className="rounded border px-3 py-2 text-sm"
+                              />
+
+                              <input
+                                value={rowItem.realized_reading ?? ""}
+                                onChange={(e) =>
+                                  updateKanjiMapRow(
+                                    word.id,
+                                    rowItem.id,
+                                    "realized_reading",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Realized reading"
+                                className="rounded border px-3 py-2 text-sm"
+                              />
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-lg border border-dashed bg-white px-3 py-3 text-sm text-stone-500">
+                            This word is ready to set up. Use “Prepare this word” once to create the kanji rows.
                           </div>
-                        ))}
+                        )}
                       </div>
 
                       <div className="mt-4 flex gap-2">
@@ -334,7 +376,7 @@ export default function TeacherTab({
 
                         <button
                           type="button"
-                          onClick={() => setOpenKanjiWordId(null)}
+                          onClick={() => setKanjiWordOpen(word.id, false)}
                           className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
                         >
                           Cancel

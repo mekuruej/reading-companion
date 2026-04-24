@@ -53,6 +53,18 @@ type PersonRecord = {
   normalized_name: string;
 };
 
+type BookAuthorRecord = {
+  id: string;
+  author: string | null;
+  author_reading: string | null;
+  author_image_url: string | null;
+};
+
+type ContributorAuthorRecord = {
+  book_id: string;
+  people: PersonRecord | PersonRecord[] | null;
+};
+
 type BookInfoTabProps = {
   book: Book;
   isEditing: boolean;
@@ -232,44 +244,158 @@ export default function BookInfoTab({
 }: BookInfoTabProps) {
   const [authorSearch, setAuthorSearch] = useState("");
   const [authorResults, setAuthorResults] = useState<PersonRecord[]>([]);
+  const [authorContributorMatches, setAuthorContributorMatches] = useState<PersonRecord[]>([]);
+  const [authorBookMatches, setAuthorBookMatches] = useState<BookAuthorRecord[]>([]);
   const [authorSearchLoading, setAuthorSearchLoading] = useState(false);
+  const [authorSearchError, setAuthorSearchError] = useState<string | null>(null);
 
   const [publisherSearch, setPublisherSearch] = useState("");
   const [publisherResults, setPublisherResults] = useState<PublisherRecord[]>([]);
   const [publisherSearchLoading, setPublisherSearchLoading] = useState(false);
+  const [publisherSearchError, setPublisherSearchError] = useState<string | null>(null);
+
+  function normalizeSearchTerm(value: string) {
+    return value.trim().replace(/\s+/g, " ").toLowerCase();
+  }
+
+  function ilikePattern(value: string) {
+    return `%${value}%`;
+  }
+
+  function dedupeById<T extends { id: string }>(items: T[]) {
+    const seen = new Set<string>();
+    const out: T[] = [];
+
+    for (const item of items) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      out.push(item);
+    }
+
+    return out;
+  }
 
   useEffect(() => {
     let cancelled = false;
 
     async function runAuthorSearch() {
       const cleaned = authorSearch.trim();
+      const normalized = normalizeSearchTerm(cleaned);
 
       if (!isEditing || !cleaned) {
         setAuthorResults([]);
+        setAuthorContributorMatches([]);
+        setAuthorBookMatches([]);
+        setAuthorSearchError(null);
         return;
       }
 
       setAuthorSearchLoading(true);
+      setAuthorSearchError(null);
 
-      const { data, error } = await supabase
-        .from("people")
-        .select("id, name_ja, name_en, reading, image_url, normalized_name")
-        .or(
-          [
-            `name_ja.ilike.%${cleaned}%`,
-            `name_en.ilike.%${cleaned}%`,
-            `reading.ilike.%${cleaned}%`,
-          ].join(",")
+      const selectClause = "id, name_ja, name_en, reading, image_url, normalized_name";
+
+      const [jaRes, enRes, readingRes, normalizedRes] = await Promise.all([
+        supabase
+          .from("people")
+          .select(selectClause)
+          .ilike("name_ja", ilikePattern(cleaned))
+          .limit(8),
+        supabase
+          .from("people")
+          .select(selectClause)
+          .ilike("name_en", ilikePattern(cleaned))
+          .limit(8),
+        supabase
+          .from("people")
+          .select(selectClause)
+          .ilike("reading", ilikePattern(cleaned))
+          .limit(8),
+        supabase
+          .from("people")
+          .select(selectClause)
+          .ilike("normalized_name", ilikePattern(normalized))
+          .limit(8),
+      ]);
+
+      const contributorRes = await supabase
+        .from("book_contributors")
+        .select(
+          "book_id, people!inner(id, name_ja, name_en, reading, image_url, normalized_name)"
         )
-        .order("name_ja", { ascending: true })
+        .eq("role", "author")
+        .limit(200);
+
+      const bookAuthorRes = await supabase
+        .from("books")
+        .select("id, author, author_reading, author_image_url")
+        .ilike("author", ilikePattern(cleaned))
         .limit(8);
+
+      const error =
+        jaRes.error ??
+        enRes.error ??
+        readingRes.error ??
+        normalizedRes.error ??
+        contributorRes.error ??
+        bookAuthorRes.error;
 
       if (!cancelled) {
         if (error) {
           console.error("Error searching authors:", error);
           setAuthorResults([]);
+          setAuthorContributorMatches([]);
+          setAuthorBookMatches([]);
+          setAuthorSearchError(error.message);
         } else {
-          setAuthorResults((data ?? []) as PersonRecord[]);
+          const merged = dedupeById([
+            ...((jaRes.data ?? []) as PersonRecord[]),
+            ...((enRes.data ?? []) as PersonRecord[]),
+            ...((readingRes.data ?? []) as PersonRecord[]),
+            ...((normalizedRes.data ?? []) as PersonRecord[]),
+          ])
+            .sort((a, b) => a.name_ja.localeCompare(b.name_ja))
+            .slice(0, 8);
+
+          setAuthorResults(merged);
+
+          const contributorPeople = dedupeById(
+            ((contributorRes.data ?? []) as ContributorAuthorRecord[])
+              .flatMap((item) =>
+                Array.isArray(item.people) ? item.people : item.people ? [item.people] : []
+              )
+              .filter(
+                (person) =>
+                  (
+                    person.name_ja?.includes(cleaned) ||
+                    (person.name_en ?? "").toLowerCase().includes(normalized) ||
+                    (person.reading ?? "").includes(cleaned) ||
+                    normalizeSearchTerm(person.normalized_name ?? "").includes(normalized)
+                  ) &&
+                  !merged.some((existing) => existing.id === person.id)
+              )
+          )
+            .sort((a, b) => a.name_ja.localeCompare(b.name_ja))
+            .slice(0, 8);
+
+          setAuthorContributorMatches(contributorPeople);
+
+          const bookMatches = dedupeById(
+            ((bookAuthorRes.data ?? []) as BookAuthorRecord[]).filter(
+              (item): item is BookAuthorRecord =>
+                !!item.author &&
+                !merged.some(
+                  (person) => normalizeSearchTerm(person.name_ja) === normalizeSearchTerm(item.author ?? "")
+                ) &&
+                !contributorPeople.some(
+                  (person) => normalizeSearchTerm(person.name_ja) === normalizeSearchTerm(item.author ?? "")
+                )
+            )
+          )
+            .sort((a, b) => (a.author ?? "").localeCompare(b.author ?? ""))
+            .slice(0, 8);
+
+          setAuthorBookMatches(bookMatches);
         }
         setAuthorSearchLoading(false);
       }
@@ -287,33 +413,61 @@ export default function BookInfoTab({
 
     async function runPublisherSearch() {
       const cleaned = publisherSearch.trim();
+      const normalized = normalizeSearchTerm(cleaned);
 
       if (!isEditing || !cleaned) {
         setPublisherResults([]);
+        setPublisherSearchError(null);
         return;
       }
 
       setPublisherSearchLoading(true);
+      setPublisherSearchError(null);
 
-      const { data, error } = await supabase
-        .from("publishers")
-        .select("id, name_ja, name_en, reading, logo_url, normalized_name")
-        .or(
-          [
-            `name_ja.ilike.%${cleaned}%`,
-            `name_en.ilike.%${cleaned}%`,
-            `reading.ilike.%${cleaned}%`,
-          ].join(",")
-        )
-        .order("name_ja", { ascending: true })
-        .limit(8);
+      const selectClause = "id, name_ja, name_en, reading, logo_url, normalized_name";
+
+      const [jaRes, enRes, readingRes, normalizedRes] = await Promise.all([
+        supabase
+          .from("publishers")
+          .select(selectClause)
+          .ilike("name_ja", ilikePattern(cleaned))
+          .limit(8),
+        supabase
+          .from("publishers")
+          .select(selectClause)
+          .ilike("name_en", ilikePattern(cleaned))
+          .limit(8),
+        supabase
+          .from("publishers")
+          .select(selectClause)
+          .ilike("reading", ilikePattern(cleaned))
+          .limit(8),
+        supabase
+          .from("publishers")
+          .select(selectClause)
+          .ilike("normalized_name", ilikePattern(normalized))
+          .limit(8),
+      ]);
+
+      const error =
+        jaRes.error ?? enRes.error ?? readingRes.error ?? normalizedRes.error;
 
       if (!cancelled) {
         if (error) {
           console.error("Error searching publishers:", error);
           setPublisherResults([]);
+          setPublisherSearchError(error.message);
         } else {
-          setPublisherResults((data ?? []) as PublisherRecord[]);
+          const merged = dedupeById([
+            ...((jaRes.data ?? []) as PublisherRecord[]),
+            ...((enRes.data ?? []) as PublisherRecord[]),
+            ...((readingRes.data ?? []) as PublisherRecord[]),
+            ...((normalizedRes.data ?? []) as PublisherRecord[]),
+          ])
+            .sort((a, b) => a.name_ja.localeCompare(b.name_ja))
+            .slice(0, 8);
+
+          setPublisherResults(merged);
         }
         setPublisherSearchLoading(false);
       }
@@ -338,6 +492,19 @@ export default function BookInfoTab({
   function clearSelectedAuthor() {
     setSelectedAuthorId(null);
     setAuthorSearch("");
+    setAuthorSearchError(null);
+  }
+
+  function handleUseBookAuthorMatch(match: BookAuthorRecord) {
+    setSelectedAuthorId(null);
+    setAuthorSearch(match.author ?? "");
+    setAuthorName(match.author ?? "");
+    setAuthorReading(match.author_reading ?? "");
+    setAuthorImg(match.author_image_url ?? "");
+    setAuthorResults([]);
+    setAuthorContributorMatches([]);
+    setAuthorBookMatches([]);
+    setAuthorSearchError(null);
   }
 
   function handleSelectPublisher(publisher: PublisherRecord) {
@@ -353,6 +520,7 @@ export default function BookInfoTab({
   function clearSelectedPublisher() {
     setSelectedPublisherId(null);
     setPublisherSearch("");
+    setPublisherSearchError(null);
   }
 
   return (
@@ -482,6 +650,7 @@ export default function BookInfoTab({
                   onChange={(e) => {
                     setAuthorSearch(e.target.value);
                     setSelectedAuthorId(null);
+                    setAuthorSearchError(null);
                   }}
                   placeholder="宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ"
                   className="w-full rounded border px-2 py-1 text-sm"
@@ -489,6 +658,10 @@ export default function BookInfoTab({
 
                 {authorSearchLoading ? (
                   <div className="mt-2 text-xs text-stone-500">Searching…</div>
+                ) : null}
+
+                {authorSearchError ? (
+                  <div className="mt-2 text-xs text-red-600">{authorSearchError}</div>
                 ) : null}
 
                 {authorResults.length > 0 ? (
@@ -506,6 +679,53 @@ export default function BookInfoTab({
                         </div>
                       </button>
                     ))}
+                  </div>
+                ) : authorSearch.trim() && !authorSearchLoading && !authorSearchError ? (
+                  <div className="mt-2 text-xs text-stone-500">No matching author found in saved people records.</div>
+                ) : null}
+
+                {authorContributorMatches.length > 0 ? (
+                  <div className="mt-2 rounded border border-blue-200 bg-blue-50">
+                    <div className="border-b border-blue-200 px-3 py-2 text-xs font-medium text-blue-800">
+                      Found through existing author links
+                    </div>
+                    {authorContributorMatches.map((person) => (
+                      <button
+                        key={person.id}
+                        type="button"
+                        onClick={() => handleSelectAuthor(person)}
+                        className="block w-full border-b border-blue-200 px-3 py-2 text-left last:border-b-0 hover:bg-blue-100"
+                      >
+                        <div className="font-medium text-stone-900">{person.name_ja}</div>
+                        <div className="text-xs text-stone-600">
+                          {person.name_en || "—"} · {person.reading || "—"}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {authorBookMatches.length > 0 ? (
+                  <div className="mt-2 rounded border border-emerald-200 bg-emerald-50">
+                    <div className="border-b border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-800">
+                      Found in existing book records
+                    </div>
+                    {authorBookMatches.map((match) => (
+                      <button
+                        key={match.id}
+                        type="button"
+                        onClick={() => handleUseBookAuthorMatch(match)}
+                        className="block w-full border-b border-emerald-200 px-3 py-2 text-left last:border-b-0 hover:bg-emerald-100"
+                      >
+                        <div className="font-medium text-stone-900">{match.author}</div>
+                        <div className="text-xs text-stone-600">
+                          {match.author_reading || "—"}
+                        </div>
+                      </button>
+                    ))}
+                    <div className="px-3 py-2 text-xs text-emerald-800">
+                      Selecting one will fill the author fields here, and saving will create or link the person record.
+                    </div>
                   </div>
                 ) : null}
 
@@ -588,6 +808,7 @@ export default function BookInfoTab({
                     onChange={(e) => {
                       setPublisherSearch(e.target.value);
                       setSelectedPublisherId(null);
+                      setPublisherSearchError(null);
                     }}
                     placeholder="講談社 / Kodansha / こうだんしゃ"
                     className="w-full rounded border px-2 py-1 text-sm"
@@ -595,6 +816,10 @@ export default function BookInfoTab({
 
                   {publisherSearchLoading ? (
                     <div className="mt-2 text-xs text-stone-500">Searching…</div>
+                  ) : null}
+
+                  {publisherSearchError ? (
+                    <div className="mt-2 text-xs text-red-600">{publisherSearchError}</div>
                   ) : null}
 
                   {publisherResults.length > 0 ? (
@@ -615,6 +840,8 @@ export default function BookInfoTab({
                         </button>
                       ))}
                     </div>
+                  ) : publisherSearch.trim() && !publisherSearchLoading && !publisherSearchError ? (
+                    <div className="mt-2 text-xs text-stone-500">No matching publisher found.</div>
                   ) : null}
 
                   {selectedPublisherId ? (

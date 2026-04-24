@@ -57,37 +57,9 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+    let cancelled = false;
 
-        if (!user) {
-          setUsername(null);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        setUsername(data?.username ?? null);
-      } catch (error) {
-        console.error("Failed to load profile:", error);
-        setUsername(null);
-      }
-    }
-
-    loadProfile();
-  }, []);
-
-  useEffect(() => {
-    async function loadBooks() {
+    async function loadHeaderData() {
       setLoadingBooks(true);
 
       try {
@@ -95,23 +67,38 @@ export default function Header() {
           data: { user },
         } = await supabase.auth.getUser();
 
+        if (cancelled) return;
+
         if (!user) {
+          setUsername(null);
           setBooks([]);
           return;
         }
 
-        const { data, error } = await supabase
-          .from("user_books")
-          .select(`
-            id,
-            status,
-            created_at,
-            finished_at,
-            books:book_id (
-              title
-            )
-          `)
-          .eq("user_id", user.id);
+        const [{ data: profile, error: profileError }, { data, error }] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("user_books")
+            .select(`
+              id,
+              status,
+              created_at,
+              finished_at,
+              books:book_id (
+                title
+              )
+            `)
+            .eq("user_id", user.id),
+        ]);
+
+        if (cancelled) return;
+
+        if (profileError) throw profileError;
+        setUsername(profile?.username ?? null);
 
         if (error) throw error;
 
@@ -131,14 +118,23 @@ export default function Header() {
 
         setBooks(loadedBooks);
       } catch (error) {
-        console.error("Failed to load header books:", error);
-        setBooks([]);
+        if (!cancelled) {
+          console.error("Failed to load header data:", error);
+          setUsername(null);
+          setBooks([]);
+        }
       } finally {
-        setLoadingBooks(false);
+        if (!cancelled) {
+          setLoadingBooks(false);
+        }
       }
     }
 
-    loadBooks();
+    loadHeaderData();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const readingBooks = books.filter((book) => book.status === "reading");

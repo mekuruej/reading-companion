@@ -1,3 +1,5 @@
+//Read Along Page
+// 
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
