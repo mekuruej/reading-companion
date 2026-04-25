@@ -15,6 +15,10 @@ type JishoChoice = {
   defaultMeaning: string;
 };
 
+type JishoCandidate = JishoChoice & {
+  id: string;
+};
+
 type SessionWord = {
   id: string;
   surface: string;
@@ -63,6 +67,58 @@ function extractMeaningChoices(entry: any): string[] {
   });
 }
 
+function isExactJishoMatch(entry: any, query: string) {
+  const cleanQuery = query.trim();
+  if (!cleanQuery) return false;
+
+  if ((entry?.slug ?? "") === cleanQuery) return true;
+
+  const japaneseForms = entry?.japanese ?? [];
+  return japaneseForms.some(
+    (form: any) => (form?.word ?? "") === cleanQuery || (form?.reading ?? "") === cleanQuery
+  );
+}
+
+function buildJishoCandidates(entries: any[], fallbackWord: string): JishoCandidate[] {
+  const exactEntries = entries.filter((entry) => isExactJishoMatch(entry, fallbackWord));
+  const sourceEntries = exactEntries.length > 0 ? exactEntries : entries;
+  const candidates: JishoCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (let index = 0; index < sourceEntries.length; index += 1) {
+    const entry = sourceEntries[index];
+    const japaneseForms = entry?.japanese ?? [];
+    const primaryForm =
+      japaneseForms.find((j: any) => j?.word || j?.reading) ?? japaneseForms[0] ?? {};
+
+    const surface = primaryForm?.word || entry?.slug || fallbackWord;
+    const reading = primaryForm?.reading || "";
+    const meaningChoices = extractMeaningChoices(entry);
+
+    const candidate: JishoCandidate = {
+      id: `${surface}__${reading || "no-reading"}__${index}`,
+      surface,
+      reading,
+      jlpt: normalizeJlpt(entry?.jlpt?.[0] || ""),
+      isCommon: !!entry?.is_common,
+      meaningChoices,
+      defaultMeaning: meaningChoices[0] || "",
+    };
+
+    const dedupeKey = [
+      candidate.surface,
+      candidate.reading,
+      candidate.meaningChoices.join("||"),
+    ].join("___");
+
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    candidates.push(candidate);
+  }
+
+  return candidates;
+}
+
 function toNullableInt(value: string): number | null {
   const t = (value ?? "").trim();
   if (!t) return null;
@@ -103,6 +159,7 @@ export default function AddWordPage() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [lookupCandidates, setLookupCandidates] = useState<JishoCandidate[]>([]);
 
   const [editingSessionWordId, setEditingSessionWordId] = useState<string | null>(null);
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
@@ -186,6 +243,7 @@ export default function AddWordPage() {
     setHideKanjiInReadingSupport(false);
     setEditingSessionWordId(null);
     setShowEditor(false);
+    setLookupCandidates([]);
 
     if (!keepLocation) {
       setPageNumber("");
@@ -220,6 +278,7 @@ export default function AddWordPage() {
     setChapterName(sessionWord.chapterName);
     setHideKanjiInReadingSupport(sessionWord.hideKanjiInReadingSupport);
     setShowEditor(true);
+    setLookupCandidates([]);
     setMessage(`Editing "${sessionWord.surface}"`);
     jumpToEditor();
   }
@@ -243,7 +302,8 @@ export default function AddWordPage() {
       }
 
       const data = await res.json();
-      const entry = data?.data?.[0];
+      const candidates = buildJishoCandidates(data?.data ?? [], cleanWord);
+      const entry = candidates[0];
 
       if (!entry) {
         setMeaningChoices([]);
@@ -253,30 +313,28 @@ export default function AddWordPage() {
         setJlpt("NON-JLPT");
         setIsCommon(false);
         setShowEditor(true);
+        setLookupCandidates([]);
         setMessage("❌ No dictionary result found. You can still enter it manually.");
         jumpToEditor();
         return;
       }
 
-      const choices = extractMeaningChoices(entry);
-
-      const jishoSurface =
-        entry?.japanese?.find((j: any) => j?.word)?.word ||
-        entry?.japanese?.[0]?.word ||
-        entry?.slug ||
-        cleanWord;
-
       applyJisho({
-        surface: jishoSurface,
-        reading: entry?.japanese?.[0]?.reading || "",
-        jlpt: normalizeJlpt(entry?.jlpt?.[0] || ""),
-        isCommon: !!entry?.is_common,
-        meaningChoices: choices,
-        defaultMeaning: choices[0] || "",
+        surface: entry.surface,
+        reading: entry.reading,
+        jlpt: entry.jlpt,
+        isCommon: entry.isCommon,
+        meaningChoices: entry.meaningChoices,
+        defaultMeaning: entry.defaultMeaning,
       });
 
+      setLookupCandidates(candidates);
       setShowEditor(true);
-      setMessage("✅ Dictionary info loaded.");
+      setMessage(
+        candidates.length > 1
+          ? "✅ Dictionary info loaded. Pick the reading that matches your book if needed."
+          : "✅ Dictionary info loaded."
+      );
       jumpToEditor();
 
     } catch (err: any) {
@@ -592,7 +650,12 @@ export default function AddWordPage() {
                 <input
                   ref={wordInputRef}
                   value={word}
-                  onChange={(e) => setWord(e.target.value)}
+                  onChange={(e) => {
+                    setWord(e.target.value);
+                    if (lookupCandidates.length > 0) {
+                      setLookupCandidates([]);
+                    }
+                  }}
                   placeholder="Search for a word"
                   className="flex-1 rounded-xl border px-3 py-2 text-sm"
                 />
@@ -615,6 +678,7 @@ export default function AddWordPage() {
                     setJlpt("NON-JLPT");
                     setIsCommon(false);
                     setShowEditor(true);
+                    setLookupCandidates([]);
                     setMessage("");
                     jumpToEditor();
                   }}
@@ -628,17 +692,93 @@ export default function AddWordPage() {
                 <div className="mt-2 text-sm text-stone-600">{message}</div>
               ) : null}
 
+              {lookupCandidates.length > 1 ? (
+                <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                  <div className="text-sm font-medium text-sky-900">
+                    More dictionary matches for "{word.trim()}"
+                  </div>
+                  <p className="mt-1 text-sm text-sky-800">
+                    If the first result is not the right reading, choose the one that matches your
+                    book.
+                  </p>
+
+                  <div className="mt-3 space-y-2">
+                    {lookupCandidates.map((candidate) => {
+                      const isSelected =
+                        candidate.surface === word &&
+                        candidate.reading === reading &&
+                        candidate.defaultMeaning === meaning;
+
+                      return (
+                        <button
+                          key={candidate.id}
+                          type="button"
+                          onClick={() => {
+                            applyJisho(candidate);
+                            setShowEditor(true);
+                            setMessage(
+                              `✅ Loaded ${candidate.surface}${
+                                candidate.reading ? `【${candidate.reading}】` : ""
+                              }.`
+                            );
+                            jumpToEditor();
+                          }}
+                          className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                            isSelected
+                              ? "border-sky-400 bg-white shadow-sm"
+                              : "border-sky-200 bg-white/80 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                            <span className="text-base font-semibold text-stone-900">
+                              {candidate.surface}
+                            </span>
+                            <span className="text-sm text-stone-600">
+                              {candidate.reading || "No reading listed"}
+                            </span>
+                            {candidate.jlpt !== "NON-JLPT" ? (
+                              <span className="text-xs font-medium text-sky-700">
+                                {candidate.jlpt}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 text-sm text-stone-700">
+                            {candidate.defaultMeaning || "No meaning listed"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
               {showEditor ? (
                 <div
                   ref={editorCardRef}
                   className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4"
                 >
+                  <div>
+                    <div className="text-sm font-semibold text-stone-900">
+                      {editingSessionWordId ? "Edit selected word" : "Review before saving"}
+                    </div>
+                    {editingSessionWordId ? (
+                      <div className="mt-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-emerald-800">
+                        This is the edit word box. Change the saved word here. Use the search box above only for a brand-new lookup.
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-sm text-stone-600">
+                        Check the result here before saving it into your Vocab List.
+                      </p>
+                    )}
+                  </div>
+
                   {editingSessionWordId ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
                       Editing "{word}"
                     </div>
                   ) : null}
 
+                  <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <div>
@@ -655,7 +795,7 @@ export default function AddWordPage() {
                             }
                           }}
                           placeholder="Word"
-                          className="w-full rounded border px-3 py-2 text-sm"
+                          className="w-full rounded border bg-white px-3 py-2 text-sm"
                         />
                       </div>
 
@@ -684,9 +824,10 @@ export default function AddWordPage() {
                         value={reading}
                         onChange={(e) => setReading(e.target.value)}
                         placeholder="Reading"
-                        className="w-full rounded border px-3 py-2 text-sm"
+                        className="w-full rounded border bg-white px-3 py-2 text-sm"
                       />
                     </div>
+                  </div>
                   </div>
 
                   <div>

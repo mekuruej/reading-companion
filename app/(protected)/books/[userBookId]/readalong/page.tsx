@@ -18,6 +18,7 @@ type ReadAlongWord = {
 };
 
 type SupportMode = "full" | "reading" | "meaning";
+type FluidReadingMode = "just" | "supported";
 
 type PageChunk = {
     label: string;
@@ -59,6 +60,7 @@ export default function ReadAlongPage() {
     const [words, setWords] = useState<ReadAlongWord[]>([]);
     const [loading, setLoading] = useState(true);
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
+    const [fluidReadingMode, setFluidReadingMode] = useState<FluidReadingMode>("supported");
     const [pageIndex, setPageIndex] = useState(0);
     const [jumpPageInput, setJumpPageInput] = useState("");
     const [fadedThroughIndex, setFadedThroughIndex] = useState<number>(-1);
@@ -83,6 +85,23 @@ export default function ReadAlongPage() {
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
     const [username, setUsername] = useState("");
+
+    const fluidModeStorageKey = `fluid-reading-mode:${userBookId}`;
+
+    useEffect(() => {
+        if (typeof window === "undefined" || !userBookId) return;
+
+        const savedMode = window.localStorage.getItem(fluidModeStorageKey);
+        if (savedMode === "just" || savedMode === "supported") {
+            setFluidReadingMode(savedMode);
+        }
+    }, [fluidModeStorageKey, userBookId]);
+
+    useEffect(() => {
+        if (typeof window === "undefined" || !userBookId) return;
+
+        window.localStorage.setItem(fluidModeStorageKey, fluidReadingMode);
+    }, [fluidModeStorageKey, fluidReadingMode, userBookId]);
 
     useEffect(() => {
         let cancelled = false;
@@ -491,21 +510,14 @@ export default function ReadAlongPage() {
 
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
-            <div className="mx-auto max-w-4xl space-y-3">
-                <div className="mb-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">
-                    <div className="text-sm font-semibold text-stone-900">non-looker-upper</div>
-                    <div className="mt-1 text-sm text-stone-500">noun · official Mekuru book club term</div>
-                    <p className="mt-2 text-sm text-stone-700">
-                        A reader who wants to immerse themselves in the story, keep reading, and practice fluid reading with their saved vocabulary.
-                    </p>
-                </div>
-
+            <div className="mx-auto max-w-4xl space-y-4">
                 <div>
-                    <p className="text-sm text-stone-700">
-                        If that is you, Fluid Reading is your place!
+                    <h1 className="text-2xl font-semibold text-stone-900">Fluid Reading</h1>
+                    <p className="mt-1 text-sm text-stone-600">
+                        Use this for a quicker, smoother reading experience while you read along with your saved words or simply time your fluid reading. Choose between Just Reading and With Saved Word Support.
                     </p>
 
-                    <p className="mt-1 text-xs text-stone-500">
+                    <p className="mt-2 text-xs text-stone-500">
                         Want to look up words while reading?{" "}
                         <a
                             href={`/vocab/single-add?userBookId=${userBookId}`}
@@ -516,10 +528,37 @@ export default function ReadAlongPage() {
                     </p>
                 </div>
 
-                <div>
-                    <h1 className="text-2xl font-semibold text-stone-900">Fluid Reading</h1>
-                    <p className="mt-1 text-sm text-stone-600">
-                        Use this for a quicker, smoother reading experience while you read along with your saved words or simply time your fluid reading.
+                <div className="rounded-2xl border border-stone-200 bg-white px-5 py-5 text-center">
+                    <div className="text-base font-semibold text-stone-900">How do you want to read today?</div>
+                    <div className="mt-4 flex justify-center">
+                        <div className="inline-flex overflow-hidden rounded-2xl border border-stone-300 bg-stone-100 p-1 text-sm shadow-sm">
+                            <button
+                                type="button"
+                                onClick={() => setFluidReadingMode("just")}
+                                className={`min-w-[160px] rounded-xl px-5 py-3 font-medium transition ${fluidReadingMode === "just"
+                                    ? "bg-stone-900 text-white shadow-sm"
+                                    : "text-stone-700 hover:bg-white"
+                                    }`}
+                            >
+                                Just Reading
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFluidReadingMode("supported")}
+                                className={`min-w-[220px] rounded-xl px-5 py-3 font-medium transition ${fluidReadingMode === "supported"
+                                    ? "bg-stone-900 text-white shadow-sm"
+                                    : "text-stone-700 hover:bg-white"
+                                    }`}
+                            >
+                                With Saved Word Support
+                            </button>
+                        </div>
+                    </div>
+
+                    <p className="mt-4 text-sm text-stone-600">
+                        {fluidReadingMode === "just"
+                            ? "Quiet, timer-first reading with as little on-screen friction as possible."
+                            : "Momentum-first reading with optional light support from words you already saved."}
                     </p>
                 </div>
 
@@ -568,7 +607,11 @@ export default function ReadAlongPage() {
                     </div>
                 ) : null}
 
-                <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
+                <div className="rounded-xl border border-stone-200 bg-white px-3 py-3">
+                    <div className="mb-2 text-center text-sm text-stone-600">
+                        Use the timer to track your fluid reading session, whether you read quietly or with saved word support.
+                    </div>
+
                     <div className="flex flex-wrap items-center justify-center gap-2">
                         {!isRunning && !isPaused ? (
                             <button
@@ -736,45 +779,77 @@ export default function ReadAlongPage() {
                     ) : null}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setSupportMode("full")}
-                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "full"
-                            ? "bg-stone-900 text-white"
-                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                            }`}
-                    >
-                        <span className="sm:hidden">Full</span>
-                        <span className="hidden sm:inline">Full Support</span>
-                    </button>
+                {fluidReadingMode === "just" ? (
+                    <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
+                        <div className="px-6 py-8 sm:px-10">
+                            <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+                                <p className="text-2xl font-bold text-stone-800 sm:text-3xl">
+                                    Enjoy your reading!
+                                </p>
 
-                    <button
-                        type="button"
-                        onClick={() => setSupportMode("reading")}
-                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "reading"
-                            ? "bg-stone-900 text-white"
-                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                            }`}
-                    >
-                        <span className="sm:hidden">Reading</span>
-                        <span className="hidden sm:inline">Reading Support</span>
-                    </button>
+                                {bookCover ? (
+                                    <img
+                                        src={bookCover}
+                                        alt={`${bookTitle} cover`}
+                                        className="mt-4 h-[26rem] w-72 rounded-2xl object-cover shadow-xl"
+                                    />
+                                ) : (
+                                    <div className="mt-4 flex h-[26rem] w-72 items-center justify-center rounded-2xl bg-stone-200 text-sm text-stone-500">
+                                        No cover yet
+                                    </div>
+                                )}
 
-                    <button
-                        type="button"
-                        onClick={() => setSupportMode("meaning")}
-                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "meaning"
-                            ? "bg-stone-900 text-white"
-                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                            }`}
-                    >
-                        <span className="sm:hidden">Meaning</span>
-                        <span className="hidden sm:inline">Meaning Support</span>
-                    </button>
-                </div>
+                                <h2 className="mt-6 text-2xl font-semibold text-stone-900">
+                                    {bookTitle || "Fluid Reading"}
+                                </h2>
 
-                <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
+                                <p className="mt-3 max-w-md text-sm leading-6 text-stone-600">
+                                    Read without stopping for new lookups. Let the timer keep you company and just stay with the book.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSupportMode("full")}
+                                className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "full"
+                                    ? "bg-stone-900 text-white"
+                                    : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                                    }`}
+                            >
+                                <span className="sm:hidden">Full</span>
+                                <span className="hidden sm:inline">Full Support</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setSupportMode("reading")}
+                                className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "reading"
+                                    ? "bg-stone-900 text-white"
+                                    : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                                    }`}
+                            >
+                                <span className="sm:hidden">Reading</span>
+                                <span className="hidden sm:inline">Reading Support</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setSupportMode("meaning")}
+                                className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "meaning"
+                                    ? "bg-stone-900 text-white"
+                                    : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                                    }`}
+                            >
+                                <span className="sm:hidden">Meaning</span>
+                                <span className="hidden sm:inline">Meaning Support</span>
+                            </button>
+                        </div>
+
+                        <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
                     <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
                         <div className="space-y-3">
                             {pages.length > 0 ? (
@@ -898,6 +973,8 @@ export default function ReadAlongPage() {
                         )}
                     </div>
                 </div>
+                    </>
+                )}
             </div>
         </main>
     );

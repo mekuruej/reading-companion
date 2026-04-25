@@ -42,6 +42,17 @@ type QuickSessionWord = {
   pageOrder: number | null;
 };
 
+type QuickLookupCandidate = {
+  id: string;
+  surface: string;
+  cacheSurface: string;
+  reading: string;
+  meanings: string[];
+  selectedMeaningIndex: number;
+  meaning: string;
+  isCustomMeaning: boolean;
+};
+
 type KanjiEntry = {
   kanji: string;
   pieces: string[];
@@ -107,6 +118,64 @@ function upsertAndSortQuickSessionWords(
   ]);
 }
 
+function extractQuickMeanings(entry: any): string[] {
+  return (entry?.senses ?? [])
+    .map((sense: any) => (sense?.english_definitions ?? []).join("; ").trim())
+    .filter(Boolean);
+}
+
+function isExactQuickLookupMatch(entry: any, query: string) {
+  const cleanQuery = query.trim();
+  if (!cleanQuery) return false;
+
+  if ((entry?.slug ?? "") === cleanQuery) return true;
+
+  const japaneseForms = entry?.japanese ?? [];
+  return japaneseForms.some(
+    (form: any) => (form?.word ?? "") === cleanQuery || (form?.reading ?? "") === cleanQuery
+  );
+}
+
+function buildQuickLookupCandidates(entries: any[], fallbackWord: string): QuickLookupCandidate[] {
+  const exactEntries = entries.filter((entry) => isExactQuickLookupMatch(entry, fallbackWord));
+  const sourceEntries = exactEntries.length > 0 ? exactEntries : entries;
+  const candidates: QuickLookupCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (let index = 0; index < sourceEntries.length; index += 1) {
+    const entry = sourceEntries[index];
+    const japaneseForms = entry?.japanese ?? [];
+    const primaryForm =
+      japaneseForms.find((j: any) => j?.word || j?.reading) ?? japaneseForms[0] ?? {};
+
+    const surface = primaryForm?.word || entry?.slug || fallbackWord;
+    const reading = primaryForm?.reading || "";
+    const meanings = extractQuickMeanings(entry);
+    const candidate: QuickLookupCandidate = {
+      id: `${surface}__${reading || "no-reading"}__${index}`,
+      surface,
+      cacheSurface: surface,
+      reading,
+      meanings: meanings.length ? meanings : [""],
+      selectedMeaningIndex: 0,
+      meaning: meanings[0] || "",
+      isCustomMeaning: false,
+    };
+
+    const dedupeKey = [
+      candidate.surface,
+      candidate.reading,
+      candidate.meanings.join("||"),
+    ].join("___");
+
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    candidates.push(candidate);
+  }
+
+  return candidates;
+}
+
 export default function SingleAddPage() {
   const router = useRouter();
   const [userBookId, setUserBookId] = useState("");
@@ -122,6 +191,7 @@ export default function SingleAddPage() {
 
   const [quickPreview, setQuickPreview] = useState<QuickPreview | null>(null);
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
+  const [quickLookupCandidates, setQuickLookupCandidates] = useState<QuickLookupCandidate[]>([]);
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
   const quickEditorCardRef = useRef<HTMLDivElement | null>(null);
@@ -345,6 +415,7 @@ export default function SingleAddPage() {
     setQuickPreview(null);
     setHideKanjiInReadingSupport(false);
     setQuickError(null);
+    setQuickLookupCandidates([]);
   }
 
   async function getNextPageOrder(
@@ -393,6 +464,7 @@ export default function SingleAddPage() {
       pageOrder: item.pageOrder,
     });
     setHideKanjiInReadingSupport(item.hideKanjiInReadingSupport);
+    setQuickLookupCandidates([]);
     setQuickError(null);
     setMessage(`Editing "${item.surface}"`);
     jumpToQuickEditor();
@@ -409,34 +481,26 @@ export default function SingleAddPage() {
       const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
       const json = await res.json();
 
-      const first = json?.data?.[0];
+      const candidates = buildQuickLookupCandidates(json?.data ?? [], word);
+      const first = candidates[0];
       if (!first) {
         setQuickPreview(null);
+        setQuickLookupCandidates([]);
         setQuickError("No result found.");
         return;
       }
-
-      const surface =
-        first?.japanese?.find((j: any) => j?.word)?.word ||
-        first?.japanese?.[0]?.word ||
-        first?.slug ||
-        word;
-      const reading = first?.japanese?.[0]?.reading || "";
-      const meanings = (first?.senses ?? [])
-        .map((sense: any) => (sense.english_definitions ?? []).join("; "))
-        .filter(Boolean);
 
       const savedMeta = getSavedQuickMeta();
 
       setQuickPreview({
         id: null,
-        surface,
-        cacheSurface: surface,
-        reading,
-        meanings: meanings.length ? meanings : [""],
-        selectedMeaningIndex: 0,
-        meaning: meanings.length ? meanings[0] : "",
-        isCustomMeaning: false,
+        surface: first.surface,
+        cacheSurface: first.cacheSurface,
+        reading: first.reading,
+        meanings: first.meanings,
+        selectedMeaningIndex: first.selectedMeaningIndex,
+        meaning: first.meaning,
+        isCustomMeaning: first.isCustomMeaning,
         useAlternateSurface: false,
         alternateSurface: "",
         page: savedMeta.page,
@@ -444,11 +508,18 @@ export default function SingleAddPage() {
         chapterName: savedMeta.chapterName,
         pageOrder: null,
       });
+      setQuickLookupCandidates(candidates);
+      setMessage(
+        candidates.length > 1
+          ? "Loaded the first result. If your book uses a different reading, choose it below."
+          : ""
+      );
       jumpToQuickEditor();
 
     } catch (err) {
       console.error(err);
       setQuickPreview(null);
+      setQuickLookupCandidates([]);
       setQuickError("Could not pull word data.");
     } finally {
       setQuickLoading(false);
@@ -762,40 +833,26 @@ export default function SingleAddPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 rounded-2xl border border-stone-300 bg-stone-50 p-4">
-          <div className="text-sm font-semibold text-stone-900">looker-upper</div>
-          <div className="mt-1 text-sm text-stone-500">
-            noun · official Mekuru book club term
-          </div>
-          <p className="mt-2 text-sm text-stone-700">
-            A reader who cannot help stopping to look up words, grammar, and anything else they
-            find interesting.
+        <div>
+          <h1 className="text-2xl font-semibold text-stone-900">Curiosity Reading</h1>
+          <p className="mt-1 text-sm text-stone-600">
+            Use this for a slower, exploratory reading experience. This is where you stop, investigate, save new words, and let lookup time count as part of the reading session.
+          </p>
+
+          <p className="mt-2 text-xs text-stone-500">
+            Want to keep moving and time your reading without look-ups?{" "}
+            {userBookId ? (
+              <a
+                href={`/books/${userBookId}/readalong`}
+                className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800"
+              >
+                Head to Fluid Reading
+              </a>
+            ) : (
+              <span className="font-medium text-stone-500">Head to Fluid Reading</span>
+            )}
           </p>
         </div>
-
-        <p className="mt-2 text-xs text-stone-500">
-          If that is you, Curiosity Reading is your place!
-        </p>
-
-        <p className="mt-2 text-xs text-stone-500">
-          Want to time your reading without look-ups?{" "}
-          {userBookId ? (
-            <a
-              href={`/books/${userBookId}/readalong`}
-              className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800"
-            >
-              Head to Fluid Reading
-            </a>
-          ) : (
-            <span className="font-medium text-stone-500">Head to Fluid Reading</span>
-          )}
-        </p>
-
-        <h1 className="mb-4 mt-4 text-2xl font-semibold">Curiosity Reading</h1>
-        <p className="mt-2 text-sm text-stone-700">
-          Use this for a slower, exploratory reading experience. Lookup time is included in the
-          time.
-        </p>
 
         {userBookId ? (
           bookTitle ? (
@@ -861,93 +918,95 @@ export default function SingleAddPage() {
 
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4">
           <div className="mb-2 text-sm font-medium text-stone-900">Log your reading session</div>
-          <p className="text-sm text-stone-500">
-            Use the timer while you read, add vocab, and save your curiosity reading session to the
-            Reading tab.
-          </p>
+  
+          <div className="mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3">
+            <div className="mb-2 text-center text-sm text-stone-600">
+              Use the timer to track a curiosity reading session where you stop, check, and save new words.
+            </div>
 
-          <div className="mt-4 flex flex-wrap justify-center gap-3 sm:justify-start">
-            {!isRunning && !isPaused ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setStartTime(Date.now());
-                  setElapsed(0);
-                  setIsRunning(true);
-                  setIsPaused(false);
-                  setHasFinishedTimer(false);
-                }}
-                className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-              >
-                Start Timer
-              </button>
-            ) : null}
-
-            {isRunning ? (
-              <>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {!isRunning && !isPaused ? (
                 <button
                   type="button"
                   onClick={() => {
-                    if (startTime) {
-                      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                    }
-                    setIsRunning(false);
-                    setIsPaused(true);
-                  }}
-                  className="rounded-2xl bg-amber-500 px-5 py-3 text-base font-medium text-white transition hover:bg-amber-600"
-                >
-                  Pause
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (startTime) {
-                      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                    }
-                    setIsRunning(false);
-                    setIsPaused(false);
-                    setHasFinishedTimer(true);
-                    void openTimedSessionFormWithDefaults();
-                  }}
-                  className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
-                >
-                  Finish
-                </button>
-              </>
-            ) : null}
-
-            {isPaused ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStartTime(Date.now() - elapsed * 1000);
-                    setIsPaused(false);
+                    setStartTime(Date.now());
+                    setElapsed(0);
                     setIsRunning(true);
-                  }}
-                  className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-medium text-white transition hover:bg-emerald-700"
-                >
-                  Resume
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
                     setIsPaused(false);
-                    setIsRunning(false);
-                    setHasFinishedTimer(true);
-                    void openTimedSessionFormWithDefaults();
+                    setHasFinishedTimer(false);
                   }}
-                  className="rounded-2xl bg-red-600 px-5 py-3 text-base font-medium text-white transition hover:bg-red-700"
+                  className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
                 >
-                  Finish
+                  Start Timer
                 </button>
-              </>
-            ) : null}
+              ) : null}
 
-            <div className="flex items-center rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700">
-              ⏱ {formatTimer(elapsed)}
+              {isRunning ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (startTime) {
+                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                      }
+                      setIsRunning(false);
+                      setIsPaused(true);
+                    }}
+                    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
+                  >
+                    Pause
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (startTime) {
+                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+                      }
+                      setIsRunning(false);
+                      setIsPaused(false);
+                      setHasFinishedTimer(true);
+                      void openTimedSessionFormWithDefaults();
+                    }}
+                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                  >
+                    Finish
+                  </button>
+                </>
+              ) : null}
+
+              {isPaused ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartTime(Date.now() - elapsed * 1000);
+                      setIsPaused(false);
+                      setIsRunning(true);
+                    }}
+                    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+                  >
+                    Resume
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPaused(false);
+                      setIsRunning(false);
+                      setHasFinishedTimer(true);
+                      void openTimedSessionFormWithDefaults();
+                    }}
+                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                  >
+                    Finish
+                  </button>
+                </>
+              ) : null}
+
+              <div className="flex items-center rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700">
+                ⏱ {formatTimer(elapsed)}
+              </div>
             </div>
           </div>
 
@@ -1025,10 +1084,10 @@ export default function SingleAddPage() {
         <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
           <div className="mb-3 text-sm font-medium text-stone-900">Single Add</div>
 
-          <div className="sticky top-4 z-10 -mx-1 rounded-2xl border border-sky-200 bg-sky-50/95 p-4 shadow-sm backdrop-blur">
-            <div className="mb-1 text-sm font-semibold text-sky-950">Search for a new word</div>
-            <p className="mb-3 text-sm text-sky-800">
-              This blue box is only for new lookups. It will not overwrite the word you are
+          <div className="sticky top-4 z-10 -mx-1 rounded-2xl border border-stone-200 bg-white/95 p-4 shadow-sm backdrop-blur">
+            <div className="mb-1 text-sm font-semibold text-stone-900">Search for a new word</div>
+            <p className="mb-3 text-sm text-stone-600">
+              This search box is only for new lookups. It will not overwrite the word you are
               editing below.
             </p>
 
@@ -1037,7 +1096,12 @@ export default function SingleAddPage() {
                 ref={quickWordInputRef}
                 type="text"
                 value={quickWord}
-                onChange={(e) => setQuickWord(e.target.value)}
+                onChange={(e) => {
+                  setQuickWord(e.target.value);
+                  if (quickLookupCandidates.length > 0) {
+                    setQuickLookupCandidates([]);
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -1045,14 +1109,14 @@ export default function SingleAddPage() {
                   }
                 }}
                 placeholder="Search a word..."
-                className="w-full rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
               />
 
               <button
                 type="button"
                 onClick={() => void pullQuickWord()}
                 disabled={quickLoading || !quickWord.trim()}
-                className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-50"
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
               >
                 {quickLoading ? "Searching..." : "Search"}
               </button>
@@ -1078,10 +1142,11 @@ export default function SingleAddPage() {
                     chapterName: savedMeta.chapterName,
                     pageOrder: null,
                   });
+                  setQuickLookupCandidates([]);
                   setQuickError(null);
                   jumpToQuickEditor();
                 }}
-                className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-sky-900 ring-1 ring-sky-300 hover:bg-sky-100"
+                className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-stone-900 ring-1 ring-stone-300 hover:bg-stone-100"
               >
                 Manual Entry
               </button>
@@ -1091,12 +1156,12 @@ export default function SingleAddPage() {
                   type="button"
                   disabled
                   aria-disabled="true"
-                  className="cursor-not-allowed rounded-xl bg-sky-100 px-4 py-2 text-sm font-medium text-sky-300 select-none"
+                  className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
                 >
                   Grammar
                 </button>
 
-                <span className="select-none text-sm text-sky-500">(coming soon...)</span>
+                <span className="select-none text-sm text-stone-400">(coming soon...)</span>
               </div>
             </div>
           </div>
@@ -1104,6 +1169,66 @@ export default function SingleAddPage() {
           {quickError ? (
             <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {quickError}
+            </div>
+          ) : null}
+
+          {quickLookupCandidates.length > 1 ? (
+            <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+              <div className="text-sm font-medium text-sky-900">
+                More dictionary matches for "{quickWord.trim()}"
+              </div>
+              <p className="mt-1 text-sm text-sky-800">
+                Choose the reading that matches your book before you save it.
+              </p>
+
+              <div className="mt-3 space-y-2">
+                {quickLookupCandidates.map((candidate) => {
+                  const isSelected =
+                    quickPreview?.surface === candidate.surface &&
+                    quickPreview?.reading === candidate.reading &&
+                    quickPreview?.meaning === candidate.meaning;
+
+                  return (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      onClick={() => {
+                        if (!quickPreview) return;
+
+                        setQuickPreview({
+                          ...quickPreview,
+                          surface: candidate.surface,
+                          cacheSurface: candidate.cacheSurface,
+                          reading: candidate.reading,
+                          meanings: candidate.meanings,
+                          selectedMeaningIndex: candidate.selectedMeaningIndex,
+                          meaning: candidate.meaning,
+                          isCustomMeaning: candidate.isCustomMeaning,
+                        });
+                        setQuickError(null);
+                        jumpToQuickEditor();
+                      }}
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                        isSelected
+                          ? "border-sky-400 bg-white shadow-sm"
+                          : "border-sky-200 bg-white/80 hover:bg-white"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="text-base font-semibold text-stone-900">
+                          {candidate.surface}
+                        </span>
+                        <span className="text-sm text-stone-600">
+                          {candidate.reading || "No reading listed"}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-sm text-stone-700">
+                        {candidate.meaning || "No meaning listed"}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
 
@@ -1122,7 +1247,7 @@ export default function SingleAddPage() {
                 </div>
                 <p className="mt-1 text-sm text-stone-600">
                   {quickPreview.id
-                    ? "You are editing an existing saved word. The blue search box above is still for new lookups."
+                    ? "You are editing an existing saved word. The search box above is still only for new lookups."
                     : "Check the result here before saving it into your Vocab List."}
                 </p>
               </div>
@@ -1132,6 +1257,11 @@ export default function SingleAddPage() {
                   Editing "{quickPreview.surface}"
                 </div>
               ) : null}
+
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3">
+                <div className="mb-3 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-emerald-800">
+                  This is the edit word box. Change the saved word here. Use the search box above only for a brand-new lookup.
+                </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -1143,7 +1273,7 @@ export default function SingleAddPage() {
                       setQuickPreview((prev) => (prev ? { ...prev, surface: e.target.value } : prev))
                     }
                     placeholder="Word"
-                    className="w-full rounded border px-3 py-2 text-sm"
+                    className="w-full rounded border bg-white px-3 py-2 text-sm"
                   />
 
                   <label className="mt-2 flex items-center gap-2 text-sm text-stone-700">
@@ -1181,9 +1311,10 @@ export default function SingleAddPage() {
                       setQuickPreview((prev) => (prev ? { ...prev, reading: e.target.value } : prev))
                     }
                     placeholder="Reading"
-                    className="w-full rounded border px-3 py-2 text-sm"
+                    className="w-full rounded border bg-white px-3 py-2 text-sm"
                   />
                 </div>
+              </div>
               </div>
 
               <div>

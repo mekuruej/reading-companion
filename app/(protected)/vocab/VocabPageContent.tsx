@@ -5,8 +5,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
-
+import { supabase } from "@/lib/supabaseClient";
 import { WordCard } from "@/components/WordCard";
 
 // BASE defaults — things not in the DB yet
