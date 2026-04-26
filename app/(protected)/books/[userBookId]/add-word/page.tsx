@@ -791,14 +791,6 @@ export default function AddWordPage() {
                         <p className="text-sm text-stone-600">
                           Check the result here before saving it into your Vocab List.
                         </p>
-                        <button
-                          type="button"
-                          disabled
-                          aria-disabled="true"
-                          className="cursor-not-allowed rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-400 select-none"
-                        >
-                          Kanji Lookup (Coming Soon)
-                        </button>
                       </div>
                     )}
                   </div>

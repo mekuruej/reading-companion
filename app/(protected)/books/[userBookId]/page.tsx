@@ -2757,37 +2757,31 @@ export default function BookHubPage() {
 
     const existingStartedAt = row.started_at ? row.started_at.slice(0, 10) : null;
 
-    const nextStartedAt =
-      !existingStartedAt || sessionDate < existingStartedAt
-        ? sessionDate
-        : existingStartedAt;
+    // Logging a reading session should only backfill the book's start date
+    // when no start date has been set yet. It should never overwrite an
+    // existing start date or clear finish/DNF dates.
+    if (!existingStartedAt) {
+      const { error: startErr } = await supabase
+        .from("user_books")
+        .update({
+          status: "reading",
+          started_at: sessionDate,
+        })
+        .eq("id", row.id);
 
-    const { error: startErr } = await supabase
-      .from("user_books")
-      .update({
-        status: "reading",
-        started_at: nextStartedAt,
-        finished_at: null,
-        dnf_at: null,
-      })
-      .eq("id", row.id);
-
-    if (startErr) {
-      console.error("Error updating user_books from reading session:", startErr);
-    } else {
-      setStartedAt(nextStartedAt);
-      setFinishedAt("");
-      setDnfAt("");
-      setRow((prev) =>
-        prev
-          ? {
-            ...prev,
-            started_at: nextStartedAt,
-            finished_at: null,
-            dnf_at: null,
-          }
-          : prev
-      );
+      if (startErr) {
+        console.error("Error updating user_books from reading session:", startErr);
+      } else {
+        setStartedAt(sessionDate);
+        setRow((prev) =>
+          prev
+            ? {
+                ...prev,
+                started_at: sessionDate,
+              }
+            : prev
+        );
+      }
     }
 
     await loadReadingSessions(row.id);

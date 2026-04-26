@@ -1263,16 +1263,6 @@ export default function SingleAddPage() {
                     ? "You are editing an existing saved word. The search box above is still only for new lookups."
                     : "Check the result here before saving it into your Vocab List."}
                 </p>
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="cursor-not-allowed rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-400 select-none"
-                  >
-                    Kanji Lookup (Coming Soon)
-                  </button>
-                </div>
               </div>
 
               {quickPreview.id ? (
