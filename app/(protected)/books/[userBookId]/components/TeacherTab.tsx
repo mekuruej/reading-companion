@@ -118,10 +118,36 @@ export default function TeacherTab({
   setKanjiWordOpen,
   hiraToKata,
 }: TeacherTabProps) {
+  const KANJI_OPEN_BATCH_SIZE = 50;
   const [isEditingLevelGuidance, setIsEditingLevelGuidance] = useState(false);
   const [isEditingStudentUse, setIsEditingStudentUse] = useState(false);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [notesSaveMessage, setNotesSaveMessage] = useState("");
+  const [isPreparingAllKanjiWords, setIsPreparingAllKanjiWords] = useState(false);
+  const queueWordIds = kanjiMapQueue.map((word) => word.id);
+  const openQueueWordIds = queueWordIds.filter((id) => !!openKanjiWordIds[id]);
+  const unopenedQueueWords = kanjiMapQueue.filter((word) => !openKanjiWordIds[word.id]);
+  const nextBatchWords = unopenedQueueWords.slice(0, KANJI_OPEN_BATCH_SIZE);
+
+  async function openNextKanjiWordBatch() {
+    setIsPreparingAllKanjiWords(true);
+
+    try {
+      for (const word of nextBatchWords) {
+        const editRows = editingKanjiRows[word.id] ?? [];
+        const hasPreparedRows =
+          editRows.length > 0 || (word.vocabulary_kanji_map ?? []).length > 0;
+
+        if (!hasPreparedRows) {
+          await handleWorkOnKanjiWord(word);
+        }
+      }
+
+      nextBatchWords.forEach((word) => setKanjiWordOpen(word.id, true));
+    } finally {
+      setIsPreparingAllKanjiWords(false);
+    }
+  }
 
   const suitableLevelOptions = [
     {
@@ -466,8 +492,41 @@ export default function TeacherTab({
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">
-          Kanji Map Enrichment Queue
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-stone-900">
+            Kanji Map Enrichment Queue
+          </div>
+
+          {kanjiMapQueue.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {nextBatchWords.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void openNextKanjiWordBatch()}
+                  disabled={isPreparingAllKanjiWords}
+                  className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                >
+                  {isPreparingAllKanjiWords
+                    ? `Preparing next ${nextBatchWords.length}...`
+                    : `Open next ${nextBatchWords.length} edit window${
+                        nextBatchWords.length === 1 ? "" : "s"
+                      }`}
+                </button>
+              ) : null}
+
+              {openQueueWordIds.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openQueueWordIds.forEach((id) => setKanjiWordOpen(id, false));
+                  }}
+                  className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                >
+                  Close all edit windows
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {kanjiMapLoading ? (

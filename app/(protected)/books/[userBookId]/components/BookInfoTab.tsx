@@ -10,6 +10,7 @@ type Book = {
   author: string | null;
   translator: string | null;
   illustrator: string | null;
+  publisher_id?: string | null;
   cover_url: string | null;
   genre: string | null;
   book_type: string | null;
@@ -73,6 +74,7 @@ type BookInfoTabProps = {
   isEditingLinks: boolean;
   isEditingMyCopy: boolean;
   saving: boolean;
+  errorMessage: string | null;
   onEditBookInfo: () => void;
   onEditPeople: () => void;
   onEditLinks: () => void;
@@ -94,10 +96,16 @@ type BookInfoTabProps = {
   setIsbn13: (value: string) => void;
 
   authorName: string;
+  authorEnglishName: string;
+  setAuthorEnglishName: (value: string) => void;
   setAuthorName: (value: string) => void;
   translatorName: string;
+  translatorEnglishName: string;
+  setTranslatorEnglishName: (value: string) => void;
   setTranslatorName: (value: string) => void;
   illustratorName: string;
+  illustratorEnglishName: string;
+  setIllustratorEnglishName: (value: string) => void;
   setIllustratorName: (value: string) => void;
 
   publisherName: string;
@@ -109,8 +117,20 @@ type BookInfoTabProps = {
 
   selectedAuthorId: string | null;
   setSelectedAuthorId: (value: string | null) => void;
+  requireSharedAuthorRecord: boolean;
+  setRequireSharedAuthorRecord: (value: boolean) => void;
+  selectedTranslatorId: string | null;
+  setSelectedTranslatorId: (value: string | null) => void;
+  requireSharedTranslatorRecord: boolean;
+  setRequireSharedTranslatorRecord: (value: boolean) => void;
+  selectedIllustratorId: string | null;
+  setSelectedIllustratorId: (value: string | null) => void;
+  requireSharedIllustratorRecord: boolean;
+  setRequireSharedIllustratorRecord: (value: boolean) => void;
   selectedPublisherId: string | null;
   setSelectedPublisherId: (value: string | null) => void;
+  requireSharedPublisherRecord: boolean;
+  setRequireSharedPublisherRecord: (value: boolean) => void;
 
   coverUrl: string;
   setCoverUrl: (value: string) => void;
@@ -164,6 +184,8 @@ type BookInfoTabProps = {
     editing: boolean;
     nameValue: string;
     setNameValue: (v: string) => void;
+    englishNameValue: string;
+    setEnglishNameValue: (v: string) => void;
     imgValue: string;
     setImgValue: (v: string) => void;
     readingValue: string;
@@ -178,6 +200,7 @@ export default function BookInfoTab({
   isEditingLinks,
   isEditingMyCopy,
   saving,
+  errorMessage,
   onEditBookInfo,
   onEditPeople,
   onEditLinks,
@@ -199,10 +222,16 @@ export default function BookInfoTab({
   setIsbn13,
 
   authorName,
+  authorEnglishName,
+  setAuthorEnglishName,
   setAuthorName,
   translatorName,
+  translatorEnglishName,
+  setTranslatorEnglishName,
   setTranslatorName,
   illustratorName,
+  illustratorEnglishName,
+  setIllustratorEnglishName,
   setIllustratorName,
 
   publisherName,
@@ -214,8 +243,20 @@ export default function BookInfoTab({
 
   selectedAuthorId,
   setSelectedAuthorId,
+  requireSharedAuthorRecord,
+  setRequireSharedAuthorRecord,
+  selectedTranslatorId,
+  setSelectedTranslatorId,
+  requireSharedTranslatorRecord,
+  setRequireSharedTranslatorRecord,
+  selectedIllustratorId,
+  setSelectedIllustratorId,
+  requireSharedIllustratorRecord,
+  setRequireSharedIllustratorRecord,
   selectedPublisherId,
   setSelectedPublisherId,
+  requireSharedPublisherRecord,
+  setRequireSharedPublisherRecord,
 
   coverUrl,
   setCoverUrl,
@@ -261,6 +302,14 @@ export default function BookInfoTab({
   const [authorBookMatches, setAuthorBookMatches] = useState<BookAuthorRecord[]>([]);
   const [authorSearchLoading, setAuthorSearchLoading] = useState(false);
   const [authorSearchError, setAuthorSearchError] = useState<string | null>(null);
+  const [translatorSearch, setTranslatorSearch] = useState("");
+  const [translatorResults, setTranslatorResults] = useState<PersonRecord[]>([]);
+  const [translatorSearchLoading, setTranslatorSearchLoading] = useState(false);
+  const [translatorSearchError, setTranslatorSearchError] = useState<string | null>(null);
+  const [illustratorSearch, setIllustratorSearch] = useState("");
+  const [illustratorResults, setIllustratorResults] = useState<PersonRecord[]>([]);
+  const [illustratorSearchLoading, setIllustratorSearchLoading] = useState(false);
+  const [illustratorSearchError, setIllustratorSearchError] = useState<string | null>(null);
 
   const [publisherSearch, setPublisherSearch] = useState("");
   const [publisherResults, setPublisherResults] = useState<PublisherRecord[]>([]);
@@ -286,6 +335,39 @@ export default function BookInfoTab({
     }
 
     return out;
+  }
+
+  async function searchPeopleRecords(term: string) {
+    const cleaned = term.trim();
+    const normalized = normalizeSearchTerm(cleaned);
+    const selectClause = "id, name_ja, name_en, reading, image_url, normalized_name";
+
+    const [jaRes, enRes, readingRes, normalizedRes] = await Promise.all([
+      supabase.from("people").select(selectClause).ilike("name_ja", ilikePattern(cleaned)).limit(8),
+      supabase.from("people").select(selectClause).ilike("name_en", ilikePattern(cleaned)).limit(8),
+      supabase.from("people").select(selectClause).ilike("reading", ilikePattern(cleaned)).limit(8),
+      supabase
+        .from("people")
+        .select(selectClause)
+        .ilike("normalized_name", ilikePattern(normalized))
+        .limit(8),
+    ]);
+
+    const error = jaRes.error ?? enRes.error ?? readingRes.error ?? normalizedRes.error;
+    if (error) {
+      return { data: [] as PersonRecord[], error };
+    }
+
+    const merged = dedupeById([
+      ...((jaRes.data ?? []) as PersonRecord[]),
+      ...((enRes.data ?? []) as PersonRecord[]),
+      ...((readingRes.data ?? []) as PersonRecord[]),
+      ...((normalizedRes.data ?? []) as PersonRecord[]),
+    ])
+      .sort((a, b) => a.name_ja.localeCompare(b.name_ja))
+      .slice(0, 8);
+
+    return { data: merged, error: null };
   }
 
   useEffect(() => {
@@ -424,6 +506,78 @@ export default function BookInfoTab({
   useEffect(() => {
     let cancelled = false;
 
+    async function runTranslatorSearch() {
+      const cleaned = translatorSearch.trim();
+
+      if (!isEditingPeople || !cleaned) {
+        setTranslatorResults([]);
+        setTranslatorSearchError(null);
+        return;
+      }
+
+      setTranslatorSearchLoading(true);
+      setTranslatorSearchError(null);
+
+      const { data, error } = await searchPeopleRecords(cleaned);
+
+      if (!cancelled) {
+        if (error) {
+          console.error("Error searching translators:", error);
+          setTranslatorResults([]);
+          setTranslatorSearchError(error.message);
+        } else {
+          setTranslatorResults(data);
+        }
+        setTranslatorSearchLoading(false);
+      }
+    }
+
+    runTranslatorSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [translatorSearch, isEditingPeople]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function runIllustratorSearch() {
+      const cleaned = illustratorSearch.trim();
+
+      if (!isEditingPeople || !cleaned) {
+        setIllustratorResults([]);
+        setIllustratorSearchError(null);
+        return;
+      }
+
+      setIllustratorSearchLoading(true);
+      setIllustratorSearchError(null);
+
+      const { data, error } = await searchPeopleRecords(cleaned);
+
+      if (!cancelled) {
+        if (error) {
+          console.error("Error searching illustrators:", error);
+          setIllustratorResults([]);
+          setIllustratorSearchError(error.message);
+        } else {
+          setIllustratorResults(data);
+        }
+        setIllustratorSearchLoading(false);
+      }
+    }
+
+    runIllustratorSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [illustratorSearch, isEditingPeople]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function runPublisherSearch() {
       const cleaned = publisherSearch.trim();
       const normalized = normalizeSearchTerm(cleaned);
@@ -495,8 +649,10 @@ export default function BookInfoTab({
 
   function handleSelectAuthor(person: PersonRecord) {
     setSelectedAuthorId(person.id);
+    setRequireSharedAuthorRecord(false);
     setAuthorSearch(person.name_ja);
     setAuthorName(person.name_ja);
+    setAuthorEnglishName(person.name_en ?? "");
     setAuthorReading(person.reading ?? "");
     setAuthorImg(person.image_url ?? "");
     setAuthorResults([]);
@@ -504,14 +660,17 @@ export default function BookInfoTab({
 
   function clearSelectedAuthor() {
     setSelectedAuthorId(null);
+    setRequireSharedAuthorRecord(false);
     setAuthorSearch("");
     setAuthorSearchError(null);
   }
 
   function handleUseBookAuthorMatch(match: BookAuthorRecord) {
     setSelectedAuthorId(null);
+    setRequireSharedAuthorRecord(false);
     setAuthorSearch(match.author ?? "");
     setAuthorName(match.author ?? "");
+    setAuthorEnglishName("");
     setAuthorReading(match.author_reading ?? "");
     setAuthorImg(match.author_image_url ?? "");
     setAuthorResults([]);
@@ -520,8 +679,45 @@ export default function BookInfoTab({
     setAuthorSearchError(null);
   }
 
+  function handleSelectTranslator(person: PersonRecord) {
+    setSelectedTranslatorId(person.id);
+    setRequireSharedTranslatorRecord(false);
+    setTranslatorSearch(person.name_ja);
+    setTranslatorName(person.name_ja);
+    setTranslatorEnglishName(person.name_en ?? "");
+    setTranslatorReading(person.reading ?? "");
+    setTranslatorImg(person.image_url ?? "");
+    setTranslatorResults([]);
+  }
+
+  function clearSelectedTranslator() {
+    setSelectedTranslatorId(null);
+    setRequireSharedTranslatorRecord(false);
+    setTranslatorSearch("");
+    setTranslatorSearchError(null);
+  }
+
+  function handleSelectIllustrator(person: PersonRecord) {
+    setSelectedIllustratorId(person.id);
+    setRequireSharedIllustratorRecord(false);
+    setIllustratorSearch(person.name_ja);
+    setIllustratorName(person.name_ja);
+    setIllustratorEnglishName(person.name_en ?? "");
+    setIllustratorReading(person.reading ?? "");
+    setIllustratorImg(person.image_url ?? "");
+    setIllustratorResults([]);
+  }
+
+  function clearSelectedIllustrator() {
+    setSelectedIllustratorId(null);
+    setRequireSharedIllustratorRecord(false);
+    setIllustratorSearch("");
+    setIllustratorSearchError(null);
+  }
+
   function handleSelectPublisher(publisher: PublisherRecord) {
     setSelectedPublisherId(publisher.id);
+    setRequireSharedPublisherRecord(false);
     setPublisherSearch(publisher.name_ja);
     setPublisherName(publisher.name_ja);
     setPublisherEnglishName(publisher.name_en ?? "");
@@ -532,8 +728,51 @@ export default function BookInfoTab({
 
   function clearSelectedPublisher() {
     setSelectedPublisherId(null);
+    setRequireSharedPublisherRecord(false);
     setPublisherSearch("");
     setPublisherSearchError(null);
+  }
+
+  function startNewAuthorFromSearch() {
+    const cleaned = authorSearch.trim();
+    if (!cleaned) return;
+    setSelectedAuthorId(null);
+    setRequireSharedAuthorRecord(true);
+    setAuthorName(cleaned);
+    setAuthorSearchError(null);
+    setAuthorResults([]);
+    setAuthorContributorMatches([]);
+    setAuthorBookMatches([]);
+  }
+
+  function startNewTranslatorFromSearch() {
+    const cleaned = translatorSearch.trim();
+    if (!cleaned) return;
+    setSelectedTranslatorId(null);
+    setRequireSharedTranslatorRecord(true);
+    setTranslatorName(cleaned);
+    setTranslatorSearchError(null);
+    setTranslatorResults([]);
+  }
+
+  function startNewIllustratorFromSearch() {
+    const cleaned = illustratorSearch.trim();
+    if (!cleaned) return;
+    setSelectedIllustratorId(null);
+    setRequireSharedIllustratorRecord(true);
+    setIllustratorName(cleaned);
+    setIllustratorSearchError(null);
+    setIllustratorResults([]);
+  }
+
+  function startNewPublisherFromSearch() {
+    const cleaned = publisherSearch.trim();
+    if (!cleaned) return;
+    setSelectedPublisherId(null);
+    setRequireSharedPublisherRecord(true);
+    setPublisherName(cleaned);
+    setPublisherSearchError(null);
+    setPublisherResults([]);
   }
 
   return (
@@ -785,6 +1024,12 @@ export default function BookInfoTab({
           )}
         </div>
 
+        {errorMessage ? (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        ) : null}
+
         <div className="space-y-4">
           <div className="space-y-2">
             {isEditingPeople ? (
@@ -802,6 +1047,11 @@ export default function BookInfoTab({
                   placeholder="宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ"
                   className="w-full rounded border px-2 py-1 text-sm"
                 />
+                <div className="mt-2 text-xs text-stone-500">
+                  Pick an existing author when you can. If no match exists, keep the author typed
+                  in below and save. The app will try to create a shared author record
+                  automatically.
+                </div>
 
                 {authorSearchLoading ? (
                   <div className="mt-2 text-xs text-stone-500">Searching…</div>
@@ -828,7 +1078,9 @@ export default function BookInfoTab({
                     ))}
                   </div>
                 ) : authorSearch.trim() && !authorSearchLoading && !authorSearchError ? (
-                  <div className="mt-2 text-xs text-stone-500">No matching author found in saved people records.</div>
+                  <div className="mt-2 text-xs text-stone-500">
+                    No matching author found in saved people records yet.
+                  </div>
                 ) : null}
 
                 {authorContributorMatches.length > 0 ? (
@@ -890,6 +1142,28 @@ export default function BookInfoTab({
                     </button>
                   </div>
                 ) : null}
+
+                {requireSharedAuthorRecord ? (
+                  <div className="mt-2 text-xs font-medium text-amber-700">
+                    New shared author record will be required on save.
+                  </div>
+                ) : null}
+
+                {authorSearch.trim() ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="text-xs text-amber-900">
+                      Don&apos;t see the right match? Create a new shared author record from this
+                      search, then finish the details below.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={startNewAuthorFromSearch}
+                      className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
+                    >
+                      Create New Author
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -904,6 +1178,11 @@ export default function BookInfoTab({
                 setAuthorName(value);
                 setSelectedAuthorId(null);
               }}
+              englishNameValue={authorEnglishName}
+              setEnglishNameValue={(value) => {
+                setAuthorEnglishName(value);
+                setSelectedAuthorId(null);
+              }}
               imgValue={authorImg}
               setImgValue={setAuthorImg}
               readingValue={authorReading}
@@ -912,35 +1191,225 @@ export default function BookInfoTab({
           </div>
 
           {(book.translator || book.translator_image_url || isEditingPeople) && (
-            <PersonRow
-              label="Translator"
-              name={isEditingPeople ? translatorName : book.translator}
-              reading={isEditingPeople ? translatorReading : book.translator_reading}
-              img={isEditingPeople ? translatorImg : book.translator_image_url}
-              editing={isEditingPeople}
-              nameValue={translatorName}
-              setNameValue={setTranslatorName}
-              imgValue={translatorImg}
-              setImgValue={setTranslatorImg}
-              readingValue={translatorReading}
-              setReadingValue={setTranslatorReading}
-            />
+            <div className="space-y-2">
+              {isEditingPeople ? (
+                <div className="rounded border bg-white p-3 text-sm">
+                  <label className="mb-1 block text-sm font-medium text-stone-700">
+                    Search existing translator
+                  </label>
+                  <input
+                    value={translatorSearch}
+                    onChange={(e) => {
+                      setTranslatorSearch(e.target.value);
+                      setSelectedTranslatorId(null);
+                      setTranslatorSearchError(null);
+                    }}
+                    placeholder="村上 春樹 / Haruki Murakami / むらかみ はるき"
+                    className="w-full rounded border px-2 py-1 text-sm"
+                  />
+
+                  {translatorSearchLoading ? (
+                    <div className="mt-2 text-xs text-stone-500">Searching…</div>
+                  ) : null}
+
+                  {translatorSearchError ? (
+                    <div className="mt-2 text-xs text-red-600">{translatorSearchError}</div>
+                  ) : null}
+
+                  {translatorResults.length > 0 ? (
+                    <div className="mt-2 rounded border border-stone-200">
+                      {translatorResults.map((person) => (
+                        <button
+                          key={person.id}
+                          type="button"
+                          onClick={() => handleSelectTranslator(person)}
+                          className="block w-full border-b border-stone-200 px-3 py-2 text-left last:border-b-0 hover:bg-stone-50"
+                        >
+                          <div className="font-medium text-stone-900">{person.name_ja}</div>
+                          <div className="text-xs text-stone-600">
+                            {person.name_en || "—"} · {person.reading || "—"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : translatorSearch.trim() && !translatorSearchLoading && !translatorSearchError ? (
+                    <div className="mt-2 text-xs text-stone-500">
+                      No matching translator found in saved people records yet.
+                    </div>
+                  ) : null}
+
+                  {selectedTranslatorId ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
+                      <span className="rounded-full bg-stone-100 px-2 py-1">
+                        Linked to person record
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearSelectedTranslator}
+                        className="text-stone-500 underline hover:text-stone-700"
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {requireSharedTranslatorRecord ? (
+                    <div className="mt-2 text-xs font-medium text-amber-700">
+                      New shared translator record will be required on save.
+                    </div>
+                  ) : null}
+
+                  {translatorSearch.trim() ? (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <div className="text-xs text-amber-900">
+                        Don&apos;t see the right match? Create a new shared translator record from
+                        this search, then finish the details below.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={startNewTranslatorFromSearch}
+                        className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
+                      >
+                        Create New Translator
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <PersonRow
+                label="Translator"
+                name={isEditingPeople ? translatorName : book.translator}
+                reading={isEditingPeople ? translatorReading : book.translator_reading}
+                img={isEditingPeople ? translatorImg : book.translator_image_url}
+                editing={isEditingPeople}
+                nameValue={translatorName}
+                setNameValue={(value) => {
+                  setTranslatorName(value);
+                  setSelectedTranslatorId(null);
+                }}
+                englishNameValue={translatorEnglishName}
+                setEnglishNameValue={(value) => {
+                  setTranslatorEnglishName(value);
+                  setSelectedTranslatorId(null);
+                }}
+                imgValue={translatorImg}
+                setImgValue={setTranslatorImg}
+                readingValue={translatorReading}
+                setReadingValue={setTranslatorReading}
+              />
+            </div>
           )}
 
           {(book.illustrator || book.illustrator_image_url || isEditingPeople) && (
-            <PersonRow
-              label="Illustrator"
-              name={isEditingPeople ? illustratorName : book.illustrator}
-              reading={isEditingPeople ? illustratorReading : book.illustrator_reading}
-              img={isEditingPeople ? illustratorImg : book.illustrator_image_url}
-              editing={isEditingPeople}
-              nameValue={illustratorName}
-              setNameValue={setIllustratorName}
-              imgValue={illustratorImg}
-              setImgValue={setIllustratorImg}
-              readingValue={illustratorReading}
-              setReadingValue={setIllustratorReading}
-            />
+            <div className="space-y-2">
+              {isEditingPeople ? (
+                <div className="rounded border bg-white p-3 text-sm">
+                  <label className="mb-1 block text-sm font-medium text-stone-700">
+                    Search existing illustrator
+                  </label>
+                  <input
+                    value={illustratorSearch}
+                    onChange={(e) => {
+                      setIllustratorSearch(e.target.value);
+                      setSelectedIllustratorId(null);
+                      setIllustratorSearchError(null);
+                    }}
+                    placeholder="安野 光雅 / Mitsumasa Anno / あんの みつまさ"
+                    className="w-full rounded border px-2 py-1 text-sm"
+                  />
+
+                  {illustratorSearchLoading ? (
+                    <div className="mt-2 text-xs text-stone-500">Searching…</div>
+                  ) : null}
+
+                  {illustratorSearchError ? (
+                    <div className="mt-2 text-xs text-red-600">{illustratorSearchError}</div>
+                  ) : null}
+
+                  {illustratorResults.length > 0 ? (
+                    <div className="mt-2 rounded border border-stone-200">
+                      {illustratorResults.map((person) => (
+                        <button
+                          key={person.id}
+                          type="button"
+                          onClick={() => handleSelectIllustrator(person)}
+                          className="block w-full border-b border-stone-200 px-3 py-2 text-left last:border-b-0 hover:bg-stone-50"
+                        >
+                          <div className="font-medium text-stone-900">{person.name_ja}</div>
+                          <div className="text-xs text-stone-600">
+                            {person.name_en || "—"} · {person.reading || "—"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : illustratorSearch.trim() && !illustratorSearchLoading && !illustratorSearchError ? (
+                    <div className="mt-2 text-xs text-stone-500">
+                      No matching illustrator found in saved people records yet.
+                    </div>
+                  ) : null}
+
+                  {selectedIllustratorId ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
+                      <span className="rounded-full bg-stone-100 px-2 py-1">
+                        Linked to person record
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearSelectedIllustrator}
+                        className="text-stone-500 underline hover:text-stone-700"
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {requireSharedIllustratorRecord ? (
+                    <div className="mt-2 text-xs font-medium text-amber-700">
+                      New shared illustrator record will be required on save.
+                    </div>
+                  ) : null}
+
+                  {illustratorSearch.trim() ? (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <div className="text-xs text-amber-900">
+                        Don&apos;t see the right match? Create a new shared illustrator record from
+                        this search, then finish the details below.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={startNewIllustratorFromSearch}
+                        className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
+                      >
+                        Create New Illustrator
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <PersonRow
+                label="Illustrator"
+                name={isEditingPeople ? illustratorName : book.illustrator}
+                reading={isEditingPeople ? illustratorReading : book.illustrator_reading}
+                img={isEditingPeople ? illustratorImg : book.illustrator_image_url}
+                editing={isEditingPeople}
+                nameValue={illustratorName}
+                setNameValue={(value) => {
+                  setIllustratorName(value);
+                  setSelectedIllustratorId(null);
+                }}
+                englishNameValue={illustratorEnglishName}
+                setEnglishNameValue={(value) => {
+                  setIllustratorEnglishName(value);
+                  setSelectedIllustratorId(null);
+                }}
+                imgValue={illustratorImg}
+                setImgValue={setIllustratorImg}
+                readingValue={illustratorReading}
+                setReadingValue={setIllustratorReading}
+              />
+            </div>
           )}
 
           {(book.publisher || book.publisher_image_url || isEditingPeople) && (
@@ -991,20 +1460,42 @@ export default function BookInfoTab({
                     <div className="mt-2 text-xs text-stone-500">No matching publisher found.</div>
                   ) : null}
 
-                  {selectedPublisherId ? (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
-                      <span className="rounded-full bg-stone-100 px-2 py-1">
-                        Linked to publisher record
-                      </span>
+                {selectedPublisherId ? (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
+                    <span className="rounded-full bg-stone-100 px-2 py-1">
+                      Linked to publisher record
+                    </span>
                       <button
                         type="button"
                         onClick={clearSelectedPublisher}
                         className="text-stone-500 underline hover:text-stone-700"
                       >
                         Clear selection
-                      </button>
+                    </button>
+                  </div>
+                ) : null}
+
+                {requireSharedPublisherRecord ? (
+                  <div className="mt-2 text-xs font-medium text-amber-700">
+                    New shared publisher record will be required on save.
+                  </div>
+                ) : null}
+
+                {publisherSearch.trim() ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="text-xs text-amber-900">
+                      Don&apos;t see the right match? Create a new shared publisher record from this
+                      search, then finish the details below.
                     </div>
-                  ) : null}
+                    <button
+                      type="button"
+                      onClick={startNewPublisherFromSearch}
+                      className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
+                    >
+                      Create New Publisher
+                    </button>
+                  </div>
+                ) : null}
 
                   <div className="mt-3">
                     <label className="mb-1 block text-sm font-medium text-stone-700">
@@ -1031,6 +1522,8 @@ export default function BookInfoTab({
                   setPublisherName(value);
                   setSelectedPublisherId(null);
                 }}
+                englishNameValue={publisherEnglishName}
+                setEnglishNameValue={setPublisherEnglishName}
                 imgValue={publisherImg}
                 setImgValue={setPublisherImg}
                 readingValue={publisherReading}

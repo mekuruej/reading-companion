@@ -20,6 +20,7 @@ type UserBookWordRow = {
 type QuizCard = {
   key: string;
   kanjiMapId: number;
+  flaggedForReview: boolean;
   kanji: string;
   reading: string;
   readingType: "onyomi" | "kunyomi" | "other" | null;
@@ -116,6 +117,12 @@ function getTrailingReadingHint(sourceWord: string, kanji: string) {
 
   if (index === -1) return "";
   return chars.filter((_, i) => i !== index).join("");
+}
+
+function expandCardsForPractice(cards: QuizCard[]) {
+  return cards.flatMap((card) =>
+    card.flaggedForReview ? [card, { ...card, key: `${card.key}-priority` }] : [card]
+  );
 }
 
 export default function WeeklyReadingsPage() {
@@ -284,16 +291,19 @@ export default function WeeklyReadingsPage() {
         const { data: kanjiMapRows, error: kanjiMapErr } = await supabase
           .from("vocabulary_kanji_map")
           .select(
-            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, excluded_from_kanji_practice"
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, excluded_from_kanji_practice, flagged_for_review"
           )
-          .in("vocabulary_cache_id", vocabularyCacheIds)
-          .eq("excluded_from_kanji_practice", false);
+          .in("vocabulary_cache_id", vocabularyCacheIds);
 
         if (kanjiMapErr) throw kanjiMapErr;
 
+        const activeKanjiMapRows = (kanjiMapRows ?? []).filter(
+          (row: any) => !row.excluded_from_kanji_practice || !!row.flagged_for_review
+        );
+
         const kanjiMapByCacheId = new Map<number, any[]>();
 
-        for (const row of kanjiMapRows ?? []) {
+        for (const row of activeKanjiMapRows) {
           const bucket = kanjiMapByCacheId.get(row.vocabulary_cache_id) ?? [];
           bucket.push(row);
           kanjiMapByCacheId.set(row.vocabulary_cache_id, bucket);
@@ -323,6 +333,7 @@ export default function WeeklyReadingsPage() {
             return {
               key: `${r.id}-${km.kanji}-${i}`,
               kanjiMapId: km.id,
+              flaggedForReview: !!km.flagged_for_review,
               kanji: km.kanji,
               reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
               baseReading: km.base_reading?.trim() || null,
@@ -471,6 +482,16 @@ export default function WeeklyReadingsPage() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [card, checked, options, inRecallFlow]);
 
+  useEffect(() => {
+    if (!notice) return;
+
+    const timer = window.setTimeout(() => {
+      setNotice(null);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   async function flagKanjiCardForReview(cardToFlag: QuizCard) {
     const flaggedAt = new Date().toISOString();
 
@@ -478,7 +499,7 @@ export default function WeeklyReadingsPage() {
       .from("vocabulary_kanji_map")
       .update({
         flagged_for_review: true,
-        excluded_from_kanji_practice: true,
+        excluded_from_kanji_practice: false,
         flagged_by_user_id: null,
         flagged_at: flaggedAt,
       })
@@ -504,9 +525,26 @@ export default function WeeklyReadingsPage() {
       console.error("Error creating kanji flag alert:", alertError);
     }
 
-    setNotice("✅ Flagged for review");
-    setDeck((prev) => prev.filter((c) => c.kanjiMapId !== cardToFlag.kanjiMapId));
-    setBaseCards((prev) => prev.filter((c) => c.kanjiMapId !== cardToFlag.kanjiMapId));
+    setNotice("✅ Flagged for review — it will come back later");
+    setDeck((prev) => {
+      const currentCard = prev[index];
+      if (!currentCard) return prev;
+
+      const remaining = prev.filter((_, i) => i !== index);
+      const recycledCard = {
+        ...currentCard,
+        flaggedForReview: true,
+        key: `${currentCard.key}-flagged-${Date.now()}`,
+      };
+
+      return [...remaining, recycledCard];
+    });
+
+    if (index >= deck.length - 1) {
+      setIndex((prev) => Math.max(prev - 1, 0));
+    }
+
+    resetCardState();
   }
 
   function resetCardState() {
@@ -525,7 +563,9 @@ export default function WeeklyReadingsPage() {
       return;
     }
 
-    const onePassDeck = shuffleArray(cards).map((c, i) => ({
+    const weightedCards = expandCardsForPractice(cards);
+
+    const onePassDeck = shuffleArray(weightedCards).map((c, i) => ({
       ...c,
       key: `${c.key}-deck-once-${i}`,
     }));
@@ -876,15 +916,29 @@ export default function WeeklyReadingsPage() {
       ) : null}
 
       <div
-        className="relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl"
+        className={`relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl ${
+          card.flaggedForReview ? "border-red-400 bg-red-50/30" : "border-slate-500"
+        }`}
         onClick={() => {
           if (!checked && !inRecallFlow) return;
           if (inRecallFlow) return;
           if (checked) nextCard();
         }}
       >
+        {card.flaggedForReview ? (
+          <div className="absolute left-4 top-3 z-10 rounded-full bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700">
+            Review Carefully
+          </div>
+        ) : null}
+
         {card.readingType ? (
-          <div className="absolute left-4 top-3 z-10 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
+          <div
+            className={`absolute z-10 rounded-full px-3 py-1.5 text-sm font-medium ${
+              card.flaggedForReview
+                ? "left-4 top-14 bg-slate-100 text-slate-600"
+                : "left-4 top-3 bg-slate-100 text-slate-600"
+            }`}
+          >
             {readingTypeLabel(card.readingType)}
           </div>
         ) : null}

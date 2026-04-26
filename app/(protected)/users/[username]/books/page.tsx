@@ -582,11 +582,15 @@ export default function BooksPage() {
     await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
 
     if (isTeacher && targetUserId === meId) {
-      const alertUserIds = isSuperTeacher
+      const studentAlertUserIds = isSuperTeacher
         ? students.filter((s) => s.id).map((s) => s.id)
         : students
             .filter((s) => s.id && (s.role === "member" || s.role === "student"))
             .map((s) => s.id);
+
+      const alertUserIds = Array.from(
+        new Set([meId, ...studentAlertUserIds].filter(Boolean))
+      ) as string[];
 
       await loadKanjiEnrichmentAlerts(alertUserIds);
     } else {
@@ -931,8 +935,17 @@ export default function BooksPage() {
         title: metaByUserBookId.get(userBookId)?.title ?? "Untitled",
         count,
         studentName: metaByUserBookId.get(userBookId)?.studentName ?? null,
+        isMyBook: (userBooks ?? []).some(
+          (row: any) => row.id === userBookId && row.user_id === meId
+        ),
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => {
+        if (a.isMyBook !== b.isMyBook) {
+          return a.isMyBook ? 1 : -1;
+        }
+
+        return b.count - a.count;
+      });
 
     setKanjiEnrichmentAlerts(alerts);
     console.log("kanjiEnrichmentAlerts", alerts);

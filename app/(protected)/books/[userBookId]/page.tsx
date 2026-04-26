@@ -20,6 +20,7 @@ type Book = {
   author: string | null;
   translator: string | null;
   illustrator: string | null;
+  publisher_id?: string | null;
   cover_url: string | null;
   genre: string | null;
   book_type: string | null;
@@ -555,6 +556,9 @@ export default function BookHubPage() {
   const [translatorName, setTranslatorName] = useState<string>("");
   const [illustratorName, setIllustratorName] = useState<string>("");
   const [publisherName, setPublisherName] = useState<string>("");
+  const [authorEnglishName, setAuthorEnglishName] = useState<string>("");
+  const [translatorEnglishName, setTranslatorEnglishName] = useState<string>("");
+  const [illustratorEnglishName, setIllustratorEnglishName] = useState<string>("");
 
   const [publisherReading, setPublisherReading] = useState<string>("");
 
@@ -566,6 +570,12 @@ export default function BookHubPage() {
   const [publisherEnglishName, setPublisherEnglishName] = useState("");
   const [selectedPublisherId, setSelectedPublisherId] = useState<string | null>(null);
   const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
+  const [selectedTranslatorId, setSelectedTranslatorId] = useState<string | null>(null);
+  const [selectedIllustratorId, setSelectedIllustratorId] = useState<string | null>(null);
+  const [requireSharedAuthorRecord, setRequireSharedAuthorRecord] = useState(false);
+  const [requireSharedTranslatorRecord, setRequireSharedTranslatorRecord] = useState(false);
+  const [requireSharedIllustratorRecord, setRequireSharedIllustratorRecord] = useState(false);
+  const [requireSharedPublisherRecord, setRequireSharedPublisherRecord] = useState(false);
 
   const [authorReading, setAuthorReading] = useState<string>("");
   const [translatorReading, setTranslatorReading] = useState<string>("");
@@ -705,6 +715,8 @@ export default function BookHubPage() {
   }, [coverageReadingSessions]);
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [saveNoticeTone, setSaveNoticeTone] = useState<"success" | "warning">("success");
   const [bookOptions, setBookOptions] = useState<
     { id: string; title: string; started_at: string | null; finished_at: string | null; dnf_at: string | null }[]
   >([]);
@@ -2901,6 +2913,7 @@ export default function BookHubPage() {
           isbn,
           isbn13,
           publisher,
+          publisher_id,
           published_date,
           publisher_reading,
           publisher_image_url,
@@ -2984,6 +2997,18 @@ export default function BookHubPage() {
     setIllustratorName(b?.illustrator ?? "");
     setPublisherName(b?.publisher ?? "");
     setPublisherReading(b?.publisher_reading ?? "");
+    setAuthorEnglishName("");
+    setTranslatorEnglishName("");
+    setIllustratorEnglishName("");
+    setPublisherEnglishName("");
+    setSelectedAuthorId(null);
+    setSelectedTranslatorId(null);
+    setSelectedIllustratorId(null);
+    setSelectedPublisherId(b?.publisher_id ?? null);
+    setRequireSharedAuthorRecord(false);
+    setRequireSharedTranslatorRecord(false);
+    setRequireSharedIllustratorRecord(false);
+    setRequireSharedPublisherRecord(false);
 
     setCoverUrl(b?.cover_url ?? "");
     setAuthorImg(b?.author_image_url ?? "");
@@ -2996,6 +3021,7 @@ export default function BookHubPage() {
     setIllustratorReading(b?.illustrator_reading ?? "");
 
     setLinksText(linksToText(b?.related_links));
+    await hydrateLinkedPeopleAndPublisher(b);
 
     await loadCommunityContributions(b?.id ?? "", user.id, b ?? undefined);
 
@@ -3128,6 +3154,18 @@ export default function BookHubPage() {
     setIllustratorName(b?.illustrator ?? "");
     setPublisherName(b?.publisher ?? "");
     setPublisherReading(b?.publisher_reading ?? "");
+    setAuthorEnglishName("");
+    setTranslatorEnglishName("");
+    setIllustratorEnglishName("");
+    setPublisherEnglishName("");
+    setSelectedAuthorId(null);
+    setSelectedTranslatorId(null);
+    setSelectedIllustratorId(null);
+    setSelectedPublisherId(b?.publisher_id ?? null);
+    setRequireSharedAuthorRecord(false);
+    setRequireSharedTranslatorRecord(false);
+    setRequireSharedIllustratorRecord(false);
+    setRequireSharedPublisherRecord(false);
 
     setCoverUrl(b?.cover_url ?? "");
     setAuthorImg(b?.author_image_url ?? "");
@@ -3142,10 +3180,85 @@ export default function BookHubPage() {
     setLinksText(linksToText(b?.related_links));
     setGenre(savedCommunityGenres);
     setTriggerWarnings(savedCommunityContentNotes);
+    void hydrateLinkedPeopleAndPublisher(b);
   };
 
   function normalizeName(value: string) {
     return value.trim().replace(/\s+/g, " ").toLowerCase();
+  }
+
+  async function hydrateLinkedPeopleAndPublisher(book: Book | null) {
+    if (!book?.id) return;
+
+    if (book.publisher_id) {
+      const { data: publisher } = await supabase
+        .from("publishers")
+        .select("id, name_ja, name_en, reading, logo_url")
+        .eq("id", book.publisher_id)
+        .maybeSingle();
+
+      if (publisher) {
+        setSelectedPublisherId(publisher.id);
+        setPublisherName(publisher.name_ja ?? book.publisher ?? "");
+        setPublisherEnglishName(publisher.name_en ?? "");
+        setPublisherReading(publisher.reading ?? book.publisher_reading ?? "");
+        setPublisherImg(publisher.logo_url ?? book.publisher_image_url ?? "");
+      }
+    }
+
+    const { data: contributorData } = await supabase
+      .from("book_contributors")
+      .select("role, people!inner(id, name_ja, name_en, reading, image_url)")
+      .eq("book_id", book.id)
+      .in("role", ["author", "translator", "illustrator"]);
+
+    const contributors = (contributorData ?? []) as Array<{
+      role: "author" | "translator" | "illustrator";
+      people:
+        | {
+            id: string;
+            name_ja: string;
+            name_en: string | null;
+            reading: string | null;
+            image_url: string | null;
+          }
+        | Array<{
+            id: string;
+            name_ja: string;
+            name_en: string | null;
+            reading: string | null;
+            image_url: string | null;
+          }>
+        | null;
+    }>;
+
+    for (const contributor of contributors) {
+      const person = Array.isArray(contributor.people)
+        ? contributor.people[0]
+        : contributor.people;
+
+      if (!person) continue;
+
+      if (contributor.role === "author") {
+        setSelectedAuthorId(person.id);
+        setAuthorName(person.name_ja ?? book.author ?? "");
+        setAuthorEnglishName(person.name_en ?? "");
+        setAuthorReading(person.reading ?? book.author_reading ?? "");
+        setAuthorImg(person.image_url ?? book.author_image_url ?? "");
+      } else if (contributor.role === "translator") {
+        setSelectedTranslatorId(person.id);
+        setTranslatorName(person.name_ja ?? book.translator ?? "");
+        setTranslatorEnglishName(person.name_en ?? "");
+        setTranslatorReading(person.reading ?? book.translator_reading ?? "");
+        setTranslatorImg(person.image_url ?? book.translator_image_url ?? "");
+      } else if (contributor.role === "illustrator") {
+        setSelectedIllustratorId(person.id);
+        setIllustratorName(person.name_ja ?? book.illustrator ?? "");
+        setIllustratorEnglishName(person.name_en ?? "");
+        setIllustratorReading(person.reading ?? book.illustrator_reading ?? "");
+        setIllustratorImg(person.image_url ?? book.illustrator_image_url ?? "");
+      }
+    }
   }
 
   async function upsertPublisherRecord() {
@@ -3201,70 +3314,205 @@ export default function BookHubPage() {
     return data;
   }
 
-  async function upsertAuthorPerson() {
-    const cleanedName = authorName.trim().replace(/\s+/g, " ");
-    if (!cleanedName) return { data: null, error: null };
+  async function ensureStrictPublisherRecord() {
+    if (!requireSharedPublisherRecord || selectedPublisherId || !publisherName.trim()) {
+      return { data: null as { id: string; name_ja: string } | null, error: null as Error | null };
+    }
 
-    if (selectedAuthorId) {
+    const publisherRecord = await upsertPublisherRecord();
+    if (!publisherRecord) {
+      return {
+        data: null,
+        error: new Error("Could not create a shared publisher record. Please try again."),
+      };
+    }
+
+    return { data: publisherRecord, error: null };
+  }
+
+  async function upsertPersonRecord({
+    selectedId,
+    name,
+    englishName,
+    reading,
+    imageUrl,
+  }: {
+    selectedId: string | null;
+    name: string;
+    englishName: string;
+    reading: string;
+    imageUrl: string;
+  }) {
+    const cleanedName = name.trim().replace(/\s+/g, " ");
+    if (!cleanedName) return { data: null, error: null, dbErrorMessage: null as string | null };
+
+    if (selectedId) {
       const { data, error } = await supabase
         .from("people")
         .update({
           name_ja: cleanedName,
-          reading: authorReading.trim() || null,
-          image_url: authorImg.trim() || null,
+          name_en: englishName.trim() || null,
+          reading: reading.trim() || null,
+          image_url: imageUrl.trim() || null,
         })
-        .eq("id", selectedAuthorId)
+        .eq("id", selectedId)
         .select("id")
         .single();
 
       if (error) {
-        console.error("Error updating selected author:", error);
-        return { data: null, error };
+        console.warn(
+          "Could not update selected person record; keeping the existing link instead:",
+          error
+        );
+        return {
+          data: { id: selectedId },
+          error: null,
+          dbErrorMessage: error.message,
+          mode: "kept-existing-link" as const,
+        };
       }
 
-      return { data, error: null };
+      return { data, error: null, dbErrorMessage: null, mode: "updated-existing" as const };
     }
 
-    // Plain text author edits should still save to the book even when the client
-    // is not allowed to create shared people records under RLS.
-    return { data: null, error: null };
+    const normalized = normalizeName(cleanedName);
+
+    const { data, error } = await supabase
+      .from("people")
+      .upsert(
+        {
+          name_ja: cleanedName,
+          name_en: englishName.trim() || null,
+          reading: reading.trim() || null,
+          image_url: imageUrl.trim() || null,
+          normalized_name: normalized,
+        },
+        {
+          onConflict: "normalized_name",
+          ignoreDuplicates: false,
+        }
+      )
+      .select("id")
+      .single();
+
+    if (error) {
+      console.warn(
+        "Could not create shared person record; saving the book text only:",
+        error
+      );
+      return {
+        data: null,
+        error: null,
+        dbErrorMessage: error.message,
+        mode: "saved-book-only" as const,
+      };
+    }
+
+    return { data, error: null, dbErrorMessage: null, mode: "created-or-linked" as const };
   }
 
-  async function syncAuthorContributor(bookId: string) {
-    if (!selectedAuthorId) {
-      return null;
+  async function ensureStrictPersonRecord(draft: {
+    selectedId: string | null;
+    name: string;
+    englishName: string;
+    reading: string;
+    imageUrl: string;
+    requireSharedRecord: boolean;
+    roleLabel: string;
+  }) {
+    if (!draft.requireSharedRecord || draft.selectedId || !draft.name.trim()) {
+      return { id: null as string | null, error: null as Error | null };
     }
 
+    const { data, dbErrorMessage } = await upsertPersonRecord(draft);
+    if (!data) {
+      return {
+        id: null,
+        error: new Error(
+          dbErrorMessage
+            ? `Could not create a shared ${draft.roleLabel} record: ${dbErrorMessage}`
+            : `Could not create a shared ${draft.roleLabel} record. The book was not saved so you can try again.`
+        ),
+      };
+    }
+
+    return { id: data.id, error: null };
+  }
+
+  async function syncContributorRole(
+    bookId: string,
+    role: "author" | "translator" | "illustrator",
+    personDraft: {
+      selectedId: string | null;
+      name: string;
+      englishName: string;
+      reading: string;
+      imageUrl: string;
+    },
+    forcedPersonId?: string | null,
+    forcedStatus?: "created-shared-record" | "linked-existing-record"
+  ) {
     const { error: deleteError } = await supabase
       .from("book_contributors")
       .delete()
       .eq("book_id", bookId)
-      .eq("role", "author");
+      .eq("role", role);
 
     if (deleteError) {
-      console.error("Error clearing existing author contributor:", deleteError);
-      return deleteError;
+      console.error(`Error clearing existing ${role} contributor:`, deleteError);
+      return { error: deleteError, status: "error" as const };
     }
 
-    const { data: person, error: personError } = await upsertAuthorPerson();
-    if (personError) return personError;
-    if (!person) return null;
+    if (!personDraft.name.trim()) {
+      return { error: null, status: "empty" as const };
+    }
+
+    let person = forcedPersonId ? { id: forcedPersonId } : null;
+    let mode: "kept-existing-link" | "updated-existing" | "saved-book-only" | "created-or-linked" =
+      "kept-existing-link";
+
+    if (!person) {
+      const result = await upsertPersonRecord(personDraft);
+      person = result.data;
+      mode = result.mode ?? "saved-book-only";
+      if (result.error) return { error: result.error, status: "error" as const };
+    }
+
+    if (!person) {
+      return {
+        error: null,
+        status: mode === "saved-book-only" ? "saved-book-only" : "empty",
+      };
+    }
 
     const { error: insertError } = await supabase
       .from("book_contributors")
-      .insert({
-        book_id: bookId,
-        person_id: person.id,
-        role: "author",
-        display_order: 1,
-      });
+      .upsert(
+        {
+          book_id: bookId,
+          person_id: person.id,
+          role,
+          display_order: 1,
+        },
+        {
+          onConflict: "book_id,person_id,role,display_order",
+          ignoreDuplicates: false,
+        }
+      );
 
     if (insertError) {
-      console.error("Error linking author contributor:", insertError);
-      return insertError;
+      console.error(`Error linking ${role} contributor:`, insertError);
+      return { error: insertError, status: "error" as const };
     }
 
-    return null;
+    return {
+      error: null,
+      status:
+        forcedStatus ??
+        (mode === "created-or-linked" ? "created-shared-record" :
+        mode === "updated-existing" || mode === "kept-existing-link" ? "linked-existing-record" :
+          "linked-existing-record"),
+    };
   }
 
   const saveAll = async () => {
@@ -3272,6 +3520,51 @@ export default function BookHubPage() {
 
     setSaving(true);
     setError(null);
+    setSaveNotice(null);
+
+    const strictPublisherResult = await ensureStrictPublisherRecord();
+    if (strictPublisherResult.error) {
+      setError(strictPublisherResult.error.message);
+      setSaving(false);
+      return;
+    }
+
+    const strictContributorResults = await Promise.all([
+      ensureStrictPersonRecord({
+        selectedId: selectedAuthorId,
+        name: authorName,
+        englishName: authorEnglishName,
+        reading: authorReading,
+        imageUrl: authorImg,
+        requireSharedRecord: requireSharedAuthorRecord,
+        roleLabel: "author",
+      }),
+      ensureStrictPersonRecord({
+        selectedId: selectedTranslatorId,
+        name: translatorName,
+        englishName: translatorEnglishName,
+        reading: translatorReading,
+        imageUrl: translatorImg,
+        requireSharedRecord: requireSharedTranslatorRecord,
+        roleLabel: "translator",
+      }),
+      ensureStrictPersonRecord({
+        selectedId: selectedIllustratorId,
+        name: illustratorName,
+        englishName: illustratorEnglishName,
+        reading: illustratorReading,
+        imageUrl: illustratorImg,
+        requireSharedRecord: requireSharedIllustratorRecord,
+        roleLabel: "illustrator",
+      }),
+    ]);
+
+    const strictContributorError = strictContributorResults.find((item) => item.error)?.error;
+    if (strictContributorError) {
+      setError(strictContributorError.message);
+      setSaving(false);
+      return;
+    }
 
     const started_at = startedAt.trim() ? startedAt.trim() : null;
     const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
@@ -3296,7 +3589,7 @@ export default function BookHubPage() {
       : null;
 
     const related_links = linksText.trim() ? parseLinks(linksText) : null;
-    const publisherRecord = await upsertPublisherRecord();
+    const publisherRecord = strictPublisherResult.data ?? (await upsertPublisherRecord());
 
     if (row.books?.id) {
       await saveCommunityContributions(row.books.id, userId);
@@ -3362,11 +3655,91 @@ export default function BookHubPage() {
       return;
     }
 
-    const authorSyncError = await syncAuthorContributor(row.books.id);
-    if (authorSyncError) {
-      setError(`author: ${authorSyncError.message}`);
-      setSaving(false);
-      return;
+    const contributorSyncs = [
+      {
+        role: "author" as const,
+        draft: {
+          selectedId: selectedAuthorId,
+          name: authorName,
+          englishName: authorEnglishName,
+          reading: authorReading,
+          imageUrl: authorImg,
+        },
+        forcedPersonId: strictContributorResults[0]?.id ?? null,
+        forcedStatus: strictContributorResults[0]?.id ? "created-shared-record" as const : undefined,
+      },
+      {
+        role: "translator" as const,
+        draft: {
+          selectedId: selectedTranslatorId,
+          name: translatorName,
+          englishName: translatorEnglishName,
+          reading: translatorReading,
+          imageUrl: translatorImg,
+        },
+        forcedPersonId: strictContributorResults[1]?.id ?? null,
+        forcedStatus: strictContributorResults[1]?.id ? "created-shared-record" as const : undefined,
+      },
+      {
+        role: "illustrator" as const,
+        draft: {
+          selectedId: selectedIllustratorId,
+          name: illustratorName,
+          englishName: illustratorEnglishName,
+          reading: illustratorReading,
+          imageUrl: illustratorImg,
+        },
+        forcedPersonId: strictContributorResults[2]?.id ?? null,
+        forcedStatus: strictContributorResults[2]?.id ? "created-shared-record" as const : undefined,
+      },
+    ];
+
+    const createdSharedRoles: string[] = [];
+    const linkedSharedRoles: string[] = [];
+    const savedBookOnlyRoles: string[] = [];
+
+    for (const syncItem of contributorSyncs) {
+      const contributorSyncResult = await syncContributorRole(
+        row.books.id,
+        syncItem.role,
+        syncItem.draft,
+        syncItem.forcedPersonId,
+        syncItem.forcedStatus
+      );
+
+      if (contributorSyncResult.error) {
+        setError(`${syncItem.role}: ${contributorSyncResult.error.message}`);
+        setSaving(false);
+        return;
+      }
+
+      if (contributorSyncResult.status === "created-shared-record") {
+        createdSharedRoles.push(syncItem.role);
+      } else if (contributorSyncResult.status === "linked-existing-record") {
+        linkedSharedRoles.push(syncItem.role);
+      } else if (contributorSyncResult.status === "saved-book-only") {
+        savedBookOnlyRoles.push(syncItem.role);
+      }
+    }
+
+    if (savedBookOnlyRoles.length > 0) {
+      setSaveNoticeTone("warning");
+      setSaveNotice(
+        `Saved to the book, but not to shared people records for: ${savedBookOnlyRoles.join(", ")}.`
+      );
+    } else if (createdSharedRoles.length > 0 || linkedSharedRoles.length > 0) {
+      const parts: string[] = [];
+      if (createdSharedRoles.length > 0) {
+        parts.push(`Created shared records for: ${createdSharedRoles.join(", ")}`);
+      }
+      if (linkedSharedRoles.length > 0) {
+        parts.push(`Linked shared records for: ${linkedSharedRoles.join(", ")}`);
+      }
+      setSaveNoticeTone("success");
+      setSaveNotice(parts.join(". "));
+    } else {
+      setSaveNoticeTone("success");
+      setSaveNotice("Saved.");
     }
 
     setEditingTab(null);
@@ -4038,9 +4411,19 @@ export default function BookHubPage() {
                 </p>
               </div>
 
-              {error ? (
+              {error && !isEditingBookInfoPeople ? (
                 <div className="border-t border-stone-200 px-5 py-3 text-sm text-red-600 md:px-8">
                   {error}
+                </div>
+              ) : null}
+
+              {saveNotice ? (
+                <div
+                  className={`border-t border-stone-200 px-5 py-3 text-sm md:px-8 ${
+                    saveNoticeTone === "warning" ? "text-amber-700" : "text-emerald-700"
+                  }`}
+                >
+                  {saveNotice}
                 </div>
               ) : null}
 
@@ -4193,6 +4576,7 @@ export default function BookHubPage() {
                     isEditingLinks={isEditingBookInfoLinks}
                     isEditingMyCopy={isEditingBookInfoCopy}
                     saving={saving}
+                    errorMessage={isEditingBookInfoPeople ? error : null}
                     onEditBookInfo={() => setEditingTab("bookInfoDetails")}
                     onEditPeople={() => setEditingTab("bookInfoPeople")}
                     onEditLinks={() => setEditingTab("bookInfoLinks")}
@@ -4212,10 +4596,16 @@ export default function BookHubPage() {
                     isbn13={isbn13}
                     setIsbn13={setIsbn13}
                     authorName={authorName}
+                    authorEnglishName={authorEnglishName}
+                    setAuthorEnglishName={setAuthorEnglishName}
                     setAuthorName={setAuthorName}
                     translatorName={translatorName}
+                    translatorEnglishName={translatorEnglishName}
+                    setTranslatorEnglishName={setTranslatorEnglishName}
                     setTranslatorName={setTranslatorName}
                     illustratorName={illustratorName}
+                    illustratorEnglishName={illustratorEnglishName}
+                    setIllustratorEnglishName={setIllustratorEnglishName}
                     setIllustratorName={setIllustratorName}
                     publisherName={publisherName}
                     setPublisherName={setPublisherName}
@@ -4225,8 +4615,20 @@ export default function BookHubPage() {
                     setPublisherEnglishName={setPublisherEnglishName}
                     selectedPublisherId={selectedPublisherId}
                     setSelectedPublisherId={setSelectedPublisherId}
+                    requireSharedPublisherRecord={requireSharedPublisherRecord}
+                    setRequireSharedPublisherRecord={setRequireSharedPublisherRecord}
                     selectedAuthorId={selectedAuthorId}
                     setSelectedAuthorId={setSelectedAuthorId}
+                    requireSharedAuthorRecord={requireSharedAuthorRecord}
+                    setRequireSharedAuthorRecord={setRequireSharedAuthorRecord}
+                    selectedTranslatorId={selectedTranslatorId}
+                    setSelectedTranslatorId={setSelectedTranslatorId}
+                    requireSharedTranslatorRecord={requireSharedTranslatorRecord}
+                    setRequireSharedTranslatorRecord={setRequireSharedTranslatorRecord}
+                    selectedIllustratorId={selectedIllustratorId}
+                    setSelectedIllustratorId={setSelectedIllustratorId}
+                    requireSharedIllustratorRecord={requireSharedIllustratorRecord}
+                    setRequireSharedIllustratorRecord={setRequireSharedIllustratorRecord}
                     coverUrl={coverUrl}
                     setCoverUrl={setCoverUrl}
                     authorImg={authorImg}
@@ -4809,6 +5211,8 @@ function PersonRow({
   editing,
   nameValue,
   setNameValue,
+  englishNameValue,
+  setEnglishNameValue,
   imgValue,
   setImgValue,
   readingValue,
@@ -4821,6 +5225,8 @@ function PersonRow({
   editing: boolean;
   nameValue: string;
   setNameValue: (v: string) => void;
+  englishNameValue: string;
+  setEnglishNameValue: (v: string) => void;
   imgValue: string;
   setImgValue: (v: string) => void;
   readingValue: string;
@@ -4843,6 +5249,9 @@ function PersonRow({
           <>
             <div className="text-xs uppercase tracking-wide text-stone-500">{label}</div>
             <div className="mt-1 text-sm font-medium text-stone-900">{name || "—"}</div>
+            {englishNameValue ? (
+              <div className="text-sm text-stone-700">{englishNameValue}</div>
+            ) : null}
             <div className="text-sm text-stone-500">{reading || "—"}</div>
           </>
         ) : (
@@ -4852,6 +5261,12 @@ function PersonRow({
               value={nameValue}
               onChange={(e) => setNameValue(e.target.value)}
               placeholder={`${label} name`}
+              className="w-full rounded border px-3 py-2 text-sm"
+            />
+            <input
+              value={englishNameValue}
+              onChange={(e) => setEnglishNameValue(e.target.value)}
+              placeholder={`${label} English name`}
               className="w-full rounded border px-3 py-2 text-sm"
             />
             <input
