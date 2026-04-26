@@ -5,63 +5,25 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-type HeaderBook = {
-  id: string;
-  status: string | null;
-  created_at: string;
-  finished_at: string | null;
-  books:
-  | {
-    title: string | null;
-  }
-  | {
-    title: string | null;
-  }[]
-  | null;
-};
-
-function getBookTitle(
-  books: { title: string | null } | { title: string | null }[] | null
-) {
-  if (!books) return null;
-  if (Array.isArray(books)) return books[0]?.title ?? null;
-  return books.title ?? null;
-}
-
 export default function Header() {
-  const [showVocabMenu, setShowVocabMenu] = useState(false);
-  const [showBookHubMenu, setShowBookHubMenu] = useState(false);
-  const [books, setBooks] = useState<HeaderBook[]>([]);
-  const [loadingBooks, setLoadingBooks] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
-  const bookHubMenuRef = useRef<HTMLDivElement | null>(null);
-  const vocabMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-
-      if (bookHubMenuRef.current && !bookHubMenuRef.current.contains(target)) {
-        setShowBookHubMenu(false);
-      }
-
-      if (vocabMenuRef.current && !vocabMenuRef.current.contains(target)) {
-        setShowVocabMenu(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const [showLibraryMenu, setShowLibraryMenu] = useState(false);
+  const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
+  const [showStudyMenu, setShowStudyMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const pathname = usePathname();
+  const libraryMenuRef = useRef<HTMLDivElement | null>(null);
+  const discoveryMenuRef = useRef<HTMLDivElement | null>(null);
+  const studyMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadHeaderData() {
-      setLoadingBooks(true);
-
       try {
         const {
           data: { user },
@@ -71,61 +33,23 @@ export default function Header() {
 
         if (!user) {
           setUsername(null);
-          setBooks([]);
           return;
         }
 
-        const [{ data: profile, error: profileError }, { data, error }] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select("username")
-            .eq("id", user.id)
-            .maybeSingle(),
-          supabase
-            .from("user_books")
-            .select(`
-              id,
-              status,
-              created_at,
-              finished_at,
-              books:book_id (
-                title
-              )
-            `)
-            .eq("user_id", user.id),
-        ]);
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", user.id)
+          .maybeSingle();
 
         if (cancelled) return;
 
         if (profileError) throw profileError;
         setUsername(profile?.username ?? null);
-
-        if (error) throw error;
-
-        const loadedBooks = ((data as HeaderBook[]) ?? []).sort((a, b) => {
-          const aIsReading = a.status === "reading" ? 0 : 1;
-          const bIsReading = b.status === "reading" ? 0 : 1;
-
-          if (aIsReading !== bIsReading) {
-            return aIsReading - bIsReading;
-          }
-
-          const aTitle = getBookTitle(a.books) ?? "";
-          const bTitle = getBookTitle(b.books) ?? "";
-
-          return aTitle.localeCompare(bTitle, "ja");
-        });
-
-        setBooks(loadedBooks);
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to load header data:", error);
           setUsername(null);
-          setBooks([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingBooks(false);
         }
       }
     }
@@ -137,20 +61,45 @@ export default function Header() {
     };
   }, []);
 
-  const readingBooks = books.filter((book) => book.status === "reading");
-  const finishedBooks = books.filter((book) => book.status === "finished");
-  const dnfBooks = books.filter((book) => book.status === "did_not_finish");
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
 
-  const quickReadingBooks = readingBooks;
-  const remainingSlots = Math.max(0, 8 - quickReadingBooks.length);
-  const quickFinishedBooks = finishedBooks.slice(0, remainingSlots);
-  const quickDnfBooks = dnfBooks.slice(0, Math.max(0, 8 - quickReadingBooks.length - quickFinishedBooks.length));
+      if (libraryMenuRef.current && !libraryMenuRef.current.contains(target)) {
+        setShowLibraryMenu(false);
+      }
 
-  const hasReadingBooks = quickReadingBooks.length > 0;
-  const hasFinishedBooks = quickFinishedBooks.length > 0;
-  const hasDnfBooks = quickDnfBooks.length > 0;
+      if (discoveryMenuRef.current && !discoveryMenuRef.current.contains(target)) {
+        setShowDiscoveryMenu(false);
+      }
+
+      if (studyMenuRef.current && !studyMenuRef.current.contains(target)) {
+        setShowStudyMenu(false);
+      }
+
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setShowProfileMenu(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const libraryHref = username ? `/users/${username}/books` : "/books";
+  const librarySectionActive =
+    pathname === libraryHref ||
+    pathname === "/books" ||
+    /^\/users\/[^/]+\/books$/.test(pathname) ||
+    pathname === "/book-hubs" ||
+    pathname === "/vocab";
+  const discoverySectionActive =
+    pathname === "/vocab/dictionary" || pathname.startsWith("/vocab/history");
+  const studySectionActive =
+    pathname === "/study-coming-soon" ||
+    pathname === "/book-flashcards" ||
+    pathname === "/book-kanji-readings";
+  const profileSectionActive = pathname === "/profile" || pathname.startsWith("/profile/");
 
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
@@ -171,169 +120,239 @@ export default function Header() {
             </div>
           </div>
 
-          <nav className="mt-2 flex flex-col items-center gap-1 text-xs sm:text-sm md:flex-row md:justify-end md:gap-3 md:mt-1">
-            {/* Row 1 — Books */}
-            <div className="flex w-full items-center justify-center gap-4 md:w-auto md:justify-end">
-              <Link
-                href={libraryHref}
-                className="text-base font-semibold text-stone-900 transition hover:text-black md:text-xl"
+          <nav className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm md:mt-1 md:justify-end">
+            <div className="relative" ref={libraryMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLibraryMenu((prev) => !prev);
+                  setShowDiscoveryMenu(false);
+                  setShowStudyMenu(false);
+                }}
+                className={`rounded-full border px-3 py-1.5 transition ${
+                  librarySectionActive
+                    ? "border-stone-900 bg-stone-900 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                }`}
               >
                 Library
-              </Link>
+              </button>
 
-              <>
-                <Link
-                  href="/book-hubs"
-                  className="text-stone-700 transition hover:text-stone-900 md:hidden"
-                >
-                  Book Hubs
-                </Link>
+              {showLibraryMenu ? (
+                <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                  <Link
+                    href={libraryHref}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowLibraryMenu(false)}
+                  >
+                    Library Home
+                  </Link>
 
-                <div className="relative hidden md:block" ref={bookHubMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowBookHubMenu((prev) => !prev);
-                      setShowVocabMenu(false);
-                    }}
-                    className="text-stone-700 transition hover:text-stone-900"
+                  <Link
+                    href="/book-hubs"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/book-hubs"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowLibraryMenu(false)}
                   >
                     Book Hubs
-                  </button>
+                  </Link>
 
-                  {showBookHubMenu ? (
-                    <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
-                      <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500">
-                        Book Hubs
-                      </div>
-
-                      {loadingBooks ? (
-                        <div className="px-2 py-2 text-sm text-stone-500">
-                          Loading...
-                        </div>
-                      ) : hasReadingBooks ? (
-                        <div className="mb-2">
-                          <div className="px-3 py-1 text-xs text-stone-400">
-                            Currently Reading
-                          </div>
-
-                          {quickReadingBooks.slice(0, 5).map((book) => {
-                            const title = getBookTitle(book.books);
-
-                            return (
-                              <Link
-                                key={book.id}
-                                href={`/books/${encodeURIComponent(book.id)}`}
-                                className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
-                                onClick={() => setShowBookHubMenu(false)}
-                              >
-                                {title || "Untitled Book"}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="px-2 py-2 text-sm text-stone-500">
-                          No active books
-                        </div>
-                      )}
-
-                      <div className="border-t border-stone-200 pt-2">
-                        <Link
-                          href="/book-hubs"
-                          className="block rounded-xl px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                          onClick={() => setShowBookHubMenu(false)}
-                        >
-                          All Book Hubs
-                        </Link>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </>
-            </div>
-
-            {/* Row 2 — Words */}
-            <div className="flex w-full items-center justify-center gap-4 md:w-auto md:justify-end">
-              <>
-                {/* Mobile / tablet: simple link */}
-                <Link
-                  href="/vocab"
-                  className="text-stone-700 transition hover:text-stone-900 md:hidden"
-                >
-                  Vocab Lists
-                </Link>
-
-                {/* Desktop: dropdown */}
-                <div className="relative hidden md:block" ref={vocabMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowVocabMenu((prev) => !prev);
-                      setShowBookHubMenu(false);
-                    }}
-                    className="text-stone-700 transition hover:text-stone-900"
+                  <Link
+                    href="/vocab"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/vocab"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowLibraryMenu(false)}
                   >
                     Vocab Lists
-                  </button>
-
-                  {showVocabMenu ? (
-                    <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
-                      <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500">
-                        Vocab Lists
-                      </div>
-
-                      {loadingBooks ? (
-                        <div className="px-2 py-2 text-sm text-stone-500">
-                          Loading...
-                        </div>
-                      ) : hasReadingBooks ? (
-                        <div className="mb-2">
-                          <div className="px-3 py-1 text-xs text-stone-400">
-                            Currently Reading
-                          </div>
-
-                          {quickReadingBooks.slice(0, 5).map((book) => {
-                            const title = getBookTitle(book.books);
-
-                            return (
-                              <Link
-                                key={book.id}
-                                href={`/books/${encodeURIComponent(book.id)}/words`}
-                                className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
-                                onClick={() => setShowVocabMenu(false)}
-                              >
-                                {title || "Untitled Book"}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="px-2 py-2 text-sm text-stone-500">
-                          No active books
-                        </div>
-                      )}
-
-                      <div className="border-t border-stone-200 pt-2">
-                        <Link
-                          href="/vocab"
-                          className="block rounded-xl px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                          onClick={() => setShowVocabMenu(false)}
-                        >
-                          All Vocab Lists
-                        </Link>
-                      </div>
-                    </div>
-                  ) : null}
+                  </Link>
                 </div>
-              </>
+              ) : null}
+            </div>
 
-              <Link
-                href="/vocab/history"
-                className="text-stone-700 transition hover:text-stone-900"
+            <div className="relative" ref={discoveryMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDiscoveryMenu((prev) => !prev);
+                  setShowLibraryMenu(false);
+                  setShowStudyMenu(false);
+                }}
+                className={`rounded-full border px-3 py-1.5 transition ${
+                  discoverySectionActive
+                    ? "border-stone-900 bg-stone-900 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                }`}
               >
-                Word History
-              </Link>
+                Discovery
+              </button>
+
+              {showDiscoveryMenu ? (
+                <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                  <Link
+                    href="/vocab/dictionary"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/vocab/dictionary"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Dictionary
+                  </Link>
+
+                  <Link
+                    href="/vocab/history"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname.startsWith("/vocab/history")
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Word History
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative" ref={studyMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStudyMenu((prev) => !prev);
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowProfileMenu(false);
+                }}
+                className={`rounded-full border px-3 py-1.5 transition ${
+                  studySectionActive
+                    ? "border-stone-900 bg-stone-900 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                }`}
+              >
+                Study
+              </button>
+
+              {showStudyMenu ? (
+                <div className="absolute right-0 z-50 mt-2 min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                  <Link
+                    href="/study-coming-soon"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/study-coming-soon"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowStudyMenu(false)}
+                  >
+                    Library Study (Coming Soon)
+                  </Link>
+
+                  <Link
+                    href="/book-flashcards"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/book-flashcards"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowStudyMenu(false)}
+                  >
+                    Book Flashcards
+                  </Link>
+
+                  <Link
+                    href="/book-kanji-readings"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/book-kanji-readings"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowStudyMenu(false)}
+                  >
+                    Book Kanji Readings
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu((prev) => !prev);
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowStudyMenu(false);
+                }}
+                className={`rounded-full border px-3 py-1.5 transition ${
+                  profileSectionActive
+                    ? "border-stone-900 bg-stone-900 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                }`}
+              >
+                Profile
+              </button>
+
+              {showProfileMenu ? (
+                <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                  <Link
+                    href="/profile"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/profile"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Profile Home
+                  </Link>
+
+                  <Link
+                    href="/stats-coming-soon"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/stats-coming-soon"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Stats
+                  </Link>
+
+                  <Link
+                    href="/profile/social"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/profile/social"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Community
+                  </Link>
+
+                  <Link
+                    href="/profile/book-clubs-coming-soon"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${
+                      pathname === "/profile/book-clubs-coming-soon"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                    }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Book Clubs
+                  </Link>
+                </div>
+              ) : null}
             </div>
           </nav>
         </div>

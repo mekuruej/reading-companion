@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BookInfoTab from "./components/BookInfoTab";
+import CommunityTab from "./components/CommunityTab";
 import ReadingTab from "./components/ReadingTab";
 import RatingTab from "./components/RatingTab";
 import TeacherTab from "./components/TeacherTab";
@@ -25,6 +26,7 @@ type Book = {
   published_date: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
+  series_number: number | null;
   isbn: string | null;
   isbn13: string | null;
   publisher: string | null;
@@ -55,6 +57,7 @@ type UserBook = {
   rating_overall: number | null;
   rating_recommend: number | null;
   rating_difficulty: number | null;
+  teacher_student_use_rating: number | null;
   reader_level: string | null;
   recommended_level: string | null;
   favorite_quotes: string | null;
@@ -84,7 +87,16 @@ type ReadingSession = {
   session_mode: string | null;
 };
 
-type HubTab = "bookInfo" | "teacher" | "study" | "reading" | "story" | "rating";
+type HubTab = "bookInfo" | "community" | "teacher" | "study" | "reading" | "story" | "rating";
+type EditingPanel =
+  | HubTab
+  | "bookInfoDetails"
+  | "bookInfoPeople"
+  | "bookInfoLinks"
+  | "bookInfoCopy"
+  | "communityGenres"
+  | "communityContentNotes"
+  | "communityReaderFit";
 type VocabTab = "readAlong" | "bulk";
 type ProfileRole = "teacher" | "member" | "student";
 
@@ -153,6 +165,16 @@ type VocabCacheQueueRow = {
   vocabulary_kanji_map: KanjiMapRow[] | null;
 };
 
+type CommunityGenreRow = {
+  genre: string;
+  user_id: string;
+};
+
+type CommunityContentNoteRow = {
+  content_note: string;
+  user_id: string;
+};
+
 type SavedKanjiReading = {
   kanji: string;
   reading_type: "on" | "kun" | "other" | null;
@@ -167,7 +189,18 @@ type SessionKanjiReading = {
   realized: string | null;
 };
 
-const LEVEL_OPTIONS = ["N5", "N4", "N3", "N2", "N1"] as const;
+const LEVEL_OPTIONS = [
+  "Level 1",
+  "Level 2",
+  "Level 3",
+  "Level 4",
+  "Level 5",
+  "Level 6",
+  "Level 7",
+  "Level 8",
+  "Level 9",
+  "Level 10",
+] as const;
 
 const BOOK_TYPE_OPTIONS = [
   { value: "picture_book", label: "Picture Book" },
@@ -262,10 +295,44 @@ function parseLinks(text: string) {
 }
 
 function displayLinkLabel(l: any) {
-  if (!l) return "Link";
-  if (typeof l === "string") return l;
-  if (typeof l === "object") return l.label ?? l.url ?? "Link";
-  return "Link";
+  const rawLabel =
+    typeof l === "object" && l != null ? (l.label ?? "").toString().trim() : "";
+  const rawUrl =
+    typeof l === "string"
+      ? l
+      : typeof l === "object" && l != null
+        ? (l.url ?? "").toString()
+        : "";
+
+  if (rawLabel && rawLabel !== rawUrl) return rawLabel;
+
+  const safeUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+    ? rawUrl
+    : rawUrl
+      ? `https://${rawUrl}`
+      : "";
+
+  if (safeUrl) {
+    try {
+      const hostname = new URL(safeUrl).hostname.replace(/^www\./, "").toLowerCase();
+
+      if (hostname.includes("amazon.")) return "Amazon";
+      if (hostname.includes("bookwalker.")) return "BookWalker";
+      if (hostname.includes("kinokuniya.")) return "Kinokuniya";
+      if (hostname.includes("rakuten.")) return "Rakuten Books";
+      if (hostname.includes("ebookjapan.")) return "ebookjapan";
+      if (hostname.includes("honto.")) return "honto";
+
+      const [firstPart] = hostname.split(".");
+      if (firstPart) {
+        return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return rawLabel || rawUrl || "Link";
 }
 
 function displayLinkUrl(l: any) {
@@ -375,31 +442,54 @@ function formatTimer(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function pageToPercent(page: number | null, pageCount: number | null) {
+  if (page == null || !pageCount || pageCount <= 0) return null;
+  return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
+}
+
+function percentToPage(percent: number | null, pageCount: number | null) {
+  if (percent == null || !pageCount || pageCount <= 0) return null;
+  const clamped = Math.max(0, Math.min(100, percent));
+  return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
+}
+
 function genreLabel(value: string | null | undefined) {
   return GENRE_OPTIONS.find((opt) => opt.value === value)?.label ?? "—";
 }
 
-function levelStars(level: string | null | undefined) {
-  switch ((level ?? "").toUpperCase()) {
-    case "N1":
-      return "★★★★★";
-    case "N2":
-      return "★★★★☆";
-    case "N3":
-      return "★★★☆☆";
-    case "N4":
-      return "★★☆☆☆";
-    case "N5":
-      return "★☆☆☆☆";
-    default:
-      return "—";
+function parseCommunityTags(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function dedupeCommunityTags(tags: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const tag of tags) {
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
   }
+
+  return out;
+}
+
+function joinCommunityTags(tags: string[]) {
+  return dedupeCommunityTags(tags).join(", ");
 }
 
 function hiraToKata(text: string) {
   return text.replace(/[\u3041-\u3096]/g, (char) =>
     String.fromCharCode(char.charCodeAt(0) + 0x60)
   );
+}
+
+function normalizeKanjiQueueKey(surface: string | null | undefined, reading: string | null | undefined) {
+  return `${(surface ?? "").trim()}|||${(reading ?? "").trim()}`;
 }
 
 export default function BookHubPage() {
@@ -415,11 +505,12 @@ export default function BookHubPage() {
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
+  const [profileLevel, setProfileLevel] = useState<string>("");
 
   const isTeacher = myRole === "teacher";
   const canEditBookInfo = isSuperTeacher;
 
-  const [editingTab, setEditingTab] = useState<HubTab | null>(null);
+  const [editingTab, setEditingTab] = useState<EditingPanel | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [activeTab, setActiveTab] = useState<HubTab>(
@@ -442,6 +533,7 @@ export default function BookHubPage() {
   const [ratingOverall, setRatingOverall] = useState<string>("");
   const [ratingRecommend, setRatingRecommend] = useState<string>("");
   const [ratingDifficulty, setRatingDifficulty] = useState<string>("");
+  const [teacherStudentUseRating, setTeacherStudentUseRating] = useState<string>("");
 
   const [readerLevel, setReaderLevel] = useState<string>("");
   const [recommendedLevel, setRecommendedLevel] = useState<string>("");
@@ -449,8 +541,13 @@ export default function BookHubPage() {
   const [genre, setGenre] = useState<string>("");
   const [bookType, setBookType] = useState<string>("");
   const [triggerWarnings, setTriggerWarnings] = useState<string>("");
+  const [savedCommunityGenres, setSavedCommunityGenres] = useState<string>("");
+  const [savedCommunityContentNotes, setSavedCommunityContentNotes] = useState<string>("");
+  const [sharedGenres, setSharedGenres] = useState<{ value: string; count: number }[]>([]);
+  const [sharedContentNotes, setSharedContentNotes] = useState<{ value: string; count: number }[]>([]);
   const [publishedDate, setPublishedDate] = useState("");
   const [pageCount, setPageCount] = useState<string>("");
+  const [seriesNumber, setSeriesNumber] = useState<string>("");
   const [isbn, setIsbn] = useState<string>("");
   const [isbn13, setIsbn13] = useState<string>("");
 
@@ -567,6 +664,12 @@ export default function BookHubPage() {
   const [sessionDate, setSessionDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
+
+  useEffect(() => {
+    if (profileLevel) {
+      setReaderLevel(profileLevel);
+    }
+  }, [profileLevel]);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -715,6 +818,14 @@ export default function BookHubPage() {
       ? canEditBookInfo
       : true; // members can edit everything else
 
+  const isEditingBookInfoDetails = editingTab === "bookInfoDetails";
+  const isEditingBookInfoPeople = editingTab === "bookInfoPeople";
+  const isEditingBookInfoLinks = editingTab === "bookInfoLinks";
+  const isEditingBookInfoCopy = editingTab === "bookInfoCopy";
+  const isEditingCommunityGenres = editingTab === "communityGenres";
+  const isEditingCommunityContentNotes = editingTab === "communityContentNotes";
+  const isEditingCommunityReaderFit = editingTab === "communityReaderFit";
+
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
   const book = row?.books ?? null;
@@ -799,6 +910,9 @@ export default function BookHubPage() {
   }, [chapterSummaries, chapterReverseOrder]);
 
   function startEditingReadingSession(session: ReadingSession) {
+    const usePercentMode =
+      progressMode === "percent" && session.session_mode !== "listening";
+
     setEditingReadingSessionId(session.id);
     setSessionDate(session.read_on);
     setSessionMode(
@@ -808,8 +922,24 @@ export default function BookHubPage() {
         ? session.session_mode
         : "fluid"
     );
-    setSessionStartPage(session.start_page != null ? String(session.start_page) : "");
-    setSessionEndPage(session.end_page != null ? String(session.end_page) : "");
+    setSessionStartPage(
+      usePercentMode
+        ? session.start_page != null
+          ? String(pageToPercent(session.start_page, book?.page_count ?? null) ?? "")
+          : ""
+        : session.start_page != null
+          ? String(session.start_page)
+          : ""
+    );
+    setSessionEndPage(
+      progressMode === "percent"
+        ? session.end_page != null
+          ? String(pageToPercent(session.end_page, book?.page_count ?? null) ?? "")
+          : ""
+        : session.end_page != null
+          ? String(session.end_page)
+          : ""
+    );
     setSessionMinutesRead(
       session.minutes_read != null ? String(session.minutes_read) : ""
     );
@@ -1044,7 +1174,7 @@ export default function BookHubPage() {
   }
 
   async function saveNotes() {
-    if (!userBookId) return;
+    if (!userBookId) return false;
 
     const { error } = await supabase
       .from("user_books")
@@ -1054,7 +1184,19 @@ export default function BookHubPage() {
     if (error) {
       console.error("Error saving notes:", error);
       alert("Failed to save notes");
+      return false;
     }
+
+    setRow((prev) =>
+      prev
+        ? {
+            ...prev,
+            notes: notes || null,
+          }
+        : prev
+    );
+
+    return true;
   }
 
   async function saveRecommendedLevel() {
@@ -1081,6 +1223,223 @@ export default function BookHubPage() {
         }
         : prev
     );
+  }
+
+  async function saveTeacherStudentUseRating() {
+    if (!userBookId) return;
+
+    const rating = teacherStudentUseRating.trim()
+      ? clampRating5(Number(teacherStudentUseRating.trim()))
+      : null;
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        teacher_student_use_rating: rating,
+      })
+      .eq("id", userBookId);
+
+    if (error) {
+      console.error("Error saving teacher student use rating:", error);
+      alert("Failed to save teacher student use rating");
+      return;
+    }
+
+    setRow((prev) =>
+      prev
+        ? {
+          ...prev,
+          teacher_student_use_rating: rating,
+        }
+        : prev
+    );
+  }
+
+  async function loadCommunityContributions(
+    bookId: string,
+    currentUserId: string | null,
+    legacy?: { genre?: string | null; trigger_warnings?: string | null }
+  ) {
+    if (!bookId) return;
+
+    try {
+      const [{ data: genreRows, error: genreError }, { data: noteRows, error: noteError }] =
+        await Promise.all([
+          supabase.from("book_genres").select("genre, user_id").eq("book_id", bookId),
+          supabase
+            .from("book_content_notes")
+            .select("content_note, user_id")
+            .eq("book_id", bookId),
+        ]);
+
+      if (genreError) throw genreError;
+      if (noteError) throw noteError;
+
+      const genreCounts = new Map<string, number>();
+      const noteCounts = new Map<string, number>();
+
+      for (const row of (genreRows ?? []) as CommunityGenreRow[]) {
+        if (!row.genre) continue;
+        genreCounts.set(row.genre, (genreCounts.get(row.genre) ?? 0) + 1);
+      }
+
+      for (const row of (noteRows ?? []) as CommunityContentNoteRow[]) {
+        if (!row.content_note) continue;
+        noteCounts.set(row.content_note, (noteCounts.get(row.content_note) ?? 0) + 1);
+      }
+
+      const myGenres = dedupeCommunityTags(
+        ((genreRows ?? []) as CommunityGenreRow[])
+          .filter((row) => currentUserId && row.user_id === currentUserId)
+          .map((row) => row.genre)
+      );
+
+      const myNotes = dedupeCommunityTags(
+        ((noteRows ?? []) as CommunityContentNoteRow[])
+          .filter((row) => currentUserId && row.user_id === currentUserId)
+          .map((row) => row.content_note)
+      );
+
+      const sharedGenreList =
+        genreCounts.size > 0
+          ? Array.from(genreCounts.entries())
+              .map(([value, count]) => ({ value, count }))
+              .sort((a, b) =>
+                b.count === a.count
+                  ? genreLabel(a.value).localeCompare(genreLabel(b.value))
+                  : b.count - a.count
+              )
+          : dedupeCommunityTags(parseCommunityTags(legacy?.genre ?? "")).map((value) => ({
+              value,
+              count: 1,
+            }));
+
+      const sharedNoteList =
+        noteCounts.size > 0
+          ? Array.from(noteCounts.entries())
+              .map(([value, count]) => ({ value, count }))
+              .sort((a, b) =>
+                b.count === a.count ? a.value.localeCompare(b.value) : b.count - a.count
+              )
+          : dedupeCommunityTags(parseCommunityTags(legacy?.trigger_warnings ?? "")).map(
+              (value) => ({
+                value,
+                count: 1,
+              })
+            );
+
+      const myGenreString = joinCommunityTags(myGenres);
+      const myNotesString = joinCommunityTags(myNotes);
+
+      setGenre(myGenreString);
+      setTriggerWarnings(myNotesString);
+      setSavedCommunityGenres(myGenreString);
+      setSavedCommunityContentNotes(myNotesString);
+      setSharedGenres(sharedGenreList);
+      setSharedContentNotes(sharedNoteList);
+    } catch (error) {
+      console.error("Error loading community contributions:", error);
+
+      const fallbackGenres = joinCommunityTags(parseCommunityTags(legacy?.genre ?? ""));
+      const fallbackNotes = joinCommunityTags(parseCommunityTags(legacy?.trigger_warnings ?? ""));
+
+      setGenre(fallbackGenres);
+      setTriggerWarnings(fallbackNotes);
+      setSavedCommunityGenres(fallbackGenres);
+      setSavedCommunityContentNotes(fallbackNotes);
+      setSharedGenres(
+        dedupeCommunityTags(parseCommunityTags(legacy?.genre ?? "")).map((value) => ({
+          value,
+          count: 1,
+        }))
+      );
+      setSharedContentNotes(
+        dedupeCommunityTags(parseCommunityTags(legacy?.trigger_warnings ?? "")).map((value) => ({
+          value,
+          count: 1,
+        }))
+      );
+    }
+  }
+
+  async function saveCommunityContributions(bookId: string, currentUserId: string | null) {
+    if (!bookId || !currentUserId) return;
+
+    const nextGenres = dedupeCommunityTags(parseCommunityTags(genre));
+    const nextNotes = dedupeCommunityTags(parseCommunityTags(triggerWarnings));
+
+    const [currentGenreRows, currentNoteRows] = await Promise.all([
+      supabase
+        .from("book_genres")
+        .select("genre")
+        .eq("book_id", bookId)
+        .eq("user_id", currentUserId),
+      supabase
+        .from("book_content_notes")
+        .select("content_note")
+        .eq("book_id", bookId)
+        .eq("user_id", currentUserId),
+    ]);
+
+    if (currentGenreRows.error) throw currentGenreRows.error;
+    if (currentNoteRows.error) throw currentNoteRows.error;
+
+    const existingGenres = new Set((currentGenreRows.data ?? []).map((row: any) => row.genre));
+    const existingNotes = new Set(
+      (currentNoteRows.data ?? []).map((row: any) => row.content_note)
+    );
+
+    const nextGenreSet = new Set(nextGenres);
+    const nextNoteSet = new Set(nextNotes);
+
+    const genresToDelete = Array.from(existingGenres).filter((value) => !nextGenreSet.has(value));
+    const notesToDelete = Array.from(existingNotes).filter((value) => !nextNoteSet.has(value));
+    const genresToInsert = nextGenres.filter((value) => !existingGenres.has(value));
+    const notesToInsert = nextNotes.filter((value) => !existingNotes.has(value));
+
+    if (genresToDelete.length > 0) {
+      const { error } = await supabase
+        .from("book_genres")
+        .delete()
+        .eq("book_id", bookId)
+        .eq("user_id", currentUserId)
+        .in("genre", genresToDelete);
+      if (error) throw error;
+    }
+
+    if (notesToDelete.length > 0) {
+      const { error } = await supabase
+        .from("book_content_notes")
+        .delete()
+        .eq("book_id", bookId)
+        .eq("user_id", currentUserId)
+        .in("content_note", notesToDelete);
+      if (error) throw error;
+    }
+
+    if (genresToInsert.length > 0) {
+      const { error } = await supabase.from("book_genres").insert(
+        genresToInsert.map((value) => ({
+          book_id: bookId,
+          user_id: currentUserId,
+          genre: value,
+        }))
+      );
+      if (error) throw error;
+    }
+
+    if (notesToInsert.length > 0) {
+      const { error } = await supabase.from("book_content_notes").insert(
+        notesToInsert.map((value) => ({
+          book_id: bookId,
+          user_id: currentUserId,
+          content_note: value,
+        }))
+      );
+      if (error) throw error;
+    }
+
+    await loadCommunityContributions(bookId, currentUserId, row?.books ?? undefined);
   }
 
   async function saveKanjiWord(vocabId: number) {
@@ -1475,7 +1834,7 @@ export default function BookHubPage() {
       return;
     }
 
-    const rows: VocabCacheQueueRow[] = (data ?? []).map((item: any) => ({
+    let cacheRows: VocabCacheQueueRow[] = (data ?? []).map((item: any) => ({
       id: item.id,
       userBookWordId: "",
       vocabularyCacheId: item.id,
@@ -1486,6 +1845,149 @@ export default function BookHubPage() {
       enrichmentStatus: "partial",
       vocabulary_kanji_map: item.vocabulary_kanji_map ?? [],
     }));
+
+    const readyByExactWord = new Map<string, VocabCacheQueueRow>();
+
+    function isFullyEnrichedWord(word: VocabCacheQueueRow) {
+      const mapRows = word.vocabulary_kanji_map ?? [];
+      const kanjiCount = Array.from(word.surface ?? "").filter((ch) =>
+        /\p{Script=Han}/u.test(ch)
+      ).length;
+
+      if (kanjiCount === 0) return false;
+      if (mapRows.length !== kanjiCount) return false;
+
+      return mapRows.every(
+        (row) => !!row.reading_type && !!row.base_reading && !!row.realized_reading
+      );
+    }
+
+    for (const word of cacheRows) {
+      if (!isFullyEnrichedWord(word)) continue;
+      readyByExactWord.set(normalizeKanjiQueueKey(word.surface, word.reading), word);
+    }
+
+    let autoFilledAny = false;
+
+    for (const word of cacheRows) {
+      const exactKey = normalizeKanjiQueueKey(word.surface, word.reading);
+      const donor = readyByExactWord.get(exactKey);
+
+      if (!donor || donor.id === word.id) continue;
+
+      const currentRows = word.vocabulary_kanji_map ?? [];
+      const currentByPosition = new Map<number, KanjiMapRow>();
+      for (const row of currentRows) {
+        currentByPosition.set(row.kanji_position, row);
+      }
+
+      const updates: Array<() => Promise<{ error: any }>> = [];
+      const inserts: Array<{
+        vocabulary_cache_id: number;
+        kanji: string;
+        kanji_position: number;
+        reading_type: "on" | "kun" | "other" | null;
+        base_reading: string | null;
+        realized_reading: string | null;
+      }> = [];
+
+      for (const donorRow of donor.vocabulary_kanji_map ?? []) {
+        const existing = currentByPosition.get(donorRow.kanji_position);
+
+        if (existing) {
+          const needsUpdate =
+            existing.kanji !== donorRow.kanji ||
+            existing.reading_type !== donorRow.reading_type ||
+            existing.base_reading !== donorRow.base_reading ||
+            existing.realized_reading !== donorRow.realized_reading;
+
+          if (needsUpdate) {
+            updates.push(
+              async () =>
+                await supabase
+                  .from("vocabulary_kanji_map")
+                  .update({
+                    kanji: donorRow.kanji,
+                    reading_type: donorRow.reading_type,
+                    base_reading: donorRow.base_reading,
+                    realized_reading: donorRow.realized_reading,
+                  })
+                  .eq("id", existing.id)
+            );
+          }
+        } else {
+          inserts.push({
+            vocabulary_cache_id: word.id,
+            kanji: donorRow.kanji,
+            kanji_position: donorRow.kanji_position,
+            reading_type: donorRow.reading_type,
+            base_reading: donorRow.base_reading,
+            realized_reading: donorRow.realized_reading,
+          });
+        }
+      }
+
+      if (updates.length > 0) {
+        const results = await Promise.all(updates.map((runUpdate) => runUpdate()));
+        const failed = results.find((result) => result.error);
+        if (failed?.error) {
+          console.error("Error auto-filling exact-word kanji map rows:", failed.error);
+        } else {
+          autoFilledAny = true;
+        }
+      }
+
+      if (inserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from("vocabulary_kanji_map")
+          .insert(inserts);
+
+        if (insertError) {
+          console.error("Error inserting exact-word kanji map rows:", insertError);
+        } else {
+          autoFilledAny = true;
+        }
+      }
+    }
+
+    if (autoFilledAny) {
+      const { data: refreshedData, error: refreshedError } = await supabase
+        .from("vocabulary_cache")
+        .select(`
+      id,
+      surface,
+      reading,
+      jlpt,
+      created_at,
+      vocabulary_kanji_map (
+        id,
+        vocabulary_cache_id,
+        kanji,
+        kanji_position,
+        reading_type,
+        base_reading,
+        realized_reading
+      )
+    `)
+        .in("id", cacheIds)
+        .order("created_at", { ascending: true });
+
+      if (refreshedError) {
+        console.error("Error refreshing kanji map queue after exact-word auto-fill:", refreshedError);
+      } else {
+        cacheRows = (refreshedData ?? []).map((item: any) => ({
+          id: item.id,
+          userBookWordId: "",
+          vocabularyCacheId: item.id,
+          surface: item.surface ?? "",
+          reading: item.reading ?? "",
+          jlpt: item.jlpt ?? null,
+          created_at: item.created_at ?? "",
+          enrichmentStatus: "partial",
+          vocabulary_kanji_map: item.vocabulary_kanji_map ?? [],
+        }));
+      }
+    }
 
     const missingCacheWords: VocabCacheQueueRow[] = kanjiBookWordRows
       .filter((r: any) => r.vocabulary_cache_id == null)
@@ -1501,7 +2003,7 @@ export default function BookHubPage() {
         vocabulary_kanji_map: [],
       }));
 
-    const needsWork = rows.flatMap((word) => {
+    const needsWork = cacheRows.flatMap((word) => {
       const hasKanji = /[\p{Script=Han}]/u.test(word.surface ?? "");
       if (!hasKanji) return [];
 
@@ -2123,13 +2625,23 @@ export default function BookHubPage() {
   async function saveReadingSession() {
     if (!row?.id) return;
 
-    const start =
+    const usingPercentMode = progressMode === "percent";
+    const parsedStart =
       sessionMode === "listening" || sessionStartPage.trim() === ""
         ? null
         : Number(sessionStartPage);
+    const parsedEnd =
+      sessionEndPage.trim() === "" ? null : Number(sessionEndPage);
+
+    const start =
+      usingPercentMode && sessionMode !== "listening"
+        ? percentToPage(parsedStart, book?.page_count ?? null)
+        : parsedStart;
 
     const end =
-      sessionEndPage.trim() === "" ? null : Number(sessionEndPage);
+      usingPercentMode
+        ? percentToPage(parsedEnd, book?.page_count ?? null)
+        : parsedEnd;
 
     const minutesFromInput =
       sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
@@ -2145,22 +2657,61 @@ export default function BookHubPage() {
     }
 
     if (sessionMode !== "listening") {
-      if (!Number.isFinite(start) || !Number.isFinite(end)) {
-        alert("Please fill in date, start page, and end page.");
+      if (usingPercentMode && (!book?.page_count || book.page_count <= 0)) {
+        alert("Percent progress needs a page count for this book.");
         return;
       }
 
-      if ((start as number) <= 0 || (end as number) <= 0) {
-        alert("Pages must be greater than 0.");
+      if (
+        (usingPercentMode &&
+          (!Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd))) ||
+        (!usingPercentMode &&
+          (!Number.isFinite(start) || !Number.isFinite(end)))
+      ) {
+        alert(
+          usingPercentMode
+            ? "Please fill in date, start percent, and end percent."
+            : "Please fill in date, start page, and end page."
+        );
         return;
+      }
+
+      if (usingPercentMode) {
+        if ((parsedStart as number) < 0 || (parsedEnd as number) < 0) {
+          alert("Percents must be 0 or higher.");
+          return;
+        }
+
+        if ((parsedStart as number) > 100 || (parsedEnd as number) > 100) {
+          alert("Percents must be 100 or lower.");
+          return;
+        }
+      } else {
+        if ((start as number) <= 0 || (end as number) <= 0) {
+          alert("Pages must be greater than 0.");
+          return;
+        }
       }
 
       if ((end as number) < (start as number)) {
-        alert("End page must be greater than or equal to start page.");
+        alert(
+          usingPercentMode
+            ? "End percent must be greater than or equal to start percent."
+            : "End page must be greater than or equal to start page."
+        );
         return;
       }
     } else {
-      if (end !== null && (!Number.isFinite(end) || end <= 0)) {
+      if (
+        usingPercentMode &&
+        parsedEnd !== null &&
+        (!Number.isFinite(parsedEnd) || parsedEnd < 0 || parsedEnd > 100)
+      ) {
+        alert("Listening end percent must be between 0 and 100 if provided.");
+        return;
+      }
+
+      if (!usingPercentMode && end !== null && (!Number.isFinite(end) || end <= 0)) {
         alert("Listening end page must be greater than 0 if provided.");
         return;
       }
@@ -2306,7 +2857,7 @@ export default function BookHubPage() {
 
     const { data: meProfile, error: meProfileErr } = await supabase
       .from("profiles")
-      .select("role, is_super_teacher")
+      .select("role, is_super_teacher, level")
       .eq("id", user.id)
       .single();
 
@@ -2316,6 +2867,7 @@ export default function BookHubPage() {
 
     setMyRole((meProfile?.role as ProfileRole | null) ?? "member");
     setIsSuperTeacher(!!meProfile?.is_super_teacher);
+    setProfileLevel(meProfile?.level ?? "");
 
     const { data, error } = await supabase
       .from("user_books")
@@ -2332,6 +2884,7 @@ export default function BookHubPage() {
         rating_overall,
         rating_recommend,
         rating_difficulty,
+        teacher_student_use_rating,
         reader_level,
         recommended_level,
         format_type,
@@ -2350,6 +2903,7 @@ export default function BookHubPage() {
           audience_category,
           trigger_warnings,
           page_count,
+          series_number,
           isbn,
           isbn13,
           publisher,
@@ -2411,21 +2965,23 @@ export default function BookHubPage() {
     setRatingOverall(r.rating_overall != null ? String(r.rating_overall) : "");
     setRatingRecommend(r.rating_recommend != null ? String(r.rating_recommend) : "");
     setRatingDifficulty(r.rating_difficulty != null ? String(r.rating_difficulty) : "");
+    setTeacherStudentUseRating(
+      r.teacher_student_use_rating != null ? String(r.teacher_student_use_rating) : ""
+    );
     setFavoriteQuotes((r as any).favorite_quotes ?? "");
     setMemorableWords((r as any).memorable_words ?? "");
 
-    setReaderLevel(r.reader_level ?? "");
+    setReaderLevel(r.reader_level ?? meProfile?.level ?? "");
     setRecommendedLevel(r.recommended_level ?? "");
     setFormatType(r.format_type ?? "");
     setProgressMode(r.progress_mode ?? "");
     setShowPageNumbers(r.show_page_numbers ?? true);
 
     const b = r.books as Book | null;
-    setGenre(b?.genre ?? "");
     setBookType(b?.book_type ?? "");
-    setTriggerWarnings(b?.trigger_warnings ?? "");
     setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
+    setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
 
@@ -2446,6 +3002,8 @@ export default function BookHubPage() {
     setIllustratorReading(b?.illustrator_reading ?? "");
 
     setLinksText(linksToText(b?.related_links));
+
+    await loadCommunityContributions(b?.id ?? "", user.id, b ?? undefined);
 
     await loadUniqueLookupCount(r.id);
     await loadReadingSessions(r.id);
@@ -2550,10 +3108,13 @@ export default function BookHubPage() {
     setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
     setRatingRecommend(row.rating_recommend != null ? String(row.rating_recommend) : "");
     setRatingDifficulty(row.rating_difficulty != null ? String(row.rating_difficulty) : "");
+    setTeacherStudentUseRating(
+      row.teacher_student_use_rating != null ? String(row.teacher_student_use_rating) : ""
+    );
     setFavoriteQuotes((row as any).favorite_quotes ?? "");
     setMemorableWords((row as any).memorable_words ?? "");
 
-    setReaderLevel(row.reader_level ?? "");
+    setReaderLevel(row.reader_level ?? profileLevel ?? "");
     setRecommendedLevel(row.recommended_level ?? "");
 
     setFormatType(row.format_type ?? "");
@@ -2561,11 +3122,10 @@ export default function BookHubPage() {
     setShowPageNumbers(row.show_page_numbers ?? true);
 
     const b = row.books;
-    setGenre(b?.genre ?? "");
     setBookType(b?.book_type ?? "");
-    setTriggerWarnings(b?.trigger_warnings ?? "");
     setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
+    setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
 
@@ -2586,6 +3146,8 @@ export default function BookHubPage() {
     setIllustratorReading(b?.illustrator_reading ?? "");
 
     setLinksText(linksToText(b?.related_links));
+    setGenre(savedCommunityGenres);
+    setTriggerWarnings(savedCommunityContentNotes);
   };
 
   function normalizeName(value: string) {
@@ -2669,34 +3231,16 @@ export default function BookHubPage() {
       return { data, error: null };
     }
 
-    const normalized = normalizeName(cleanedName);
-
-    const { data, error } = await supabase
-      .from("people")
-      .upsert(
-        {
-          name_ja: cleanedName,
-          reading: authorReading.trim() || null,
-          image_url: authorImg.trim() || null,
-          normalized_name: normalized,
-        },
-        {
-          onConflict: "normalized_name",
-          ignoreDuplicates: false,
-        }
-      )
-      .select("id")
-      .single();
-
-    if (error) {
-      console.error("Error upserting author:", error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
+    // Plain text author edits should still save to the book even when the client
+    // is not allowed to create shared people records under RLS.
+    return { data: null, error: null };
   }
 
   async function syncAuthorContributor(bookId: string) {
+    if (!selectedAuthorId) {
+      return null;
+    }
+
     const { error: deleteError } = await supabase
       .from("book_contributors")
       .delete()
@@ -2747,13 +3291,23 @@ export default function BookHubPage() {
 
     const pc = pageCount.trim() ? Number(pageCount.trim()) : null;
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
+    const sn = seriesNumber.trim() ? Number(seriesNumber.trim()) : null;
+    const series_number = Number.isFinite(sn as any) ? (sn as number) : null;
 
     const ro = ratingOverall.trim() ? clampRating5(Number(ratingOverall.trim())) : null;
     const rr = ratingRecommend.trim() ? clampRating5(Number(ratingRecommend.trim())) : null;
     const rd = ratingDifficulty.trim() ? clampRating5(Number(ratingDifficulty.trim())) : null;
+    const tsur = teacherStudentUseRating.trim()
+      ? clampRating5(Number(teacherStudentUseRating.trim()))
+      : null;
 
     const related_links = linksText.trim() ? parseLinks(linksText) : null;
     const publisherRecord = await upsertPublisherRecord();
+
+    if (row.books?.id) {
+      await saveCommunityContributions(row.books.id, userId);
+    }
+
     const userBooksUpdate = supabase
       .from("user_books")
       .update({
@@ -2766,9 +3320,10 @@ export default function BookHubPage() {
         rating_overall: ro,
         rating_recommend: rr,
         rating_difficulty: rd,
+        teacher_student_use_rating: tsur,
         favorite_quotes: favoriteQuotes || null,
         memorable_words: memorableWords || null,
-        reader_level: readerLevel || null,
+        reader_level: profileLevel || readerLevel || null,
         recommended_level: recommendedLevel || null,
         format_type: formatType || null,
         progress_mode: progressMode || null,
@@ -2785,10 +3340,9 @@ export default function BookHubPage() {
         publisher: publisherRecord?.name_ja ?? (publisherName || null),
         publisher_id: publisherRecord?.id ?? null,
         published_date: publishedDate || null,
-        genre: genre || null,
         book_type: bookType || null,
-        trigger_warnings: triggerWarnings || null,
         page_count,
+        series_number,
         isbn: isbn || null,
         isbn13: isbn13 || null,
         publisher_reading: publisherReading || null,
@@ -3616,6 +4170,13 @@ export default function BookHubPage() {
                     </FilingTab>
 
                     <FilingTab
+                      active={activeTab === "community"}
+                      onClick={() => setActiveTab("community")}
+                    >
+                      Community
+                    </FilingTab>
+
+                    <FilingTab
                       active={activeTab === "bookInfo"}
                       onClick={() => setActiveTab("bookInfo")}
                     >
@@ -3627,51 +4188,31 @@ export default function BookHubPage() {
 
               {activeTab === "bookInfo" && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3 px-4 md:px-6">
+                  <div className="px-4 md:px-6">
                     <div className="text-base font-semibold text-stone-900">Book Info</div>
-
-                    {!isEditingThisTab ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditingTab("bookInfo")}
-                        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-                      >
-                        Edit
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={cancelEdits}
-                          className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveAll}
-                          disabled={saving}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {saving ? "Saving..." : "Save"}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   <BookInfoTab
                     book={book}
-                    isEditing={isEditingThisTab}
-                    genre={genre}
-                    setGenre={setGenre}
+                    isEditingBookInfo={isEditingBookInfoDetails}
+                    isEditingPeople={isEditingBookInfoPeople}
+                    isEditingLinks={isEditingBookInfoLinks}
+                    isEditingMyCopy={isEditingBookInfoCopy}
+                    saving={saving}
+                    onEditBookInfo={() => setEditingTab("bookInfoDetails")}
+                    onEditPeople={() => setEditingTab("bookInfoPeople")}
+                    onEditLinks={() => setEditingTab("bookInfoLinks")}
+                    onEditMyCopy={() => setEditingTab("bookInfoCopy")}
+                    onCancel={cancelEdits}
+                    onSave={saveAll}
                     bookType={bookType}
                     setBookType={setBookType}
-                    triggerWarnings={triggerWarnings}
-                    setTriggerWarnings={setTriggerWarnings}
                     publishedDate={publishedDate}
                     setPublishedDate={setPublishedDate}
                     pageCount={pageCount}
                     setPageCount={setPageCount}
+                    seriesNumber={seriesNumber}
+                    setSeriesNumber={setSeriesNumber}
                     isbn={isbn}
                     setIsbn={setIsbn}
                     isbn13={isbn13}
@@ -3709,11 +4250,9 @@ export default function BookHubPage() {
                     illustratorReading={illustratorReading}
                     setIllustratorReading={setIllustratorReading}
                     relatedLinksArr={relatedLinksArr}
-                    genreLabel={genreLabel}
                     bookTypeLabel={bookTypeLabel}
                     displayLinkLabel={displayLinkLabel}
                     displayLinkUrl={displayLinkUrl}
-                    GENRE_OPTIONS={GENRE_OPTIONS}
                     BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
                     Detail={Detail}
                     PersonRow={PersonRow}
@@ -3725,6 +4264,39 @@ export default function BookHubPage() {
                     setShowPageNumbers={setShowPageNumbers}
                     formatTypeLabel={formatTypeLabel}
                     progressModeLabel={progressModeLabel}
+                  />
+                </div>
+              )}
+
+              {activeTab === "community" && (
+                <div className="space-y-4">
+                  <div className="px-4 md:px-6">
+                    <div className="text-base font-semibold text-stone-900">Community</div>
+                  </div>
+
+                  <CommunityTab
+                    isEditingGenres={isEditingCommunityGenres}
+                    isEditingContentNotes={isEditingCommunityContentNotes}
+                    isEditingReaderFit={isEditingCommunityReaderFit}
+                    saving={saving}
+                    onEditGenres={() => setEditingTab("communityGenres")}
+                    onEditContentNotes={() => setEditingTab("communityContentNotes")}
+                    onEditReaderFit={() => setEditingTab("communityReaderFit")}
+                    onCancel={cancelEdits}
+                    onSave={saveAll}
+                    genre={genre}
+                    setGenre={setGenre}
+                    triggerWarnings={triggerWarnings}
+                    setTriggerWarnings={setTriggerWarnings}
+                    readerLevel={readerLevel}
+                    setReaderLevel={setReaderLevel}
+                    ratingDifficulty={ratingDifficulty}
+                    setRatingDifficulty={setRatingDifficulty}
+                    sharedGenres={sharedGenres}
+                    sharedContentNotes={sharedContentNotes}
+                    genreLabel={genreLabel}
+                    GENRE_OPTIONS={GENRE_OPTIONS}
+                    LEVEL_OPTIONS={LEVEL_OPTIONS}
                   />
                 </div>
               )}
@@ -3760,9 +4332,11 @@ export default function BookHubPage() {
                     setNotes={setNotes}
                     saveNotes={saveNotes}
                     saveRecommendedLevel={saveRecommendedLevel}
+                    saveTeacherStudentUseRating={saveTeacherStudentUseRating}
                     recommendedLevel={recommendedLevel}
                     setRecommendedLevel={setRecommendedLevel}
-                    levelStars={levelStars}
+                    teacherStudentUseRating={teacherStudentUseRating}
+                    setTeacherStudentUseRating={setTeacherStudentUseRating}
                     kanjiMapLoading={kanjiMapLoading}
                     kanjiMapError={kanjiMapError}
                     kanjiMapQueue={kanjiMapQueue}
@@ -3924,17 +4498,11 @@ export default function BookHubPage() {
                     setRatingOverall={setRatingOverall}
                     ratingRecommend={ratingRecommend}
                     setRatingRecommend={setRatingRecommend}
-                    ratingDifficulty={ratingDifficulty}
-                    setRatingDifficulty={setRatingDifficulty}
-                    readerLevel={readerLevel}
-                    setReaderLevel={setReaderLevel}
                     favoriteQuotes={favoriteQuotes}
                     setFavoriteQuotes={setFavoriteQuotes}
                     memorableWords={memorableWords}
                     setMemorableWords={setMemorableWords}
-                    LEVEL_OPTIONS={LEVEL_OPTIONS}
                     StarRatingField={StarRatingField}
-                    DifficultyField={DifficultyField}
                   />
                 </div>
               )}

@@ -1,11 +1,26 @@
 import { useState } from "react";
 
-type HubTab = "bookInfo" | "teacher" | "study" | "reading" | "story" | "rating";
+type EditingPanel =
+  | "bookInfo"
+  | "teacher"
+  | "study"
+  | "reading"
+  | "story"
+  | "rating"
+  | "community"
+  | "bookInfoDetails"
+  | "bookInfoPeople"
+  | "bookInfoLinks"
+  | "bookInfoCopy"
+  | "communityGenres"
+  | "communityContentNotes"
+  | "communityReaderFit";
 
 type UserBook = {
   id: string;
   notes: string | null;
   recommended_level: string | null;
+  teacher_student_use_rating: number | null;
 };
 
 type Book = {
@@ -40,17 +55,19 @@ type TeacherTabProps = {
   userId: string | null;
 
   isEditingThisTab: boolean;
-  editingTab: HubTab | null;
-  setEditingTab: React.Dispatch<React.SetStateAction<HubTab | null>>;
+  editingTab: EditingPanel | null;
+  setEditingTab: React.Dispatch<React.SetStateAction<EditingPanel | null>>;
 
   notes: string;
   setNotes: (value: string) => void;
-  saveNotes: () => Promise<void>;
+  saveNotes: () => Promise<boolean>;
   saveRecommendedLevel: () => Promise<void>;
+  saveTeacherStudentUseRating: () => Promise<void>;
 
   recommendedLevel: string;
   setRecommendedLevel: (value: string) => void;
-  levelStars: (value: string | null | undefined) => string;
+  teacherStudentUseRating: string;
+  setTeacherStudentUseRating: (value: string) => void;
 
   kanjiMapLoading: boolean;
   kanjiMapError: string | null;
@@ -82,9 +99,11 @@ export default function TeacherTab({
   setNotes,
   saveNotes,
   saveRecommendedLevel,
+  saveTeacherStudentUseRating,
   recommendedLevel,
   setRecommendedLevel,
-  levelStars,
+  teacherStudentUseRating,
+  setTeacherStudentUseRating,
   kanjiMapLoading,
   kanjiMapError,
   kanjiMapQueue,
@@ -100,12 +119,121 @@ export default function TeacherTab({
   hiraToKata,
 }: TeacherTabProps) {
   const [isEditingLevelGuidance, setIsEditingLevelGuidance] = useState(false);
+  const [isEditingStudentUse, setIsEditingStudentUse] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [notesSaveMessage, setNotesSaveMessage] = useState("");
+
+  const suitableLevelOptions = [
+    {
+      value: "Level 1",
+      title: "Level 1",
+      plain: "Absolute Beginner",
+      cefr: "Pre-A1",
+      jlpt: "Before N5",
+      feel: "Hiragana/katakana, survival words, very guided sentences",
+    },
+    {
+      value: "Level 2",
+      title: "Level 2",
+      plain: "Beginner 1",
+      cefr: "A1",
+      jlpt: "Early N5",
+      feel: "Simple sentences, basic particles, dictionary-form verbs still hard",
+    },
+    {
+      value: "Level 3",
+      title: "Level 3",
+      plain: "Beginner 2",
+      cefr: "A1+",
+      jlpt: "Solid N5",
+      feel: "Can read graded material slowly with support",
+    },
+    {
+      value: "Level 4",
+      title: "Level 4",
+      plain: "Upper Beginner",
+      cefr: "A2",
+      jlpt: "N4 entry",
+      feel: "Longer sentences, more verb forms, lots of grammar still foggy",
+    },
+    {
+      value: "Level 5",
+      title: "Level 5",
+      plain: "Pre-Intermediate",
+      cefr: "A2+",
+      jlpt: "Solid N4",
+      feel: "Can follow simple stories, but unknown vocab blocks flow",
+    },
+    {
+      value: "Level 6",
+      title: "Level 6",
+      plain: "Intermediate 1",
+      cefr: "B1",
+      jlpt: "N3 entry",
+      feel: "Real Japanese starts becoming possible, but slow and lookup-heavy",
+    },
+    {
+      value: "Level 7",
+      title: "Level 7",
+      plain: "Intermediate 2",
+      cefr: "B1+",
+      jlpt: "Solid N3",
+      feel: "Can read easier native texts with support; nuance still hard",
+    },
+    {
+      value: "Level 8",
+      title: "Level 8",
+      plain: "Upper Intermediate",
+      cefr: "B2-ish",
+      jlpt: "N2 entry",
+      feel: "Can handle novels/articles, but kanji/vocab density hurts",
+    },
+    {
+      value: "Level 9",
+      title: "Level 9",
+      plain: "Advanced",
+      cefr: "B2+",
+      jlpt: "Solid N2 / N1 entry",
+      feel: "Reads real Japanese regularly, still misses style, implication, register",
+    },
+    {
+      value: "Level 10",
+      title: "Level 10",
+      plain: "Upper Advanced",
+      cefr: "C1-ish",
+      jlpt: "Solid N1+",
+      feel: "Can read widely with nuance, ambiguity, tone, and less hand-holding",
+    },
+  ] as const;
+
+  function stars5(n: number | null) {
+    if (!n || n < 1) return "☆☆☆☆☆";
+    return "★".repeat(n) + "☆".repeat(5 - n);
+  }
+
+  function studentUseLabel(value: number | null) {
+    if (value === 5) return "Strong yes. I'd happily use this with students.";
+    if (value === 4) return "Yes, with minor caveats.";
+    if (value === 3) return "Maybe. Depends on the student or context.";
+    if (value === 2) return "Probably not.";
+    if (value === 1) return "No. I would not use this with students.";
+    return "Rate whether this feels like a book you would actually want to use with students.";
+  }
+
+  function suitableLevelInfo(value: string | null | undefined) {
+    return suitableLevelOptions.find((option) => option.value === value) ?? null;
+  }
 
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-stone-900">Level (with guidance)</div>
+          <div>
+            <div className="text-sm font-semibold text-stone-900">Suitable Level</div>
+            <div className="mt-1 text-xs text-stone-500">
+              Mekuru-style reading level with guidance.
+            </div>
+          </div>
 
           {!isEditingLevelGuidance ? (
             <button
@@ -131,28 +259,45 @@ export default function TeacherTab({
 
         {!isEditingLevelGuidance ? (
           <>
-            <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
-            <div className="mt-1 text-xs text-amber-600">
-              {levelStars(row.recommended_level)}
-            </div>
+            {suitableLevelInfo(row.recommended_level) ? (
+              <div className="rounded-xl border border-stone-200 bg-white px-3 py-3">
+                <div className="text-sm font-semibold text-stone-900">
+                  {suitableLevelInfo(row.recommended_level)?.title} · {suitableLevelInfo(row.recommended_level)?.plain}
+                </div>
+                <div className="mt-1 text-xs font-medium text-amber-700">
+                  {suitableLevelInfo(row.recommended_level)?.cefr} · {suitableLevelInfo(row.recommended_level)?.jlpt}
+                </div>
+                <div className="mt-2 text-sm leading-6 text-stone-700">
+                  {suitableLevelInfo(row.recommended_level)?.feel}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1 font-medium">{row.recommended_level || "—"}</div>
+            )}
           </>
         ) : (
-          <div className="mt-2 grid gap-2 sm:grid-cols-5">
-            {["N5", "N4", "N3", "N2", "N1"].map((opt) => {
-              const isSelected = recommendedLevel === opt;
+          <div className="mt-2 space-y-2">
+            <div className="rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm leading-6 text-stone-700">
+              Pick the level that feels suitable with guidance, not necessarily the level where the book becomes easy.
+            </div>
+
+            {suitableLevelOptions.map((opt) => {
+              const isSelected = recommendedLevel === opt.value;
 
               return (
                 <button
-                  key={opt}
+                  key={opt.value}
                   type="button"
-                  onClick={() => setRecommendedLevel(opt)}
+                  onClick={() => setRecommendedLevel(opt.value)}
                   className={`rounded-lg border px-3 py-2 text-left transition ${isSelected
                     ? "border-stone-900 bg-stone-100"
                     : "border-stone-200 hover:bg-stone-50"
                     }`}
                 >
-                  <div className="text-amber-600">{levelStars(opt)}</div>
-                  <div className="text-xs text-stone-600">{opt}</div>
+                  <div className="text-sm font-semibold text-stone-900">
+                    {opt.title} · {opt.plain} ({opt.cefr} · {opt.jlpt})
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-stone-700">{opt.feel}</div>
                 </button>
               );
             })}
@@ -160,6 +305,91 @@ export default function TeacherTab({
             <button
               type="button"
               onClick={() => setRecommendedLevel("")}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+            >
+              <div className="text-xs text-stone-600">Clear</div>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-stone-900">Use With Students</div>
+          </div>
+
+          {!isEditingStudentUse ? (
+            <button
+              type="button"
+              onClick={() => setIsEditingStudentUse(true)}
+              className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-black"
+            >
+              Edit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={async () => {
+                await saveTeacherStudentUseRating();
+                setIsEditingStudentUse(false);
+              }}
+              className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-black"
+            >
+              Save
+            </button>
+          )}
+        </div>
+
+        {!isEditingStudentUse ? (
+          <>
+            <div className="rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm leading-6 text-stone-700">
+              {studentUseLabel(row.teacher_student_use_rating)}
+            </div>
+            <div className="mt-1 font-medium">
+              {row.teacher_student_use_rating ? `${row.teacher_student_use_rating}/5` : "—"}
+            </div>
+            <div className="mt-1 text-amber-600">
+              {stars5(row.teacher_student_use_rating)}
+            </div>
+          </>
+        ) : (
+          <div className="mt-2 space-y-2">
+            <div className="rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm leading-6 text-stone-700">
+              This rating is about teaching fit, not reading level alone. A book can be readable with
+              guidance and still not be something you would want to use with students.
+            </div>
+
+            {[
+              [5, "Strong yes. I'd happily use this with students."],
+              [4, "Yes, with minor caveats."],
+              [3, "Maybe. Depends on the student or context."],
+              [2, "Probably not."],
+              [1, "No. I would not use this with students."],
+            ].map(([value, label]) => {
+              const isSelected = Number(teacherStudentUseRating) === value;
+
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTeacherStudentUseRating(String(value))}
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                    isSelected
+                      ? "border-amber-500 bg-amber-50 shadow-sm"
+                      : "border-stone-200 bg-white hover:bg-stone-50"
+                  }`}
+                >
+                  <div className="font-medium text-amber-600">{stars5(value as number)}</div>
+                  <div className="mt-1 text-sm font-medium text-stone-900">{value} star{value === 1 ? "" : "s"}</div>
+                  <div className="mt-1 text-xs text-stone-600">{label}</div>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setTeacherStudentUseRating("")}
               className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
             >
               <div className="text-xs text-stone-600">Clear</div>
@@ -194,10 +424,21 @@ export default function TeacherTab({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void saveNotes()}
+                onClick={async () => {
+                  setIsSavingNotes(true);
+                  setNotesSaveMessage("");
+                  const didSave = await saveNotes();
+                  setIsSavingNotes(false);
+
+                  if (didSave) {
+                    setNotesSaveMessage("Saved.");
+                    window.setTimeout(() => setNotesSaveMessage(""), 1800);
+                  }
+                }}
+                disabled={isSavingNotes}
                 className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
               >
-                Save Notes
+                {isSavingNotes ? "Saving..." : "Save Notes"}
               </button>
 
               <button
@@ -208,6 +449,10 @@ export default function TeacherTab({
                 Cancel
               </button>
             </div>
+
+            {notesSaveMessage ? (
+              <div className="text-sm text-emerald-700">{notesSaveMessage}</div>
+            ) : null}
           </div>
         ) : (
           <div className="whitespace-pre-wrap text-sm leading-6 text-stone-700">

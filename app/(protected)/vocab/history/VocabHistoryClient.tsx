@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -24,29 +24,29 @@ type SeenInstance = {
   book_title: string;
 };
 
+type BrowseWordRow = {
+  surface: string | null;
+  reading: string | null;
+  meaning: string | null;
+  user_book_id: string;
+  created_at: string;
+};
+
+type HistoryPatternItem = {
+  surface: string;
+  reading: string | null;
+  meaning: string | null;
+  totalAppearances: number;
+  uniqueBookCount: number;
+  lastSeenAt: string;
+};
+
 type DictionaryFallbackEntry = {
   word: string;
   reading: string;
   meanings: string[];
   jlpt: string | null;
   isCommon: boolean | null;
-};
-
-type KanjiMeta = {
-  kanji: string;
-  strokes: number | null;
-  radical: string | null;
-};
-
-type RelatedWord = {
-  word: string;
-  reading: string;
-  meaning: string;
-};
-
-type KanjiGroup = {
-  kanji: string;
-  relatedWords: RelatedWord[];
 };
 
 // -------------------------------------------------------------
@@ -82,10 +82,6 @@ function chapterDisplay(chNum: number | null, chName: string | null) {
   return "";
 }
 
-function getUniqueKanji(surface: string) {
-  return Array.from(new Set(surface.match(/[\u3400-\u9FFF]/g) || []));
-}
-
 function uniqueStrings(values: (string | null | undefined)[]) {
   return Array.from(new Set(values.map((v) => (v ?? "").trim()).filter(Boolean)));
 }
@@ -115,19 +111,166 @@ export default function VocabHistoryClient() {
 
   const [notFoundEntry, setNotFoundEntry] = useState<DictionaryFallbackEntry | null>(null);
   const [otherMatches, setOtherMatches] = useState<DictionaryFallbackEntry[]>([]);
-
-  const [kanjiMeta, setKanjiMeta] = useState<KanjiMeta[]>([]);
-  const [kanjiGroups, setKanjiGroups] = useState<KanjiGroup[]>([]);
-  const [extraLoading, setExtraLoading] = useState(false);
+  const [browseLoading, setBrowseLoading] = useState(true);
+  const [oftenLookedUp, setOftenLookedUp] = useState<HistoryPatternItem[]>([]);
+  const [acrossManyBooks, setAcrossManyBooks] = useState<HistoryPatternItem[]>([]);
 
   const uniqueBookCount = new Set(seenInstances.map((x) => x.user_book_id)).size;
-  ;
+  const hasActiveResult = !!surface || !!notFoundEntry;
+  const hasSearchText = query.trim().length > 0;
+
+  const shouldShowBrowse = useMemo(() => {
+    return !hasActiveResult && !hasSearchText;
+  }, [hasActiveResult, hasSearchText]);
 
   useEffect(() => {
     if (!initialWord) return;
     runSearch(initialWord);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialWord]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBrowsePatterns() {
+      setBrowseLoading(true);
+
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) throw authError;
+        if (!user) {
+          if (!cancelled) {
+            setOftenLookedUp([]);
+            setAcrossManyBooks([]);
+          }
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("user_book_words")
+          .select(
+            `
+            surface,
+            reading,
+            meaning,
+            user_book_id,
+            created_at,
+            user_books!inner (
+              user_id
+            )
+          `
+          )
+          .eq("user_books.user_id", user.id);
+
+        if (error) throw error;
+
+        const grouped = new Map<
+          string,
+          {
+            surface: string;
+            reading: string | null;
+            meaning: string | null;
+            count: number;
+            bookIds: Set<string>;
+            lastSeenAt: string;
+          }
+        >();
+
+        for (const row of (data ?? []) as (BrowseWordRow & { user_books?: { user_id: string }[] | { user_id: string } | null })[]) {
+          const surface = (row.surface ?? "").trim();
+          if (!surface) continue;
+
+          const key = `${surface}|||${(row.reading ?? "").trim()}`;
+          const existing = grouped.get(key);
+
+          if (!existing) {
+            grouped.set(key, {
+              surface,
+              reading: row.reading ?? null,
+              meaning: row.meaning ?? null,
+              count: 1,
+              bookIds: new Set([row.user_book_id]),
+              lastSeenAt: row.created_at,
+            });
+            continue;
+          }
+
+          existing.count += 1;
+          existing.bookIds.add(row.user_book_id);
+          if (row.created_at > existing.lastSeenAt) {
+            existing.lastSeenAt = row.created_at;
+          }
+          if (!existing.meaning && row.meaning) {
+            existing.meaning = row.meaning;
+          }
+        }
+
+        const items: HistoryPatternItem[] = Array.from(grouped.values()).map((item) => ({
+          surface: item.surface,
+          reading: item.reading,
+          meaning: item.meaning,
+          totalAppearances: item.count,
+          uniqueBookCount: item.bookIds.size,
+          lastSeenAt: item.lastSeenAt,
+        }));
+
+        const byAppearances = [...items]
+          .sort((a, b) => {
+            if (b.totalAppearances !== a.totalAppearances) {
+              return b.totalAppearances - a.totalAppearances;
+            }
+            if (b.uniqueBookCount !== a.uniqueBookCount) {
+              return b.uniqueBookCount - a.uniqueBookCount;
+            }
+            return b.lastSeenAt.localeCompare(a.lastSeenAt);
+          })
+          .slice(0, 8);
+
+        const byAppearanceKeys = new Set(
+          byAppearances.map((item) => `${item.surface}|||${item.reading ?? ""}`)
+        );
+
+        const byBooks = [...items]
+          .filter((item) => item.uniqueBookCount > 1)
+          .filter((item) => !byAppearanceKeys.has(`${item.surface}|||${item.reading ?? ""}`))
+          .sort((a, b) => {
+            if (b.uniqueBookCount !== a.uniqueBookCount) {
+              return b.uniqueBookCount - a.uniqueBookCount;
+            }
+            if (b.totalAppearances !== a.totalAppearances) {
+              return b.totalAppearances - a.totalAppearances;
+            }
+            return b.lastSeenAt.localeCompare(a.lastSeenAt);
+          })
+          .slice(0, 8);
+
+        if (!cancelled) {
+          setOftenLookedUp(byAppearances);
+          setAcrossManyBooks(byBooks);
+        }
+      } catch (e) {
+        console.error("Could not load word history patterns:", e);
+        if (!cancelled) {
+          setOftenLookedUp([]);
+          setAcrossManyBooks([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setBrowseLoading(false);
+        }
+      }
+    }
+
+    loadBrowsePatterns();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function runSearch(raw?: string) {
     const q = (raw ?? query).trim();
@@ -146,9 +289,6 @@ export default function VocabHistoryClient() {
 
     setNotFoundEntry(null);
     setOtherMatches([]);
-
-    setKanjiMeta([]);
-    setKanjiGroups([]);
 
     try {
       const {
@@ -222,8 +362,6 @@ export default function VocabHistoryClient() {
 
         setSeenInstances(normalizedSeen);
         setTotalLookupCount(normalizedSeen.length);
-
-        await loadExtraInfo(first.surface);
         return;
       }
 
@@ -270,86 +408,11 @@ export default function VocabHistoryClient() {
 
       setNotFoundEntry(mapped[0]);
       setOtherMatches(mapped.slice(1, 5));
-
-      if (mapped[0]?.word) {
-        await loadExtraInfo(mapped[0].word);
-      }
     } catch (e: any) {
       console.error(e);
       setErrorMsg(e?.message ?? "Could not search word history.");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadExtraInfo(wordSurface: string) {
-    setExtraLoading(true);
-
-    try {
-      const chars = getUniqueKanji(wordSurface);
-
-      if (chars.length === 0) {
-        setKanjiMeta([]);
-        setKanjiGroups([]);
-        return;
-      }
-
-      const metaResults: KanjiMeta[] = [];
-      const groupResults: KanjiGroup[] = [];
-
-      for (const ch of chars) {
-        try {
-          const r = await fetch(`https://kanjiapi.dev/v1/kanji/${encodeURIComponent(ch)}`);
-          if (!r.ok) {
-            metaResults.push({ kanji: ch, strokes: null, radical: null });
-          } else {
-            const data = await r.json();
-            metaResults.push({
-              kanji: ch,
-              strokes: data.stroke_count ?? null,
-              radical: null,
-            });
-          }
-        } catch {
-          metaResults.push({ kanji: ch, strokes: null, radical: null });
-        }
-
-        try {
-          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(ch)}`);
-          if (!res.ok) {
-            groupResults.push({ kanji: ch, relatedWords: [] });
-            continue;
-          }
-
-          const data = await res.json();
-          const relatedWords: RelatedWord[] = (data?.data ?? [])
-            .map((item: any) => ({
-              word: item?.japanese?.[0]?.word ?? item?.japanese?.[0]?.reading ?? "",
-              reading: item?.japanese?.[0]?.reading ?? "",
-              meaning: item?.senses?.[0]?.english_definitions?.join("; ") ?? "",
-            }))
-            .filter((x: RelatedWord) => x.word && x.word !== wordSurface)
-            .slice(0, 3);
-
-          groupResults.push({
-            kanji: ch,
-            relatedWords,
-          });
-        } catch {
-          groupResults.push({
-            kanji: ch,
-            relatedWords: [],
-          });
-        }
-      }
-
-      setKanjiMeta(metaResults);
-      setKanjiGroups(groupResults);
-    } catch {
-      setKanjiMeta([]);
-      setKanjiGroups([]);
-    } finally {
-      setExtraLoading(false);
     }
   }
 
@@ -369,12 +432,6 @@ export default function VocabHistoryClient() {
     setIsCommon(null);
     setSeenInstances([]);
     setTotalLookupCount(0);
-    setKanjiMeta([]);
-    setKanjiGroups([]);
-
-    if (entry.word) {
-      await loadExtraInfo(entry.word);
-    }
   }
 
   function clearSearch() {
@@ -392,9 +449,59 @@ export default function VocabHistoryClient() {
 
     setNotFoundEntry(null);
     setOtherMatches([]);
+    router.replace("/vocab/history");
+  }
 
-    setKanjiMeta([]);
-    setKanjiGroups([]);
+  function PatternSection({
+    title,
+    subtitle,
+    items,
+  }: {
+    title: string;
+    subtitle: string;
+    items: HistoryPatternItem[];
+  }) {
+    return (
+      <section className="rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="mb-4">
+          <div className="text-lg font-semibold text-stone-900">{title}</div>
+          <p className="mt-1 text-sm text-stone-500">{subtitle}</p>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="text-sm text-stone-500">Nothing here yet.</div>
+        ) : (
+          <div className="space-y-3">
+            {items.map((item) => (
+              <button
+                key={`${item.surface}|||${item.reading ?? ""}`}
+                type="button"
+                onClick={() => {
+                  router.push(`/vocab/history?word=${encodeURIComponent(item.surface)}`);
+                }}
+                className="w-full rounded-xl border p-3 text-left transition hover:bg-stone-50"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-lg font-semibold text-stone-900">{item.surface}</div>
+                    {item.reading ? (
+                      <div className="mt-0.5 text-sm text-stone-500">{item.reading}</div>
+                    ) : null}
+                  </div>
+
+                  <div className="shrink-0 text-right text-xs text-stone-500">
+                    <div>{item.totalAppearances} appearances</div>
+                    <div className="mt-1">
+                      {item.uniqueBookCount} book{item.uniqueBookCount === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    );
   }
 
   return (
@@ -428,6 +535,29 @@ export default function VocabHistoryClient() {
 
       {errorMsg ? <p className="mb-4 text-sm text-red-600">{errorMsg}</p> : null}
 
+      {shouldShowBrowse ? (
+        <div className="mb-6 grid gap-6 lg:grid-cols-2">
+          {browseLoading ? (
+            <section className="rounded-2xl border bg-white p-6 shadow-sm lg:col-span-2">
+              <div className="text-sm text-stone-500">Loading your recurring words…</div>
+            </section>
+          ) : (
+            <>
+              <PatternSection
+                title="Words I Often Look Up"
+                subtitle="Words that show up the most in your saved reading."
+                items={oftenLookedUp}
+              />
+              <PatternSection
+                title="Words Across Many Books"
+                subtitle="Words you have met in more than one book."
+                items={acrossManyBooks}
+              />
+            </>
+          )}
+        </div>
+      ) : null}
+
       {surface ? (
         <>
           <section className="w-full rounded-2xl border bg-white p-6 shadow-sm">
@@ -444,23 +574,6 @@ export default function VocabHistoryClient() {
                 <div className="text-2xl font-medium">{reading || "—"}</div>
               </div>
 
-              <div>
-                <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Definitions</div>
-
-                {definitions.length > 0 ? (
-                  <div className="space-y-2">
-                    {definitions.map((meaning, i) => (
-                      <div key={`${meaning}-${i}`} className="rounded-xl border p-3">
-                        <div className="text-sm font-semibold text-stone-700">Def {i + 1}</div>
-                        <div className="mt-1 text-base text-stone-900">{meaning}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-lg">—</div>
-                )}
-              </div>
-
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                 {normalizeJlpt(jlpt) !== "NON-JLPT" ? (
                   <span className="rounded-full bg-gray-100 px-3 py-1 text-[17px] font-medium leading-none text-gray-800">
@@ -473,13 +586,13 @@ export default function VocabHistoryClient() {
 
               <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border p-3">
-                  <div className="text-xs text-gray-500">Total lookup count</div>
+                  <div className="text-xs text-gray-500">Total appearances</div>
                   <div className="text-2xl font-semibold">{totalLookupCount}</div>
-                  <div className="mt-1 text-xs text-gray-400">Across all your books</div>
+                  <div className="mt-1 text-xs text-gray-400">Across all your saved reading</div>
                 </div>
 
                 <div className="rounded-xl border p-3">
-                  <div className="text-xs text-gray-500">Books where saved</div>
+                  <div className="text-xs text-gray-500">Books where it appeared</div>
                   <div className="text-2xl font-semibold">{uniqueBookCount}</div>
                 </div>
               </div>
@@ -512,7 +625,7 @@ export default function VocabHistoryClient() {
                       </div>
 
                       {instance.meaning ? (
-                        <div className="mt-1 text-sm text-stone-500">
+                        <div className="mt-2 text-sm text-stone-500">
                           {defIndex !== -1 && defIndex != null ? `Def ${defIndex + 1}: ` : ""}
                           {instance.meaning}
                         </div>
@@ -520,68 +633,6 @@ export default function VocabHistoryClient() {
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </section>
-
-          <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
-            <div className="mb-4 text-lg font-semibold">Extra</div>
-
-            {extraLoading ? (
-              <div className="text-sm text-gray-500">Loading extra info…</div>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <div className="mb-2 text-sm font-semibold">Kanji Info</div>
-
-                  {kanjiMeta.length === 0 ? (
-                    <div className="text-sm text-gray-500">No kanji info for this word.</div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {kanjiMeta.map((k) => (
-                        <span
-                          key={k.kanji}
-                          className="rounded-full border bg-stone-50 px-3 py-1 text-sm"
-                        >
-                          {k.kanji} · {k.strokes ?? "?"} strokes
-                          {k.radical ? ` · radical ${k.radical}` : ""}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  {kanjiGroups.length === 0 ? (
-                    <div className="text-sm text-gray-500">No related words found.</div>
-                  ) : (
-                    <div className="space-y-5">
-                      {kanjiGroups.map((group) => (
-                        <div key={group.kanji}>
-                          <div className="mb-2 text-sm font-semibold">Words with {group.kanji}</div>
-
-                          {group.relatedWords.length === 0 ? (
-                            <div className="text-sm text-gray-500">No related words found.</div>
-                          ) : (
-                            <div className="space-y-2">
-                              {group.relatedWords.map((kw, i) => (
-                                <div key={`${group.kanji}-${kw.word}-${i}`} className="text-sm">
-                                  <span className="font-medium text-stone-900">{kw.word}</span>
-                                  {kw.reading ? (
-                                    <span className="ml-2 text-stone-600">（{kw.reading}）</span>
-                                  ) : null}
-                                  {kw.meaning ? (
-                                    <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
-                                  ) : null}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </section>

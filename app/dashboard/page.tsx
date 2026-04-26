@@ -1,9 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
-
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -32,6 +29,30 @@ export default function DashboardPage() {
         >
           Go to My Library
         </button>
+      </div>
+
+      <div className="grid w-full max-w-4xl gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-stone-300 bg-stone-50 p-5 text-left shadow-sm">
+          <div className="text-sm font-semibold text-stone-900">looker-upper</div>
+          <div className="mt-1 text-sm text-stone-500">
+            noun · official Mekuru book club term
+          </div>
+          <p className="mt-2 text-sm leading-6 text-stone-700">
+            A reader who cannot help stopping to look up words, grammar, and anything else
+            they find interesting.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-stone-300 bg-stone-50 p-5 text-left shadow-sm">
+          <div className="text-sm font-semibold text-stone-900">non-looker-upper</div>
+          <div className="mt-1 text-sm text-stone-500">
+            noun · official Mekuru book club term
+          </div>
+          <p className="mt-2 text-sm leading-6 text-stone-700">
+            A reader who wants to immerse themselves in the story, keep going, and practice
+            fluid reading with only light support when needed.
+          </p>
+        </div>
       </div>
     </div>
   );

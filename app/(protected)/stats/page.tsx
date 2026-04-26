@@ -25,6 +25,7 @@ type BookType =
 
 type BookRow = {
   title: string;
+  author: string | null;
   book_type: BookType;
   page_count: number | null;
   cover_url: string | null;
@@ -182,6 +183,19 @@ function inRangeByDateString(dateString: string | null, cutoff: Date | null) {
   return date >= cutoff;
 }
 
+function paceScore(item: BookMetric) {
+  return (item.wordsPerPage ?? 0) * 2 + (item.averageMinutesPerPage ?? 0);
+}
+
+function paceLabel(item: BookMetric) {
+  const score = paceScore(item);
+
+  if (score <= 0.9) return "Flowing";
+  if (score <= 1.9) return "Steady";
+  if (score <= 3.2) return "Support-heavy";
+  return "Pushes back";
+}
+
 function SectionBand({
   title,
   eyebrow,
@@ -259,6 +273,206 @@ function BarStrip({
   );
 }
 
+function PieChart({
+  items,
+  size = 220,
+}: {
+  items: { label: string; value: number; color: string }[];
+  size?: number;
+}) {
+  const filtered = items.filter((item) => item.value > 0);
+  const total = filtered.reduce((sum, item) => sum + item.value, 0);
+  const radius = size / 2 - 12;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  if (total <= 0) {
+    return (
+      <div className="flex h-[220px] items-center justify-center rounded-2xl bg-slate-50 text-sm text-slate-500">
+        No data yet
+      </div>
+    );
+  }
+
+  let running = -Math.PI / 2;
+
+  const paths = filtered.map((item) => {
+    const angle = (item.value / total) * Math.PI * 2;
+    const startAngle = running;
+    const endAngle = running + angle;
+    running = endAngle;
+
+    const x1 = cx + radius * Math.cos(startAngle);
+    const y1 = cy + radius * Math.sin(startAngle);
+    const x2 = cx + radius * Math.cos(endAngle);
+    const y2 = cy + radius * Math.sin(endAngle);
+    const largeArc = angle > Math.PI ? 1 : 0;
+
+    const d = [
+      `M ${cx} ${cy}`,
+      `L ${x1} ${y1}`,
+      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+      "Z",
+    ].join(" ");
+
+    return { ...item, d, percent: (item.value / total) * 100 };
+  });
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[220px_1fr] lg:items-center">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
+        {paths.map((item) => (
+          <path
+            key={item.label}
+            d={item.d}
+            fill={item.color}
+            stroke="white"
+            strokeWidth="3"
+          />
+        ))}
+        <circle cx={cx} cy={cy} r={radius * 0.48} fill="white" />
+        <text
+          x={cx}
+          y={cy - 6}
+          textAnchor="middle"
+          className="fill-slate-500 text-[11px] font-medium uppercase"
+        >
+          Total
+        </text>
+        <text
+          x={cx}
+          y={cy + 18}
+          textAnchor="middle"
+          className="fill-slate-900 text-[18px] font-semibold"
+        >
+          {total}
+        </text>
+      </svg>
+
+      <div className="space-y-3">
+        {paths.map((item) => (
+          <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                className="h-3 w-3 shrink-0 rounded-full"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="truncate text-sm text-slate-700">{item.label}</span>
+            </div>
+            <div className="shrink-0 text-sm font-medium text-slate-900">
+              {item.value} <span className="text-slate-500">({formatDecimal(item.percent)}%)</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrendChart({
+  items,
+}: {
+  items: { label: string; books: number; pages: number }[];
+}) {
+  const width = 760;
+  const height = 320;
+  const left = 52;
+  const right = 52;
+  const top = 26;
+  const bottom = 42;
+  const innerWidth = width - left - right;
+  const innerHeight = height - top - bottom;
+  const maxBooks = Math.max(1, ...items.map((item) => item.books));
+  const maxPages = Math.max(1, ...items.map((item) => item.pages));
+
+  const pointFor = (index: number, value: number, max: number) => {
+    const x = left + (items.length === 1 ? innerWidth / 2 : (index / (items.length - 1)) * innerWidth);
+    const y = top + innerHeight - (value / max) * innerHeight;
+    return { x, y };
+  };
+
+  const booksPoints = items.map((item, index) => pointFor(index, item.books, maxBooks));
+  const pagesPoints = items.map((item, index) => pointFor(index, item.pages, maxPages));
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
+        {[0, 1, 2, 3, 4].map((line) => {
+          const y = top + (innerHeight / 4) * line;
+          return (
+            <line
+              key={line}
+              x1={left}
+              y1={y}
+              x2={width - right}
+              y2={y}
+              stroke="#e2e8f0"
+              strokeWidth="1"
+            />
+          );
+        })}
+
+        <text x={18} y={20} className="fill-slate-500 text-[11px] font-medium">
+          Books
+        </text>
+        <text x={width - 18} y={20} textAnchor="end" className="fill-slate-500 text-[11px] font-medium">
+          Pages
+        </text>
+
+        <polyline
+          fill="none"
+          stroke="#60a5fa"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          points={booksPoints.map((point) => `${point.x},${point.y}`).join(" ")}
+        />
+        <polyline
+          fill="none"
+          stroke="#fb7185"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          points={pagesPoints.map((point) => `${point.x},${point.y}`).join(" ")}
+        />
+
+        {booksPoints.map((point, index) => (
+          <circle key={`book-${items[index].label}`} cx={point.x} cy={point.y} r="4.5" fill="#60a5fa" />
+        ))}
+        {pagesPoints.map((point, index) => (
+          <circle key={`page-${items[index].label}`} cx={point.x} cy={point.y} r="4.5" fill="#fb7185" />
+        ))}
+
+        {items.map((item, index) => {
+          const x = left + (items.length === 1 ? innerWidth / 2 : (index / (items.length - 1)) * innerWidth);
+          return (
+            <text
+              key={item.label}
+              x={x}
+              y={height - 12}
+              textAnchor="middle"
+              className="fill-slate-500 text-[11px]"
+            >
+              {item.label}
+            </text>
+          );
+        })}
+      </svg>
+
+      <div className="mt-3 flex flex-wrap justify-center gap-4 text-sm">
+        <div className="flex items-center gap-2 text-slate-700">
+          <span className="h-3 w-3 rounded-full bg-sky-400" />
+          Books engaged with
+        </div>
+        <div className="flex items-center gap-2 text-slate-700">
+          <span className="h-3 w-3 rounded-full bg-rose-400" />
+          Pages read
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SpotlightCard({
   label,
   value,
@@ -319,6 +533,7 @@ export default function StatsPage() {
             dnf_at,
             books:book_id (
               title,
+              author,
               book_type,
               page_count,
               cover_url
@@ -568,6 +783,102 @@ export default function StatsPage() {
       .slice(0, 6);
   }, [bookMetrics]);
 
+  const timePie = useMemo(() => {
+    return [
+      { label: "Fluid", value: totals.fluidMinutes, color: "#34d399" },
+      { label: "Curiosity", value: totals.curiosityMinutes, color: "#fbbf24" },
+      { label: "Listening", value: totals.listeningMinutes, color: "#60a5fa" },
+    ];
+  }, [totals]);
+
+  const bookTypePie = useMemo(() => {
+    const palette = ["#8b5cf6", "#ec4899", "#38bdf8", "#f59e0b", "#14b8a6", "#f97316"];
+    return typeMetrics.map((item, index) => ({
+      label: item.bookType,
+      value: item.pagesRead,
+      color: palette[index % palette.length],
+    }));
+  }, [typeMetrics]);
+
+  const repeatedAuthors = useMemo(() => {
+    const counts = new Map<string, { author: string; books: number; pages: number }>();
+
+    for (const row of rows) {
+      const author = row.books?.author?.trim();
+      if (!author) continue;
+
+      const metric = bookMetrics.find((item) => item.userBookId === row.id);
+      const existing = counts.get(author) ?? { author, books: 0, pages: 0 };
+      existing.books += 1;
+      existing.pages += metric?.pagesRead ?? 0;
+      counts.set(author, existing);
+    }
+
+    return Array.from(counts.values())
+      .sort((a, b) => (b.books === a.books ? b.pages - a.pages : b.books - a.books))
+      .slice(0, 6);
+  }, [rows, bookMetrics]);
+
+  const pacePie = useMemo(() => {
+    const grouped = new Map<string, number>();
+
+    for (const item of bookMetrics) {
+      if (item.pagesRead <= 0) continue;
+      const label = paceLabel(item);
+      grouped.set(label, (grouped.get(label) ?? 0) + 1);
+    }
+
+    const palette: Record<string, string> = {
+      Flowing: "#34d399",
+      Steady: "#60a5fa",
+      "Support-heavy": "#fbbf24",
+      "Pushes back": "#f87171",
+    };
+
+    return ["Flowing", "Steady", "Support-heavy", "Pushes back"]
+      .map((label) => ({
+        label,
+        value: grouped.get(label) ?? 0,
+        color: palette[label],
+      }))
+      .filter((item) => item.value > 0);
+  }, [bookMetrics]);
+
+  const monthlyTrend = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    const buckets = labels.map((label) => ({
+      label,
+      books: 0,
+      pages: 0,
+      seen: new Set<string>(),
+    }));
+
+    for (const session of sessions) {
+      if (!session.read_on) continue;
+      const date = new Date(session.read_on);
+      if (Number.isNaN(date.getTime()) || date.getFullYear() !== year) continue;
+      const month = date.getMonth();
+      buckets[month].pages += sessionPages(session);
+      buckets[month].seen.add(session.user_book_id);
+    }
+
+    for (const word of words) {
+      const date = new Date(word.created_at);
+      if (Number.isNaN(date.getTime()) || date.getFullYear() !== year) continue;
+      const month = date.getMonth();
+      buckets[month].seen.add(word.user_book_id);
+    }
+
+    return buckets.map((bucket) => ({
+      label: bucket.label,
+      books: bucket.seen.size,
+      pages: bucket.pages,
+    }));
+  }, [sessions, words]);
+
   const spotlights = useMemo(() => {
     const byConsistency = [...bookMetrics]
       .filter((item) => item.engagementDays > 0)
@@ -639,6 +950,17 @@ export default function StatsPage() {
       .slice(0, 5);
   }, [bookMetrics]);
 
+  const flowingBooks = useMemo(() => {
+    return [...bookMetrics]
+      .filter((item) => item.pagesRead > 0)
+      .sort((a, b) => {
+        const aScore = (a.wordsPerPage ?? 0) * 2 + (a.averageMinutesPerPage ?? 0);
+        const bScore = (b.wordsPerPage ?? 0) * 2 + (b.averageMinutesPerPage ?? 0);
+        return aScore - bScore;
+      })
+      .slice(0, 5);
+  }, [bookMetrics]);
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-100 px-6 py-8">
@@ -673,11 +995,11 @@ export default function StatsPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <div className="text-xs font-semibold uppercase text-slate-500">Rough Draft</div>
-              <h1 className="mt-1 text-3xl font-semibold text-slate-900">What kind of Japanese reader am I becoming?</h1>
+              <h1 className="mt-1 text-3xl font-semibold text-slate-900">What kind of Japanese reader am I?</h1>
               <p className="mt-3 text-sm leading-6 text-slate-700">
-                This first pass leans into study habits, reading support, vocabulary friction, and consistency
-                instead of generic book-tracking stats. It should feel more like reading in a language that pushes
-                back a little, and less like a bookshelf app with graphs.
+                This page is trying to hold both sides of MEKURU at once: study habits, reading support, and
+                vocabulary friction, but also a little ordinary bookish life. So it can talk about what pushes
+                back, what flows, what kinds of books you read, and how your reading rhythm changes over time.
               </p>
             </div>
 
@@ -804,7 +1126,7 @@ export default function StatsPage() {
           <SectionBand
             eyebrow="Support"
             title="How support showed up"
-            description="This is less about volume and more about the kind of help your reading needed."
+            description="Still very MEKURU: not just how much time you spent, but what kind of help your reading leaned on."
           >
             <div className="space-y-4">
               {supportBars.map((item) => (
@@ -834,6 +1156,24 @@ export default function StatsPage() {
                   )} listening. That mix says a lot more about your reader-self than a plain monthly book count.`}
               </div>
             </div>
+          </SectionBand>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
+          <SectionBand
+            eyebrow="Over Time"
+            title="Books and pages this year"
+            description="A more ordinary reading-life chart, but still useful. It shows how many books you were actively touching and how many pages you moved through each month."
+          >
+            <TrendChart items={monthlyTrend} />
+          </SectionBand>
+
+          <SectionBand
+            eyebrow="Color"
+            title="Time breakdown"
+            description="A brighter view of how fluid, curious, or listening-heavy your reading life has been."
+          >
+            <PieChart items={timePie} />
           </SectionBand>
         </div>
 
@@ -903,6 +1243,84 @@ export default function StatsPage() {
             />
           </div>
         </SectionBand>
+
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <SectionBand
+            eyebrow="Bookish"
+            title="What kinds of books filled your time"
+            description="A little more classic bookshelf energy, but measured by pages so the chart reflects actual reading weight."
+          >
+            <PieChart items={bookTypePie} />
+          </SectionBand>
+
+          <SectionBand
+            eyebrow="Pace"
+            title="How your books felt to read"
+            description="A pie chart of all the books you touched in this window, grouped by pace: which ones flowed, which stayed steady, and which really pushed back."
+          >
+            <PieChart items={pacePie} />
+          </SectionBand>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+          <SectionBand
+            eyebrow="Authors"
+            title="Authors you keep returning to"
+            description="Not just favorites in theory. These are the writers whose books actually keep showing up in your reading life."
+          >
+            {repeatedAuthors.length > 0 ? (
+              <BarStrip
+                items={repeatedAuthors.map((item) => ({
+                  label: item.author,
+                  value: item.books,
+                }))}
+                colorClass="bg-gradient-to-r from-fuchsia-400 to-violet-500"
+                valueSuffix=" books"
+              />
+            ) : (
+              <div className="text-sm text-slate-500">No repeated authors yet.</div>
+            )}
+          </SectionBand>
+
+          <SectionBand
+            eyebrow="Legend"
+            title="What the pace slices mean"
+            description="This is a rough learner-centered read on the books, not a judgment about their literary value."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                {
+                  label: "Flowing",
+                  color: "bg-emerald-400",
+                  text: "These books tended to move with less friction and lighter support.",
+                },
+                {
+                  label: "Steady",
+                  color: "bg-sky-400",
+                  text: "Comfortably readable, but still asking for some attention.",
+                },
+                {
+                  label: "Support-heavy",
+                  color: "bg-amber-400",
+                  text: "More lookups or slower pacing showed up here.",
+                },
+                {
+                  label: "Pushes back",
+                  color: "bg-rose-400",
+                  text: "These are the ones that really asked more of you.",
+                },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                    <span className={`h-3 w-3 rounded-full ${item.color}`} />
+                    {item.label}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-700">{item.text}</div>
+                </div>
+              ))}
+            </div>
+          </SectionBand>
+        </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <SectionBand
@@ -996,6 +1414,54 @@ export default function StatsPage() {
             )}
           </SectionBand>
         </div>
+
+        <SectionBand
+          eyebrow="Ease"
+          title="Books that flowed"
+          description="The companion to push-back: books where your pace stayed lighter and support density stayed gentler."
+        >
+          {flowingBooks.length > 0 ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {flowingBooks.map((item) => (
+                <div key={item.userBookId} className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                  <div className="flex items-center gap-3">
+                    {item.coverUrl ? (
+                      <img src={item.coverUrl} alt="" className="h-16 w-12 rounded object-cover" />
+                    ) : (
+                      <div className="h-16 w-12 rounded bg-slate-200" />
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-slate-900">{item.title}</div>
+                      <div className="mt-1 text-xs text-slate-500">{bookTypeLabel(item.bookType)}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg bg-white px-3 py-2">
+                      <div className="text-[11px] text-slate-500">Words/page</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {formatDecimal(item.wordsPerPage)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-white px-3 py-2">
+                      <div className="text-[11px] text-slate-500">Min/page</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {formatDecimal(item.averageMinutesPerPage)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-white px-3 py-2">
+                      <div className="text-[11px] text-slate-500">Pages read</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">{item.pagesRead}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-500">No flow profile yet.</div>
+          )}
+        </SectionBand>
 
         <SectionBand
           eyebrow="Direction"

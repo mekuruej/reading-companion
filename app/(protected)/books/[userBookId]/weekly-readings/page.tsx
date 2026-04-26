@@ -525,23 +525,12 @@ export default function WeeklyReadingsPage() {
       return;
     }
 
-    const firstRound = shuffleArray(cards).map((c, i) => ({
+    const onePassDeck = shuffleArray(cards).map((c, i) => ({
       ...c,
-      key: `${c.key}-deck-first-${i}`,
+      key: `${c.key}-deck-once-${i}`,
     }));
 
-    const repeatsNeeded = Math.max(40 - firstRound.length, 0);
-    const repeatPool: QuizCard[] = [];
-
-    for (let i = 0; i < repeatsNeeded; i++) {
-      const picked = cards[Math.floor(Math.random() * cards.length)];
-      repeatPool.push({
-        ...picked,
-        key: `${picked.key}-deck-repeat-${i}`,
-      });
-    }
-
-    setDeck([...firstRound, ...shuffleArray(repeatPool)]);
+    setDeck(onePassDeck);
     setIndex(0);
     resetCardState();
   }

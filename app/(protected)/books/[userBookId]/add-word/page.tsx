@@ -222,11 +222,16 @@ export default function AddWordPage() {
 
   function jumpToEditor() {
     window.setTimeout(() => {
-      editorCardRef.current?.scrollIntoView({
+      const editor = editorCardRef.current;
+      if (!editor) return;
+
+      const top = window.scrollY + editor.getBoundingClientRect().top - 132;
+      window.scrollTo({
+        top: Math.max(0, top),
         behavior: "smooth",
-        block: "start",
       });
-      editorWordInputRef.current?.focus();
+
+      wordInputRef.current?.focus();
     }, 0);
   }
 
@@ -516,7 +521,10 @@ export default function AddWordPage() {
           pageOrder: insertedRow.page_order ?? null,
         };
 
-        setSessionWords((prev) => [newSessionWord, ...prev]);
+        setSessionWords((prev) => [
+          newSessionWord,
+          ...prev.filter((item) => item.id !== newSessionWord.id),
+        ]);
         setMessage(`✅ Saved "${finalSurface}".`);
       } else {
         const { data: updatedRow, error } = await supabase
@@ -686,6 +694,19 @@ export default function AddWordPage() {
                 >
                   Manual Entry
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
+                  >
+                    Kanji Lookup
+                  </button>
+
+                  <span className="select-none text-sm text-stone-400">(coming soon...)</span>
+                </div>
               </div>
 
               {message ? (
@@ -766,9 +787,19 @@ export default function AddWordPage() {
                         This is the edit word box. Change the saved word here. Use the search box above only for a brand-new lookup.
                       </div>
                     ) : (
-                      <p className="mt-1 text-sm text-stone-600">
-                        Check the result here before saving it into your Vocab List.
-                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <p className="text-sm text-stone-600">
+                          Check the result here before saving it into your Vocab List.
+                        </p>
+                        <button
+                          type="button"
+                          disabled
+                          aria-disabled="true"
+                          className="cursor-not-allowed rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-400 select-none"
+                        >
+                          Kanji Lookup (Coming Soon)
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -873,6 +904,9 @@ export default function AddWordPage() {
                     <div>
                       <div className="mb-1 text-sm font-medium text-stone-700">Page</div>
                       <input
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
                         value={pageNumber}
                         onChange={(e) => setPageNumber(e.target.value)}
                         placeholder="Page"

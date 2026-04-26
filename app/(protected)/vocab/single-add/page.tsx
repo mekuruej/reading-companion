@@ -112,10 +112,7 @@ function upsertAndSortQuickSessionWords(
   words: QuickSessionWord[],
   nextItem: QuickSessionWord
 ) {
-  return sortQuickSessionWords([
-    nextItem,
-    ...words.filter((item) => item.id !== nextItem.id),
-  ]);
+  return [nextItem, ...words.filter((item) => item.id !== nextItem.id)];
 }
 
 function extractQuickMeanings(entry: any): string[] {
@@ -371,11 +368,16 @@ export default function SingleAddPage() {
 
   function jumpToQuickEditor() {
     window.setTimeout(() => {
-      quickEditorCardRef.current?.scrollIntoView({
+      const editor = quickEditorCardRef.current;
+      if (!editor) return;
+
+      const top = window.scrollY + editor.getBoundingClientRect().top - 132;
+      window.scrollTo({
+        top: Math.max(0, top),
         behavior: "smooth",
-        block: "nearest",
       });
-      quickEditorWordInputRef.current?.focus();
+
+      quickWordInputRef.current?.focus();
     }, 0);
   }
 
@@ -1158,6 +1160,17 @@ export default function SingleAddPage() {
                   aria-disabled="true"
                   className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
                 >
+                  Kanji Lookup
+                </button>
+
+                <span className="select-none text-sm text-stone-400">(coming soon...)</span>
+
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
+                >
                   Grammar
                 </button>
 
@@ -1250,6 +1263,16 @@ export default function SingleAddPage() {
                     ? "You are editing an existing saved word. The search box above is still only for new lookups."
                     : "Check the result here before saving it into your Vocab List."}
                 </p>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="cursor-not-allowed rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-400 select-none"
+                  >
+                    Kanji Lookup (Coming Soon)
+                  </button>
+                </div>
               </div>
 
               {quickPreview.id ? (
@@ -1367,6 +1390,9 @@ export default function SingleAddPage() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
                   value={quickPreview.page}
                   onChange={(e) =>
                     setQuickPreview((prev) => (prev ? { ...prev, page: e.target.value } : prev))
@@ -1432,8 +1458,8 @@ export default function SingleAddPage() {
                 Words saved into Vocab List this session
               </div>
               <p className="mb-3 text-sm text-stone-500">
-                This list stays in page order so editing one word does not make everything jump
-                around.
+                Newer saved words stay at the top so you can keep moving without hunting for the
+                latest one.
               </p>
 
               <div className="space-y-3">

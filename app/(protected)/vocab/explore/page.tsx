@@ -1,15 +1,24 @@
-//Book Hub Word History Search Page
-// 
-
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-// -------------------------------------------------------------
-// Types
-// -------------------------------------------------------------
+type SeenInstance = {
+  id: string;
+  surface: string;
+  reading: string | null;
+  meaning: string | null;
+  meaning_choice_index: number | null;
+  meaning_choices: any | null;
+  jlpt: string | null;
+  is_common: boolean | null;
+  page_number: number | null;
+  chapter_number: number | null;
+  chapter_name: string | null;
+  created_at: string;
+};
+
 type DictionaryEntry = {
   word: string;
   reading: string;
@@ -18,51 +27,81 @@ type DictionaryEntry = {
   isCommon: boolean | null;
 };
 
-// -------------------------------------------------------------
-// Helpers
-// -------------------------------------------------------------
+type HistoryPatternItem = {
+  surface: string;
+  reading: string | null;
+  meaning: string | null;
+  totalAppearances: number;
+  lastSeenAt: string;
+};
+
 function normalizeJlpt(val: string | null | undefined) {
   const v = (val ?? "").toUpperCase();
   if (v === "N1" || v === "N2" || v === "N3" || v === "N4" || v === "N5") return v;
   return "NON-JLPT";
 }
 
-// -------------------------------------------------------------
-// Main Component
-// -------------------------------------------------------------
+function chapterDisplay(chNum: number | null, chName: string | null) {
+  const name = (chName ?? "").trim();
+  const num = chNum;
+
+  if (num != null && name) return `Chapter ${num}: ${name}`;
+  if (num != null) return `Chapter ${num}`;
+  if (name) return name;
+  return "";
+}
+
+function asStringArray(val: any): string[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.map((x) => String(x)).filter(Boolean);
+
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
+    } catch {}
+  }
+
+  return [];
+}
+
+function uniqueStrings(values: (string | null | undefined)[]) {
+  return Array.from(new Set(values.map((v) => (v ?? "").trim()).filter(Boolean)));
+}
+
 export default function WordHistorySearchPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [query, setQuery] = useState("");
-  const [userBookId, setUserBookId] = useState("");
+  const userBookId = searchParams.get("userBookId") ?? "";
+  const initialWord = searchParams.get("word") ?? "";
 
+  const [query, setQuery] = useState(initialWord);
   const [loading, setLoading] = useState(false);
+  const [browseLoading, setBrowseLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
 
+  const [surface, setSurface] = useState("");
+  const [reading, setReading] = useState<string | null>(null);
+  const [definitions, setDefinitions] = useState<string[]>([]);
+  const [jlpt, setJlpt] = useState<string | null>(null);
+  const [isCommon, setIsCommon] = useState<boolean | null>(null);
+  const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
+  const [totalLookupCount, setTotalLookupCount] = useState(0);
+
   const [notFoundEntry, setNotFoundEntry] = useState<DictionaryEntry | null>(null);
   const [otherMatches, setOtherMatches] = useState<DictionaryEntry[]>([]);
+  const [oftenLookedUp, setOftenLookedUp] = useState<HistoryPatternItem[]>([]);
 
-  // -------------------------------------------------------------
-  // Pull userBookId from URL
-  // -------------------------------------------------------------
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    setUserBookId(params.get("userBookId") || "");
-  }, []);
+  const hasActiveResult = !!surface || !!notFoundEntry;
+  const hasSearchText = query.trim().length > 0;
+  const shouldShowBrowse = !hasActiveResult && !hasSearchText;
 
-  // -------------------------------------------------------------
-  // Load optional book info
-  // -------------------------------------------------------------
   useEffect(() => {
-    if (!userBookId) {
-      setBookTitle("");
-      setBookCover(null);
-      return;
-    }
+    if (!userBookId) return;
 
     (async () => {
       const { data, error } = await supabase
@@ -90,58 +129,186 @@ export default function WordHistorySearchPage() {
     })();
   }, [userBookId]);
 
-  // -------------------------------------------------------------
-  // Search
-  // -------------------------------------------------------------
-  async function runSearch() {
-    const q = query.trim();
-    if (!q) return;
+  useEffect(() => {
+    if (!initialWord || !userBookId) return;
+    void runSearch(initialWord);
+  }, [initialWord, userBookId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBookPatterns() {
+      if (!userBookId) {
+        setBrowseLoading(false);
+        setOftenLookedUp([]);
+        return;
+      }
+
+      setBrowseLoading(true);
+
+      try {
+        const { data, error } = await supabase
+          .from("user_book_words")
+          .select("surface, reading, meaning, created_at")
+          .eq("user_book_id", userBookId)
+          .eq("hidden", false);
+
+        if (error) throw error;
+
+        const grouped = new Map<
+          string,
+          {
+            surface: string;
+            reading: string | null;
+            meaning: string | null;
+            count: number;
+            lastSeenAt: string;
+          }
+        >();
+
+        for (const row of (data ?? []) as {
+          surface: string | null;
+          reading: string | null;
+          meaning: string | null;
+          created_at: string;
+        }[]) {
+          const word = (row.surface ?? "").trim();
+          if (!word) continue;
+
+          const key = `${word}|||${(row.reading ?? "").trim()}`;
+          const existing = grouped.get(key);
+
+          if (!existing) {
+            grouped.set(key, {
+              surface: word,
+              reading: row.reading ?? null,
+              meaning: row.meaning ?? null,
+              count: 1,
+              lastSeenAt: row.created_at,
+            });
+            continue;
+          }
+
+          existing.count += 1;
+          if (!existing.meaning && row.meaning) {
+            existing.meaning = row.meaning;
+          }
+          if (row.created_at > existing.lastSeenAt) {
+            existing.lastSeenAt = row.created_at;
+          }
+        }
+
+        const items = Array.from(grouped.values())
+          .map((item) => ({
+            surface: item.surface,
+            reading: item.reading,
+            meaning: item.meaning,
+            totalAppearances: item.count,
+            lastSeenAt: item.lastSeenAt,
+          }))
+          .sort((a, b) => {
+            if (b.totalAppearances !== a.totalAppearances) {
+              return b.totalAppearances - a.totalAppearances;
+            }
+            return b.lastSeenAt.localeCompare(a.lastSeenAt);
+          })
+          .slice(0, 10);
+
+        if (!cancelled) {
+          setOftenLookedUp(items);
+        }
+      } catch (e) {
+        console.error("Could not load book word history patterns:", e);
+        if (!cancelled) {
+          setOftenLookedUp([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setBrowseLoading(false);
+        }
+      }
+    }
+
+    void loadBookPatterns();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userBookId]);
+
+  async function runSearch(raw?: string) {
+    const q = (raw ?? query).trim();
+    if (!q || !userBookId) return;
 
     setLoading(true);
     setErrorMsg(null);
+
+    setSurface("");
+    setReading(null);
+    setDefinitions([]);
+    setJlpt(null);
+    setIsCommon(null);
+    setSeenInstances([]);
+    setTotalLookupCount(0);
+
     setNotFoundEntry(null);
     setOtherMatches([]);
 
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError) throw authError;
-      if (!user) {
-        throw new Error("You need to sign in to search your word history.");
-      }
-
-      // 1) Search saved library first
-      const { data: savedRows, error: savedError } = await supabase
+      const { data: seen, error: seenError } = await supabase
         .from("user_book_words")
         .select(
           `
           id,
-          user_book_id,
           surface,
-          user_books!inner (
-            user_id
-          )
+          reading,
+          meaning,
+          meaning_choice_index,
+          meaning_choices,
+          jlpt,
+          is_common,
+          page_number,
+          chapter_number,
+          chapter_name,
+          created_at
         `
         )
+        .eq("user_book_id", userBookId)
         .eq("surface", q)
-        .eq("user_books.user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
 
-      if (savedError) throw savedError;
+      if (seenError) throw seenError;
 
-      if (savedRows && savedRows.length > 0) {
-        router.push(
-          `/vocab/history?word=${encodeURIComponent(q)}${userBookId ? `&userBookId=${encodeURIComponent(userBookId)}` : ""
-          }`
-        );
+      const normalizedSeen = ((seen ?? []) as any[]).map((row) => ({
+        id: row.id,
+        surface: row.surface,
+        reading: row.reading ?? null,
+        meaning: row.meaning ?? null,
+        meaning_choice_index: row.meaning_choice_index ?? null,
+        meaning_choices: row.meaning_choices ?? null,
+        jlpt: row.jlpt ?? null,
+        is_common: row.is_common ?? null,
+        page_number: row.page_number ?? null,
+        chapter_number: row.chapter_number ?? null,
+        chapter_name: row.chapter_name ?? null,
+        created_at: row.created_at,
+      })) as SeenInstance[];
+
+      if (normalizedSeen.length > 0) {
+        const first = normalizedSeen[0];
+        const choiceDefs = asStringArray(first.meaning_choices);
+        const fallbackDefs = uniqueStrings(normalizedSeen.map((x) => x.meaning));
+
+        setSurface(first.surface);
+        setReading(first.reading ?? null);
+        setDefinitions(choiceDefs.length > 0 ? choiceDefs : fallbackDefs);
+        setJlpt(first.jlpt ?? null);
+        setIsCommon(first.is_common ?? null);
+        setSeenInstances(normalizedSeen);
+        setTotalLookupCount(normalizedSeen.length);
         return;
       }
 
-      // 2) If not found in saved history, show lightweight dictionary fallback
       const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`);
       if (!res.ok) {
         throw new Error(`Search failed (${res.status})`);
@@ -159,9 +326,7 @@ export default function WordHistorySearchPage() {
 
         const meanings = senses
           .map((s: any) =>
-            Array.isArray(s?.english_definitions)
-              ? s.english_definitions.join("; ")
-              : ""
+            Array.isArray(s?.english_definitions) ? s.english_definitions.join("; ") : ""
           )
           .filter(Boolean);
 
@@ -198,17 +363,23 @@ export default function WordHistorySearchPage() {
   function clearSearch() {
     setQuery("");
     setErrorMsg(null);
+    setSurface("");
+    setReading(null);
+    setDefinitions([]);
+    setJlpt(null);
+    setIsCommon(null);
+    setSeenInstances([]);
+    setTotalLookupCount(0);
     setNotFoundEntry(null);
     setOtherMatches([]);
+    router.replace(`/vocab/explore?userBookId=${encodeURIComponent(userBookId)}`);
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-6 pb-10 pt-30">
-      <h1 className="mb-1 text-2xl font-semibold">Word History</h1>
+    <main className="mx-auto min-h-screen max-w-5xl px-6 pb-10 pt-15">
+      <h1 className="mb-1 text-2xl font-semibold">Word History in This Book</h1>
       <p className="mb-4 text-sm text-stone-500">
-        {userBookId
-          ? "Search to see how a word was used in this book and across your library."
-          : "Search your library to see where a word appeared and how it was used."}
+        Search this book to see where a word appeared and how you saved it.
       </p>
 
       {bookTitle ? (
@@ -221,7 +392,7 @@ export default function WordHistorySearchPage() {
               In book: <span className="font-medium">{bookTitle}</span>
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              Search this word in the context of your saved reading history.
+              This version only tracks appearances inside this specific book.
             </p>
           </div>
         </div>
@@ -233,7 +404,9 @@ export default function WordHistorySearchPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") runSearch();
+            if (e.key === "Enter") {
+              void runSearch();
+            }
           }}
           placeholder="Search Japanese word..."
           className="flex-1 rounded border bg-white px-3 py-2"
@@ -241,7 +414,7 @@ export default function WordHistorySearchPage() {
 
         <button
           type="button"
-          onClick={runSearch}
+          onClick={() => void runSearch()}
           disabled={loading}
           className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
         >
@@ -251,9 +424,125 @@ export default function WordHistorySearchPage() {
 
       {errorMsg ? <p className="mb-4 text-sm text-red-600">{errorMsg}</p> : null}
 
+      {shouldShowBrowse ? (
+        <section className="mb-6 rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="mb-4">
+            <div className="text-lg font-semibold text-stone-900">Words I Often Look Up</div>
+            <p className="mt-1 text-sm text-stone-500">
+              Words that show up the most in this book's saved reading.
+            </p>
+          </div>
+
+          {browseLoading ? (
+            <div className="text-sm text-stone-500">Loading recurring words…</div>
+          ) : oftenLookedUp.length === 0 ? (
+            <div className="text-sm text-stone-500">Nothing here yet.</div>
+          ) : (
+            <div className="space-y-3">
+              {oftenLookedUp.map((item) => (
+                <button
+                  key={`${item.surface}|||${item.reading ?? ""}`}
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/vocab/explore?userBookId=${encodeURIComponent(userBookId)}&word=${encodeURIComponent(item.surface)}`
+                    )
+                  }
+                  className="w-full rounded-xl border p-3 text-left transition hover:bg-stone-50"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-lg font-semibold text-stone-900">{item.surface}</div>
+                      {item.reading ? (
+                        <div className="mt-0.5 text-sm text-stone-500">{item.reading}</div>
+                      ) : null}
+                    </div>
+
+                    <div className="shrink-0 text-right text-xs text-stone-500">
+                      <div>{item.totalAppearances} appearances</div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {surface ? (
+        <>
+          <section className="w-full rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="mb-4 text-lg font-semibold">Word History</div>
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-slate-500">Word</div>
+                <div className="break-words text-4xl font-bold">{surface}</div>
+              </div>
+
+              <div>
+                <div className="text-xs uppercase tracking-wide text-slate-500">Reading</div>
+                <div className="text-2xl font-medium">{reading || "—"}</div>
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                {normalizeJlpt(jlpt) !== "NON-JLPT" ? (
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-[17px] font-medium leading-none text-gray-800">
+                    {normalizeJlpt(jlpt)}
+                  </span>
+                ) : null}
+
+                {isCommon ? <span className="text-gray-500">Common</span> : null}
+              </div>
+
+              <div className="mt-2 rounded-xl border p-3">
+                <div className="text-xs text-gray-500">Appearances in this book</div>
+                <div className="text-2xl font-semibold">{totalLookupCount}</div>
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="mb-4 text-lg font-semibold">Seen in</div>
+
+            {seenInstances.length === 0 ? (
+              <div className="text-sm text-gray-500">No saved instances found yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {seenInstances.map((instance) => {
+                  const choices = asStringArray(instance.meaning_choices);
+                  const defIndex =
+                    instance.meaning_choice_index != null
+                      ? instance.meaning_choice_index
+                      : choices.findIndex((m) => m === instance.meaning);
+
+                  return (
+                    <div key={instance.id} className="rounded-xl border p-3">
+                      <div className="text-sm text-stone-600">
+                        {chapterDisplay(instance.chapter_number, instance.chapter_name)
+                          ? chapterDisplay(instance.chapter_number, instance.chapter_name)
+                          : "No chapter"}
+                        {instance.page_number != null ? ` • p. ${instance.page_number}` : ""}
+                      </div>
+
+                      {instance.meaning ? (
+                        <div className="mt-2 text-sm text-stone-500">
+                          {defIndex !== -1 && defIndex != null ? `Def ${defIndex + 1}: ` : ""}
+                          {instance.meaning}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+
       {notFoundEntry ? (
-        <section className="w-full rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Not found in your reading history</div>
+        <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="mb-4 text-lg font-semibold">Not found in this book</div>
 
           <div className="flex flex-col gap-4">
             <div>
@@ -282,22 +571,6 @@ export default function WordHistorySearchPage() {
                 <div className="text-lg">—</div>
               )}
             </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              {normalizeJlpt(notFoundEntry.jlpt) !== "NON-JLPT" ? (
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-[17px] font-medium leading-none text-gray-800">
-                  {normalizeJlpt(notFoundEntry.jlpt)}
-                </span>
-              ) : null}
-
-              {notFoundEntry.isCommon ? (
-                <span className="text-gray-500">Common</span>
-              ) : null}
-            </div>
-
-            <p className="text-sm text-stone-500">
-              You haven’t saved this word in your reading yet.
-            </p>
           </div>
         </section>
       ) : null}
@@ -322,17 +595,11 @@ export default function WordHistorySearchPage() {
       ) : null}
 
       <div className="mt-8 flex justify-between">
-        <button
-          onClick={() => router.back()}
-          className="rounded bg-gray-200 px-4 py-2"
-        >
+        <button onClick={() => router.back()} className="rounded bg-gray-200 px-4 py-2">
           ← Back
         </button>
 
-        <button
-          onClick={clearSearch}
-          className="rounded bg-gray-100 px-4 py-2"
-        >
+        <button onClick={clearSearch} className="rounded bg-gray-100 px-4 py-2">
           Clear
         </button>
       </div>

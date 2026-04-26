@@ -642,23 +642,6 @@ export default function WordDetailPage() {
               <div className="text-2xl font-medium">{word.reading || "—"}</div>
             </div>
 
-            <div>
-              <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Definitions</div>
-
-              {meaningChoices.length > 0 ? (
-                <div className="space-y-2">
-                  {meaningChoices.map((meaning, i) => (
-                    <div key={`${meaning}-${i}`} className="rounded-xl border p-3">
-                      <div className="text-sm font-semibold text-stone-700">Def {i + 1}</div>
-                      <div className="mt-1 text-base text-stone-900">{meaning}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-lg">{word.meaning || "—"}</div>
-              )}
-            </div>
-
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
               {jlpt !== "NON-JLPT" ? (
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-[17px] font-medium leading-none text-gray-800">
@@ -690,12 +673,48 @@ export default function WordDetailPage() {
                 </div>
               )}
             </div>
+
+            <div className="mt-2 rounded-xl border p-4">
+              <div className="mb-2 text-sm font-semibold">Words Using These Kanji</div>
+
+              {kanjiGroups.length === 0 ? (
+                <div className="text-sm text-gray-500">No related kanji words found.</div>
+              ) : (
+                <div className="space-y-5">
+                  {kanjiGroups.map((group) => (
+                    <div key={group.kanji}>
+                      <div className="mb-2 text-sm font-semibold text-stone-700">
+                        Words with {group.kanji}
+                      </div>
+
+                      {group.relatedWords.length === 0 ? (
+                        <div className="text-sm text-gray-500">No related words found.</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {group.relatedWords.map((kw, i) => (
+                            <div key={`${group.kanji}-${kw.word}-${i}`} className="text-sm">
+                              <span className="font-medium text-stone-900">{kw.word}</span>
+                              {kw.reading ? (
+                                <span className="ml-2 text-stone-600">（{kw.reading}）</span>
+                              ) : null}
+                              {kw.meaning ? (
+                                <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
-        {/* 2) Book Info */}
+        {/* 2) Seen In */}
         <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Book Info</div>
+          <div className="mb-4 text-lg font-semibold">Seen In</div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-xl border p-3">
@@ -749,39 +768,11 @@ export default function WordDetailPage() {
           </div>
         </section>
 
-        {/* 3) Extra */}
+        {/* 3) Useful Phrases */}
         <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Extra</div>
-
-          {kanjiGroups.length === 0 ? (
-            <div className="text-sm text-gray-500">No extra kanji-related info yet.</div>
-          ) : (
-            <div className="space-y-5">
-              {kanjiGroups.map((group) => (
-                <div key={group.kanji}>
-                  <div className="mb-2 text-sm font-semibold">Words with {group.kanji}</div>
-
-                  {group.relatedWords.length === 0 ? (
-                    <div className="text-sm text-gray-500">No related words found.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {group.relatedWords.map((kw, i) => (
-                        <div key={`${group.kanji}-${kw.word}-${i}`} className="text-sm">
-                          <span className="font-medium text-stone-900">{kw.word}</span>
-                          {kw.reading ? (
-                            <span className="ml-2 text-stone-600">（{kw.reading}）</span>
-                          ) : null}
-                          {kw.meaning ? (
-                            <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="mb-2 text-sm text-stone-500">
+            Save short useful phrases from your reading here later.
+          </div>
 
           {isTeacher ? (
             <CollocationsPanel userBookId={userBookId} userBookWordId={word.id} />

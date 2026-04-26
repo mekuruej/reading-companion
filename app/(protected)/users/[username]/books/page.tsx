@@ -80,15 +80,9 @@ type ReadingSessionStats = {
 type MonthlyLibraryStats = {
   pagesRead: number;
   daysRead: number;
-  finishedBooks: number;
-  curiosityTimeMinutes: number;
-  fluidTimeMinutes: number;
-  listeningTimeMinutes: number;
-  avgPagesPerSession: number | null;
+  totalTimeMinutes: number;
   totalWordsLookedUp: number;
-  weeklySpotlightLabel: string | null;
-  weeklySpotlightValue: string | null;
-  weeklySpotlightTitle: string | null;
+  longestRunDays: number;
 };
 
 type MonthOption = {
@@ -102,18 +96,10 @@ function getMonthOptions(count = 12): MonthOption[] {
   const opts: MonthOption[] = [];
   const now = new Date();
 
-  opts.push({
-    value: `year-${now.getFullYear()}`,
-    label: `${now.getFullYear()}`,
-  });
-
   for (let i = 0; i < count; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-    });
+    const label = d.toLocaleDateString("en-US", { month: "long" });
     opts.push({ value, label });
   }
 
@@ -346,8 +332,6 @@ export default function BooksPage() {
 
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
   const [formatFilter, setFormatFilter] = useState<string>("all");
-  const [statsBookTypeFilter, setStatsBookTypeFilter] = useState<string>("all");
-
   const isTeacher = myRole === "teacher";
 
   const filteredRows = useMemo(() => {
@@ -371,21 +355,15 @@ export default function BooksPage() {
 
   const monthOptions = getMonthOptions(12);
   const [selectedMonth, setSelectedMonth] = useState<string>(
-    monthOptions[1]?.value ?? monthOptions[0]?.value ?? ""
+    monthOptions[0]?.value ?? ""
   );
 
   const [monthlyStats, setMonthlyStats] = useState<MonthlyLibraryStats>({
     pagesRead: 0,
     daysRead: 0,
-    finishedBooks: 0,
-    curiosityTimeMinutes: 0,
-    fluidTimeMinutes: 0,
-    listeningTimeMinutes: 0,
-    avgPagesPerSession: null,
+    totalTimeMinutes: 0,
     totalWordsLookedUp: 0,
-    weeklySpotlightLabel: null,
-    weeklySpotlightValue: null,
-    weeklySpotlightTitle: null,
+    longestRunDays: 0,
   });
 
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
@@ -419,41 +397,22 @@ export default function BooksPage() {
         setMonthlyStats({
           pagesRead: 0,
           daysRead: 0,
-          finishedBooks: 0,
-          curiosityTimeMinutes: 0,
-          fluidTimeMinutes: 0,
-          listeningTimeMinutes: 0,
-          avgPagesPerSession: null,
+          totalTimeMinutes: 0,
           totalWordsLookedUp: 0,
-          weeklySpotlightLabel: null,
-          weeklySpotlightValue: null,
-          weeklySpotlightTitle: null,
+          longestRunDays: 0,
         });
         return;
       }
 
-      const filteredUserBooks = (allUserBooksRows ?? []).filter((r: any) => {
-        const matchesBookType =
-          statsBookTypeFilter === "all" || r.books?.book_type === statsBookTypeFilter;
-
-        return matchesBookType;
-      });
-
-      const userBookIds = filteredUserBooks.map((r: any) => r.id).filter(Boolean);
+      const userBookIds = (allUserBooksRows ?? []).map((r: any) => r.id).filter(Boolean);
 
       if (userBookIds.length === 0) {
         setMonthlyStats({
           pagesRead: 0,
           daysRead: 0,
-          finishedBooks: 0,
-          curiosityTimeMinutes: 0,
-          fluidTimeMinutes: 0,
-          listeningTimeMinutes: 0,
-          avgPagesPerSession: null,
+          totalTimeMinutes: 0,
           totalWordsLookedUp: 0,
-          weeklySpotlightLabel: null,
-          weeklySpotlightValue: null,
-          weeklySpotlightTitle: null,
+          longestRunDays: 0,
         });
         return;
       }
@@ -488,37 +447,8 @@ export default function BooksPage() {
       const sessions = sessionRows ?? [];
       const words = wordRows ?? [];
 
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - 7);
-      const weekStartStr = weekStart.toISOString().slice(0, 10);
-      const weekStartDateTime = weekStart.toISOString();
-
-      const spotlightByUserBookId: Record<
-        string,
-        {
-          title: string;
-          daysRead: Set<string>;
-          wordsSaved: number;
-          listeningMinutes: number;
-          pagesRead: number;
-          totalMinutes: number;
-          sessions: number;
-        }
-      > = {};
-
-      for (const row of filteredUserBooks as any[]) {
-        spotlightByUserBookId[row.id] = {
-          title: row.books?.title ?? "Untitled",
-          daysRead: new Set<string>(),
-          wordsSaved: 0,
-          listeningMinutes: 0,
-          pagesRead: 0,
-          totalMinutes: 0,
-          sessions: 0,
-        };
-      }
-
       const uniqueWordSet = new Set<string>();
+      const engagedDays = new Set<string>();
 
       for (const w of words as any[]) {
         const surface = (w.surface ?? "").trim();
@@ -526,200 +456,60 @@ export default function BooksPage() {
         if (!surface && !meaning) continue;
 
         uniqueWordSet.add(`${surface}|||${meaning}`);
-
-        const createdAt = w.created_at as string | null;
-
-        if (
-          createdAt &&
-          createdAt >= weekStartDateTime &&
-          spotlightByUserBookId[w.user_book_id]
-        ) {
-          spotlightByUserBookId[w.user_book_id].wordsSaved += 1;
+        const createdAt = (w.created_at as string | null) ?? "";
+        if (createdAt) {
+          engagedDays.add(createdAt.slice(0, 10));
         }
       }
 
       const totalWordsLookedUp = uniqueWordSet.size;
 
       let pagesRead = 0;
-      let curiosityTimeMinutes = 0;
-      let fluidTimeMinutes = 0;
-      let listeningTimeMinutes = 0;
-      let totalSessionPages = 0;
-      let totalSessionCount = 0;
-
-      const uniqueDays = new Set<string>();
+      let totalTimeMinutes = 0;
 
       for (const s of sessions as any[]) {
-        if (s.read_on) uniqueDays.add(s.read_on);
+        if (s.read_on) engagedDays.add(s.read_on);
 
         const startPage = Number(s.start_page);
         const endPage = Number(s.end_page);
         const minutes = s.minutes_read == null ? null : Number(s.minutes_read);
-        const sessionMode = (s.session_mode ?? "fluid") as string;
-
-        if (
-          s.read_on &&
-          s.read_on >= weekStartStr &&
-          spotlightByUserBookId[s.user_book_id]
-        ) {
-          spotlightByUserBookId[s.user_book_id].sessions += 1;
-          spotlightByUserBookId[s.user_book_id].daysRead.add(s.read_on);
-
-          if (Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage) {
-            spotlightByUserBookId[s.user_book_id].pagesRead += endPage - startPage + 1;
-          }
-
-          if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
-            spotlightByUserBookId[s.user_book_id].totalMinutes += minutes;
-
-            if (sessionMode === "listening") {
-              spotlightByUserBookId[s.user_book_id].listeningMinutes += minutes;
-            }
-          }
-        }
 
         if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
-          if (sessionMode === "curiosity") {
-            curiosityTimeMinutes += minutes;
-          } else if (sessionMode === "listening") {
-            listeningTimeMinutes += minutes;
-          } else {
-            fluidTimeMinutes += minutes;
-          }
+          totalTimeMinutes += minutes;
         }
 
         if (Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage) {
-          const sessionPages = endPage - startPage + 1;
-          pagesRead += sessionPages;
-          totalSessionPages += sessionPages;
-          totalSessionCount += 1;
+          pagesRead += endPage - startPage + 1;
         }
       }
 
-      const finishedBookIds = filteredUserBooks
-        .filter(
-          (r: any) =>
-            !!r.finished_at &&
-            !r.dnf_at &&
-            r.finished_at >= startStr &&
-            r.finished_at < endStr
-        )
-        .map((r: any) => r.id);
+      const sortedEngagedDays = Array.from(engagedDays).sort((a, b) => a.localeCompare(b));
+      let longestRunDays = 0;
+      let currentRunDays = 0;
+      let previousDayValue: number | null = null;
 
-      const finishedBooks = finishedBookIds.length;
+      for (const day of sortedEngagedDays) {
+        const dayValue = Math.floor(new Date(`${day}T00:00:00`).getTime() / 86400000);
 
-      const avgPagesPerSession =
-        totalSessionCount > 0 ? totalSessionPages / totalSessionCount : null;
-
-      const spotlightOptions: {
-        label: string;
-        value: string;
-        title: string;
-      }[] = [];
-
-      let bestConsistent: { title: string; count: number } | null = null;
-      let bestWords: { title: string; count: number } | null = null;
-      let bestListening: { title: string; count: number } | null = null;
-      let bestPages: { title: string; count: number } | null = null;
-      let bestTime: { title: string; count: number } | null = null;
-      let bestSessions: { title: string; count: number } | null = null;
-
-      for (const entry of Object.values(spotlightByUserBookId)) {
-        const daysCount = entry.daysRead.size;
-
-        if (daysCount > 0 && (!bestConsistent || daysCount > bestConsistent.count)) {
-          bestConsistent = { title: entry.title, count: daysCount };
+        if (previousDayValue != null && dayValue === previousDayValue + 1) {
+          currentRunDays += 1;
+        } else {
+          currentRunDays = 1;
         }
 
-        if (entry.wordsSaved > 0 && (!bestWords || entry.wordsSaved > bestWords.count)) {
-          bestWords = { title: entry.title, count: entry.wordsSaved };
+        if (currentRunDays > longestRunDays) {
+          longestRunDays = currentRunDays;
         }
 
-        if (
-          entry.listeningMinutes > 0 &&
-          (!bestListening || entry.listeningMinutes > bestListening.count)
-        ) {
-          bestListening = { title: entry.title, count: entry.listeningMinutes };
-        }
-
-        if (entry.pagesRead > 0 && (!bestPages || entry.pagesRead > bestPages.count)) {
-          bestPages = { title: entry.title, count: entry.pagesRead };
-        }
-
-        if (entry.totalMinutes > 0 && (!bestTime || entry.totalMinutes > bestTime.count)) {
-          bestTime = { title: entry.title, count: entry.totalMinutes };
-        }
-
-        if (entry.sessions > 0 && (!bestSessions || entry.sessions > bestSessions.count)) {
-          bestSessions = { title: entry.title, count: entry.sessions };
-        }
+        previousDayValue = dayValue;
       }
-
-      if (bestConsistent) {
-        spotlightOptions.push({
-          label: "Most Consistent",
-          value: `${bestConsistent.count} day${bestConsistent.count === 1 ? "" : "s"}`,
-          title: bestConsistent.title,
-        });
-      }
-
-      if (bestWords) {
-        spotlightOptions.push({
-          label: "Most Words Saved",
-          value: `${bestWords.count} word${bestWords.count === 1 ? "" : "s"}`,
-          title: bestWords.title,
-        });
-      }
-
-      if (bestListening) {
-        spotlightOptions.push({
-          label: "Most Listened To",
-          value: formatMinutesAsReadableTime(bestListening.count),
-          title: bestListening.title,
-        });
-      }
-
-      if (bestPages) {
-        spotlightOptions.push({
-          label: "Most Pages Read",
-          value: `${bestPages.count} page${bestPages.count === 1 ? "" : "s"}`,
-          title: bestPages.title,
-        });
-      }
-
-      if (bestTime) {
-        spotlightOptions.push({
-          label: "Most Time Spent",
-          value: formatMinutesAsReadableTime(bestTime.count),
-          title: bestTime.title,
-        });
-      }
-
-      if (bestSessions) {
-        spotlightOptions.push({
-          label: "Most Sessions",
-          value: `${bestSessions.count} session${bestSessions.count === 1 ? "" : "s"}`,
-          title: bestSessions.title,
-        });
-      }
-
-      const randomSpotlight =
-        spotlightOptions.length > 0
-          ? spotlightOptions[Math.floor(Math.random() * spotlightOptions.length)]
-          : null;
 
       setMonthlyStats({
         pagesRead,
-        daysRead: uniqueDays.size,
-        finishedBooks,
-        curiosityTimeMinutes,
-        fluidTimeMinutes,
-        listeningTimeMinutes,
-        avgPagesPerSession,
+        daysRead: engagedDays.size,
+        totalTimeMinutes,
         totalWordsLookedUp,
-        weeklySpotlightLabel: randomSpotlight?.label ?? null,
-        weeklySpotlightValue: randomSpotlight?.value ?? null,
-        weeklySpotlightTitle: randomSpotlight?.title ?? null,
+        longestRunDays,
       });
     } finally {
       setMonthlyStatsLoading(false);
@@ -1459,7 +1249,7 @@ export default function BooksPage() {
   useEffect(() => {
     if (!viewingUserId || !selectedMonth) return;
     loadMonthlyLibraryStats(viewingUserId, selectedMonth);
-  }, [viewingUserId, selectedMonth, statsBookTypeFilter]);
+  }, [viewingUserId, selectedMonth]);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -1800,7 +1590,7 @@ export default function BooksPage() {
                   Monthly Snapshot
                 </h2>
                 <p className="mt-1 text-xs text-slate-700">
-                  Reading and study activity across all books
+                  Effort across all books for this month
                 </p>
               </div>
 
@@ -1817,43 +1607,30 @@ export default function BooksPage() {
                   ))}
                 </select>
 
-                <select
-                  value={statsBookTypeFilter}
-                  onChange={(e) => setStatsBookTypeFilter(e.target.value)}
-                  className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                <button
+                  type="button"
+                  onClick={() => router.push("/stats-coming-soon")}
+                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 hover:bg-white"
                 >
-                  <option value="all">All Book Types</option>
-                  <option value="picture_book">Picture Book</option>
-                  <option value="early_reader">Early Reader</option>
-                  <option value="chapter_book">Chapter Book</option>
-                  <option value="middle_grade">Middle Grade</option>
-                  <option value="ya">YA</option>
-                  <option value="novel">Novel</option>
-                  <option value="short_story">Short Story</option>
-                  <option value="manga">Manga</option>
-                  <option value="nonfiction">Nonfiction</option>
-                  <option value="essay">Essay</option>
-                  <option value="memoir">Memoir</option>
-                  <option value="textbook">Textbook</option>
-                  <option value="other">Other</option>
-                </select>
+                  See Full Stats
+                </button>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Pages Read</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
                 <div className="text-[11px] text-slate-600">Days Engaged</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
                   {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
                 </div>
-                <div className="mt-1 text-[10px] text-slate-500">Read or listened</div>
+                <div className="mt-1 text-[10px] text-slate-500">Read, listened, or saved words</div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Pages Read</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">
+                  {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
+                </div>
               </div>
 
               <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
@@ -1863,75 +1640,27 @@ export default function BooksPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
-                <div className="text-xs text-slate-600">Books Finished</div>
+              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                <div className="text-[11px] text-slate-600">Time Total</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStats.finishedBooks === 0
-                    ? "All books still in progress"
-                    : `${monthlyStats.finishedBooks} ${monthlyStats.finishedBooks === 1 ? "book" : "books"
-                    }`}
+                  {monthlyStatsLoading ? "…" : formatMinutesAsReadableTime(monthlyStats.totalTimeMinutes)}
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
-                <div className="text-xs text-slate-600">Time Spent</div>
-                <div className="mt-1 space-y-0.5 text-sm text-slate-900">
-                  {monthlyStatsLoading ? (
-                    <div>…</div>
-                  ) : (
-                    <>
-                      {monthlyStats.fluidTimeMinutes > 0 ? (
-                        <div>
-                          Extensive: {formatMinutesAsReadableTime(monthlyStats.fluidTimeMinutes)}
-                        </div>
-                      ) : null}
-
-                      {monthlyStats.curiosityTimeMinutes > 0 ? (
-                        <div>
-                          Intensive:{" "}
-                          {formatMinutesAsReadableTime(monthlyStats.curiosityTimeMinutes)}
-                        </div>
-                      ) : null}
-
-                      {monthlyStats.listeningTimeMinutes > 0 ? (
-                        <div>
-                          Listening:{" "}
-                          {formatMinutesAsReadableTime(monthlyStats.listeningTimeMinutes)}
-                        </div>
-                      ) : null}
-
-                      {monthlyStats.fluidTimeMinutes === 0 &&
-                        monthlyStats.curiosityTimeMinutes === 0 &&
-                        monthlyStats.listeningTimeMinutes === 0 ? (
-                        <div>—</div>
-                      ) : null}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3">
-                <div className="text-[11px] text-slate-500">This Week</div>
-
-                <div className="mt-1 text-xs text-slate-600">
+            <div className="mt-3 rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="text-[11px] text-slate-500">This Month&apos;s Longest Run</div>
+                <div className="text-center text-xl font-semibold text-slate-900">
                   {monthlyStatsLoading
                     ? "…"
-                    : monthlyStats.weeklySpotlightLabel ?? "No activity yet"}
+                    : monthlyStats.longestRunDays > 0
+                      ? `${monthlyStats.longestRunDays} day${
+                          monthlyStats.longestRunDays === 1 ? "" : "s"
+                        }`
+                      : "—"}
                 </div>
-
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading
-                    ? "…"
-                    : monthlyStats.weeklySpotlightValue ?? "—"}
-                </div>
-
-                {!monthlyStatsLoading && monthlyStats.weeklySpotlightTitle ? (
-                  <div className="mt-1 text-sm font-medium text-slate-900">
-                    {monthlyStats.weeklySpotlightTitle}
-                  </div>
-                ) : null}
+                <div aria-hidden="true" />
               </div>
             </div>
           </div>
@@ -2341,16 +2070,6 @@ export default function BooksPage() {
             ) : null}
           </>
         )}
-        <div className="mt-12 border-t border-slate-300 pt-6 text-center">
-          <a
-            href="https://ko-fi.com/japanesemekuru"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
-          >
-            Support this project
-          </a>
-        </div>
       </div>
     </main>
   );

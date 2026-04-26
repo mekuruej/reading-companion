@@ -15,6 +15,7 @@ type Book = {
   book_type: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
+  series_number: number | null;
   isbn: string | null;
   isbn13: string | null;
   publisher: string | null;
@@ -67,18 +68,26 @@ type ContributorAuthorRecord = {
 
 type BookInfoTabProps = {
   book: Book;
-  isEditing: boolean;
+  isEditingBookInfo: boolean;
+  isEditingPeople: boolean;
+  isEditingLinks: boolean;
+  isEditingMyCopy: boolean;
+  saving: boolean;
+  onEditBookInfo: () => void;
+  onEditPeople: () => void;
+  onEditLinks: () => void;
+  onEditMyCopy: () => void;
+  onCancel: () => void;
+  onSave: () => void;
 
-  genre: string;
-  setGenre: (value: string) => void;
   bookType: string;
   setBookType: (value: string) => void;
-  triggerWarnings: string;
-  setTriggerWarnings: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
   pageCount: string;
   setPageCount: (value: string) => void;
+  seriesNumber: string;
+  setSeriesNumber: (value: string) => void;
   isbn: string;
   setIsbn: (value: string) => void;
   isbn13: string;
@@ -130,14 +139,12 @@ type BookInfoTabProps = {
 
   relatedLinksArr: any[];
 
-  genreLabel: (value: string | null | undefined) => string;
   bookTypeLabel: (value: string | null | undefined) => string;
   formatTypeLabel: (value: string | null | undefined) => string;
   progressModeLabel: (value: string | null | undefined) => string;
   displayLinkLabel: (value: any) => string;
   displayLinkUrl: (value: any) => string;
 
-  GENRE_OPTIONS: readonly Option[];
   BOOK_TYPE_OPTIONS: readonly Option[];
 
   Detail: ComponentType<{
@@ -166,18 +173,26 @@ type BookInfoTabProps = {
 
 export default function BookInfoTab({
   book,
-  isEditing,
+  isEditingBookInfo,
+  isEditingPeople,
+  isEditingLinks,
+  isEditingMyCopy,
+  saving,
+  onEditBookInfo,
+  onEditPeople,
+  onEditLinks,
+  onEditMyCopy,
+  onCancel,
+  onSave,
 
-  genre,
-  setGenre,
   bookType,
   setBookType,
-  triggerWarnings,
-  setTriggerWarnings,
   publishedDate,
   setPublishedDate,
   pageCount,
   setPageCount,
+  seriesNumber,
+  setSeriesNumber,
   isbn,
   setIsbn,
   isbn13,
@@ -229,14 +244,12 @@ export default function BookInfoTab({
 
   relatedLinksArr,
 
-  genreLabel,
   bookTypeLabel,
   formatTypeLabel,
   progressModeLabel,
   displayLinkLabel,
   displayLinkUrl,
 
-  GENRE_OPTIONS,
   BOOK_TYPE_OPTIONS,
 
   Detail,
@@ -282,7 +295,7 @@ export default function BookInfoTab({
       const cleaned = authorSearch.trim();
       const normalized = normalizeSearchTerm(cleaned);
 
-      if (!isEditing || !cleaned) {
+      if (!isEditingPeople || !cleaned) {
         setAuthorResults([]);
         setAuthorContributorMatches([]);
         setAuthorBookMatches([]);
@@ -406,7 +419,7 @@ export default function BookInfoTab({
     return () => {
       cancelled = true;
     };
-  }, [authorSearch, isEditing]);
+  }, [authorSearch, isEditingPeople]);
 
   useEffect(() => {
     let cancelled = false;
@@ -415,7 +428,7 @@ export default function BookInfoTab({
       const cleaned = publisherSearch.trim();
       const normalized = normalizeSearchTerm(cleaned);
 
-      if (!isEditing || !cleaned) {
+      if (!isEditingPeople || !cleaned) {
         setPublisherResults([]);
         setPublisherSearchError(null);
         return;
@@ -478,7 +491,7 @@ export default function BookInfoTab({
     return () => {
       cancelled = true;
     };
-  }, [publisherSearch, isEditing]);
+  }, [publisherSearch, isEditingPeople]);
 
   function handleSelectAuthor(person: PersonRecord) {
     setSelectedAuthorId(person.id);
@@ -526,32 +539,144 @@ export default function BookInfoTab({
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">Book Info</div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-stone-900">My Copy</div>
+          {!isEditingMyCopy ? (
+            <button
+              type="button"
+              onClick={onEditMyCopy}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={saving}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          )}
+        </div>
 
-        <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Genre</div>
-            {!isEditing ? (
-              <div className="font-medium">{genreLabel(book.genre)}</div>
+            <div className="text-stone-600">Format</div>
+            {!isEditingMyCopy ? (
+              <div className="mt-1 font-medium">{formatTypeLabel(formatType)}</div>
             ) : (
               <select
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
+                value={formatType}
+                onChange={(e) => setFormatType(e.target.value)}
                 className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
               >
                 <option value="">—</option>
-                {GENRE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
+                <option value="paperback">Paperback</option>
+                <option value="hardcover">Hardcover</option>
+                <option value="ebook">eBook</option>
+                <option value="audiobook">Audiobook</option>
+                <option value="other">Other</option>
               </select>
             )}
           </div>
 
           <div className="rounded border bg-white p-3 text-sm">
+            <div className="text-stone-600">Progress Mode</div>
+            {!isEditingMyCopy ? (
+              <div className="mt-1 font-medium">{progressModeLabel(progressMode)}</div>
+            ) : (
+              <select
+                value={progressMode}
+                onChange={(e) => setProgressMode(e.target.value)}
+                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+              >
+                <option value="">—</option>
+                <option value="pages">Pages</option>
+                <option value="percent">Percent</option>
+                <option value="chapters">Chapters</option>
+                <option value="time">Time</option>
+              </select>
+            )}
+          </div>
+
+          <div className="rounded border bg-white p-3 text-sm">
+            <div className="text-stone-600">Use page numbers in this book</div>
+            {!isEditingMyCopy ? (
+              <div className="mt-1 font-medium">{showPageNumbers ? "Yes" : "No"}</div>
+            ) : (
+              <label className="mt-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showPageNumbers}
+                  onChange={(e) => setShowPageNumbers(e.target.checked)}
+                />
+                <span>Show page numbers</span>
+              </label>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+              <span>These book details are managed by the site.</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-1 font-medium text-stone-700">
+                <span>Request a different edition</span>
+                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+                  Coming Soon
+                </span>
+              </span>
+            </div>
+            <div className="mt-2 text-sm font-semibold text-stone-900">
+              Book Info
+            </div>
+          </div>
+          {!isEditingBookInfo ? (
+            <button
+              type="button"
+              onClick={onEditBookInfo}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={saving}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          <div className="rounded border bg-white p-3 text-sm">
             <div className="text-stone-600">Book Type</div>
-            {!isEditing ? (
+            {!isEditingBookInfo ? (
               <div className="font-medium">{bookTypeLabel(book.book_type)}</div>
             ) : (
               <select
@@ -572,7 +697,7 @@ export default function BookInfoTab({
           <Detail
             label="Published"
             value={book.published_date}
-            editing={isEditing}
+            editing={isEditingBookInfo}
             inputValue={publishedDate}
             setInputValue={setPublishedDate}
             placeholder="e.g. 2005"
@@ -581,16 +706,25 @@ export default function BookInfoTab({
           <Detail
             label="Page Count"
             value={book.page_count}
-            editing={isEditing}
+            editing={isEditingBookInfo}
             inputValue={pageCount}
             setInputValue={setPageCount}
             placeholder="e.g. 352"
           />
 
           <Detail
+            label="Series Number"
+            value={book.series_number}
+            editing={isEditingBookInfo}
+            inputValue={seriesNumber}
+            setInputValue={setSeriesNumber}
+            placeholder="e.g. 2"
+          />
+
+          <Detail
             label="ISBN"
             value={book.isbn}
-            editing={isEditing}
+            editing={isEditingBookInfo}
             inputValue={isbn}
             setInputValue={setIsbn}
             placeholder="ISBN"
@@ -599,14 +733,14 @@ export default function BookInfoTab({
           <Detail
             label="ISBN-13"
             value={book.isbn13}
-            editing={isEditing}
+            editing={isEditingBookInfo}
             inputValue={isbn13}
             setInputValue={setIsbn13}
             placeholder="ISBN-13"
           />
         </div>
 
-        {isEditing ? (
+        {isEditingBookInfo ? (
           <div className="mt-4 rounded border bg-white p-3 text-sm">
             <div className="text-stone-600">Cover URL</div>
             <input
@@ -617,30 +751,43 @@ export default function BookInfoTab({
             />
           </div>
         ) : null}
-
-        <div className="mt-4">
-          <div className="text-sm font-medium">Trigger Warnings</div>
-          {!isEditing ? (
-            <div className="mt-1 min-h-[40px] whitespace-pre-wrap text-sm text-stone-700">
-              {book.trigger_warnings?.trim() ? book.trigger_warnings : "—"}
-            </div>
-          ) : (
-            <textarea
-              value={triggerWarnings}
-              onChange={(e) => setTriggerWarnings(e.target.value)}
-              placeholder="Anything you want to flag"
-              className="mt-2 min-h-[90px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-            />
-          )}
-        </div>
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">People</div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-stone-900">People</div>
+          {!isEditingPeople ? (
+            <button
+              type="button"
+              onClick={onEditPeople}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={saving}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            {isEditing ? (
+            {isEditingPeople ? (
               <div className="rounded border bg-white p-3 text-sm">
                 <label className="mb-1 block text-sm font-medium text-stone-700">
                   Search existing author
@@ -748,10 +895,10 @@ export default function BookInfoTab({
 
             <PersonRow
               label="Author"
-              name={isEditing ? authorName : book.author}
-              reading={isEditing ? authorReading : book.author_reading}
-              img={isEditing ? authorImg : book.author_image_url}
-              editing={isEditing}
+              name={isEditingPeople ? authorName : book.author}
+              reading={isEditingPeople ? authorReading : book.author_reading}
+              img={isEditingPeople ? authorImg : book.author_image_url}
+              editing={isEditingPeople}
               nameValue={authorName}
               setNameValue={(value) => {
                 setAuthorName(value);
@@ -764,13 +911,13 @@ export default function BookInfoTab({
             />
           </div>
 
-          {(book.translator || book.translator_image_url || isEditing) && (
+          {(book.translator || book.translator_image_url || isEditingPeople) && (
             <PersonRow
               label="Translator"
-              name={isEditing ? translatorName : book.translator}
-              reading={isEditing ? translatorReading : book.translator_reading}
-              img={isEditing ? translatorImg : book.translator_image_url}
-              editing={isEditing}
+              name={isEditingPeople ? translatorName : book.translator}
+              reading={isEditingPeople ? translatorReading : book.translator_reading}
+              img={isEditingPeople ? translatorImg : book.translator_image_url}
+              editing={isEditingPeople}
               nameValue={translatorName}
               setNameValue={setTranslatorName}
               imgValue={translatorImg}
@@ -780,13 +927,13 @@ export default function BookInfoTab({
             />
           )}
 
-          {(book.illustrator || book.illustrator_image_url || isEditing) && (
+          {(book.illustrator || book.illustrator_image_url || isEditingPeople) && (
             <PersonRow
               label="Illustrator"
-              name={isEditing ? illustratorName : book.illustrator}
-              reading={isEditing ? illustratorReading : book.illustrator_reading}
-              img={isEditing ? illustratorImg : book.illustrator_image_url}
-              editing={isEditing}
+              name={isEditingPeople ? illustratorName : book.illustrator}
+              reading={isEditingPeople ? illustratorReading : book.illustrator_reading}
+              img={isEditingPeople ? illustratorImg : book.illustrator_image_url}
+              editing={isEditingPeople}
               nameValue={illustratorName}
               setNameValue={setIllustratorName}
               imgValue={illustratorImg}
@@ -796,9 +943,9 @@ export default function BookInfoTab({
             />
           )}
 
-          {(book.publisher || book.publisher_image_url || isEditing) && (
+          {(book.publisher || book.publisher_image_url || isEditingPeople) && (
             <div className="space-y-2">
-              {isEditing ? (
+              {isEditingPeople ? (
                 <div className="rounded border bg-white p-3 text-sm">
                   <label className="mb-1 block text-sm font-medium text-stone-700">
                     Search existing publisher
@@ -875,10 +1022,10 @@ export default function BookInfoTab({
 
               <PersonRow
                 label="Publisher"
-                name={isEditing ? publisherName : book.publisher}
-                reading={isEditing ? publisherReading : book.publisher_reading}
-                img={isEditing ? publisherImg : book.publisher_image_url}
-                editing={isEditing}
+                name={isEditingPeople ? publisherName : book.publisher}
+                reading={isEditingPeople ? publisherReading : book.publisher_reading}
+                img={isEditingPeople ? publisherImg : book.publisher_image_url}
+                editing={isEditingPeople}
                 nameValue={publisherName}
                 setNameValue={(value) => {
                   setPublisherName(value);
@@ -895,10 +1042,39 @@ export default function BookInfoTab({
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">Related Links</div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-stone-900">Where to Find It</div>
+          {!isEditingLinks ? (
+            <button
+              type="button"
+              onClick={onEditLinks}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={saving}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          )}
+        </div>
 
         {relatedLinksArr.length > 0 ? (
-          <ul className="space-y-2 text-sm">
+          <ul className="flex flex-wrap gap-2 text-sm">
             {relatedLinksArr.map((item: any, idx: number) => {
               const label = displayLinkLabel(item);
               const url = displayLinkUrl(item);
@@ -910,7 +1086,7 @@ export default function BookInfoTab({
                       href={url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="inline-flex items-center rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-stone-700 transition hover:bg-stone-100"
                     >
                       {label}
                     </a>
@@ -925,73 +1101,13 @@ export default function BookInfoTab({
           <div className="text-sm text-stone-500">—</div>
         )}
 
-        {isEditing ? (
+        {isEditingLinks ? (
           <p className="mt-3 text-xs text-stone-500">
             Related link editing is not wired into this extracted component yet.
           </p>
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">My Copy</div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Format</div>
-            {!isEditing ? (
-              <div className="mt-1 font-medium">{formatTypeLabel(formatType)}</div>
-            ) : (
-              <select
-                value={formatType}
-                onChange={(e) => setFormatType(e.target.value)}
-                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-              >
-                <option value="">—</option>
-                <option value="paperback">Paperback</option>
-                <option value="hardcover">Hardcover</option>
-                <option value="ebook">eBook</option>
-                <option value="audiobook">Audiobook</option>
-                <option value="other">Other</option>
-              </select>
-            )}
-          </div>
-
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Progress Mode</div>
-            {!isEditing ? (
-              <div className="mt-1 font-medium">{progressModeLabel(progressMode)}</div>
-            ) : (
-              <select
-                value={progressMode}
-                onChange={(e) => setProgressMode(e.target.value)}
-                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-              >
-                <option value="">—</option>
-                <option value="pages">Pages</option>
-                <option value="percent">Percent</option>
-                <option value="chapters">Chapters</option>
-                <option value="time">Time</option>
-              </select>
-            )}
-          </div>
-
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Show Page Numbers</div>
-            {!isEditing ? (
-              <div className="mt-1 font-medium">{showPageNumbers ? "Yes" : "No"}</div>
-            ) : (
-              <label className="mt-2 flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showPageNumbers}
-                  onChange={(e) => setShowPageNumbers(e.target.checked)}
-                />
-                <span>Show page numbers</span>
-              </label>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

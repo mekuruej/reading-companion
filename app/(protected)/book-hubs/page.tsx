@@ -231,10 +231,10 @@ export default function BookHubsPage() {
                 </div>
                 <div>
                     <h1 className="text-3xl font-semibold tracking-tight text-stone-900">
-                        All Book Hubs
+                        Book Hubs
                     </h1>
                     <p className="mt-1 text-sm text-stone-500">
-                        Open any book hub to track progress, review vocab, and continue reading.
+                        Open any book hub to keep reading, review vocab, and move around your library more easily.
                     </p>
                 </div>
             </div>

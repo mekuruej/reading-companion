@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppHeaderGate from "../components/AppHeaderGate";
+import SupportProjectFooterGate from "../components/SupportProjectFooterGate";
 
 export const metadata: Metadata = {
   title: "Mekuru Reading Companion | ページをめくって、話しまくろう",
@@ -17,6 +18,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-white text-black flex flex-col">
         <AppHeaderGate />
         <main className="flex-1">{children}</main>
+        <SupportProjectFooterGate />
       </body>
     </html>
   );

@@ -15,9 +15,6 @@ type UserBook = {
 type RatingTabProps = {
   row: UserBook;
 
-  // kept for compatibility with your current parent usage
-  isEditingThisTab?: boolean;
-
   onSave: () => void | Promise<void>;
   saving?: boolean;
 
@@ -30,19 +27,11 @@ type RatingTabProps = {
   ratingRecommend: string;
   setRatingRecommend: (value: string) => void;
 
-  ratingDifficulty: string;
-  setRatingDifficulty: (value: string) => void;
-
-  readerLevel: string;
-  setReaderLevel: (value: string) => void;
-
   favoriteQuotes: string;
   setFavoriteQuotes: (value: string) => void;
 
   memorableWords: string;
   setMemorableWords: (value: string) => void;
-
-  LEVEL_OPTIONS: readonly string[];
 
   StarRatingField: ComponentType<{
     label: string;
@@ -51,13 +40,6 @@ type RatingTabProps = {
     inputValue: string;
     setInputValue: (v: string) => void;
     descriptions: Record<number, string>;
-  }>;
-
-  DifficultyField: ComponentType<{
-    value: number | null;
-    editing: boolean;
-    inputValue: string;
-    setInputValue: (v: string) => void;
   }>;
 };
 
@@ -121,21 +103,14 @@ export default function RatingTab({
   setRatingOverall,
   ratingRecommend,
   setRatingRecommend,
-  ratingDifficulty,
-  setRatingDifficulty,
-  readerLevel,
-  setReaderLevel,
   favoriteQuotes,
   setFavoriteQuotes,
   memorableWords,
   setMemorableWords,
-  LEVEL_OPTIONS,
   StarRatingField,
-  DifficultyField,
 }: RatingTabProps) {
   const [editingReview, setEditingReview] = useState(false);
   const [editingRatings, setEditingRatings] = useState(false);
-  const [editingContext, setEditingContext] = useState(false);
   const [editingMemory, setEditingMemory] = useState(false);
 
   function cancelReview() {
@@ -147,14 +122,6 @@ export default function RatingTab({
     setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
     setRatingRecommend(row.rating_recommend != null ? String(row.rating_recommend) : "");
     setEditingRatings(false);
-  }
-
-  function cancelContext() {
-    setReaderLevel(row.reader_level ?? "");
-    setRatingDifficulty(
-      row.rating_difficulty != null ? String(row.rating_difficulty) : ""
-    );
-    setEditingContext(false);
   }
 
   function cancelMemory() {
@@ -171,11 +138,6 @@ export default function RatingTab({
   async function saveRatings() {
     await onSave();
     setEditingRatings(false);
-  }
-
-  async function saveContext() {
-    await onSave();
-    setEditingContext(false);
   }
 
   async function saveMemory() {
@@ -248,46 +210,6 @@ export default function RatingTab({
               2: "Not so much useful language material.",
               1: "I didn’t get anything out of it.",
             }}
-          />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <CardHeader
-          title="Reading Context"
-          editing={editingContext}
-          onEdit={() => setEditingContext(true)}
-          onCancel={cancelContext}
-          onSave={saveContext}
-          saving={saving}
-        />
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">My Level at Time of Reading</div>
-            {!editingContext ? (
-              <div className="mt-1 font-medium">{row.reader_level || "—"}</div>
-            ) : (
-              <select
-                value={readerLevel}
-                onChange={(e) => setReaderLevel(e.target.value)}
-                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-              >
-                <option value="">—</option>
-                {LEVEL_OPTIONS.map((lvl) => (
-                  <option key={lvl} value={lvl}>
-                    {lvl}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <DifficultyField
-            value={row.rating_difficulty}
-            editing={editingContext}
-            inputValue={ratingDifficulty}
-            setInputValue={setRatingDifficulty}
           />
         </div>
       </div>

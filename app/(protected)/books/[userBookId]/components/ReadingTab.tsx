@@ -136,6 +136,13 @@ export default function ReadingTab({
   DateField,
 }: ReadingTabProps) {
   const [isEditingDates, setIsEditingDates] = useState(false);
+  const usePercentMode = progressMode === "percent" && book.page_count != null && book.page_count > 0;
+
+  function pageToPercent(page: number | null) {
+    if (page == null || !book.page_count || book.page_count <= 0) return null;
+    return Math.max(0, Math.min(100, Math.round((page / book.page_count) * 100)));
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -255,25 +262,31 @@ export default function ReadingTab({
           {sessionMode !== "listening" && (
             <>
               <div className="rounded border bg-white p-3 text-sm">
-                <div className="text-stone-600">Start page</div>
+                <div className="text-stone-600">
+                  {usePercentMode ? "Start percent" : "Start page"}
+                </div>
                 <input
                   type="number"
-                  min={1}
+                  min={usePercentMode ? 0 : 1}
+                  max={usePercentMode ? 100 : undefined}
                   value={sessionStartPage}
                   onChange={(e) => setSessionStartPage(e.target.value)}
-                  placeholder="e.g. 4"
+                  placeholder={usePercentMode ? "e.g. 12" : "e.g. 4"}
                   className="mt-1 w-full rounded border px-2 py-1"
                 />
               </div>
 
               <div className="rounded border bg-white p-3 text-sm">
-                <div className="text-stone-600">End page</div>
+                <div className="text-stone-600">
+                  {usePercentMode ? "End percent" : "End page"}
+                </div>
                 <input
                   type="number"
-                  min={1}
+                  min={usePercentMode ? 0 : 1}
+                  max={usePercentMode ? 100 : undefined}
                   value={sessionEndPage}
                   onChange={(e) => setSessionEndPage(e.target.value)}
-                  placeholder="e.g. 10"
+                  placeholder={usePercentMode ? "e.g. 18" : "e.g. 10"}
                   className="mt-1 w-full rounded border px-2 py-1"
                 />
               </div>
@@ -282,13 +295,18 @@ export default function ReadingTab({
 
           {sessionMode === "listening" && (
             <div className="rounded border bg-white p-3 text-sm">
-              <div className="text-stone-600">Listening end page (optional)</div>
+              <div className="text-stone-600">
+                {usePercentMode
+                  ? "Listening end percent (optional)"
+                  : "Listening end page (optional)"}
+              </div>
               <input
                 type="number"
-                min={1}
+                min={usePercentMode ? 0 : 1}
+                max={usePercentMode ? 100 : undefined}
                 value={sessionEndPage}
                 onChange={(e) => setSessionEndPage(e.target.value)}
-                placeholder="e.g. 45"
+                placeholder={usePercentMode ? "e.g. 35" : "e.g. 45"}
                 className="mt-1 w-full rounded border px-2 py-1"
               />
               <p className="mt-2 text-xs text-stone-500">
@@ -346,12 +364,16 @@ export default function ReadingTab({
                         <div className="mt-1">
                           {session.session_mode === "listening" ? (
                             session.end_page != null ? (
-                              `Listening · up to p. ${session.end_page}`
+                              usePercentMode
+                                ? `Listening · up to ${pageToPercent(session.end_page)}%`
+                                : `Listening · up to p. ${session.end_page}`
                             ) : (
                               "Listening session"
                             )
                           ) : session.start_page != null && session.end_page != null ? (
-                            `p. ${session.start_page} → ${session.end_page}`
+                            usePercentMode
+                              ? `${pageToPercent(session.start_page)}% → ${pageToPercent(session.end_page)}%`
+                              : `p. ${session.start_page} → ${session.end_page}`
                           ) : (
                             "Pages not recorded"
                           )}

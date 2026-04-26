@@ -1,0 +1,86 @@
+export const PROFILE_LEVEL_OPTIONS = [
+  {
+    value: "Level 1",
+    title: "Level 1",
+    plain: "Absolute Beginner",
+    cefr: "Pre-A1",
+    jlpt: "Before N5",
+    feel: "Hiragana/katakana, survival words, very guided sentences",
+  },
+  {
+    value: "Level 2",
+    title: "Level 2",
+    plain: "Beginner 1",
+    cefr: "A1",
+    jlpt: "Early N5",
+    feel: "Simple sentences, basic particles, dictionary-form verbs still hard",
+  },
+  {
+    value: "Level 3",
+    title: "Level 3",
+    plain: "Beginner 2",
+    cefr: "A1+",
+    jlpt: "Solid N5",
+    feel: "Can read graded material slowly with support",
+  },
+  {
+    value: "Level 4",
+    title: "Level 4",
+    plain: "Upper Beginner",
+    cefr: "A2",
+    jlpt: "N4 entry",
+    feel: "Longer sentences, more verb forms, lots of grammar still foggy",
+  },
+  {
+    value: "Level 5",
+    title: "Level 5",
+    plain: "Pre-Intermediate",
+    cefr: "A2+",
+    jlpt: "Solid N4",
+    feel: "Can follow simple stories, but unknown vocab blocks flow",
+  },
+  {
+    value: "Level 6",
+    title: "Level 6",
+    plain: "Intermediate 1",
+    cefr: "B1",
+    jlpt: "N3 entry",
+    feel: "Real Japanese starts becoming possible, but slow and lookup-heavy",
+  },
+  {
+    value: "Level 7",
+    title: "Level 7",
+    plain: "Intermediate 2",
+    cefr: "B1+",
+    jlpt: "Solid N3",
+    feel: "Can read easier native texts with support; nuance still hard",
+  },
+  {
+    value: "Level 8",
+    title: "Level 8",
+    plain: "Upper Intermediate",
+    cefr: "B2-ish",
+    jlpt: "N2 entry",
+    feel: "Can handle novels/articles, but kanji/vocab density hurts",
+  },
+  {
+    value: "Level 9",
+    title: "Level 9",
+    plain: "Advanced",
+    cefr: "B2+",
+    jlpt: "Solid N2 / N1 entry",
+    feel: "Reads real Japanese regularly, still misses style, implication, register",
+  },
+  {
+    value: "Level 10",
+    title: "Level 10",
+    plain: "Upper Advanced",
+    cefr: "C1-ish",
+    jlpt: "Solid N1+",
+    feel: "Can read widely with nuance, ambiguity, tone, and less hand-holding",
+  },
+] as const;
+
+export const PROFILE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
+  PROFILE_LEVEL_OPTIONS.map((option) => [option.value, option.plain])
+);
