@@ -7,6 +7,10 @@ build/
 .env*.local
 
 .DS_Store
+components 2/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+reading-companion@0.1.0
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
