@@ -1,3 +1,6 @@
+// Book Info Tab
+// 
+
 "use client";
 
 import { useEffect, useState, type ComponentType } from "react";

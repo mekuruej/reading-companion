@@ -1,68 +1,33 @@
-export type AppAccessType = "student" | "trial" | "inactive";
-
-export type AppAccessProfile = {
+type AppAccessProfile = {
   role?: string | null;
-  app_access_type?: AppAccessType | null;
+  app_access_type?: string | null;
   app_access_expires_at?: string | null;
 };
 
-export function getAppAccessStatus(profile: AppAccessProfile | null) {
-  if (!profile) {
-    return {
-      hasAccess: false,
-      isExpired: false,
-      daysLeft: 0,
-    };
+export function getAppAccessStatus(profile: AppAccessProfile) {
+  const role = profile.role ?? "";
+  const accessType = profile.app_access_type ?? "";
+  const expiresAt = profile.app_access_expires_at;
+
+  if (role === "teacher" || role === "admin") {
+    return { hasAccess: true, reason: "staff" };
   }
 
-  // Teachers should always be able to enter
-  if (profile.role === "teacher" || profile.role === "super_teacher") {
-    return {
-      hasAccess: true,
-      isExpired: false,
-      daysLeft: null as number | null,
-    };
+  if (accessType === "none" || accessType === "expired") {
+    return { hasAccess: false, reason: accessType };
   }
 
-  if (profile.app_access_type === "student") {
-    return {
-      hasAccess: true,
-      isExpired: false,
-      daysLeft: null as number | null,
-    };
+  if (!expiresAt) {
+    return { hasAccess: true, reason: "no_expiration" };
   }
 
-  if (profile.app_access_type === "trial") {
-    if (!profile.app_access_expires_at) {
-      return {
-        hasAccess: false,
-        isExpired: true,
-        daysLeft: 0,
-      };
-    }
-
-    const expiresAt = new Date(profile.app_access_expires_at).getTime();
-    const now = Date.now();
-    const msLeft = expiresAt - now;
-
-    if (msLeft <= 0) {
-      return {
-        hasAccess: false,
-        isExpired: true,
-        daysLeft: 0,
-      };
-    }
-
-    return {
-      hasAccess: true,
-      isExpired: false,
-      daysLeft: Math.ceil(msLeft / (1000 * 60 * 60 * 24)),
-    };
+  const expiry = new Date(expiresAt).getTime();
+  if (Number.isNaN(expiry)) {
+    return { hasAccess: true, reason: "invalid_expiration" };
   }
 
   return {
-    hasAccess: false,
-    isExpired: false,
-    daysLeft: 0,
+    hasAccess: expiry >= Date.now(),
+    reason: expiry >= Date.now() ? "active" : "expired",
   };
 }

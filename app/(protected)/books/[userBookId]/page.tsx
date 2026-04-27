@@ -3522,6 +3522,46 @@ export default function BookHubPage() {
     setError(null);
     setSaveNotice(null);
 
+    if (
+      editingTab === "communityGenres" ||
+      editingTab === "communityContentNotes" ||
+      editingTab === "communityReaderFit"
+    ) {
+      try {
+        if (editingTab === "communityGenres" || editingTab === "communityContentNotes") {
+          await saveCommunityContributions(row.books.id, userId);
+        }
+
+        if (editingTab === "communityReaderFit") {
+          const rd = ratingDifficulty.trim()
+            ? clampRating5(Number(ratingDifficulty.trim()))
+            : null;
+
+          const { error: userBookError } = await supabase
+            .from("user_books")
+            .update({
+              reader_level: profileLevel || readerLevel || null,
+              rating_difficulty: rd,
+            })
+            .eq("id", row.id);
+
+          if (userBookError) throw userBookError;
+        }
+
+        setSaveNoticeTone("success");
+        setSaveNotice("Saved.");
+        setEditingTab(null);
+        await load();
+      } catch (saveError: any) {
+        console.error("Error saving community fields:", saveError);
+        setError(saveError?.message ?? "Could not save community fields.");
+      } finally {
+        setSaving(false);
+      }
+
+      return;
+    }
+
     const strictPublisherResult = await ensureStrictPublisherRecord();
     if (strictPublisherResult.error) {
       setError(strictPublisherResult.error.message);

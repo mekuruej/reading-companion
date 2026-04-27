@@ -1,88 +1,81 @@
-export type LessonAlertKind =
-  | "teacher_prepare"
-  | "student_new_readings"
-  | "student_last_chance";
-
-const DAY_INDEX: Record<string, number> = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
+type LessonAlertInput = {
+  lessonDay?: string | number | null;
+  isTeacherView?: boolean;
+  studentName?: string | null;
 };
 
-function normalizeLessonDay(day: string | null | undefined): string | null {
-  if (!day) return null;
-  const cleaned = day.trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(DAY_INDEX, cleaned) ? cleaned : null;
+type LessonAlertInfo = {
+  title: string;
+  message: string;
+  alertKey: string;
+  kind: "teacher_prepare" | "student_new_readings" | "student_last_chance";
+  showBadge: boolean;
+  badgeText: string | null;
+};
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function normalizeLessonDay(value: string | number | null | undefined) {
+  if (typeof value === "number" && value >= 0 && value <= 6) return value;
+  if (!value) return null;
+
+  const text = String(value).trim().toLowerCase();
+  const numeric = Number(text);
+  if (Number.isInteger(numeric) && numeric >= 0 && numeric <= 6) return numeric;
+
+  const index = DAY_NAMES.findIndex((day) => day.toLowerCase() === text);
+  return index >= 0 ? index : null;
 }
 
-function getTodayIndex(): number {
-  return new Date().getDay();
+function daysUntil(day: number) {
+  const today = new Date().getDay();
+  return (day - today + 7) % 7;
 }
 
-function getDateStamp(d = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+export function getLessonAlertInfo({
+  lessonDay,
+  isTeacherView = false,
+  studentName,
+}: LessonAlertInput): LessonAlertInfo | null {
+  const day = normalizeLessonDay(lessonDay);
+  if (day === null) return null;
 
-export function getLessonAlertInfo(params: {
-  lessonDay: string | null | undefined;
-  isTeacherView: boolean;
-  studentName?: string | null;
-}) {
-  const normalizedLessonDay = normalizeLessonDay(params.lessonDay);
-  if (!normalizedLessonDay) return null;
+  const daysAway = daysUntil(day);
+  const dayName = DAY_NAMES[day];
+  const name = studentName || "your student";
 
-  const lessonIdx = DAY_INDEX[normalizedLessonDay];
-  const todayIdx = getTodayIndex();
-
-  const teacherPrepIdx = (lessonIdx + 1) % 7;
-  const studentNewIdx = (lessonIdx + 2) % 7;
-  const studentLastChanceIdx = (lessonIdx + 6) % 7; // day before lesson
-
-  const dateStamp = getDateStamp();
-
-  if (params.isTeacherView) {
-    if (todayIdx !== teacherPrepIdx) return null;
-
-    const studentLabel = params.studentName?.trim() || "this student";
+  if (isTeacherView) {
+    if (daysAway > 2) return null;
 
     return {
-      kind: "teacher_prepare" as LessonAlertKind,
-      title: "📚 TEACHER REMINDER",
-      message: `Prepare next week’s readings for ${studentLabel}.`,
-      alertKey: `teacher_prepare:${dateStamp}:${normalizedLessonDay}:${studentLabel}`,
-      showBadge: false,
-      badgeText: null,
+      title: "Prepare lesson readings",
+      message: `${name} has a ${dayName} lesson coming up. Check their readings and prepare support notes.`,
+      alertKey: `teacher_prepare_${dayName.toLowerCase()}_${daysAway}`,
+      kind: "teacher_prepare",
+      showBadge: true,
+      badgeText: daysAway === 0 ? "Today" : daysAway === 1 ? "Tomorrow" : `${daysAway} days`,
     };
   }
 
-  if (todayIdx === studentNewIdx) {
+  if (daysAway === 0 || daysAway === 1) {
     return {
-      kind: "student_new_readings" as LessonAlertKind,
-      title: "🆕 NEW READINGS",
-      message:
-        "Your new kanji readings for next week’s lesson are ready.\nRegular review will help you build confidence and stronger reading skills over time.",
-      alertKey: `student_new_readings:${dateStamp}:${normalizedLessonDay}`,
+      title: "Lesson soon",
+      message: "Add any new readings or questions before your next lesson.",
+      alertKey: `student_last_chance_${dayName.toLowerCase()}_${daysAway}`,
+      kind: "student_last_chance",
       showBadge: true,
-      badgeText: "NEW",
+      badgeText: daysAway === 0 ? "Today" : "Tomorrow",
     };
   }
 
-  if (todayIdx === studentLastChanceIdx) {
+  if (daysAway <= 4) {
     return {
-      kind: "student_last_chance" as LessonAlertKind,
-      title: "⚠ LAST CHANCE!",
-      message:
-        "Lesson tomorrow! A quick review of your kanji readings will make the reading feel lighter.",
-      alertKey: `student_last_chance:${dateStamp}:${normalizedLessonDay}`,
+      title: "Prepare your readings",
+      message: "Add the pages or words you want to work through in your next lesson.",
+      alertKey: `student_new_readings_${dayName.toLowerCase()}_${daysAway}`,
+      kind: "student_new_readings",
       showBadge: true,
-      badgeText: "LAST CHANCE",
+      badgeText: `${daysAway} days`,
     };
   }
 

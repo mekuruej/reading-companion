@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 // ------------------------------------------------------------
 // Helpers
@@ -44,8 +44,9 @@ function normalizeJlpt(val: string): string {
 // ------------------------------------------------------------
 // Page Component
 // ------------------------------------------------------------
-export default function EditVocabPage({ params }: { params: { id: string } }) {
+export default function EditVocabPage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
   const vocabId = params.id;
 
   const [loading, setLoading] = useState(true);

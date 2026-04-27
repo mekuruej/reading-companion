@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getAppAccessStatus } from "@/lib/appAccess";
 import { supabase } from "@/lib/supabaseClient";
+import { getAppAccessStatus } from "@/lib/appAccess";
 
 type Props = {
   children: React.ReactNode;
@@ -27,7 +27,9 @@ export default function AppAccessGate({ children }: Props) {
       } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        if (!cancelled) router.replace("/login");
+        if (!cancelled) {
+          router.replace("/login");
+        }
         return;
       }
 
@@ -39,14 +41,18 @@ export default function AppAccessGate({ children }: Props) {
 
       if (error || !profile) {
         console.error("Error checking app access:", error);
-        if (!cancelled) router.replace("/login");
+        if (!cancelled) {
+          router.replace("/login");
+        }
         return;
       }
 
       const status = getAppAccessStatus(profile);
 
       if (!status.hasAccess) {
-        if (!cancelled && pathname !== "/trial-ended") router.replace("/trial-ended");
+        if (!cancelled && pathname !== "/trial-ended") {
+          router.replace("/trial-ended");
+        }
         return;
       }
 
@@ -64,7 +70,11 @@ export default function AppAccessGate({ children }: Props) {
   }, [pathname, router]);
 
   if (checking || !allowed) {
-    return <div className="p-6 text-sm text-stone-600">Checking access...</div>;
+    return (
+      <div className="p-6 text-sm text-stone-600">
+        Checking access...
+      </div>
+    );
   }
 
   return <>{children}</>;

@@ -1,3 +1,6 @@
+// Story Tab
+// 
+
 type StoryTabMode = "characters" | "plot" | "setting" | "cultural";
 
 type Character = {
