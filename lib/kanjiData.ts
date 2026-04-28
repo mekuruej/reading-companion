@@ -1,3 +1,6 @@
+// Kanji Data
+//
+
 export type KanjiEntry = {
   kanji: string;
   pieces: string[];

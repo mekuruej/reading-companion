@@ -1,3 +1,6 @@
+// Lesson Alerts
+//
+
 type LessonAlertInput = {
   lessonDay?: string | number | null;
   isTeacherView?: boolean;

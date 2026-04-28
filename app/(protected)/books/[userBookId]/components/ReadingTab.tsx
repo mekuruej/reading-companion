@@ -51,6 +51,9 @@ type ReadingTabProps = {
   started: Date | null;
   finished: Date | null;
 
+  canFillBeginningPages: boolean;
+  fillBeginningPages: () => Promise<void>;
+
   sessionDate: string;
   setSessionDate: (value: string) => void;
   sessionMinutesRead: string;
@@ -106,6 +109,8 @@ export default function ReadingTab({
   setFinishedAt,
   dnfAt,
   setDnfAt,
+  canFillBeginningPages,
+  fillBeginningPages,
 
   started,
   finished,
@@ -213,6 +218,22 @@ export default function ReadingTab({
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 text-sm font-semibold text-stone-900">Log Reading Session</div>
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          <p>
+            Use this for real reading sessions. If you’re catching up pages you read before using Mekuru,
+            use “Fill beginning pages” instead so your progress is correct without making your stats weird.
+          </p>
+
+          {canFillBeginningPages && !editingReadingSessionId ? (
+            <button
+              type="button"
+              onClick={() => void fillBeginningPages()}
+              className="mt-3 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
+            >
+              Fill beginning pages instead
+            </button>
+          ) : null}
+        </div>
 
         {editingReadingSessionId ? (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">

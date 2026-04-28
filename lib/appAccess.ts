@@ -1,3 +1,6 @@
+// App Access
+//
+
 type AppAccessProfile = {
   role?: string | null;
   app_access_type?: string | null;

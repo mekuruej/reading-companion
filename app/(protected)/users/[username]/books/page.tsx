@@ -92,6 +92,27 @@ type MonthOption = {
 
 type UserBarVariant = "full" | "logoutOnly" | "labelOnly";
 
+function ymdInTimeZone(value: string | Date, timeZone: string) {
+  const date = typeof value === "string" ? new Date(value) : value;
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+
+  if (!year || !month || !day) return null;
+
+  return `${year}-${month}-${day}`;
+}
+
 function getMonthOptions(count = 12): MonthOption[] {
   const opts: MonthOption[] = [];
   const now = new Date();
@@ -316,6 +337,7 @@ export default function BooksPage() {
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
+  const [myTimeZone, setMyTimeZone] = useState("Asia/Tokyo");
 
   const [newBookTitle, setNewBookTitle] = useState("");
   const [newBookAuthor, setNewBookAuthor] = useState("");
@@ -373,7 +395,11 @@ export default function BooksPage() {
       ? "Me"
       : students.find((s) => s.id === viewingUserId)?.display_name || "Member";
 
-  async function loadMonthlyLibraryStats(userId: string, monthValue: string) {
+  async function loadMonthlyLibraryStats(
+    userId: string,
+    monthValue: string,
+    timeZone = "Asia/Tokyo"
+  ) {
     setMonthlyStatsLoading(true);
 
     try {
@@ -423,7 +449,7 @@ export default function BooksPage() {
       ] = await Promise.all([
         supabase
           .from("user_book_reading_sessions")
-          .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode")
+          .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler")
           .in("user_book_id", userBookIds)
           .gte("read_on", startStr)
           .lt("read_on", endStr),
@@ -444,7 +470,7 @@ export default function BooksPage() {
         console.error("Error loading words for monthly stats:", wordErr);
       }
 
-      const sessions = sessionRows ?? [];
+      const sessions = ((sessionRows ?? []) as any[]).filter((s) => !s.is_filler);
       const words = wordRows ?? [];
 
       const uniqueWordSet = new Set<string>();
@@ -458,7 +484,10 @@ export default function BooksPage() {
         uniqueWordSet.add(`${surface}|||${meaning}`);
         const createdAt = (w.created_at as string | null) ?? "";
         if (createdAt) {
-          engagedDays.add(createdAt.slice(0, 10));
+          const localCreatedDay = ymdInTimeZone(createdAt, timeZone);
+          if (localCreatedDay) {
+            engagedDays.add(localCreatedDay);
+          }
         }
       }
 
@@ -585,8 +614,8 @@ export default function BooksPage() {
       const studentAlertUserIds = isSuperTeacher
         ? students.filter((s) => s.id).map((s) => s.id)
         : students
-            .filter((s) => s.id && (s.role === "member" || s.role === "student"))
-            .map((s) => s.id);
+          .filter((s) => s.id && (s.role === "member" || s.role === "student"))
+          .map((s) => s.id);
 
       const alertUserIds = Array.from(
         new Set([meId, ...studentAlertUserIds].filter(Boolean))
@@ -1114,7 +1143,7 @@ export default function BooksPage() {
 
       const { data: meProfile, error: meProfileErr } = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, username")
+        .select("role, is_super_teacher, username, time_zone")
         .eq("id", user.id)
         .single();
 
@@ -1125,6 +1154,7 @@ export default function BooksPage() {
       if (cancelled) return;
 
       setMyUsername((meProfile as any)?.username ?? "");
+      setMyTimeZone((meProfile as any)?.time_zone || "Asia/Tokyo");
 
       const role = (meProfile?.role as ProfileRole | null) ?? "member";
       const superTeacherFlag = Boolean((meProfile as any)?.is_super_teacher);
@@ -1261,8 +1291,8 @@ export default function BooksPage() {
 
   useEffect(() => {
     if (!viewingUserId || !selectedMonth) return;
-    loadMonthlyLibraryStats(viewingUserId, selectedMonth);
-  }, [viewingUserId, selectedMonth]);
+    loadMonthlyLibraryStats(viewingUserId, selectedMonth, myTimeZone);
+  }, [viewingUserId, selectedMonth, myTimeZone]);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -1668,9 +1698,8 @@ export default function BooksPage() {
                   {monthlyStatsLoading
                     ? "…"
                     : monthlyStats.longestRunDays > 0
-                      ? `${monthlyStats.longestRunDays} day${
-                          monthlyStats.longestRunDays === 1 ? "" : "s"
-                        }`
+                      ? `${monthlyStats.longestRunDays} day${monthlyStats.longestRunDays === 1 ? "" : "s"
+                      }`
                       : "—"}
                 </div>
                 <div aria-hidden="true" />

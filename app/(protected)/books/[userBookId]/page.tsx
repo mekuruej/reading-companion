@@ -671,8 +671,8 @@ export default function BookHubPage() {
 
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const [sessionDate, setSessionDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+  const [sessionDate, setSessionDate] = useState<string>(() =>
+    formatYmd(new Date())
   );
 
   useEffect(() => {
@@ -682,8 +682,7 @@ export default function BookHubPage() {
   }, [profileLevel]);
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    setSessionDate(today);
+    setSessionDate(formatYmd(new Date()));
   }, []);
 
   const realReadingSessions = useMemo(() => {
@@ -960,7 +959,7 @@ export default function BookHubPage() {
 
   function cancelEditingReadingSession() {
     setEditingReadingSessionId(null);
-    setSessionDate(new Date().toISOString().slice(0, 10));
+    setSessionDate(formatYmd(new Date()));
     setSessionStartPage("");
     setSessionEndPage("");
     setSessionMinutesRead("");
@@ -1202,9 +1201,9 @@ export default function BookHubPage() {
     setRow((prev) =>
       prev
         ? {
-            ...prev,
-            notes: notes || null,
-          }
+          ...prev,
+          notes: notes || null,
+        }
         : prev
     );
 
@@ -1267,6 +1266,36 @@ export default function BookHubPage() {
     );
   }
 
+  async function saveLanguageLearningPotential() {
+    if (!userBookId) return;
+
+    const rating = ratingRecommend.trim()
+      ? clampRating5(Number(ratingRecommend.trim()))
+      : null;
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        rating_recommend: rating,
+      })
+      .eq("id", userBookId);
+
+    if (error) {
+      console.error("Error saving language learning potential:", error);
+      alert("Failed to save language learning potential");
+      return;
+    }
+
+    setRow((prev) =>
+      prev
+        ? {
+          ...prev,
+          rating_recommend: rating,
+        }
+        : prev
+    );
+  }
+
   async function loadCommunityContributions(
     bookId: string,
     currentUserId: string | null,
@@ -1315,30 +1344,30 @@ export default function BookHubPage() {
       const sharedGenreList =
         genreCounts.size > 0
           ? Array.from(genreCounts.entries())
-              .map(([value, count]) => ({ value, count }))
-              .sort((a, b) =>
-                b.count === a.count
-                  ? genreLabel(a.value).localeCompare(genreLabel(b.value))
-                  : b.count - a.count
-              )
+            .map(([value, count]) => ({ value, count }))
+            .sort((a, b) =>
+              b.count === a.count
+                ? genreLabel(a.value).localeCompare(genreLabel(b.value))
+                : b.count - a.count
+            )
           : dedupeCommunityTags(parseCommunityTags(legacy?.genre ?? "")).map((value) => ({
-              value,
-              count: 1,
-            }));
+            value,
+            count: 1,
+          }));
 
       const sharedNoteList =
         noteCounts.size > 0
           ? Array.from(noteCounts.entries())
-              .map(([value, count]) => ({ value, count }))
-              .sort((a, b) =>
-                b.count === a.count ? a.value.localeCompare(b.value) : b.count - a.count
-              )
+            .map(([value, count]) => ({ value, count }))
+            .sort((a, b) =>
+              b.count === a.count ? a.value.localeCompare(b.value) : b.count - a.count
+            )
           : dedupeCommunityTags(parseCommunityTags(legacy?.trigger_warnings ?? "")).map(
-              (value) => ({
-                value,
-                count: 1,
-              })
-            );
+            (value) => ({
+              value,
+              count: 1,
+            })
+          );
 
       const myGenreString = joinCommunityTags(myGenres);
       const myNotesString = joinCommunityTags(myNotes);
@@ -1712,7 +1741,7 @@ export default function BookHubPage() {
       }
     }
 
-  setSavedKanjiDefaults(byKanji);
+    setSavedKanjiDefaults(byKanji);
   }
 
   function buildPreparedKanjiRows(rows: KanjiMapRow[]) {
@@ -2788,9 +2817,9 @@ export default function BookHubPage() {
         setRow((prev) =>
           prev
             ? {
-                ...prev,
-                started_at: sessionDate,
-              }
+              ...prev,
+              started_at: sessionDate,
+            }
             : prev
         );
       }
@@ -3215,21 +3244,21 @@ export default function BookHubPage() {
     const contributors = (contributorData ?? []) as Array<{
       role: "author" | "translator" | "illustrator";
       people:
-        | {
-            id: string;
-            name_ja: string;
-            name_en: string | null;
-            reading: string | null;
-            image_url: string | null;
-          }
-        | Array<{
-            id: string;
-            name_ja: string;
-            name_en: string | null;
-            reading: string | null;
-            image_url: string | null;
-          }>
-        | null;
+      | {
+        id: string;
+        name_ja: string;
+        name_en: string | null;
+        reading: string | null;
+        image_url: string | null;
+      }
+      | Array<{
+        id: string;
+        name_ja: string;
+        name_en: string | null;
+        reading: string | null;
+        image_url: string | null;
+      }>
+      | null;
     }>;
 
     for (const contributor of contributors) {
@@ -3510,8 +3539,8 @@ export default function BookHubPage() {
       status:
         forcedStatus ??
         (mode === "created-or-linked" ? "created-shared-record" :
-        mode === "updated-existing" || mode === "kept-existing-link" ? "linked-existing-record" :
-          "linked-existing-record"),
+          mode === "updated-existing" || mode === "kept-existing-link" ? "linked-existing-record" :
+            "linked-existing-record"),
     };
   }
 
@@ -4459,9 +4488,8 @@ export default function BookHubPage() {
 
               {saveNotice ? (
                 <div
-                  className={`border-t border-stone-200 px-5 py-3 text-sm md:px-8 ${
-                    saveNoticeTone === "warning" ? "text-amber-700" : "text-emerald-700"
-                  }`}
+                  className={`border-t border-stone-200 px-5 py-3 text-sm md:px-8 ${saveNoticeTone === "warning" ? "text-amber-700" : "text-emerald-700"
+                    }`}
                 >
                   {saveNotice}
                 </div>
@@ -4769,10 +4797,13 @@ export default function BookHubPage() {
                     saveNotes={saveNotes}
                     saveRecommendedLevel={saveRecommendedLevel}
                     saveTeacherStudentUseRating={saveTeacherStudentUseRating}
+                    saveLanguageLearningPotential={saveLanguageLearningPotential}
                     recommendedLevel={recommendedLevel}
                     setRecommendedLevel={setRecommendedLevel}
                     teacherStudentUseRating={teacherStudentUseRating}
                     setTeacherStudentUseRating={setTeacherStudentUseRating}
+                    ratingRecommend={ratingRecommend}
+                    setRatingRecommend={setRatingRecommend}
                     kanjiMapLoading={kanjiMapLoading}
                     kanjiMapError={kanjiMapError}
                     kanjiMapQueue={kanjiMapQueue}
@@ -4830,6 +4861,8 @@ export default function BookHubPage() {
                     editingReadingSessionId={editingReadingSessionId}
                     startEditingReadingSession={startEditingReadingSession}
                     cancelEditingReadingSession={cancelEditingReadingSession}
+                    canFillBeginningPages={canFillBeginningPages}
+                    fillBeginningPages={fillBeginningPages}
                     readingSessions={readingSessions}
                     visibleReadingSessions={visibleReadingSessions}
                     showAllSessions={showAllSessions}
@@ -4932,8 +4965,6 @@ export default function BookHubPage() {
                     setMyReview={setMyReview}
                     ratingOverall={ratingOverall}
                     setRatingOverall={setRatingOverall}
-                    ratingRecommend={ratingRecommend}
-                    setRatingRecommend={setRatingRecommend}
                     favoriteQuotes={favoriteQuotes}
                     setFavoriteQuotes={setFavoriteQuotes}
                     memorableWords={memorableWords}

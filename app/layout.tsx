@@ -1,3 +1,6 @@
+// Root Layout
+//
+
 import type { Metadata } from "next";
 import AppHeaderGate from "@/components/AppHeaderGate";
 import SupportProjectFooterGate from "@/components/SupportProjectFooterGate";

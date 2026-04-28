@@ -1,3 +1,6 @@
+// App Access Gate
+//
+
 "use client";
 
 import { useEffect, useState } from "react";

@@ -8,7 +8,6 @@ import { useState, type ComponentType } from "react";
 type UserBook = {
   my_review: string | null;
   rating_overall: number | null;
-  rating_recommend: number | null;
   rating_difficulty: number | null;
   reader_level: string | null;
   favorite_quotes?: string | null;
@@ -26,9 +25,6 @@ type RatingTabProps = {
 
   ratingOverall: string;
   setRatingOverall: (value: string) => void;
-
-  ratingRecommend: string;
-  setRatingRecommend: (value: string) => void;
 
   favoriteQuotes: string;
   setFavoriteQuotes: (value: string) => void;
@@ -104,8 +100,6 @@ export default function RatingTab({
   setMyReview,
   ratingOverall,
   setRatingOverall,
-  ratingRecommend,
-  setRatingRecommend,
   favoriteQuotes,
   setFavoriteQuotes,
   memorableWords,
@@ -123,7 +117,6 @@ export default function RatingTab({
 
   function cancelRatings() {
     setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
-    setRatingRecommend(row.rating_recommend != null ? String(row.rating_recommend) : "");
     setEditingRatings(false);
   }
 
@@ -184,7 +177,7 @@ export default function RatingTab({
           saving={saving}
         />
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3">
           <StarRatingField
             label="Entertainment Rating"
             value={row.rating_overall}
@@ -197,21 +190,6 @@ export default function RatingTab({
               3: "Good solid book.",
               2: "Not bad, but I would have liked to read something else.",
               1: "Didn’t like it.",
-            }}
-          />
-
-          <StarRatingField
-            label="Language Learning Potential"
-            value={row.rating_recommend}
-            editing={editingRatings}
-            inputValue={ratingRecommend}
-            setInputValue={setRatingRecommend}
-            descriptions={{
-              5: "This is a learner’s dream come true!",
-              4: "Has a lot of good material in there.",
-              3: "You can learn some stuff, but nothing special.",
-              2: "Not so much useful language material.",
-              1: "I didn’t get anything out of it.",
             }}
           />
         </div>

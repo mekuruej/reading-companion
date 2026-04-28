@@ -1,3 +1,6 @@
+// Support Project Footer Gate
+//
+
 "use client";
 
 import Link from "next/link";

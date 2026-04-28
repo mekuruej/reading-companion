@@ -1,3 +1,6 @@
+// Kanji Radicals
+//
+
 export type KanjiRadicalInfo = {
   radical: string;
   name: string;

@@ -1,3 +1,6 @@
+// App Header Gate
+//
+
 "use client";
 
 import { usePathname } from "next/navigation";

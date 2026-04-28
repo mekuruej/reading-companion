@@ -24,6 +24,7 @@ type UserBook = {
   notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
+  rating_recommend: number | null;
 };
 
 type Book = {
@@ -66,11 +67,14 @@ type TeacherTabProps = {
   saveNotes: () => Promise<boolean>;
   saveRecommendedLevel: () => Promise<void>;
   saveTeacherStudentUseRating: () => Promise<void>;
+  saveLanguageLearningPotential: () => Promise<void>;
 
   recommendedLevel: string;
   setRecommendedLevel: (value: string) => void;
   teacherStudentUseRating: string;
   setTeacherStudentUseRating: (value: string) => void;
+  ratingRecommend: string;
+  setRatingRecommend: (value: string) => void;
 
   kanjiMapLoading: boolean;
   kanjiMapError: string | null;
@@ -103,10 +107,13 @@ export default function TeacherTab({
   saveNotes,
   saveRecommendedLevel,
   saveTeacherStudentUseRating,
+  saveLanguageLearningPotential,
   recommendedLevel,
   setRecommendedLevel,
   teacherStudentUseRating,
   setTeacherStudentUseRating,
+  ratingRecommend,
+  setRatingRecommend,
   kanjiMapLoading,
   kanjiMapError,
   kanjiMapQueue,
@@ -124,6 +131,7 @@ export default function TeacherTab({
   const KANJI_OPEN_BATCH_SIZE = 50;
   const [isEditingLevelGuidance, setIsEditingLevelGuidance] = useState(false);
   const [isEditingStudentUse, setIsEditingStudentUse] = useState(false);
+  const [isEditingLanguagePotential, setIsEditingLanguagePotential] = useState(false);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [notesSaveMessage, setNotesSaveMessage] = useState("");
   const [isPreparingAllKanjiWords, setIsPreparingAllKanjiWords] = useState(false);
@@ -247,6 +255,64 @@ export default function TeacherTab({
     if (value === 2) return "Probably not.";
     if (value === 1) return "No. I would not use this with students.";
     return "Rate whether this feels like a book you would actually want to use with students.";
+  }
+
+  function LanguageLearningRatingField() {
+    const descriptions: Record<number, string> = {
+      5: "This is a learner's dream come true.",
+      4: "Has a lot of good material in there.",
+      3: "You can learn some stuff, but nothing special.",
+      2: "Not so much useful language material.",
+      1: "I didn't get anything out of it.",
+    };
+    const selected = ratingRecommend ? Number(ratingRecommend) : null;
+
+    return (
+      <div className="rounded border bg-white p-3 text-sm">
+        <div className="text-stone-600">Language Learning Potential</div>
+
+        {!isEditingLanguagePotential ? (
+          <>
+            <div className="mt-1 font-medium">
+              {row.rating_recommend ? `${row.rating_recommend}/5` : "—"}
+            </div>
+            <div className="text-amber-600">{stars5(row.rating_recommend)}</div>
+            <div className="mt-1 text-xs text-stone-500">
+              {row.rating_recommend ? descriptions[row.rating_recommend] : "—"}
+            </div>
+          </>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {[5, 4, 3, 2, 1].map((n) => {
+              const isSelected = selected === n;
+
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRatingRecommend(String(n))}
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
+                    ? "border-amber-500 bg-amber-50 shadow-sm"
+                    : "border-stone-200 bg-white hover:bg-stone-50"
+                    }`}
+                >
+                  <div className="font-medium text-amber-600">{stars5(n)}</div>
+                  <div className="mt-1 text-xs text-stone-600">{descriptions[n]}</div>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setRatingRecommend("")}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-left transition hover:bg-stone-50"
+            >
+              <div className="text-xs text-stone-600">Clear</div>
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   function suitableLevelInfo(value: string | null | undefined) {
@@ -425,6 +491,40 @@ export default function TeacherTab({
             </button>
           </div>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-stone-900">Language Learning Potential</div>
+            <div className="mt-1 text-xs text-stone-500">
+              Use this for the material inside the book: vocabulary, grammar, patterns, and discussion value.
+            </div>
+          </div>
+
+          {!isEditingLanguagePotential ? (
+            <button
+              type="button"
+              onClick={() => setIsEditingLanguagePotential(true)}
+              className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-black"
+            >
+              Edit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={async () => {
+                await saveLanguageLearningPotential();
+                setIsEditingLanguagePotential(false);
+              }}
+              className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-black"
+            >
+              Save
+            </button>
+          )}
+        </div>
+
+        <LanguageLearningRatingField />
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-white p-4">
