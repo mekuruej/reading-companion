@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { recordStudyEvent } from "@/lib/studyEvents";
 
 type StudySet =
   | "READING"
@@ -939,7 +940,21 @@ export default function BookFlashcardsPage() {
   async function logStudyEvent(result: "revealed" | "correct" | "wrong") {
     if (!card || !meId) return;
 
-    await supabase.from("study_logs").insert([
+    const unifiedResult =
+      result === "correct"
+        ? "correct"
+        : result === "wrong"
+          ? "incorrect"
+          : "reviewed";
+
+    const isCorrect =
+      result === "correct"
+        ? true
+        : result === "wrong"
+          ? false
+          : null;
+
+    const { error: oldLogError } = await supabase.from("study_logs").insert([
       {
         user_id: meId,
         user_book_id: userBookId,
@@ -949,6 +964,26 @@ export default function BookFlashcardsPage() {
         result,
       },
     ]);
+
+    if (oldLogError) {
+      console.error("Error writing old study log:", oldLogError);
+    }
+
+    const newLogResult = await recordStudyEvent({
+      userBookId,
+      userBookWordId: card.id,
+      studyMode: "study_flashcards",
+      cardType: studySet,
+      result: unifiedResult,
+      isCorrect,
+      surface: card.word ?? null,
+      reading: card.reading ?? null,
+      meaning: card.meaning ?? null,
+    });
+
+    if (!newLogResult.ok) {
+      console.error("Error writing unified study event:", newLogResult.error);
+    }
   }
 
   async function goToNextWord(result: "revealed" | "correct" | "wrong" = "revealed") {
@@ -1884,7 +1919,7 @@ export default function BookFlashcardsPage() {
                 </div>
               ) : null}
             </>
-            
+
           ) : card ? (
             <>
               <Row label="Word" value={card.word} visible={showWord} big placeholder="---" />

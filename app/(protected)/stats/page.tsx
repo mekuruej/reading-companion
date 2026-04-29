@@ -91,6 +91,21 @@ type GenreRow = {
   genre: string | null;
 };
 
+type StudyEventRow = {
+  id: string;
+  user_id: string;
+  user_book_id: string | null;
+  user_book_word_id: string | null;
+  study_mode: string | null;
+  card_type: string | null;
+  result: "reviewed" | "correct" | "incorrect" | "skipped" | string;
+  is_correct: boolean | null;
+  surface: string | null;
+  reading: string | null;
+  meaning: string | null;
+  created_at: string;
+};
+
 type BookMetric = {
   userBookId: string;
   title: string;
@@ -1042,6 +1057,34 @@ async function fetchAllUserBookWords(userBookIds: string[]) {
   return allRows;
 }
 
+async function fetchAllStudyEvents(userId: string) {
+  const pageSize = 1000;
+  let from = 0;
+  let allRows: StudyEventRow[] = [];
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("user_study_events")
+      .select(
+        "id, user_id, user_book_id, user_book_word_id, study_mode, card_type, result, is_correct, surface, reading, meaning, created_at"
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = (data ?? []) as StudyEventRow[];
+    allRows = [...allRows, ...rows];
+
+    if (rows.length < pageSize) break;
+
+    from += pageSize;
+  }
+
+  return allRows;
+}
+
 function SpotlightCard({
   label,
   value,
@@ -1076,6 +1119,7 @@ export default function StatsPage() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [words, setWords] = useState<WordRow[]>([]);
   const [genres, setGenres] = useState<GenreRow[]>([]);
+  const [studyEvents, setStudyEvents] = useState<StudyEventRow[]>([]);
 
   async function loadStats() {
     setLoading(true);
@@ -1096,6 +1140,7 @@ export default function StatsPage() {
         setSessions([]);
         setWords([]);
         setGenres([]);
+        setStudyEvents([]);
         return;
       }
 
@@ -1159,6 +1204,7 @@ export default function StatsPage() {
         setSessions([]);
         setWords([]);
         setGenres([]);
+        setStudyEvents([]);
         return;
       }
 
@@ -1169,6 +1215,7 @@ export default function StatsPage() {
       const [
         { data: sessionData, error: sessionErr },
         wordData,
+        studyEventData,
         genreResult,
       ] =
         await Promise.all([
@@ -1177,6 +1224,7 @@ export default function StatsPage() {
             .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler")
             .in("user_book_id", userBookIds),
           fetchAllUserBookWords(userBookIds),
+          fetchAllStudyEvents(user.id),
           bookIds.length > 0
             ? supabase.from("book_genres").select("book_id, genre").in("book_id", bookIds)
             : Promise.resolve({ data: [], error: null }),
@@ -1190,6 +1238,7 @@ export default function StatsPage() {
       );
       setWords((wordData ?? []) as WordRow[]);
       setGenres((genreResult.data ?? []) as GenreRow[]);
+      setStudyEvents((studyEventData ?? []) as StudyEventRow[]);
     } catch (e: any) {
       setErrorMsg(e?.message ?? "Failed to load stats");
     } finally {
@@ -1229,6 +1278,10 @@ export default function StatsPage() {
   const filteredWords = useMemo(() => {
     return words.filter((row) => inRangeByDateString(row.created_at, cutoff));
   }, [words, cutoff]);
+
+  const filteredStudyEvents = useMemo(() => {
+    return studyEvents.filter((row) => inRangeByDateString(row.created_at, cutoff));
+  }, [studyEvents, cutoff]);
 
   const engagementDays = useMemo(() => {
     const days = new Set<string>();
@@ -1511,6 +1564,180 @@ export default function StatsPage() {
       ).size,
     };
   }, [vocabularyBookMetrics, vocabularyWords]);
+
+  const studyEventsForSelectedBookCategory = useMemo(() => {
+    if (abilityBookType === "all") return filteredStudyEvents;
+
+    const bookTypeByUserBookId = new Map(
+      rows.map((row) => [row.id, row.books?.book_type ?? null])
+    );
+
+    return filteredStudyEvents.filter((event) => {
+      if (!event.user_book_id) return false;
+
+      const bookType = bookTypeByUserBookId.get(event.user_book_id) ?? null;
+      return abilityReadingGroupForBookType(bookType) === abilityBookType;
+    });
+  }, [abilityBookType, filteredStudyEvents, rows]);
+
+  const studySignals = useMemo(() => {
+    const studyDays = new Set<string>();
+    const studiedBooks = new Set<string>();
+    const studiedCards = new Set<string>();
+    const studiedWords = new Set<string>();
+
+    const byBook = new Map<
+      string,
+      {
+        title: string;
+        total: number;
+        vocab: number;
+        kanji: number;
+        correct: number;
+        incorrect: number;
+        shown: number;
+        lastStudiedAt: number;
+      }
+    >();
+
+    const bookTitleByUserBookId = new Map(
+      rows.map((row) => [row.id, row.books?.title ?? "Untitled"])
+    );
+
+    let correct = 0;
+    let incorrect = 0;
+    let reviewed = 0;
+    let skipped = 0;
+
+    for (const event of studyEventsForSelectedBookCategory) {
+      studyDays.add(ymdLocal(new Date(event.created_at)));
+
+      if (event.user_book_id) {
+        studiedBooks.add(event.user_book_id);
+
+        const title = bookTitleByUserBookId.get(event.user_book_id) ?? "Untitled";
+        const eventTime = new Date(event.created_at).getTime();
+
+        const bookStats =
+          byBook.get(event.user_book_id) ?? {
+            title,
+            total: 0,
+            vocab: 0,
+            kanji: 0,
+            correct: 0,
+            incorrect: 0,
+            shown: 0,
+            lastStudiedAt: 0,
+          };
+
+        bookStats.total += 1;
+
+        if (event.study_mode === "kanji_reading_flashcards") {
+          bookStats.kanji += 1;
+        } else {
+          bookStats.vocab += 1;
+        }
+
+        if (event.result === "correct" || event.is_correct === true) {
+          bookStats.correct += 1;
+        } else if (event.result === "incorrect" || event.is_correct === false) {
+          bookStats.incorrect += 1;
+        } else {
+          bookStats.shown += 1;
+        }
+
+        if (Number.isFinite(eventTime)) {
+          bookStats.lastStudiedAt = Math.max(bookStats.lastStudiedAt, eventTime);
+        }
+
+        byBook.set(event.user_book_id, bookStats);
+      }
+
+      const studyItemKey =
+        event.user_book_word_id ??
+        `${event.study_mode ?? "study"}|||${event.user_book_id ?? ""}|||${event.surface ?? ""}|||${event.reading ?? ""}|||${event.meaning ?? ""}`;
+
+      if (studyItemKey.trim()) {
+        studiedCards.add(studyItemKey);
+      }
+
+      const wordStudyKey =
+        event.user_book_word_id ??
+        `${event.surface ?? ""}|||${event.reading ?? ""}|||${event.meaning ?? ""}`;
+
+      if (wordStudyKey.trim()) {
+        studiedWords.add(wordStudyKey);
+      }
+
+      if (event.result === "correct" || event.is_correct === true) {
+        correct += 1;
+      } else if (event.result === "incorrect" || event.is_correct === false) {
+        incorrect += 1;
+      } else if (event.result === "skipped") {
+        skipped += 1;
+      } else {
+        reviewed += 1;
+      }
+    }
+
+    const answered = correct + incorrect;
+    const accuracyPercent = answered > 0 ? Math.round((correct / answered) * 100) : null;
+
+    const recentBookAnswerItems = Array.from(byBook.values())
+      .sort((a, b) => b.lastStudiedAt - a.lastStudiedAt)
+      .slice(0, 5)
+      .map((item) => {
+        const answered = item.correct + item.incorrect;
+
+        const studyTypeLabel =
+          item.vocab > 0 && item.kanji > 0
+            ? "Mixed"
+            : item.kanji > 0
+              ? "Kanji"
+              : item.vocab > 0
+                ? "Vocab"
+                : "—";
+
+        const studyTypeDetail =
+          item.vocab > 0 && item.kanji > 0
+            ? `Vocab ${item.vocab} · Kanji ${item.kanji}`
+            : item.kanji > 0
+              ? `${item.kanji} card${item.kanji === 1 ? "" : "s"}`
+              : item.vocab > 0
+                ? `${item.vocab} card${item.vocab === 1 ? "" : "s"}`
+                : null;
+
+        return {
+          ...item,
+          studyTypeLabel,
+          studyTypeDetail,
+          accuracyPercent:
+            answered > 0 ? Math.round((item.correct / answered) * 100) : null,
+        };
+      });
+
+    const answerMixItems = [
+      { label: "Correct", value: correct },
+      { label: "Still sticky", value: incorrect },
+      { label: "Reviewed", value: reviewed },
+      { label: "Skipped", value: skipped },
+    ].filter((item) => item.value > 0);
+
+    return {
+      totalEvents: studyEventsForSelectedBookCategory.length,
+      studyDays: studyDays.size,
+      studiedBooks: studiedBooks.size,
+      studiedCards: studiedCards.size,
+      studiedWords: studiedWords.size,
+      correct,
+      incorrect,
+      reviewed,
+      skipped,
+      accuracyPercent,
+      recentBookAnswerItems,
+      answerMixItems,
+    };
+  }, [rows, studyEventsForSelectedBookCategory]);
 
   const vocabularySavedWordRhythmActivity = useMemo(() => {
     const today = startOfToday();
@@ -3124,25 +3351,127 @@ export default function StatsPage() {
             </SectionBand>
 
             <SectionBand
-              eyebrow="Later"
-              title="Language study signals"
-              description="This could become a wider language-study or linguistics tab if grammar, collocations, kanji, and flashcard habits grow."
+              eyebrow="Study Signals"
+              title="Saved words in study"
+              description="A bridge between words you saved while reading and words you came back to in flashcards. This combines study activity without separating every flashcard mode."
               tone={filteredSectionTone}
             >
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                  <div className="font-medium text-slate-900">Vocabulary relationship</div>
-                  <div className="mt-2">
-                    Show recurring saved words across books, revisits, and words that move into known territory.
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                  <div className="text-xs text-slate-500">Study days</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {studySignals.studyDays}
                   </div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                  <div className="font-medium text-slate-900">Kanji reading pressure</div>
-                  <div className="mt-2">
-                    Track kanji enrichment, hidden-kanji support, and words known in vocab but still shaky in reading.
+
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                  <div className="text-xs text-slate-500">Cards reviewed</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {studySignals.totalEvents}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                  <div className="text-xs text-slate-500">Unique study items</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {studySignals.studiedCards}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                  <div className="text-xs text-slate-500">Books represented</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {studySignals.studiedBooks}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                  <div className="text-xs text-slate-500">Accuracy</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {studySignals.accuracyPercent == null
+                      ? "—"
+                      : `${studySignals.accuracyPercent}%`}
                   </div>
                 </div>
               </div>
+
+              {studySignals.totalEvents > 0 ? (
+                <div className="mt-5">
+                  <div className="rounded-xl border border-slate-200 bg-white/70 p-4">
+                    <div className="mb-3 text-sm font-semibold text-slate-900">
+                      Recent study by book
+                    </div>
+
+                    {studySignals.recentBookAnswerItems.length > 0 ? (
+                      <div className="space-y-3">
+                        {studySignals.recentBookAnswerItems.map((book) => (
+                          <div
+                            key={book.title}
+                            className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-slate-900">
+                                  {book.title}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {book.total} card{book.total === 1 ? "" : "s"} studied
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 text-right">
+                                <div className="text-sm font-semibold text-slate-900">
+                                  {book.accuracyPercent == null
+                                    ? "—"
+                                    : `${book.accuracyPercent}%`}
+                                </div>
+                                <div className="text-xs text-slate-500">accuracy</div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                              <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                                <div className="text-[11px] text-emerald-700">Correct</div>
+                                <div className="mt-1 text-sm font-semibold text-slate-900">
+                                  {book.correct}
+                                </div>
+                              </div>
+
+                              <div className="rounded-lg bg-rose-50 px-3 py-2">
+                                <div className="text-[11px] text-rose-700">Still sticky</div>
+                                <div className="mt-1 text-sm font-semibold text-slate-900">
+                                  {book.incorrect}
+                                </div>
+                              </div>
+
+                              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="text-[11px] text-slate-500">Study type</div>
+                                <div className="mt-1 text-sm font-semibold text-slate-900">
+                                  {book.studyTypeLabel}
+                                </div>
+                                {book.studyTypeDetail ? (
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {book.studyTypeDetail}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-500">
+                        Study events are being recorded, but no book connection was found yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-white/60 p-4 text-sm leading-6 text-slate-500">
+                  No study activity in this window yet. Review a few flashcards and this
+                  section will start connecting saved words back to study.
+                </div>
+              )}
             </SectionBand>
             <SectionBand
               eyebrow="Vocabulary Friction"

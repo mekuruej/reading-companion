@@ -16,7 +16,7 @@ type ProfileShellProps = {
 
 const PROFILE_NAV = [
   { href: "/profile", label: "Profile Home" },
-  { href: "/stats-coming-soon", label: "Stats" },
+  { href: "/stats", label: "Stats" },
   { href: "/profile/social", label: "Community" },
   { href: "/reading-groups", label: "Book Clubs" },
 ] as const;

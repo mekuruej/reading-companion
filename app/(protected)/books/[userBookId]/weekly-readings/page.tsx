@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { recordStudyEvent } from "@/lib/studyEvents";
 
 type UserBookWordRow = {
   id: string;
@@ -586,16 +587,54 @@ export default function WeeklyReadingsPage() {
     setCardsSinceLastRecall(0);
   }
 
+  function recordKanjiReadingStudyEvent({
+    result,
+    isCorrect,
+    cardType,
+  }: {
+    result: "reviewed" | "correct" | "incorrect" | "skipped";
+    isCorrect: boolean | null;
+    cardType: string;
+  }) {
+    if (!card) return;
+
+    void recordStudyEvent({
+      userBookId,
+      userBookWordId:
+        (card as any).user_book_word_id ??
+        (card as any).userBookWordId ??
+        null,
+      studyMode: "kanji_reading_flashcards",
+      cardType,
+      result,
+      isCorrect,
+      surface:
+        (card as any).sourceWord ??
+        (card as any).word ??
+        (card as any).surface ??
+        null,
+      reading: card.reading ?? null,
+      meaning: null,
+    });
+  }
+
   function checkAnswer(choice: string) {
     if (!card || checked) return;
 
     const displayedCorrect = formatReadingForType(card.reading, card.readingType);
     const ok = normalizeReading(choice) === normalizeReading(displayedCorrect);
+
     setSelected(choice);
     setChecked({ ok, correct: displayedCorrect });
     setGuessInput("");
     setRecallRevealed(false);
     setRecallResult(null);
+
+    recordKanjiReadingStudyEvent({
+      result: ok ? "correct" : "incorrect",
+      isCorrect: ok,
+      cardType: "kanji_reading_choice",
+    });
   }
 
   function revealRecallCard(mode: Exclude<RecallResult, null>) {
@@ -609,6 +648,22 @@ export default function WeeklyReadingsPage() {
     setRecallResult(mode);
     setRecallRevealed(true);
     setCardsSinceLastRecall(0);
+
+    recordKanjiReadingStudyEvent({
+      result:
+        mode === "correct"
+          ? "correct"
+          : mode === "wrong"
+            ? "incorrect"
+            : "reviewed",
+      isCorrect:
+        mode === "correct"
+          ? true
+          : mode === "wrong"
+            ? false
+            : null,
+      cardType: "kanji_reading_recall",
+    });
   }
 
   function submitGuess() {
@@ -919,9 +974,8 @@ export default function WeeklyReadingsPage() {
       ) : null}
 
       <div
-        className={`relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl ${
-          card.flaggedForReview ? "border-red-400 bg-red-50/30" : "border-slate-500"
-        }`}
+        className={`relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl ${card.flaggedForReview ? "border-red-400 bg-red-50/30" : "border-slate-500"
+          }`}
         onClick={() => {
           if (!checked && !inRecallFlow) return;
           if (inRecallFlow) return;
@@ -936,11 +990,10 @@ export default function WeeklyReadingsPage() {
 
         {card.readingType ? (
           <div
-            className={`absolute z-10 rounded-full px-3 py-1.5 text-sm font-medium ${
-              card.flaggedForReview
-                ? "left-4 top-14 bg-slate-100 text-slate-600"
-                : "left-4 top-3 bg-slate-100 text-slate-600"
-            }`}
+            className={`absolute z-10 rounded-full px-3 py-1.5 text-sm font-medium ${card.flaggedForReview
+              ? "left-4 top-14 bg-slate-100 text-slate-600"
+              : "left-4 top-3 bg-slate-100 text-slate-600"
+              }`}
           >
             {readingTypeLabel(card.readingType)}
           </div>
@@ -967,7 +1020,7 @@ export default function WeeklyReadingsPage() {
               {card.kanji}
               {(card.readingType === "other" ||
                 (card.readingType === "kunyomi" && isKunWithOkurigana(card.sourceWord))) &&
-              card.sourceWord ? (
+                card.sourceWord ? (
                 <span className="ml-1 font-medium text-slate-300">
                   {getTrailingReadingHint(card.sourceWord, card.kanji)}
                 </span>
@@ -1028,9 +1081,9 @@ export default function WeeklyReadingsPage() {
                 <>
                   <p className="text-green-700">✅ Correct!</p>
                   {card.readingType === "kunyomi" &&
-                  isKunWithOkurigana(card.sourceWord) &&
-                  card.baseReading &&
-                  normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
+                    isKunWithOkurigana(card.sourceWord) &&
+                    card.baseReading &&
+                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
                     <p className="mt-1 text-gray-600">Base reading: {card.baseReading}</p>
                   ) : null}
                 </>
@@ -1039,9 +1092,9 @@ export default function WeeklyReadingsPage() {
                   <p className="text-red-700">❌ Not quite.</p>
                   <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
                   {card.readingType === "kunyomi" &&
-                  isKunWithOkurigana(card.sourceWord) &&
-                  card.baseReading &&
-                  normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
+                    isKunWithOkurigana(card.sourceWord) &&
+                    card.baseReading &&
+                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
                     <p className="mt-1 text-gray-600">Base reading: {card.baseReading}</p>
                   ) : null}
                 </>

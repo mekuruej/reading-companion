@@ -99,7 +99,10 @@ export default function Header() {
     pathname === "/study-coming-soon" ||
     pathname === "/book-flashcards" ||
     pathname === "/book-kanji-readings";
-  const profileSectionActive = pathname === "/profile" || pathname.startsWith("/profile/");
+  const profileSectionActive =
+    pathname === "/profile" ||
+    pathname.startsWith("/profile/") ||
+    pathname === "/stats";
 
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
@@ -129,11 +132,10 @@ export default function Header() {
                   setShowDiscoveryMenu(false);
                   setShowStudyMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${
-                  librarySectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                }`}
+                className={`rounded-full border px-3 py-1.5 transition ${librarySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
               >
                 Library
               </button>
@@ -142,11 +144,10 @@ export default function Header() {
                 <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
                   <Link
                     href={libraryHref}
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
                     Library Home
@@ -154,11 +155,10 @@ export default function Header() {
 
                   <Link
                     href="/book-hubs"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/book-hubs"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/book-hubs"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
                     Book Hubs
@@ -166,11 +166,10 @@ export default function Header() {
 
                   <Link
                     href="/vocab"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/vocab"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/vocab"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
                     Vocab Lists
@@ -187,11 +186,10 @@ export default function Header() {
                   setShowLibraryMenu(false);
                   setShowStudyMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${
-                  discoverySectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                }`}
+                className={`rounded-full border px-3 py-1.5 transition ${discoverySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
               >
                 Discovery
               </button>
@@ -200,11 +198,10 @@ export default function Header() {
                 <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
                   <Link
                     href="/vocab/dictionary"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/vocab/dictionary"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/vocab/dictionary"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowDiscoveryMenu(false)}
                   >
                     Dictionary
@@ -212,11 +209,10 @@ export default function Header() {
 
                   <Link
                     href="/vocab/history"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname.startsWith("/vocab/history")
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname.startsWith("/vocab/history")
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowDiscoveryMenu(false)}
                   >
                     Word History
@@ -234,11 +230,10 @@ export default function Header() {
                   setShowDiscoveryMenu(false);
                   setShowProfileMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${
-                  studySectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                }`}
+                className={`rounded-full border px-3 py-1.5 transition ${studySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
               >
                 Study
               </button>
@@ -247,11 +242,10 @@ export default function Header() {
                 <div className="absolute right-0 z-50 mt-2 min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
                   <Link
                     href="/study-coming-soon"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/study-coming-soon"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/study-coming-soon"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
                     Library Study (Coming Soon)
@@ -259,11 +253,10 @@ export default function Header() {
 
                   <Link
                     href="/book-flashcards"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/book-flashcards"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/book-flashcards"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
                     Book Flashcards
@@ -271,11 +264,10 @@ export default function Header() {
 
                   <Link
                     href="/book-kanji-readings"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/book-kanji-readings"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/book-kanji-readings"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
                     Book Kanji Readings
@@ -293,11 +285,10 @@ export default function Header() {
                   setShowDiscoveryMenu(false);
                   setShowStudyMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${
-                  profileSectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                }`}
+                className={`rounded-full border px-3 py-1.5 transition ${profileSectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
               >
                 Profile
               </button>
@@ -306,23 +297,21 @@ export default function Header() {
                 <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
                   <Link
                     href="/profile"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/profile"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/profile"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
                     Profile Home
                   </Link>
 
                   <Link
-                    href="/stats-coming-soon"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/stats-coming-soon"
+                    href="/stats"
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/stats"
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                      }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
                     Stats
@@ -330,11 +319,10 @@ export default function Header() {
 
                   <Link
                     href="/profile/social"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/profile/social"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/profile/social"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
                     Community
@@ -342,11 +330,10 @@ export default function Header() {
 
                   <Link
                     href="/profile/book-clubs-coming-soon"
-                    className={`block rounded-xl px-3 py-2 text-sm transition ${
-                      pathname === "/profile/book-clubs-coming-soon"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                    }`}
+                    className={`block rounded-xl px-3 py-2 text-sm transition ${pathname === "/profile/book-clubs-coming-soon"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
                     Book Clubs
