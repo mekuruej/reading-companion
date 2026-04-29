@@ -416,31 +416,67 @@ function timeRangeTheme(value: DateRange) {
   };
 }
 
-function readingLaneTheme(value: AbilityReadingFilter) {
+function readingLaneButtonTheme(value: AbilityReadingFilter) {
   if (value === "image_supported") {
     return {
-      background: "bg-emerald-50/25",
-      statBackground: "bg-emerald-50/35",
+      active: "border-emerald-600 bg-emerald-600 text-white shadow-md",
+      inactive:
+        "border-emerald-200 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100",
+      inactiveDescription: "text-emerald-700/80",
     };
   }
 
   if (value === "bridge_books") {
     return {
-      background: "bg-violet-50/25",
-      statBackground: "bg-violet-50/35",
+      active: "border-violet-600 bg-violet-600 text-white shadow-md",
+      inactive:
+        "border-violet-200 bg-violet-50/80 text-violet-800 hover:bg-violet-100",
+      inactiveDescription: "text-violet-700/80",
     };
   }
 
   if (value === "text_dense") {
     return {
-      background: "bg-amber-50/25",
-      statBackground: "bg-amber-50/35",
+      active: "border-amber-600 bg-amber-500 text-white shadow-md",
+      inactive:
+        "border-amber-200 bg-amber-50/90 text-amber-900 hover:bg-amber-100",
+      inactiveDescription: "text-amber-800/80",
     };
   }
 
   return {
-    background: "bg-sky-50/20",
-    statBackground: "bg-sky-50/30",
+    active: "border-sky-600 bg-sky-600 text-white shadow-md",
+    inactive:
+      "border-sky-200 bg-sky-50/80 text-sky-800 hover:bg-sky-100",
+    inactiveDescription: "text-sky-700/80",
+  };
+}
+
+function readingLaneTheme(value: AbilityReadingFilter) {
+  if (value === "image_supported") {
+    return {
+      background: "bg-emerald-50/70",
+      statBackground: "bg-emerald-100/60",
+    };
+  }
+
+  if (value === "bridge_books") {
+    return {
+      background: "bg-violet-50/70",
+      statBackground: "bg-violet-100/60",
+    };
+  }
+
+  if (value === "text_dense") {
+    return {
+      background: "bg-amber-50/70",
+      statBackground: "bg-amber-100/60",
+    };
+  }
+
+  return {
+    background: "bg-sky-50/70",
+    statBackground: "bg-sky-100/60",
   };
 }
 
@@ -665,25 +701,28 @@ function ReadingLaneFilter({
       </div>
 
       <div className="grid gap-2 md:grid-cols-4">
-        {ABILITY_READING_GROUP_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={`rounded-xl border px-4 py-3 text-left transition ${value === option.value
-              ? "border-slate-900 bg-slate-900 text-white shadow-md"
-              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-              }`}
-          >
-            <div className="text-sm font-semibold">{option.label}</div>
-            <div
-              className={`mt-1 text-xs leading-5 ${value === option.value ? "text-slate-200" : "text-slate-500"
+        {ABILITY_READING_GROUP_OPTIONS.map((option) => {
+          const optionTheme = readingLaneButtonTheme(option.value);
+          const selected = value === option.value;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={`rounded-xl border px-4 py-3 text-left transition ${selected ? optionTheme.active : optionTheme.inactive
                 }`}
             >
-              {option.description}
-            </div>
-          </button>
-        ))}
+              <div className="text-sm font-semibold">{option.label}</div>
+              <div
+                className={`mt-1 text-xs leading-5 ${selected ? "text-white/80" : optionTheme.inactiveDescription
+                  }`}
+              >
+                {option.description}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -872,15 +911,15 @@ function TrendChart({
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
       <div className="grid gap-3 p-2 sm:grid-cols-3">
-        <div className="rounded-xl bg-slate-50 px-4 py-3">
+        <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
           <div className="text-xs text-slate-500">Active {bucketLabel.toLowerCase()}s</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">{activeBuckets.length}</div>
         </div>
-        <div className="rounded-xl bg-slate-50 px-4 py-3">
+        <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
           <div className="text-xs text-slate-500">Books in Motion</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">{totalBooks}</div>
         </div>
-        <div className="rounded-xl bg-slate-50 px-4 py-3">
+        <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
           <div className="text-xs text-slate-500">Pages in range</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">{totalPages}</div>
         </div>
@@ -2600,7 +2639,7 @@ export default function StatsPage() {
           ) : null}
         </section>
 
-        <section className={`sticky top-36 z-40 rounded-2xl border-2 ${rangeTheme.border} bg-white/95 p-3 shadow-lg ring-1 ring-slate-900/5 backdrop-blur`}>
+        <section className={`lg:sticky lg:top-36 z-30 rounded-2xl border-2 ${rangeTheme.border} bg-white/95 p-3 shadow-lg ring-1 ring-slate-900/5 backdrop-blur`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -2708,19 +2747,19 @@ export default function StatsPage() {
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
                   <div className="text-xs text-slate-500">Reading pages</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {totals.pagesRead}
                   </div>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
                   <div className="text-xs text-slate-500">Reading time</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {formatMinutesAsReadableTime(totals.readingMinutes)}
                   </div>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
                   <div className="text-xs text-slate-500">Listening time</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {formatMinutesAsReadableTime(totals.listeningMinutes)}
@@ -3049,19 +3088,19 @@ export default function StatsPage() {
                               </div>
 
                               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Min/page</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {formatDecimal(row.pushed.averageMinutesPerPage)}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Pages</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.pushed.pagesRead}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Days</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.pushed.engagementDays}
@@ -3108,19 +3147,19 @@ export default function StatsPage() {
                               </div>
 
                               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Min/page</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {formatDecimal(row.flowed.averageMinutesPerPage)}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Pages</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.flowed.pagesRead}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Days</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.flowed.engagementDays}
@@ -3357,35 +3396,35 @@ export default function StatsPage() {
               tone={filteredSectionTone}
             >
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
                   <div className="text-xs text-slate-500">Study days</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {studySignals.studyDays}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
                   <div className="text-xs text-slate-500">Cards reviewed</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {studySignals.totalEvents}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
                   <div className="text-xs text-slate-500">Unique study items</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {studySignals.studiedCards}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
                   <div className="text-xs text-slate-500">Books represented</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {studySignals.studiedBooks}
-                  </div>
+                  </div>ƒ√
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
                   <div className="text-xs text-slate-500">Accuracy</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {studySignals.accuracyPercent == null
@@ -3444,7 +3483,7 @@ export default function StatsPage() {
                                 </div>
                               </div>
 
-                              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                              <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                 <div className="text-[11px] text-slate-500">Study type</div>
                                 <div className="mt-1 text-sm font-semibold text-slate-900">
                                   {book.studyTypeLabel}
@@ -3525,19 +3564,19 @@ export default function StatsPage() {
                               </div>
 
                               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Words/page</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {formatRate(row.moreWords.wordsPerPage)}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Saved words</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.moreWords.wordsSaved}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Pages</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.moreWords.pagesRead}
@@ -3581,19 +3620,19 @@ export default function StatsPage() {
                               </div>
 
                               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Words/page</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {formatRate(row.fewerWords.wordsPerPage)}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Saved words</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.fewerWords.wordsSaved}
                                   </div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
                                   <div className="text-[11px] text-slate-500">Pages</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-900">
                                     {row.fewerWords.pagesRead}

@@ -105,7 +105,7 @@ export default function Header() {
     pathname === "/stats";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
+    <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
       <div className="mx-auto max-w-6xl px-4 py-3">
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div className="text-center md:text-left">
