@@ -83,6 +83,7 @@ type WordRow = {
   created_at: string;
   surface: string | null;
   meaning: string | null;
+  page_number: number | null;
 };
 
 type GenreRow = {
@@ -247,6 +248,11 @@ function formatDecimal(value: number | null, digits = 1) {
   return value.toFixed(digits);
 }
 
+function formatRate(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return value.toFixed(4);
+}
+
 function formatRangeLabel(range: DateRange) {
   if (range === "7d") return "Last 7 days";
   if (range === "30d") return "Last 30 days";
@@ -268,6 +274,28 @@ function bookTypeLabel(bookType: BookType) {
     .split("_")
     .map((piece) => piece.charAt(0).toUpperCase() + piece.slice(1))
     .join(" ");
+}
+
+const BOOK_TYPE_DISPLAY_ORDER: BookType[] = [
+  "picture_book",
+  "early_reader",
+  "manga",
+  "chapter_book",
+  "middle_grade",
+  "ya",
+  "novel",
+  "short_story",
+  "essay",
+  "memoir",
+  "nonfiction",
+  "textbook",
+  "other",
+  null,
+];
+
+function bookTypeSortIndex(bookType: BookType) {
+  const index = BOOK_TYPE_DISPLAY_ORDER.indexOf(bookType);
+  return index === -1 ? 999 : index;
 }
 
 const ABILITY_READING_GROUP_OPTIONS: {
@@ -326,6 +354,79 @@ function abilityReadingGroupLabel(value: AbilityReadingFilter | AbilityReadingGr
     ABILITY_READING_GROUP_OPTIONS.find((option) => option.value === value)?.label ??
     "Text-Dense"
   );
+}
+
+function timeRangeTheme(value: DateRange) {
+  if (value === "7d") {
+    return {
+      border: "border-emerald-400",
+      buttonActive: "border-emerald-600 bg-emerald-600 text-white shadow-sm",
+      buttonInactive: "border-emerald-200 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100",
+      label: "Last 7 days",
+    };
+  }
+
+  if (value === "30d") {
+    return {
+      border: "border-sky-400",
+      buttonActive: "border-sky-600 bg-sky-600 text-white shadow-sm",
+      buttonInactive: "border-sky-200 bg-sky-50/70 text-sky-800 hover:bg-sky-100",
+      label: "Last 30 days",
+    };
+  }
+
+  if (value === "90d") {
+    return {
+      border: "border-violet-400",
+      buttonActive: "border-violet-600 bg-violet-600 text-white shadow-sm",
+      buttonInactive: "border-violet-200 bg-violet-50/70 text-violet-800 hover:bg-violet-100",
+      label: "Last 90 days",
+    };
+  }
+
+  if (value === "1y") {
+    return {
+      border: "border-amber-400",
+      buttonActive: "border-amber-600 bg-amber-500 text-white shadow-sm",
+      buttonInactive: "border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100",
+      label: "Last year",
+    };
+  }
+
+  return {
+    border: "border-stone-400",
+    buttonActive: "border-stone-700 bg-stone-700 text-white shadow-sm",
+    buttonInactive: "border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100",
+    label: "All time",
+  };
+}
+
+function readingLaneTheme(value: AbilityReadingFilter) {
+  if (value === "image_supported") {
+    return {
+      background: "bg-emerald-50/25",
+      statBackground: "bg-emerald-50/35",
+    };
+  }
+
+  if (value === "bridge_books") {
+    return {
+      background: "bg-violet-50/25",
+      statBackground: "bg-violet-50/35",
+    };
+  }
+
+  if (value === "text_dense") {
+    return {
+      background: "bg-amber-50/25",
+      statBackground: "bg-amber-50/35",
+    };
+  }
+
+  return {
+    background: "bg-sky-50/20",
+    statBackground: "bg-sky-50/30",
+  };
 }
 
 function genreLabel(value: string | null | undefined) {
@@ -448,7 +549,7 @@ function statsTabLabel(tab: StatsTab) {
 
 function statsTabDescription(tab: StatsTab) {
   if (tab === "life") return "Effort, consistency, rhythm, and reading habits.";
-  if (tab === "skill") return "Difficulty and support, separated by book type.";
+  if (tab === "skill") return "Difficulty, pace, and support by reading lane.";
   if (tab === "library") return "Broad bookish stats like books, authors, types, and monthly reading.";
   if (tab === "vocabulary") return "Words, kanji, repeated lookups, and vocabulary relationships.";
   return "Lesson prep, guided reading support, and teacher/student reading signals.";
@@ -465,15 +566,17 @@ function inRangeByDateString(dateString: string | null, cutoff: Date | null) {
 }
 
 function paceScore(item: BookMetric) {
-  return (item.wordsPerPage ?? 0) * 2 + (item.averageMinutesPerPage ?? 0);
+  return item.averageMinutesPerPage;
 }
 
 function paceLabel(item: BookMetric) {
   const score = paceScore(item);
 
-  if (score <= 0.9) return "Flowing";
-  if (score <= 1.9) return "Steady";
-  if (score <= 3.2) return "Support-heavy";
+  if (score == null) return null;
+
+  if (score <= 2) return "Flowing";
+  if (score <= 5) return "Steady";
+  if (score <= 10) return "Support-heavy";
   return "Pushes back";
 }
 
@@ -482,14 +585,16 @@ function SectionBand({
   eyebrow,
   description,
   children,
+  tone = "border-slate-200 bg-white",
 }: {
   title: string;
   eyebrow?: string;
   description?: string;
   children: ReactNode;
+  tone?: string;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+    <section className={`rounded-2xl border-2 px-5 py-5 shadow-sm ${tone}`}>
       <div className="mb-4">
         {eyebrow ? <div className="text-[11px] font-semibold uppercase text-slate-500">{eyebrow}</div> : null}
         <h2 className="mt-1 text-xl font-semibold text-slate-900">{title}</h2>
@@ -512,10 +617,59 @@ function StatCard({
   tone: string;
 }) {
   return (
-    <div className={`rounded-2xl border p-4 ${tone}`}>
+    <div className={`rounded-2xl border-2 p-4 ${tone}`}>
       <div className="text-xs font-medium text-slate-600">{label}</div>
       <div className="mt-2 text-2xl font-semibold text-slate-900">{value}</div>
       {hint ? <div className="mt-2 text-xs text-slate-600">{hint}</div> : null}
+    </div>
+  );
+}
+
+function ReadingLaneFilter({
+  value,
+  onChange,
+}: {
+  value: AbilityReadingFilter;
+  onChange: (value: AbilityReadingFilter) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Book Category Filter
+          </div>
+          <div className="text-lg font-semibold text-slate-900">
+            Showing: {abilityReadingGroupLabel(value)}
+          </div>
+        </div>
+
+        <div className="text-xs text-slate-500">
+          These buttons change the stats and book examples below.
+        </div>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-4">
+        {ABILITY_READING_GROUP_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={`rounded-xl border px-4 py-3 text-left transition ${value === option.value
+              ? "border-slate-900 bg-slate-900 text-white shadow-md"
+              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
+              }`}
+          >
+            <div className="text-sm font-semibold">{option.label}</div>
+            <div
+              className={`mt-1 text-xs leading-5 ${value === option.value ? "text-slate-200" : "text-slate-500"
+                }`}
+            >
+              {option.description}
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -862,6 +1016,32 @@ function TrendChart({
   );
 }
 
+async function fetchAllUserBookWords(userBookIds: string[]) {
+  const pageSize = 1000;
+  let from = 0;
+  let allRows: WordRow[] = [];
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .select("user_book_id, created_at, surface, meaning, page_number")
+      .in("user_book_id", userBookIds)
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = (data ?? []) as WordRow[];
+    allRows = [...allRows, ...rows];
+
+    if (rows.length < pageSize) break;
+
+    from += pageSize;
+  }
+
+  return allRows;
+}
+
 function SpotlightCard({
   label,
   value,
@@ -988,7 +1168,7 @@ export default function StatsPage() {
 
       const [
         { data: sessionData, error: sessionErr },
-        { data: wordData, error: wordErr },
+        wordData,
         genreResult,
       ] =
         await Promise.all([
@@ -996,17 +1176,13 @@ export default function StatsPage() {
             .from("user_book_reading_sessions")
             .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler")
             .in("user_book_id", userBookIds),
-          supabase
-            .from("user_book_words")
-            .select("user_book_id, created_at, surface, meaning")
-            .in("user_book_id", userBookIds),
+          fetchAllUserBookWords(userBookIds),
           bookIds.length > 0
             ? supabase.from("book_genres").select("book_id, genre").in("book_id", bookIds)
             : Promise.resolve({ data: [], error: null }),
         ]);
 
       if (sessionErr) throw sessionErr;
-      if (wordErr) throw wordErr;
       if (genreResult.error) throw genreResult.error;
 
       setSessions(
@@ -1025,7 +1201,7 @@ export default function StatsPage() {
     void loadStats();
   }, []);
 
-  const isTeacher = myRole === "teacher";
+  const isTeacher = myRole === "teacher" || myRole === "super_teacher";
 
   useEffect(() => {
     if (!isTeacher && activeTab === "teacherSupport") {
@@ -1034,6 +1210,17 @@ export default function StatsPage() {
   }, [activeTab, isTeacher]);
 
   const cutoff = useMemo(() => buildRangeCutoff(range), [range]);
+
+  const rangeTheme = useMemo(() => timeRangeTheme(range), [range]);
+
+  const laneTheme = useMemo(
+    () => readingLaneTheme(abilityBookType),
+    [abilityBookType]
+  );
+
+  const plainSectionTone = `${rangeTheme.border} bg-white`;
+  const filteredSectionTone = `${rangeTheme.border} ${laneTheme.background}`;
+  const filteredStatTone = `${rangeTheme.border} ${laneTheme.statBackground}`;
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((row) => inRangeByDateString(row.read_on, cutoff));
@@ -1145,6 +1332,30 @@ export default function StatsPage() {
     }));
   }, [range, sessions, words]);
 
+  const savedWordRhythmActivity = useMemo(() => {
+    const today = startOfToday();
+    const dayCount = rangeDayCount(range, sessions, words);
+    const start = addDays(today, -(dayCount - 1));
+    const buckets = new Map<string, { words: number }>();
+
+    for (let i = 0; i < dayCount; i++) {
+      buckets.set(ymdLocal(addDays(start, i)), { words: 0 });
+    }
+
+    for (const row of words) {
+      const day = ymdLocal(new Date(row.created_at));
+      if (!buckets.has(day)) continue;
+
+      const bucket = buckets.get(day)!;
+      bucket.words += 1;
+    }
+
+    return Array.from(buckets.entries()).map(([day, value]) => ({
+      day,
+      ...value,
+    }));
+  }, [range, sessions, words]);
+
   const bookMetrics = useMemo(() => {
     const sessionsByBook = new Map<string, SessionRow[]>();
     const wordsByBook = new Map<string, WordRow[]>();
@@ -1218,6 +1429,13 @@ export default function StatsPage() {
         const totalMinutes = curiosityMinutes + fluidMinutes + listeningMinutes;
         const readingMinutes = curiosityMinutes + fluidMinutes;
         const uniqueWords = new Set(bookWords.map((word) => wordKey(word.surface, word.meaning))).size;
+        const wordPages = new Set(
+          bookWords
+            .map((word) => Number(word.page_number))
+            .filter((page) => Number.isFinite(page) && page > 0)
+        );
+
+        const pagesWithSavedWords = wordPages.size;
         const days = new Set<string>();
 
         for (const session of bookSessions) {
@@ -1248,7 +1466,7 @@ export default function StatsPage() {
           listeningMinutes,
           totalMinutes,
           averageMinutesPerPage: timedReadingPages > 0 ? readingMinutes / timedReadingPages : null,
-          wordsPerPage: pagesRead > 0 ? bookWords.length / pagesRead : null,
+          wordsPerPage: pagesWithSavedWords > 0 ? bookWords.length / pagesWithSavedWords : null,
           sessions: bookSessions.length,
           relationshipDays: safeDateDiffInDays(
             row.started_at,
@@ -1258,6 +1476,136 @@ export default function StatsPage() {
       })
       .filter((item) => item.pagesRead > 0 || item.wordsSaved > 0 || item.totalMinutes > 0);
   }, [rows, filteredSessions, filteredWords]);
+
+  const vocabularyBookMetrics = useMemo(() => {
+    if (abilityBookType === "all") return bookMetrics;
+
+    return bookMetrics.filter(
+      (item) => abilityReadingGroupForBookType(item.bookType) === abilityBookType
+    );
+  }, [abilityBookType, bookMetrics]);
+
+  const vocabularyUserBookIds = useMemo(() => {
+    return new Set(vocabularyBookMetrics.map((item) => item.userBookId));
+  }, [vocabularyBookMetrics]);
+
+  const vocabularyWords = useMemo(() => {
+    return filteredWords.filter((word) => vocabularyUserBookIds.has(word.user_book_id));
+  }, [filteredWords, vocabularyUserBookIds]);
+
+  const vocabularyTotals = useMemo(() => {
+    const pagesRead = vocabularyBookMetrics.reduce((sum, item) => sum + item.pagesRead, 0);
+    const wordsSaved = vocabularyWords.length;
+    const uniqueWords = new Set(
+      vocabularyWords.map((row) => wordKey(row.surface, row.meaning))
+    ).size;
+
+    return {
+      pagesRead,
+      wordsSaved,
+      uniqueWords,
+      wordsPerPage: pagesRead > 0 ? wordsSaved / pagesRead : null,
+      booksWithWords: vocabularyBookMetrics.filter((item) => item.wordsSaved > 0).length,
+      vocabularyDays: new Set(
+        vocabularyWords.map((word) => ymdLocal(new Date(word.created_at)))
+      ).size,
+    };
+  }, [vocabularyBookMetrics, vocabularyWords]);
+
+  const vocabularySavedWordRhythmActivity = useMemo(() => {
+    const today = startOfToday();
+    const dayCount = rangeDayCount(range, sessions, vocabularyWords);
+    const start = addDays(today, -(dayCount - 1));
+    const buckets = new Map<string, { words: number }>();
+
+    for (let i = 0; i < dayCount; i++) {
+      buckets.set(ymdLocal(addDays(start, i)), { words: 0 });
+    }
+
+    for (const row of vocabularyWords) {
+      const day = ymdLocal(new Date(row.created_at));
+      if (!buckets.has(day)) continue;
+
+      const bucket = buckets.get(day)!;
+      bucket.words += 1;
+    }
+
+    return Array.from(buckets.entries()).map(([day, value]) => ({
+      day,
+      ...value,
+    }));
+  }, [range, sessions, vocabularyWords]);
+
+  const vocabularyWordsByBookTypePie = useMemo(() => {
+    const typeByUserBookId = new Map(
+      rows.map((row) => [row.id, bookTypeLabel(row.books?.book_type ?? null)])
+    );
+    const counts = new Map<string, number>();
+    const palette = ["#f59e0b", "#ec4899", "#8b5cf6", "#38bdf8", "#14b8a6", "#f97316"];
+
+    for (const word of vocabularyWords) {
+      const label = typeByUserBookId.get(word.user_book_id) ?? "Other";
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], index) => ({
+        label,
+        value,
+        color: palette[index % palette.length],
+      }));
+  }, [rows, vocabularyWords]);
+
+  const vocabularyComparisonRows = useMemo(() => {
+    const grouped = new Map<string, BookMetric[]>();
+
+    for (const item of vocabularyBookMetrics) {
+      if (item.pagesRead <= 0 || item.wordsPerPage == null) continue;
+
+      const key = item.bookType ?? "other";
+      const list = grouped.get(key) ?? [];
+      list.push(item);
+      grouped.set(key, list);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([key, items]) => {
+        const sortedMostWordsFirst = [...items].sort(
+          (a, b) => (b.wordsPerPage ?? -1) - (a.wordsPerPage ?? -1)
+        );
+
+        const sortedLeastWordsFirst = [...items].sort(
+          (a, b) => (a.wordsPerPage ?? 999) - (b.wordsPerPage ?? 999)
+        );
+
+        let moreWords: BookMetric | null = null;
+        let fewerWords: BookMetric | null = null;
+
+        if (items.length === 1) {
+          const onlyBook = items[0];
+
+          if (onlyBook.wordsSaved > 0) {
+            moreWords = onlyBook;
+          } else {
+            fewerWords = onlyBook;
+          }
+        } else {
+          moreWords = sortedMostWordsFirst[0] ?? null;
+          fewerWords =
+            sortedLeastWordsFirst.find(
+              (item) => item.userBookId !== moreWords?.userBookId
+            ) ?? null;
+        }
+
+        return {
+          bookType: items[0]?.bookType ?? null,
+          moreWords,
+          fewerWords,
+        };
+      })
+      .sort((a, b) => bookTypeSortIndex(a.bookType) - bookTypeSortIndex(b.bookType));
+  }, [vocabularyBookMetrics]);
 
   const typeMetrics = useMemo(() => {
     const grouped = new Map<string, TypeMetric>();
@@ -1333,13 +1681,90 @@ export default function StatsPage() {
     const curiosityMinutes = abilityBookMetrics.reduce((sum, item) => sum + item.curiosityMinutes, 0);
     const timedFluidPages = abilityBookMetrics.reduce((sum, item) => sum + item.timedFluidPages, 0);
     const timedCuriosityPages = abilityBookMetrics.reduce((sum, item) => sum + item.timedCuriosityPages, 0);
+    const sessions = abilityBookMetrics.reduce((sum, item) => sum + item.sessions, 0);
+
+    const timedPages = timedFluidPages + timedCuriosityPages;
+    const untimedPages = Math.max(0, pagesRead - timedPages);
+    const readingMinutes = fluidMinutes + curiosityMinutes;
+    const booksTouched = abilityBookMetrics.filter(
+      (item) => item.pagesRead > 0 || item.wordsSaved > 0 || item.totalMinutes > 0
+    ).length;
 
     return {
       pagesRead,
+      fluidPages,
+      curiosityPages,
+      timedPages,
+      untimedPages,
       wordsSaved,
+      readingMinutes,
+      booksTouched,
+      sessions,
+      timedCoveragePercent: pagesRead > 0 ? (timedPages / pagesRead) * 100 : null,
       averageWordsPerPage: pagesRead > 0 ? wordsSaved / pagesRead : null,
       fluidMinutesPerPage: timedFluidPages > 0 ? fluidMinutes / timedFluidPages : null,
       curiosityMinutesPerPage: timedCuriosityPages > 0 ? curiosityMinutes / timedCuriosityPages : null,
+    };
+  }, [abilityBookMetrics]);
+
+  const abilityStandouts = useMemo(() => {
+    const mostWordsPerPage =
+      [...abilityBookMetrics]
+        .filter((item) => item.wordsPerPage != null && item.pagesRead > 0)
+        .sort((a, b) => (b.wordsPerPage ?? 0) - (a.wordsPerPage ?? 0))[0] ?? null;
+
+    const leastWordsPerPage =
+      [...abilityBookMetrics]
+        .filter((item) => item.wordsPerPage != null && item.pagesRead > 0)
+        .sort((a, b) => (a.wordsPerPage ?? 999) - (b.wordsPerPage ?? 999))[0] ?? null;
+
+    const fluidPaceBooks = abilityBookMetrics
+      .map((item) => ({
+        ...item,
+        fluidMinPerPage:
+          item.timedFluidPages > 0 ? item.fluidMinutes / item.timedFluidPages : null,
+      }))
+      .filter((item) => item.fluidMinPerPage != null);
+
+    const curiosityPaceBooks = abilityBookMetrics
+      .map((item) => ({
+        ...item,
+        curiosityMinPerPage:
+          item.timedCuriosityPages > 0
+            ? item.curiosityMinutes / item.timedCuriosityPages
+            : null,
+      }))
+      .filter((item) => item.curiosityMinPerPage != null);
+
+    const fastestFluid =
+      [...fluidPaceBooks].sort(
+        (a, b) => (a.fluidMinPerPage ?? 999) - (b.fluidMinPerPage ?? 999)
+      )[0] ?? null;
+
+    const slowestFluid =
+      [...fluidPaceBooks].sort(
+        (a, b) => (b.fluidMinPerPage ?? 0) - (a.fluidMinPerPage ?? 0)
+      )[0] ?? null;
+
+    const fastestCuriosity =
+      [...curiosityPaceBooks].sort(
+        (a, b) =>
+          (a.curiosityMinPerPage ?? 999) - (b.curiosityMinPerPage ?? 999)
+      )[0] ?? null;
+
+    const slowestCuriosity =
+      [...curiosityPaceBooks].sort(
+        (a, b) =>
+          (b.curiosityMinPerPage ?? 0) - (a.curiosityMinPerPage ?? 0)
+      )[0] ?? null;
+
+    return {
+      mostWordsPerPage,
+      leastWordsPerPage,
+      fastestFluid,
+      slowestFluid,
+      fastestCuriosity,
+      slowestCuriosity,
     };
   }, [abilityBookMetrics]);
 
@@ -1688,8 +2113,11 @@ export default function StatsPage() {
     const grouped = new Map<string, number>();
 
     for (const item of abilityBookMetrics) {
-      if (item.pagesRead <= 0) continue;
+      if (item.pagesRead <= 0 || item.averageMinutesPerPage == null) continue;
+
       const label = paceLabel(item);
+      if (!label) continue;
+
       grouped.set(label, (grouped.get(label) ?? 0) + 1);
     }
 
@@ -1817,41 +2245,6 @@ export default function StatsPage() {
     }));
   }, [range, sessions, words]);
 
-  const spotlights = useMemo(() => {
-    const byConsistency = [...abilityBookMetrics]
-      .filter((item) => item.engagementDays > 0)
-      .sort((a, b) => b.engagementDays - a.engagementDays)[0];
-
-    const byStretch = [...abilityBookMetrics]
-      .filter((item) => item.wordsPerPage != null)
-      .sort((a, b) => (b.wordsPerPage ?? 0) - (a.wordsPerPage ?? 0))[0];
-
-    const bySmoothest = [...abilityBookMetrics]
-      .filter((item) => item.averageMinutesPerPage != null)
-      .sort((a, b) => (a.averageMinutesPerPage ?? 999) - (b.averageMinutesPerPage ?? 999))[0];
-
-    const byCuriosity = [...abilityBookMetrics]
-      .filter((item) => item.curiosityMinutes > 0)
-      .sort((a, b) => b.curiosityMinutes - a.curiosityMinutes)[0];
-
-    const byFluid = [...abilityBookMetrics]
-      .filter((item) => item.fluidMinutes > 0)
-      .sort((a, b) => b.fluidMinutes - a.fluidMinutes)[0];
-
-    const byRelationship = [...abilityBookMetrics]
-      .filter((item) => item.relationshipDays != null)
-      .sort((a, b) => (b.relationshipDays ?? 0) - (a.relationshipDays ?? 0))[0];
-
-    return {
-      byConsistency,
-      byStretch,
-      bySmoothest,
-      byCuriosity,
-      byFluid,
-      byRelationship,
-    };
-  }, [abilityBookMetrics]);
-
   const supportBars = useMemo(() => {
     const total = Math.max(1, totals.totalMinutes);
 
@@ -1877,26 +2270,57 @@ export default function StatsPage() {
     ];
   }, [totals]);
 
-  const bookChallengeList = useMemo(() => {
-    return [...abilityBookMetrics]
-      .filter((item) => item.pagesRead > 0)
-      .sort((a, b) => {
-        const aScore = (a.wordsPerPage ?? 0) * 2 + (a.averageMinutesPerPage ?? 0);
-        const bScore = (b.wordsPerPage ?? 0) * 2 + (b.averageMinutesPerPage ?? 0);
-        return bScore - aScore;
-      })
-      .slice(0, 5);
-  }, [abilityBookMetrics]);
+  const abilityComparisonRows = useMemo(() => {
+    const grouped = new Map<string, BookMetric[]>();
 
-  const flowingBooks = useMemo(() => {
-    return [...abilityBookMetrics]
-      .filter((item) => item.pagesRead > 0)
-      .sort((a, b) => {
-        const aScore = (a.wordsPerPage ?? 0) * 2 + (a.averageMinutesPerPage ?? 0);
-        const bScore = (b.wordsPerPage ?? 0) * 2 + (b.averageMinutesPerPage ?? 0);
-        return aScore - bScore;
+    for (const item of abilityBookMetrics) {
+      if (item.pagesRead <= 0 || item.averageMinutesPerPage == null) continue;
+
+      const key = item.bookType ?? "other";
+      const list = grouped.get(key) ?? [];
+      list.push(item);
+      grouped.set(key, list);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([key, items]) => {
+        const sortedSlowestFirst = [...items].sort(
+          (a, b) =>
+            (b.averageMinutesPerPage ?? -1) - (a.averageMinutesPerPage ?? -1)
+        );
+
+        const sortedFastestFirst = [...items].sort(
+          (a, b) =>
+            (a.averageMinutesPerPage ?? 999) - (b.averageMinutesPerPage ?? 999)
+        );
+
+        let pushed: BookMetric | null = null;
+        let flowed: BookMetric | null = null;
+
+        if (items.length === 1) {
+          const onlyBook = items[0];
+          const label = paceLabel(onlyBook);
+
+          if (label === "Flowing" || label === "Steady") {
+            flowed = onlyBook;
+          } else if (label === "Support-heavy" || label === "Pushes back") {
+            pushed = onlyBook;
+          }
+        } else {
+          pushed = sortedSlowestFirst[0] ?? null;
+          flowed =
+            sortedFastestFirst.find(
+              (item) => item.userBookId !== pushed?.userBookId
+            ) ?? null;
+        }
+
+        return {
+          bookType: items[0]?.bookType ?? null,
+          pushed,
+          flowed,
+        };
       })
-      .slice(0, 5);
+      .sort((a, b) => bookTypeSortIndex(a.bookType) - bookTypeSortIndex(b.bookType));
   }, [abilityBookMetrics]);
 
   if (loading) {
@@ -1929,30 +2353,56 @@ export default function StatsPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="sticky top-28 z-20 rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="text-xs font-semibold uppercase text-slate-500">Rough Draft</div>
-              <h1 className="mt-1 text-3xl font-semibold text-slate-900">Stats with clearer jobs</h1>
-              <p className="mt-3 text-sm leading-6 text-slate-700">
-                This draft separates the page into different questions: how much you are showing up,
-                what kind of Japanese you can handle, what your library says about you, what words are
-                following you, and how teacher support fits into the reading.
-              </p>
+        <section className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="max-w-4xl">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Stats
+            </div>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+              Stats with clearer jobs
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              A clearer view of your reading life, reading ability, library, vocabulary, and teacher support.
+            </p>
+          </div>
+
+          {errorMsg ? (
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMsg}
+            </div>
+          ) : null}
+        </section>
+
+        <section className={`sticky top-36 z-40 rounded-2xl border-2 ${rangeTheme.border} bg-white/95 p-3 shadow-lg ring-1 ring-slate-900/5 backdrop-blur`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Stats Controls
+              </div>
+              <div className="text-sm font-medium text-slate-900">
+                {statsTabLabel(activeTab)} · {formatRangeLabel(range)}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-white text-sm">
-                {(["7d", "30d", "90d", "1y", "all"] as DateRange[]).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setRange(option)}
-                    className={`px-4 py-2 ${range === option ? "bg-slate-900 text-white" : "text-slate-700"}`}
-                  >
-                    {formatRangeLabel(option)}
-                  </button>
-                ))}
+              <div className="flex flex-wrap gap-2 text-sm">
+                {(["7d", "30d", "90d", "1y", "all"] as DateRange[]).map((option) => {
+                  const optionTheme = timeRangeTheme(option);
+
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setRange(option)}
+                      className={`rounded-xl border px-4 py-2 font-medium transition ${range === option
+                        ? optionTheme.buttonActive
+                        : optionTheme.buttonInactive
+                        }`}
+                    >
+                      {formatRangeLabel(option)}
+                    </button>
+                  );
+                })}
               </div>
 
               <button
@@ -1965,32 +2415,35 @@ export default function StatsPage() {
             </div>
           </div>
 
-          {errorMsg ? (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMsg}
+          <div className="mt-3 border-t border-slate-200 pt-3">
+            <div className="grid gap-2 md:grid-cols-5">
+              {(["library", "life", "skill", "vocabulary", ...(isTeacher ? ["teacherSupport" as const] : [])] as StatsTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-xl px-4 py-3 text-left transition ${activeTab === tab
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-50 text-slate-700 hover:bg-white"
+                    }`}
+                >
+                  <div className="text-sm font-semibold">{statsTabLabel(tab)}</div>
+                  <div className={`mt-1 text-xs leading-5 ${activeTab === tab ? "text-slate-200" : "text-slate-500"}`}>
+                    {statsTabDescription(tab)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {activeTab === "skill" || activeTab === "vocabulary" ? (
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              <ReadingLaneFilter
+                value={abilityBookType}
+                onChange={setAbilityBookType}
+              />
             </div>
           ) : null}
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-          <div className="grid gap-2 md:grid-cols-5">
-            {(["library", "life", "skill", "vocabulary", ...(isTeacher ? ["teacherSupport" as const] : [])] as StatsTab[]).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`rounded-xl px-4 py-3 text-left transition ${activeTab === tab
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-              >
-                <div className="text-sm font-semibold">{statsTabLabel(tab)}</div>
-                <div className={`mt-1 text-xs leading-5 ${activeTab === tab ? "text-slate-200" : "text-slate-500"}`}>
-                  {statsTabDescription(tab)}
-                </div>
-              </button>
-            ))}
-          </div>
         </section>
 
         {activeTab === "life" && (
@@ -1999,6 +2452,7 @@ export default function StatsPage() {
               eyebrow="Momentum"
               title="Reading rhythm"
               description={`A quick view of how often Japanese showed up in your life for ${formatRangeLabel(range).toLowerCase()}.`}
+              tone={plainSectionTone}
             >
               <div className="grid grid-cols-7 gap-2 sm:grid-cols-14 xl:grid-cols-28">
                 {readingRhythmActivity.map((item) => {
@@ -2053,6 +2507,7 @@ export default function StatsPage() {
                 eyebrow="Pages"
                 title="Reading pages by mode"
                 description="Listening stays separate here. This is only pages you visually read, split by fluid vs curiosity reading."
+                tone={plainSectionTone}
               >
                 <PieChart items={readingPagesPie} size={180} />
 
@@ -2070,6 +2525,7 @@ export default function StatsPage() {
                 eyebrow="Color"
                 title="Time breakdown"
                 description="A brighter view of how fluid, curious, or listening-heavy your reading life has been."
+                tone={plainSectionTone}
               >
                 <PieChart items={timePie} size={180} />
 
@@ -2098,6 +2554,7 @@ export default function StatsPage() {
                 eyebrow="Book Types"
                 title="Reading pages by book type"
                 description="A page-weighted view of what kinds of books made up your reading in this range."
+                tone={plainSectionTone}
               >
                 <PieChart items={bookTypePie} size={180} />
               </SectionBand>
@@ -2107,41 +2564,18 @@ export default function StatsPage() {
 
         {activeTab === "skill" && (
           <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="grid gap-2 md:grid-cols-4">
-                {ABILITY_READING_GROUP_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setAbilityBookType(option.value)}
-                    className={`rounded-xl px-4 py-3 text-left transition ${abilityBookType === option.value
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                      }`}
-                  >
-                    <div className="text-sm font-semibold">{option.label}</div>
-                    <div
-                      className={`mt-1 text-xs leading-5 ${abilityBookType === option.value ? "text-slate-200" : "text-slate-500"
-                        }`}
-                    >
-                      {option.description}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-
             <div className="grid gap-4 md:grid-cols-3">
               <StatCard
-                label="Words Saved Per Page"
+                label="Timed Page Coverage"
                 value={
-                  abilityTotals.averageWordsPerPage == null
+                  abilityTotals.timedCoveragePercent == null
                     ? "—"
-                    : `${formatDecimal(abilityTotals.averageWordsPerPage)} words/page`
+                    : `${Math.round(abilityTotals.timedCoveragePercent)}%`
                 }
-                hint="Vocabulary density while visually reading"
-                tone="border-amber-200 bg-amber-50"
+                hint={`${abilityTotals.timedPages} timed pages · ${abilityTotals.untimedPages} untimed pages`}
+                tone={filteredStatTone}
               />
+
               <StatCard
                 label="Fluid Pace Per Page"
                 value={
@@ -2150,8 +2584,9 @@ export default function StatsPage() {
                     : `${formatDecimal(abilityTotals.fluidMinutesPerPage)} min/page`
                 }
                 hint="Time per page during fluid reading"
-                tone="border-emerald-200 bg-emerald-50"
+                tone={filteredStatTone}
               />
+
               <StatCard
                 label="Curiosity Pace Per Page"
                 value={
@@ -2160,91 +2595,139 @@ export default function StatsPage() {
                     : `${formatDecimal(abilityTotals.curiosityMinutesPerPage)} min/page`
                 }
                 hint="Time per page during curiosity reading"
-                tone="border-rose-200 bg-rose-50"
+                tone={filteredStatTone}
               />
             </div>
 
-            <SectionBand
-              eyebrow="Reminder"
-              title="Support vs confidence"
-              description="A future Reading Ability view could track when reading starts needing less visible support."
-            >
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                Track how often sessions happen with no lookups, or with fewer saved words per page than before. This belongs here because it is about confidence and support, not just effort.
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className={`rounded-2xl border-2 p-4 shadow-sm ${filteredSectionTone}`}>
+                <div className="text-xs font-medium uppercase text-slate-600">
+                  Fluid Reading Range
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <div className="text-xs text-slate-500">Fastest</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {abilityStandouts.fastestFluid?.fluidMinPerPage != null
+                        ? `${formatDecimal(abilityStandouts.fastestFluid.fluidMinPerPage)} min/page`
+                        : "—"}
+                    </div>
+                    <div className="truncate text-sm text-slate-700">
+                      {abilityStandouts.fastestFluid?.title ?? "No timed fluid reading yet"}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="text-xs text-slate-500">Slowest</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {abilityStandouts.slowestFluid?.fluidMinPerPage != null
+                        ? `${formatDecimal(abilityStandouts.slowestFluid.fluidMinPerPage)} min/page`
+                        : "—"}
+                    </div>
+                    <div className="truncate text-sm text-slate-700">
+                      {abilityStandouts.slowestFluid?.title ?? "No timed fluid reading yet"}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </SectionBand>
+
+              <div className={`rounded-2xl border-2 p-4 shadow-sm ${filteredSectionTone}`}>
+                <div className="text-xs font-medium uppercase text-slate-600">
+                  Curiosity Reading Range
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <div className="text-xs text-slate-500">Fastest</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {abilityStandouts.fastestCuriosity?.curiosityMinPerPage != null
+                        ? `${formatDecimal(
+                          abilityStandouts.fastestCuriosity.curiosityMinPerPage
+                        )} min/page`
+                        : "—"}
+                    </div>
+                    <div className="truncate text-sm text-slate-700">
+                      {abilityStandouts.fastestCuriosity?.title ??
+                        "No timed curiosity reading yet"}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="text-xs text-slate-500">Slowest</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {abilityStandouts.slowestCuriosity?.curiosityMinPerPage != null
+                        ? `${formatDecimal(
+                          abilityStandouts.slowestCuriosity.curiosityMinPerPage
+                        )} min/page`
+                        : "—"}
+                    </div>
+                    <div className="truncate text-sm text-slate-700">
+                      {abilityStandouts.slowestCuriosity?.title ??
+                        "No timed curiosity reading yet"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <SectionBand
-              eyebrow="Spotlights"
-              title="Not just top books"
-              description="These labels are meant to feel like reading growth, not consumption trophies."
+              eyebrow="Pace Confidence"
+              title="Support vs confidence"
+              description="This focuses on reading pace and timed coverage, not saved-word density. Vocabulary friction now lives in the Vocabulary tab."
+              tone={filteredSectionTone}
             >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <SpotlightCard
-                  label="Most Consistent Book"
-                  value={
-                    spotlights.byConsistency ? `${spotlights.byConsistency.engagementDays} days` : "—"
-                  }
-                  title={spotlights.byConsistency?.title ?? null}
-                  tone="border-violet-200 bg-violet-50"
-                />
-                <SpotlightCard
-                  label="Biggest Stretch"
-                  value={
-                    spotlights.byStretch?.wordsPerPage != null
-                      ? `${formatDecimal(spotlights.byStretch.wordsPerPage)} words/page`
-                      : "—"
-                  }
-                  title={spotlights.byStretch?.title ?? null}
-                  tone="border-amber-200 bg-amber-50"
-                />
-                <SpotlightCard
-                  label="Smoothest Reading"
-                  value={
-                    spotlights.bySmoothest?.averageMinutesPerPage != null
-                      ? `${formatDecimal(spotlights.bySmoothest.averageMinutesPerPage)} min/page`
-                      : "—"
-                  }
-                  title={spotlights.bySmoothest?.title ?? null}
-                  tone="border-emerald-200 bg-emerald-50"
-                />
-                <SpotlightCard
-                  label="Most Curious Reading Time"
-                  value={
-                    spotlights.byCuriosity
-                      ? formatMinutesAsReadableTime(spotlights.byCuriosity.curiosityMinutes)
-                      : "—"
-                  }
-                  title={spotlights.byCuriosity?.title ?? null}
-                  tone="border-rose-200 bg-rose-50"
-                />
-                <SpotlightCard
-                  label="Most Fluid Reading Time"
-                  value={
-                    spotlights.byFluid
-                      ? formatMinutesAsReadableTime(spotlights.byFluid.fluidMinutes)
-                      : "—"
-                  }
-                  title={spotlights.byFluid?.title ?? null}
-                  tone="border-sky-200 bg-sky-50"
-                />
-                <SpotlightCard
-                  label="Longest Reading Relationship"
-                  value={
-                    spotlights.byRelationship?.relationshipDays != null
-                      ? `${spotlights.byRelationship.relationshipDays} days`
-                      : "—"
-                  }
-                  title={spotlights.byRelationship?.title ?? null}
-                  tone="border-fuchsia-200 bg-fuchsia-50"
-                />
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs text-slate-500">Pages in this lane</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {abilityTotals.pagesRead}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs text-slate-500">Timed page coverage</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {abilityTotals.timedCoveragePercent == null
+                      ? "—"
+                      : `${Math.round(abilityTotals.timedCoveragePercent)}%`}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs text-slate-500">Untimed pages</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {abilityTotals.untimedPages}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs text-slate-500">Books touched</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {abilityTotals.booksTouched}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
+                {abilityTotals.pagesRead === 0 ? (
+                  "No reading ability data in this lane yet."
+                ) : abilityTotals.timedCoveragePercent == null ||
+                  abilityTotals.timedCoveragePercent === 0 ? (
+                  "You have page movement here, but not enough timed reading yet to describe pace."
+                ) : abilityTotals.timedCoveragePercent < 50 ? (
+                  "Some of this lane is timed, but a lot of the reading is still untimed. Pace signals may be partial."
+                ) : (
+                  "This lane has enough timed reading to start showing a useful pace picture."
+                )}
               </div>
             </SectionBand>
 
             <SectionBand
               eyebrow="Pace"
               title="How your books felt to read"
-              description="A pie chart of all the books you touched in this window, grouped by pace: which ones flowed, which stayed steady, and which really pushed back."
+              description="Books are grouped by minutes per page only. Saved-word density has been moved to the Vocabulary tab."
+              tone={filteredSectionTone}
             >
               <div className="grid gap-6 xl:grid-cols-[1fr_1.25fr] xl:items-start">
                 <PieChart items={pacePie} />
@@ -2254,178 +2737,184 @@ export default function StatsPage() {
                     {
                       label: "Flowing",
                       color: "bg-emerald-400",
-                      text: "These books tended to move with less friction and lighter support.",
+                      text: "These books moved quickly page by page.",
                     },
                     {
                       label: "Steady",
                       color: "bg-sky-400",
-                      text: "Comfortably readable, but still asking for some attention.",
+                      text: "Comfortably readable, but still asking for attention.",
                     },
                     {
                       label: "Support-heavy",
                       color: "bg-amber-400",
-                      text: "More lookups or slower pacing showed up here.",
+                      text: "These books took noticeably more time per page.",
                     },
                     {
                       label: "Pushes back",
                       color: "bg-rose-400",
-                      text: "These are the ones that really asked more of you.",
+                      text: "These books were slow enough to feel like real resistance.",
                     },
                   ].map((item) => (
-                    <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div
+                      key={item.label}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
                       <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
                         <span className={`h-3 w-3 rounded-full ${item.color}`} />
                         {item.label}
                       </div>
-                      <div className="mt-2 text-sm leading-6 text-slate-700">{item.text}</div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">
+                        {item.text}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             </SectionBand>
 
-            <div className="grid gap-6 xl:grid-cols-2">
-              <SectionBand
-                eyebrow="By Reading Lane"
-                title="Where reading felt smooth or sticky"
-                description="This groups books by reading experience instead of exact book type, so the stats have enough data to mean something."
-              >
-                {abilityTypeMetrics.length > 0 ? (
-                  <div className="space-y-5">
-                    <BarStrip
-                      items={abilityTypeMetrics.map((item) => ({
-                        label: item.bookType,
-                        value: item.pagesRead,
-                      }))}
-                      colorClass="bg-gradient-to-r from-sky-400 to-indigo-500"
-                      valueSuffix=" p"
-                    />
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {abilityTypeMetrics.map((item) => (
-                        <div key={item.bookType} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                          <div className="text-sm font-medium text-slate-900">{item.bookType}</div>
-                          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                              <div className="text-xs text-slate-500">Words/page</div>
-                              <div className="mt-1 font-semibold text-slate-900">
-                                {formatDecimal(item.wordsPerPage)}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-slate-500">Min/page</div>
-                              <div className="mt-1 font-semibold text-slate-900">
-                                {formatDecimal(item.averageMinutesPerPage)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-500">No book-type stats yet.</div>
-                )}
-              </SectionBand>
-
-              <SectionBand
-                eyebrow="Challenge"
-                title="Books that pushed back"
-                description="A rough composite of word-save density and time-per-page. This is intentionally learner-centered."
-              >
-                {bookChallengeList.length > 0 ? (
-                  <div className="space-y-4">
-                    {bookChallengeList.map((item) => (
-                      <div key={item.userBookId} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="flex items-center gap-3">
-                          {item.coverUrl ? (
-                            <img src={item.coverUrl} alt="" className="h-16 w-12 rounded object-cover" />
-                          ) : (
-                            <div className="h-16 w-12 rounded bg-slate-200" />
-                          )}
-
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium text-slate-900">{item.title}</div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {abilityReadingGroupLabel(abilityReadingGroupForBookType(item.bookType))} · {bookTypeLabel(item.bookType)}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                          <div className="rounded-lg bg-white px-3 py-2">
-                            <div className="text-[11px] text-slate-500">Words/page</div>
-                            <div className="mt-1 text-sm font-semibold text-slate-900">
-                              {formatDecimal(item.wordsPerPage)}
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-white px-3 py-2">
-                            <div className="text-[11px] text-slate-500">Min/page</div>
-                            <div className="mt-1 text-sm font-semibold text-slate-900">
-                              {formatDecimal(item.averageMinutesPerPage)}
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-white px-3 py-2">
-                            <div className="text-[11px] text-slate-500">Days engaged</div>
-                            <div className="mt-1 text-sm font-semibold text-slate-900">{item.engagementDays}</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-500">No challenge profile yet.</div>
-                )}
-              </SectionBand>
-            </div>
-
             <SectionBand
-              eyebrow="Ease"
-              title="Books that flowed"
-              description="The companion to push-back: books where your pace stayed lighter and support density stayed gentler."
+              eyebrow="Challenge vs Ease"
+              title="Books that pushed back / books that flowed"
+              description="One representative from each book type, using pace only: slowest min/page on the left, fastest min/page on the right."
+              tone={filteredSectionTone}
             >
-              {flowingBooks.length > 0 ? (
-                <div className="grid gap-4 xl:grid-cols-2">
-                  {flowingBooks.map((item) => (
-                    <div key={item.userBookId} className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-                      <div className="flex items-center gap-3">
-                        {item.coverUrl ? (
-                          <img src={item.coverUrl} alt="" className="h-16 w-12 rounded object-cover" />
-                        ) : (
-                          <div className="h-16 w-12 rounded bg-slate-200" />
-                        )}
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium text-slate-900">{item.title}</div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {abilityReadingGroupLabel(abilityReadingGroupForBookType(item.bookType))} · {bookTypeLabel(item.bookType)}
-                          </div>
-                        </div>
+              {abilityComparisonRows.length > 0 ? (
+                <div className="space-y-4">
+                  {abilityComparisonRows.map((row) => (
+                    <div
+                      key={row.bookType ?? "other"}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-3 text-sm font-semibold text-slate-900">
+                        {bookTypeLabel(row.bookType)}
                       </div>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-lg bg-white px-3 py-2">
-                          <div className="text-[11px] text-slate-500">Words/page</div>
-                          <div className="mt-1 text-sm font-semibold text-slate-900">
-                            {formatDecimal(item.wordsPerPage)}
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-xl border border-rose-200 bg-white p-4">
+                          <div className="mb-3 text-xs font-semibold uppercase text-rose-700">
+                            Pushed back
                           </div>
+
+                          {row.pushed ? (
+                            <>
+                              <div className="flex items-center gap-3">
+                                {row.pushed.coverUrl ? (
+                                  <img
+                                    src={row.pushed.coverUrl}
+                                    alt=""
+                                    className="h-16 w-12 rounded object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-16 w-12 rounded bg-slate-200" />
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium text-slate-900">
+                                    {row.pushed.title}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {abilityReadingGroupLabel(
+                                      abilityReadingGroupForBookType(row.pushed.bookType)
+                                    )}{" "}
+                                    · {bookTypeLabel(row.pushed.bookType)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Min/page</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {formatDecimal(row.pushed.averageMinutesPerPage)}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Pages</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.pushed.pagesRead}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Days</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.pushed.engagementDays}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
+                              No pushed-back book fits here yet. Keep reading!
+                            </div>
+                          )}
                         </div>
-                        <div className="rounded-lg bg-white px-3 py-2">
-                          <div className="text-[11px] text-slate-500">Min/page</div>
-                          <div className="mt-1 text-sm font-semibold text-slate-900">
-                            {formatDecimal(item.averageMinutesPerPage)}
+
+                        <div className="rounded-xl border border-sky-200 bg-white p-4">
+                          <div className="mb-3 text-xs font-semibold uppercase text-sky-700">
+                            Flowed
                           </div>
-                        </div>
-                        <div className="rounded-lg bg-white px-3 py-2">
-                          <div className="text-[11px] text-slate-500">Pages read</div>
-                          <div className="mt-1 text-sm font-semibold text-slate-900">{item.pagesRead}</div>
+
+                          {row.flowed ? (
+                            <>
+                              <div className="flex items-center gap-3">
+                                {row.flowed.coverUrl ? (
+                                  <img
+                                    src={row.flowed.coverUrl}
+                                    alt=""
+                                    className="h-16 w-12 rounded object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-16 w-12 rounded bg-slate-200" />
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium text-slate-900">
+                                    {row.flowed.title}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {abilityReadingGroupLabel(
+                                      abilityReadingGroupForBookType(row.flowed.bookType)
+                                    )}{" "}
+                                    · {bookTypeLabel(row.flowed.bookType)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Min/page</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {formatDecimal(row.flowed.averageMinutesPerPage)}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Pages</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.flowed.pagesRead}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Days</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.flowed.engagementDays}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
+                              No flowing book fits here yet. Keep reading!
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-slate-500">No flow profile yet.</div>
+                <div className="text-sm text-slate-500">
+                  No timed reading comparison yet. Add minutes to reading sessions to see pace.
+                </div>
               )}
             </SectionBand>
           </>
@@ -2437,6 +2926,7 @@ export default function StatsPage() {
               eyebrow="Over Time"
               title="Books and pages over time"
               description={`This is the more ordinary reading-site view for ${formatRangeLabel(range).toLowerCase()}: what had books in motion, and how much page movement happened.`}
+              tone={plainSectionTone}
             >
               <TrendChart items={trendItems} bucketLabel={trendBucketLabel(range)} />
             </SectionBand>
@@ -2446,6 +2936,7 @@ export default function StatsPage() {
                 eyebrow="Book Types"
                 title="Book types in your library"
                 description="A page-weighted view of the kinds of books in this reading window."
+                tone={plainSectionTone}
               >
                 <PieChart items={bookTypePie} size={180} />
               </SectionBand>
@@ -2454,6 +2945,7 @@ export default function StatsPage() {
                 eyebrow="Ratings"
                 title="How you rated books"
                 description="Your overall ratings across books with a saved rating."
+                tone={plainSectionTone}
               >
                 <PieChart items={ratingPie} size={180} />
               </SectionBand>
@@ -2462,6 +2954,7 @@ export default function StatsPage() {
                 eyebrow="Difficulty"
                 title="Difficulty for me"
                 description="Your private community answer about how each book felt at your level."
+                tone={plainSectionTone}
               >
                 <PieChart items={difficultyPie} size={180} />
               </SectionBand>
@@ -2472,6 +2965,7 @@ export default function StatsPage() {
                 eyebrow="Authors"
                 title="Authors you keep returning to"
                 description="Writers whose books actually keep showing up in your reading life."
+                tone={plainSectionTone}
               >
                 {repeatedAuthors.length > 0 ? (
                   <BarStrip
@@ -2493,6 +2987,7 @@ export default function StatsPage() {
                 eyebrow="Publishers"
                 title="Publishers you keep returning to"
                 description="Especially useful for Japanese reading, where publisher style and imprint can matter a lot."
+                tone={plainSectionTone}
               >
                 {repeatedPublishers.length > 0 ? (
                   <BarStrip
@@ -2514,6 +3009,7 @@ export default function StatsPage() {
                 eyebrow="Translators & Illustrators"
                 title="Translators and illustrators you keep returning to"
                 description="Creative names behind the text and art, shown when they repeat across books."
+                tone={plainSectionTone}
               >
                 {repeatedTranslatorsAndIllustrators.length > 0 ? (
                   <BarStrip
@@ -2536,49 +3032,80 @@ export default function StatsPage() {
 
         {activeTab === "vocabulary" && (
           <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                label="Words Saved"
-                value={String(totals.wordsSaved)}
-                hint={`${totals.uniqueWords} unique words in this window`}
-                tone="border-amber-200 bg-amber-50"
-              />
-              <StatCard
-                label="Words Per Page"
-                value={totals.averageWordsPerPage == null ? "—" : formatDecimal(totals.averageWordsPerPage)}
-                hint="A rough support-density signal"
-                tone="border-rose-200 bg-rose-50"
-              />
-              <StatCard
-                label="Books With Words"
-                value={String(bookMetrics.filter((item) => item.wordsSaved > 0).length)}
-                hint="Books that contributed vocabulary"
-                tone="border-violet-200 bg-violet-50"
-              />
-              <StatCard
-                label="Vocabulary Days"
-                value={String(new Set(filteredWords.map((word) => ymdLocal(new Date(word.created_at)))).size)}
-                hint="Days when words were saved"
-                tone="border-emerald-200 bg-emerald-50"
-              />
-            </div>
+            <SectionBand
+              eyebrow="Vocabulary Rhythm"
+              title="Saved word rhythm"
+              description={`A quick view of which days you saved vocabulary during ${formatRangeLabel(
+                range
+              ).toLowerCase()}. This respects the book category filter above.`}
+              tone={filteredSectionTone}
+            >
+              <div className="grid grid-cols-7 gap-2 sm:grid-cols-14 xl:grid-cols-28">
+                {vocabularySavedWordRhythmActivity.map((item) => {
+                  const intensity = item.words;
+                  const colorClass =
+                    intensity === 0
+                      ? "bg-slate-100"
+                      : intensity < 3
+                        ? "bg-amber-200"
+                        : intensity < 8
+                          ? "bg-amber-400"
+                          : "bg-amber-600";
 
+                  return (
+                    <div key={item.day} className="space-y-1">
+                      <div
+                        className={`h-14 rounded-xl border border-white/60 ${colorClass}`}
+                        title={`${item.day}: ${item.words} saved word${item.words === 1 ? "" : "s"
+                          }`}
+                      />
+                      <div className="text-center text-[10px] text-slate-500">
+                        {item.day.slice(8)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <div className="text-xs text-slate-500">Saved word days</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {vocabularySavedWordRhythmActivity.filter((item) => item.words > 0).length}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <div className="text-xs text-slate-500">Words saved</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {vocabularyTotals.wordsSaved}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <div className="text-xs text-slate-500">Unique words</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {vocabularyTotals.uniqueWords}
+                  </div>
+                </div>
+              </div>
+            </SectionBand>
             <SectionBand
               eyebrow="Book Type"
               title="Where saved words came from"
               description="This keeps vocabulary tied to reading context: a word saved from manga, a novel, or a textbook can mean different kinds of friction."
+              tone={filteredSectionTone}
             >
-              <PieChart items={wordsByBookTypePie} />
+              <PieChart items={vocabularyWordsByBookTypePie} />
             </SectionBand>
 
             <SectionBand
               eyebrow="Vocabulary Relationship"
               title="Words by book"
-              description="A first version of the word tab. Next, this could show repeated lookups, words that follow you across books, kanji readings, and words that moved into known territory."
+              description="Books ranked by saved words in the selected time range and book category."
+              tone={filteredSectionTone}
             >
-              {bookMetrics.filter((item) => item.wordsSaved > 0).length > 0 ? (
+              {vocabularyBookMetrics.filter((item) => item.wordsSaved > 0).length > 0 ? (
                 <BarStrip
-                  items={bookMetrics
+                  items={vocabularyBookMetrics
                     .filter((item) => item.wordsSaved > 0)
                     .sort((a, b) => b.wordsSaved - a.wordsSaved)
                     .slice(0, 8)
@@ -2590,7 +3117,9 @@ export default function StatsPage() {
                   valueSuffix=" words"
                 />
               ) : (
-                <div className="text-sm text-slate-500">No vocabulary stats in this window yet.</div>
+                <div className="text-sm text-slate-500">
+                  No vocabulary stats in this window yet.
+                </div>
               )}
             </SectionBand>
 
@@ -2598,21 +3127,169 @@ export default function StatsPage() {
               eyebrow="Later"
               title="Language study signals"
               description="This could become a wider language-study or linguistics tab if grammar, collocations, kanji, and flashcard habits grow."
+              tone={filteredSectionTone}
             >
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
                   <div className="font-medium text-slate-900">Vocabulary relationship</div>
-                  <div className="mt-2">Show recurring saved words across books, revisits, and words that move into known territory.</div>
+                  <div className="mt-2">
+                    Show recurring saved words across books, revisits, and words that move into known territory.
+                  </div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
                   <div className="font-medium text-slate-900">Kanji reading pressure</div>
-                  <div className="mt-2">Track kanji enrichment, hidden-kanji support, and words known in vocab but still shaky in reading.</div>
+                  <div className="mt-2">
+                    Track kanji enrichment, hidden-kanji support, and words known in vocab but still shaky in reading.
+                  </div>
                 </div>
               </div>
             </SectionBand>
+            <SectionBand
+              eyebrow="Vocabulary Friction"
+              title="Books with more saved words / fewer saved words"
+              description="One representative from each book type. This uses saved-word density, not reading pace."
+              tone={filteredSectionTone}
+            >
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                Vocabulary density is calculated from saved word page numbers:
+                saved words ÷ pages with saved words. Words without page numbers still count
+                as saved words, but they cannot be used for words/page density yet.
+              </div>
+              {vocabularyComparisonRows.length > 0 ? (
+                <div className="space-y-4">
+                  {vocabularyComparisonRows.map((row) => (
+                    <div
+                      key={row.bookType ?? "other"}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-3 text-sm font-semibold text-slate-900">
+                        {bookTypeLabel(row.bookType)}
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-xl border border-amber-200 bg-white p-4">
+                          <div className="mb-3 text-xs font-semibold uppercase text-amber-700">
+                            More saved words
+                          </div>
+
+                          {row.moreWords ? (
+                            <>
+                              <div className="flex items-center gap-3">
+                                {row.moreWords.coverUrl ? (
+                                  <img
+                                    src={row.moreWords.coverUrl}
+                                    alt=""
+                                    className="h-16 w-12 rounded object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-16 w-12 rounded bg-slate-200" />
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium text-slate-900">
+                                    {row.moreWords.title}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {bookTypeLabel(row.moreWords.bookType)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Words/page</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {formatRate(row.moreWords.wordsPerPage)}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Saved words</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.moreWords.wordsSaved}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Pages</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.moreWords.pagesRead}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
+                              No high-vocabulary-friction book fits here yet. Keep reading!
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-sky-200 bg-white p-4">
+                          <div className="mb-3 text-xs font-semibold uppercase text-sky-700">
+                            Fewer saved words
+                          </div>
+
+                          {row.fewerWords ? (
+                            <>
+                              <div className="flex items-center gap-3">
+                                {row.fewerWords.coverUrl ? (
+                                  <img
+                                    src={row.fewerWords.coverUrl}
+                                    alt=""
+                                    className="h-16 w-12 rounded object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-16 w-12 rounded bg-slate-200" />
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium text-slate-900">
+                                    {row.fewerWords.title}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {bookTypeLabel(row.fewerWords.bookType)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Words/page</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {formatRate(row.fewerWords.wordsPerPage)}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Saved words</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.fewerWords.wordsSaved}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                  <div className="text-[11px] text-slate-500">Pages</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-900">
+                                    {row.fewerWords.pagesRead}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
+                              No low-vocabulary-friction book fits here yet. Keep reading!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-slate-500">
+                  No vocabulary density comparison yet. Add page numbers to saved words to calculate words/page.
+                </div>
+              )}
+            </SectionBand>
           </>
         )}
-
         {activeTab === "teacherSupport" && isTeacher && (
           <>
             <div className="grid gap-6 xl:grid-cols-2">
@@ -2620,6 +3297,7 @@ export default function StatsPage() {
                 eyebrow="Best Books"
                 title="Best books to use"
                 description="Books rated 4 or 5 for Use With Students. This is about whether you would actually choose them for students."
+                tone={plainSectionTone}
               >
                 {bestBooksToUse.length > 0 ? (
                   <BarStrip
@@ -2641,6 +3319,7 @@ export default function StatsPage() {
                 eyebrow="Avoid"
                 title="Books to avoid"
                 description="Books rated 1 or 2 for Use With Students. This is about lesson fit, not book quality or language-learning value."
+                tone={plainSectionTone}
               >
                 {booksToAvoid.length > 0 ? (
                   <BarStrip
@@ -2663,14 +3342,20 @@ export default function StatsPage() {
               eyebrow="Teacher View"
               title="Teacher-use overview"
               description="Use With Students is whether you would actually use a book with students. Language Learning Potential is about the material inside the book."
+              tone={plainSectionTone}
             >
               <div className="grid gap-6 xl:grid-cols-2">
                 <div>
-                  <div className="mb-3 text-sm font-semibold text-slate-900">Use With Students ratings</div>
+                  <div className="mb-3 text-sm font-semibold text-slate-900">
+                    Use With Students ratings
+                  </div>
                   <PieChart items={teacherUsePie} size={180} />
                 </div>
+
                 <div>
-                  <div className="mb-3 text-sm font-semibold text-slate-900">Language Learning Potential ratings</div>
+                  <div className="mb-3 text-sm font-semibold text-slate-900">
+                    Language Learning Potential ratings
+                  </div>
                   <PieChart items={languageLearningPie} size={180} />
                 </div>
               </div>
@@ -2680,19 +3365,25 @@ export default function StatsPage() {
               eyebrow="Mekuru Levels"
               title="Books by recommended Mekuru level"
               description="Every level stays visible. Books appear under the level a teacher marked on the book page."
+              tone={plainSectionTone}
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 {MEKURU_LEVEL_OPTIONS.map((level) => {
                   const levelBooks = booksByRecommendedLevel.get(level.value) ?? [];
 
                   return (
-                    <div key={level.value} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div
+                      key={level.value}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
                       <div className="text-sm font-semibold text-slate-900">
                         {level.title} · {level.plain}
                       </div>
+
                       <div className="mt-1 text-xs font-medium text-amber-700">
                         {level.cefr} · {level.jlpt}
                       </div>
+
                       <div className="mt-2 text-sm leading-6 text-slate-700">
                         {level.feel}
                       </div>
@@ -2700,10 +3391,16 @@ export default function StatsPage() {
                       <div className="mt-4 space-y-2">
                         {levelBooks.length > 0 ? (
                           levelBooks.map((book) => (
-                            <div key={book.userBookId} className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700">
-                              <div className="font-medium text-slate-900">{book.title}</div>
+                            <div
+                              key={book.userBookId}
+                              className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
+                            >
+                              <div className="font-medium text-slate-900">
+                                {book.title}
+                              </div>
                               <div className="mt-1 text-xs text-slate-500">
-                                Student use: {book.rating ? `${book.rating}/5` : "not rated"}
+                                Student use:{" "}
+                                {book.rating ? `${book.rating}/5` : "not rated"}
                               </div>
                             </div>
                           ))
@@ -2720,7 +3417,6 @@ export default function StatsPage() {
             </SectionBand>
           </>
         )}
-
       </div>
     </main>
   );

@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { recordStudyEvent } from "@/lib/studyEvents";
 
 type UserBookJoinRow = {
   id: string;
@@ -454,6 +455,29 @@ export default function LibraryStudyPage() {
     resetCardState();
   }
 
+  function recordCurrentStudyEvent(
+    result: "correct" | "incorrect" | "skipped" | "reviewed",
+    isCorrect: boolean | null,
+    cardType: string
+  ) {
+    if (!currentCard) return;
+
+    void recordStudyEvent({
+      userBookId:
+        (currentCard as any).user_book_id ??
+        (currentCard as any).userBookId ??
+        null,
+      userBookWordId: currentCard.id,
+      studyMode: "study_flashcards",
+      cardType,
+      result,
+      isCorrect,
+      surface: currentCard.surface,
+      reading: currentCard.reading,
+      meaning: currentCard.meaning,
+    });
+  }
+
   function checkMultipleChoice(choice: string) {
     if (!currentCard || checked) return;
 
@@ -475,441 +499,420 @@ export default function LibraryStudyPage() {
 
     setSelectedAnswer(choice);
     setChecked({ ok, correct });
-  }
 
-  function checkTypingSingle() {
-    if (!currentCard || checked) return;
+    recordCurrentStudyEvent(
+      ok ? "correct" : "incorrect",
+      ok,
+      studyMode
+    );
 
-    let correct = currentCard.reading;
-    let ok = false;
+    function checkTypingSingle() {
+      if (!currentCard || checked) return;
 
-    if (studyMode === "reading_typing") {
-      correct = currentCard.reading;
-      ok = normalizeKana(typingInput) === normalizeKana(correct);
-    } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
-      correct = currentCard.meaning;
-      ok = matchesAnyMeaning(typingInput, correct);
+      let correct = currentCard.reading;
+      let ok = false;
+
+      if (studyMode === "reading_typing") {
+        correct = currentCard.reading;
+        ok = normalizeKana(typingInput) === normalizeKana(correct);
+      } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
+        correct = currentCard.meaning;
+        ok = matchesAnyMeaning(typingInput, correct);
+      }
+
+      setChecked({ ok, correct });
+
+      recordCurrentStudyEvent(
+        ok ? "correct" : "incorrect",
+        ok,
+        studyMode
+      );
     }
 
-    setChecked({ ok, correct });
-  }
+    function checkCompleteStudyStep1() {
+      if (!currentCard || firstStepChecked) return;
 
-  function checkCompleteStudyStep1() {
-    if (!currentCard || firstStepChecked) return;
+      const ok = normalizeKana(typingInput) === normalizeKana(currentCard.reading);
+      setFirstStepChecked({ ok, correct: currentCard.reading });
 
-    const ok = normalizeKana(typingInput) === normalizeKana(currentCard.reading);
-    setFirstStepChecked({ ok, correct: currentCard.reading });
+      recordCurrentStudyEvent(
+        ok ? "correct" : "incorrect",
+        ok,
+        "complete_study_reading_step"
+      );
 
-    if (ok) {
-      setTwoStepStage(2);
-      setSecondStepInput("");
-    }
-  }
-
-  function checkCompleteStudyStep2() {
-    if (!currentCard || !firstStepChecked?.ok || secondStepChecked) return;
-
-    const ok = matchesAnyMeaning(secondStepInput, currentCard.meaning);
-    setSecondStepChecked({ ok, correct: currentCard.meaning });
-  }
-
-  async function flagCurrentCard() {
-    if (!currentCard) return;
-
-    const ok = window.confirm("Hide this card from study?");
-    if (!ok) return;
-
-    const { error } = await supabase
-      .from("user_book_words")
-      .update({ hidden: true })
-      .eq("id", currentCard.id);
-
-    if (error) {
-      console.error("Error hiding study card:", error);
-      alert(`Could not flag card.\n${error.message}`);
-      return;
+      if (ok) {
+        setTwoStepStage(2);
+        setSecondStepInput("");
+      }
     }
 
-    setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
-    setNotice("Card hidden from study.");
-  }
+    function checkCompleteStudyStep2() {
+      if (!currentCard || !firstStepChecked?.ok || secondStepChecked) return;
 
-  if (loading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <p className="text-lg text-gray-500">Loading Library Study…</p>
-      </main>
-    );
-  }
+      const ok = matchesAnyMeaning(secondStepInput, currentCard.meaning);
+      setSecondStepChecked({ ok, correct: currentCard.meaning });
 
-  if (needsSignIn) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-gray-700">You need to sign in to use Library Study.</p>
-        <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
-          Go to Login
-        </button>
-      </main>
-    );
-  }
+      recordCurrentStudyEvent(
+        ok ? "correct" : "incorrect",
+        ok,
+        "complete_study_meaning_step"
+      );
+    }
 
-  if (errorMsg) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-red-700">{errorMsg}</p>
-        <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-          Back to Library
-        </button>
-      </main>
-    );
-  }
+    async function flagCurrentCard() {
+      if (!currentCard) return;
 
-  if (allCards.length === 0) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-2xl font-semibold text-gray-700">
-          No saved vocab is ready for Library Study yet.
-        </p>
-        <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-          Back to Library
-        </button>
-      </main>
-    );
-  }
+      const ok = window.confirm("Hide this card from study?");
+      if (!ok) return;
 
-  if (filteredCards.length === 0) {
-    return (
-      <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">Library Study</h1>
-          <p className="mt-3 text-gray-600">
-            {selectedJlpt === "all"
-              ? "You’ve already studied all available Library Study cards today."
-              : "No cards match your current JLPT filter, or you already studied them today."}
+      const { error } = await supabase
+        .from("user_book_words")
+        .update({ hidden: true })
+        .eq("id", currentCard.id);
+
+      if (error) {
+        console.error("Error hiding study card:", error);
+        alert(`Could not flag card.\n${error.message}`);
+        return;
+      }
+
+      setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
+      setNotice("Card hidden from study.");
+    }
+
+    if (loading) {
+      return (
+        <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
+          <p className="text-lg text-gray-500">Loading Library Study…</p>
+        </main>
+      );
+    }
+
+    if (needsSignIn) {
+      return (
+        <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
+          <p className="text-gray-700">You need to sign in to use Library Study.</p>
+          <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
+            Go to Login
+          </button>
+        </main>
+      );
+    }
+
+    if (errorMsg) {
+      return (
+        <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
+          <p className="text-red-700">{errorMsg}</p>
+          <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
+            Back to Library
+          </button>
+        </main>
+      );
+    }
+
+    if (allCards.length === 0) {
+      return (
+        <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
+          <p className="text-2xl font-semibold text-gray-700">
+            No saved vocab is ready for Library Study yet.
           </p>
+          <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
+            Back to Library
+          </button>
+        </main>
+      );
+    }
 
-          <div className="mt-6 flex justify-center gap-3">
-            <button
-              onClick={() => setSelectedJlpt("all")}
-              className="rounded bg-gray-700 px-4 py-2 text-white"
-            >
-              Clear JLPT Filter
-            </button>
-            <button
-              onClick={() => router.push("/books")}
-              className="rounded bg-gray-200 px-4 py-2"
-            >
-              Back to Library
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
+    if (filteredCards.length === 0) {
+      return (
+        <main className="min-h-screen bg-slate-100 px-6 py-8">
+          <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+            <h1 className="text-2xl font-semibold">Library Study</h1>
+            <p className="mt-3 text-gray-600">
+              {selectedJlpt === "all"
+                ? "You’ve already studied all available Library Study cards today."
+                : "No cards match your current JLPT filter, or you already studied them today."}
+            </p>
 
-  if (index >= deck.length) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
-        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">
-            {endedEarly ? "Nice work today!" : "Nice work!"}
-          </h1>
-
-          {endedEarly ? (
-            <>
-              <p className="mt-3 text-gray-700">You gave your library some practice.</p>
-              <p className="mt-2 text-sm text-gray-500">Come back when you’re ready.</p>
-            </>
-          ) : (
-            <>
-              <p className="mt-3 text-gray-700">You finished this Library Study session.</p>
-              <p className="mt-2 text-sm text-gray-500">
-                Come back tomorrow to run into more old book memories.
-              </p>
-            </>
-          )}
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-              Back to Library
-            </button>
-            <button onClick={restartDeck} className="rounded bg-gray-700 px-4 py-2 text-white">
-              Refresh Remaining Cards
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main className="min-h-screen bg-slate-100 px-6 py-4">
-      <div className="mx-auto flex max-w-5xl flex-col items-center">
-        <div className="mb-2 text-center">
-          <h1 className="text-2xl font-semibold">Library Study</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Review saved words from across your books
-          </p>
-        </div>
-
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">JLPT:</label>
-            <select
-              value={selectedJlpt}
-              onChange={(e) => setSelectedJlpt(e.target.value)}
-              className="rounded border bg-white px-3 py-2 text-sm"
-            >
-              <option value="all">All Levels</option>
-              <option value="N5">N5</option>
-              <option value="N4">N4</option>
-              <option value="N3">N3</option>
-              <option value="N2">N2</option>
-              <option value="N1">N1</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Mode:</label>
-            <select
-              value={studyMode}
-              onChange={(e) => setStudyMode(e.target.value as StudyMode)}
-              className="rounded border bg-white px-3 py-2 text-sm"
-            >
-              <option value="reading_typing">Reading Typing</option>
-              <option value="meaning_typing">Meaning Typing</option>
-              <option value="reading_to_meaning_typing">Reading to Meaning Typing</option>
-              <option value="reading_mc">Reading MC</option>
-              <option value="meaning_mc">Meaning MC</option>
-              <option value="reading_to_kanji_mc">Reading to Kanji MC</option>
-              <option value="reading_to_meaning_mc">Reading to Meaning MC</option>
-              <option value="complete_study">Complete Study</option>
-            </select>
-          </div>
-        </div>
-
-        {notice ? (
-          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-            {notice}
-          </div>
-        ) : null}
-
-        <p className="mb-3 text-sm text-gray-500">
-          Card {index + 1}/{deck.length}
-        </p>
-
-        <div className="relative flex min-h-80 w-[90vw] max-w-xl items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl">
-          {currentCard?.jlpt ? (
-            <div className="absolute left-4 top-3 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
-              {currentCard.jlpt}
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={() => setSelectedJlpt("all")}
+                className="rounded bg-gray-700 px-4 py-2 text-white"
+              >
+                Clear JLPT Filter
+              </button>
+              <button
+                onClick={() => router.push("/books")}
+                className="rounded bg-gray-200 px-4 py-2"
+              >
+                Back to Library
+              </button>
             </div>
-          ) : null}
+          </div>
+        </main>
+      );
+    }
 
-          <div className="flex w-full flex-col items-center gap-6">
-            {(studyMode === "reading_typing" ||
-              studyMode === "reading_mc" ||
-              studyMode === "complete_study") && (
-                <>
-                  <div className="text-xs uppercase tracking-wide text-slate-500">
-                    What is the reading?
-                  </div>
-                  <div className="text-5xl font-bold">{currentCard?.surface}</div>
-                </>
-              )}
+    if (index >= deck.length) {
+      return (
+        <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
+          <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+            <h1 className="text-2xl font-semibold">
+              {endedEarly ? "Nice work today!" : "Nice work!"}
+            </h1>
 
-            {(studyMode === "meaning_typing" || studyMode === "meaning_mc") && (
+            {endedEarly ? (
               <>
-                <div className="text-xs uppercase tracking-wide text-slate-500">
-                  What is the meaning?
-                </div>
-                <div className="text-5xl font-bold">{currentCard?.surface}</div>
-                <div className="text-lg text-slate-500">{currentCard?.reading}</div>
+                <p className="mt-3 text-gray-700">You gave your library some practice.</p>
+                <p className="mt-2 text-sm text-gray-500">Come back when you’re ready.</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-gray-700">You finished this Library Study session.</p>
+                <p className="mt-2 text-sm text-gray-500">
+                  Come back tomorrow to run into more old book memories.
+                </p>
               </>
             )}
 
-            {(studyMode === "reading_to_kanji_mc" ||
-              studyMode === "reading_to_meaning_mc" ||
-              studyMode === "reading_to_meaning_typing") && (
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
+                Back to Library
+              </button>
+              <button onClick={restartDeck} className="rounded bg-gray-700 px-4 py-2 text-white">
+                Refresh Remaining Cards
+              </button>
+            </div>
+          </div>
+        </main>
+      );
+    }
+
+    return (
+      <main className="min-h-screen bg-slate-100 px-6 py-4">
+        <div className="mx-auto flex max-w-5xl flex-col items-center">
+          <div className="mb-2 text-center">
+            <h1 className="text-2xl font-semibold">Library Study</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Review saved words from across your books
+            </p>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">JLPT:</label>
+              <select
+                value={selectedJlpt}
+                onChange={(e) => setSelectedJlpt(e.target.value)}
+                className="rounded border bg-white px-3 py-2 text-sm"
+              >
+                <option value="all">All Levels</option>
+                <option value="N5">N5</option>
+                <option value="N4">N4</option>
+                <option value="N3">N3</option>
+                <option value="N2">N2</option>
+                <option value="N1">N1</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Mode:</label>
+              <select
+                value={studyMode}
+                onChange={(e) => setStudyMode(e.target.value as StudyMode)}
+                className="rounded border bg-white px-3 py-2 text-sm"
+              >
+                <option value="reading_typing">Reading Typing</option>
+                <option value="meaning_typing">Meaning Typing</option>
+                <option value="reading_to_meaning_typing">Reading to Meaning Typing</option>
+                <option value="reading_mc">Reading MC</option>
+                <option value="meaning_mc">Meaning MC</option>
+                <option value="reading_to_kanji_mc">Reading to Kanji MC</option>
+                <option value="reading_to_meaning_mc">Reading to Meaning MC</option>
+                <option value="complete_study">Complete Study</option>
+              </select>
+            </div>
+          </div>
+
+          {notice ? (
+            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+              {notice}
+            </div>
+          ) : null}
+
+          <p className="mb-3 text-sm text-gray-500">
+            Card {index + 1}/{deck.length}
+          </p>
+
+          <div className="relative flex min-h-80 w-[90vw] max-w-xl items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl">
+            {currentCard?.jlpt ? (
+              <div className="absolute left-4 top-3 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
+                {currentCard.jlpt}
+              </div>
+            ) : null}
+
+            <div className="flex w-full flex-col items-center gap-6">
+              {(studyMode === "reading_typing" ||
+                studyMode === "reading_mc" ||
+                studyMode === "complete_study") && (
+                  <>
+                    <div className="text-xs uppercase tracking-wide text-slate-500">
+                      What is the reading?
+                    </div>
+                    <div className="text-5xl font-bold">{currentCard?.surface}</div>
+                  </>
+                )}
+
+              {(studyMode === "meaning_typing" || studyMode === "meaning_mc") && (
                 <>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
-                    {studyMode === "reading_to_kanji_mc"
-                      ? "Which word matches this reading?"
-                      : "What is the meaning of this reading?"}
+                    What is the meaning?
                   </div>
-                  <div className="text-4xl font-bold">{currentCard?.reading}</div>
+                  <div className="text-5xl font-bold">{currentCard?.surface}</div>
+                  <div className="text-lg text-slate-500">{currentCard?.reading}</div>
                 </>
               )}
 
-            {studyMode === "reading_mc" && (
-              <div className="flex w-full max-w-sm flex-col gap-3">
-                {readingOptions.map((opt, i) => {
-                  const isCorrect =
-                    !!checked && normalizeKana(opt) === normalizeKana(currentCard!.reading);
-                  const isChosen =
-                    !!selectedAnswer && normalizeKana(opt) === normalizeKana(selectedAnswer);
-
-                  let className = "w-full rounded border px-4 py-3 text-base ";
-                  if (!checked) className += "bg-white hover:bg-gray-50";
-                  else if (isCorrect) className += "border-green-400 bg-green-100";
-                  else if (isChosen) className += "border-red-400 bg-red-100";
-                  else className += "bg-white";
-
-                  return (
-                    <button
-                      key={`${opt}-${i}`}
-                      type="button"
-                      disabled={!!checked}
-                      onClick={() => checkMultipleChoice(opt)}
-                      className={className}
-                    >
-                      <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {studyMode === "meaning_mc" && (
-              <div className="flex w-full max-w-sm flex-col gap-3">
-                {meaningOptions.map((opt, i) => {
-                  const isCorrect =
-                    !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
-                  const isChosen =
-                    !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                  let className = "w-full rounded border px-4 py-3 text-base ";
-                  if (!checked) className += "bg-white hover:bg-gray-50";
-                  else if (isCorrect) className += "border-green-400 bg-green-100";
-                  else if (isChosen) className += "border-red-400 bg-red-100";
-                  else className += "bg-white";
-
-                  return (
-                    <button
-                      key={`${opt}-${i}`}
-                      type="button"
-                      disabled={!!checked}
-                      onClick={() => checkMultipleChoice(opt)}
-                      className={className}
-                    >
-                      <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {studyMode === "reading_to_kanji_mc" && (
-              <div className="flex w-full max-w-sm flex-col gap-3">
-                {surfaceOptions.map((opt, i) => {
-                  const isCorrect =
-                    !!checked && normalizeText(opt) === normalizeText(currentCard!.surface);
-                  const isChosen =
-                    !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                  let className = "w-full rounded border px-4 py-3 text-base ";
-                  if (!checked) className += "bg-white hover:bg-gray-50";
-                  else if (isCorrect) className += "border-green-400 bg-green-100";
-                  else if (isChosen) className += "border-red-400 bg-red-100";
-                  else className += "bg-white";
-
-                  return (
-                    <button
-                      key={`${opt}-${i}`}
-                      type="button"
-                      disabled={!!checked}
-                      onClick={() => checkMultipleChoice(opt)}
-                      className={className}
-                    >
-                      <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {studyMode === "reading_to_meaning_mc" && (
-              <div className="flex w-full max-w-sm flex-col gap-3">
-                {meaningOptions.map((opt, i) => {
-                  const isCorrect =
-                    !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
-                  const isChosen =
-                    !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                  let className = "w-full rounded border px-4 py-3 text-base ";
-                  if (!checked) className += "bg-white hover:bg-gray-50";
-                  else if (isCorrect) className += "border-green-400 bg-green-100";
-                  else if (isChosen) className += "border-red-400 bg-red-100";
-                  else className += "bg-white";
-
-                  return (
-                    <button
-                      key={`${opt}-${i}`}
-                      type="button"
-                      disabled={!!checked}
-                      onClick={() => checkMultipleChoice(opt)}
-                      className={className}
-                    >
-                      <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {(studyMode === "reading_typing" ||
-              studyMode === "meaning_typing" ||
-              studyMode === "reading_to_meaning_typing") && (
-                <div className="w-full max-w-sm">
-                  <input
-                    ref={typingInputRef}
-                    value={typingInput}
-                    onChange={(e) => setTypingInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-
-                      e.preventDefault();
-                      e.stopPropagation();
-
-                      if (!checked) {
-                        checkTypingSingle();
-                      } else if (!checked.ok) {
-                        movePastCurrentCard();
-                      }
-                    }}
-                    placeholder={
-                      studyMode === "reading_typing"
-                        ? "Type the reading"
-                        : "Type the meaning"
-                    }
-                    className="w-full rounded border px-4 py-3 text-base"
-                    disabled={!!checked}
-                  />
-
-                  {!checked ? (
-                    <div className="mt-3 flex justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={checkTypingSingle}
-                        className="rounded bg-gray-700 px-4 py-2 text-white"
-                      >
-                        Check
-                      </button>
+              {(studyMode === "reading_to_kanji_mc" ||
+                studyMode === "reading_to_meaning_mc" ||
+                studyMode === "reading_to_meaning_typing") && (
+                  <>
+                    <div className="text-xs uppercase tracking-wide text-slate-500">
+                      {studyMode === "reading_to_kanji_mc"
+                        ? "Which word matches this reading?"
+                        : "What is the meaning of this reading?"}
                     </div>
-                  ) : null}
+                    <div className="text-4xl font-bold">{currentCard?.reading}</div>
+                  </>
+                )}
+
+              {studyMode === "reading_mc" && (
+                <div className="flex w-full max-w-sm flex-col gap-3">
+                  {readingOptions.map((opt, i) => {
+                    const isCorrect =
+                      !!checked && normalizeKana(opt) === normalizeKana(currentCard!.reading);
+                    const isChosen =
+                      !!selectedAnswer && normalizeKana(opt) === normalizeKana(selectedAnswer);
+
+                    let className = "w-full rounded border px-4 py-3 text-base ";
+                    if (!checked) className += "bg-white hover:bg-gray-50";
+                    else if (isCorrect) className += "border-green-400 bg-green-100";
+                    else if (isChosen) className += "border-red-400 bg-red-100";
+                    else className += "bg-white";
+
+                    return (
+                      <button
+                        key={`${opt}-${i}`}
+                        type="button"
+                        disabled={!!checked}
+                        onClick={() => checkMultipleChoice(opt)}
+                        className={className}
+                      >
+                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
-            {studyMode === "complete_study" && (
-              <div className="w-full max-w-sm">
-                <div className="space-y-3">
-                  <div>
-                    <div className="mb-1 text-sm text-gray-500">Step 1: Reading</div>
+              {studyMode === "meaning_mc" && (
+                <div className="flex w-full max-w-sm flex-col gap-3">
+                  {meaningOptions.map((opt, i) => {
+                    const isCorrect =
+                      !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
+                    const isChosen =
+                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
+
+                    let className = "w-full rounded border px-4 py-3 text-base ";
+                    if (!checked) className += "bg-white hover:bg-gray-50";
+                    else if (isCorrect) className += "border-green-400 bg-green-100";
+                    else if (isChosen) className += "border-red-400 bg-red-100";
+                    else className += "bg-white";
+
+                    return (
+                      <button
+                        key={`${opt}-${i}`}
+                        type="button"
+                        disabled={!!checked}
+                        onClick={() => checkMultipleChoice(opt)}
+                        className={className}
+                      >
+                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {studyMode === "reading_to_kanji_mc" && (
+                <div className="flex w-full max-w-sm flex-col gap-3">
+                  {surfaceOptions.map((opt, i) => {
+                    const isCorrect =
+                      !!checked && normalizeText(opt) === normalizeText(currentCard!.surface);
+                    const isChosen =
+                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
+
+                    let className = "w-full rounded border px-4 py-3 text-base ";
+                    if (!checked) className += "bg-white hover:bg-gray-50";
+                    else if (isCorrect) className += "border-green-400 bg-green-100";
+                    else if (isChosen) className += "border-red-400 bg-red-100";
+                    else className += "bg-white";
+
+                    return (
+                      <button
+                        key={`${opt}-${i}`}
+                        type="button"
+                        disabled={!!checked}
+                        onClick={() => checkMultipleChoice(opt)}
+                        className={className}
+                      >
+                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {studyMode === "reading_to_meaning_mc" && (
+                <div className="flex w-full max-w-sm flex-col gap-3">
+                  {meaningOptions.map((opt, i) => {
+                    const isCorrect =
+                      !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
+                    const isChosen =
+                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
+
+                    let className = "w-full rounded border px-4 py-3 text-base ";
+                    if (!checked) className += "bg-white hover:bg-gray-50";
+                    else if (isCorrect) className += "border-green-400 bg-green-100";
+                    else if (isChosen) className += "border-red-400 bg-red-100";
+                    else className += "bg-white";
+
+                    return (
+                      <button
+                        key={`${opt}-${i}`}
+                        type="button"
+                        disabled={!!checked}
+                        onClick={() => checkMultipleChoice(opt)}
+                        className={className}
+                      >
+                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {(studyMode === "reading_typing" ||
+                studyMode === "meaning_typing" ||
+                studyMode === "reading_to_meaning_typing") && (
+                  <div className="w-full max-w-sm">
                     <input
-                      ref={twoStepStage === 1 ? typingInputRef : null}
+                      ref={typingInputRef}
                       value={typingInput}
                       onChange={(e) => setTypingInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -918,177 +921,221 @@ export default function LibraryStudyPage() {
                         e.preventDefault();
                         e.stopPropagation();
 
-                        if (!firstStepChecked) {
-                          checkCompleteStudyStep1();
-                        } else if (!firstStepChecked.ok) {
+                        if (!checked) {
+                          checkTypingSingle();
+                        } else if (!checked.ok) {
                           movePastCurrentCard();
                         }
                       }}
-                      placeholder="Type the reading"
+                      placeholder={
+                        studyMode === "reading_typing"
+                          ? "Type the reading"
+                          : "Type the meaning"
+                      }
                       className="w-full rounded border px-4 py-3 text-base"
-                      disabled={!!firstStepChecked}
+                      disabled={!!checked}
                     />
-                    <div className="mt-2">
-                      {!firstStepChecked ? (
+
+                    {!checked ? (
+                      <div className="mt-3 flex justify-center gap-2">
                         <button
                           type="button"
-                          onClick={checkCompleteStudyStep1}
+                          onClick={checkTypingSingle}
                           className="rounded bg-gray-700 px-4 py-2 text-white"
                         >
-                          Check Reading
+                          Check
                         </button>
-                      ) : firstStepChecked.ok ? (
-                        <p className="text-green-700">✅ Reading correct!</p>
-                      ) : (
-                        <>
-                          <p className="text-red-700">❌ Reading: {firstStepChecked.correct}</p>
-                          <div className="mt-3 flex justify-center">
-                            <button
-                              type="button"
-                              onClick={movePastCurrentCard}
-                              className="rounded bg-gray-700 px-4 py-2 text-white"
-                            >
-                              Next
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
-
-                  <div>
-                    <div className="mb-1 text-sm text-gray-500">Step 2: Meaning</div>
-                    <input
-                      ref={twoStepStage === 2 ? typingInputRef : null}
-                      value={secondStepInput}
-                      onChange={(e) => setSecondStepInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        if (firstStepChecked?.ok && !secondStepChecked) {
-                          checkCompleteStudyStep2();
-                        } else if (secondStepChecked && !secondStepChecked.ok) {
-                          movePastCurrentCard();
-                        }
-                      }}
-                      placeholder="Type the meaning"
-                      className="w-full rounded border px-4 py-3 text-base"
-                      disabled={!firstStepChecked?.ok || !!secondStepChecked}
-                    />
-                    <div className="mt-2">
-                      {!secondStepChecked ? (
-                        <button
-                          type="button"
-                          onClick={checkCompleteStudyStep2}
-                          disabled={!firstStepChecked?.ok}
-                          className="rounded bg-gray-700 px-4 py-2 text-white disabled:opacity-50"
-                        >
-                          Check Meaning
-                        </button>
-                      ) : secondStepChecked.ok ? (
-                        <p className="text-green-700">✅ Meaning correct!</p>
-                      ) : (
-                        <>
-                          <p className="text-red-700">❌ Meaning: {secondStepChecked.correct}</p>
-                          <div className="mt-3 flex justify-center">
-                            <button
-                              type="button"
-                              onClick={movePastCurrentCard}
-                              className="rounded bg-gray-700 px-4 py-2 text-white"
-                            >
-                              Next
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {studyMode !== "complete_study" && checked ? (
-              <div className="mt-2 w-full max-w-sm text-center text-sm">
-                {checked.ok ? (
-                  <p className="text-green-700">✅ Correct!</p>
-                ) : (
-                  <>
-                    <p className="text-red-700">❌ Not quite.</p>
-                    <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
-                  </>
                 )}
 
-                <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                  <div className="text-lg font-semibold">{currentCard?.surface}</div>
-                  <div className="mt-1 text-sm text-slate-500">{currentCard?.reading}</div>
-                  <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
-                  <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
-                </div>
+              {studyMode === "complete_study" && (
+                <div className="w-full max-w-sm">
+                  <div className="space-y-3">
+                    <div>
+                      <div className="mb-1 text-sm text-gray-500">Step 1: Reading</div>
+                      <input
+                        ref={twoStepStage === 1 ? typingInputRef : null}
+                        value={typingInput}
+                        onChange={(e) => setTypingInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
 
-                {!checked.ok ? (
-                  <div className="mt-3 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={movePastCurrentCard}
-                      className="rounded bg-gray-700 px-4 py-2 text-white"
-                    >
-                      Next
-                    </button>
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          if (!firstStepChecked) {
+                            checkCompleteStudyStep1();
+                          } else if (!firstStepChecked.ok) {
+                            movePastCurrentCard();
+                          }
+                        }}
+                        placeholder="Type the reading"
+                        className="w-full rounded border px-4 py-3 text-base"
+                        disabled={!!firstStepChecked}
+                      />
+                      <div className="mt-2">
+                        {!firstStepChecked ? (
+                          <button
+                            type="button"
+                            onClick={checkCompleteStudyStep1}
+                            className="rounded bg-gray-700 px-4 py-2 text-white"
+                          >
+                            Check Reading
+                          </button>
+                        ) : firstStepChecked.ok ? (
+                          <p className="text-green-700">✅ Reading correct!</p>
+                        ) : (
+                          <>
+                            <p className="text-red-700">❌ Reading: {firstStepChecked.correct}</p>
+                            <div className="mt-3 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={movePastCurrentCard}
+                                className="rounded bg-gray-700 px-4 py-2 text-white"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-1 text-sm text-gray-500">Step 2: Meaning</div>
+                      <input
+                        ref={twoStepStage === 2 ? typingInputRef : null}
+                        value={secondStepInput}
+                        onChange={(e) => setSecondStepInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
+
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          if (firstStepChecked?.ok && !secondStepChecked) {
+                            checkCompleteStudyStep2();
+                          } else if (secondStepChecked && !secondStepChecked.ok) {
+                            movePastCurrentCard();
+                          }
+                        }}
+                        placeholder="Type the meaning"
+                        className="w-full rounded border px-4 py-3 text-base"
+                        disabled={!firstStepChecked?.ok || !!secondStepChecked}
+                      />
+                      <div className="mt-2">
+                        {!secondStepChecked ? (
+                          <button
+                            type="button"
+                            onClick={checkCompleteStudyStep2}
+                            disabled={!firstStepChecked?.ok}
+                            className="rounded bg-gray-700 px-4 py-2 text-white disabled:opacity-50"
+                          >
+                            Check Meaning
+                          </button>
+                        ) : secondStepChecked.ok ? (
+                          <p className="text-green-700">✅ Meaning correct!</p>
+                        ) : (
+                          <>
+                            <p className="text-red-700">❌ Meaning: {secondStepChecked.correct}</p>
+                            <div className="mt-3 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={movePastCurrentCard}
+                                className="rounded bg-gray-700 px-4 py-2 text-white"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {studyMode === "complete_study" && secondStepChecked ? (
-              <div className="mt-2 w-full max-w-sm text-center text-sm">
-                <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                  <div className="text-lg font-semibold">{currentCard?.surface}</div>
-                  <div className="mt-1 text-sm text-slate-500">{currentCard?.reading}</div>
-                  <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
-                  <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
                 </div>
-              </div>
-            ) : null}
+              )}
+
+              {studyMode !== "complete_study" && checked ? (
+                <div className="mt-2 w-full max-w-sm text-center text-sm">
+                  {checked.ok ? (
+                    <p className="text-green-700">✅ Correct!</p>
+                  ) : (
+                    <>
+                      <p className="text-red-700">❌ Not quite.</p>
+                      <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
+                    </>
+                  )}
+
+                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
+                    <div className="text-lg font-semibold">{currentCard?.surface}</div>
+                    <div className="mt-1 text-sm text-slate-500">{currentCard?.reading}</div>
+                    <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
+                    <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
+                  </div>
+
+                  {!checked.ok ? (
+                    <div className="mt-3 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={movePastCurrentCard}
+                        className="rounded bg-gray-700 px-4 py-2 text-white"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {studyMode === "complete_study" && secondStepChecked ? (
+                <div className="mt-2 w-full max-w-sm text-center text-sm">
+                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
+                    <div className="text-lg font-semibold">{currentCard?.surface}</div>
+                    <div className="mt-1 text-sm text-slate-500">{currentCard?.reading}</div>
+                    <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
+                    <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/books")}
+              className="rounded bg-gray-200 px-4 py-2"
+            >
+              Back to Library
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push(`/books/${currentCard?.userBookId}`)}
+              className="rounded bg-gray-200 px-4 py-2"
+            >
+              Open Book
+            </button>
+
+            <button
+              type="button"
+              onClick={flagCurrentCard}
+              className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-amber-800"
+            >
+              Flag this card
+            </button>
+
+            <button
+              type="button"
+              onClick={finishForToday}
+              className="rounded bg-gray-700 px-4 py-2 text-white"
+            >
+              Finish for Today
+            </button>
           </div>
         </div>
-
-        <div className="mt-5 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/books")}
-            className="rounded bg-gray-200 px-4 py-2"
-          >
-            Back to Library
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push(`/books/${currentCard?.userBookId}`)}
-            className="rounded bg-gray-200 px-4 py-2"
-          >
-            Open Book
-          </button>
-
-          <button
-            type="button"
-            onClick={flagCurrentCard}
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-amber-800"
-          >
-            Flag this card
-          </button>
-
-          <button
-            type="button"
-            onClick={finishForToday}
-            className="rounded bg-gray-700 px-4 py-2 text-white"
-          >
-            Finish for Today
-          </button>
-        </div>
-      </div>
-    </main>
-  );
-}
+      </main>
+    );
+  }}

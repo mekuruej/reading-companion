@@ -18,56 +18,97 @@ export default function AppAccessGate({ children }: Props) {
 
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const [redirectingTo, setRedirectingTo] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function checkAccess() {
       setChecking(true);
+      setAllowed(false);
+      setRedirectingTo(null);
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-      if (!session?.user) {
-        if (!cancelled) router.replace("/login");
-        return;
-      }
+        if (sessionError || !session?.user) {
+          if (!cancelled) {
+            setRedirectingTo("/login");
+            setChecking(false);
+            router.replace("/login");
+          }
+          return;
+        }
 
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("role, app_access_type, app_access_expires_at")
-        .eq("id", session.user.id)
-        .single();
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("role, app_access_type, app_access_expires_at")
+          .eq("id", session.user.id)
+          .single();
 
-      if (error || !profile) {
-        console.error("Error checking app access:", error);
-        if (!cancelled) router.replace("/login");
-        return;
-      }
+        if (error || !profile) {
+          console.error("Error checking app access:", error);
 
-      const status = getAppAccessStatus(profile);
+          if (!cancelled) {
+            setRedirectingTo("/login");
+            setChecking(false);
+            router.replace("/login");
+          }
+          return;
+        }
 
-      if (!status.hasAccess) {
-        if (!cancelled && pathname !== "/trial-ended") router.replace("/trial-ended");
-        return;
-      }
+        const status = getAppAccessStatus(profile);
 
-      if (!cancelled) {
-        setAllowed(true);
-        setChecking(false);
+        if (!status.hasAccess) {
+          if (!cancelled) {
+            if (pathname === "/trial-ended") {
+              setAllowed(true);
+              setChecking(false);
+              return;
+            }
+
+            setRedirectingTo("/trial-ended");
+            setChecking(false);
+            router.replace("/trial-ended");
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setAllowed(true);
+          setChecking(false);
+        }
+      } catch (err) {
+        console.error("Unexpected error checking app access:", err);
+
+        if (!cancelled) {
+          setRedirectingTo("/login");
+          setChecking(false);
+          router.replace("/login");
+        }
       }
     }
 
-    checkAccess();
+    void checkAccess();
 
     return () => {
       cancelled = true;
     };
   }, [pathname, router]);
 
-  if (checking || !allowed) {
+  if (checking) {
     return <div className="p-6 text-sm text-stone-600">Checking access...</div>;
+  }
+
+  if (!allowed) {
+    return (
+      <div className="p-6 text-sm text-stone-600">
+        Redirecting{redirectingTo ? ` to ${redirectingTo}` : ""}...
+      </div>
+    );
   }
 
   return <>{children}</>;

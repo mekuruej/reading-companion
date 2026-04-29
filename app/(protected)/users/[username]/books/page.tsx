@@ -82,6 +82,7 @@ type MonthlyLibraryStats = {
   daysRead: number;
   totalTimeMinutes: number;
   totalWordsLookedUp: number;
+  currentRunDays: number;
   longestRunDays: number;
 };
 
@@ -111,6 +112,11 @@ function ymdInTimeZone(value: string | Date, timeZone: string) {
   if (!year || !month || !day) return null;
 
   return `${year}-${month}-${day}`;
+}
+
+function ymdToDayNumber(ymd: string) {
+  const [year, month, day] = ymd.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
 }
 
 function getMonthOptions(count = 12): MonthOption[] {
@@ -385,6 +391,7 @@ export default function BooksPage() {
     daysRead: 0,
     totalTimeMinutes: 0,
     totalWordsLookedUp: 0,
+    currentRunDays: 0,
     longestRunDays: 0,
   });
 
@@ -425,6 +432,7 @@ export default function BooksPage() {
           daysRead: 0,
           totalTimeMinutes: 0,
           totalWordsLookedUp: 0,
+          currentRunDays: 0,
           longestRunDays: 0,
         });
         return;
@@ -438,6 +446,7 @@ export default function BooksPage() {
           daysRead: 0,
           totalTimeMinutes: 0,
           totalWordsLookedUp: 0,
+          currentRunDays: 0,
           longestRunDays: 0,
         });
         return;
@@ -512,25 +521,40 @@ export default function BooksPage() {
         }
       }
 
-      const sortedEngagedDays = Array.from(engagedDays).sort((a, b) => a.localeCompare(b));
+      const sortedEngagedDays = Array.from(engagedDays).sort((a, b) =>
+        a.localeCompare(b)
+      );
+
       let longestRunDays = 0;
-      let currentRunDays = 0;
+      let runBeingCounted = 0;
       let previousDayValue: number | null = null;
 
       for (const day of sortedEngagedDays) {
-        const dayValue = Math.floor(new Date(`${day}T00:00:00`).getTime() / 86400000);
+        const dayValue = ymdToDayNumber(day);
 
         if (previousDayValue != null && dayValue === previousDayValue + 1) {
-          currentRunDays += 1;
+          runBeingCounted += 1;
         } else {
-          currentRunDays = 1;
+          runBeingCounted = 1;
         }
 
-        if (currentRunDays > longestRunDays) {
-          longestRunDays = currentRunDays;
+        if (runBeingCounted > longestRunDays) {
+          longestRunDays = runBeingCounted;
         }
 
         previousDayValue = dayValue;
+      }
+
+      let currentRunDays = 0;
+      const todayInTimeZone = ymdInTimeZone(new Date(), timeZone);
+
+      if (todayInTimeZone) {
+        let cursor = ymdToDayNumber(todayInTimeZone);
+
+        while (engagedDays.has(new Date(cursor * 86400000).toISOString().slice(0, 10))) {
+          currentRunDays += 1;
+          cursor -= 1;
+        }
       }
 
       setMonthlyStats({
@@ -538,6 +562,7 @@ export default function BooksPage() {
         daysRead: engagedDays.size,
         totalTimeMinutes,
         totalWordsLookedUp,
+        currentRunDays,
         longestRunDays,
       });
     } finally {
@@ -1691,10 +1716,25 @@ export default function BooksPage() {
               </div>
             </div>
 
-            <div className="mt-3 rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                <div className="text-[11px] text-slate-500">This Month&apos;s Longest Run</div>
-                <div className="text-center text-xl font-semibold text-slate-900">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
+                <div className="text-[11px] text-slate-500">Current Run</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">
+                  {monthlyStatsLoading
+                    ? "…"
+                    : monthlyStats.currentRunDays > 0
+                      ? `${monthlyStats.currentRunDays} day${monthlyStats.currentRunDays === 1 ? "" : "s"
+                      }`
+                      : "—"}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-500">
+                  Consecutive engaged days ending today
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
+                <div className="text-[11px] text-slate-500">Longest Run This Month</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">
                   {monthlyStatsLoading
                     ? "…"
                     : monthlyStats.longestRunDays > 0
@@ -1702,7 +1742,9 @@ export default function BooksPage() {
                       }`
                       : "—"}
                 </div>
-                <div aria-hidden="true" />
+                <div className="mt-1 text-[10px] text-slate-500">
+                  Best streak anywhere in this month
+                </div>
               </div>
             </div>
           </div>
