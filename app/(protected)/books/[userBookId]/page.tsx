@@ -10,6 +10,7 @@ import CommunityTab from "./components/CommunityTab";
 import ReadingTab from "./components/ReadingTab";
 import RatingTab from "./components/RatingTab";
 import TeacherTab from "./components/TeacherTab";
+import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
 import StoryTab from "./components/StoryTab";
 import VocabTab from "./components/VocabTab";
 
@@ -67,6 +68,11 @@ type UserBook = {
   format_type: string | null;
   progress_mode: string | null;
   show_page_numbers: boolean | null;
+  is_teacher_prep?: boolean | null;
+  teacher_prep_kind?: string | null;
+  prepared_by?: string | null;
+  source_user_book_id?: string | null;
+  assigned_from_prep_at?: string | null;
 
   books: Book | null;
 };
@@ -2922,9 +2928,16 @@ export default function BookHubPage() {
         teacher_student_use_rating,
         reader_level,
         recommended_level,
+        favorite_quotes,
+        memorable_words,
         format_type,
         progress_mode,
         show_page_numbers,
+        is_teacher_prep,
+        teacher_prep_kind,
+        prepared_by,
+        source_user_book_id,
+        assigned_from_prep_at,
         books (
           id,
           title,
@@ -3677,8 +3690,8 @@ export default function BookHubPage() {
         rating_recommend: rr,
         rating_difficulty: rd,
         teacher_student_use_rating: tsur,
-        favorite_quotes: favoriteQuotes || null,
-        memorable_words: memorableWords || null,
+        favorite_quotes: favoriteQuotes.trim() || null,
+        memorable_words: memorableWords.trim() || null,
         reader_level: profileLevel || readerLevel || null,
         recommended_level: recommendedLevel || null,
         format_type: formatType || null,
@@ -4377,6 +4390,12 @@ export default function BookHubPage() {
               </div>
             </div>
 
+            {row.is_teacher_prep && row.teacher_prep_kind === "trial" ? (
+              <div className="mt-6">
+                <TeacherPrepAssignBox userBookId={row.id} />
+              </div>
+            ) : null}
+
             <div className="mt-6 space-y-4">
               <div>
                 <div className="mb-2 text-sm text-stone-700">
@@ -4714,6 +4733,8 @@ export default function BookHubPage() {
                     illustratorReading={illustratorReading}
                     setIllustratorReading={setIllustratorReading}
                     relatedLinksArr={relatedLinksArr}
+                    linksText={linksText}
+                    setLinksText={setLinksText}
                     bookTypeLabel={bookTypeLabel}
                     displayLinkLabel={displayLinkLabel}
                     displayLinkUrl={displayLinkUrl}

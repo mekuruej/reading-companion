@@ -210,14 +210,14 @@ export default function RatingTab({
             <div className="rounded border bg-white p-3 text-sm">
               <div className="text-stone-600">Favorite Quotes</div>
               <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
-                {row.favorite_quotes?.trim() ? row.favorite_quotes : "—"}
+                {favoriteQuotes.trim() ? favoriteQuotes : "—"}
               </div>
             </div>
 
             <div className="rounded border bg-white p-3 text-sm">
               <div className="text-stone-600">Memorable Words</div>
               <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
-                {row.memorable_words?.trim() ? row.memorable_words : "—"}
+                {memorableWords.trim() ? memorableWords : "—"}
               </div>
             </div>
           </div>

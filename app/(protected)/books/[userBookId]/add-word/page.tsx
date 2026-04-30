@@ -1,4 +1,4 @@
-//Read Along Page
+//Single Add 
 // 
 "use client";
 
@@ -655,26 +655,32 @@ export default function AddWordPage() {
           <div className="grid gap-4">
             <div>
               <div className="flex flex-wrap gap-2">
-                <input
-                  ref={wordInputRef}
-                  value={word}
-                  onChange={(e) => {
-                    setWord(e.target.value);
-                    if (lookupCandidates.length > 0) {
-                      setLookupCandidates([]);
-                    }
-                  }}
-                  placeholder="Search for a word"
-                  className="flex-1 rounded-xl border px-3 py-2 text-sm"
-                />
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
 
-                <button
-                  type="button"
-                  onClick={() => void handleLookup()}
-                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+                    if (!word.trim() || lookupLoading) return;
+
+                    void handleLookup();
+                  }}
+                  className="flex w-full flex-col gap-3 sm:flex-row sm:items-center"
                 >
-                  Search
-                </button>
+                  <input
+                    ref={wordInputRef}
+                    value={word}
+                    onChange={(event) => setWord(event.target.value)}
+                    placeholder="Search a word..."
+                    className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-500"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={lookupLoading || !word.trim()}
+                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                  >
+                    {lookupLoading ? "Searching..." : "Search"}
+                  </button>
+                </form>
 
                 <button
                   type="button"
@@ -703,6 +709,14 @@ export default function AddWordPage() {
                     className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
                   >
                     Kanji Lookup
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled
+                    className="shrink-0 rounded-xl bg-stone-100 px-5 py-3 text-sm font-medium text-stone-400"
+                  >
+                    Grammar Lookup
                   </button>
 
                   <span className="select-none text-sm text-stone-400">(coming soon...)</span>
@@ -738,17 +752,15 @@ export default function AddWordPage() {
                             applyJisho(candidate);
                             setShowEditor(true);
                             setMessage(
-                              `✅ Loaded ${candidate.surface}${
-                                candidate.reading ? `【${candidate.reading}】` : ""
+                              `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
                               }.`
                             );
                             jumpToEditor();
                           }}
-                          className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                            isSelected
+                          className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
                               ? "border-sky-400 bg-white shadow-sm"
                               : "border-sky-200 bg-white/80 hover:bg-white"
-                          }`}
+                            }`}
                         >
                           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                             <span className="text-base font-semibold text-stone-900">
@@ -802,55 +814,55 @@ export default function AddWordPage() {
                   ) : null}
 
                   <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <div>
+                          <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
+                          <input
+                            ref={editorWordInputRef}
+                            value={useAlternateSurface ? alternateSurface : word}
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              if (useAlternateSurface) {
+                                setAlternateSurface(next);
+                              } else {
+                                setWord(next);
+                              }
+                            }}
+                            placeholder="Word"
+                            className="w-full rounded border bg-white px-3 py-2 text-sm"
+                          />
+                        </div>
+
+                        <label className="flex items-center gap-2 text-sm text-stone-700">
+                          <input
+                            type="checkbox"
+                            checked={useAlternateSurface}
+                            onChange={(e) => setUseAlternateSurface(e.target.checked)}
+                          />
+                          <span>Alternate kanji (in this book)</span>
+                        </label>
+
+                        {useAlternateSurface ? (
+                          <input
+                            value={alternateSurface}
+                            onChange={(e) => setAlternateSurface(e.target.value)}
+                            placeholder="Book form (e.g. 愉しい)"
+                            className="w-full rounded border px-3 py-2 text-sm"
+                          />
+                        ) : null}
+                      </div>
+
                       <div>
-                        <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
+                        <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
                         <input
-                          ref={editorWordInputRef}
-                          value={useAlternateSurface ? alternateSurface : word}
-                          onChange={(e) => {
-                            const next = e.target.value;
-                            if (useAlternateSurface) {
-                              setAlternateSurface(next);
-                            } else {
-                              setWord(next);
-                            }
-                          }}
-                          placeholder="Word"
+                          value={reading}
+                          onChange={(e) => setReading(e.target.value)}
+                          placeholder="Reading"
                           className="w-full rounded border bg-white px-3 py-2 text-sm"
                         />
                       </div>
-
-                      <label className="flex items-center gap-2 text-sm text-stone-700">
-                        <input
-                          type="checkbox"
-                          checked={useAlternateSurface}
-                          onChange={(e) => setUseAlternateSurface(e.target.checked)}
-                        />
-                        <span>Alternate kanji (in this book)</span>
-                      </label>
-
-                      {useAlternateSurface ? (
-                        <input
-                          value={alternateSurface}
-                          onChange={(e) => setAlternateSurface(e.target.value)}
-                          placeholder="Book form (e.g. 愉しい)"
-                          className="w-full rounded border px-3 py-2 text-sm"
-                        />
-                      ) : null}
                     </div>
-
-                    <div>
-                      <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
-                      <input
-                        value={reading}
-                        onChange={(e) => setReading(e.target.value)}
-                        placeholder="Reading"
-                        className="w-full rounded border bg-white px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </div>
                   </div>
 
                   <div>

@@ -599,11 +599,11 @@ function statsTabLabel(tab: StatsTab) {
 }
 
 function statsTabDescription(tab: StatsTab) {
-  if (tab === "life") return "Effort, consistency, rhythm, and reading habits.";
-  if (tab === "skill") return "Difficulty, pace, and support by reading lane.";
-  if (tab === "library") return "Broad bookish stats like books, authors, types, and monthly reading.";
-  if (tab === "vocabulary") return "Words, kanji, repeated lookups, and vocabulary relationships.";
-  return "Lesson prep, guided reading support, and teacher/student reading signals.";
+  if (tab === "life") return "Effort, consistency, and habits";
+  if (tab === "skill") return "Difficulty, pace, and support type";
+  if (tab === "library") return "Books, authors, and monthly reading";
+  if (tab === "vocabulary") return "Vocab, kanji, and study";
+  return "Lesson prep and potential books";
 }
 
 function inRangeByDateString(dateString: string | null, cutoff: Date | null) {
@@ -685,18 +685,16 @@ function ReadingLaneFilter({
 }) {
   return (
     <div>
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Book Category Filter
-          </div>
-          <div className="text-lg font-semibold text-slate-900">
-            Showing: {abilityReadingGroupLabel(value)}
-          </div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Book Category:{" "}
+          <span className="normal-case tracking-normal text-slate-900">
+            {abilityReadingGroupLabel(value)}
+          </span>
         </div>
 
-        <div className="text-xs text-slate-500">
-          These buttons change the stats and book examples below.
+        <div className="hidden text-[11px] text-slate-500 md:block">
+          Changes the stats and book examples below.
         </div>
       </div>
 
@@ -710,12 +708,15 @@ function ReadingLaneFilter({
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
-              className={`rounded-xl border px-4 py-3 text-left transition ${selected ? optionTheme.active : optionTheme.inactive
+              className={`rounded-xl border px-3 py-2 text-left transition ${selected ? optionTheme.active : optionTheme.inactive
                 }`}
             >
-              <div className="text-sm font-semibold">{option.label}</div>
+              <div className="text-sm font-semibold leading-5">
+                {option.label}
+              </div>
+
               <div
-                className={`mt-1 text-xs leading-5 ${selected ? "text-white/80" : optionTheme.inactiveDescription
+                className={`hidden sm:block mt-0.5 text-[11px] leading-4 ${selected ? "text-white/75" : optionTheme.inactiveDescription
                   }`}
               >
                 {option.description}
@@ -1778,29 +1779,122 @@ export default function StatsPage() {
     };
   }, [rows, studyEventsForSelectedBookCategory]);
 
-  const vocabularySavedWordRhythmActivity = useMemo(() => {
+  const vocabularyRhythmActivity = useMemo(() => {
     const today = startOfToday();
-    const dayCount = rangeDayCount(range, sessions, vocabularyWords);
-    const start = addDays(today, -(dayCount - 1));
-    const buckets = new Map<string, { words: number }>();
 
-    for (let i = 0; i < dayCount; i++) {
-      buckets.set(ymdLocal(addDays(start, i)), { words: 0 });
+    let dayCount = 30;
+
+    if (range === "7d") {
+      dayCount = 7;
+    } else if (range === "30d") {
+      dayCount = 30;
+    } else if (range === "90d") {
+      dayCount = 90;
+    } else if (range === "1y") {
+      dayCount = 365;
+    } else {
+      const dateValues: number[] = [];
+
+      for (const word of vocabularyWords) {
+        const time = new Date(word.created_at).getTime();
+        if (!Number.isNaN(time)) dateValues.push(time);
+      }
+
+      for (const event of studyEventsForSelectedBookCategory) {
+        const time = new Date(event.created_at).getTime();
+        if (!Number.isNaN(time)) dateValues.push(time);
+      }
+
+      if (dateValues.length > 0) {
+        const earliest = new Date(Math.min(...dateValues));
+        earliest.setHours(0, 0, 0, 0);
+
+        const diff = today.getTime() - earliest.getTime();
+        dayCount = Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)) + 1);
+      }
     }
 
-    for (const row of vocabularyWords) {
-      const day = ymdLocal(new Date(row.created_at));
+    const start = addDays(today, -(dayCount - 1));
+
+    const buckets = new Map<
+      string,
+      {
+        words: number;
+        studyEvents: number;
+        correct: number;
+        incorrect: number;
+        reviewed: number;
+        skipped: number;
+      }
+    >();
+
+    for (let i = 0; i < dayCount; i++) {
+      buckets.set(ymdLocal(addDays(start, i)), {
+        words: 0,
+        studyEvents: 0,
+        correct: 0,
+        incorrect: 0,
+        reviewed: 0,
+        skipped: 0,
+      });
+    }
+
+    for (const word of vocabularyWords) {
+      const day = ymdLocal(new Date(word.created_at));
       if (!buckets.has(day)) continue;
 
       const bucket = buckets.get(day)!;
       bucket.words += 1;
     }
 
+    for (const event of studyEventsForSelectedBookCategory) {
+      const day = ymdLocal(new Date(event.created_at));
+      if (!buckets.has(day)) continue;
+
+      const bucket = buckets.get(day)!;
+      bucket.studyEvents += 1;
+
+      if (event.result === "correct" || event.is_correct === true) {
+        bucket.correct += 1;
+      } else if (event.result === "incorrect" || event.is_correct === false) {
+        bucket.incorrect += 1;
+      } else if (event.result === "skipped") {
+        bucket.skipped += 1;
+      } else {
+        bucket.reviewed += 1;
+      }
+    }
+
     return Array.from(buckets.entries()).map(([day, value]) => ({
       day,
       ...value,
     }));
-  }, [range, sessions, vocabularyWords]);
+  }, [range, vocabularyWords, studyEventsForSelectedBookCategory]);
+
+  const vocabularyRhythmSummary = useMemo(() => {
+    const savedWordDays = vocabularyRhythmActivity.filter(
+      (item) => item.words > 0
+    ).length;
+
+    const studyDays = vocabularyRhythmActivity.filter(
+      (item) => item.studyEvents > 0
+    ).length;
+
+    const overlapDays = vocabularyRhythmActivity.filter(
+      (item) => item.words > 0 && item.studyEvents > 0
+    ).length;
+
+    const activeVocabularyDays = vocabularyRhythmActivity.filter(
+      (item) => item.words > 0 || item.studyEvents > 0
+    ).length;
+
+    return {
+      savedWordDays,
+      studyDays,
+      overlapDays,
+      activeVocabularyDays,
+    };
+  }, [vocabularyRhythmActivity]);
 
   const vocabularyWordsByBookTypePie = useMemo(() => {
     const typeByUserBookId = new Map(
@@ -2077,6 +2171,24 @@ export default function StatsPage() {
   const activeRows = useMemo(() => {
     return rows.filter((row) => activeUserBookIds.has(row.id));
   }, [rows, activeUserBookIds]);
+
+  const bookTypeCountPie = useMemo(() => {
+    const counts = new Map<string, number>();
+    const palette = ["#8b5cf6", "#ec4899", "#38bdf8", "#f59e0b", "#14b8a6", "#f97316"];
+
+    for (const row of activeRows) {
+      const label = bookTypeLabel(row.books?.book_type ?? null);
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], index) => ({
+        label,
+        value,
+        color: palette[index % palette.length],
+      }));
+  }, [activeRows]);
 
   const teacherRows = useMemo(() => {
     return rows.filter(
@@ -3201,10 +3313,10 @@ export default function StatsPage() {
               <SectionBand
                 eyebrow="Book Types"
                 title="Book types in your library"
-                description="A page-weighted view of the kinds of books in this reading window."
+                description="A count of the book types that showed up in this reading window."
                 tone={plainSectionTone}
               >
-                <PieChart items={bookTypePie} size={180} />
+                <PieChart items={bookTypeCountPie} size={180} />
               </SectionBand>
 
               <SectionBand
@@ -3300,29 +3412,45 @@ export default function StatsPage() {
           <>
             <SectionBand
               eyebrow="Vocabulary Rhythm"
-              title="Saved word rhythm"
-              description={`A quick view of which days you saved vocabulary during ${formatRangeLabel(
+              title="Saved words → study rhythm"
+              description={`A combined view of which days you saved vocabulary and which days you came back to study it during ${formatRangeLabel(
                 range
               ).toLowerCase()}. This respects the book category filter above.`}
               tone={filteredSectionTone}
             >
               <div className="grid grid-cols-7 gap-2 sm:grid-cols-14 xl:grid-cols-28">
-                {vocabularySavedWordRhythmActivity.map((item) => {
-                  const intensity = item.words;
+                {vocabularyRhythmActivity.map((item) => {
+                  const hasSavedWords = item.words > 0;
+                  const hasStudy = item.studyEvents > 0;
+                  const intensity = item.words + item.studyEvents;
+
                   const colorClass =
-                    intensity === 0
+                    !hasSavedWords && !hasStudy
                       ? "bg-slate-100"
-                      : intensity < 3
-                        ? "bg-amber-200"
-                        : intensity < 8
-                          ? "bg-amber-400"
-                          : "bg-amber-600";
+                      : hasSavedWords && hasStudy
+                        ? intensity < 5
+                          ? "bg-violet-300"
+                          : intensity < 12
+                            ? "bg-violet-500"
+                            : "bg-violet-700"
+                        : hasStudy
+                          ? intensity < 5
+                            ? "bg-sky-300"
+                            : intensity < 12
+                              ? "bg-sky-500"
+                              : "bg-sky-700"
+                          : intensity < 3
+                            ? "bg-amber-200"
+                            : intensity < 8
+                              ? "bg-amber-400"
+                              : "bg-amber-600";
 
                   return (
                     <div key={item.day} className="space-y-1">
                       <div
                         className={`h-14 rounded-xl border border-white/60 ${colorClass}`}
                         title={`${item.day}: ${item.words} saved word${item.words === 1 ? "" : "s"
+                          }, ${item.studyEvents} study card${item.studyEvents === 1 ? "" : "s"
                           }`}
                       />
                       <div className="text-center text-[10px] text-slate-500">
@@ -3333,26 +3461,207 @@ export default function StatsPage() {
                 })}
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
-                  <div className="text-xs text-slate-500">Saved word days</div>
+              <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-amber-400" />
+                  Saved words
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-sky-500" />
+                  Studied
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-violet-500" />
+                  Saved + studied
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+                  <div className="text-xs text-slate-500">Active vocab days</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {vocabularySavedWordRhythmActivity.filter((item) => item.words > 0).length}
+                    {vocabularyRhythmSummary.activeVocabularyDays}
                   </div>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
+
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+                  <div className="text-xs text-slate-500">Saved word days</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {vocabularyRhythmSummary.savedWordDays}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+                  <div className="text-xs text-slate-500">Study days</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {vocabularyRhythmSummary.studyDays}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
                   <div className="text-xs text-slate-500">Words saved</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {vocabularyTotals.wordsSaved}
                   </div>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
-                  <div className="text-xs text-slate-500">Unique words</div>
+
+                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+                  <div className="text-xs text-slate-500">Cards reviewed</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {vocabularyTotals.uniqueWords}
+                    {studySignals.totalEvents}
                   </div>
                 </div>
               </div>
+
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white/70 p-4">
+                <div className="text-sm font-semibold text-slate-900">
+                  Study loop
+                </div>
+
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  {vocabularyTotals.wordsSaved === 0 && studySignals.totalEvents === 0
+                    ? "No vocabulary activity in this window yet. Save words while reading, then review a few flashcards to start building a rhythm."
+                    : studySignals.totalEvents === 0
+                      ? `You saved ${vocabularyTotals.wordsSaved} word${vocabularyTotals.wordsSaved === 1 ? "" : "s"
+                      } in this window, but haven’t studied them yet.`
+                      : vocabularyTotals.wordsSaved === 0
+                        ? `You reviewed ${studySignals.totalEvents} card${studySignals.totalEvents === 1 ? "" : "s"
+                        }, but did not save new words in this window.`
+                        : `You saved ${vocabularyTotals.wordsSaved} word${vocabularyTotals.wordsSaved === 1 ? "" : "s"
+                        } and reviewed ${studySignals.totalEvents} card${studySignals.totalEvents === 1 ? "" : "s"
+                        }. ${vocabularyRhythmSummary.overlapDays} day${vocabularyRhythmSummary.overlapDays === 1 ? "" : "s"
+                        } included both saving and studying.`}
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
+                    <div className="text-[11px] text-slate-500">Unique words studied</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {studySignals.studiedWords}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
+                    <div className="text-[11px] text-slate-500">Books represented</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {studySignals.studiedBooks}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
+                    <div className="text-[11px] text-slate-500">Accuracy</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {studySignals.accuracyPercent == null
+                        ? "—"
+                        : `${studySignals.accuracyPercent}%`}
+                    </div>
+                  </div>
+                </div>
+
+                {studySignals.totalEvents > 0 ? (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                    <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                      <div className="text-[11px] text-emerald-700">Correct</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {studySignals.correct}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-rose-50 px-3 py-2">
+                      <div className="text-[11px] text-rose-700">Still sticky</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {studySignals.incorrect}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
+                      <div className="text-[11px] text-slate-500">Reviewed</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {studySignals.reviewed}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
+                      <div className="text-[11px] text-slate-500">Skipped</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {studySignals.skipped}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              {studySignals.recentBookAnswerItems.length > 0 ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white/70 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        Last 5 books studied
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Recent book connections from vocab and kanji study.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {studySignals.recentBookAnswerItems.map((book) => (
+                      <div
+                        key={`${book.title}-${book.lastStudiedAt}`}
+                        className="rounded-xl border border-slate-200 bg-white/85 px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-slate-900">
+                              {book.title}
+                            </div>
+
+                            <div className="mt-1 text-xs text-slate-500">
+                              {book.total} card{book.total === 1 ? "" : "s"} studied
+                              {book.studyTypeDetail ? ` · ${book.studyTypeDetail}` : ""}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <div className="text-sm font-semibold text-slate-900">
+                              {book.accuracyPercent == null
+                                ? "—"
+                                : `${book.accuracyPercent}%`}
+                            </div>
+                            <div className="text-xs text-slate-500">accuracy</div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                            <div className="text-[11px] text-emerald-700">Correct</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                              {book.correct}
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg bg-rose-50 px-3 py-2">
+                            <div className="text-[11px] text-rose-700">Still sticky</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                              {book.incorrect}
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
+                            <div className="text-[11px] text-slate-500">Study type</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                              {book.studyTypeLabel}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : studySignals.totalEvents > 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white/60 p-4 text-sm leading-6 text-slate-500">
+                  Study events are being recorded, but no book connection was found yet.
+                </div>
+              ) : null}
             </SectionBand>
             <SectionBand
               eyebrow="Book Type"
@@ -3363,155 +3672,7 @@ export default function StatsPage() {
               <PieChart items={vocabularyWordsByBookTypePie} />
             </SectionBand>
 
-            <SectionBand
-              eyebrow="Vocabulary Relationship"
-              title="Words by book"
-              description="Books ranked by saved words in the selected time range and book category."
-              tone={filteredSectionTone}
-            >
-              {vocabularyBookMetrics.filter((item) => item.wordsSaved > 0).length > 0 ? (
-                <BarStrip
-                  items={vocabularyBookMetrics
-                    .filter((item) => item.wordsSaved > 0)
-                    .sort((a, b) => b.wordsSaved - a.wordsSaved)
-                    .slice(0, 8)
-                    .map((item) => ({
-                      label: item.title,
-                      value: item.wordsSaved,
-                    }))}
-                  colorClass="bg-gradient-to-r from-amber-400 to-rose-500"
-                  valueSuffix=" words"
-                />
-              ) : (
-                <div className="text-sm text-slate-500">
-                  No vocabulary stats in this window yet.
-                </div>
-              )}
-            </SectionBand>
 
-            <SectionBand
-              eyebrow="Study Signals"
-              title="Saved words in study"
-              description="A bridge between words you saved while reading and words you came back to in flashcards. This combines study activity without separating every flashcard mode."
-              tone={filteredSectionTone}
-            >
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
-                  <div className="text-xs text-slate-500">Study days</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {studySignals.studyDays}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
-                  <div className="text-xs text-slate-500">Cards reviewed</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {studySignals.totalEvents}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
-                  <div className="text-xs text-slate-500">Unique study items</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {studySignals.studiedCards}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
-                  <div className="text-xs text-slate-500">Books represented</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {studySignals.studiedBooks}
-                  </div>ƒ√
-                </div>
-
-                <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
-                  <div className="text-xs text-slate-500">Accuracy</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {studySignals.accuracyPercent == null
-                      ? "—"
-                      : `${studySignals.accuracyPercent}%`}
-                  </div>
-                </div>
-              </div>
-
-              {studySignals.totalEvents > 0 ? (
-                <div className="mt-5">
-                  <div className="rounded-xl border border-slate-200 bg-white/70 p-4">
-                    <div className="mb-3 text-sm font-semibold text-slate-900">
-                      Recent study by book
-                    </div>
-
-                    {studySignals.recentBookAnswerItems.length > 0 ? (
-                      <div className="space-y-3">
-                        {studySignals.recentBookAnswerItems.map((book) => (
-                          <div
-                            key={book.title}
-                            className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-900">
-                                  {book.title}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-500">
-                                  {book.total} card{book.total === 1 ? "" : "s"} studied
-                                </div>
-                              </div>
-
-                              <div className="shrink-0 text-right">
-                                <div className="text-sm font-semibold text-slate-900">
-                                  {book.accuracyPercent == null
-                                    ? "—"
-                                    : `${book.accuracyPercent}%`}
-                                </div>
-                                <div className="text-xs text-slate-500">accuracy</div>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                              <div className="rounded-lg bg-emerald-50 px-3 py-2">
-                                <div className="text-[11px] text-emerald-700">Correct</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                  {book.correct}
-                                </div>
-                              </div>
-
-                              <div className="rounded-lg bg-rose-50 px-3 py-2">
-                                <div className="text-[11px] text-rose-700">Still sticky</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                  {book.incorrect}
-                                </div>
-                              </div>
-
-                              <div className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm">
-                                <div className="text-[11px] text-slate-500">Study type</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                  {book.studyTypeLabel}
-                                </div>
-                                {book.studyTypeDetail ? (
-                                  <div className="mt-1 text-xs text-slate-500">
-                                    {book.studyTypeDetail}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-slate-500">
-                        Study events are being recorded, but no book connection was found yet.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-white/60 p-4 text-sm leading-6 text-slate-500">
-                  No study activity in this window yet. Review a few flashcards and this
-                  section will start connecting saved words back to study.
-                </div>
-              )}
-            </SectionBand>
             <SectionBand
               eyebrow="Vocabulary Friction"
               title="Books with more saved words / fewer saved words"

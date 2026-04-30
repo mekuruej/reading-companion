@@ -33,9 +33,14 @@ type UserBookRow = {
   format_type: string | null;
   progress_mode: string | null;
   show_page_numbers: boolean | null;
+  is_teacher_prep?: boolean | null;
+  teacher_prep_kind?: string | null;
+  prepared_by?: string | null;
+  source_user_book_id?: string | null;
+  assigned_from_prep_at?: string | null;
 };
 
-type ProfileRole = "teacher" | "member" | "student";
+type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
 
 type StudentOption = {
   id: string;
@@ -360,7 +365,7 @@ export default function BooksPage() {
 
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
   const [formatFilter, setFormatFilter] = useState<string>("all");
-  const isTeacher = myRole === "teacher";
+  const isTeacher = myRole === "teacher" || myRole === "super_teacher" || isSuperTeacher;
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -374,7 +379,9 @@ export default function BooksPage() {
     });
   }, [rows, bookTypeFilter, formatFilter]);
 
-  const validRows = filteredRows.filter((r) => !!r.books);
+  const allValidRows = filteredRows.filter((r) => !!r.books);
+  const teacherPrepBooks = allValidRows.filter((r) => !!r.is_teacher_prep);
+  const validRows = allValidRows.filter((r) => !r.is_teacher_prep);
 
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<
@@ -590,7 +597,7 @@ export default function BooksPage() {
       return;
     }
 
-    const targetUserId = myRole === "teacher" ? userIdToView : user.id;
+    const targetUserId = isTeacher ? userIdToView : user.id;
 
     const { data, error } = await supabase
       .from("user_books")
@@ -603,6 +610,11 @@ export default function BooksPage() {
         format_type,
         progress_mode,
         show_page_numbers,
+        is_teacher_prep,
+        teacher_prep_kind,
+        prepared_by,
+        source_user_book_id,
+        assigned_from_prep_at,
         books (
           id,
           title,
@@ -652,7 +664,9 @@ export default function BooksPage() {
     }
   }
 
-  async function handleAddBook() {
+  async function handleAddBook(options: { asTrialPrep?: boolean } = {}) {
+    const asTrialPrep = options.asTrialPrep === true;
+
     if (!isTeacher) {
       alert("Only teachers can add books right now.");
       return;
@@ -672,9 +686,9 @@ export default function BooksPage() {
       return;
     }
 
-    const targetUserId = viewingUserId || meId;
+    const targetUserId = asTrialPrep ? meId : viewingUserId || meId;
 
-    if (!isSuperTeacher && targetUserId !== meId) {
+    if (!asTrialPrep && !isSuperTeacher && targetUserId !== meId) {
       const allowedStudentIds = students
         .filter((s) => (s.role === "member" || s.role === "student") && s.id !== meId)
         .map((s) => s.id);
@@ -732,6 +746,9 @@ export default function BooksPage() {
       const { error: userBookError } = await supabase.from("user_books").insert({
         user_id: targetUserId,
         book_id: bookId,
+        is_teacher_prep: asTrialPrep,
+        teacher_prep_kind: asTrialPrep ? "trial" : null,
+        prepared_by: asTrialPrep ? meId : null,
       });
 
       if (userBookError) {
@@ -748,7 +765,7 @@ export default function BooksPage() {
       setShowAddBook(false);
       await fetchBooks(viewingUserId || meId);
 
-      alert("Book added!");
+      alert(asTrialPrep ? "Trial prep book added!" : "Book added!");
     } catch (err) {
       console.error("ADD BOOK ERROR:", err);
       alert("Could not add book.");
@@ -1187,7 +1204,7 @@ export default function BooksPage() {
       setMyRole(role);
       setIsSuperTeacher(superTeacherFlag);
 
-      if (superTeacherFlag) {
+      if (role === "super_teacher" || superTeacherFlag) {
         await loadPendingBookRequests();
       }
 
@@ -1424,6 +1441,10 @@ export default function BooksPage() {
 
     loadAlerts();
   }, [viewingUserId, meId, isTeacher, students]);
+
+  const sortedTeacherPrepBooks = useMemo(() => {
+    return sortLibraryItems(teacherPrepBooks);
+  }, [teacherPrepBooks, sortMode, readingStatsByUserBookId]);
 
   const currentlyReading = validRows.filter(
     (r) => !!r.started_at && !r.finished_at && !r.dnf_at
@@ -1954,6 +1975,13 @@ export default function BooksPage() {
         {viewMode === "cover" ? (
           sortMode === "status" ? (
             <>
+              {isTeacher ? (
+                <Section
+                  title="Teacher Trial Prep"
+                  subtitle="Prep copies for trial lessons"
+                  items={sortedTeacherPrepBooks}
+                />
+              ) : null}
               <Section
                 title="Currently Reading"
                 subtitle="Started but not finished yet"
@@ -1964,21 +1992,51 @@ export default function BooksPage() {
               <Section title="DNF" subtitle="Did not finish" items={dnf} />
             </>
           ) : (
-            <ul className={gridClass}>
-              {sortedValidRows.map((row) => renderBookCard(row))}
-            </ul>
+            <>
+              {isTeacher ? (
+                <Section
+                  title="Teacher Trial Prep"
+                  subtitle="Prep copies for trial lessons"
+                  items={sortedTeacherPrepBooks}
+                />
+              ) : null}
+              <ul className={gridClass}>
+                {sortedValidRows.map((row) => renderBookCard(row))}
+              </ul>
+            </>
           )
         ) : (
-          <ul className="overflow-hidden rounded-xl border bg-white">
-            {sortedValidRows.map((row) => renderBookRow(row))}
-          </ul>
+          <>
+            {isTeacher && sortedTeacherPrepBooks.length > 0 ? (
+              <section className="mb-6">
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold text-gray-800">
+                    Teacher Trial Prep{" "}
+                    <span className="font-normal text-gray-500">
+                      ({sortedTeacherPrepBooks.length})
+                    </span>
+                  </h2>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Prep copies for trial lessons
+                  </p>
+                </div>
+                <ul className="overflow-hidden rounded-xl border bg-white">
+                  {sortedTeacherPrepBooks.map((row) => renderBookRow(row))}
+                </ul>
+              </section>
+            ) : null}
+
+            <ul className="overflow-hidden rounded-xl border bg-white">
+              {sortedValidRows.map((row) => renderBookRow(row))}
+            </ul>
+          </>
         )}
 
-        {validRows.length === 0 ? (
+        {allValidRows.length === 0 ? (
           <div className="mt-8 text-sm text-gray-600">No books yet.</div>
         ) : null}
 
-        {isSuperTeacher ? (
+        {isTeacher ? (
           <>
             <button
               type="button"
@@ -1997,8 +2055,9 @@ export default function BooksPage() {
                         Add Book {viewingLabel ? `for ${viewingLabel}` : ""}
                       </h2>
                       <p className="mt-1 text-sm text-stone-500">
-                        This book will be added to:{" "}
-                        <span className="font-medium text-stone-700">{viewingLabel}</span>
+                        Add Book goes to{" "}
+                        <span className="font-medium text-stone-700">{viewingLabel}</span>.
+                        Trial Prep goes to your teacher prep shelf.
                       </p>
                     </div>
 
@@ -2048,7 +2107,7 @@ export default function BooksPage() {
                       </p>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="flex flex-wrap justify-end gap-2 pt-2">
                       <button
                         type="button"
                         onClick={() => setShowAddBook(false)}
@@ -2058,11 +2117,19 @@ export default function BooksPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={handleAddBook}
+                        onClick={() => void handleAddBook()}
                         disabled={isSavingBook}
                         className="rounded-xl bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
                       >
                         {isSavingBook ? "Saving..." : "Add Book"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleAddBook({ asTrialPrep: true })}
+                        disabled={isSavingBook}
+                        className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 disabled:opacity-50"
+                      >
+                        {isSavingBook ? "Saving..." : "Add as Trial Prep"}
                       </button>
                     </div>
                   </div>

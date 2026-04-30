@@ -161,6 +161,8 @@ type BookInfoTabProps = {
   setShowPageNumbers: (value: boolean) => void;
 
   relatedLinksArr: any[];
+  linksText: string;
+  setLinksText: (value: string) => void;
 
   bookTypeLabel: (value: string | null | undefined) => string;
   formatTypeLabel: (value: string | null | undefined) => string;
@@ -287,6 +289,8 @@ export default function BookInfoTab({
   setShowPageNumbers,
 
   relatedLinksArr,
+  linksText,
+  setLinksText,
 
   bookTypeLabel,
   formatTypeLabel,
@@ -318,6 +322,75 @@ export default function BookInfoTab({
   const [publisherResults, setPublisherResults] = useState<PublisherRecord[]>([]);
   const [publisherSearchLoading, setPublisherSearchLoading] = useState(false);
   const [publisherSearchError, setPublisherSearchError] = useState<string | null>(null);
+
+  const LINK_FIELD_OPTIONS = [
+    {
+      label: "Amazon",
+      placeholder: "https://www.amazon.co.jp/...",
+    },
+    {
+      label: "BookWalker",
+      placeholder: "https://bookwalker.jp/...",
+    },
+    {
+      label: "Other",
+      placeholder: "https://...",
+    },
+  ] as const;
+
+  function parseLinkTextToMap(text: string) {
+    const map = new Map<string, string>();
+
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .forEach((line) => {
+        const parts = line.split("|").map((part) => part.trim());
+
+        if (parts.length >= 2) {
+          const label = parts[0];
+          const url = parts.slice(1).join("|").trim();
+
+          if (label && url) {
+            map.set(label, url);
+          }
+
+          return;
+        }
+
+        if (parts[0]) {
+          map.set("Other", parts[0]);
+        }
+      });
+
+    return map;
+  }
+
+  function getLinkFieldValue(label: string) {
+    return parseLinkTextToMap(linksText).get(label) ?? "";
+  }
+
+  function updateLinkField(label: string, value: string) {
+    const nextMap = parseLinkTextToMap(linksText);
+    const trimmedValue = value.trim();
+
+    if (trimmedValue) {
+      nextMap.set(label, trimmedValue);
+    } else {
+      nextMap.delete(label);
+    }
+
+    const nextText = LINK_FIELD_OPTIONS
+      .map((option) => {
+        const url = nextMap.get(option.label)?.trim();
+        return url ? `${option.label} | ${url}` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    setLinksText(nextText);
+  }
 
   function normalizeSearchTerm(value: string) {
     return value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -1463,42 +1536,42 @@ export default function BookInfoTab({
                     <div className="mt-2 text-xs text-stone-500">No matching publisher found.</div>
                   ) : null}
 
-                {selectedPublisherId ? (
-                  <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
-                    <span className="rounded-full bg-stone-100 px-2 py-1">
-                      Linked to publisher record
-                    </span>
+                  {selectedPublisherId ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
+                      <span className="rounded-full bg-stone-100 px-2 py-1">
+                        Linked to publisher record
+                      </span>
                       <button
                         type="button"
                         onClick={clearSelectedPublisher}
                         className="text-stone-500 underline hover:text-stone-700"
                       >
                         Clear selection
-                    </button>
-                  </div>
-                ) : null}
-
-                {requireSharedPublisherRecord ? (
-                  <div className="mt-2 text-xs font-medium text-amber-700">
-                    New shared publisher record will be required on save.
-                  </div>
-                ) : null}
-
-                {publisherSearch.trim() ? (
-                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <div className="text-xs text-amber-900">
-                      Don&apos;t see the right match? Create a new shared publisher record from this
-                      search, then finish the details below.
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={startNewPublisherFromSearch}
-                      className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
-                    >
-                      Create New Publisher
-                    </button>
-                  </div>
-                ) : null}
+                  ) : null}
+
+                  {requireSharedPublisherRecord ? (
+                    <div className="mt-2 text-xs font-medium text-amber-700">
+                      New shared publisher record will be required on save.
+                    </div>
+                  ) : null}
+
+                  {publisherSearch.trim() ? (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <div className="text-xs text-amber-900">
+                        Don&apos;t see the right match? Create a new shared publisher record from this
+                        search, then finish the details below.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={startNewPublisherFromSearch}
+                        className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
+                      >
+                        Create New Publisher
+                      </button>
+                    </div>
+                  ) : null}
 
                   <div className="mt-3">
                     <label className="mb-1 block text-sm font-medium text-stone-700">
@@ -1598,9 +1671,22 @@ export default function BookInfoTab({
         )}
 
         {isEditingLinks ? (
-          <p className="mt-3 text-xs text-stone-500">
-            Related link editing is not wired into this extracted component yet.
-          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {LINK_FIELD_OPTIONS.map((option) => (
+              <label key={option.label} className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  {option.label}
+                </span>
+
+                <input
+                  value={getLinkFieldValue(option.label)}
+                  onChange={(event) => updateLinkField(option.label, event.target.value)}
+                  placeholder={option.placeholder}
+                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+            ))}
+          </div>
         ) : null}
       </div>
 
