@@ -5,6 +5,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  computeLibraryStudyColorStatus,
+  getLibraryStudyEncounterStageCounts,
+  type LibraryStudyGateStatus,
+  type LibraryStudyColorStatus,
+} from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 
@@ -33,6 +39,52 @@ type UserBookWordRow = {
   created_at: string;
 };
 
+type LearningSettingsRow = {
+  red_stages: number | null;
+  orange_stages: number | null;
+  yellow_stages: number | null;
+  show_badge_numbers: boolean | null;
+  skip_katakana_library_check?: boolean | null;
+};
+
+type LibraryWordProgressRow = {
+  id?: string;
+  user_id: string;
+  study_identity_key: string;
+  surface: string | null;
+  reading: string | null;
+  definition_key: string;
+  reading_gate_status: LibraryStudyGateStatus;
+  meaning_gate_status: LibraryStudyGateStatus;
+  held_before_reading_gate: boolean;
+  held_before_meaning_gate: boolean;
+  mastered: boolean;
+  reading_gate_attempts: number;
+  meaning_gate_attempts: number;
+  reading_gate_passed_at: string | null;
+  reading_gate_failed_at: string | null;
+  meaning_gate_passed_at: string | null;
+  meaning_gate_failed_at: string | null;
+  mastered_at: string | null;
+  last_studied_at: string | null;
+};
+
+type LibraryWordSummaryRow = {
+  study_identity_key: string;
+  surface: string | null;
+  reading: string | null;
+  meaning: string | null;
+  jlpt: string | null;
+  total_encounter_count: number | null;
+  check_ready_encounter_count: number | null;
+  sample_user_book_word_id: string | null;
+  sample_user_book_id: string | null;
+  sample_book_title: string | null;
+  sample_book_cover_url: string | null;
+};
+
+type LibraryCheckGate = "reading" | "meaning";
+
 type StudyCard = {
   id: string;
   userBookId: string;
@@ -42,6 +94,26 @@ type StudyCard = {
   reading: string;
   meaning: string;
   jlpt: string | null;
+  encounterCount: number;
+  encounterIds: string[];
+  colorStatus: LibraryStudyColorStatus;
+  activeGate: LibraryCheckGate;
+  studyIdentityKey: string;
+  progress: LibraryWordProgressRow | null;
+};
+
+type LibraryCheckDebug = {
+  threshold: number;
+  rawRows: number;
+  completeGroups: number;
+  eligibleCards: number;
+  filteredCards: number;
+  topCompleteGroups: {
+    surface: string;
+    reading: string;
+    encounters: number;
+    reason: string;
+  }[];
 };
 
 type StudyMode =
@@ -54,7 +126,20 @@ type StudyMode =
   | "reading_to_meaning_mc"
   | "complete_study";
 
+type LibraryStudyMode = "check" | "practice";
+type PracticeRevealStep = "word" | "reading" | "meaning";
+
 const STORAGE_KEY = "library-study-seen-by-date";
+
+const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
+  red_stages: 1,
+  orange_stages: 1,
+  yellow_stages: 1,
+  show_badge_numbers: true,
+  skip_katakana_library_check: true,
+};
+
+const LIBRARY_CHECK_WORD_PAGE_SIZE = 1000;
 
 function shuffleArray<T>(arr: T[]) {
   const copy = [...arr];
@@ -77,12 +162,428 @@ function normalizeKana(value: string) {
     .toLowerCase();
 }
 
+function normalizeJlpt(value: string | null | undefined) {
+  return (value ?? "NON-JLPT").toUpperCase() || "NON-JLPT";
+}
+
+function isKatakanaOnly(value: string | null | undefined) {
+  const compact = (value ?? "").trim().replace(/\s+/g, "");
+  return compact.length > 0 && /^[ァ-ヶー・･]+$/.test(compact);
+}
+
+function studyIdentityKey(surface: string | null | undefined, reading: string | null | undefined) {
+  const normalizedSurface = normalizeText(surface ?? "");
+  const normalizedReading = normalizeKana(reading ?? "");
+  if (!normalizedSurface) return "";
+  return `${normalizedSurface}||${normalizedReading}`;
+}
+
 function getBookMeta(row: UserBookJoinRow) {
   const book = Array.isArray(row.books) ? row.books[0] : row.books;
   return {
     title: book?.title ?? "Untitled",
     cover_url: book?.cover_url ?? null,
   };
+}
+
+async function loadAllLibraryCheckWords(userBookIds: string[]) {
+  const allRows: UserBookWordRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .select("id, user_book_id, surface, reading, meaning, jlpt, hidden, created_at")
+      .in("user_book_id", userBookIds)
+      .or("hidden.is.null,hidden.eq.false")
+      .order("created_at", { ascending: false })
+      .range(from, to)
+      .returns<UserBookWordRow[]>();
+
+    if (error) throw error;
+
+    allRows.push(...(data ?? []));
+
+    if (!data || data.length < LIBRARY_CHECK_WORD_PAGE_SIZE) {
+      break;
+    }
+
+    from += LIBRARY_CHECK_WORD_PAGE_SIZE;
+  }
+
+  return allRows;
+}
+
+function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
+  const color = status?.color ?? "yellow";
+  const base =
+    "relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border p-6 text-center shadow-2xl transition-colors sm:min-h-[36vh]";
+
+  if (color === "green") return `${base} border-emerald-100 bg-[#f5fcf8]`;
+  if (color === "blue") return `${base} border-sky-100 bg-[#f5fbff]`;
+  if (color === "grey") return `${base} border-slate-100 bg-[#f8fafc]`;
+  if (color === "purple") return `${base} border-violet-100 bg-[#fbf8ff]`;
+  if (color === "red") return `${base} border-rose-100 bg-[#fff7f8]`;
+  if (color === "orange") return `${base} border-orange-100 bg-[#fff9f2]`;
+  return `${base} border-amber-100 bg-[#fffdf3]`;
+}
+
+function libraryStudyChipClass(status: LibraryStudyColorStatus | undefined) {
+  const color = status?.color ?? "yellow";
+  const base = "rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm";
+
+  if (color === "green") return `${base} border-emerald-100 bg-white/90 text-emerald-900`;
+  if (color === "blue") return `${base} border-sky-100 bg-white/90 text-sky-900`;
+  if (color === "grey") return `${base} border-slate-100 bg-white/90 text-slate-700`;
+  if (color === "purple") return `${base} border-violet-100 bg-white/90 text-violet-900`;
+  if (color === "red") return `${base} border-rose-100 bg-white/90 text-rose-900`;
+  if (color === "orange") return `${base} border-orange-100 bg-white/90 text-orange-950`;
+  return `${base} border-amber-100 bg-white/90 text-amber-950`;
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function pickLibraryCheckGate(status: LibraryStudyColorStatus, seed: string): LibraryCheckGate {
+  if (status.nextGate === "reading") return "reading";
+  if (status.nextGate === "meaning") return "meaning";
+  return hashString(`${seed}::${getTodayKey()}`) % 2 === 0 ? "reading" : "meaning";
+}
+
+function includeLibraryCheckCard(status: LibraryStudyColorStatus) {
+  return (
+    status.eligibleForLibraryStudy ||
+    status.nextGate === "mastery" ||
+    status.color === "purple"
+  );
+}
+
+function gatePromptText(card: StudyCard | undefined) {
+  if (!card) return "Will you pass through?";
+  if (card.colorStatus.color === "purple") return "A mastered word is back for a quiet check.";
+  if (card.colorStatus.nextGate === "mastery") return "One more check before this word settles.";
+  return card.activeGate === "meaning"
+    ? "Will you pass the MEANING gate?"
+    : "Will you pass the READING gate?";
+}
+
+function gatePromptClass(card: StudyCard | undefined) {
+  const base = "rounded-full border px-5 py-2 text-sm font-semibold shadow-sm";
+
+  if (card?.activeGate === "meaning") {
+    return `${base} border-sky-200 bg-sky-100 text-sky-950`;
+  }
+
+  return `${base} border-emerald-200 bg-emerald-100 text-emerald-950`;
+}
+
+function checkModeLabel(card: StudyCard | undefined) {
+  if (!card) return "Library Check";
+  if (card.colorStatus.color === "purple") {
+    return card.activeGate === "reading" ? "Mastered Reading Review" : "Mastered Meaning Review";
+  }
+  if (card.colorStatus.nextGate === "mastery") {
+    return card.activeGate === "reading" ? "Mastery Reading Check" : "Mastery Meaning Check";
+  }
+  if (card.activeGate === "reading") return "Reading Check";
+  if (card.activeGate === "meaning") return "Meaning Check";
+  return "Library Check";
+}
+
+function checkModeDescription(card: StudyCard | undefined) {
+  if (!card) return "Automatic typed gates move words through your library colors";
+  if (card.activeGate === "reading") {
+    return "Show word + meaning -> type the reading";
+  }
+  if (card.activeGate === "meaning") {
+    return "Show word + reading -> type one meaning word";
+  }
+  return "Automatic typed gates move words through your library colors";
+}
+
+function promptModeClass(gate: LibraryCheckGate | undefined) {
+  const base =
+    "rounded-2xl border px-7 py-3 text-2xl font-bold uppercase tracking-wide shadow-sm";
+
+  if (gate === "meaning") {
+    return `${base} border-sky-200 bg-sky-100 text-sky-950`;
+  }
+
+  return `${base} border-emerald-200 bg-emerald-100 text-emerald-950`;
+}
+
+function KatakanaBadge() {
+  return (
+    <span
+      title="Katakana-only word"
+      className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white shadow-sm"
+    >
+      カ
+    </span>
+  );
+}
+
+function LibraryCheckIntroCard({
+  mode,
+  onModeChange,
+}: {
+  mode: LibraryStudyMode;
+  onModeChange: (mode: LibraryStudyMode) => void;
+}) {
+  const colorSteps = [
+    { label: "Green", className: "bg-emerald-500", text: "reading passed" },
+    { label: "Blue", className: "bg-sky-500", text: "meaning passed" },
+    { label: "Purple", className: "bg-violet-500", text: "mastered" },
+  ];
+
+  return (
+    <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_180px] md:items-center">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-slate-900">
+            {mode === "practice" ? "Library Practice" : "Library Check"}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            {mode === "practice"
+              ? "A gentle reveal space for reviewing words without moving their colors."
+              : "Strict typed gates for words that are ready to move."}
+          </p>
+        </div>
+
+        <div className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1 text-sm font-semibold">
+          <button
+            type="button"
+            onClick={() => onModeChange("check")}
+            className={`rounded-lg px-3 py-2 transition ${
+              mode === "check" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
+            }`}
+          >
+            Check
+          </button>
+          <button
+            type="button"
+            onClick={() => onModeChange("practice")}
+            className={`rounded-lg px-3 py-2 transition ${
+              mode === "practice" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
+            }`}
+          >
+            Practice
+          </button>
+        </div>
+      </div>
+
+      {mode === "practice" ? (
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl bg-sky-50 px-3 py-2">
+            <div className="text-xs font-semibold text-sky-950">Reveal slowly</div>
+            <div className="text-[11px] leading-4 text-slate-500">Word, then reading, then meaning.</div>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 px-3 py-2">
+            <div className="text-xs font-semibold text-slate-800">No gate movement</div>
+            <div className="text-[11px] leading-4 text-slate-500">Practice never passes or fails a word.</div>
+          </div>
+
+          <div className="rounded-xl bg-violet-50 px-3 py-2">
+            <div className="text-xs font-semibold text-violet-950">Repeat freely</div>
+            <div className="text-[11px] leading-4 text-slate-500">Shuffle and review as much as you want.</div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          {colorSteps.map((step) => (
+            <div key={step.label} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
+              <span className={`h-3 w-3 rounded-full ${step.className}`} />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-800">{step.label}</div>
+                <div className="truncate text-[11px] text-slate-500">{step.text}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LibraryPracticePanel({
+  card,
+  total,
+  revealStep,
+  onRevealReading,
+  onRevealMeaning,
+  onNext,
+  onPrevious,
+  onShuffle,
+}: {
+  card: StudyCard | undefined;
+  total: number;
+  revealStep: PracticeRevealStep;
+  onRevealReading: () => void;
+  onRevealMeaning: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onShuffle: () => void;
+}) {
+  if (!card) {
+    return (
+      <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Practice Study
+        </div>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-950">No practice cards here yet.</h2>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
+          Try another JLPT filter, or add a few easier words from Word Sky.
+        </p>
+      </div>
+    );
+  }
+
+  const showReading = revealStep === "reading" || revealStep === "meaning";
+  const showMeaning = revealStep === "meaning";
+
+  return (
+    <div className="w-full max-w-2xl space-y-2">
+      <div className={libraryStudyCardClass(card.colorStatus)}>
+        <div className="absolute left-4 right-4 top-4 flex justify-center">
+          <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
+            Practice Study
+          </div>
+        </div>
+
+        <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+          {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
+
+          {card.jlpt ? (
+            <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
+          ) : null}
+
+          {card.progress?.definition_key ? (
+            <div className={libraryStudyChipClass(card.colorStatus)}>
+              Def {card.progress.definition_key}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
+          <div className={libraryStudyChipClass(card.colorStatus)}>
+            {card.encounterCount} encounter{card.encounterCount === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Word
+          </div>
+          <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+
+          <div className="grid w-full max-w-md gap-3 text-center">
+            <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Reading
+              </div>
+              <div className={`mt-1 text-2xl font-semibold ${showReading ? "text-slate-900" : "text-slate-300"}`}>
+                {showReading ? card.reading : "Hidden"}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Meaning
+              </div>
+              <div className={`mt-1 text-xl font-semibold ${showMeaning ? "text-slate-900" : "text-slate-300"}`}>
+                {showMeaning ? card.meaning : "Hidden"}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr]">
+        <button
+          type="button"
+          onClick={onPrevious}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+          disabled={total <= 1}
+        >
+          Previous
+        </button>
+
+        {revealStep === "word" ? (
+          <button
+            type="button"
+            onClick={onRevealReading}
+            className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
+          >
+            Show Reading
+          </button>
+        ) : revealStep === "reading" ? (
+          <button
+            type="button"
+            onClick={onRevealMeaning}
+            className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
+          >
+            Show Meaning
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onNext}
+            className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
+          >
+            Next Card
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={onNext}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+          disabled={total <= 1}
+        >
+          Skip
+        </button>
+
+        <button
+          type="button"
+          onClick={onShuffle}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+          disabled={total <= 1}
+        >
+          Shuffle
+        </button>
+      </div>
+
+      <p className="text-center text-xs leading-5 text-slate-500">
+        Practice does not move colors or count as passing a Library Check gate.
+      </p>
+    </div>
+  );
+}
+
+function errorMessage(error: unknown) {
+  if (!error) return "";
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+
+  const maybeError = error as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+  };
+
+  return (
+    [maybeError.message, maybeError.details, maybeError.hint, maybeError.code]
+      .filter(Boolean)
+      .join(" ") || "Unknown error"
+  );
 }
 
 function uniqueByNormalized(
@@ -180,10 +681,27 @@ function saveSeenForToday(values: Set<string>) {
   }
 }
 
+function clearSeenForToday() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
+    const today = getTodayKey();
+    delete parsed[today];
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
 export default function LibraryStudyPage() {
   const router = useRouter();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [learningSettings, setLearningSettings] =
+    useState<LearningSettingsRow>(DEFAULT_LEARNING_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -191,7 +709,12 @@ export default function LibraryStudyPage() {
   const [allCards, setAllCards] = useState<StudyCard[]>([]);
   const [deck, setDeck] = useState<StudyCard[]>([]);
   const [index, setIndex] = useState(0);
+  const [practiceDeck, setPracticeDeck] = useState<StudyCard[]>([]);
+  const [practiceIndex, setPracticeIndex] = useState(0);
+  const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
+  const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
+  const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("check");
   const [selectedJlpt, setSelectedJlpt] = useState("all");
   const [studyMode, setStudyMode] = useState<StudyMode>("reading_typing");
 
@@ -213,15 +736,23 @@ export default function LibraryStudyPage() {
   const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
 
   const currentCard = deck[index];
+  const practiceCard = practiceDeck[practiceIndex];
 
   const filteredCards = useMemo(() => {
     return allCards.filter((card) => {
-      const jlptMatch =
-        selectedJlpt === "all" || (card.jlpt ?? "").toUpperCase() === selectedJlpt;
+      const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
       const notSeenToday = !seenTodayIds.has(card.id);
       return jlptMatch && notSeenToday;
     });
   }, [allCards, selectedJlpt, seenTodayIds]);
+
+  const practiceFilteredCards = useMemo(() => {
+    return allCards.filter((card) => selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt);
+  }, [allCards, selectedJlpt]);
+
+  useEffect(() => {
+    setDebugInfo((prev) => (prev ? { ...prev, filteredCards: filteredCards.length } : prev));
+  }, [filteredCards.length]);
 
   const meaningOptions = useMemo(() => {
     if (!currentCard) return [];
@@ -282,10 +813,13 @@ export default function LibraryStudyPage() {
         } = await supabase.auth.getUser();
 
         if (authErr || !user) {
+          setCurrentUserId(null);
           setNeedsSignIn(true);
           setLoading(false);
           return;
         }
+
+        setCurrentUserId(user.id);
 
         const { data: userBooks, error: userBooksErr } = await supabase
           .from("user_books")
@@ -310,46 +844,324 @@ export default function LibraryStudyPage() {
           return;
         }
 
+        const { data: learningSettings, error: settingsErr } = await supabase
+          .from("user_learning_settings")
+          .select("red_stages, orange_stages, yellow_stages, show_badge_numbers, skip_katakana_library_check")
+          .eq("user_id", user.id)
+          .maybeSingle<LearningSettingsRow>();
+
+        if (settingsErr) throw settingsErr;
+
+        const colorSettings = {
+          ...DEFAULT_LEARNING_SETTINGS,
+          ...(learningSettings ?? {}),
+        };
+        const encounterThreshold = getLibraryStudyEncounterStageCounts(colorSettings).total;
+        setLearningSettings(colorSettings);
+
         const metaById = new Map<string, { title: string; cover_url: string | null }>();
         for (const row of userBooks ?? []) {
           metaById.set(row.id, getBookMeta(row));
         }
 
-        const { data: words, error: wordsErr } = await supabase
-          .from("user_book_words")
-          .select("id, user_book_id, surface, reading, meaning, jlpt, hidden, created_at")
-          .in("user_book_id", userBookIds)
-          .eq("hidden", false)
-          .order("created_at", { ascending: false })
-          .returns<UserBookWordRow[]>();
+        const { data: summaryRows, error: summaryErr } = await supabase
+          .from("user_library_word_summaries")
+          .select(
+            `
+              study_identity_key,
+              surface,
+              reading,
+              meaning,
+              jlpt,
+              total_encounter_count,
+              check_ready_encounter_count,
+              sample_user_book_word_id,
+              sample_user_book_id,
+              sample_book_title,
+              sample_book_cover_url
+            `
+          )
+          .eq("user_id", user.id)
+          .gte("check_ready_encounter_count", encounterThreshold)
+          .order("total_encounter_count", { ascending: false })
+          .limit(500)
+          .returns<LibraryWordSummaryRow[]>();
 
-        if (wordsErr) throw wordsErr;
+        if (!summaryErr && summaryRows && summaryRows.length > 0) {
+          const studyKeys = summaryRows
+            .map((row) => row.study_identity_key)
+            .filter(Boolean);
 
-        const cards: StudyCard[] = (words ?? [])
-          .filter((row) => {
-            const surface = row.surface?.trim() ?? "";
-            const reading = row.reading?.trim() ?? "";
-            const meaning = row.meaning?.trim() ?? "";
-            return !!surface && !!reading && !!meaning;
-          })
-          .map((row) => {
-            const meta = metaById.get(row.user_book_id);
+          const progressByKey = new Map<string, LibraryWordProgressRow>();
+
+          if (studyKeys.length > 0) {
+            const { data: progressRows, error: progressErr } = await supabase
+              .from("user_library_word_progress")
+              .select(
+                `
+                  id,
+                  user_id,
+                  study_identity_key,
+                  surface,
+                  reading,
+                  definition_key,
+                  reading_gate_status,
+                  meaning_gate_status,
+                  held_before_reading_gate,
+                  held_before_meaning_gate,
+                  mastered,
+                  reading_gate_attempts,
+                  meaning_gate_attempts,
+                  reading_gate_passed_at,
+                  reading_gate_failed_at,
+                  meaning_gate_passed_at,
+                  meaning_gate_failed_at,
+                  mastered_at,
+                  last_studied_at
+                `
+              )
+              .eq("user_id", user.id)
+              .eq("definition_key", "")
+              .in("study_identity_key", studyKeys)
+              .returns<LibraryWordProgressRow[]>();
+
+            if (progressErr) {
+              console.warn("Library Check progress did not load:", progressErr);
+              setNotice(
+                "Library Check loaded, but saved gate progress did not load. You can still preview the cards."
+              );
+            } else {
+              for (const row of progressRows ?? []) {
+                progressByKey.set(row.study_identity_key, row);
+              }
+            }
+          }
+
+          const cards: StudyCard[] = summaryRows
+            .map((summary) => {
+              const surface = (summary.surface ?? "").trim();
+              const reading = (summary.reading ?? "").trim();
+              const meaning = (summary.meaning ?? "").trim();
+              const encounterCount = summary.total_encounter_count ?? 0;
+              const progress = progressByKey.get(summary.study_identity_key) ?? null;
+
+              if (!surface || !reading || !meaning || !summary.sample_user_book_word_id) {
+                return null;
+              }
+
+              if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
+                return null;
+              }
+
+              const colorStatus = computeLibraryStudyColorStatus({
+                encounterCount,
+                settings: colorSettings,
+                readingGate: progress?.reading_gate_status ?? "not_started",
+                meaningGate: progress?.meaning_gate_status ?? "not_started",
+                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                mastered: progress?.mastered ?? false,
+              });
+
+              if (!includeLibraryCheckCard(colorStatus)) return null;
+
+              return {
+                id: summary.sample_user_book_word_id,
+                userBookId: summary.sample_user_book_id ?? "",
+                bookTitle: summary.sample_book_title ?? "Untitled",
+                bookCoverUrl: summary.sample_book_cover_url ?? null,
+                surface,
+                reading,
+                meaning,
+                jlpt: summary.jlpt ?? null,
+                encounterCount,
+                encounterIds: [summary.sample_user_book_word_id],
+                colorStatus,
+                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
+                studyIdentityKey: summary.study_identity_key,
+                progress,
+              };
+            })
+            .filter((card): card is StudyCard => Boolean(card));
+
+          setAllCards(cards);
+          setDebugInfo({
+            threshold: encounterThreshold,
+            rawRows: summaryRows.length,
+            completeGroups: summaryRows.length,
+            eligibleCards: cards.length,
+            filteredCards: cards.length,
+            topCompleteGroups: summaryRows.slice(0, 8).map((summary) => {
+              const progress = progressByKey.get(summary.study_identity_key) ?? null;
+              const encounterCount = summary.total_encounter_count ?? 0;
+              const status = computeLibraryStudyColorStatus({
+                encounterCount,
+                settings: colorSettings,
+                readingGate: progress?.reading_gate_status ?? "not_started",
+                meaningGate: progress?.meaning_gate_status ?? "not_started",
+                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                mastered: progress?.mastered ?? false,
+              });
+
+              return {
+                surface: summary.surface?.trim() ?? "",
+                reading: summary.reading?.trim() ?? "",
+                encounters: encounterCount,
+                reason: status.reason,
+              };
+            }),
+          });
+          return;
+        }
+
+        if (summaryErr) {
+          console.warn("Library word summaries are not available yet:", summaryErr);
+        }
+
+        const words = await loadAllLibraryCheckWords(userBookIds);
+
+        const groupedWords = new Map<string, UserBookWordRow[]>();
+
+        for (const row of words) {
+          const surface = row.surface?.trim() ?? "";
+          const reading = row.reading?.trim() ?? "";
+          const meaning = row.meaning?.trim() ?? "";
+          const key = studyIdentityKey(surface, reading);
+
+          if (!surface || !reading || !meaning || !key) continue;
+
+          const group = groupedWords.get(key) ?? [];
+          group.push(row);
+          groupedWords.set(key, group);
+        }
+
+        const progressByKey = new Map<string, LibraryWordProgressRow>();
+        const studyKeys = Array.from(groupedWords.entries())
+          .filter(([, group]) => group.length >= encounterThreshold)
+          .map(([key]) => key);
+
+        if (studyKeys.length > 0) {
+          const { data: progressRows, error: progressErr } = await supabase
+            .from("user_library_word_progress")
+            .select(
+              `
+                id,
+                user_id,
+                study_identity_key,
+                surface,
+                reading,
+                definition_key,
+                reading_gate_status,
+                meaning_gate_status,
+                held_before_reading_gate,
+                held_before_meaning_gate,
+                mastered,
+                reading_gate_attempts,
+                meaning_gate_attempts,
+                reading_gate_passed_at,
+                reading_gate_failed_at,
+                meaning_gate_passed_at,
+                meaning_gate_failed_at,
+                mastered_at,
+                last_studied_at
+              `
+            )
+            .eq("user_id", user.id)
+            .eq("definition_key", "")
+            .in("study_identity_key", studyKeys)
+            .returns<LibraryWordProgressRow[]>();
+
+          if (progressErr) {
+            console.warn("Library Check progress did not load:", progressErr);
+            setNotice(
+              "Library Check loaded, but saved gate progress did not load. You can still preview the cards."
+            );
+          } else {
+            for (const row of progressRows ?? []) {
+              progressByKey.set(row.study_identity_key, row);
+            }
+          }
+        }
+
+        const cards: StudyCard[] = Array.from(groupedWords.entries())
+          .map(([key, group]) => {
+            const representative = group[0];
+            const meta = metaById.get(representative.user_book_id);
+            const progress = progressByKey.get(key) ?? null;
+
+            if (
+              colorSettings.skip_katakana_library_check &&
+              isKatakanaOnly(representative.surface)
+            ) {
+              return null;
+            }
+
+            const colorStatus = computeLibraryStudyColorStatus({
+              encounterCount: group.length,
+              settings: colorSettings,
+              readingGate: progress?.reading_gate_status ?? "not_started",
+              meaningGate: progress?.meaning_gate_status ?? "not_started",
+              heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+              heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+              mastered: progress?.mastered ?? false,
+            });
+
+            if (!includeLibraryCheckCard(colorStatus)) return null;
+
             return {
-              id: row.id,
-              userBookId: row.user_book_id,
+              id: representative.id,
+              userBookId: representative.user_book_id,
               bookTitle: meta?.title ?? "Untitled",
               bookCoverUrl: meta?.cover_url ?? null,
-              surface: row.surface!.trim(),
-              reading: row.reading!.trim(),
-              meaning: row.meaning!.trim(),
-              jlpt: row.jlpt ?? null,
+              surface: representative.surface!.trim(),
+              reading: representative.reading!.trim(),
+              meaning: representative.meaning!.trim(),
+              jlpt: representative.jlpt ?? null,
+              encounterCount: group.length,
+              encounterIds: group.map((word) => word.id),
+              colorStatus,
+              activeGate: pickLibraryCheckGate(colorStatus, key),
+              studyIdentityKey: key,
+              progress,
             };
-          });
+          })
+          .filter((card): card is StudyCard => Boolean(card));
 
         setAllCards(cards);
+        setDebugInfo({
+          threshold: encounterThreshold,
+          rawRows: words?.length ?? 0,
+          completeGroups: groupedWords.size,
+          eligibleCards: cards.length,
+          filteredCards: cards.length,
+          topCompleteGroups: Array.from(groupedWords.entries())
+            .map(([key, group]) => {
+              const representative = group[0];
+              const progress = progressByKey.get(key) ?? null;
+              const status = computeLibraryStudyColorStatus({
+                encounterCount: group.length,
+                settings: colorSettings,
+                readingGate: progress?.reading_gate_status ?? "not_started",
+                meaningGate: progress?.meaning_gate_status ?? "not_started",
+                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                mastered: progress?.mastered ?? false,
+              });
+
+              return {
+                surface: representative.surface?.trim() ?? "",
+                reading: representative.reading?.trim() ?? "",
+                encounters: group.length,
+                reason: status.reason,
+              };
+            })
+            .sort((a, b) => b.encounters - a.encounters)
+            .slice(0, 8),
+        });
       } catch (err: any) {
-        console.error("Error loading Library Study:", err);
-        setErrorMsg(err?.message ?? "Failed to load Library Study.");
+        console.error("Error loading Library Check:", err);
+        setErrorMsg(errorMessage(err) || "Failed to load Library Check.");
       } finally {
         setLoading(false);
       }
@@ -363,24 +1175,56 @@ export default function LibraryStudyPage() {
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
-  }, [filteredCards, studyMode]);
+  }, [filteredCards]);
 
   useEffect(() => {
-    if (!checked?.ok) return;
+    setPracticeDeck(shuffleArray(practiceFilteredCards));
+    setPracticeIndex(0);
+    setPracticeRevealStep("word");
+  }, [practiceFilteredCards]);
+
+  useEffect(() => {
+    if (!currentCard) return;
+    if (studyMode !== "reading_typing" && studyMode !== "meaning_typing") return;
+    if (checked || firstStepChecked || secondStepChecked) return;
+
+    const activeGate = currentCard.activeGate;
+
+    if (activeGate === "reading" && studyMode !== "reading_typing") {
+      setStudyMode("reading_typing");
+      resetCardState();
+    } else if (activeGate === "meaning" && studyMode !== "meaning_typing") {
+      setStudyMode("meaning_typing");
+      resetCardState();
+    }
+  }, [currentCard, studyMode, checked, firstStepChecked, secondStepChecked]);
+
+  useEffect(() => {
+    if (!checked) return;
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, 2500);
+    }, checked.ok ? 5000 : 5000);
 
     return () => window.clearTimeout(timer);
   }, [checked]);
 
   useEffect(() => {
-    if (!secondStepChecked?.ok) return;
+    if (!firstStepChecked || firstStepChecked.ok) return;
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, 2500);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [firstStepChecked]);
+
+  useEffect(() => {
+    if (!secondStepChecked) return;
+
+    const timer = window.setTimeout(() => {
+      movePastCurrentCard();
+    }, secondStepChecked.ok ? 5000 : 5000);
 
     return () => window.clearTimeout(timer);
   }, [secondStepChecked]);
@@ -428,6 +1272,46 @@ export default function LibraryStudyPage() {
     resetCardState();
     setEndedEarly(false);
     setNotice(null);
+  }
+
+  function studyAgainToday() {
+    clearSeenForToday();
+    setSeenTodayIds(new Set());
+    setDeck(shuffleArray(allCards));
+    setIndex(0);
+    resetCardState();
+    setEndedEarly(false);
+    setNotice("Today’s Library Check memory was cleared for testing.");
+  }
+
+  function resetPracticeReveal() {
+    setPracticeRevealStep("word");
+  }
+
+  function goToNextPracticeCard() {
+    if (practiceDeck.length === 0) return;
+
+    setPracticeIndex((prev) => {
+      if (prev + 1 >= practiceDeck.length) return 0;
+      return prev + 1;
+    });
+    resetPracticeReveal();
+  }
+
+  function goToPreviousPracticeCard() {
+    if (practiceDeck.length === 0) return;
+
+    setPracticeIndex((prev) => {
+      if (prev <= 0) return practiceDeck.length - 1;
+      return prev - 1;
+    });
+    resetPracticeReveal();
+  }
+
+  function shufflePracticeDeck() {
+    setPracticeDeck(shuffleArray(practiceFilteredCards));
+    setPracticeIndex(0);
+    resetPracticeReveal();
   }
 
   function nextCardWithoutMarkingSeen() {
@@ -478,6 +1362,146 @@ export default function LibraryStudyPage() {
     });
   }
 
+  async function saveTypedGateProgress(
+    gate: "reading" | "meaning",
+    ok: boolean,
+    options: { forceMeaning?: boolean } = {}
+  ) {
+    if (!currentUserId || !currentCard) return;
+
+    const now = new Date().toISOString();
+    const existing = currentCard.progress;
+    const isMasteryCheck =
+      currentCard.colorStatus.nextGate === "mastery" ||
+      currentCard.colorStatus.color === "purple" ||
+      Boolean(existing?.mastered);
+
+    if (!options.forceMeaning && currentCard.activeGate !== gate) return;
+
+    const nextProgress: LibraryWordProgressRow = {
+      id: existing?.id,
+      user_id: currentUserId,
+      study_identity_key: currentCard.studyIdentityKey,
+      surface: currentCard.surface,
+      reading: currentCard.reading,
+      definition_key: "",
+      reading_gate_status: existing?.reading_gate_status ?? "not_started",
+      meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
+      held_before_reading_gate: existing?.held_before_reading_gate ?? false,
+      held_before_meaning_gate: existing?.held_before_meaning_gate ?? false,
+      mastered: existing?.mastered ?? false,
+      reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
+      meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
+      reading_gate_passed_at: existing?.reading_gate_passed_at ?? null,
+      reading_gate_failed_at: existing?.reading_gate_failed_at ?? null,
+      meaning_gate_passed_at: existing?.meaning_gate_passed_at ?? null,
+      meaning_gate_failed_at: existing?.meaning_gate_failed_at ?? null,
+      mastered_at: existing?.mastered_at ?? null,
+      last_studied_at: now,
+    };
+
+    if (gate === "reading") {
+      nextProgress.reading_gate_status = ok ? "passed" : "failed";
+      nextProgress.held_before_reading_gate = false;
+      nextProgress.reading_gate_attempts += 1;
+      if (ok) {
+        nextProgress.reading_gate_passed_at = now;
+      } else {
+        nextProgress.reading_gate_failed_at = now;
+      }
+    } else {
+      nextProgress.meaning_gate_status = ok ? "passed" : "failed";
+      nextProgress.held_before_meaning_gate = false;
+      nextProgress.meaning_gate_attempts += 1;
+      if (ok) {
+        nextProgress.meaning_gate_passed_at = now;
+      } else {
+        nextProgress.meaning_gate_failed_at = now;
+      }
+    }
+
+    if (isMasteryCheck) {
+      if (ok) {
+        nextProgress.reading_gate_status = "passed";
+        nextProgress.meaning_gate_status = "passed";
+        nextProgress.mastered = true;
+        nextProgress.mastered_at = nextProgress.mastered_at ?? now;
+      } else {
+        nextProgress.mastered = false;
+        nextProgress.mastered_at = null;
+
+        if (gate === "reading") {
+          nextProgress.reading_gate_status = "failed";
+          nextProgress.meaning_gate_status = "not_started";
+          nextProgress.meaning_gate_passed_at = null;
+          nextProgress.meaning_gate_failed_at = null;
+        } else {
+          nextProgress.reading_gate_status = "passed";
+          nextProgress.meaning_gate_status = "failed";
+        }
+      }
+    }
+
+    const { error } = await supabase
+      .from("user_library_word_progress")
+      .upsert(
+        {
+          user_id: nextProgress.user_id,
+          study_identity_key: nextProgress.study_identity_key,
+          surface: nextProgress.surface,
+          reading: nextProgress.reading,
+          definition_key: nextProgress.definition_key,
+          reading_gate_status: nextProgress.reading_gate_status,
+          meaning_gate_status: nextProgress.meaning_gate_status,
+          held_before_reading_gate: nextProgress.held_before_reading_gate,
+          held_before_meaning_gate: nextProgress.held_before_meaning_gate,
+          mastered: nextProgress.mastered,
+          reading_gate_attempts: nextProgress.reading_gate_attempts,
+          meaning_gate_attempts: nextProgress.meaning_gate_attempts,
+          reading_gate_passed_at: nextProgress.reading_gate_passed_at,
+          reading_gate_failed_at: nextProgress.reading_gate_failed_at,
+          meaning_gate_passed_at: nextProgress.meaning_gate_passed_at,
+          meaning_gate_failed_at: nextProgress.meaning_gate_failed_at,
+          mastered_at: nextProgress.mastered_at,
+          last_studied_at: nextProgress.last_studied_at,
+        },
+        { onConflict: "user_id,study_identity_key,definition_key" }
+      )
+      .select(
+        `
+          id,
+          user_id,
+          study_identity_key,
+          surface,
+          reading,
+          definition_key,
+          reading_gate_status,
+          meaning_gate_status,
+          held_before_reading_gate,
+          held_before_meaning_gate,
+          mastered,
+          reading_gate_attempts,
+          meaning_gate_attempts,
+          reading_gate_passed_at,
+          reading_gate_failed_at,
+          meaning_gate_passed_at,
+          meaning_gate_failed_at,
+          mastered_at,
+          last_studied_at
+        `
+      )
+      .single<LibraryWordProgressRow>();
+
+    if (error) {
+      console.error("Error saving Library Check gate progress:", error);
+      setNotice("Could not save Library Check gate progress.");
+      return;
+    }
+
+    // Keep the active card on its original gate for this session.
+    // The saved progress is picked up next time, so a word cannot climb twice in one sitting.
+  }
+
   function checkMultipleChoice(choice: string) {
     if (!currentCard || checked) return;
 
@@ -505,86 +1529,97 @@ export default function LibraryStudyPage() {
       ok,
       studyMode
     );
+  }
 
-    function checkTypingSingle() {
-      if (!currentCard || checked) return;
+  function checkTypingSingle() {
+    if (!currentCard || checked) return;
 
-      let correct = currentCard.reading;
-      let ok = false;
+    let correct = currentCard.reading;
+    let ok = false;
 
-      if (studyMode === "reading_typing") {
-        correct = currentCard.reading;
-        ok = normalizeKana(typingInput) === normalizeKana(correct);
-      } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
-        correct = currentCard.meaning;
-        ok = matchesAnyMeaning(typingInput, correct);
-      }
-
-      setChecked({ ok, correct });
-
-      recordCurrentStudyEvent(
-        ok ? "correct" : "incorrect",
-        ok,
-        studyMode
-      );
+    if (studyMode === "reading_typing") {
+      correct = currentCard.reading;
+      ok = normalizeKana(typingInput) === normalizeKana(correct);
+    } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
+      correct = currentCard.meaning;
+      ok = matchesAnyMeaning(typingInput, correct);
     }
 
-    function checkCompleteStudyStep1() {
-      if (!currentCard || firstStepChecked) return;
+    setChecked({ ok, correct });
 
-      const ok = normalizeKana(typingInput) === normalizeKana(currentCard.reading);
-      setFirstStepChecked({ ok, correct: currentCard.reading });
+    recordCurrentStudyEvent(
+      ok ? "correct" : "incorrect",
+      ok,
+      studyMode
+    );
 
-      recordCurrentStudyEvent(
-        ok ? "correct" : "incorrect",
-        ok,
-        "complete_study_reading_step"
-      );
+    if (studyMode === "reading_typing") {
+      void saveTypedGateProgress("reading", ok);
+    } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
+      void saveTypedGateProgress("meaning", ok);
+    }
+  }
 
-      if (ok) {
-        setTwoStepStage(2);
-        setSecondStepInput("");
-      }
+  function checkCompleteStudyStep1() {
+    if (!currentCard || firstStepChecked) return;
+
+    const ok = normalizeKana(typingInput) === normalizeKana(currentCard.reading);
+    setFirstStepChecked({ ok, correct: currentCard.reading });
+
+    recordCurrentStudyEvent(
+      ok ? "correct" : "incorrect",
+      ok,
+      "complete_study_reading_step"
+    );
+
+    void saveTypedGateProgress("reading", ok);
+
+    if (ok) {
+      setTwoStepStage(2);
+      setSecondStepInput("");
+    }
+  }
+
+  function checkCompleteStudyStep2() {
+    if (!currentCard || !firstStepChecked?.ok || secondStepChecked) return;
+
+    const ok = matchesAnyMeaning(secondStepInput, currentCard.meaning);
+    setSecondStepChecked({ ok, correct: currentCard.meaning });
+
+    recordCurrentStudyEvent(
+      ok ? "correct" : "incorrect",
+      ok,
+      "complete_study_meaning_step"
+    );
+
+    void saveTypedGateProgress("meaning", ok, { forceMeaning: true });
+  }
+
+  async function flagCurrentCard() {
+    if (!currentCard) return;
+
+    const ok = window.confirm("Hide this card from study?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("user_book_words")
+      .update({ hidden: true })
+      .eq("id", currentCard.id);
+
+    if (error) {
+      console.error("Error hiding study card:", error);
+      alert(`Could not flag card.\n${error.message}`);
+      return;
     }
 
-    function checkCompleteStudyStep2() {
-      if (!currentCard || !firstStepChecked?.ok || secondStepChecked) return;
-
-      const ok = matchesAnyMeaning(secondStepInput, currentCard.meaning);
-      setSecondStepChecked({ ok, correct: currentCard.meaning });
-
-      recordCurrentStudyEvent(
-        ok ? "correct" : "incorrect",
-        ok,
-        "complete_study_meaning_step"
-      );
-    }
-
-    async function flagCurrentCard() {
-      if (!currentCard) return;
-
-      const ok = window.confirm("Hide this card from study?");
-      if (!ok) return;
-
-      const { error } = await supabase
-        .from("user_book_words")
-        .update({ hidden: true })
-        .eq("id", currentCard.id);
-
-      if (error) {
-        console.error("Error hiding study card:", error);
-        alert(`Could not flag card.\n${error.message}`);
-        return;
-      }
-
-      setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
-      setNotice("Card hidden from study.");
-    }
+    setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
+    setNotice("Card hidden from study.");
+  }
 
     if (loading) {
       return (
         <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-          <p className="text-lg text-gray-500">Loading Library Study…</p>
+          <p className="text-lg text-gray-500">Loading Library Check...</p>
         </main>
       );
     }
@@ -592,7 +1627,7 @@ export default function LibraryStudyPage() {
     if (needsSignIn) {
       return (
         <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-          <p className="text-gray-700">You need to sign in to use Library Study.</p>
+          <p className="text-gray-700">You need to sign in to use Library Check.</p>
           <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
             Go to Login
           </button>
@@ -613,34 +1648,62 @@ export default function LibraryStudyPage() {
 
     if (allCards.length === 0) {
       return (
-        <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-          <p className="text-2xl font-semibold text-gray-700">
-            No saved vocab is ready for Library Study yet.
-          </p>
-          <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-            Back to Library
-          </button>
+        <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
+          <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+            <p className="text-2xl font-semibold text-gray-700">
+              No saved vocab is ready for Library Check yet.
+            </p>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
+              Real reading encounters will unlock strict checks. You can also warm up with Word Sky.
+            </p>
+
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/library-study/word-sky")}
+                className="rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-200"
+              >
+                Try Word Sky
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/books")}
+                className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium"
+              >
+                Back to Library
+              </button>
+            </div>
+          </div>
         </main>
       );
     }
 
-    if (filteredCards.length === 0) {
+    if (libraryMode === "check" && filteredCards.length === 0) {
       return (
         <main className="min-h-screen bg-slate-100 px-6 py-8">
           <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-            <h1 className="text-2xl font-semibold">Library Study</h1>
+            <h1 className="text-2xl font-semibold">Library Check</h1>
             <p className="mt-3 text-gray-600">
               {selectedJlpt === "all"
-                ? "You’ve already studied all available Library Study cards today."
-                : "No cards match your current JLPT filter, or you already studied them today."}
+                ? "You’ve already checked all available Library Check cards today."
+                : "No cards match your current JLPT filter, or you already checked them today."}
+            </p>
+            <p className="mt-3 text-sm text-slate-500">
+              Debug: {allCards.length} eligible cards loaded, {filteredCards.length} left after today/JLPT filters.
             </p>
 
-            <div className="mt-6 flex justify-center gap-3">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <button
                 onClick={() => setSelectedJlpt("all")}
                 className="rounded bg-gray-700 px-4 py-2 text-white"
               >
                 Clear JLPT Filter
+              </button>
+              <button
+                onClick={studyAgainToday}
+                className="rounded bg-amber-100 px-4 py-2 text-amber-900"
+              >
+                Check Again Today
               </button>
               <button
                 onClick={() => router.push("/books")}
@@ -654,7 +1717,7 @@ export default function LibraryStudyPage() {
       );
     }
 
-    if (index >= deck.length) {
+    if (libraryMode === "check" && index >= deck.length) {
       return (
         <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
           <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
@@ -669,7 +1732,7 @@ export default function LibraryStudyPage() {
               </>
             ) : (
               <>
-                <p className="mt-3 text-gray-700">You finished this Library Study session.</p>
+                <p className="mt-3 text-gray-700">You finished this Library Check session.</p>
                 <p className="mt-2 text-sm text-gray-500">
                   Come back tomorrow to run into more old book memories.
                 </p>
@@ -681,7 +1744,13 @@ export default function LibraryStudyPage() {
                 Back to Library
               </button>
               <button onClick={restartDeck} className="rounded bg-gray-700 px-4 py-2 text-white">
-                Refresh Remaining Cards
+                Refresh Remaining Checks
+              </button>
+              <button
+                onClick={studyAgainToday}
+                className="rounded bg-amber-100 px-4 py-2 text-amber-900"
+              >
+                Check Again Today
               </button>
             </div>
           </div>
@@ -690,22 +1759,68 @@ export default function LibraryStudyPage() {
     }
 
     return (
-      <main className="min-h-screen bg-slate-100 px-6 py-4">
-        <div className="mx-auto flex max-w-5xl flex-col items-center">
-          <div className="mb-2 text-center">
+      <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
+        <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">
             <h1 className="text-2xl font-semibold">Library Study</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Review saved words from across your books
+            <p className="text-sm leading-6 text-gray-500 sm:whitespace-nowrap">
+              Study the readings and meanings to master words across your library encounters.
             </p>
           </div>
 
-          <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">JLPT:</label>
+        <div className="mb-2 w-full max-w-3xl space-y-2">
+          <LibraryCheckIntroCard mode={libraryMode} onModeChange={setLibraryMode} />
+
+          <button
+            type="button"
+            onClick={() => router.push("/library-study/word-sky")}
+            className="w-full rounded-2xl border border-sky-100 bg-[#f5fbff] px-4 py-3 text-left shadow-sm transition hover:border-sky-200 hover:bg-sky-50"
+          >
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-sky-950">
+                  Need more words, or bogged down with difficult words?
+                </div>
+                <div className="text-xs leading-5 text-slate-500">
+                  Add easier words you may not need to look up in a book to your study.
+                </div>
+              </div>
+              <div className="text-sm font-semibold text-sky-900">Open Word Sky</div>
+            </div>
+          </button>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">
+                  {libraryMode === "practice" ? "Practice Progress" : "Session Progress"}
+                </p>
+                <p className="text-base font-semibold text-slate-800">
+                  Card{" "}
+                  {libraryMode === "practice"
+                    ? `${practiceDeck.length > 0 ? practiceIndex + 1 : 0}/${practiceDeck.length}`
+                    : `${index + 1}/${deck.length}`}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <p className="text-xs uppercase tracking-wide text-gray-500">
+                  {libraryMode === "practice" ? "Practice Pool" : "Cards Left"}
+                </p>
+                <p className="text-base font-semibold text-slate-800">
+                  {libraryMode === "practice"
+                    ? practiceDeck.length
+                    : Math.max(deck.length - index, 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <select
                 value={selectedJlpt}
                 onChange={(e) => setSelectedJlpt(e.target.value)}
-                className="rounded border bg-white px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               >
                 <option value="all">All Levels</option>
                 <option value="N5">N5</option>
@@ -713,52 +1828,76 @@ export default function LibraryStudyPage() {
                 <option value="N3">N3</option>
                 <option value="N2">N2</option>
                 <option value="N1">N1</option>
+                <option value="NON-JLPT">NON-JLPT</option>
               </select>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">Mode:</label>
-              <select
-                value={studyMode}
-                onChange={(e) => setStudyMode(e.target.value as StudyMode)}
-                className="rounded border bg-white px-3 py-2 text-sm"
-              >
-                <option value="reading_typing">Reading Typing</option>
-                <option value="meaning_typing">Meaning Typing</option>
-                <option value="reading_to_meaning_typing">Reading to Meaning Typing</option>
-                <option value="reading_mc">Reading MC</option>
-                <option value="meaning_mc">Meaning MC</option>
-                <option value="reading_to_kanji_mc">Reading to Kanji MC</option>
-                <option value="reading_to_meaning_mc">Reading to Meaning MC</option>
-                <option value="complete_study">Complete Study</option>
-              </select>
+              <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
+                {libraryMode === "practice" ? "Reveal practice" : "Automatic typed gates"}
+              </div>
             </div>
           </div>
+        </div>
 
+          {libraryMode === "practice" ? (
+            <LibraryPracticePanel
+              card={practiceCard}
+              total={practiceDeck.length}
+              revealStep={practiceRevealStep}
+              onRevealReading={() => setPracticeRevealStep("reading")}
+              onRevealMeaning={() => setPracticeRevealStep("meaning")}
+              onNext={goToNextPracticeCard}
+              onPrevious={goToPreviousPracticeCard}
+              onShuffle={shufflePracticeDeck}
+            />
+          ) : (
+            <>
           {notice ? (
-            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+            <div className="mb-3 w-full max-w-2xl rounded-xl border border-amber-100 bg-[#fffaf0] px-4 py-2 text-sm text-amber-900">
               {notice}
             </div>
           ) : null}
 
-          <p className="mb-3 text-sm text-gray-500">
-            Card {index + 1}/{deck.length}
-          </p>
-
-          <div className="relative flex min-h-80 w-[90vw] max-w-xl items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl">
-            {currentCard?.jlpt ? (
-              <div className="absolute left-4 top-3 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
-                {currentCard.jlpt}
+          <div className={libraryStudyCardClass(currentCard?.colorStatus)}>
+            {currentCard ? (
+              <div className="absolute left-4 right-4 top-4 flex justify-center">
+                <div className={gatePromptClass(currentCard)}>
+                  {gatePromptText(currentCard)}
+                </div>
               </div>
             ) : null}
 
-            <div className="flex w-full flex-col items-center gap-6">
+            <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+              {isKatakanaOnly(currentCard?.surface) ? <KatakanaBadge /> : null}
+
+              {currentCard?.jlpt ? (
+                <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
+                  {currentCard.jlpt}
+                </div>
+              ) : null}
+
+              {currentCard?.progress?.definition_key ? (
+                <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
+                  Def {currentCard.progress.definition_key}
+                </div>
+              ) : null}
+            </div>
+
+            {currentCard ? (
+              <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
+                <div className={libraryStudyChipClass(currentCard.colorStatus)}>
+                  {currentCard.encounterCount} encounter
+                  {currentCard.encounterCount === 1 ? "" : "s"}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex w-full flex-col items-center gap-6 pt-12 pb-10">
               {(studyMode === "reading_typing" ||
                 studyMode === "reading_mc" ||
                 studyMode === "complete_study") && (
                   <>
-                    <div className="text-xs uppercase tracking-wide text-slate-500">
-                      What is the reading?
+                    <div className={promptModeClass("reading")}>
+                      Reading
                     </div>
                     <div className="text-5xl font-bold">{currentCard?.surface}</div>
                   </>
@@ -766,8 +1905,8 @@ export default function LibraryStudyPage() {
 
               {(studyMode === "meaning_typing" || studyMode === "meaning_mc") && (
                 <>
-                  <div className="text-xs uppercase tracking-wide text-slate-500">
-                    What is the meaning?
+                  <div className={promptModeClass("meaning")}>
+                    Meaning
                   </div>
                   <div className="text-5xl font-bold">{currentCard?.surface}</div>
                   <div className="text-lg text-slate-500">{currentCard?.reading}</div>
@@ -923,8 +2062,6 @@ export default function LibraryStudyPage() {
 
                         if (!checked) {
                           checkTypingSingle();
-                        } else if (!checked.ok) {
-                          movePastCurrentCard();
                         }
                       }}
                       placeholder={
@@ -935,6 +2072,12 @@ export default function LibraryStudyPage() {
                       className="w-full rounded border px-4 py-3 text-base"
                       disabled={!!checked}
                     />
+
+                    <div className="mt-2 text-center text-xs uppercase tracking-wide text-slate-500">
+                      {studyMode === "reading_typing"
+                        ? "Type the reading"
+                        : "Type one meaning word"}
+                    </div>
 
                     {!checked ? (
                       <div className="mt-3 flex justify-center gap-2">
@@ -967,8 +2110,6 @@ export default function LibraryStudyPage() {
 
                           if (!firstStepChecked) {
                             checkCompleteStudyStep1();
-                          } else if (!firstStepChecked.ok) {
-                            movePastCurrentCard();
                           }
                         }}
                         placeholder="Type the reading"
@@ -989,15 +2130,9 @@ export default function LibraryStudyPage() {
                         ) : (
                           <>
                             <p className="text-red-700">❌ Reading: {firstStepChecked.correct}</p>
-                            <div className="mt-3 flex justify-center">
-                              <button
-                                type="button"
-                                onClick={movePastCurrentCard}
-                                className="rounded bg-gray-700 px-4 py-2 text-white"
-                              >
-                                Next
-                              </button>
-                            </div>
+                            <p className="mt-2 text-xs text-slate-400">
+                              Next card in a moment...
+                            </p>
                           </>
                         )}
                       </div>
@@ -1017,8 +2152,6 @@ export default function LibraryStudyPage() {
 
                           if (firstStepChecked?.ok && !secondStepChecked) {
                             checkCompleteStudyStep2();
-                          } else if (secondStepChecked && !secondStepChecked.ok) {
-                            movePastCurrentCard();
                           }
                         }}
                         placeholder="Type the meaning"
@@ -1040,15 +2173,9 @@ export default function LibraryStudyPage() {
                         ) : (
                           <>
                             <p className="text-red-700">❌ Meaning: {secondStepChecked.correct}</p>
-                            <div className="mt-3 flex justify-center">
-                              <button
-                                type="button"
-                                onClick={movePastCurrentCard}
-                                className="rounded bg-gray-700 px-4 py-2 text-white"
-                              >
-                                Next
-                              </button>
-                            </div>
+                            <p className="mt-2 text-xs text-slate-400">
+                              Next card in a moment...
+                            </p>
                           </>
                         )}
                       </div>
@@ -1075,17 +2202,7 @@ export default function LibraryStudyPage() {
                     <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
                   </div>
 
-                  {!checked.ok ? (
-                    <div className="mt-3 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={movePastCurrentCard}
-                        className="rounded bg-gray-700 px-4 py-2 text-white"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  ) : null}
+                  <p className="mt-3 text-xs text-slate-400">Next card in a moment...</p>
                 </div>
               ) : null}
 
@@ -1102,40 +2219,42 @@ export default function LibraryStudyPage() {
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/books")}
-              className="rounded bg-gray-200 px-4 py-2"
-            >
-              Back to Library
-            </button>
+          <div className="mt-2 w-full max-w-2xl space-y-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:justify-between">
+                <div className="flex min-w-0 flex-1 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Check Mode
+                    </div>
 
-            <button
-              type="button"
-              onClick={() => router.push(`/books/${currentCard?.userBookId}`)}
-              className="rounded bg-gray-200 px-4 py-2"
-            >
-              Open Book
-            </button>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                    {checkModeLabel(currentCard)}
+                    </div>
 
-            <button
-              type="button"
-              onClick={flagCurrentCard}
-              className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-amber-800"
-            >
-              Flag this card
-            </button>
+                    <p className="mt-1 truncate text-xs text-gray-600">
+                    {checkModeDescription(currentCard)}
+                    </p>
+                  </div>
+                </div>
 
-            <button
-              type="button"
-              onClick={finishForToday}
-              className="rounded bg-gray-700 px-4 py-2 text-white"
-            >
-              Finish for Today
-            </button>
+                <div className="md:w-[180px]">
+                  <button
+                    type="button"
+                    onClick={flagCurrentCard}
+                    className="h-full min-h-[74px] w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
+                  >
+                    <div className="leading-tight">Flag</div>
+                    <div className="text-[10px] font-normal text-amber-700">
+                      Problem card
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+          </>
+        )}
       </main>
     );
-  }}
+}

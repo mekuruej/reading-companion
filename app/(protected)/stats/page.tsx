@@ -5,6 +5,12 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import {
+  emptyLibraryStudyColorTotals,
+  fetchLibraryStudyColorTotals,
+  LIBRARY_STUDY_COLOR_ORDER,
+  type LibraryStudyColorTotals,
+} from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
 
 type DateRange = "7d" | "30d" | "90d" | "1y" | "all";
@@ -105,6 +111,8 @@ type StudyEventRow = {
   meaning: string | null;
   created_at: string;
 };
+
+type LibraryStudyDisplayColor = "red" | "orange" | "yellow" | "grey" | "green" | "blue" | "purple";
 
 type BookMetric = {
   userBookId: string;
@@ -554,12 +562,21 @@ function buildRangeCutoff(range: DateRange) {
   if (range === "all") return null;
 
   const today = startOfToday();
-  const days =
-    range === "7d" ? -6 :
-      range === "30d" ? -29 :
-        range === "90d" ? -89 :
-          -364;
-  return addDays(today, days);
+  return addDays(today, -(rangeWindowDays(range) - 1));
+}
+
+function rangeWindowDays(range: DateRange) {
+  if (range === "7d") return 7;
+  if (range === "30d") return 30;
+  if (range === "90d") return 90;
+  if (range === "1y") return 365;
+  return null;
+}
+
+function previousRangeCutoff(range: DateRange, currentCutoff: Date | null) {
+  const days = rangeWindowDays(range);
+  if (!days || !currentCutoff) return null;
+  return addDays(currentCutoff, -days);
 }
 
 function rangeDayCount(range: DateRange, sessions: SessionRow[], words: WordRow[]) {
@@ -1145,6 +1162,37 @@ function SpotlightCard({
   );
 }
 
+function libraryStudyColorLabel(color: LibraryStudyDisplayColor) {
+  if (color === "grey") return "Support";
+  return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
+function libraryStudyColorDot(color: LibraryStudyDisplayColor) {
+  if (color === "red") return "bg-red-500";
+  if (color === "orange") return "bg-orange-500";
+  if (color === "yellow") return "bg-yellow-300";
+  if (color === "green") return "bg-emerald-500";
+  if (color === "blue") return "bg-sky-500";
+  if (color === "purple") return "bg-violet-500";
+  return "bg-slate-500";
+}
+
+function ColorTotalDelta({ value }: { value: number | null }) {
+  if (value == null) return null;
+
+  if (value === 0) {
+    return <span className="text-xs font-semibold text-slate-400">0</span>;
+  }
+
+  const isUp = value > 0;
+
+  return (
+    <span className={`text-xs font-semibold ${isUp ? "text-emerald-700" : "text-rose-700"}`}>
+      {isUp ? "↑" : "↓"} {Math.abs(value)}
+    </span>
+  );
+}
+
 export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -1154,12 +1202,17 @@ export default function StatsPage() {
   const [abilityBookType, setAbilityBookType] =
     useState<AbilityReadingFilter>("all");
   const [myRole, setMyRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [rows, setRows] = useState<UserBookRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [words, setWords] = useState<WordRow[]>([]);
   const [genres, setGenres] = useState<GenreRow[]>([]);
   const [studyEvents, setStudyEvents] = useState<StudyEventRow[]>([]);
+  const [libraryStudyColorTotals, setLibraryStudyColorTotals] =
+    useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
+  const [previousLibraryStudyColorTotals, setPreviousLibraryStudyColorTotals] =
+    useState<LibraryStudyColorTotals | null>(null);
 
   async function loadStats() {
     setLoading(true);
@@ -1176,13 +1229,18 @@ export default function StatsPage() {
       if (!user) {
         setNeedsSignIn(true);
         setMyRole(null);
+        setCurrentUserId(null);
         setRows([]);
         setSessions([]);
         setWords([]);
         setGenres([]);
         setStudyEvents([]);
+        setLibraryStudyColorTotals(emptyLibraryStudyColorTotals());
+        setPreviousLibraryStudyColorTotals(null);
         return;
       }
+
+      setCurrentUserId(user.id);
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
@@ -1299,6 +1357,44 @@ export default function StatsPage() {
   }, [activeTab, isTeacher]);
 
   const cutoff = useMemo(() => buildRangeCutoff(range), [range]);
+  const previousCutoff = useMemo(() => previousRangeCutoff(range, cutoff), [range, cutoff]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    let cancelled = false;
+
+    async function loadLibraryStudyColorTotals() {
+      try {
+        const [totals, previousTotals] = await Promise.all([
+          fetchLibraryStudyColorTotals(currentUserId!, null, { since: cutoff }),
+          previousCutoff && cutoff
+            ? fetchLibraryStudyColorTotals(currentUserId!, null, {
+                since: previousCutoff,
+                before: cutoff,
+              })
+            : Promise.resolve(null),
+        ]);
+
+        if (!cancelled) {
+          setLibraryStudyColorTotals(totals);
+          setPreviousLibraryStudyColorTotals(previousTotals);
+        }
+      } catch (error) {
+        console.error("Error loading Library Study color totals:", error);
+        if (!cancelled) {
+          setLibraryStudyColorTotals(emptyLibraryStudyColorTotals());
+          setPreviousLibraryStudyColorTotals(null);
+        }
+      }
+    }
+
+    void loadLibraryStudyColorTotals();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId, cutoff, previousCutoff]);
 
   const rangeTheme = useMemo(() => timeRangeTheme(range), [range]);
 
@@ -3050,58 +3146,6 @@ export default function StatsPage() {
             </div>
 
             <SectionBand
-              eyebrow="Pace Confidence"
-              title="Support vs confidence"
-              description="This focuses on reading pace and timed coverage, not saved-word density. Vocabulary friction now lives in the Vocabulary tab."
-              tone={filteredSectionTone}
-            >
-              <div className="grid gap-3 md:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs text-slate-500">Pages in this lane</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {abilityTotals.pagesRead}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs text-slate-500">Timed page coverage</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {abilityTotals.timedCoveragePercent == null
-                      ? "—"
-                      : `${Math.round(abilityTotals.timedCoveragePercent)}%`}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs text-slate-500">Untimed pages</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {abilityTotals.untimedPages}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs text-slate-500">Books touched</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">
-                    {abilityTotals.booksTouched}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
-                {abilityTotals.pagesRead === 0 ? (
-                  "No reading ability data in this lane yet."
-                ) : abilityTotals.timedCoveragePercent == null ||
-                  abilityTotals.timedCoveragePercent === 0 ? (
-                  "You have page movement here, but not enough timed reading yet to describe pace."
-                ) : abilityTotals.timedCoveragePercent < 50 ? (
-                  "Some of this lane is timed, but a lot of the reading is still untimed. Pace signals may be partial."
-                ) : (
-                  "This lane has enough timed reading to start showing a useful pace picture."
-                )}
-              </div>
-            </SectionBand>
-
-            <SectionBand
               eyebrow="Pace"
               title="How your books felt to read"
               description="Books are grouped by minutes per page only. Saved-word density has been moved to the Vocabulary tab."
@@ -3410,6 +3454,46 @@ export default function StatsPage() {
 
         {activeTab === "vocabulary" && (
           <>
+            <SectionBand
+              eyebrow="Library Study"
+              title="Color totals in this window"
+              description="Current color states for words encountered or claimed during the selected time filter. Book type does not affect these stats. Practice review does not move these colors."
+              tone={filteredSectionTone}
+            >
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+                {LIBRARY_STUDY_COLOR_ORDER.map((color) => {
+                  const displayColor = color as LibraryStudyDisplayColor;
+                  const delta =
+                    previousLibraryStudyColorTotals == null
+                      ? null
+                      : libraryStudyColorTotals[color] - previousLibraryStudyColorTotals[color];
+
+                  return (
+                    <div
+                      key={color}
+                      className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`h-3 w-3 rounded-full ${libraryStudyColorDot(displayColor)}`}
+                        />
+                        <div className="text-xs font-semibold text-slate-600">
+                          {libraryStudyColorLabel(displayColor)}
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-xl font-semibold text-slate-900">
+                          {libraryStudyColorTotals[color]}
+                        </span>
+                        <ColorTotalDelta value={delta} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </SectionBand>
+
             <SectionBand
               eyebrow="Vocabulary Rhythm"
               title="Saved words → study rhythm"

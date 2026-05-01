@@ -728,21 +728,26 @@ export default function BulkVocabPage() {
                           <option value="other">Other</option>
                         </select>
 
-                        <textarea
-                          rows={2}
-                          value={i.meaning}
-                          onChange={(e) => updateItem(idx, "meaning", e.target.value)}
-                          readOnly={i.meaningChoiceIndex != null}
-                          className={`w-full rounded border p-2 text-sm ${i.meaningChoiceIndex == null
-                            ? "bg-white"
-                            : "bg-slate-100 text-slate-700"
-                            }`}
-                          placeholder={
-                            i.meaningChoiceIndex == null
-                              ? "Type your custom meaning"
-                              : "Meaning"
-                          }
-                        />
+                        {i.meaningChoiceIndex == null ? (
+                          <textarea
+                            key={`${i.surface}-${idx}-custom-meaning`}
+                            rows={2}
+                            value={i.meaning}
+                            onChange={(e) => updateItem(idx, "meaning", e.target.value)}
+                            className="w-full rounded border bg-white p-2 text-sm"
+                            placeholder="Type your custom meaning"
+                            autoFocus
+                          />
+                        ) : (
+                          <textarea
+                            key={`${i.surface}-${idx}-picked-meaning`}
+                            rows={2}
+                            value={i.meaning}
+                            readOnly
+                            className="w-full rounded border bg-slate-100 p-2 text-sm text-slate-700"
+                            placeholder="Meaning"
+                          />
+                        )}
                       </div>
                       <p className="mt-1 text-xs text-stone-500">
                         Choose Other to write your own definition.

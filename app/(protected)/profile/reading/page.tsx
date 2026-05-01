@@ -5,6 +5,11 @@
 
 import { useEffect, useState } from "react";
 import ProfileShell from "@/components/profile/ProfileShell";
+import {
+  emptyLibraryStudyColorTotals,
+  fetchLibraryStudyColorTotals,
+  type LibraryStudyColorTotals,
+} from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
 
 type LearningSettings = {
@@ -15,18 +20,36 @@ type LearningSettings = {
   yellow_stages: number;
   show_badge_numbers: boolean;
   color_system: string;
+  skip_katakana_library_check: boolean;
 };
 
-type MainStage = "red" | "orange" | "yellow" | "green" | "blue" | "grey";
+type MainStage = "red" | "orange" | "yellow" | "green" | "blue" | "grey" | "purple";
+
+const COLOR_TOTAL_LAYOUT: (MainStage | "spacer")[] = [
+  "red",
+  "orange",
+  "yellow",
+  "spacer",
+  "green",
+  "blue",
+  "purple",
+  "grey",
+];
+
+function colorLabel(stage: MainStage) {
+  if (stage === "grey") return "Support";
+  return stage.charAt(0).toUpperCase() + stage.slice(1);
+}
 
 function stagePill(stage: MainStage) {
-  const base = "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold";
+  const base = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold";
 
   if (stage === "red") return `${base} bg-red-600 text-white`;
   if (stage === "orange") return `${base} bg-orange-500 text-white`;
   if (stage === "yellow") return `${base} bg-yellow-300 text-stone-900`;
   if (stage === "green") return `${base} bg-green-600 text-white`;
   if (stage === "blue") return `${base} bg-blue-600 text-white`;
+  if (stage === "purple") return `${base} bg-purple-600 text-white`;
   return `${base} bg-slate-500 text-white`;
 }
 
@@ -69,21 +92,28 @@ function ColorStepCard({
   note: string;
 }) {
   return (
-    <div className="rounded-xl border border-stone-200 p-4">
-      <div className="flex items-center gap-2">
+    <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3">
+      <div className="flex items-center justify-between gap-2">
         <span className={stagePill(stage)}>
           {stage.charAt(0).toUpperCase() + stage.slice(1)}
         </span>
       </div>
-      <div className="mt-2 text-sm font-semibold text-stone-900">{title}</div>
-      <div className="mt-1 text-sm leading-6 text-stone-600">{detail}</div>
-      <div className="mt-2 text-xs text-stone-500">{note}</div>
+      <div className="mt-2 text-sm font-semibold leading-5 text-stone-900">{title}</div>
+      <div className="mt-1 text-xs leading-5 text-stone-600">{detail}</div>
+      <div className="mt-2 text-[11px] leading-4 text-stone-500">{note}</div>
     </div>
   );
 }
 
+function totalEncounterSteps(settings: LearningSettings) {
+  return settings.red_stages + settings.orange_stages + settings.yellow_stages;
+}
+
 export default function ReadingProfilePage() {
   const [settings, setSettings] = useState<LearningSettings | null>(null);
+  const [colorTotals, setColorTotals] = useState<LibraryStudyColorTotals>(
+    emptyLibraryStudyColorTotals()
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -119,7 +149,7 @@ export default function ReadingProfilePage() {
       }
 
       if (!data) {
-        setSettings({
+        const defaultSettings: LearningSettings = {
           user_id: user.id,
           learning_profile: "Advanced",
           red_stages: 1,
@@ -127,11 +157,21 @@ export default function ReadingProfilePage() {
           yellow_stages: 1,
           show_badge_numbers: true,
           color_system: "rainbow",
-        });
+          skip_katakana_library_check: true,
+        };
+        setSettings(defaultSettings);
+        setColorTotals(await fetchLibraryStudyColorTotals(user.id, defaultSettings));
         return;
       }
 
-      setSettings(data as LearningSettings);
+      const loadedSettings = {
+        ...(data as LearningSettings),
+        skip_katakana_library_check:
+          (data as Partial<LearningSettings>).skip_katakana_library_check ?? true,
+      };
+
+      setSettings(loadedSettings);
+      setColorTotals(await fetchLibraryStudyColorTotals(user.id, loadedSettings));
     } finally {
       setLoading(false);
     }
@@ -183,6 +223,7 @@ export default function ReadingProfilePage() {
           yellow_stages: settings.yellow_stages,
           show_badge_numbers: settings.show_badge_numbers,
           color_system: settings.color_system,
+          skip_katakana_library_check: settings.skip_katakana_library_check,
         },
         { onConflict: "user_id" }
       );
@@ -226,163 +267,203 @@ export default function ReadingProfilePage() {
   return (
     <ProfileShell
       title="Reading Profile"
-      description="Set the study and display preferences that shape how Mekuru supports your reading."
+      description="Set how much real reading support a word needs before Mekuru asks you to study it directly."
     >
       <div className="mx-auto max-w-4xl space-y-4">
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">Reading style preset</h2>
+          <h2 className="text-lg font-semibold text-stone-900">Your current color totals</h2>
           <p className="mt-1 text-sm leading-6 text-stone-600">
-            Choose the kind of support you usually want while reading. You can always switch to a
-            custom setup later.
+            These are your current Library Study color states across real encounters and claimed
+            Word Sky words.
           </p>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <ReadingStyleCard
-              active={settings.learning_profile === "Beginner"}
-              title="More support"
-              description="More warm-color stages before words cool down. Better when you want gentler repetition."
-              onClick={() => applyProfilePreset("Beginner")}
-            />
-            <ReadingStyleCard
-              active={settings.learning_profile === "Intermediate"}
-              title="Balanced"
-              description="A middle-ground setting for readers who want support without everything staying urgent for too long."
-              onClick={() => applyProfilePreset("Intermediate")}
-            />
-            <ReadingStyleCard
-              active={settings.learning_profile === "Advanced"}
-              title="Lighter support"
-              description="Faster cooling and less hand-holding. Good if you want the system to stay quieter."
-              onClick={() => applyProfilePreset("Advanced")}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setSettings({ ...settings, learning_profile: "Custom" })}
-            className={`mt-3 rounded-xl border px-4 py-2 text-sm transition ${
-              settings.learning_profile === "Custom"
-                ? "border-stone-900 bg-stone-900 text-white"
-                : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-            }`}
-          >
-            Use custom settings
-          </button>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">Warm-color stages</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-600">
-            These control how long words stay visually urgent before settling down.
-          </p>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {(["red", "orange", "yellow"] as const).map((color) => (
-              <div key={color}>
-                <label className="block text-sm font-medium capitalize text-stone-800">
-                  {color} stages
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  className="mt-1 w-full rounded-xl border px-3 py-2"
-                  value={settings[`${color}_stages` as keyof LearningSettings] as number}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      [`${color}_stages`]: Number(e.target.value),
-                      learning_profile: "Custom",
-                    } as LearningSettings)
-                  }
-                />
-              </div>
-            ))}
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {COLOR_TOTAL_LAYOUT.map((stage) =>
+              stage === "spacer" ? (
+                <div key="totals-spacer" className="hidden lg:block" />
+              ) : (
+                <div key={stage} className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={stagePill(stage)}>
+                      {colorLabel(stage)}
+                    </span>
+                    <span className="text-lg font-semibold text-stone-900">
+                      {colorTotals[stage]}
+                    </span>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         </div>
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-stone-900">What the colors mean</h2>
           <p className="mt-1 text-sm leading-6 text-stone-600">
-            Your colors come from lookup behavior and check stages, not from self-report. Red,
-            orange, and yellow use your chosen repetition settings above.
+            Changing your profile does not erase your reading history. It changes how strictly
+            Mekuru interprets your encounters before sending words to Library Study.
           </p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <ColorStepCard
               stage="red"
-              title="New / just met it"
-              detail="A word lands here when it is still fresh and unfamiliar."
+              title="Early encounter support"
+              detail="You have started meeting this word in real reading, but it is still too new for Library Study."
               note={`Currently set to ${settings.red_stages} stage${
                 settings.red_stages === 1 ? "" : "s"
-              } before moving on.`}
+              }.`}
             />
             <ColorStepCard
               stage="orange"
-              title="Seen again"
-              detail="You have met it more than once, but recognition is still warming up."
+              title="Repeated encounter support"
+              detail="The word is showing up again, but Mekuru is still gathering reading support before testing it."
               note={`Currently set to ${settings.orange_stages} stage${
                 settings.orange_stages === 1 ? "" : "s"
-              } before moving on.`}
+              }.`}
             />
             <ColorStepCard
               stage="yellow"
-              title="Almost readable"
-              detail="This is the last lookup-driven color before Mekuru starts checking knowledge more directly."
+              title="Final encounter support"
+              detail="The final yellow stage means the word has enough encounter support for Library Study."
               note={`Currently set to ${settings.yellow_stages} stage${
                 settings.yellow_stages === 1 ? "" : "s"
-              } before moving on.`}
+              }.`}
             />
+            <div className="hidden lg:block" />
             <ColorStepCard
               stage="green"
-              title="Read-check"
-              detail="The word should be readable now. This is where the app starts treating reading as the next hurdle."
-              note="A gate stage before meaning confidence."
+              title="Reading gate passed"
+              detail="In Library Study, you typed or chose the reading correctly."
+              note="This means reading knowledge has cleared its first gate."
             />
             <ColorStepCard
               stage="blue"
-              title="Meaning-check"
-              detail="You can get through the reading, but meaning still needs to feel stable."
-              note="A gate stage before the word settles fully."
+              title="Meaning gate passed"
+              detail="In Library Study, you answered the saved meaning or definition target."
+              note="Advanced words may care about the saved definition number."
+            />
+            <ColorStepCard
+              stage="purple"
+              title="Mastered"
+              detail="The word has cleared the major study gates and is no longer demanding regular attention."
+              note="Purple can split into passive/active mastery later."
             />
             <ColorStepCard
               stage="grey"
-              title="Stable"
-              detail="This is the calm end of the ladder: the word is no longer demanding attention."
-              note="Grey means the word feels settled for now."
+              title="Held for support"
+              detail="The word is being held before the next gate, either because it is not ready yet or because a gate was missed."
+              note="Grey is support, not punishment, and strong words can skip it."
             />
           </div>
         </div>
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">Display preferences</h2>
+          <h2 className="text-lg font-semibold text-stone-900">Reading style preset</h2>
           <p className="mt-1 text-sm leading-6 text-stone-600">
-            Small choices that change how much visual guidance you want on the page.
+            Choose how much encounter support you usually want before words become eligible for
+            Library Study.
           </p>
 
-          <label className="mt-4 flex items-center gap-3 text-sm text-stone-700">
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold leading-6 text-amber-900">
+            This controls how many real reading encounters a word needs before it can appear in
+            Library Study. It does not count quiz answers.
+          </p>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <ReadingStyleCard
+              active={settings.learning_profile === "Beginner"}
+              title="More support"
+              description="Recommended for beginners: 3 red, 3 orange, and 3 yellow stages before Library Study."
+              onClick={() => applyProfilePreset("Beginner")}
+            />
+            <ReadingStyleCard
+              active={settings.learning_profile === "Intermediate"}
+              title="Balanced"
+              description="Recommended for intermediate readers: 2 red, 2 orange, and 2 yellow stages before Library Study."
+              onClick={() => applyProfilePreset("Intermediate")}
+            />
+            <ReadingStyleCard
+              active={settings.learning_profile === "Advanced"}
+              title="Lighter support"
+              description="Recommended for advanced readers: 1 red, 1 orange, and 1 yellow stage before Library Study."
+              onClick={() => applyProfilePreset("Advanced")}
+            />
+          </div>
+
+          <div className="mt-6 border-t border-stone-200 pt-5">
+            <h3 className="text-base font-semibold text-stone-900">Encounter support stages</h3>
+            <p className="mt-1 text-sm leading-6 text-stone-600">
+              Red, orange, and yellow are based on real reading encounters, not quiz performance.
+              The final yellow stage is the normal threshold for Library Study.
+            </p>
+
+            <p className="mt-3 text-sm leading-6 text-stone-700">
+              Your current setup uses{" "}
+              <span className="font-semibold">{totalEncounterSteps(settings)} encounter steps</span>{" "}
+              before a word is ready for its first Library Study gate.
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              {(["red", "orange", "yellow"] as const).map((color) => (
+                <div key={color}>
+                  <label className="block text-sm font-medium capitalize text-stone-800">
+                    {color} stages
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={5}
+                    className="mt-1 w-full rounded-xl border px-3 py-2"
+                    value={settings[`${color}_stages` as keyof LearningSettings] as number}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        [`${color}_stages`]: Number(e.target.value),
+                        learning_profile: "Custom",
+                      } as LearningSettings)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
+              If too many hard words are showing up in Library Check, a gentle custom setup is to
+              leave red and orange lower and add extra yellow stages. That keeps words visible as
+              almost-ready without sending them to a gate too quickly.
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-stone-900">Katakana words</h2>
+          <p className="mt-1 text-sm leading-6 text-stone-600">
+            Katakana-only words can still appear in your vocabulary lists, but you can keep them
+            out of strict Library Check if they feel too easy or distracting.
+          </p>
+
+          <label className="mt-4 flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
             <input
               type="checkbox"
-              checked={settings.show_badge_numbers}
+              checked={settings.skip_katakana_library_check}
               onChange={(e) =>
-                setSettings({ ...settings, show_badge_numbers: e.target.checked })
+                setSettings({
+                  ...settings,
+                  skip_katakana_library_check: e.target.checked,
+                })
               }
+              className="mt-1"
             />
-            Show stage numbers inside vocabulary color badges
+            <span>
+              <span className="font-semibold text-stone-900">
+                Skip katakana-only words in Library Check
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-stone-500">
+                They keep a small カ badge, but they will not enter the strict gate session when this
+                is on.
+              </span>
+            </span>
           </label>
-
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-stone-800">Color system</label>
-            <select
-              className="mt-1 w-full rounded-xl border px-3 py-2"
-              value={settings.color_system}
-              onChange={(e) => setSettings({ ...settings, color_system: e.target.value })}
-            >
-              <option value="rainbow">Rainbow</option>
-              <option value="mono">Monotone</option>
-              <option value="pastel">Pastel</option>
-            </select>
-          </div>
         </div>
 
         {message ? <p className="text-sm text-stone-700">{message}</p> : null}

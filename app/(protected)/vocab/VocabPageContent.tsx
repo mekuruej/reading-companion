@@ -7,6 +7,11 @@ import { useState, useEffect, FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { WordCard } from "@/components/WordCard";
+import {
+  computeLibraryStudyColorStatus,
+  type LibraryStudyColor,
+  type LibraryStudyColorStatus,
+} from "@/lib/libraryStudyColor";
 
 // BASE defaults — things not in the DB yet
 const DEFAULT_SETTINGS = {
@@ -49,6 +54,61 @@ function normalizeJlpt(value: string | null | undefined): string {
   if (lower.startsWith("n4")) return "N4";
   if (lower.startsWith("n5")) return "N5";
   return "NON-JLPT";
+}
+
+function badgeColorClass(color: LibraryStudyColor) {
+  if (color === "red") return "border-red-800 bg-red-600 text-white";
+  if (color === "orange") return "border-orange-700 bg-orange-400 text-stone-950";
+  if (color === "yellow") return "border-yellow-500 bg-yellow-300 text-stone-900";
+  if (color === "green") return "border-green-800 bg-green-600 text-white";
+  if (color === "blue") return "border-blue-800 bg-blue-600 text-white";
+  if (color === "purple") return "border-purple-800 bg-purple-600 text-white";
+  if (color === "grey") return "border-slate-700 bg-slate-500 text-white";
+  return "border-stone-400 bg-stone-300 text-stone-700";
+}
+
+function colorLabel(color: LibraryStudyColor) {
+  if (color === "none") return "No color yet";
+  return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
+function LibraryStudyStatusBadge({
+  status,
+  showNumbers,
+  encounterCount,
+  days,
+}: {
+  status: LibraryStudyColorStatus;
+  showNumbers: boolean;
+  encounterCount: number;
+  days: number;
+}) {
+  const showStageNumber =
+    showNumbers &&
+    status.stageNumber != null &&
+    status.stageCount != null &&
+    status.stageCount > 1;
+
+  const title = [
+    `${colorLabel(status.color)}${showStageNumber ? ` ${status.stageNumber}` : ""}`,
+    status.reason,
+    `${encounterCount} encounter${encounterCount === 1 ? "" : "s"} in this book`,
+    days ? `${days} day${days === 1 ? "" : "s"}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold shadow-sm ${badgeColorClass(
+        status.color
+      )} ${showStageNumber ? "h-6 min-w-6 px-1.5" : "h-4 w-4"}`}
+    >
+      {showStageNumber ? status.stageNumber : ""}
+    </span>
+  );
 }
 
 // -------------------------------------------------------------
@@ -943,6 +1003,12 @@ export default function VocabPageContent() {
           const appearsIn = currentBook ? [currentBook.title] : [];
 
           const inBook = bookLookupMap[String(entry.orthography ?? "").trim()];
+          const status = computeLibraryStudyColorStatus({
+            encounterCount: inBook?.count ?? 0,
+            settings: mergedSettings,
+            readingGate: state.reading_stage === "known" ? "passed" : "not_started",
+            meaningGate: state.meaning_stage === "known" ? "passed" : "not_started",
+          });
 
           return (
             <div key={entry.id}>
@@ -956,10 +1022,18 @@ export default function VocabPageContent() {
               />
 
               {inBook ? (
-                <p className="text-xs text-gray-500 mt-1">
-                  In this book: {inBook.count}×
-                  {inBook.days ? ` (${inBook.days} day${inBook.days === 1 ? "" : "s"})` : ""}
-                </p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                  <LibraryStudyStatusBadge
+                    status={status}
+                    showNumbers={!!mergedSettings.show_badge_numbers}
+                    encounterCount={inBook.count}
+                    days={inBook.days}
+                  />
+                  <span className="sr-only">
+                    {inBook.count} encounter{inBook.count === 1 ? "" : "s"}
+                    {inBook.days ? ` across ${inBook.days} day${inBook.days === 1 ? "" : "s"}` : ""}
+                  </span>
+                </div>
               ) : null}
             </div>
           );

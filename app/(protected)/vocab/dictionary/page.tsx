@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import {
+  computeLibraryStudyColorStatus,
+  type LibraryStudyColor,
+  type LibraryStudyColorStatus,
+} from "@/lib/libraryStudyColor";
+import { supabase } from "@/lib/supabaseClient";
 
 type DictionaryEntry = {
   word: string;
@@ -29,14 +35,95 @@ type KanjiGroup = {
   relatedWords: RelatedWord[];
 };
 
+type LearningSettingsRow = {
+  red_stages: number | null;
+  orange_stages: number | null;
+  yellow_stages: number | null;
+  show_badge_numbers: boolean | null;
+};
+
+type LibraryWordSummaryRow = {
+  study_identity_key: string;
+  total_encounter_count: number | null;
+};
+
+const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
+  red_stages: 1,
+  orange_stages: 1,
+  yellow_stages: 1,
+  show_badge_numbers: true,
+};
+
 function normalizeJlpt(val: string | null | undefined) {
   const v = (val ?? "").toUpperCase();
   if (v === "N1" || v === "N2" || v === "N3" || v === "N4" || v === "N5") return v;
   return "NON-JLPT";
 }
 
+function normalizeText(val: string | null | undefined) {
+  return (val ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeKana(val: string | null | undefined) {
+  return (val ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .toLowerCase();
+}
+
+function studyIdentityKey(surface: string | null | undefined, reading: string | null | undefined) {
+  const normalizedSurface = normalizeText(surface);
+  const normalizedReading = normalizeKana(reading);
+  if (!normalizedSurface) return "";
+  return `${normalizedSurface}||${normalizedReading}`;
+}
+
 function getUniqueKanji(surface: string) {
   return Array.from(new Set(surface.match(/[\u3400-\u9FFF]/g) || []));
+}
+
+function badgeColorClass(color: LibraryStudyColor) {
+  if (color === "red") return "border-red-800 bg-red-600 text-white";
+  if (color === "orange") return "border-orange-700 bg-orange-400 text-stone-950";
+  if (color === "yellow") return "border-yellow-500 bg-yellow-300 text-stone-900";
+  if (color === "green") return "border-green-800 bg-green-600 text-white";
+  if (color === "blue") return "border-blue-800 bg-blue-600 text-white";
+  if (color === "purple") return "border-purple-800 bg-purple-600 text-white";
+  if (color === "grey") return "border-slate-700 bg-slate-500 text-white";
+  return "border-stone-400 bg-stone-300 text-stone-700";
+}
+
+function LibraryStatusBadge({
+  status,
+  encounterCount,
+  showNumbers,
+}: {
+  status: LibraryStudyColorStatus;
+  encounterCount: number;
+  showNumbers: boolean;
+}) {
+  const showStageNumber =
+    showNumbers &&
+    status.stageNumber != null &&
+    status.stageCount != null &&
+    status.stageCount > 1;
+
+  const title = `${status.reason} · ${encounterCount} library encounter${
+    encounterCount === 1 ? "" : "s"
+  }`;
+
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold shadow-sm ${badgeColorClass(
+        status.color
+      )} ${showStageNumber ? "h-6 min-w-6 px-1.5" : "h-4 w-4"}`}
+    >
+      {showStageNumber ? status.stageNumber : ""}
+    </span>
+  );
 }
 
 export default function DictionaryPage() {
@@ -50,6 +137,9 @@ export default function DictionaryPage() {
   const [extraLoadingWord, setExtraLoadingWord] = useState<string | null>(null);
   const [kanjiMetaByWord, setKanjiMetaByWord] = useState<Record<string, KanjiMeta[]>>({});
   const [kanjiGroupsByWord, setKanjiGroupsByWord] = useState<Record<string, KanjiGroup[]>>({});
+  const [learningSettings, setLearningSettings] =
+    useState<LearningSettingsRow>(DEFAULT_LEARNING_SETTINGS);
+  const [summaryCountsByKey, setSummaryCountsByKey] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!initialWord) return;
@@ -131,6 +221,7 @@ export default function DictionaryPage() {
     setLoading(true);
     setErrorMsg(null);
     setResults([]);
+    setSummaryCountsByKey({});
 
     try {
       const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`);
@@ -172,6 +263,7 @@ export default function DictionaryPage() {
       });
 
       setResults(mapped);
+      void loadLibraryStatuses(mapped);
       const uniqueSurfaces = Array.from(
         new Set(mapped.map((entry) => entry.word).filter(Boolean))
       );
@@ -189,6 +281,48 @@ export default function DictionaryPage() {
       setResults([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadLibraryStatuses(entries: DictionaryEntry[]) {
+    const keys = Array.from(
+      new Set(entries.map((entry) => studyIdentityKey(entry.word, entry.reading)).filter(Boolean))
+    );
+    if (keys.length === 0) return;
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: settings } = await supabase
+        .from("user_learning_settings")
+        .select("red_stages, orange_stages, yellow_stages, show_badge_numbers")
+        .eq("user_id", user.id)
+        .maybeSingle<LearningSettingsRow>();
+
+      setLearningSettings({
+        ...DEFAULT_LEARNING_SETTINGS,
+        ...(settings ?? {}),
+      });
+
+      const { data, error } = await supabase
+        .from("user_library_word_summaries")
+        .select("study_identity_key, total_encounter_count")
+        .eq("user_id", user.id)
+        .in("study_identity_key", keys)
+        .returns<LibraryWordSummaryRow[]>();
+
+      if (error) throw error;
+
+      const next: Record<string, number> = {};
+      for (const row of data ?? []) {
+        next[row.study_identity_key] = row.total_encounter_count ?? 0;
+      }
+      setSummaryCountsByKey(next);
+    } catch (error) {
+      console.warn("Could not load dictionary library statuses:", error);
     }
   }
 
@@ -225,12 +359,31 @@ export default function DictionaryPage() {
 
       <div className="space-y-3">
         {results.map((entry, idx) => (
+          (() => {
+            const key = studyIdentityKey(entry.word, entry.reading);
+            const encounterCount = summaryCountsByKey[key] ?? 0;
+            const status = computeLibraryStudyColorStatus({
+              encounterCount,
+              settings: learningSettings,
+            });
+            const showBadge = encounterCount > 0;
+
+            return (
           <div
             key={`${entry.word}-${entry.reading}-${idx}`}
             className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
           >
-            <div className="text-2xl font-semibold text-stone-900">
-              {entry.word || "—"}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-2xl font-semibold text-stone-900">
+                {entry.word || "—"}
+              </div>
+              {showBadge ? (
+                <LibraryStatusBadge
+                  status={status}
+                  encounterCount={encounterCount}
+                  showNumbers={learningSettings.show_badge_numbers ?? true}
+                />
+              ) : null}
             </div>
 
             <div className="mt-1 text-base text-stone-500">
@@ -337,6 +490,8 @@ export default function DictionaryPage() {
               </Link>
             </div>
           </div>
+            );
+          })()
         ))}
       </div>
     </main>

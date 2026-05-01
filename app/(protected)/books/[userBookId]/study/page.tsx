@@ -2,7 +2,7 @@
 // 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
@@ -141,6 +141,23 @@ function normalizeMeaning(s: string) {
     .replace(/\s+/g, " ");
 }
 
+function meaningWords(s: string) {
+  return normalizeMeaning(s)
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && part !== "to" && part !== "be");
+}
+
+function meaningMatchesOneWord(input: string, meanings: (string | null | undefined)[]) {
+  const userWords = new Set(meaningWords(input));
+  if (userWords.size === 0) return false;
+
+  return meanings
+    .filter(Boolean)
+    .flatMap((meaning) => meaningWords(String(meaning)))
+    .some((word) => userWords.has(word));
+}
+
 function asStringArray(val: any): string[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.map((x) => String(x)).filter(Boolean);
@@ -157,6 +174,10 @@ function asStringArray(val: any): string[] {
 
 function normalizeRepeatKey(surface: string) {
   return (surface ?? "").trim();
+}
+
+function hasKanji(text: string) {
+  return /[\p{Script=Han}]/u.test(text);
 }
 
 function shuffleArray<T>(arr: T[]) {
@@ -236,6 +257,10 @@ export default function BookFlashcardsPage() {
   const [mcCorrectAnswer, setMcCorrectAnswer] = useState<string | null>(null);
   const [mcAnswered, setMcAnswered] = useState(false);
   const [mcWasCorrect, setMcWasCorrect] = useState<boolean | null>(null);
+  const [correctionInput, setCorrectionInput] = useState("");
+  const [correctionFeedback, setCorrectionFeedback] = useState<string | null>(null);
+  const typedInputRef = useRef<HTMLInputElement | null>(null);
+  const correctionInputRef = useRef<HTMLInputElement | null>(null);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [firstTouch, setFirstTouch] = useState(true);
@@ -257,6 +282,21 @@ export default function BookFlashcardsPage() {
   const [defSaving, setDefSaving] = useState(false);
   const [defError, setDefError] = useState<string | null>(null);
   const [showDefPicker, setShowDefPicker] = useState(false);
+
+  function clearTypedInput() {
+    setTypedInput("");
+    setInputResetKey((k) => k + 1);
+    window.requestAnimationFrame(() => {
+      if (typedInputRef.current) typedInputRef.current.value = "";
+    });
+  }
+
+  function clearCorrectionInput() {
+    setCorrectionInput("");
+    window.requestAnimationFrame(() => {
+      if (correctionInputRef.current) correctionInputRef.current.value = "";
+    });
+  }
 
   useEffect(() => {
     if (!userBookId) return;
@@ -610,8 +650,12 @@ export default function BookFlashcardsPage() {
       result = result.filter((c) => (c.repeatCount ?? 1) >= 2);
     }
 
-    if (studySet === "READING_MC") {
-      result = result.filter((c) => !isKanaOnly(c.word));
+    if (
+      studySet === "READING" ||
+      studySet === "READING_MC" ||
+      studySet === "FROM_READING_MC"
+    ) {
+      result = result.filter((c) => hasKanji(c.word));
     }
 
     setFilteredCards(result);
@@ -623,6 +667,8 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
   }, [cards, jlptSelected, chapterFilter, repeatsOnly, studySet]);
 
   useEffect(() => {
@@ -638,6 +684,8 @@ export default function BookFlashcardsPage() {
     setDefError(null);
     setShowDefPicker(false);
     setFirstTouch(true);
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
   }, [filteredCards, studyOnceMode]);
 
   useEffect(() => {
@@ -649,6 +697,8 @@ export default function BookFlashcardsPage() {
     setReadyForNextCard(false);
     setLastTypedResult(null);
     resetMcState();
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
   }, [sessionIndex]);
 
   useEffect(() => {
@@ -659,6 +709,8 @@ export default function BookFlashcardsPage() {
     setReadyForNextCard(false);
     setLastTypedResult(null);
     resetMcState();
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
   }, [studySet]);
 
   function getFirstKana(s: string) {
@@ -1009,6 +1061,8 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
     resetMcState();
   }
 
@@ -1030,6 +1084,8 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setDefError(null);
     setShowDefPicker(false);
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
     resetMcState();
   }
 
@@ -1039,6 +1095,8 @@ export default function BookFlashcardsPage() {
     setMcCorrectAnswer(null);
     setMcAnswered(false);
     setMcWasCorrect(null);
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
   }
 
   async function skipCardForToday(cardId: string) {
@@ -1115,6 +1173,7 @@ export default function BookFlashcardsPage() {
 
     const userAnsRaw = typedInput.trim();
     const userAns = kataToHira(userAnsRaw);
+    const firstAnswerResult = lastTypedResult === "wrong" ? "wrong" : "correct";
 
     if (studySet === "READING") {
       const correctReading = card.reading ?? "";
@@ -1131,14 +1190,13 @@ export default function BookFlashcardsPage() {
         setLastTypedResult("correct");
 
         window.setTimeout(() => {
-          goToNextWord("correct");
+          goToNextWord(firstAnswerResult);
         }, 500);
 
         return;
       }
 
-      setTypedInput("");
-      setInputResetKey((k) => k + 1);
+      clearTypedInput();
       setTypedFeedback({
         ok: false,
         message: `Correct: ${correctReading}`,
@@ -1149,12 +1207,8 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "MEANING") {
-      const u = normalizeMeaning(userAns);
-      const possible = [card.meaning, ...(card.meaningChoices ?? [])]
-        .filter(Boolean)
-        .map((x) => normalizeMeaning(String(x)));
-
-      const ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
+      const possible = [card.meaning, ...(card.meaningChoices ?? [])];
+      const ok = meaningMatchesOneWord(userAns, possible);
 
       if (ok) {
         setTypedFeedback({
@@ -1166,12 +1220,13 @@ export default function BookFlashcardsPage() {
         setReadyForNextCard(false);
 
         window.setTimeout(() => {
-          goToNextWord("correct");
+          goToNextWord(firstAnswerResult);
         }, 1800);
 
         return;
       }
 
+      clearTypedInput();
       setTypedFeedback({
         ok: false,
         message: `Correct: ${card.meaning || "—"}`,
@@ -1183,12 +1238,8 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "FROM_READING_MEANING") {
-      const u = normalizeMeaning(userAnsRaw);
-      const possible = [card.meaning, ...(card.meaningChoices ?? [])]
-        .filter(Boolean)
-        .map((x) => normalizeMeaning(String(x)));
-
-      const ok = u.length > 0 && possible.some((m) => m.includes(u) || u.includes(m));
+      const possible = [card.meaning, ...(card.meaningChoices ?? [])];
+      const ok = meaningMatchesOneWord(userAnsRaw, possible);
 
       if (ok) {
         setTypedFeedback({
@@ -1200,12 +1251,13 @@ export default function BookFlashcardsPage() {
         setReadyForNextCard(false);
 
         window.setTimeout(() => {
-          goToNextWord("correct");
+          goToNextWord(firstAnswerResult);
         }, 1200);
 
         return;
       }
 
+      clearTypedInput();
       setTypedFeedback({
         ok: false,
         message: `Correct: ${card.meaning || "—"}`,
@@ -1218,13 +1270,8 @@ export default function BookFlashcardsPage() {
 
     const wordOk = userAnsRaw === (card.word ?? "").trim();
 
-    const u = normalizeMeaning(userAns);
-    const possibleMeanings = [card.meaning, ...(card.meaningChoices ?? [])]
-      .filter(Boolean)
-      .map((x) => normalizeMeaning(String(x)));
-
-    const meaningOk =
-      u.length > 0 && possibleMeanings.some((m) => m.includes(u) || u.includes(m));
+    const possibleMeanings = [card.meaning, ...(card.meaningChoices ?? [])];
+    const meaningOk = meaningMatchesOneWord(userAns, possibleMeanings);
 
     if (wordOk || meaningOk) {
       setTypedInput("");
@@ -1283,6 +1330,34 @@ export default function BookFlashcardsPage() {
     setMcSelected(selected);
     setMcAnswered(true);
     setMcWasCorrect(isCorrect);
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
+  }
+
+  function checkCorrectionAnswer() {
+    if (!card) return;
+
+    const input = correctionInput.trim();
+    if (!input) return;
+
+    let ok = false;
+
+    if (studySet === "READING_MC") {
+      ok = normalizeReading(input) === normalizeReading(card.reading || "");
+    } else if (studySet === "FROM_READING_MC") {
+      ok = input === (card.word || "").trim();
+    } else if (studySet === "MEANING_MC" || studySet === "FROM_READING_MEANING_MC") {
+      ok = meaningMatchesOneWord(input, [card.meaning, ...(card.meaningChoices ?? [])]);
+    }
+
+    if (!ok) {
+      clearCorrectionInput();
+      setCorrectionFeedback("Try typing the correct answer once.");
+      return;
+    }
+
+    setCorrectionFeedback(null);
+    void goToNextWord("wrong");
   }
 
   function flip() {
@@ -1340,12 +1415,6 @@ export default function BookFlashcardsPage() {
     }
   }
 
-  const showWrongNextButton =
-    ((studySet === "MEANING" || studySet === "FROM_READING_MEANING") &&
-      typedFeedback &&
-      !typedFeedback.ok) ||
-    (isMultipleChoiceMode && mcAnswered && !mcWasCorrect);
-
   const currentTypeAnswerField =
     typeModeEnabled
       ? studySet === "READING"
@@ -1363,6 +1432,11 @@ export default function BookFlashcardsPage() {
         if (e.key === "Enter") {
           e.preventDefault();
 
+          if (isMultipleChoiceMode && mcAnswered && !mcWasCorrect) {
+            checkCorrectionAnswer();
+            return;
+          }
+
           if (readyForNextCard) {
             goToNextWord(lastTypedResult ?? "revealed");
             return;
@@ -1374,6 +1448,7 @@ export default function BookFlashcardsPage() {
 
         if (e.key === "ArrowRight") {
           e.preventDefault();
+          if (typedFeedback && !typedFeedback.ok) return;
           goToNextWord(readyForNextCard ? lastTypedResult ?? "revealed" : "revealed");
           return;
         }
@@ -1385,6 +1460,19 @@ export default function BookFlashcardsPage() {
         }
 
         return;
+      }
+
+      if (e.key === "Enter" && isMultipleChoiceMode && mcAnswered && !mcWasCorrect) {
+        e.preventDefault();
+        checkCorrectionAnswer();
+        return;
+      }
+
+      if (isMultipleChoiceMode && mcAnswered && !mcWasCorrect) {
+        if (e.key === "ArrowRight" || e.key === " ") {
+          e.preventDefault();
+          return;
+        }
       }
 
       if (e.key === "ArrowRight") nextCardReveal();
@@ -1770,16 +1858,60 @@ export default function BookFlashcardsPage() {
                     </p>
 
                     {!mcWasCorrect ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          goToNextWord("wrong");
-                        }}
-                        className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
-                      >
-                        Next
-                      </button>
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs text-slate-500">
+                          Type the correct answer once to continue.
+                        </p>
+                        <div className="flex gap-2">
+                          <input
+                            ref={correctionInputRef}
+                            type="text"
+                            value={correctionInput}
+                            onChange={(e) => {
+                              setCorrectionInput(e.target.value);
+                              setCorrectionFeedback(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                checkCorrectionAnswer();
+                              }
+                            }}
+                            lang={
+                              studySet === "READING_MC" ||
+                                studySet === "FROM_READING_MC"
+                                ? "ja"
+                                : undefined
+                            }
+                            autoCorrect="off"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            autoFocus
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                            placeholder={
+                              studySet === "READING_MC"
+                                ? "Type the reading"
+                                : studySet === "FROM_READING_MC"
+                                  ? "Type the kanji word"
+                                  : "Type one meaning word"
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              checkCorrectionAnswer();
+                            }}
+                            className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
+                          >
+                            Check
+                          </button>
+                        </div>
+                        {correctionFeedback ? (
+                          <p className="text-xs text-red-700">{correctionFeedback}</p>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
@@ -1837,6 +1969,7 @@ export default function BookFlashcardsPage() {
 
                   <div className="flex gap-2">
                     <input
+                      ref={typedInputRef}
                       key={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
                       type="text"
                       value={typedInput}
@@ -1900,18 +2033,16 @@ export default function BookFlashcardsPage() {
                         </p>
                       ) : null}
 
-                      {!typedFeedback.ok &&
-                        (studySet === "MEANING" || studySet === "FROM_READING_MEANING") ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            goToNextWord("wrong");
-                          }}
-                          className="mt-3 rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
-                        >
-                          Next
-                        </button>
+                      {!typedFeedback.ok && studySet === "MEANING" ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Type one correct meaning word to continue.
+                        </p>
+                      ) : null}
+
+                      {!typedFeedback.ok && studySet === "FROM_READING_MEANING" ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Type one correct meaning word to continue.
+                        </p>
                       ) : null}
 
                     </div>

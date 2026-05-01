@@ -112,7 +112,7 @@ export function WordCard({
   const { text: textClass, badge: badgeClass } = colourClasses(baseColour);
 
   const isKatakana = !!dict?.is_katakana;
-  const showKatakanaBadge = baseColour === "purple" && isKatakana;
+  const showKatakanaBadge = isKatakana;
 
   // Button should appear only in the reading/meaning check zones
   const canAdvance =
@@ -160,8 +160,11 @@ export function WordCard({
           )}
 
           {showKatakanaBadge && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-              カタカナ
+            <span
+              title="Katakana-only word"
+              className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white"
+            >
+              カ
             </span>
           )}
         </div>

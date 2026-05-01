@@ -5,6 +5,20 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  computeLibraryStudyColorStatus,
+  type LibraryStudyColor,
+  type LibraryStudyColorStatus,
+} from "@/lib/libraryStudyColor";
+
+const DEFAULT_LEARNING_SETTINGS = {
+  red_stages: 1,
+  orange_stages: 1,
+  yellow_stages: 1,
+  show_badge_numbers: true,
+};
+
+const GLOBAL_ENCOUNTER_PAGE_SIZE = 1000;
 
 type WordRow = {
   id: string;
@@ -30,6 +44,58 @@ type WordRow = {
 };
 
 type ProfileRole = "teacher" | "student";
+
+type LearningSettingsRow = {
+  red_stages: number;
+  orange_stages: number;
+  yellow_stages: number;
+  show_badge_numbers: boolean;
+};
+
+type GlobalEncounterRow = {
+  surface: string | null;
+  reading: string | null;
+};
+
+type LibraryWordSummaryRow = {
+  study_identity_key: string;
+  total_encounter_count: number | null;
+};
+
+async function loadAllGlobalEncounterRows(ownerUserId: string) {
+  const allRows: GlobalEncounterRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + GLOBAL_ENCOUNTER_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .select(
+        `
+          surface,
+          reading,
+          user_books!inner (
+            user_id
+          )
+        `
+      )
+      .eq("user_books.user_id", ownerUserId)
+      .or("hidden.is.null,hidden.eq.false")
+      .range(from, to);
+
+    if (error) throw error;
+
+    allRows.push(...((data ?? []) as GlobalEncounterRow[]));
+
+    if (!data || data.length < GLOBAL_ENCOUNTER_PAGE_SIZE) {
+      break;
+    }
+
+    from += GLOBAL_ENCOUNTER_PAGE_SIZE;
+  }
+
+  return allRows;
+}
 
 function normalizeJlpt(val: string | null | undefined) {
   const v = (val ?? "").toUpperCase();
@@ -74,7 +140,31 @@ function asStringArray(val: any): string[] {
 }
 
 function normalizeText(val: string | null | undefined) {
-  return (val ?? "").trim();
+  return (val ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeKana(val: string | null | undefined) {
+  return (val ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .toLowerCase();
+}
+
+function isKatakanaOnly(value: string | null | undefined) {
+  const compact = (value ?? "").trim().replace(/\s+/g, "");
+  return compact.length > 0 && /^[ァ-ヶー・･]+$/.test(compact);
+}
+
+function KatakanaBadge() {
+  return (
+    <span
+      title="Katakana-only word"
+      className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white"
+    >
+      カ
+    </span>
+  );
 }
 
 function repeatKey(w: WordRow) {
@@ -92,6 +182,63 @@ function repeatKey(w: WordRow) {
   return `${s}||MEAN:${m}`;
 }
 
+function studyIdentityKey(surface: string | null | undefined, reading: string | null | undefined) {
+  const normalizedSurface = normalizeText(surface);
+  const normalizedReading = normalizeKana(reading);
+  if (!normalizedSurface) return "";
+  return `${normalizedSurface}||${normalizedReading}`;
+}
+
+function badgeColorClass(color: LibraryStudyColor) {
+  if (color === "red") return "border-red-800 bg-red-600 text-white";
+  if (color === "orange") return "border-orange-700 bg-orange-400 text-stone-950";
+  if (color === "yellow") return "border-yellow-500 bg-yellow-300 text-stone-900";
+  if (color === "green") return "border-green-800 bg-green-600 text-white";
+  if (color === "blue") return "border-blue-800 bg-blue-600 text-white";
+  if (color === "purple") return "border-purple-800 bg-purple-600 text-white";
+  if (color === "grey") return "border-slate-700 bg-slate-500 text-white";
+  return "border-stone-400 bg-stone-300 text-stone-700";
+}
+
+function colorLabel(color: LibraryStudyColor) {
+  if (color === "none") return "No color yet";
+  return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
+function LibraryStudyStatusBadge({
+  status,
+  showNumbers,
+  encounterCount,
+}: {
+  status: LibraryStudyColorStatus;
+  showNumbers: boolean;
+  encounterCount: number;
+}) {
+  const showStageNumber =
+    showNumbers &&
+    status.stageNumber != null &&
+    status.stageCount != null &&
+    status.stageCount > 1;
+
+  const title = [
+    `${colorLabel(status.color)}${showStageNumber ? ` ${status.stageNumber}` : ""}`,
+    status.reason,
+    `${encounterCount} encounter${encounterCount === 1 ? "" : "s"} across saved books`,
+  ].join(" · ");
+
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold shadow-sm ${badgeColorClass(
+        status.color
+      )} ${showStageNumber ? "h-6 min-w-6 px-1.5" : "h-4 w-4"}`}
+    >
+      {showStageNumber ? status.stageNumber : ""}
+    </span>
+  );
+}
+
 export default function BookWordsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
@@ -103,6 +250,10 @@ export default function BookWordsPage() {
 
   const [myRole, setMyRole] = useState<ProfileRole>("student");
   const isTeacher = myRole === "teacher";
+  const [learningSettings, setLearningSettings] = useState<LearningSettingsRow>(
+    DEFAULT_LEARNING_SETTINGS
+  );
+  const [globalEncounterCounts, setGlobalEncounterCounts] = useState<Record<string, number>>({});
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -515,6 +666,57 @@ export default function BookWordsPage() {
 
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
+        const ownerUserId = (ub as any)?.user_id ?? authedUser.id;
+
+        const { data: learningSettingsRow, error: learningSettingsErr } = await supabase
+          .from("user_learning_settings")
+          .select("red_stages, orange_stages, yellow_stages, show_badge_numbers")
+          .eq("user_id", ownerUserId)
+          .maybeSingle();
+
+        if (learningSettingsErr) {
+          console.error("Error loading learning settings:", learningSettingsErr);
+          setLearningSettings(DEFAULT_LEARNING_SETTINGS);
+        } else {
+          setLearningSettings({
+            ...DEFAULT_LEARNING_SETTINGS,
+            ...((learningSettingsRow as Partial<LearningSettingsRow> | null) ?? {}),
+          });
+        }
+
+        try {
+          const counts: Record<string, number> = {};
+
+          const { data: summaryRows, error: summaryErr } = await supabase
+            .from("user_library_word_summaries")
+            .select("study_identity_key, total_encounter_count")
+            .eq("user_id", ownerUserId)
+            .returns<LibraryWordSummaryRow[]>();
+
+          if (!summaryErr && summaryRows && summaryRows.length > 0) {
+            for (const row of summaryRows) {
+              const key = row.study_identity_key;
+              if (!key) continue;
+              counts[key] = row.total_encounter_count ?? 0;
+            }
+          } else {
+            if (summaryErr) {
+              console.warn("Library word summaries are not available yet:", summaryErr);
+            }
+
+            const globalWords = await loadAllGlobalEncounterRows(ownerUserId);
+            for (const row of globalWords) {
+              const key = studyIdentityKey(row.surface, row.reading);
+              if (!key) continue;
+              counts[key] = (counts[key] ?? 0) + 1;
+            }
+          }
+
+          setGlobalEncounterCounts(counts);
+        } catch (globalWordsErr) {
+          console.error("Error loading global word encounters:", globalWordsErr);
+          setGlobalEncounterCounts({});
+        }
 
         let wordsQuery = supabase
           .from("user_book_words")
@@ -862,38 +1064,45 @@ export default function BookWordsPage() {
         </p>
       </div>
 
-      <div ref={stickyControlsRef} className="sticky top-0 z-30 bg-white border-b border-gray-200">
-        <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start">
+      <div
+        ref={stickyControlsRef}
+        className="sticky top-0 z-30 border-b border-stone-200 bg-white/95 backdrop-blur"
+      >
+        <div className="grid gap-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)]">
           <button
             type="button"
             onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="flex min-w-0 items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-left transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-400"
+            className="flex min-w-0 items-start gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 text-left shadow-sm transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-400"
             title="Open Book Hub"
           >
             {bookCover ? (
               <img
                 src={bookCover}
                 alt={bookTitle || "Book cover"}
-                className="h-16 w-12 shrink-0 rounded-md object-cover shadow-sm"
+                className="h-20 w-14 shrink-0 rounded-lg object-cover shadow-sm"
               />
             ) : null}
 
             <div className="min-w-0 flex-1">
-              <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
-              <h1 className="break-words text-xl font-semibold leading-tight text-stone-900">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-stone-500">
+                For Book
+              </p>
+              <h1 className="mt-1 break-words text-2xl font-semibold leading-tight text-stone-900">
                 {bookTitle || "Words"}
               </h1>
-              <p className="mt-0.5 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-stone-500">
                 Total: {words.length} • Showing: {filteredSorted.length}
               </p>
-              <p className="mt-0.5 text-sm text-emerald-700">Open Book Hub</p>
+              <p className="mt-3 text-sm font-medium text-emerald-700">
+                Open Book Hub
+              </p>
             </div>
           </button>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:ml-auto">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-end">
-              <div className="min-w-[260px] lg:flex-[0_0_360px]">
-                <div className="mb-1 text-xs uppercase tracking-wide text-gray-500">
+          <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4 shadow-sm">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="min-w-0">
+                <div className="mb-1.5 text-[11px] uppercase tracking-[0.18em] text-stone-500">
                   Switch Book
                 </div>
                 <select
@@ -910,7 +1119,7 @@ export default function BookWordsPage() {
                     if (newValue === userBookId) return;
                     router.push(`/books/${encodeURIComponent(newValue)}/words`);
                   }}
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
+                  className="h-14 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
                 >
                   <option value="all-vocab">All Vocab Lists</option>
 
@@ -936,246 +1145,279 @@ export default function BookWordsPage() {
                 </select>
               </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="mb-1 text-xs uppercase tracking-wide text-gray-500">
+              <div className="min-w-0">
+                <div className="mb-1.5 text-[11px] uppercase tracking-[0.18em] text-stone-500">
                   Search
                 </div>
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search (word/reading/meaning/def #/page/chapter)…"
-                  className="w-full rounded border p-2"
+                  placeholder="Try 犬, いぬ, dog, p45, etc."
+                  className="h-14 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <label className="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
+            <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+              <label className="flex h-14 items-center gap-3 rounded-xl border border-stone-300 bg-white px-4 text-sm text-stone-900 shadow-sm">
                 <input
                   type="checkbox"
                   checked={showHidden}
                   onChange={(e) => setShowHidden(e.target.checked)}
+                  className="h-5 w-5 rounded border-stone-300 text-stone-900 focus:ring-stone-300"
                 />
-                Hidden Words Only
+                <span className="font-medium">Hidden Words Only</span>
               </label>
 
-              <select
-                value={chapterFilter}
-                onChange={(e) => setChapterFilter(e.target.value)}
-                className="rounded border bg-white p-2 sm:min-w-[220px]"
-              >
-                <option value="all">All chapters</option>
-                {chapterOptions.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+              <div className="min-w-0">
+                <select
+                  value={chapterFilter}
+                  onChange={(e) => setChapterFilter(e.target.value)}
+                  className="h-14 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                >
+                  <option value="all">All chapters</option>
+                  {chapterOptions.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
-
         </div>
+      </div>
 
-        {reordering ? (
-          <p className="mb-2 text-sm text-stone-500">Saving new order…</p>
-        ) : (
-          <p className="mb-2 text-sm text-stone-500">
-            Drag words by ☰ to adjust their reading order.
-          </p>
-        )}
+      {reordering ? (
+        <p className="mb-2 text-sm text-stone-500">Saving new order…</p>
+      ) : (
+        <p className="mb-2 text-sm text-stone-500">
+          Drag words by ☰ to adjust their reading order.
+        </p>
+      )}
 
-        <div className="overflow-x-auto overflow-y-visible border rounded bg-white relative">
-          <table className="w-full text-sm border-separate border-spacing-0">
-            <thead className="bg-gray-50">
-              <tr className="text-left">
-                <th
-                  className="p-2 w-10 sticky bg-gray-50 z-20"
-                  style={headerStickyStyle}
-                  title="Drag to reorder within the same page"
+      <div className="relative overflow-x-auto overflow-y-visible rounded border bg-white">
+        <table className="w-full border-separate border-spacing-0 text-sm">
+          <thead className="bg-gray-50">
+            <tr className="text-left">
+              <th
+                className="sticky z-20 w-10 bg-gray-50 p-2"
+                style={headerStickyStyle}
+                title="Drag to reorder within the same page"
+              >
+                ↕
+              </th>
+
+              <th
+                className="sticky z-20 w-5 bg-gray-50 p-2 text-center"
+                style={headerStickyStyle}
+                title="How many times this word appears in this book (same word + same definition)"
+              >
+                <span className="block leading-tight">
+                  <span className="block">Book</span>
+                  <span className="block">Repeats</span>
+                </span>
+              </th>
+
+              <th
+                className="sticky z-20 w-5 bg-gray-50 p-2 text-center"
+                style={headerStickyStyle}
+                title="Library Study color from encounters across saved books"
+              >
+                <span className="block leading-tight">
+                  <span className="block">Library</span>
+                  <span className="block">Encounters</span>
+                </span>
+              </th>
+
+              <th className="sticky z-20 w-20 bg-gray-50 p-2" style={headerStickyStyle}>
+                Word
+              </th>
+              <th className="sticky z-20 w-30 bg-gray-50 p-2" style={headerStickyStyle}>
+                Reading
+              </th>
+              <th className="sticky z-20 w-60 bg-gray-50 p-2" style={headerStickyStyle}>
+                Meaning
+              </th>
+              <th className="sticky z-20 w-10 bg-gray-50 p-2" style={headerStickyStyle}>
+                Def #
+              </th>
+              <th className="sticky z-20 w-5 bg-gray-50 p-2" style={headerStickyStyle}>
+                Chapter
+              </th>
+              <th className="sticky z-20 w-10 bg-gray-50 p-2" style={headerStickyStyle}>
+                Page
+              </th>
+              <th className="sticky z-20 w-25 bg-gray-50 p-2" style={headerStickyStyle}>
+                Actions
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filteredSorted.map((w) => {
+              const rep = repeatCounts.get(repeatKey(w)) ?? 0;
+              const globalEncounterCount =
+                globalEncounterCounts[studyIdentityKey(w.surface, w.reading)] ?? rep;
+              const status = computeLibraryStudyColorStatus({
+                encounterCount: globalEncounterCount,
+                settings: learningSettings,
+              });
+
+              return (
+                <tr
+                  key={w.id}
+                  draggable
+                  onDragStart={() => {
+                    setDraggingId(w.id);
+                    setDropTargetId(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (draggingId && draggingId !== w.id) {
+                      setDropTargetId(w.id);
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+
+                    const scrollY = window.scrollY;
+
+                    if (draggingId && draggingId !== w.id) {
+                      await moveWordInGroup(draggingId, w.id);
+                    }
+
+                    setDraggingId(null);
+                    setDropTargetId(null);
+
+                    requestAnimationFrame(() => {
+                      window.scrollTo({ top: scrollY });
+                    });
+                  }}
+                  onDragEnd={() => {
+                    setDraggingId(null);
+                    setDropTargetId(null);
+                  }}
+                  className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""} ${dropTargetId === w.id ? "bg-blue-50" : ""
+                    } ${draggingId === w.id ? "opacity-50" : ""}`}
                 >
-                  ↕
-                </th>
-
-                <th
-                  className="p-2 w-5 sticky bg-gray-50 z-20"
-                  style={headerStickyStyle}
-                  title="How many times this word appears in this book (same word + same definition)"
-                >
-                  Repeats
-                </th>
-
-                <th className="p-2 w-20 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  Word
-                </th>
-                <th className="p-2 w-30 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  Reading
-                </th>
-                <th className="p-2 w-60 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  Meaning
-                </th>
-                <th className="p-2 w-10 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  Def #
-                </th>
-                <th className="p-2 w-5 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  Chapter
-                </th>
-                <th className="p-2 w-10 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  Page
-                </th>
-                <th className="p-2 w-20 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  JLPT
-                </th>
-                <th className="p-2 w-25 sticky bg-gray-50 z-20" style={headerStickyStyle}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredSorted.map((w) => {
-                const rep = repeatCounts.get(repeatKey(w)) ?? 0;
-
-                return (
-                  <tr
-                    key={w.id}
-                    draggable
-                    onDragStart={() => {
-                      setDraggingId(w.id);
-                      setDropTargetId(null);
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (draggingId && draggingId !== w.id) {
-                        setDropTargetId(w.id);
-                      }
-                    }}
-                    onDrop={async (e) => {
-                      e.preventDefault();
-
-                      const scrollY = window.scrollY;
-
-                      if (draggingId && draggingId !== w.id) {
-                        await moveWordInGroup(draggingId, w.id);
-                      }
-
-                      setDraggingId(null);
-                      setDropTargetId(null);
-
-                      requestAnimationFrame(() => {
-                        window.scrollTo({ top: scrollY });
-                      });
-                    }}
-                    onDragEnd={() => {
-                      setDraggingId(null);
-                      setDropTargetId(null);
-                    }}
-                    className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""} ${dropTargetId === w.id ? "bg-blue-50" : ""
-                      } ${draggingId === w.id ? "opacity-50" : ""}`}
+                  <td
+                    className="cursor-grab select-none p-2 text-center text-gray-400"
+                    title="Drag to reorder within this page"
                   >
-                    <td
-                      className="p-2 text-center text-gray-400 cursor-grab select-none"
-                      title="Drag to reorder within this page"
-                    >
-                      ☰
-                    </td>
+                    ☰
+                  </td>
 
-                    <td className="p-2 text-center text-xs text-gray-600">
-                      {rep > 1 ? rep : ""}
-                    </td>
+                  <td className="p-2 text-center text-xs text-gray-600">
+                    {rep > 1 ? rep : ""}
+                  </td>
 
-                    <td className="p-2 font-medium">{w.surface}</td>
-                    <td className="p-2">{w.reading ?? "—"}</td>
+                  <td className="p-2 text-center text-xs text-gray-600 align-middle">
+                    <span className="mx-auto flex w-8 -translate-x-1 items-center justify-center">
+                      <LibraryStudyStatusBadge
+                        status={status}
+                        showNumbers={learningSettings.show_badge_numbers}
+                        encounterCount={globalEncounterCount}
+                      />
+                    </span>
+                  </td>
 
-                    <td className="p-2">
-                      <div>{w.meaning ?? "—"}</div>
-                    </td>
+                  <td className="p-2 font-medium">
+                    <span className="inline-flex items-center gap-2">
+                      {w.surface}
+                      {isKatakanaOnly(w.surface) ? <KatakanaBadge /> : null}
+                    </span>
+                  </td>
+                  <td className="p-2">{w.reading ?? "—"}</td>
 
-                    <td className="p-2 text-center">
-                      {w.meaning_choice_index != null
-                        ? w.meaning_choice_index + 1
-                        : w.meaning
-                          ? "O"
-                          : "—"}
-                    </td>
+                  <td className="p-2">
+                    <div>{w.meaning ?? "—"}</div>
+                  </td>
 
-                    <td className="p-2">
-                      {(() => {
-                        const ch = chapterDisplayParts(w);
-                        if (ch.num && ch.name) {
-                          return (
-                            <span className="leading-tight">
-                              <span className="block">{ch.num}</span>
-                              <span className="block text-gray-600">{ch.name}</span>
-                            </span>
-                          );
+                  <td className="p-2 text-center">
+                    {w.meaning_choice_index != null
+                      ? w.meaning_choice_index + 1
+                      : w.meaning
+                        ? "O"
+                        : "—"}
+                  </td>
+
+                  <td className="p-2">
+                    {(() => {
+                      const ch = chapterDisplayParts(w);
+                      if (ch.num && ch.name) {
+                        return (
+                          <span className="leading-tight">
+                            <span className="block">{ch.num}</span>
+                            <span className="block text-gray-600">{ch.name}</span>
+                          </span>
+                        );
+                      }
+                      return ch.fallback;
+                    })()}
+                  </td>
+
+                  <td className="p-2">{w.page_number ?? "—"}</td>
+
+                  <td className="p-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() =>
+                          router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
                         }
-                        return ch.fallback;
-                      })()}
-                    </td>
+                        className="rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
+                        title="Open word card"
+                      >
+                        Open
+                      </button>
 
-                    <td className="p-2">{w.page_number ?? "—"}</td>
-                    <td className="p-2">{normalizeJlpt(w.jlpt)}</td>
-
-                    <td className="p-2">
-                      <div className="flex gap-2 flex-wrap">
+                      <>
                         <button
-                          onClick={() =>
-                            router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
-                          }
-                          className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs"
-                          title="Open word card"
+                          onClick={() => openEdit(w)}
+                          className="rounded bg-blue-400 px-2 py-1 text-xs hover:bg-green-500"
                         >
-                          Open
+                          Edit
                         </button>
 
-                        <>
+                        {w.hidden ? (
                           <button
-                            onClick={() => openEdit(w)}
-                            className="px-2 py-1 rounded bg-blue-400 hover:bg-green-500 text-xs"
+                            onClick={() => unhideWord(w)}
+                            className="rounded bg-green-700 px-2 py-1 text-xs text-white hover:bg-green-800"
                           >
-                            Edit
+                            Unhide
                           </button>
-
-                          {w.hidden ? (
-                            <button
-                              onClick={() => unhideWord(w)}
-                              className="px-2 py-1 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
-                            >
-                              Unhide
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => hideWord(w)}
-                              className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-xs"
-                            >
-                              Hide
-                            </button>
-                          )}
-
+                        ) : (
                           <button
-                            onClick={() => deleteWord(w)}
-                            className="px-2 py-1 rounded bg-gray-700 hover:bg-red-700 text-white text-xs"
+                            onClick={() => hideWord(w)}
+                            className="rounded bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
                           >
-                            Delete
+                            Hide
                           </button>
-                        </>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                        )}
 
-              {filteredSorted.length === 0 ? (
-                <tr>
-                  <td className="p-4 text-gray-500" colSpan={10}>
-                    No words match your filters.
+                        <button
+                          onClick={() => deleteWord(w)}
+                          className="rounded bg-gray-700 px-2 py-1 text-xs text-white hover:bg-red-700"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    </div>
                   </td>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-    </div>
+              );
+            })}
+
+            {filteredSorted.length === 0 ? (
+              <tr>
+                <td className="p-4 text-gray-500" colSpan={10}>
+                  No words match your filters.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }
