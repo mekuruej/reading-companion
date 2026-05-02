@@ -131,6 +131,11 @@ function toDisplayString(value: number | null | undefined) {
   return value == null ? "" : String(value);
 }
 
+function isSmallViewport() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 640px)").matches;
+}
+
 export default function AddWordPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -225,13 +230,37 @@ export default function AddWordPage() {
       const editor = editorCardRef.current;
       if (!editor) return;
 
-      const top = window.scrollY + editor.getBoundingClientRect().top - 132;
+      const smallScreen = isSmallViewport();
+      const top = window.scrollY + editor.getBoundingClientRect().top - (smallScreen ? 18 : 132);
       window.scrollTo({
         top: Math.max(0, top),
         behavior: "smooth",
       });
 
-      wordInputRef.current?.focus();
+      if (smallScreen) {
+        editorWordInputRef.current?.focus({ preventScroll: true });
+      } else {
+        editorWordInputRef.current?.focus();
+      }
+    }, 0);
+  }
+
+  function prepareForNextWord() {
+    window.setTimeout(() => {
+      const input = wordInputRef.current;
+      if (!input) return;
+
+      if (isSmallViewport()) {
+        input.focus({ preventScroll: true });
+        const top = window.scrollY + input.getBoundingClientRect().top - 18;
+        window.scrollTo({
+          top: Math.max(0, top),
+          behavior: "smooth",
+        });
+        return;
+      }
+
+      input.focus();
     }, 0);
   }
 
@@ -577,7 +606,7 @@ export default function AddWordPage() {
       }
 
       clearForm(true);
-      wordInputRef.current?.focus();
+      prepareForNextWord();
     } catch (err: any) {
       console.error("Save error:", err);
       setMessage(`❌ Failed saving: ${err?.message ?? "unknown error"}`);

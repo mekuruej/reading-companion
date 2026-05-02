@@ -173,6 +173,11 @@ function buildQuickLookupCandidates(entries: any[], fallbackWord: string): Quick
   return candidates;
 }
 
+function isSmallViewport() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 640px)").matches;
+}
+
 export default function SingleAddPage() {
   const router = useRouter();
   const [userBookId, setUserBookId] = useState("");
@@ -371,13 +376,37 @@ export default function SingleAddPage() {
       const editor = quickEditorCardRef.current;
       if (!editor) return;
 
-      const top = window.scrollY + editor.getBoundingClientRect().top - 132;
+      const smallScreen = isSmallViewport();
+      const top = window.scrollY + editor.getBoundingClientRect().top - (smallScreen ? 18 : 132);
       window.scrollTo({
         top: Math.max(0, top),
         behavior: "smooth",
       });
 
-      quickWordInputRef.current?.focus();
+      if (smallScreen) {
+        quickEditorWordInputRef.current?.focus({ preventScroll: true });
+      } else {
+        quickEditorWordInputRef.current?.focus();
+      }
+    }, 0);
+  }
+
+  function prepareForNextQuickWord() {
+    window.setTimeout(() => {
+      const input = quickWordInputRef.current;
+      if (!input) return;
+
+      if (isSmallViewport()) {
+        input.focus({ preventScroll: true });
+        const top = window.scrollY + input.getBoundingClientRect().top - 18;
+        window.scrollTo({
+          top: Math.max(0, top),
+          behavior: "smooth",
+        });
+        return;
+      }
+
+      input.focus();
     }, 0);
   }
 
@@ -697,7 +726,7 @@ export default function SingleAddPage() {
 
     setQuickWord("");
     clearQuickPreview();
-    quickWordInputRef.current?.focus();
+    prepareForNextQuickWord();
   }
 
   async function deleteQuickWordById(id: string) {

@@ -5,11 +5,6 @@
 
 import { useEffect, useState } from "react";
 import ProfileShell from "@/components/profile/ProfileShell";
-import {
-  emptyLibraryStudyColorTotals,
-  fetchLibraryStudyColorTotals,
-  type LibraryStudyColorTotals,
-} from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
 
 type LearningSettings = {
@@ -21,24 +16,19 @@ type LearningSettings = {
   show_badge_numbers: boolean;
   color_system: string;
   skip_katakana_library_check: boolean;
+  library_check_daily_limit: number;
 };
 
 type MainStage = "red" | "orange" | "yellow" | "green" | "blue" | "grey" | "purple";
 
-const COLOR_TOTAL_LAYOUT: (MainStage | "spacer")[] = [
-  "red",
-  "orange",
-  "yellow",
-  "spacer",
-  "green",
-  "blue",
-  "purple",
-  "grey",
-];
-
 function colorLabel(stage: MainStage) {
-  if (stage === "grey") return "Support";
+  if (stage === "grey") return "Limbo";
   return stage.charAt(0).toUpperCase() + stage.slice(1);
+}
+
+function cleanDailyCheckLimit(value: number | null | undefined) {
+  if (value === 10 || value === 20 || value === 30) return value;
+  return 20;
 }
 
 function stagePill(stage: MainStage) {
@@ -111,9 +101,6 @@ function totalEncounterSteps(settings: LearningSettings) {
 
 export default function ReadingProfilePage() {
   const [settings, setSettings] = useState<LearningSettings | null>(null);
-  const [colorTotals, setColorTotals] = useState<LibraryStudyColorTotals>(
-    emptyLibraryStudyColorTotals()
-  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -158,9 +145,9 @@ export default function ReadingProfilePage() {
           show_badge_numbers: true,
           color_system: "rainbow",
           skip_katakana_library_check: true,
+          library_check_daily_limit: 20,
         };
         setSettings(defaultSettings);
-        setColorTotals(await fetchLibraryStudyColorTotals(user.id, defaultSettings));
         return;
       }
 
@@ -168,10 +155,12 @@ export default function ReadingProfilePage() {
         ...(data as LearningSettings),
         skip_katakana_library_check:
           (data as Partial<LearningSettings>).skip_katakana_library_check ?? true,
+        library_check_daily_limit: cleanDailyCheckLimit(
+          (data as Partial<LearningSettings>).library_check_daily_limit
+        ),
       };
 
       setSettings(loadedSettings);
-      setColorTotals(await fetchLibraryStudyColorTotals(user.id, loadedSettings));
     } finally {
       setLoading(false);
     }
@@ -224,12 +213,35 @@ export default function ReadingProfilePage() {
           show_badge_numbers: settings.show_badge_numbers,
           color_system: settings.color_system,
           skip_katakana_library_check: settings.skip_katakana_library_check,
+          library_check_daily_limit: cleanDailyCheckLimit(settings.library_check_daily_limit),
         },
         { onConflict: "user_id" }
       );
 
       if (error) {
-        setMessage(error.message ?? "Error saving reading profile.");
+        if ((error as any).code === "42703") {
+          const { error: fallbackError } = await supabase.from("user_learning_settings").upsert(
+            {
+              user_id: user.id,
+              learning_profile: settings.learning_profile,
+              red_stages: settings.red_stages,
+              orange_stages: settings.orange_stages,
+              yellow_stages: settings.yellow_stages,
+              show_badge_numbers: settings.show_badge_numbers,
+              color_system: settings.color_system,
+              skip_katakana_library_check: settings.skip_katakana_library_check,
+            },
+            { onConflict: "user_id" }
+          );
+
+          setMessage(
+            fallbackError
+              ? fallbackError.message ?? "Error saving reading profile."
+              : "Reading profile saved. Run the daily-limit SQL to save the Library Check card limit."
+          );
+        } else {
+          setMessage(error.message ?? "Error saving reading profile.");
+        }
       } else {
         setMessage("Reading profile saved.");
       }
@@ -271,34 +283,7 @@ export default function ReadingProfilePage() {
     >
       <div className="mx-auto max-w-4xl space-y-4">
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">Your current color totals</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-600">
-            These are your current Library Study color states across real encounters and claimed
-            Word Sky words.
-          </p>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {COLOR_TOTAL_LAYOUT.map((stage) =>
-              stage === "spacer" ? (
-                <div key="totals-spacer" className="hidden lg:block" />
-              ) : (
-                <div key={stage} className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={stagePill(stage)}>
-                      {colorLabel(stage)}
-                    </span>
-                    <span className="text-lg font-semibold text-stone-900">
-                      {colorTotals[stage]}
-                    </span>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">What the colors mean</h2>
+          <h2 className="text-lg font-semibold text-stone-900">What the Mekuru colors mean</h2>
           <p className="mt-1 text-sm leading-6 text-stone-600">
             Changing your profile does not erase your reading history. It changes how strictly
             Mekuru interprets your encounters before sending words to Library Study.
@@ -350,9 +335,9 @@ export default function ReadingProfilePage() {
             />
             <ColorStepCard
               stage="grey"
-              title="Held for support"
+              title="Between gates"
               detail="The word is being held before the next gate, either because it is not ready yet or because a gate was missed."
-              note="Grey is support, not punishment, and strong words can skip it."
+              note="Grey is not punishment, and strong words can skip it."
             />
           </div>
         </div>
@@ -436,11 +421,31 @@ export default function ReadingProfilePage() {
         </div>
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">Katakana words</h2>
+          <h2 className="text-lg font-semibold text-stone-900">Library Check session</h2>
           <p className="mt-1 text-sm leading-6 text-stone-600">
-            Katakana-only words can still appear in your vocabulary lists, but you can keep them
-            out of strict Library Check if they feel too easy or distracting.
+            Keep the strict gate session small enough to finish. Practice can still show the larger
+            pool whenever you want.
           </p>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-stone-800">
+              Cards per Library Check session
+            </label>
+            <select
+              value={cleanDailyCheckLimit(settings.library_check_daily_limit)}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  library_check_daily_limit: Number(e.target.value),
+                })
+              }
+              className="mt-1 w-full rounded-xl border px-3 py-2"
+            >
+              <option value={10}>10 cards</option>
+              <option value={20}>20 cards</option>
+              <option value={30}>30 cards</option>
+            </select>
+          </div>
 
           <label className="mt-4 flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
             <input

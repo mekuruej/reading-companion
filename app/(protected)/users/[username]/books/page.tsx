@@ -6,6 +6,13 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getLessonAlertInfo } from "@/lib/lessonAlerts";
+import {
+  emptyLibraryStudyColorTotals,
+  emptyLibraryStudyLimboTotals,
+  fetchLibraryStudyColorBreakdown,
+  type LibraryStudyColorTotals,
+  type LibraryStudyLimboTotals,
+} from "@/lib/libraryStudyTotals";
 
 type Book = {
   id: string;
@@ -97,6 +104,11 @@ type MonthOption = {
 };
 
 type UserBarVariant = "full" | "logoutOnly" | "labelOnly";
+type LibrarySnapshotView = "monthly" | "colors";
+type MekuruColor = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "grey";
+
+const MEKURU_ENCOUNTER_COLORS: MekuruColor[] = ["red", "orange", "yellow"];
+const MEKURU_ABILITY_COLORS: MekuruColor[] = ["green", "blue", "purple"];
 
 function ymdInTimeZone(value: string | Date, timeZone: string) {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -325,6 +337,50 @@ function makeBookKey(title: string, author?: string | null) {
   return [normalizeBookPart(title), normalizeBookPart(author)].join("|");
 }
 
+function mekuruColorLabel(color: MekuruColor) {
+  if (color === "grey") return "Limbo";
+  return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
+function mekuruColorDotClass(color: MekuruColor) {
+  if (color === "red") return "bg-red-500";
+  if (color === "orange") return "bg-orange-500";
+  if (color === "yellow") return "bg-yellow-300";
+  if (color === "green") return "bg-emerald-500";
+  if (color === "blue") return "bg-sky-500";
+  if (color === "purple") return "bg-violet-500";
+  return "bg-slate-500";
+}
+
+function MekuruColorRowLabel({ label }: { label: string }) {
+  return (
+    <div className="mb-1.5">
+      <div className="h-px w-full bg-slate-400/70" />
+      <div className="mt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function MekuruColorDelta({ value }: { value: number }) {
+  if (value === 0) {
+    return <span className="text-xs font-semibold text-slate-400">0</span>;
+  }
+
+  const isUp = value > 0;
+
+  return (
+    <span className={`text-xs font-semibold ${isUp ? "text-emerald-600" : "text-rose-600"}`}>
+      {isUp ? "↑" : "↓"} {Math.abs(value)}
+    </span>
+  );
+}
+
+function dateFromYmd(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
 export default function BooksPage() {
   const router = useRouter();
   const params = useParams<{ username: string }>();
@@ -388,6 +444,8 @@ export default function BooksPage() {
     "status" | "title" | "last_engaged" | "last_read"
   >("status");
 
+  const [librarySnapshotView, setLibrarySnapshotView] =
+    useState<LibrarySnapshotView>("monthly");
   const monthOptions = getMonthOptions(12);
   const [selectedMonth, setSelectedMonth] = useState<string>(
     monthOptions[0]?.value ?? ""
@@ -403,6 +461,19 @@ export default function BooksPage() {
   });
 
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
+  const [mekuruColorTotals, setMekuruColorTotals] =
+    useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
+  const [mekuruLimboTotals, setMekuruLimboTotals] =
+    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
+  const [mekuruColorMovementTotals, setMekuruColorMovementTotals] =
+    useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
+  const [previousMekuruColorMovementTotals, setPreviousMekuruColorMovementTotals] =
+    useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
+  const [mekuruLimboMovementTotals, setMekuruLimboMovementTotals] =
+    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
+  const [previousMekuruLimboMovementTotals, setPreviousMekuruLimboMovementTotals] =
+    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
+  const [mekuruColorCountsLoading, setMekuruColorCountsLoading] = useState(false);
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
@@ -574,6 +645,51 @@ export default function BooksPage() {
       });
     } finally {
       setMonthlyStatsLoading(false);
+    }
+  }
+
+  async function loadMekuruColorCounts(userId: string) {
+    setMekuruColorCountsLoading(true);
+
+    try {
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const previousMonth = `${previousMonthDate.getFullYear()}-${String(
+        previousMonthDate.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      const currentRange = getMonthRange(currentMonth);
+      const previousRange = getMonthRange(previousMonth);
+
+      const [breakdown, currentMovement, previousMovement] = await Promise.all([
+        fetchLibraryStudyColorBreakdown(userId),
+        fetchLibraryStudyColorBreakdown(userId, null, {
+          since: dateFromYmd(currentRange.startStr),
+          before: dateFromYmd(currentRange.endStr),
+        }),
+        fetchLibraryStudyColorBreakdown(userId, null, {
+          since: dateFromYmd(previousRange.startStr),
+          before: dateFromYmd(previousRange.endStr),
+        }),
+      ]);
+
+      setMekuruColorTotals(breakdown.colorTotals);
+      setMekuruLimboTotals(breakdown.limboTotals);
+      setMekuruColorMovementTotals(currentMovement.colorTotals);
+      setPreviousMekuruColorMovementTotals(previousMovement.colorTotals);
+      setMekuruLimboMovementTotals(currentMovement.limboTotals);
+      setPreviousMekuruLimboMovementTotals(previousMovement.limboTotals);
+    } catch (error) {
+      console.error("Error loading Mekuru color counts:", error);
+      setMekuruColorTotals(emptyLibraryStudyColorTotals());
+      setMekuruLimboTotals(emptyLibraryStudyLimboTotals());
+      setMekuruColorMovementTotals(emptyLibraryStudyColorTotals());
+      setPreviousMekuruColorMovementTotals(emptyLibraryStudyColorTotals());
+      setMekuruLimboMovementTotals(emptyLibraryStudyLimboTotals());
+      setPreviousMekuruLimboMovementTotals(emptyLibraryStudyLimboTotals());
+    } finally {
+      setMekuruColorCountsLoading(false);
     }
   }
 
@@ -915,7 +1031,7 @@ export default function BooksPage() {
 
     const { data: wordRows, error: wordError } = await supabase
       .from("user_book_words")
-      .select("user_book_id, vocabulary_cache_id, surface, is_manual_override, created_at")
+      .select("user_book_id, vocabulary_cache_id, surface, reading, is_manual_override, created_at")
       .in("user_book_id", userBookIds)
       .eq("is_manual_override", false)
       .gte("created_at", KANJI_ENRICHMENT_TEST_START);
@@ -934,12 +1050,15 @@ export default function BooksPage() {
       )
     );
 
-    const mapStatusByCacheId = new Map<number, { hasAny: boolean; hasIncomplete: boolean }>();
+    const mapStatusByCacheId = new Map<
+      number,
+      { completePositions: Set<number>; hasIncomplete: boolean }
+    >();
 
     if (cacheIds.length > 0) {
       const { data: mapRows, error: mapError } = await supabase
         .from("vocabulary_kanji_map")
-        .select("vocabulary_cache_id, reading_type, base_reading, realized_reading")
+        .select("vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading")
         .in("vocabulary_cache_id", cacheIds);
 
       if (mapError) {
@@ -951,11 +1070,9 @@ export default function BooksPage() {
       for (const row of mapRows ?? []) {
         const cacheId = (row as any).vocabulary_cache_id as number;
         const existing = mapStatusByCacheId.get(cacheId) ?? {
-          hasAny: false,
+          completePositions: new Set<number>(),
           hasIncomplete: false,
         };
-
-        existing.hasAny = true;
 
         if (
           !(row as any).reading_type ||
@@ -963,6 +1080,8 @@ export default function BooksPage() {
           !(row as any).realized_reading
         ) {
           existing.hasIncomplete = true;
+        } else if (typeof (row as any).kanji_position === "number") {
+          existing.completePositions.add((row as any).kanji_position);
         }
 
         mapStatusByCacheId.set(cacheId, existing);
@@ -981,30 +1100,72 @@ export default function BooksPage() {
       });
     }
 
-    const countsByUserBookId = new Map<string, number>();
+    function kanjiCountForSurface(surface: string) {
+      return Array.from(surface).filter((ch) => /\p{Script=Han}/u.test(ch)).length;
+    }
+
+    function kanjiQueueKey(surface: string, reading: string) {
+      return `${surface.trim()}|||${reading.trim()}`;
+    }
+
+    function isMapCompleteForSurface(
+      mapStatus: { completePositions: Set<number>; hasIncomplete: boolean } | null | undefined,
+      surface: string
+    ) {
+      const kanjiCount = kanjiCountForSurface(surface);
+      return Boolean(mapStatus && !mapStatus.hasIncomplete && mapStatus.completePositions.size >= kanjiCount);
+    }
+
+    const completeExactKeysByUserBookId = new Map<string, Set<string>>();
 
     for (const row of wordRows ?? []) {
-      const surface = (row as any).surface ?? "";
+      const surface = String((row as any).surface ?? "");
+      const reading = String((row as any).reading ?? "");
+      if (!/[\p{Script=Han}]/u.test(surface)) continue;
+
+      const cacheId = (row as any).vocabulary_cache_id as number | null;
+      if (cacheId == null) continue;
+
+      const mapStatus = mapStatusByCacheId.get(cacheId);
+      if (!isMapCompleteForSurface(mapStatus, surface)) continue;
+
+      const userBookId = (row as any).user_book_id as string;
+      const exactKeys = completeExactKeysByUserBookId.get(userBookId) ?? new Set<string>();
+      exactKeys.add(kanjiQueueKey(surface, reading));
+      completeExactKeysByUserBookId.set(userBookId, exactKeys);
+    }
+
+    const neededKeysByUserBookId = new Map<string, Set<string>>();
+
+    for (const row of wordRows ?? []) {
+      const surface = String((row as any).surface ?? "");
+      const reading = String((row as any).reading ?? "");
       const hasKanji = /[\p{Script=Han}]/u.test(surface);
       if (!hasKanji) continue;
+
+      const userBookId = (row as any).user_book_id as string;
+      const completeExactKeys = completeExactKeysByUserBookId.get(userBookId);
+      if (completeExactKeys?.has(kanjiQueueKey(surface, reading))) continue;
 
       const cacheId = (row as any).vocabulary_cache_id as number | null;
       const mapStatus = cacheId != null ? mapStatusByCacheId.get(cacheId) : null;
 
       const needsEnrichment =
-        cacheId == null || !mapStatus?.hasAny || mapStatus.hasIncomplete;
+        cacheId == null ||
+        !isMapCompleteForSurface(mapStatus, surface);
 
       if (needsEnrichment) {
-        const userBookId = (row as any).user_book_id as string;
-        countsByUserBookId.set(userBookId, (countsByUserBookId.get(userBookId) ?? 0) + 1);
+        const neededKeys = neededKeysByUserBookId.get(userBookId) ?? new Set<string>();
+        neededKeys.add(cacheId == null ? `missing:${surface}::${reading}` : `cache:${cacheId}`);
+        neededKeysByUserBookId.set(userBookId, neededKeys);
       }
     }
 
-    const alerts = Array.from(countsByUserBookId.entries())
-      .map(([userBookId, count]) => ({
+    const alerts = Array.from(neededKeysByUserBookId.entries())
+      .map(([userBookId, neededKeys]) => ({
         userBookId,
         title: metaByUserBookId.get(userBookId)?.title ?? "Untitled",
-        count,
+        count: neededKeys.size,
         studentName: metaByUserBookId.get(userBookId)?.studentName ?? null,
         isMyBook: (userBooks ?? []).some(
           (row: any) => row.id === userBookId && row.user_id === meId
@@ -1019,7 +1180,6 @@ export default function BooksPage() {
       });
 
     setKanjiEnrichmentAlerts(alerts);
-    console.log("kanjiEnrichmentAlerts", alerts);
   }
 
   async function loadReadingStatsForBooks(
@@ -1335,6 +1495,11 @@ export default function BooksPage() {
     if (!viewingUserId || !selectedMonth) return;
     loadMonthlyLibraryStats(viewingUserId, selectedMonth, myTimeZone);
   }, [viewingUserId, selectedMonth, myTimeZone]);
+
+  useEffect(() => {
+    if (!viewingUserId) return;
+    loadMekuruColorCounts(viewingUserId);
+  }, [viewingUserId]);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -1676,25 +1841,59 @@ export default function BooksPage() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900 sm:text-base">
-                  Monthly Snapshot
+                  {librarySnapshotView === "monthly" ? "Monthly Snapshot" : "Mekuru Color Counts"}
                 </h2>
-                <p className="mt-1 text-xs text-slate-700">
-                  Effort across all books for this month
-                </p>
+                {librarySnapshotView === "monthly" ? (
+                  <p className="mt-1 text-xs text-slate-700">
+                    Effort across all books for this month
+                  </p>
+                ) : (
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-700">
+                    <p>Color states across your Library Study words.</p>
+                    <p>Arrows compare this month with last month.</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
-                >
-                  {monthOptions.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 rounded-xl border border-slate-400 bg-slate-50 p-1 text-xs font-semibold text-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setLibrarySnapshotView("monthly")}
+                    className={`rounded-lg px-3 py-1.5 transition ${
+                      librarySnapshotView === "monthly"
+                        ? "bg-white text-slate-950 shadow-sm"
+                        : "hover:bg-white/70"
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLibrarySnapshotView("colors")}
+                    className={`rounded-lg px-3 py-1.5 transition ${
+                      librarySnapshotView === "colors"
+                        ? "bg-white text-slate-950 shadow-sm"
+                        : "hover:bg-white/70"
+                    }`}
+                  >
+                    Colors
+                  </button>
+                </div>
+
+                {librarySnapshotView === "monthly" ? (
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
+                  >
+                    {monthOptions.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
 
                 <button
                   type="button"
@@ -1706,68 +1905,219 @@ export default function BooksPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Days Engaged</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
-                </div>
-                <div className="mt-1 text-[10px] text-slate-500">Read, listened, or saved words</div>
-              </div>
+            {librarySnapshotView === "monthly" ? (
+              <>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                    <div className="text-[11px] text-slate-600">Days Engaged</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                      {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-500">Read, listened, or saved words</div>
+                  </div>
 
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Pages Read</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
-                </div>
-              </div>
+                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                    <div className="text-[11px] text-slate-600">Pages Read</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                      {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
+                    </div>
+                  </div>
 
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Words Saved</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : monthlyStats.totalWordsLookedUp}
-                </div>
-              </div>
+                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                    <div className="text-[11px] text-slate-600">Words Saved</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                      {monthlyStatsLoading ? "…" : monthlyStats.totalWordsLookedUp}
+                    </div>
+                  </div>
 
-              <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                <div className="text-[11px] text-slate-600">Time Total</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {monthlyStatsLoading ? "…" : formatMinutesAsReadableTime(monthlyStats.totalTimeMinutes)}
+                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
+                    <div className="text-[11px] text-slate-600">Time Total</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                      {monthlyStatsLoading ? "…" : formatMinutesAsReadableTime(monthlyStats.totalTimeMinutes)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
-                <div className="text-[11px] text-slate-500">Current Run</div>
-                <div className="mt-1 text-xl font-semibold text-slate-900">
-                  {monthlyStatsLoading
-                    ? "…"
-                    : monthlyStats.currentRunDays > 0
-                      ? `${monthlyStats.currentRunDays} day${monthlyStats.currentRunDays === 1 ? "" : "s"
-                      }`
-                      : "—"}
-                </div>
-                <div className="mt-1 text-[10px] text-slate-500">
-                  Consecutive engaged days ending today
-                </div>
-              </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
+                    <div className="text-[11px] text-slate-500">Current Run</div>
+                    <div className="mt-1 text-xl font-semibold text-slate-900">
+                      {monthlyStatsLoading
+                        ? "…"
+                        : monthlyStats.currentRunDays > 0
+                          ? `${monthlyStats.currentRunDays} day${monthlyStats.currentRunDays === 1 ? "" : "s"
+                          }`
+                          : "—"}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-500">
+                      Consecutive engaged days ending today
+                    </div>
+                  </div>
 
-              <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
-                <div className="text-[11px] text-slate-500">Longest Run This Month</div>
-                <div className="mt-1 text-xl font-semibold text-slate-900">
-                  {monthlyStatsLoading
-                    ? "…"
-                    : monthlyStats.longestRunDays > 0
-                      ? `${monthlyStats.longestRunDays} day${monthlyStats.longestRunDays === 1 ? "" : "s"
-                      }`
-                      : "—"}
+                  <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
+                    <div className="text-[11px] text-slate-500">Longest Run This Month</div>
+                    <div className="mt-1 text-xl font-semibold text-slate-900">
+                      {monthlyStatsLoading
+                        ? "…"
+                        : monthlyStats.longestRunDays > 0
+                          ? `${monthlyStats.longestRunDays} day${monthlyStats.longestRunDays === 1 ? "" : "s"
+                          }`
+                          : "—"}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-500">
+                      Best streak anywhere in this month
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-1 text-[10px] text-slate-500">
-                  Best streak anywhere in this month
+              </>
+            ) : (
+              <>
+                <div>
+                  <MekuruColorRowLabel label="Based on encounters" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {MEKURU_ENCOUNTER_COLORS.map((color) => (
+                      <div
+                        key={color}
+                        className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5"
+                      >
+                        <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                          <span className={`h-2.5 w-2.5 rounded-full ${mekuruColorDotClass(color)}`} />
+                          {mekuruColorLabel(color)}
+                        </div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">
+                          {mekuruColorCountsLoading ? (
+                            "…"
+                          ) : (
+                            <span className="flex items-baseline gap-2">
+                              {mekuruColorTotals[color]}
+                              <MekuruColorDelta
+                                value={
+                                  mekuruColorMovementTotals[color] -
+                                  previousMekuruColorMovementTotals[color]
+                                }
+                              />
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
+
+                <div className="mt-3">
+                  <MekuruColorRowLabel label="Based on ability" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {MEKURU_ABILITY_COLORS.map((color) => (
+                      <div
+                        key={color}
+                        className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5"
+                      >
+                        <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                          <span className={`h-2.5 w-2.5 rounded-full ${mekuruColorDotClass(color)}`} />
+                          {mekuruColorLabel(color)}
+                        </div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">
+                          {mekuruColorCountsLoading ? (
+                            "…"
+                          ) : (
+                            <span className="flex items-baseline gap-2">
+                              {mekuruColorTotals[color]}
+                              <MekuruColorDelta
+                                value={
+                                  mekuruColorMovementTotals[color] -
+                                  previousMekuruColorMovementTotals[color]
+                                }
+                              />
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <MekuruColorRowLabel label="Between gates" />
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                        <span className={`h-2 w-2 rounded-full ${mekuruColorDotClass("grey")}`} />
+                        Limbo total
+                      </div>
+                      <div className="mt-1 text-base font-semibold text-slate-900">
+                        {mekuruColorCountsLoading ? (
+                          "…"
+                        ) : (
+                          <span className="flex items-baseline gap-2">
+                            {mekuruColorTotals.grey}
+                            <MekuruColorDelta
+                              value={
+                                mekuruColorMovementTotals.grey -
+                                previousMekuruColorMovementTotals.grey
+                              }
+                            />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
+                      <div className="text-[10px] text-slate-500">Before Reading</div>
+                      <div className="mt-1 text-base font-semibold text-slate-900">
+                        {mekuruColorCountsLoading ? (
+                          "…"
+                        ) : (
+                          <span className="flex items-baseline gap-2">
+                            {mekuruLimboTotals.pre_reading_support}
+                            <MekuruColorDelta
+                              value={
+                                mekuruLimboMovementTotals.pre_reading_support -
+                                previousMekuruLimboMovementTotals.pre_reading_support
+                              }
+                            />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
+                      <div className="text-[10px] text-slate-500">Reading Missed</div>
+                      <div className="mt-1 text-base font-semibold text-slate-900">
+                        {mekuruColorCountsLoading ? (
+                          "…"
+                        ) : (
+                          <span className="flex items-baseline gap-2">
+                            {mekuruLimboTotals.reading_gate_support}
+                            <MekuruColorDelta
+                              value={
+                                mekuruLimboMovementTotals.reading_gate_support -
+                                previousMekuruLimboMovementTotals.reading_gate_support
+                              }
+                            />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
+                      <div className="text-[10px] text-slate-500">Meaning Missed</div>
+                      <div className="mt-1 text-base font-semibold text-slate-900">
+                        {mekuruColorCountsLoading ? (
+                          "…"
+                        ) : (
+                          <span className="flex items-baseline gap-2">
+                            {mekuruLimboTotals.meaning_gate_support}
+                            <MekuruColorDelta
+                              value={
+                                mekuruLimboMovementTotals.meaning_gate_support -
+                                previousMekuruLimboMovementTotals.meaning_gate_support
+                              }
+                            />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

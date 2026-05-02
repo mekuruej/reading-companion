@@ -45,6 +45,7 @@ type LearningSettingsRow = {
   yellow_stages: number | null;
   show_badge_numbers: boolean | null;
   skip_katakana_library_check?: boolean | null;
+  library_check_daily_limit?: number | null;
 };
 
 type LibraryWordProgressRow = {
@@ -102,6 +103,15 @@ type StudyCard = {
   progress: LibraryWordProgressRow | null;
 };
 
+type MeaningReviewItem = {
+  id: string;
+  card: StudyCard;
+  userAnswer: string;
+  correctAnswer: string;
+  cardType: string;
+  originalOk: boolean;
+};
+
 type LibraryCheckDebug = {
   threshold: number;
   rawRows: number;
@@ -128,8 +138,25 @@ type StudyMode =
 
 type LibraryStudyMode = "check" | "practice";
 type PracticeRevealStep = "word" | "reading" | "meaning";
+type PracticeColorFilter =
+  | "all"
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "blue"
+  | "purple"
+  | "grey"
+  | "katakana";
 
 const STORAGE_KEY = "library-study-seen-by-date";
+const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
+const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
+const REGULAR_GATE_RECHECK_WINDOW_DAYS = 3;
+const MISSED_GATE_RECHECK_MIN_DAYS = 7;
+const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
+const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
+const PRE_READING_WAIT_RECHECK_DAYS = 90;
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   red_stages: 1,
@@ -137,6 +164,7 @@ const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   yellow_stages: 1,
   show_badge_numbers: true,
   skip_katakana_library_check: true,
+  library_check_daily_limit: 20,
 };
 
 const LIBRARY_CHECK_WORD_PAGE_SIZE = 1000;
@@ -164,6 +192,11 @@ function normalizeKana(value: string) {
 
 function normalizeJlpt(value: string | null | undefined) {
   return (value ?? "NON-JLPT").toUpperCase() || "NON-JLPT";
+}
+
+function cleanDailyCheckLimit(value: number | null | undefined) {
+  if (value === 10 || value === 20 || value === 30) return value;
+  return 20;
 }
 
 function isKatakanaOnly(value: string | null | undefined) {
@@ -215,6 +248,56 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
   return allRows;
 }
 
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+async function loadLibraryProgressByKey(userId: string, studyKeys: string[]) {
+  const progressByKey = new Map<string, LibraryWordProgressRow>();
+  const uniqueKeys = uniqueStrings(studyKeys);
+
+  for (let i = 0; i < uniqueKeys.length; i += LIBRARY_PROGRESS_KEY_BATCH_SIZE) {
+    const batch = uniqueKeys.slice(i, i + LIBRARY_PROGRESS_KEY_BATCH_SIZE);
+    const { data: progressRows, error: progressErr } = await supabase
+      .from("user_library_word_progress")
+      .select(
+        `
+          id,
+          user_id,
+          study_identity_key,
+          surface,
+          reading,
+          definition_key,
+          reading_gate_status,
+          meaning_gate_status,
+          held_before_reading_gate,
+          held_before_meaning_gate,
+          mastered,
+          reading_gate_attempts,
+          meaning_gate_attempts,
+          reading_gate_passed_at,
+          reading_gate_failed_at,
+          meaning_gate_passed_at,
+          meaning_gate_failed_at,
+          mastered_at,
+          last_studied_at
+        `
+      )
+      .eq("user_id", userId)
+      .eq("definition_key", "")
+      .in("study_identity_key", batch)
+      .returns<LibraryWordProgressRow[]>();
+
+    if (progressErr) throw progressErr;
+
+    for (const row of progressRows ?? []) {
+      progressByKey.set(row.study_identity_key, row);
+    }
+  }
+
+  return progressByKey;
+}
+
 function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base =
@@ -242,6 +325,25 @@ function libraryStudyChipClass(status: LibraryStudyColorStatus | undefined) {
   return `${base} border-amber-100 bg-white/90 text-amber-950`;
 }
 
+function libraryStudyDotClass(status: LibraryStudyColorStatus | undefined) {
+  const color = status?.color ?? "yellow";
+
+  if (color === "red") return "bg-red-500";
+  if (color === "orange") return "bg-orange-500";
+  if (color === "yellow") return "bg-yellow-300";
+  if (color === "green") return "bg-emerald-500";
+  if (color === "blue") return "bg-sky-500";
+  if (color === "purple") return "bg-violet-500";
+  if (color === "grey") return "bg-slate-500";
+  return "bg-slate-300";
+}
+
+function libraryStudyColorName(status: LibraryStudyColorStatus | undefined) {
+  const color = status?.color ?? "yellow";
+  if (color === "grey") return "Limbo";
+  return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
 function hashString(value: string) {
   let hash = 0;
   for (let i = 0; i < value.length; i += 1) {
@@ -264,10 +366,102 @@ function includeLibraryCheckCard(status: LibraryStudyColorStatus) {
   );
 }
 
+function isMasteredMaintenanceDue(card: StudyCard, now = new Date()) {
+  if (card.colorStatus.color !== "purple") return true;
+
+  const lastCheck = card.progress?.last_studied_at ?? card.progress?.mastered_at;
+  if (!lastCheck) return true;
+
+  const lastCheckDate = new Date(lastCheck);
+  if (Number.isNaN(lastCheckDate.getTime())) return true;
+
+  const elapsedMs = now.getTime() - lastCheckDate.getTime();
+  return elapsedMs >= MASTERED_MAINTENANCE_INTERVAL_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function daysSinceIso(value: string | null | undefined, now = new Date()) {
+  if (!value) return Number.POSITIVE_INFINITY;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
+
+  return (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
+}
+
+function missedGateRecheckDays(card: StudyCard) {
+  return (
+    MISSED_GATE_RECHECK_MIN_DAYS +
+    (hashString(`${card.studyIdentityKey}::missed-gate`) % MISSED_GATE_RECHECK_WINDOW_DAYS)
+  );
+}
+
+function isMissedGateLimboDue(card: StudyCard, now = new Date()) {
+  if (card.colorStatus.color !== "grey") return true;
+
+  if (card.colorStatus.greyReason === "pre_reading_support") {
+    return daysSinceIso(card.progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
+  }
+
+  const recheckDays = missedGateRecheckDays(card);
+
+  if (card.colorStatus.greyReason === "reading_gate_support") {
+    return daysSinceIso(card.progress?.reading_gate_failed_at, now) >= recheckDays;
+  }
+
+  if (card.colorStatus.greyReason === "meaning_gate_support") {
+    return daysSinceIso(card.progress?.meaning_gate_failed_at, now) >= recheckDays;
+  }
+
+  return true;
+}
+
+function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
+  if (card.colorStatus.color === "purple" || card.colorStatus.color === "grey") return true;
+  if (!card.progress?.last_studied_at) return true;
+
+  const recheckDays =
+    REGULAR_GATE_RECHECK_MIN_DAYS +
+    (hashString(`${card.studyIdentityKey}::regular-gate`) % REGULAR_GATE_RECHECK_WINDOW_DAYS);
+
+  return daysSinceIso(card.progress.last_studied_at, now) >= recheckDays;
+}
+
+function isCardAvailableForLibraryCheck(
+  card: StudyCard,
+  selectedJlpt: string,
+  seenTodayIds: Set<string>
+) {
+  const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
+  const notSeenToday = !seenTodayIds.has(card.id);
+
+  return (
+    jlptMatch &&
+    notSeenToday &&
+    includeLibraryCheckCard(card.colorStatus) &&
+    isMasteredMaintenanceDue(card) &&
+    isMissedGateLimboDue(card) &&
+    isRegularGateRecheckDue(card)
+  );
+}
+
+function isCardAvailableForLibraryPractice(
+  card: StudyCard,
+  selectedJlpt: string,
+  colorFilter: PracticeColorFilter
+) {
+  const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
+  if (!jlptMatch) return false;
+
+  if (colorFilter === "all") return true;
+  if (colorFilter === "katakana") return isKatakanaOnly(card.surface);
+
+  return card.colorStatus.color === colorFilter;
+}
+
 function gatePromptText(card: StudyCard | undefined) {
   if (!card) return "Will you pass through?";
   if (card.colorStatus.color === "purple") return "A mastered word is back for a quiet check.";
-  if (card.colorStatus.nextGate === "mastery") return "One more check before this word settles.";
+  if (card.colorStatus.nextGate === "mastery") return "One more right answer until this word is mastered.";
   return card.activeGate === "meaning"
     ? "Will you pass the MEANING gate?"
     : "Will you pass the READING gate?";
@@ -337,6 +531,7 @@ function LibraryCheckIntroCard({
   onModeChange: (mode: LibraryStudyMode) => void;
 }) {
   const colorSteps = [
+    { label: "Yellow", className: "bg-yellow-300", text: "ready for gate checks" },
     { label: "Green", className: "bg-emerald-500", text: "reading passed" },
     { label: "Blue", className: "bg-sky-500", text: "meaning passed" },
     { label: "Purple", className: "bg-violet-500", text: "mastered" },
@@ -351,8 +546,8 @@ function LibraryCheckIntroCard({
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">
             {mode === "practice"
-              ? "A gentle reveal space for reviewing words without moving their colors."
-              : "Strict typed gates for words that are ready to move."}
+              ? "A gentle reveal space for reviewing all words in your library without moving their colors."
+              : "Strict typed gates for words that are ready to move by ability."}
           </p>
         </div>
 
@@ -396,7 +591,7 @@ function LibraryCheckIntroCard({
           </div>
         </div>
       ) : (
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {colorSteps.map((step) => (
             <div key={step.label} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
               <span className={`h-3 w-3 rounded-full ${step.className}`} />
@@ -416,8 +611,7 @@ function LibraryPracticePanel({
   card,
   total,
   revealStep,
-  onRevealReading,
-  onRevealMeaning,
+  onAdvance,
   onNext,
   onPrevious,
   onShuffle,
@@ -425,8 +619,7 @@ function LibraryPracticePanel({
   card: StudyCard | undefined;
   total: number;
   revealStep: PracticeRevealStep;
-  onRevealReading: () => void;
-  onRevealMeaning: () => void;
+  onAdvance: () => void;
   onNext: () => void;
   onPrevious: () => void;
   onShuffle: () => void;
@@ -450,16 +643,31 @@ function LibraryPracticePanel({
 
   return (
     <div className="w-full max-w-2xl space-y-2">
-      <div className={libraryStudyCardClass(card.colorStatus)}>
-        <div className="absolute left-4 right-4 top-4 flex justify-center">
+      <button
+        type="button"
+        onClick={onAdvance}
+        className="relative flex min-h-[30vh] w-full max-w-2xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[36vh]"
+      >
+        <div className="absolute left-4 top-4 flex">
           <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
             Practice Study
           </div>
         </div>
 
-        <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-          {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
+        <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
+          <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+            <span
+              className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
+                card.colorStatus
+              )}`}
+            />
+            {libraryStudyColorName(card.colorStatus)}
+          </div>
 
+          {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
+        </div>
+
+        <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
           {card.jlpt ? (
             <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
           ) : null}
@@ -503,9 +711,9 @@ function LibraryPracticePanel({
             </div>
           </div>
         </div>
-      </div>
+      </button>
 
-      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr]">
+      <div className="grid gap-2 sm:grid-cols-3">
         <button
           type="button"
           onClick={onPrevious}
@@ -514,32 +722,6 @@ function LibraryPracticePanel({
         >
           Previous
         </button>
-
-        {revealStep === "word" ? (
-          <button
-            type="button"
-            onClick={onRevealReading}
-            className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
-          >
-            Show Reading
-          </button>
-        ) : revealStep === "reading" ? (
-          <button
-            type="button"
-            onClick={onRevealMeaning}
-            className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
-          >
-            Show Meaning
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onNext}
-            className="rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-900"
-          >
-            Next Card
-          </button>
-        )}
 
         <button
           type="button"
@@ -561,7 +743,7 @@ function LibraryPracticePanel({
       </div>
 
       <p className="text-center text-xs leading-5 text-slate-500">
-        Practice does not move colors or count as passing a Library Check gate.
+        Tap the card to reveal. Practice does not move colors or count as passing a Library Check gate.
       </p>
     </div>
   );
@@ -716,6 +898,8 @@ export default function LibraryStudyPage() {
 
   const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("check");
   const [selectedJlpt, setSelectedJlpt] = useState("all");
+  const [practiceColorFilter, setPracticeColorFilter] =
+    useState<PracticeColorFilter>("all");
   const [studyMode, setStudyMode] = useState<StudyMode>("reading_typing");
 
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -734,21 +918,23 @@ export default function LibraryStudyPage() {
   const [endedEarly, setEndedEarly] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
+  const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
 
   const currentCard = deck[index];
   const practiceCard = practiceDeck[practiceIndex];
+  const dailyCheckLimit = cleanDailyCheckLimit(learningSettings.library_check_daily_limit);
 
   const filteredCards = useMemo(() => {
-    return allCards.filter((card) => {
-      const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
-      const notSeenToday = !seenTodayIds.has(card.id);
-      return jlptMatch && notSeenToday;
-    });
+    return allCards.filter((card) =>
+      isCardAvailableForLibraryCheck(card, selectedJlpt, seenTodayIds)
+    );
   }, [allCards, selectedJlpt, seenTodayIds]);
 
   const practiceFilteredCards = useMemo(() => {
-    return allCards.filter((card) => selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt);
-  }, [allCards, selectedJlpt]);
+    return allCards.filter((card) =>
+      isCardAvailableForLibraryPractice(card, selectedJlpt, practiceColorFilter)
+    );
+  }, [allCards, selectedJlpt, practiceColorFilter]);
 
   useEffect(() => {
     setDebugInfo((prev) => (prev ? { ...prev, filteredCards: filteredCards.length } : prev));
@@ -844,13 +1030,25 @@ export default function LibraryStudyPage() {
           return;
         }
 
-        const { data: learningSettings, error: settingsErr } = await supabase
+        let learningSettings: LearningSettingsRow | null = null;
+        const { data: learningSettingsWithLimit, error: settingsErr } = await supabase
           .from("user_learning_settings")
-          .select("red_stages, orange_stages, yellow_stages, show_badge_numbers, skip_katakana_library_check")
+          .select("red_stages, orange_stages, yellow_stages, show_badge_numbers, skip_katakana_library_check, library_check_daily_limit")
           .eq("user_id", user.id)
           .maybeSingle<LearningSettingsRow>();
 
-        if (settingsErr) throw settingsErr;
+        if (settingsErr) {
+          const { data: fallbackSettings, error: fallbackSettingsErr } = await supabase
+            .from("user_learning_settings")
+            .select("red_stages, orange_stages, yellow_stages, show_badge_numbers, skip_katakana_library_check")
+            .eq("user_id", user.id)
+            .maybeSingle<LearningSettingsRow>();
+
+          if (fallbackSettingsErr) throw fallbackSettingsErr;
+          learningSettings = fallbackSettings;
+        } else {
+          learningSettings = learningSettingsWithLimit;
+        }
 
         const colorSettings = {
           ...DEFAULT_LEARNING_SETTINGS,
@@ -882,7 +1080,7 @@ export default function LibraryStudyPage() {
             `
           )
           .eq("user_id", user.id)
-          .gte("check_ready_encounter_count", encounterThreshold)
+          .gt("check_ready_encounter_count", 0)
           .order("total_encounter_count", { ascending: false })
           .limit(500)
           .returns<LibraryWordSummaryRow[]>();
@@ -895,45 +1093,16 @@ export default function LibraryStudyPage() {
           const progressByKey = new Map<string, LibraryWordProgressRow>();
 
           if (studyKeys.length > 0) {
-            const { data: progressRows, error: progressErr } = await supabase
-              .from("user_library_word_progress")
-              .select(
-                `
-                  id,
-                  user_id,
-                  study_identity_key,
-                  surface,
-                  reading,
-                  definition_key,
-                  reading_gate_status,
-                  meaning_gate_status,
-                  held_before_reading_gate,
-                  held_before_meaning_gate,
-                  mastered,
-                  reading_gate_attempts,
-                  meaning_gate_attempts,
-                  reading_gate_passed_at,
-                  reading_gate_failed_at,
-                  meaning_gate_passed_at,
-                  meaning_gate_failed_at,
-                  mastered_at,
-                  last_studied_at
-                `
-              )
-              .eq("user_id", user.id)
-              .eq("definition_key", "")
-              .in("study_identity_key", studyKeys)
-              .returns<LibraryWordProgressRow[]>();
-
-            if (progressErr) {
+            try {
+              const loadedProgress = await loadLibraryProgressByKey(user.id, studyKeys);
+              for (const [key, row] of loadedProgress.entries()) {
+                progressByKey.set(key, row);
+              }
+            } catch (progressErr) {
               console.warn("Library Check progress did not load:", progressErr);
               setNotice(
                 "Library Check loaded, but saved gate progress did not load. You can still preview the cards."
               );
-            } else {
-              for (const row of progressRows ?? []) {
-                progressByKey.set(row.study_identity_key, row);
-              }
             }
           }
 
@@ -962,8 +1131,6 @@ export default function LibraryStudyPage() {
                 heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
                 mastered: progress?.mastered ?? false,
               });
-
-              if (!includeLibraryCheckCard(colorStatus)) return null;
 
               return {
                 id: summary.sample_user_book_word_id,
@@ -1038,49 +1205,19 @@ export default function LibraryStudyPage() {
 
         const progressByKey = new Map<string, LibraryWordProgressRow>();
         const studyKeys = Array.from(groupedWords.entries())
-          .filter(([, group]) => group.length >= encounterThreshold)
           .map(([key]) => key);
 
         if (studyKeys.length > 0) {
-          const { data: progressRows, error: progressErr } = await supabase
-            .from("user_library_word_progress")
-            .select(
-              `
-                id,
-                user_id,
-                study_identity_key,
-                surface,
-                reading,
-                definition_key,
-                reading_gate_status,
-                meaning_gate_status,
-                held_before_reading_gate,
-                held_before_meaning_gate,
-                mastered,
-                reading_gate_attempts,
-                meaning_gate_attempts,
-                reading_gate_passed_at,
-                reading_gate_failed_at,
-                meaning_gate_passed_at,
-                meaning_gate_failed_at,
-                mastered_at,
-                last_studied_at
-              `
-            )
-            .eq("user_id", user.id)
-            .eq("definition_key", "")
-            .in("study_identity_key", studyKeys)
-            .returns<LibraryWordProgressRow[]>();
-
-          if (progressErr) {
+          try {
+            const loadedProgress = await loadLibraryProgressByKey(user.id, studyKeys);
+            for (const [key, row] of loadedProgress.entries()) {
+              progressByKey.set(key, row);
+            }
+          } catch (progressErr) {
             console.warn("Library Check progress did not load:", progressErr);
             setNotice(
               "Library Check loaded, but saved gate progress did not load. You can still preview the cards."
             );
-          } else {
-            for (const row of progressRows ?? []) {
-              progressByKey.set(row.study_identity_key, row);
-            }
           }
         }
 
@@ -1106,8 +1243,6 @@ export default function LibraryStudyPage() {
               heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
               mastered: progress?.mastered ?? false,
             });
-
-            if (!includeLibraryCheckCard(colorStatus)) return null;
 
             return {
               id: representative.id,
@@ -1171,11 +1306,11 @@ export default function LibraryStudyPage() {
   }, []);
 
   useEffect(() => {
-    setDeck(shuffleArray(filteredCards));
+    setDeck(shuffleArray(filteredCards).slice(0, dailyCheckLimit));
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
-  }, [filteredCards]);
+  }, [filteredCards, dailyCheckLimit]);
 
   useEffect(() => {
     setPracticeDeck(shuffleArray(practiceFilteredCards));
@@ -1267,7 +1402,7 @@ export default function LibraryStudyPage() {
   }
 
   function restartDeck() {
-    setDeck(shuffleArray(filteredCards));
+    setDeck(shuffleArray(filteredCards).slice(0, dailyCheckLimit));
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
@@ -1276,8 +1411,15 @@ export default function LibraryStudyPage() {
 
   function studyAgainToday() {
     clearSeenForToday();
-    setSeenTodayIds(new Set());
-    setDeck(shuffleArray(allCards));
+    const clearedSeenIds = new Set<string>();
+    setSeenTodayIds(clearedSeenIds);
+    setDeck(
+      shuffleArray(
+        allCards.filter((card) =>
+          isCardAvailableForLibraryCheck(card, selectedJlpt, clearedSeenIds)
+        )
+      ).slice(0, dailyCheckLimit)
+    );
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
@@ -1296,6 +1438,20 @@ export default function LibraryStudyPage() {
       return prev + 1;
     });
     resetPracticeReveal();
+  }
+
+  function advancePracticeCard() {
+    if (practiceRevealStep === "word") {
+      setPracticeRevealStep("reading");
+      return;
+    }
+
+    if (practiceRevealStep === "reading") {
+      setPracticeRevealStep("meaning");
+      return;
+    }
+
+    goToNextPracticeCard();
   }
 
   function goToPreviousPracticeCard() {
@@ -1339,6 +1495,38 @@ export default function LibraryStudyPage() {
     resetCardState();
   }
 
+  function queueMeaningReview(
+    card: StudyCard,
+    userAnswer: string,
+    correctAnswer: string,
+    cardType: string,
+    originalOk: boolean
+  ) {
+    setMeaningReviewItems((prev) => {
+      if (prev.some((item) => item.id === `${card.id}:${cardType}`)) return prev;
+
+      return [
+        ...prev,
+        {
+          id: `${card.id}:${cardType}`,
+          card,
+          userAnswer,
+          correctAnswer,
+          cardType,
+          originalOk,
+        },
+      ];
+    });
+  }
+
+  function canComeBackLater(card: StudyCard | undefined) {
+    return (
+      card?.colorStatus.color === "yellow" &&
+      card.colorStatus.nextGate === "reading" &&
+      card.activeGate === "reading"
+    );
+  }
+
   function recordCurrentStudyEvent(
     result: "correct" | "incorrect" | "skipped" | "reviewed",
     isCorrect: boolean | null,
@@ -1365,25 +1553,26 @@ export default function LibraryStudyPage() {
   async function saveTypedGateProgress(
     gate: "reading" | "meaning",
     ok: boolean,
-    options: { forceMeaning?: boolean } = {}
+    options: { forceMeaning?: boolean; card?: StudyCard } = {}
   ) {
-    if (!currentUserId || !currentCard) return;
+    const activeCard = options.card ?? currentCard;
+    if (!currentUserId || !activeCard) return;
 
     const now = new Date().toISOString();
-    const existing = currentCard.progress;
+    const existing = activeCard.progress;
     const isMasteryCheck =
-      currentCard.colorStatus.nextGate === "mastery" ||
-      currentCard.colorStatus.color === "purple" ||
+      activeCard.colorStatus.nextGate === "mastery" ||
+      activeCard.colorStatus.color === "purple" ||
       Boolean(existing?.mastered);
 
-    if (!options.forceMeaning && currentCard.activeGate !== gate) return;
+    if (!options.forceMeaning && activeCard.activeGate !== gate) return;
 
     const nextProgress: LibraryWordProgressRow = {
       id: existing?.id,
       user_id: currentUserId,
-      study_identity_key: currentCard.studyIdentityKey,
-      surface: currentCard.surface,
-      reading: currentCard.reading,
+      study_identity_key: activeCard.studyIdentityKey,
+      surface: activeCard.surface,
+      reading: activeCard.reading,
       definition_key: "",
       reading_gate_status: existing?.reading_gate_status ?? "not_started",
       meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
@@ -1502,6 +1691,128 @@ export default function LibraryStudyPage() {
     // The saved progress is picked up next time, so a word cannot climb twice in one sitting.
   }
 
+  async function comeBackLaterForCurrentCard() {
+    if (!currentUserId || !currentCard || !canComeBackLater(currentCard)) return;
+
+    const now = new Date().toISOString();
+    const existing = currentCard.progress;
+
+    const { data, error } = await supabase
+      .from("user_library_word_progress")
+      .upsert(
+        {
+          user_id: currentUserId,
+          study_identity_key: currentCard.studyIdentityKey,
+          surface: currentCard.surface,
+          reading: currentCard.reading,
+          definition_key: "",
+          reading_gate_status: existing?.reading_gate_status ?? "not_started",
+          meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
+          held_before_reading_gate: true,
+          held_before_meaning_gate: existing?.held_before_meaning_gate ?? false,
+          mastered: existing?.mastered ?? false,
+          reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
+          meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
+          reading_gate_passed_at: existing?.reading_gate_passed_at ?? null,
+          reading_gate_failed_at: existing?.reading_gate_failed_at ?? null,
+          meaning_gate_passed_at: existing?.meaning_gate_passed_at ?? null,
+          meaning_gate_failed_at: existing?.meaning_gate_failed_at ?? null,
+          mastered_at: existing?.mastered_at ?? null,
+          last_studied_at: now,
+        },
+        { onConflict: "user_id,study_identity_key,definition_key" }
+      )
+      .select(
+        `
+          id,
+          user_id,
+          study_identity_key,
+          surface,
+          reading,
+          definition_key,
+          reading_gate_status,
+          meaning_gate_status,
+          held_before_reading_gate,
+          held_before_meaning_gate,
+          mastered,
+          reading_gate_attempts,
+          meaning_gate_attempts,
+          reading_gate_passed_at,
+          reading_gate_failed_at,
+          meaning_gate_passed_at,
+          meaning_gate_failed_at,
+          mastered_at,
+          last_studied_at
+        `
+      )
+      .single<LibraryWordProgressRow>();
+
+    if (error) {
+      console.error("Error holding Library Check card for later:", error);
+      setNotice("Could not hold this word for later.");
+      return;
+    }
+
+    const heldProgress = data ?? {
+      ...(existing ?? {}),
+      user_id: currentUserId,
+      study_identity_key: currentCard.studyIdentityKey,
+      surface: currentCard.surface,
+      reading: currentCard.reading,
+      definition_key: "",
+      reading_gate_status: existing?.reading_gate_status ?? "not_started",
+      meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
+      held_before_reading_gate: true,
+      held_before_meaning_gate: existing?.held_before_meaning_gate ?? false,
+      mastered: existing?.mastered ?? false,
+      reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
+      meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
+      reading_gate_passed_at: existing?.reading_gate_passed_at ?? null,
+      reading_gate_failed_at: existing?.reading_gate_failed_at ?? null,
+      meaning_gate_passed_at: existing?.meaning_gate_passed_at ?? null,
+      meaning_gate_failed_at: existing?.meaning_gate_failed_at ?? null,
+      mastered_at: existing?.mastered_at ?? null,
+      last_studied_at: now,
+    } as LibraryWordProgressRow;
+
+    setAllCards((prev) =>
+      prev.map((card) =>
+        card.studyIdentityKey === currentCard.studyIdentityKey
+          ? {
+              ...card,
+              progress: heldProgress,
+              colorStatus: computeLibraryStudyColorStatus({
+                encounterCount: card.encounterCount,
+                settings: learningSettings,
+                readingGate: heldProgress.reading_gate_status,
+                meaningGate: heldProgress.meaning_gate_status,
+                heldBeforeReadingGate: true,
+                heldBeforeMeaningGate: heldProgress.held_before_meaning_gate,
+                mastered: heldProgress.mastered,
+              }),
+            }
+          : card
+      )
+    );
+
+    markCardSeen(currentCard.id);
+    nextCardWithoutMarkingSeen();
+  }
+
+  async function countMeaningReviewAsPassed(item: MeaningReviewItem) {
+    await saveTypedGateProgress("meaning", true, { forceMeaning: true, card: item.card });
+    setMeaningReviewItems((prev) => prev.filter((review) => review.id !== item.id));
+  }
+
+  function keepMeaningReviewMissed(item: MeaningReviewItem) {
+    setMeaningReviewItems((prev) => prev.filter((review) => review.id !== item.id));
+  }
+
+  async function countMeaningReviewAsMissed(item: MeaningReviewItem) {
+    await saveTypedGateProgress("meaning", false, { forceMeaning: true, card: item.card });
+    setMeaningReviewItems((prev) => prev.filter((review) => review.id !== item.id));
+  }
+
   function checkMultipleChoice(choice: string) {
     if (!currentCard || checked) return;
 
@@ -1522,6 +1833,12 @@ export default function LibraryStudyPage() {
     }
 
     setSelectedAnswer(choice);
+    if (
+      (studyMode === "meaning_mc" || studyMode === "reading_to_meaning_mc")
+    ) {
+      queueMeaningReview(currentCard, choice, correct, studyMode, ok);
+    }
+
     setChecked({ ok, correct });
 
     recordCurrentStudyEvent(
@@ -1543,6 +1860,12 @@ export default function LibraryStudyPage() {
     } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
       correct = currentCard.meaning;
       ok = matchesAnyMeaning(typingInput, correct);
+    }
+
+    if (
+      (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing")
+    ) {
+      queueMeaningReview(currentCard, typingInput.trim(), correct, studyMode, ok);
     }
 
     setChecked({ ok, correct });
@@ -1584,6 +1907,14 @@ export default function LibraryStudyPage() {
     if (!currentCard || !firstStepChecked?.ok || secondStepChecked) return;
 
     const ok = matchesAnyMeaning(secondStepInput, currentCard.meaning);
+    queueMeaningReview(
+      currentCard,
+      secondStepInput.trim(),
+      currentCard.meaning,
+      "complete_study_meaning_step",
+      ok
+    );
+
     setSecondStepChecked({ ok, correct: currentCard.meaning });
 
     recordCurrentStudyEvent(
@@ -1688,10 +2019,6 @@ export default function LibraryStudyPage() {
                 ? "You’ve already checked all available Library Check cards today."
                 : "No cards match your current JLPT filter, or you already checked them today."}
             </p>
-            <p className="mt-3 text-sm text-slate-500">
-              Debug: {allCards.length} eligible cards loaded, {filteredCards.length} left after today/JLPT filters.
-            </p>
-
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <button
                 onClick={() => setSelectedJlpt("all")}
@@ -1711,6 +2038,101 @@ export default function LibraryStudyPage() {
               >
                 Back to Library
               </button>
+              {practiceFilteredCards.length > 0 ? (
+                <button
+                  onClick={() => setLibraryMode("practice")}
+                  className="rounded bg-sky-100 px-4 py-2 text-sky-950"
+                >
+                  Open Practice
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </main>
+      );
+    }
+
+    if (
+      libraryMode === "check" &&
+      index >= deck.length &&
+      !endedEarly &&
+      meaningReviewItems.length > 0
+    ) {
+      return (
+        <main className="min-h-screen bg-slate-100 p-6">
+          <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="text-center">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Meaning Review
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+                Double-check meaning answers
+              </h1>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                Meaning can be fuzzy. Confirm the app’s call, or change it before the session closes.
+              </p>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {meaningReviewItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-2xl font-semibold text-slate-950">
+                        {item.card.surface}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-500">{item.card.reading}</div>
+                      <div
+                        className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                          item.originalOk
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-rose-100 text-rose-800"
+                        }`}
+                      >
+                        App marked: {item.originalOk ? "passed" : "missed"}
+                      </div>
+                      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                        <div className="rounded-xl bg-white px-3 py-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                            Your answer
+                          </div>
+                          <div className="mt-1 text-slate-900">{item.userAnswer || "—"}</div>
+                        </div>
+                        <div className="rounded-xl bg-white px-3 py-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                            Saved meaning
+                          </div>
+                          <div className="mt-1 text-slate-900">{item.correctAnswer}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid shrink-0 gap-2 sm:grid-cols-2 md:w-[260px] md:grid-cols-1">
+                      <button
+                        type="button"
+                        onClick={() => void countMeaningReviewAsPassed(item)}
+                        className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                      >
+                        Count as passed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          item.originalOk
+                            ? void countMeaningReviewAsMissed(item)
+                            : keepMeaningReviewMissed(item)
+                        }
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                      >
+                        Count as missed
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </main>
@@ -1762,9 +2184,6 @@ export default function LibraryStudyPage() {
       <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
         <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">
             <h1 className="text-2xl font-semibold">Library Study</h1>
-            <p className="text-sm leading-6 text-gray-500 sm:whitespace-nowrap">
-              Study the readings and meanings to master words across your library encounters.
-            </p>
           </div>
 
         <div className="mb-2 w-full max-w-3xl space-y-2">
@@ -1831,6 +2250,26 @@ export default function LibraryStudyPage() {
                 <option value="NON-JLPT">NON-JLPT</option>
               </select>
 
+              {libraryMode === "practice" ? (
+                <select
+                  value={practiceColorFilter}
+                  onChange={(e) =>
+                    setPracticeColorFilter(e.target.value as PracticeColorFilter)
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="all">All Colors</option>
+                  <option value="red">Red</option>
+                  <option value="orange">Orange</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="green">Green</option>
+                  <option value="blue">Blue</option>
+                  <option value="purple">Purple</option>
+                  <option value="grey">Limbo</option>
+                  <option value="katakana">Katakana</option>
+                </select>
+              ) : null}
+
               <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
                 {libraryMode === "practice" ? "Reveal practice" : "Automatic typed gates"}
               </div>
@@ -1843,8 +2282,7 @@ export default function LibraryStudyPage() {
               card={practiceCard}
               total={practiceDeck.length}
               revealStep={practiceRevealStep}
-              onRevealReading={() => setPracticeRevealStep("reading")}
-              onRevealMeaning={() => setPracticeRevealStep("meaning")}
+              onAdvance={advancePracticeCard}
               onNext={goToNextPracticeCard}
               onPrevious={goToPreviousPracticeCard}
               onShuffle={shufflePracticeDeck}
@@ -2238,11 +2676,24 @@ export default function LibraryStudyPage() {
                   </div>
                 </div>
 
-                <div className="md:w-[180px]">
+                <div className="grid gap-2 md:w-[180px]">
+                  {canComeBackLater(currentCard) ? (
+                    <button
+                      type="button"
+                      onClick={comeBackLaterForCurrentCard}
+                      className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                    >
+                      <div className="leading-tight">Come back later</div>
+                      <div className="text-[10px] font-normal text-slate-500">
+                        Hold 90 days
+                      </div>
+                    </button>
+                  ) : null}
+
                   <button
                     type="button"
                     onClick={flagCurrentCard}
-                    className="h-full min-h-[74px] w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
+                    className="min-h-[74px] w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
                   >
                     <div className="leading-tight">Flag</div>
                     <div className="text-[10px] font-normal text-amber-700">

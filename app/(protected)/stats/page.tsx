@@ -7,9 +7,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   emptyLibraryStudyColorTotals,
-  fetchLibraryStudyColorTotals,
-  LIBRARY_STUDY_COLOR_ORDER,
+  emptyLibraryStudyLimboTotals,
+  fetchLibraryStudyColorBreakdown,
   type LibraryStudyColorTotals,
+  type LibraryStudyLimboReason,
+  type LibraryStudyLimboTotals,
 } from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -113,6 +115,15 @@ type StudyEventRow = {
 };
 
 type LibraryStudyDisplayColor = "red" | "orange" | "yellow" | "grey" | "green" | "blue" | "purple";
+
+const ENCOUNTER_COLOR_TOTALS: LibraryStudyDisplayColor[] = ["red", "orange", "yellow"];
+const ABILITY_COLOR_TOTALS: LibraryStudyDisplayColor[] = ["green", "blue", "purple"];
+
+const LIMBO_REASON_TOTALS: { key: LibraryStudyLimboReason; label: string }[] = [
+  { key: "pre_reading_support", label: "Before reading gate" },
+  { key: "reading_gate_support", label: "Reading gate missed" },
+  { key: "meaning_gate_support", label: "Meaning gate missed" },
+];
 
 type BookMetric = {
   userBookId: string;
@@ -1163,7 +1174,7 @@ function SpotlightCard({
 }
 
 function libraryStudyColorLabel(color: LibraryStudyDisplayColor) {
-  if (color === "grey") return "Support";
+  if (color === "grey") return "Limbo";
   return color.charAt(0).toUpperCase() + color.slice(1);
 }
 
@@ -1193,6 +1204,68 @@ function ColorTotalDelta({ value }: { value: number | null }) {
   );
 }
 
+function LibraryStudyColorTotalCard({
+  color,
+  totals,
+  previousTotals,
+}: {
+  color: LibraryStudyDisplayColor;
+  totals: LibraryStudyColorTotals;
+  previousTotals: LibraryStudyColorTotals | null;
+}) {
+  const delta =
+    previousTotals == null ? null : totals[color] - previousTotals[color];
+
+  return (
+    <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span className={`h-3 w-3 rounded-full ${libraryStudyColorDot(color)}`} />
+        <div className="text-xs font-semibold text-slate-600">
+          {libraryStudyColorLabel(color)}
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className="text-xl font-semibold text-slate-900">{totals[color]}</span>
+        <ColorTotalDelta value={delta} />
+      </div>
+    </div>
+  );
+}
+
+function LibraryStudyLimboReasonCard({
+  label,
+  value,
+  previousValue,
+}: {
+  label: string;
+  value: number;
+  previousValue: number | null;
+}) {
+  const delta = previousValue == null ? null : value - previousValue;
+
+  return (
+    <div className="rounded-xl border border-slate-900/10 bg-white/80 px-4 py-3">
+      <div className="text-xs font-semibold text-slate-600">{label}</div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className="text-xl font-semibold text-slate-900">{value}</span>
+        <ColorTotalDelta value={delta} />
+      </div>
+    </div>
+  );
+}
+
+function LibraryStudyColorGroupLabel({ label }: { label: string }) {
+  return (
+    <div className="mb-2">
+      <div className="h-px w-full bg-slate-300" />
+      <div className="mt-1 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+    </div>
+  );
+}
+
 export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -1213,6 +1286,10 @@ export default function StatsPage() {
     useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
   const [previousLibraryStudyColorTotals, setPreviousLibraryStudyColorTotals] =
     useState<LibraryStudyColorTotals | null>(null);
+  const [libraryStudyLimboTotals, setLibraryStudyLimboTotals] =
+    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
+  const [previousLibraryStudyLimboTotals, setPreviousLibraryStudyLimboTotals] =
+    useState<LibraryStudyLimboTotals | null>(null);
 
   async function loadStats() {
     setLoading(true);
@@ -1366,10 +1443,10 @@ export default function StatsPage() {
 
     async function loadLibraryStudyColorTotals() {
       try {
-        const [totals, previousTotals] = await Promise.all([
-          fetchLibraryStudyColorTotals(currentUserId!, null, { since: cutoff }),
+        const [breakdown, previousBreakdown] = await Promise.all([
+          fetchLibraryStudyColorBreakdown(currentUserId!, null, { since: cutoff }),
           previousCutoff && cutoff
-            ? fetchLibraryStudyColorTotals(currentUserId!, null, {
+            ? fetchLibraryStudyColorBreakdown(currentUserId!, null, {
                 since: previousCutoff,
                 before: cutoff,
               })
@@ -1377,14 +1454,18 @@ export default function StatsPage() {
         ]);
 
         if (!cancelled) {
-          setLibraryStudyColorTotals(totals);
-          setPreviousLibraryStudyColorTotals(previousTotals);
+          setLibraryStudyColorTotals(breakdown.colorTotals);
+          setLibraryStudyLimboTotals(breakdown.limboTotals);
+          setPreviousLibraryStudyColorTotals(previousBreakdown?.colorTotals ?? null);
+          setPreviousLibraryStudyLimboTotals(previousBreakdown?.limboTotals ?? null);
         }
       } catch (error) {
         console.error("Error loading Library Study color totals:", error);
         if (!cancelled) {
           setLibraryStudyColorTotals(emptyLibraryStudyColorTotals());
+          setLibraryStudyLimboTotals(emptyLibraryStudyLimboTotals());
           setPreviousLibraryStudyColorTotals(null);
+          setPreviousLibraryStudyLimboTotals(null);
         }
       }
     }
@@ -3460,37 +3541,55 @@ export default function StatsPage() {
               description="Current color states for words encountered or claimed during the selected time filter. Book type does not affect these stats. Practice review does not move these colors."
               tone={filteredSectionTone}
             >
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
-                {LIBRARY_STUDY_COLOR_ORDER.map((color) => {
-                  const displayColor = color as LibraryStudyDisplayColor;
-                  const delta =
-                    previousLibraryStudyColorTotals == null
-                      ? null
-                      : libraryStudyColorTotals[color] - previousLibraryStudyColorTotals[color];
-
-                  return (
-                    <div
-                      key={color}
-                      className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`h-3 w-3 rounded-full ${libraryStudyColorDot(displayColor)}`}
+              <div className="space-y-4">
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div>
+                    <LibraryStudyColorGroupLabel label="Based on encounters" />
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {ENCOUNTER_COLOR_TOTALS.map((color) => (
+                        <LibraryStudyColorTotalCard
+                          key={color}
+                          color={color}
+                          totals={libraryStudyColorTotals}
+                          previousTotals={previousLibraryStudyColorTotals}
                         />
-                        <div className="text-xs font-semibold text-slate-600">
-                          {libraryStudyColorLabel(displayColor)}
-                        </div>
-                      </div>
-
-                      <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-xl font-semibold text-slate-900">
-                          {libraryStudyColorTotals[color]}
-                        </span>
-                        <ColorTotalDelta value={delta} />
-                      </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  </div>
+
+                  <div>
+                    <LibraryStudyColorGroupLabel label="Based on ability" />
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {ABILITY_COLOR_TOTALS.map((color) => (
+                        <LibraryStudyColorTotalCard
+                          key={color}
+                          color={color}
+                          totals={libraryStudyColorTotals}
+                          previousTotals={previousLibraryStudyColorTotals}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <LibraryStudyColorGroupLabel label="Between gates" />
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <LibraryStudyColorTotalCard
+                      color="grey"
+                      totals={libraryStudyColorTotals}
+                      previousTotals={previousLibraryStudyColorTotals}
+                    />
+                    {LIMBO_REASON_TOTALS.map((reason) => (
+                      <LibraryStudyLimboReasonCard
+                        key={reason.key}
+                        label={reason.label}
+                        value={libraryStudyLimboTotals[reason.key]}
+                        previousValue={previousLibraryStudyLimboTotals?.[reason.key] ?? null}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             </SectionBand>
 

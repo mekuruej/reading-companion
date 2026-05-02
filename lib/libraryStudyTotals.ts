@@ -7,10 +7,13 @@ import {
   type LibraryStudyColor,
   type LibraryStudyColorSettings,
   type LibraryStudyGateStatus,
+  type LibraryStudyGreyReason,
 } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
 
 export type LibraryStudyColorTotals = Record<LibraryStudyColor, number>;
+export type LibraryStudyLimboReason = Exclude<LibraryStudyGreyReason, null>;
+export type LibraryStudyLimboTotals = Record<LibraryStudyLimboReason, number>;
 
 type SummaryRow = {
   study_identity_key: string;
@@ -56,6 +59,14 @@ export function emptyLibraryStudyColorTotals(): LibraryStudyColorTotals {
   };
 }
 
+export function emptyLibraryStudyLimboTotals(): LibraryStudyLimboTotals {
+  return {
+    pre_reading_support: 0,
+    reading_gate_support: 0,
+    meaning_gate_support: 0,
+  };
+}
+
 function shouldClaimUpgradeColor(color: LibraryStudyColor) {
   return color === "none" || color === "red" || color === "orange" || color === "yellow" || color === "grey";
 }
@@ -76,7 +87,7 @@ async function loadColorSettings(userId: string): Promise<LibraryStudyColorSetti
   };
 }
 
-export async function fetchLibraryStudyColorTotals(
+export async function fetchLibraryStudyColorBreakdown(
   userId: string,
   settings?: LibraryStudyColorSettings | null,
   options?: { since?: Date | null; before?: Date | null }
@@ -143,6 +154,7 @@ export async function fetchLibraryStudyColorTotals(
   );
 
   const totals = emptyLibraryStudyColorTotals();
+  const limboTotals = emptyLibraryStudyLimboTotals();
   const countedKeys = new Set<string>();
 
   for (const row of summaryRows ?? []) {
@@ -164,6 +176,9 @@ export async function fetchLibraryStudyColorTotals(
       claimedKeys.has(key) && shouldClaimUpgradeColor(status.color) ? "green" : status.color;
 
     totals[color] += 1;
+    if (color === "grey" && status.greyReason) {
+      limboTotals[status.greyReason] += 1;
+    }
     countedKeys.add(key);
   }
 
@@ -172,5 +187,14 @@ export async function fetchLibraryStudyColorTotals(
     totals.green += 1;
   }
 
-  return totals;
+  return { colorTotals: totals, limboTotals };
+}
+
+export async function fetchLibraryStudyColorTotals(
+  userId: string,
+  settings?: LibraryStudyColorSettings | null,
+  options?: { since?: Date | null; before?: Date | null }
+) {
+  const { colorTotals } = await fetchLibraryStudyColorBreakdown(userId, settings, options);
+  return colorTotals;
 }
