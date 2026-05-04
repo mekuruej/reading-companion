@@ -1113,7 +1113,10 @@ export default function BooksPage() {
       surface: string
     ) {
       const kanjiCount = kanjiCountForSurface(surface);
-      return Boolean(mapStatus && !mapStatus.hasIncomplete && mapStatus.completePositions.size >= kanjiCount);
+
+      // A word should count as enriched if every kanji position has at least one complete row.
+      // Extra incomplete placeholder rows should not keep the Library alert alive.
+      return Boolean(mapStatus && mapStatus.completePositions.size >= kanjiCount);
     }
 
     const completeExactKeysByUserBookId = new Map<string, Set<string>>();
@@ -1860,22 +1863,20 @@ export default function BooksPage() {
                   <button
                     type="button"
                     onClick={() => setLibrarySnapshotView("monthly")}
-                    className={`rounded-lg px-3 py-1.5 transition ${
-                      librarySnapshotView === "monthly"
+                    className={`rounded-lg px-3 py-1.5 transition ${librarySnapshotView === "monthly"
                         ? "bg-white text-slate-950 shadow-sm"
                         : "hover:bg-white/70"
-                    }`}
+                      }`}
                   >
                     Monthly
                   </button>
                   <button
                     type="button"
                     onClick={() => setLibrarySnapshotView("colors")}
-                    className={`rounded-lg px-3 py-1.5 transition ${
-                      librarySnapshotView === "colors"
+                    className={`rounded-lg px-3 py-1.5 transition ${librarySnapshotView === "colors"
                         ? "bg-white text-slate-950 shadow-sm"
                         : "hover:bg-white/70"
-                    }`}
+                      }`}
                   >
                     Colors
                   </button>
@@ -2121,7 +2122,7 @@ export default function BooksPage() {
           </div>
         </div>
 
-        {isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
+        {false && isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-amber-900">
               Kanji Enrichment Needed

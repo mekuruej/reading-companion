@@ -1671,9 +1671,12 @@ export default function BookHubPage() {
 
     const { data: bookWordRows, error: bookWordErr } = await supabase
       .from("user_book_words")
-      .select("id, surface, reading, vocabulary_cache_id, is_manual_override, created_at")
-      .eq("is_manual_override", false)
+      .select(
+        "id, user_book_id, vocabulary_cache_id, surface, reading, is_manual_override, created_at"
+      )
       .eq("user_book_id", userBookIdValue)
+      .eq("is_manual_override", false)
+      .eq("ignore_kanji_enrichment", false)
       .gte("created_at", KANJI_ENRICHMENT_TEST_START);
 
     if (bookWordErr) {
@@ -1795,8 +1798,11 @@ export default function BookHubPage() {
 
     let bookWordQuery = supabase
       .from("user_book_words")
-      .select("id, surface, reading, vocabulary_cache_id, is_manual_override, created_at")
+      .select(
+        "id, surface, reading, vocabulary_cache_id, is_manual_override, created_at, ignore_kanji_enrichment"
+      )
       .eq("is_manual_override", false)
+      .eq("ignore_kanji_enrichment", false)
       .eq("user_book_id", userBookIdValue);
 
     if (!LEGACY_KANJI_BOOK_IDS.includes(userBookIdValue)) {
@@ -1821,6 +1827,86 @@ export default function BookHubPage() {
     const missingCacheCount = kanjiBookWordRows.filter(
       (r: any) => r.vocabulary_cache_id == null
     ).length;
+
+    let repairedExactCacheLinks = false;
+
+    for (const bookWord of kanjiBookWordRows as any[]) {
+      const savedSurface = String(bookWord.surface ?? "").trim();
+      const savedReading = String(bookWord.reading ?? "").trim();
+
+      if (!savedSurface || bookWord.vocabulary_cache_id == null) continue;
+
+      const { data: currentCache, error: currentCacheError } = await supabase
+        .from("vocabulary_cache")
+        .select("id, surface, reading")
+        .eq("id", bookWord.vocabulary_cache_id)
+        .maybeSingle();
+
+      if (currentCacheError) {
+        console.error("Error checking current vocabulary cache row:", currentCacheError);
+        continue;
+      }
+
+      const cacheSurface = String(currentCache?.surface ?? "").trim();
+      const cacheReading = String(currentCache?.reading ?? "").trim();
+
+      if (cacheSurface === savedSurface && cacheReading === savedReading) continue;
+
+      const { data: exactCache, error: exactCacheError } = await supabase
+        .from("vocabulary_cache")
+        .select("id")
+        .eq("surface", savedSurface)
+        .eq("reading", savedReading)
+        .maybeSingle();
+
+      if (exactCacheError) {
+        console.error("Error looking up exact vocabulary cache row:", exactCacheError);
+        continue;
+      }
+
+      let exactCacheId = exactCache?.id ?? null;
+
+      if (!exactCacheId) {
+        const { data: createdCache, error: createCacheError } = await supabase
+          .from("vocabulary_cache")
+          .insert({
+            surface: savedSurface,
+            reading: savedReading,
+          })
+          .select("id")
+          .single();
+
+        if (createCacheError || !createdCache) {
+          console.error("Error creating exact vocabulary cache row:", createCacheError);
+          continue;
+        }
+
+        exactCacheId = createdCache.id;
+      }
+
+      if (exactCacheId && exactCacheId !== bookWord.vocabulary_cache_id) {
+        const { error: relinkError } = await supabase
+          .from("user_book_words")
+          .update({
+            vocabulary_cache_id: exactCacheId,
+            is_manual_override: false,
+            ignore_kanji_enrichment: false,
+          })
+          .eq("id", bookWord.id);
+
+        if (relinkError) {
+          console.error("Error relinking saved word to exact cache row:", relinkError);
+          continue;
+        }
+
+        bookWord.vocabulary_cache_id = exactCacheId;
+        repairedExactCacheLinks = true;
+      }
+    }
+
+    if (repairedExactCacheLinks) {
+      console.info("Repaired exact vocabulary cache links for kanji enrichment queue.");
+    }
 
     const cacheIds = Array.from(
       new Set(
@@ -2051,37 +2137,52 @@ export default function BookHubPage() {
       }));
 
     const needsWork = cacheRows.flatMap((word) => {
-      const hasKanji = /[\p{Script=Han}]/u.test(word.surface ?? "");
-      if (!hasKanji) return [];
-
       const mapRows = word.vocabulary_kanji_map ?? [];
 
-      const needsWorkForThisWord =
-        mapRows.length === 0 ||
-        mapRows.some(
-          (r) =>
-            !r.reading_type ||
-            !r.base_reading ||
-            !r.realized_reading
-        );
-
-      if (!needsWorkForThisWord) return [];
-
-      const enrichmentStatus: VocabCacheQueueRow["enrichmentStatus"] =
-        mapRows.length === 0
-          ? "missing"
-          : "partial";
+      const completePositions = new Set(
+        mapRows
+          .filter(
+            (r) =>
+              typeof r.kanji_position === "number" &&
+              !!r.reading_type &&
+              !!r.base_reading &&
+              !!r.realized_reading
+          )
+          .map((r) => r.kanji_position)
+      );
 
       const matchingBookWords = kanjiBookWordRows.filter(
         (r: any) => r.vocabulary_cache_id === word.id
       );
 
-      return matchingBookWords.map((bookWord: any) => ({
-        ...word,
-        userBookWordId: String(bookWord.id),
-        vocabularyCacheId: word.id,
-        enrichmentStatus,
-      }));
+      return matchingBookWords.flatMap((bookWord: any) => {
+        const savedSurface = String(bookWord.surface ?? word.surface ?? "");
+        const savedReading = String(bookWord.reading ?? word.reading ?? "");
+
+        const kanjiCount = Array.from(savedSurface).filter((ch) =>
+          /\p{Script=Han}/u.test(ch)
+        ).length;
+
+        if (kanjiCount === 0) return [];
+
+        const needsWorkForThisWord = completePositions.size < kanjiCount;
+
+        if (!needsWorkForThisWord) return [];
+
+        const enrichmentStatus: VocabCacheQueueRow["enrichmentStatus"] =
+          mapRows.length === 0 ? "missing" : "partial";
+
+        return [
+          {
+            ...word,
+            userBookWordId: String(bookWord.id),
+            vocabularyCacheId: word.id,
+            surface: savedSurface,
+            reading: savedReading,
+            enrichmentStatus,
+          },
+        ];
+      });
     });
 
     const combinedQueue = [...missingCacheWords, ...needsWork];
@@ -2365,65 +2466,168 @@ export default function BookHubPage() {
       };
     }
 
-    const hasRows = (workingWord.vocabulary_kanji_map ?? []).length > 0;
+    let desiredSurface = String(workingWord.surface ?? "").trim();
+    let desiredReading = String(workingWord.reading ?? "").trim();
 
-    if (!hasRows) {
-      const currentVocabularyCacheId =
-        workingWord.vocabularyCacheId ?? (workingWord.id > 0 ? workingWord.id : null);
+    // Use the actual saved book word as the source of truth.
+    // This matters when the saved word surface differs from the cache surface,
+    // e.g. saved word 出所 / cache word 出どころ.
+    if (workingWord.userBookWordId) {
+      const { data: savedWord, error: savedWordError } = await supabase
+        .from("user_book_words")
+        .select("surface, reading")
+        .eq("id", workingWord.userBookWordId)
+        .maybeSingle();
 
-      if (!currentVocabularyCacheId) {
-        alert("Could not prepare this word because no vocabulary cache id was found.");
+      if (savedWordError) {
+        console.error("Error loading saved word for exact kanji enrichment:", savedWordError);
+        alert("Could not prepare this word.");
         return;
       }
 
-      const kanjiChars = Array.from(workingWord.surface ?? "").filter((ch) =>
-        /\p{Script=Han}/u.test(ch)
-      );
+      if (savedWord?.surface) {
+        desiredSurface = String(savedWord.surface).trim();
+      }
 
-      const rowsToInsert = kanjiChars.map((kanji, index) => ({
-        vocabulary_cache_id: currentVocabularyCacheId,
-        kanji,
-        kanji_position: index,
-      }));
-
-      if (rowsToInsert.length > 0) {
-        const { data: existingRows, error: existingRowsError } = await supabase
-          .from("vocabulary_kanji_map")
-          .select("kanji_position")
-          .eq("vocabulary_cache_id", currentVocabularyCacheId);
-
-        if (existingRowsError) {
-          console.error("Error checking existing kanji map rows:", existingRowsError);
-          alert("Could not prepare this word.");
-          return;
-        }
-
-        const existingPositions = new Set(
-          (existingRows ?? []).map((item: any) => Number(item.kanji_position))
-        );
-
-        const missingRows = rowsToInsert.filter(
-          (item) => !existingPositions.has(item.kanji_position)
-        );
-
-        if (missingRows.length > 0) {
-          const { error: insertError } = await supabase
-            .from("vocabulary_kanji_map")
-            .insert(missingRows);
-
-          if (insertError) {
-            console.error("Error inserting kanji map rows:", insertError);
-            alert(insertError.message || "Could not prepare this word.");
-            return;
-          }
-        }
+      if (savedWord?.reading) {
+        desiredReading = String(savedWord.reading).trim();
       }
 
       workingWord = {
         ...workingWord,
-        vocabulary_kanji_map: [],
+        surface: desiredSurface,
+        reading: desiredReading,
       };
     }
+
+    let currentVocabularyCacheId =
+      workingWord.vocabularyCacheId ?? (workingWord.id > 0 ? workingWord.id : null);
+
+    if (!currentVocabularyCacheId) {
+      alert("Could not prepare this word because no vocabulary cache id was found.");
+      return;
+    }
+
+    // If the saved book word uses a different surface than the current cache row
+    // For example: saved word 出所 / cache word 出どころ
+    // create or reuse an exact cache row for the saved surface.
+    if (desiredSurface) {
+      const { data: exactCache, error: exactCacheLookupError } = await supabase
+        .from("vocabulary_cache")
+        .select("id, surface, reading, jlpt, created_at")
+        .eq("surface", desiredSurface)
+        .eq("reading", desiredReading)
+        .maybeSingle();
+
+      if (exactCacheLookupError) {
+        console.error("Error looking up exact vocabulary cache row:", exactCacheLookupError);
+        alert("Could not prepare this word.");
+        return;
+      }
+
+      let exactCacheRow = exactCache;
+
+      if (!exactCacheRow) {
+        const { data: createdCache, error: createExactCacheError } = await supabase
+          .from("vocabulary_cache")
+          .insert({
+            surface: desiredSurface,
+            reading: desiredReading,
+          })
+          .select("id, surface, reading, jlpt, created_at")
+          .single();
+
+        if (createExactCacheError || !createdCache) {
+          console.error("Error creating exact vocabulary cache row:", createExactCacheError);
+          alert("Could not prepare this word.");
+          return;
+        }
+
+        exactCacheRow = createdCache;
+      }
+
+      if (exactCacheRow.id !== currentVocabularyCacheId) {
+        const { error: relinkError } = await supabase
+          .from("user_book_words")
+          .update({
+            vocabulary_cache_id: exactCacheRow.id,
+            is_manual_override: false,
+            ignore_kanji_enrichment: false,
+          })
+          .eq("id", workingWord.userBookWordId);
+
+        if (relinkError) {
+          console.error("Error relinking saved word to exact cache row:", relinkError);
+          alert("Could not link this word to its exact kanji enrichment row.");
+          return;
+        }
+
+        currentVocabularyCacheId = exactCacheRow.id;
+
+        workingWord = {
+          ...workingWord,
+          id: exactCacheRow.id,
+          vocabularyCacheId: exactCacheRow.id,
+          surface: exactCacheRow.surface ?? desiredSurface,
+          reading: exactCacheRow.reading ?? desiredReading,
+          jlpt: exactCacheRow.jlpt ?? null,
+          created_at: exactCacheRow.created_at ?? "",
+          vocabulary_kanji_map: [],
+        };
+      }
+    }
+
+    // Always make sure there is one map row for every kanji in the saved surface.
+    // Do not only do this when there are zero rows, because mixed cache/saved surfaces
+    // can leave us with one row when we actually need two.
+    const kanjiChars = Array.from(workingWord.surface ?? "").filter((ch) =>
+      /\p{Script=Han}/u.test(ch)
+    );
+
+    const rowsToInsert = kanjiChars.map((kanji, index) => ({
+      vocabulary_cache_id: currentVocabularyCacheId,
+      kanji,
+      kanji_position: index,
+    }));
+
+    if (rowsToInsert.length > 0) {
+      const { data: existingRows, error: existingRowsError } = await supabase
+        .from("vocabulary_kanji_map")
+        .select("kanji_position")
+        .eq("vocabulary_cache_id", currentVocabularyCacheId);
+
+      if (existingRowsError) {
+        console.error("Error checking existing kanji map rows:", existingRowsError);
+        alert("Could not prepare this word.");
+        return;
+      }
+
+      const existingPositions = new Set(
+        (existingRows ?? []).map((item: any) => Number(item.kanji_position))
+      );
+
+      const missingRows = rowsToInsert.filter(
+        (item) => !existingPositions.has(item.kanji_position)
+      );
+
+      if (missingRows.length > 0) {
+        const { error: insertError } = await supabase
+          .from("vocabulary_kanji_map")
+          .insert(missingRows);
+
+        if (insertError) {
+          console.error("Error inserting kanji map rows:", insertError);
+          alert(insertError.message || "Could not prepare this word.");
+          return;
+        }
+      }
+    }
+
+    workingWord = {
+      ...workingWord,
+      vocabularyCacheId: currentVocabularyCacheId,
+      vocabulary_kanji_map: [],
+    };
 
     const { data, error } = await supabase
       .from("vocabulary_kanji_map")
@@ -2490,8 +2694,10 @@ export default function BookHubPage() {
     const { error } = await supabase
       .from("user_book_words")
       .update({
-        vocabulary_cache_id: null,
-        is_manual_override: true,
+        ignore_kanji_enrichment: true,
+        kanji_enrichment_ignore_reason: "Removed from teacher enrichment queue",
+        kanji_enrichment_ignored_at: new Date().toISOString(),
+        kanji_enrichment_ignored_by: userId,
       })
       .eq("user_book_id", currentUserBookId)
       .eq("vocabulary_cache_id", vocabId);
