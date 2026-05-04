@@ -99,7 +99,7 @@ export default function Header() {
     pathname.startsWith("/library-study") ||
     pathname === "/study-coming-soon" ||
     pathname === "/book-flashcards" ||
-    pathname === "/book-kanji-readings";
+    pathname.startsWith("/kanji-reading-study");
   const profileSectionActive =
     pathname === "/profile" ||
     pathname.startsWith("/profile/") ||
@@ -142,7 +142,7 @@ export default function Header() {
               </button>
 
               {showLibraryMenu ? (
-  <div className="absolute left-1/2 z-50 mt-2 w-44 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg origin-top-center md:left-auto md:right-0 md:w-52 md:translate-x-0 md:origin-top-right">
+                <div className="absolute left-1/2 z-50 mt-2 w-44 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg origin-top-center md:left-auto md:right-0 md:w-52 md:translate-x-0 md:origin-top-right">
                   <Link
                     href={libraryHref}
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
@@ -264,14 +264,14 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/book-kanji-readings"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/book-kanji-readings"
+                    href="/kanji-reading-study/coming-soon"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/kanji-reading-study")
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Book Kanji Readings
+                    Kanji Readings
                   </Link>
                 </div>
               ) : null}
@@ -310,8 +310,8 @@ export default function Header() {
                   <Link
                     href="/stats"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/stats"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
