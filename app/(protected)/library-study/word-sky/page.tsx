@@ -364,7 +364,7 @@ export default function WordSkyPage() {
           <div>
             <h1 className="text-2xl font-semibold">Word Sky</h1>
             <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
-              Pick words you are fairly comfortable with. These words can move into Library Study,
+              Pick words you are fairly comfortable with. These words can move into Ability Check and Library Practice,
               but encountering words through your reading is still the ideal path.
             </p>
           </div>
@@ -381,7 +381,7 @@ export default function WordSkyPage() {
               onClick={() => router.push("/library-study")}
               className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
-              Library Check
+              Ability Check
             </button>
           </div>
         </div>

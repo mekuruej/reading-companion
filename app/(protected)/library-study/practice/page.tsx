@@ -612,7 +612,7 @@ function isCardAvailableForLibraryPractice(
 }
 
 function gatePromptText(card: StudyCard | undefined) {
-  if (!card) return "Ability Check";
+  if (!card) return "Library Practice";
 
   if (card.activeGate === "meaning") {
     return "This is a MEANING gate";
@@ -896,7 +896,7 @@ function LibraryPracticePanel({
       </div>
 
       <p className="text-center text-xs leading-5 text-slate-500">
-        Tap the card to reveal. Practice does not move colors or count as passing an Ability Check gate.
+        Tap the card to reveal. Practice is review only and does not move colors.
       </p>
     </div>
   );
@@ -2323,7 +2323,7 @@ export default function LibraryStudyPage() {
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <p className="text-lg text-gray-500">Loading Ability Check...</p>
+        <p className="text-lg text-gray-500">Loading Library Practice...</p>
       </main>
     );
   }
@@ -2331,7 +2331,7 @@ export default function LibraryStudyPage() {
   if (needsSignIn) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-gray-700">You need to sign in to use Ability Check.</p>
+        <p className="text-gray-700">You need to sign in to use Library Practice.</p>
         <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
           Go to Login
         </button>
@@ -2355,24 +2355,26 @@ export default function LibraryStudyPage() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
         <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
           <p className="text-2xl font-semibold text-gray-700">
-            No saved vocab is ready for Ability Check yet.
+            No words are ready for Library Practice yet.
           </p>
+
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
-            Real reading encounters will unlock strict checks. You can also warm up with Word Sky.
+            Add words from books or use Word Sky to build your practice pool.
           </p>
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <button
               type="button"
               onClick={() => router.push("/library-study/word-sky")}
-              className="rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-200"
+              className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
             >
-              Try Word Sky
+              Open Word Sky
             </button>
+
             <button
               type="button"
               onClick={() => router.push("/books")}
-              className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium"
+              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               Back to Library
             </button>
@@ -2382,7 +2384,7 @@ export default function LibraryStudyPage() {
     );
   }
 
-  if (libraryMode === "check" && !dailyCheckPlan) {
+  if (false && libraryMode === "check" && !dailyCheckPlan) {
     const allLevelsSelected = DAILY_CHECK_LEVELS.every((level) =>
       setupLevels.includes(level)
     );
@@ -2552,7 +2554,7 @@ export default function LibraryStudyPage() {
     );
   }
 
-  if (libraryMode === "check" && deck.length === 0 && filteredCards.length === 0) {
+  if (false && libraryMode === "check" && deck.length === 0 && filteredCards.length === 0) {
     return (
       <main className="min-h-screen bg-slate-100 px-6 py-8">
         <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
@@ -2605,6 +2607,7 @@ export default function LibraryStudyPage() {
   }
 
   if (
+    false &&
     libraryMode === "check" &&
     index >= deck.length &&
     !endedEarly &&
@@ -2715,7 +2718,7 @@ export default function LibraryStudyPage() {
     );
   }
 
-  if (libraryMode === "check" && index >= deck.length) {
+  if (false && libraryMode === "check" && index >= deck.length) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
         <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
@@ -2760,7 +2763,7 @@ export default function LibraryStudyPage() {
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
       <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">
-        <h1 className="text-2xl font-semibold">Ability Check</h1>
+        <h1 className="text-2xl font-semibold">Library Practice</h1>
       </div>
 
       <div className="mb-2 w-full max-w-3xl space-y-2">
@@ -2771,17 +2774,9 @@ export default function LibraryStudyPage() {
                 Library Practice
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Review your existing words freely. Practice does not move colors or count as passing an Ability Check gate.
+                Review your existing words freely. Practice is review only and does not move colors.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => router.push("/library-study")}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              Open Ability Check
-            </button>
           </div>
         </div>
 
@@ -2793,10 +2788,10 @@ export default function LibraryStudyPage() {
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-sm font-semibold text-sky-950">
-                Need more words, or bogged down with difficult words?
+                Want more easy practice words?
               </div>
               <div className="text-xs leading-5 text-slate-500">
-                Add easier words you may not need to look up in a book to your study.
+                Use Word Sky to add easier words to your study pool.
               </div>
             </div>
             <div className="text-sm font-semibold text-sky-900">Open Word Sky</div>
