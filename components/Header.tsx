@@ -243,13 +243,24 @@ export default function Header() {
                 <div className="absolute right-0 z-50 mt-2 min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
                   <Link
                     href="/library-study"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/library-study")
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Library Study
+                    Ability Check
+                  </Link>
+
+                  <Link
+                    href="/library-study/practice"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/practice"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowStudyMenu(false)}
+                  >
+                    Library Practice
                   </Link>
 
                   <Link

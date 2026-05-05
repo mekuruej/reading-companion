@@ -1050,7 +1050,7 @@ export default function LibraryStudyPage() {
   const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
   const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
-  const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("check");
+  const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("practice");
   const [selectedJlpt, setSelectedJlpt] = useState("all");
   const [dailyCheckPlan, setDailyCheckPlan] = useState<DailyCheckPlan | null>(null);
   const [setupLevels, setSetupLevels] = useState<DailyCheckLevel[]>([]);
@@ -2518,7 +2518,7 @@ export default function LibraryStudyPage() {
             {practiceFilteredCards.length > 0 ? (
               <button
                 type="button"
-                onClick={() => router.push("/library-study/practice")}
+                onClick={() => setLibraryMode("practice")}
                 className="rounded-2xl border border-sky-200 bg-green-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
               >
                 Open Library Practice
@@ -2556,7 +2556,7 @@ export default function LibraryStudyPage() {
     return (
       <main className="min-h-screen bg-slate-100 px-6 py-8">
         <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">Ability Check</h1>
+          <h1 className="text-2xl font-semibold">Library Practice</h1>
 
           <p className="mt-3 text-gray-600">
             No cards are available for today’s Ability Check.
@@ -2592,7 +2592,7 @@ export default function LibraryStudyPage() {
             {practiceFilteredCards.length > 0 ? (
               <button
                 type="button"
-                onClick={() => router.push("/library-study/practice")}
+                onClick={() => setLibraryMode("practice")}
                 className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
               >
                 Open Library Practice
@@ -2743,7 +2743,10 @@ export default function LibraryStudyPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push("/library-study/practice")}
+              onClick={() => {
+                setLibraryMode("practice");
+                setNotice(null);
+              }}
               className="rounded bg-sky-100 px-4 py-2 text-sky-950"
             >
               Open Library Practice
@@ -2765,19 +2768,19 @@ export default function LibraryStudyPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">
-                Ability Check
+                Library Practice
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                A once-a-day check for words that are ready to move by ability.
+                Review your existing words freely. Practice does not move colors or count as passing an Ability Check gate.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => router.push("/library-study/practice")}
-              className="rounded-2xl border border-sky-200 bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
+              onClick={() => router.push("/library-study")}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
-              Open Library Practice
+              Open Ability Check
             </button>
           </div>
         </div>

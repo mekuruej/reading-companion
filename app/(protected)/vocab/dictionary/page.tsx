@@ -1,13 +1,13 @@
+// Dictionary
+// 
+
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  computeLibraryStudyColorStatus,
-  type LibraryStudyColor,
-  type LibraryStudyColorStatus,
-} from "@/lib/libraryStudyColor";
+import LibraryColorBadge from "@/components/LibraryColorBadge";
+import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
 
 type DictionaryEntry = {
@@ -81,49 +81,6 @@ function studyIdentityKey(surface: string | null | undefined, reading: string | 
 
 function getUniqueKanji(surface: string) {
   return Array.from(new Set(surface.match(/[\u3400-\u9FFF]/g) || []));
-}
-
-function badgeColorClass(color: LibraryStudyColor) {
-  if (color === "red") return "border-red-800 bg-red-600 text-white";
-  if (color === "orange") return "border-orange-700 bg-orange-400 text-stone-950";
-  if (color === "yellow") return "border-yellow-500 bg-yellow-300 text-stone-900";
-  if (color === "green") return "border-green-800 bg-green-600 text-white";
-  if (color === "blue") return "border-blue-800 bg-blue-600 text-white";
-  if (color === "purple") return "border-purple-800 bg-purple-600 text-white";
-  if (color === "grey") return "border-slate-700 bg-slate-500 text-white";
-  return "border-stone-400 bg-stone-300 text-stone-700";
-}
-
-function LibraryStatusBadge({
-  status,
-  encounterCount,
-  showNumbers,
-}: {
-  status: LibraryStudyColorStatus;
-  encounterCount: number;
-  showNumbers: boolean;
-}) {
-  const showStageNumber =
-    showNumbers &&
-    status.stageNumber != null &&
-    status.stageCount != null &&
-    status.stageCount > 1;
-
-  const title = `${status.reason} · ${encounterCount} library encounter${
-    encounterCount === 1 ? "" : "s"
-  }`;
-
-  return (
-    <span
-      title={title}
-      aria-label={title}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold shadow-sm ${badgeColorClass(
-        status.color
-      )} ${showStageNumber ? "h-6 min-w-6 px-1.5" : "h-4 w-4"}`}
-    >
-      {showStageNumber ? status.stageNumber : ""}
-    </span>
-  );
 }
 
 export default function DictionaryPage() {
@@ -369,127 +326,123 @@ export default function DictionaryPage() {
             const showBadge = encounterCount > 0;
 
             return (
-          <div
-            key={`${entry.word}-${entry.reading}-${idx}`}
-            className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-2xl font-semibold text-stone-900">
-                {entry.word || "—"}
-              </div>
-              {showBadge ? (
-                <LibraryStatusBadge
-                  status={status}
-                  encounterCount={encounterCount}
-                  showNumbers={learningSettings.show_badge_numbers ?? true}
-                />
-              ) : null}
-            </div>
-
-            <div className="mt-1 text-base text-stone-500">
-              {entry.reading || "—"}
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {entry.meanings.map((meaning, meaningIndex) => (
-                <div
-                  key={`${entry.word}-${entry.reading}-${meaningIndex}`}
-                  className="rounded-xl border border-stone-200 bg-stone-50 p-4"
-                >
-                  <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                    Meaning {meaningIndex + 1}
+              <div
+                key={`${entry.word}-${entry.reading}-${idx}`}
+                className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-2xl font-semibold text-stone-900">
+                    {entry.word || "—"}
                   </div>
-                  <div className="mt-2 text-sm leading-7 text-stone-800">
-                    {meaning}
-                  </div>
+                  {showBadge ? (
+                    <LibraryColorBadge colorStatus={status} size="md" />
+                  ) : null}
                 </div>
-              ))}
-            </div>
 
-            <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              {normalizeJlpt(entry.jlpt) !== "NON-JLPT" ? (
-                <span className="rounded-full border bg-white px-2 py-1">
-                  {normalizeJlpt(entry.jlpt)}
-                </span>
-              ) : null}
+                <div className="mt-1 text-base text-stone-500">
+                  {entry.reading || "—"}
+                </div>
 
-              {entry.isCommon ? (
-                <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-green-700">
-                  Common
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mt-4 rounded-xl border p-4">
-              <div className="mb-2 text-sm font-semibold text-stone-900">Kanji Info</div>
-
-              {extraLoadingWord === entry.word ? (
-                <div className="text-sm text-stone-500">Loading kanji info…</div>
-              ) : (kanjiMetaByWord[entry.word] ?? []).length === 0 ? (
-                <div className="text-sm text-stone-500">No kanji info for this word.</div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {(kanjiMetaByWord[entry.word] ?? []).map((k) => (
-                    <span
-                      key={`${entry.word}-${k.kanji}`}
-                      className="rounded-full border bg-stone-50 px-3 py-1 text-sm"
+                <div className="mt-4 space-y-2">
+                  {entry.meanings.map((meaning, meaningIndex) => (
+                    <div
+                      key={`${entry.word}-${entry.reading}-${meaningIndex}`}
+                      className="rounded-xl border border-stone-200 bg-stone-50 p-4"
                     >
-                      {k.kanji} · {k.strokes ?? "?"} strokes
-                      {k.radical ? ` · radical ${k.radical}` : ""}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 rounded-xl border p-4">
-              <div className="mb-2 text-sm font-semibold text-stone-900">Words Using These Kanji</div>
-
-              {(kanjiGroupsByWord[entry.word] ?? []).length === 0 ? (
-                <div className="text-sm text-stone-500">No related kanji words found.</div>
-              ) : (
-                <div className="space-y-5">
-                  {(kanjiGroupsByWord[entry.word] ?? []).map((group) => (
-                    <div key={`${entry.word}-${group.kanji}`}>
-                      <div className="mb-2 text-sm font-semibold text-stone-700">
-                        Words with {group.kanji}
+                      <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                        Meaning {meaningIndex + 1}
                       </div>
-
-                      {group.relatedWords.length === 0 ? (
-                        <div className="text-sm text-stone-500">No related words found.</div>
-                      ) : (
-                        <div className="space-y-2">
-                          {group.relatedWords.map((kw, meaningIndex) => (
-                            <div
-                              key={`${entry.word}-${group.kanji}-${kw.word}-${meaningIndex}`}
-                              className="text-sm"
-                            >
-                              <span className="font-medium text-stone-900">{kw.word}</span>
-                              {kw.reading ? (
-                                <span className="ml-2 text-stone-600">（{kw.reading}）</span>
-                              ) : null}
-                              {kw.meaning ? (
-                                <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="mt-2 text-sm leading-7 text-stone-800">
+                        {meaning}
+                      </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                href={`/vocab/history?word=${encodeURIComponent(entry.word || query)}`}
-                className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 transition hover:bg-stone-50"
-              >
-                Open in Word History
-              </Link>
-            </div>
-          </div>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  {normalizeJlpt(entry.jlpt) !== "NON-JLPT" ? (
+                    <span className="rounded-full border bg-white px-2 py-1">
+                      {normalizeJlpt(entry.jlpt)}
+                    </span>
+                  ) : null}
+
+                  {entry.isCommon ? (
+                    <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-green-700">
+                      Common
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 rounded-xl border p-4">
+                  <div className="mb-2 text-sm font-semibold text-stone-900">Kanji Info</div>
+
+                  {extraLoadingWord === entry.word ? (
+                    <div className="text-sm text-stone-500">Loading kanji info…</div>
+                  ) : (kanjiMetaByWord[entry.word] ?? []).length === 0 ? (
+                    <div className="text-sm text-stone-500">No kanji info for this word.</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {(kanjiMetaByWord[entry.word] ?? []).map((k) => (
+                        <span
+                          key={`${entry.word}-${k.kanji}`}
+                          className="rounded-full border bg-stone-50 px-3 py-1 text-sm"
+                        >
+                          {k.kanji} · {k.strokes ?? "?"} strokes
+                          {k.radical ? ` · radical ${k.radical}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 rounded-xl border p-4">
+                  <div className="mb-2 text-sm font-semibold text-stone-900">Words Using These Kanji</div>
+
+                  {(kanjiGroupsByWord[entry.word] ?? []).length === 0 ? (
+                    <div className="text-sm text-stone-500">No related kanji words found.</div>
+                  ) : (
+                    <div className="space-y-5">
+                      {(kanjiGroupsByWord[entry.word] ?? []).map((group) => (
+                        <div key={`${entry.word}-${group.kanji}`}>
+                          <div className="mb-2 text-sm font-semibold text-stone-700">
+                            Words with {group.kanji}
+                          </div>
+
+                          {group.relatedWords.length === 0 ? (
+                            <div className="text-sm text-stone-500">No related words found.</div>
+                          ) : (
+                            <div className="space-y-2">
+                              {group.relatedWords.map((kw, meaningIndex) => (
+                                <div
+                                  key={`${entry.word}-${group.kanji}-${kw.word}-${meaningIndex}`}
+                                  className="text-sm"
+                                >
+                                  <span className="font-medium text-stone-900">{kw.word}</span>
+                                  {kw.reading ? (
+                                    <span className="ml-2 text-stone-600">（{kw.reading}）</span>
+                                  ) : null}
+                                  {kw.meaning ? (
+                                    <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href={`/vocab/history?word=${encodeURIComponent(entry.word || query)}`}
+                    className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 transition hover:bg-stone-50"
+                  >
+                    Open in Word History
+                  </Link>
+                </div>
+              </div>
             );
           })()
         ))}
