@@ -469,11 +469,10 @@ export default function TeacherTab({
                   key={value}
                   type="button"
                   onClick={() => setTeacherStudentUseRating(String(value))}
-                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                    isSelected
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${isSelected
                       ? "border-amber-500 bg-amber-50 shadow-sm"
                       : "border-stone-200 bg-white hover:bg-stone-50"
-                  }`}
+                    }`}
                 >
                   <div className="font-medium text-amber-600">{stars5(value as number)}</div>
                   <div className="mt-1 text-sm font-medium text-stone-900">{value} star{value === 1 ? "" : "s"}</div>
@@ -590,212 +589,27 @@ export default function TeacherTab({
         )}
       </div>
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Kanji enrichment needed: {needsKanjiEnrichmentCount}
-      </div>
-
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-stone-900">
-            Kanji Map Enrichment Queue
-          </div>
-
-          {kanjiMapQueue.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {nextBatchWords.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => void openNextKanjiWordBatch()}
-                  disabled={isPreparingAllKanjiWords}
-                  className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
-                >
-                  {isPreparingAllKanjiWords
-                    ? `Preparing next ${nextBatchWords.length}...`
-                    : `Open next ${nextBatchWords.length} edit window${
-                        nextBatchWords.length === 1 ? "" : "s"
-                      }`}
-                </button>
-              ) : null}
-
-              {openQueueWordIds.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    openQueueWordIds.forEach((id) => setKanjiWordOpen(id, false));
-                  }}
-                  className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
-                >
-                  Close all edit windows
-                </button>
-              ) : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-stone-900">
+              Kanji Enrichment
             </div>
-          ) : null}
-        </div>
-
-        {kanjiMapLoading ? (
-          <div className="text-sm text-stone-500">Loading kanji map queue...</div>
-        ) : kanjiMapError ? (
-          <div className="text-sm text-red-600">{kanjiMapError}</div>
-        ) : kanjiMapQueue.length === 0 ? (
-          <div className="text-sm text-stone-500">No words currently need kanji-map work.</div>
-        ) : (
-          <div className="space-y-2">
-            {kanjiMapQueue.map((word) => {
-              const isOpen = !!openKanjiWordIds[word.id];
-              const editRows = editingKanjiRows[word.id] ?? [];
-              const hasPreparedRows =
-                editRows.length > 0 || (word.vocabulary_kanji_map ?? []).length > 0;
-
-              return (
-                <div
-                  id={`kanji-word-${word.id}`}
-                  key={word.userBookWordId || String(word.id)}
-                  className="rounded-xl border bg-white p-3"
-                >
-                  <div className="rounded-2xl border border-stone-300 bg-stone-100 px-5 py-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-2xl font-semibold text-stone-900">
-                          {word.surface}
-                        </div>
-                        <div className="mt-1 text-lg text-stone-500">
-                          {word.reading} ・ {hiraToKata(word.reading ?? "")}
-                        </div>
-                        {word.enrichmentStatus === "ready" ? (
-                          <div className="mt-2 text-sm text-emerald-700">
-                            Prefilled from saved kanji readings. Review and save if it looks right.
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="flex flex-col gap-2 sm:flex-row md:shrink-0">
-                        {hasPreparedRows ? (
-                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                            Ready to review
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => void handleWorkOnKanjiWord(word)}
-                            className="rounded-2xl bg-emerald-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-emerald-700"
-                          >
-                            Prepare this word
-                          </button>
-                        )}
-
-                        {hasPreparedRows ? (
-                          <button
-                            type="button"
-                            onClick={() => setKanjiWordOpen(word.id, !isOpen)}
-                            className="rounded-2xl border border-stone-300 bg-white px-5 py-3 text-base font-medium text-stone-700 transition hover:bg-stone-50"
-                          >
-                            {isOpen ? "Hide details" : "Show details"}
-                          </button>
-                        ) : null}
-
-                        <button
-                          type="button"
-                          onClick={() => removeWordFromKanjiEnrichment(word.id)}
-                          className="rounded-2xl border border-red-300 bg-white px-5 py-3 text-base font-medium text-red-600 transition hover:bg-red-50"
-                        >
-                          Remove from Kanji
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {isOpen ? (
-                    <div className="mt-4 space-y-3">
-                      <div className="grid gap-2">
-                        {editRows.length > 0 ? (
-                          editRows.map((rowItem) => (
-                            <div
-                              key={rowItem.id}
-                              className="grid grid-cols-1 gap-2 rounded-lg border bg-white p-3 md:grid-cols-[60px_120px_1fr_1fr]"
-                            >
-                              <div className="flex items-center text-lg font-medium text-stone-900">
-                                {rowItem.kanji}
-                              </div>
-
-                              <select
-                                value={rowItem.reading_type ?? ""}
-                                onChange={(e) =>
-                                  updateKanjiMapRow(
-                                    word.id,
-                                    rowItem.id,
-                                    "reading_type",
-                                    e.target.value
-                                  )
-                                }
-                                className="rounded border px-2 py-2 text-sm"
-                              >
-                                <option value="">—</option>
-                                <option value="on">on</option>
-                                <option value="kun">kun</option>
-                                <option value="other">other</option>
-                              </select>
-
-                              <input
-                                value={rowItem.base_reading ?? ""}
-                                onChange={(e) =>
-                                  updateKanjiMapRow(
-                                    word.id,
-                                    rowItem.id,
-                                    "base_reading",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Base reading"
-                                className="rounded border px-3 py-2 text-sm"
-                              />
-
-                              <input
-                                value={rowItem.realized_reading ?? ""}
-                                onChange={(e) =>
-                                  updateKanjiMapRow(
-                                    word.id,
-                                    rowItem.id,
-                                    "realized_reading",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Realized reading"
-                                className="rounded border px-3 py-2 text-sm"
-                              />
-                            </div>
-                          ))
-                        ) : (
-                          <div className="rounded-lg border border-dashed bg-white px-3 py-3 text-sm text-stone-500">
-                            This word is ready to set up. Use “Prepare this word” once to create the kanji rows.
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mt-4 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void saveKanjiWord(word.id)}
-                          disabled={savingKanjiWordId === word.id}
-                          className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {savingKanjiWordId === word.id ? "Saving..." : "Save"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setKanjiWordOpen(word.id, false)}
-                          className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+            <p className="mt-1 text-sm text-stone-500">
+              {needsKanjiEnrichmentCount > 0
+                ? `${needsKanjiEnrichmentCount} word${needsKanjiEnrichmentCount === 1 ? "" : "s"
+                } may need kanji-reading work.`
+                : "Open the global teacher queue to review kanji-reading work."}
+            </p>
           </div>
-        )}
+
+          <a
+            href="/teacher/kanji"
+            className="inline-flex rounded-2xl border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black"
+          >
+            Open Kanji Queue →
+          </a>
+        </div>
       </div>
     </div>
   );

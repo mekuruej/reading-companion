@@ -14,6 +14,8 @@ type ReadAlongWord = {
     meaning: string | null;
     page_number: number | null;
     page_order: number | null;
+    chapter_number: number | null;
+    chapter_name: string | null;
     hide_kanji_in_reading_support?: boolean | null;
 };
 
@@ -51,6 +53,26 @@ function formatTimer(totalSeconds: number) {
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function chapterKeyForWord(word: Pick<ReadAlongWord, "chapter_number" | "chapter_name">) {
+    const chapterNumber = word.chapter_number;
+    const chapterName = word.chapter_name?.trim() ?? "";
+
+    if (chapterNumber == null && !chapterName) return "";
+
+    return `${chapterNumber ?? "no-number"}|||${chapterName}`;
+}
+
+function chapterLabelForWord(word: Pick<ReadAlongWord, "chapter_number" | "chapter_name">) {
+    const chapterNumber = word.chapter_number;
+    const chapterName = word.chapter_name?.trim() ?? "";
+
+    if (chapterNumber != null && chapterName) return `Chapter ${chapterNumber}: ${chapterName}`;
+    if (chapterNumber != null) return `Chapter ${chapterNumber}`;
+    if (chapterName) return chapterName;
+
+    return "Unchaptered";
+}
+
 export default function ReadAlongPage() {
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -63,6 +85,7 @@ export default function ReadAlongPage() {
     const [fluidReadingMode, setFluidReadingMode] = useState<FluidReadingMode>("supported");
     const [pageIndex, setPageIndex] = useState(0);
     const [jumpPageInput, setJumpPageInput] = useState("");
+    const [selectedChapterKey, setSelectedChapterKey] = useState("all");
     const [fadedThroughIndex, setFadedThroughIndex] = useState<number>(-1);
 
     const [sessionDate, setSessionDate] = useState("");
@@ -140,15 +163,16 @@ export default function ReadAlongPage() {
             const { data, error } = await supabase
                 .from("user_book_words")
                 .select(`
-          id,
-          surface,
-          reading,
-          meaning,
-          page_number,
-          page_order,
-          chapter_number,
-          hide_kanji_in_reading_support
-        `)
+                    id,
+                    surface,
+                    reading,
+                    meaning,
+                    page_number,
+                    page_order,
+                    chapter_number,
+                    chapter_name,
+                    hide_kanji_in_reading_support
+                    `)
                 .eq("user_book_id", userBookId)
                 .eq("hidden", false)
                 .order("page_number", { ascending: true, nullsFirst: false })
@@ -169,8 +193,67 @@ export default function ReadAlongPage() {
         loadWords();
     }, [userBookId]);
 
+    const chapterOptions = useMemo(() => {
+        const map = new Map<
+            string,
+            {
+                label: string;
+                wordCount: number;
+                pages: Set<number>;
+                sortNumber: number;
+            }
+        >();
+
+        for (const word of words) {
+            const key = chapterKeyForWord(word);
+            if (!key) continue;
+
+            const existing =
+                map.get(key) ??
+                {
+                    label: chapterLabelForWord(word),
+                    wordCount: 0,
+                    pages: new Set<number>(),
+                    sortNumber: word.chapter_number ?? 999999,
+                };
+
+            existing.wordCount += 1;
+
+            if (word.page_number != null) {
+                existing.pages.add(word.page_number);
+            }
+
+            map.set(key, existing);
+        }
+
+        return Array.from(map.entries())
+            .map(([key, value]) => ({
+                key,
+                label: value.label,
+                wordCount: value.wordCount,
+                pageCount: value.pages.size,
+                sortNumber: value.sortNumber,
+            }))
+            .sort((a, b) => {
+                if (a.sortNumber !== b.sortNumber) return a.sortNumber - b.sortNumber;
+                return a.label.localeCompare(b.label, "ja");
+            });
+    }, [words]);
+
+    const filteredWords = useMemo(() => {
+        if (selectedChapterKey === "all") return words;
+
+        return words.filter((word) => chapterKeyForWord(word) === selectedChapterKey);
+    }, [words, selectedChapterKey]);
+
+    const selectedChapterLabel =
+        selectedChapterKey === "all"
+            ? "All chapters"
+            : chapterOptions.find((chapter) => chapter.key === selectedChapterKey)?.label ??
+            "Selected chapter";
+
     const pages = useMemo<PageChunk[]>(() => {
-        const numberedWords = words.filter((w) => w.page_number != null);
+        const numberedWords = filteredWords.filter((w) => w.page_number != null);
 
         if (numberedWords.length > 0) {
             const grouped = new Map<number, ReadAlongWord[]>();
@@ -198,12 +281,25 @@ export default function ReadAlongPage() {
             return result;
         }
 
-        return chunkArray(words, 8).map((chunk, idx) => ({
+        return chunkArray(filteredWords, 8).map((chunk, idx) => ({
             label: `Section ${idx + 1}`,
             words: chunk,
             pageNumber: null,
         }));
-    }, [words]);
+    }, [filteredWords]);
+
+    useEffect(() => {
+        setPageIndex(0);
+        setJumpPageInput("");
+        setFadedThroughIndex(-1);
+    }, [selectedChapterKey]);
+
+    useEffect(() => {
+        if (selectedChapterKey === "all") return;
+        if (chapterOptions.some((chapter) => chapter.key === selectedChapterKey)) return;
+
+        setSelectedChapterKey("all");
+    }, [chapterOptions, selectedChapterKey]);
 
     useEffect(() => {
         if (!pages.length) return;
@@ -849,130 +945,160 @@ export default function ReadAlongPage() {
                             </button>
                         </div>
 
-                        <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
-                    <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-                        <div className="space-y-3">
-                            {pages.length > 0 ? (
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={goPrev}
-                                        disabled={pageIndex === 0}
-                                        className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        ← Previous
-                                    </button>
-
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={jumpPageInput}
-                                            onChange={(e) => setJumpPageInput(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter") {
-                                                    e.preventDefault();
-                                                    jumpToPage(Number(jumpPageInput));
-                                                }
-                                            }}
-                                            placeholder="Page"
-                                            className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => jumpToPage(Number(jumpPageInput))}
-                                            className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
-                                        >
-                                            Go
-                                        </button>
+                        {chapterOptions.length > 0 ? (
+                            <section className="mb-4 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                    <div>
+                                        <h2 className="text-lg font-black text-stone-900">
+                                            {selectedChapterLabel}
+                                        </h2>
+                                        <p className="mt-1 text-sm text-stone-500">
+                                            Choose a chapter, or add a page number below for a more exact spot.
+                                        </p>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        onClick={goNext}
-                                        disabled={pageIndex === pages.length - 1}
-                                        className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        Next →
-                                    </button>
+                                    <label className="w-full text-sm sm:w-72">
+                                        <select
+                                            value={selectedChapterKey}
+                                            onChange={(event) => setSelectedChapterKey(event.target.value)}
+                                            className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                                        >
+                                            <option value="all">All chapters</option>
+                                            {chapterOptions.map((chapter) => (
+                                                <option key={chapter.key} value={chapter.key}>
+                                                    {chapter.label} · {chapter.wordCount} words
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
                                 </div>
-                            ) : null}
+                            </section>
+                        ) : null}
 
-                            <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
-                                <div className="order-2 text-sm text-stone-500 sm:order-1">
-                                    {currentPage
-                                        ? `${currentPage.words.length} saved word${currentPage.words.length === 1 ? "" : "s"}`
-                                        : "No saved words yet"}
-                                </div>
+                        <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
+                            <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+                                <div className="space-y-3">
+                                    {pages.length > 0 ? (
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={goPrev}
+                                                disabled={pageIndex === 0}
+                                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                ← Previous
+                                            </button>
 
-                                <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">
-                                    {currentPage ? currentPage.label : "Fluid Reading"}
-                                </div>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    value={jumpPageInput}
+                                                    onChange={(e) => setJumpPageInput(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            e.preventDefault();
+                                                            jumpToPage(Number(jumpPageInput));
+                                                        }
+                                                    }}
+                                                    placeholder="Page"
+                                                    className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => jumpToPage(Number(jumpPageInput))}
+                                                    className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
+                                                >
+                                                    Go
+                                                </button>
+                                            </div>
 
-                                <div className="order-3 text-sm text-stone-500 sm:text-right">
-                                    Tap the words to follow along with the book.
+                                            <button
+                                                type="button"
+                                                onClick={goNext}
+                                                disabled={pageIndex === pages.length - 1}
+                                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+                                    ) : null}
+
+                                    <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
+                                        <div className="order-2 text-sm text-stone-500 sm:order-1">
+                                            {currentPage
+                                                ? `${currentPage.words.length} saved word${currentPage.words.length === 1 ? "" : "s"}`
+                                                : "No saved words yet"}
+                                        </div>
+
+                                        <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">
+                                            {currentPage ? currentPage.label : "Fluid Reading"}
+                                        </div>
+
+                                        <div className="order-3 text-sm text-stone-500 sm:text-right">
+                                            Tap the words to follow along with the book.
+                                        </div>
+                                    </div>
                                 </div>
+                            </div>
+
+                            <div
+                                ref={scrollAreaRef}
+                                className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
+                            >
+                                {!currentPage || currentPage.words.length === 0 ? (
+                                    <div className="mx-auto max-w-2xl py-16 text-center">
+                                        <div className="text-2xl font-semibold text-stone-700">
+                                            No saved words here.
+                                        </div>
+
+                                        <p className="mt-3 text-sm text-stone-500">
+                                            Enjoy the story!
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
+                                        {currentPage.words.map((w, index) => {
+                                            const isFaded = index <= fadedThroughIndex;
+
+                                            return (
+                                                <div
+                                                    key={w.id}
+                                                    ref={(el) => {
+                                                        wordRefs.current[w.id] = el;
+                                                    }}
+                                                    onClick={() => handleProgressTap(index, w.id)}
+                                                    className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
+                                                        ? "border-stone-200 bg-stone-50 opacity-35"
+                                                        : "border-stone-200 bg-white hover:bg-stone-50"
+                                                        }`}
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                                            <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
+                                                                {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
+                                                            </div>
+
+                                                            {(supportMode === "full" || supportMode === "reading") && (
+                                                                <div className="text-sm text-stone-500 sm:text-base">
+                                                                    {w.reading || "—"}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {(supportMode === "full" || supportMode === "meaning") && (
+                                                            <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
+                                                                {w.meaning || "—"}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
-
-                    <div
-                        ref={scrollAreaRef}
-                        className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
-                    >
-                        {!currentPage || currentPage.words.length === 0 ? (
-                            <div className="mx-auto max-w-2xl py-16 text-center">
-                                <div className="text-2xl font-semibold text-stone-700">
-                                    No saved words here.
-                                </div>
-
-                                <p className="mt-3 text-sm text-stone-500">
-                                    Enjoy the story!
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
-                                {currentPage.words.map((w, index) => {
-                                    const isFaded = index <= fadedThroughIndex;
-
-                                    return (
-                                        <div
-                                            key={w.id}
-                                            ref={(el) => {
-                                                wordRefs.current[w.id] = el;
-                                            }}
-                                            onClick={() => handleProgressTap(index, w.id)}
-                                            className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
-                                                ? "border-stone-200 bg-stone-50 opacity-35"
-                                                : "border-stone-200 bg-white hover:bg-stone-50"
-                                                }`}
-                                        >
-                                            <div className="min-w-0">
-                                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                                                    <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
-                                                        {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
-                                                    </div>
-
-                                                    {(supportMode === "full" || supportMode === "reading") && (
-                                                        <div className="text-sm text-stone-500 sm:text-base">
-                                                            {w.reading || "—"}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {(supportMode === "full" || supportMode === "meaning") && (
-                                                    <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
-                                                        {w.meaning || "—"}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
                     </>
                 )}
             </div>

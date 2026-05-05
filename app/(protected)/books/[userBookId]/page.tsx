@@ -1515,7 +1515,7 @@ export default function BookHubPage() {
 
     if (row?.id) {
       await loadSavedKanjiDefaults(row.id);
-      await loadKanjiMapQueue(row.id);
+      setKanjiMapQueue([]);
     }
     setSavingKanjiWordId(null);
   }
@@ -2709,7 +2709,7 @@ export default function BookHubPage() {
     }
 
     await loadSavedKanjiDefaults(row.id);
-    await loadKanjiMapQueue(row.id);
+    setKanjiMapQueue([]);
   }
 
   function updateKanjiMapRow(
@@ -3278,7 +3278,7 @@ export default function BookHubPage() {
     await loadChapterSummaries(r.id);
     await loadCharacters(r.id);
     await loadSavedKanjiDefaults(r.id);
-    await loadKanjiMapQueue(r.id);
+    setKanjiMapQueue([]);
 
     setLoading(false);
   };
@@ -5033,7 +5033,7 @@ export default function BookHubPage() {
                     setRatingRecommend={setRatingRecommend}
                     kanjiMapLoading={kanjiMapLoading}
                     kanjiMapError={kanjiMapError}
-                    kanjiMapQueue={kanjiMapQueue}
+                    kanjiMapQueue={[]}
                     needsKanjiEnrichmentCount={needsKanjiEnrichmentCount}
                     editingKanjiRows={editingKanjiRows}
                     openKanjiWordIds={openKanjiWordIds}

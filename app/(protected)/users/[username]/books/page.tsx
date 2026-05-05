@@ -2326,13 +2326,7 @@ export default function BooksPage() {
         {viewMode === "cover" ? (
           sortMode === "status" ? (
             <>
-              {isTeacher ? (
-                <Section
-                  title="Teacher Trial Prep"
-                  subtitle="Prep copies for trial lessons"
-                  items={sortedTeacherPrepBooks}
-                />
-              ) : null}
+              {null}
               <Section
                 title="Currently Reading"
                 subtitle="Started but not finished yet"
@@ -2358,24 +2352,7 @@ export default function BooksPage() {
           )
         ) : (
           <>
-            {isTeacher && sortedTeacherPrepBooks.length > 0 ? (
-              <section className="mb-6">
-                <div className="mb-3">
-                  <h2 className="text-lg font-semibold text-gray-800">
-                    Teacher Trial Prep{" "}
-                    <span className="font-normal text-gray-500">
-                      ({sortedTeacherPrepBooks.length})
-                    </span>
-                  </h2>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    Prep copies for trial lessons
-                  </p>
-                </div>
-                <ul className="overflow-hidden rounded-xl border bg-white">
-                  {sortedTeacherPrepBooks.map((row) => renderBookRow(row))}
-                </ul>
-              </section>
-            ) : null}
+            {null}
 
             <ul className="overflow-hidden rounded-xl border bg-white">
               {sortedValidRows.map((row) => renderBookRow(row))}

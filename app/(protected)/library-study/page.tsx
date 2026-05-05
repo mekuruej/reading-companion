@@ -301,15 +301,16 @@ async function loadLibraryProgressByKey(userId: string, studyKeys: string[]) {
 function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base =
-    "relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border p-6 text-center shadow-2xl transition-colors sm:min-h-[36vh]";
+    "relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border bg-white p-6 text-center shadow-2xl transition-colors sm:min-h-[36vh]";
 
-  if (color === "green") return `${base} border-emerald-100 bg-[#f5fcf8]`;
-  if (color === "blue") return `${base} border-sky-100 bg-[#f5fbff]`;
-  if (color === "grey") return `${base} border-slate-100 bg-[#f8fafc]`;
-  if (color === "purple") return `${base} border-violet-100 bg-[#fbf8ff]`;
-  if (color === "red") return `${base} border-rose-100 bg-[#fff7f8]`;
-  if (color === "orange") return `${base} border-orange-100 bg-[#fff9f2]`;
-  return `${base} border-amber-100 bg-[#fffdf3]`;
+  if (color === "green") return `${base} border-emerald-100`;
+  if (color === "blue") return `${base} border-sky-100`;
+  if (color === "grey") return `${base} border-slate-200`;
+  if (color === "purple") return `${base} border-violet-100`;
+  if (color === "red") return `${base} border-rose-100`;
+  if (color === "orange") return `${base} border-orange-100`;
+
+  return `${base} border-amber-100`;
 }
 
 function libraryStudyChipClass(status: LibraryStudyColorStatus | undefined) {
@@ -322,6 +323,7 @@ function libraryStudyChipClass(status: LibraryStudyColorStatus | undefined) {
   if (color === "purple") return `${base} border-violet-100 bg-white/90 text-violet-900`;
   if (color === "red") return `${base} border-rose-100 bg-white/90 text-rose-900`;
   if (color === "orange") return `${base} border-orange-100 bg-white/90 text-orange-950`;
+
   return `${base} border-amber-100 bg-white/90 text-amber-950`;
 }
 
@@ -429,15 +431,22 @@ function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
 function isCardAvailableForLibraryCheck(
   card: StudyCard,
   selectedJlpt: string,
-  seenTodayIds: Set<string>
+  seenTodayIds: Set<string>,
+  options: { ignoreTiming?: boolean } = {}
 ) {
   const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
+
+  if (!jlptMatch) return false;
+  if (!includeLibraryCheckCard(card.colorStatus)) return false;
+
+  // Used by "Check Again Today" so the button really means:
+  // "give me cards even if I already checked them today / they are not due yet."
+  if (options.ignoreTiming) return true;
+
   const notSeenToday = !seenTodayIds.has(card.id);
 
   return (
-    jlptMatch &&
     notSeenToday &&
-    includeLibraryCheckCard(card.colorStatus) &&
     isMasteredMaintenanceDue(card) &&
     isMissedGateLimboDue(card) &&
     isRegularGateRecheckDue(card)
@@ -459,22 +468,24 @@ function isCardAvailableForLibraryPractice(
 }
 
 function gatePromptText(card: StudyCard | undefined) {
-  if (!card) return "Will you pass through?";
-  if (card.colorStatus.color === "purple") return "A mastered word is back for a quiet check.";
-  if (card.colorStatus.nextGate === "mastery") return "One more right answer until this word is mastered.";
-  return card.activeGate === "meaning"
-    ? "Will you pass the MEANING gate?"
-    : "Will you pass the READING gate?";
+  if (!card) return "Library Check";
+
+  if (card.activeGate === "meaning") {
+    return "This is a MEANING gate";
+  }
+
+  return "This is a READING gate";
 }
 
 function gatePromptClass(card: StudyCard | undefined) {
-  const base = "rounded-full border px-5 py-2 text-sm font-semibold shadow-sm";
+  const base =
+    "rounded-full border px-5 py-2 text-sm font-black uppercase tracking-wide shadow-sm";
 
   if (card?.activeGate === "meaning") {
-    return `${base} border-sky-200 bg-sky-100 text-sky-950`;
+    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
   }
 
-  return `${base} border-emerald-200 bg-emerald-100 text-emerald-950`;
+  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
 }
 
 function checkModeLabel(card: StudyCard | undefined) {
@@ -503,13 +514,13 @@ function checkModeDescription(card: StudyCard | undefined) {
 
 function promptModeClass(gate: LibraryCheckGate | undefined) {
   const base =
-    "rounded-2xl border px-7 py-3 text-2xl font-bold uppercase tracking-wide shadow-sm";
+    "animate-pulse rounded-3xl border px-9 py-4 text-3xl font-black uppercase tracking-[0.16em] shadow-sm";
 
   if (gate === "meaning") {
-    return `${base} border-sky-200 bg-sky-100 text-sky-950`;
+    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
   }
 
-  return `${base} border-emerald-200 bg-emerald-100 text-emerald-950`;
+  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
 }
 
 function KatakanaBadge() {
@@ -555,18 +566,16 @@ function LibraryCheckIntroCard({
           <button
             type="button"
             onClick={() => onModeChange("check")}
-            className={`rounded-lg px-3 py-2 transition ${
-              mode === "check" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-            }`}
+            className={`rounded-lg px-3 py-2 transition ${mode === "check" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
+              }`}
           >
             Check
           </button>
           <button
             type="button"
             onClick={() => onModeChange("practice")}
-            className={`rounded-lg px-3 py-2 transition ${
-              mode === "practice" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-            }`}
+            className={`rounded-lg px-3 py-2 transition ${mode === "practice" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
+              }`}
           >
             Practice
           </button>
@@ -918,6 +927,8 @@ export default function LibraryStudyPage() {
   const [endedEarly, setEndedEarly] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
+  const [activeTodayKey, setActiveTodayKey] = useState(getTodayKey());
+  const [forceCheckAgainToday, setForceCheckAgainToday] = useState(false);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
 
   const currentCard = deck[index];
@@ -926,9 +937,11 @@ export default function LibraryStudyPage() {
 
   const filteredCards = useMemo(() => {
     return allCards.filter((card) =>
-      isCardAvailableForLibraryCheck(card, selectedJlpt, seenTodayIds)
+      isCardAvailableForLibraryCheck(card, selectedJlpt, seenTodayIds, {
+        ignoreTiming: forceCheckAgainToday,
+      })
     );
-  }, [allCards, selectedJlpt, seenTodayIds]);
+  }, [allCards, selectedJlpt, seenTodayIds, forceCheckAgainToday]);
 
   const practiceFilteredCards = useMemo(() => {
     return allCards.filter((card) =>
@@ -983,7 +996,38 @@ export default function LibraryStudyPage() {
   }, [currentCard, filteredCards]);
 
   useEffect(() => {
+    function resetForCurrentDay() {
+      const todayKey = getTodayKey();
+
+      setActiveTodayKey((previousKey) => {
+        if (previousKey !== todayKey) {
+          setSeenTodayIds(loadSeenForToday());
+          setForceCheckAgainToday(false);
+          setNotice(null);
+          setEndedEarly(false);
+          setIndex(0);
+          resetCardState();
+
+          return todayKey;
+        }
+
+        return previousKey;
+      });
+    }
+
     setSeenTodayIds(loadSeenForToday());
+    resetForCurrentDay();
+
+    const interval = window.setInterval(resetForCurrentDay, 60_000);
+
+    window.addEventListener("focus", resetForCurrentDay);
+    document.addEventListener("visibilitychange", resetForCurrentDay);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", resetForCurrentDay);
+      document.removeEventListener("visibilitychange", resetForCurrentDay);
+    };
   }, []);
 
   useEffect(() => {
@@ -1306,11 +1350,30 @@ export default function LibraryStudyPage() {
   }, []);
 
   useEffect(() => {
-    setDeck(shuffleArray(filteredCards).slice(0, dailyCheckLimit));
+    if (allCards.length === 0) {
+      setDeck([]);
+      setIndex(0);
+      resetCardState();
+      setEndedEarly(false);
+      return;
+    }
+
+    const nextDeckSource = allCards.filter((card) =>
+      isCardAvailableForLibraryCheck(card, selectedJlpt, seenTodayIds, {
+        ignoreTiming: forceCheckAgainToday,
+      })
+    );
+
+    setDeck(shuffleArray(nextDeckSource).slice(0, dailyCheckLimit));
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
-  }, [filteredCards, dailyCheckLimit]);
+
+    // Do not include seenTodayIds here.
+    // If this effect reruns every time a card is marked seen,
+    // the active 20-card session gets rebuilt and reshuffled.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allCards, selectedJlpt, dailyCheckLimit, forceCheckAgainToday, activeTodayKey]);
 
   useEffect(() => {
     setPracticeDeck(shuffleArray(practiceFilteredCards));
@@ -1402,7 +1465,13 @@ export default function LibraryStudyPage() {
   }
 
   function restartDeck() {
-    setDeck(shuffleArray(filteredCards).slice(0, dailyCheckLimit));
+    const nextDeckSource = allCards.filter((card) =>
+      isCardAvailableForLibraryCheck(card, selectedJlpt, seenTodayIds, {
+        ignoreTiming: forceCheckAgainToday,
+      })
+    );
+
+    setDeck(shuffleArray(nextDeckSource).slice(0, dailyCheckLimit));
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
@@ -1411,19 +1480,25 @@ export default function LibraryStudyPage() {
 
   function studyAgainToday() {
     clearSeenForToday();
+
     const clearedSeenIds = new Set<string>();
     setSeenTodayIds(clearedSeenIds);
+    setForceCheckAgainToday(true);
+
     setDeck(
       shuffleArray(
         allCards.filter((card) =>
-          isCardAvailableForLibraryCheck(card, selectedJlpt, clearedSeenIds)
+          isCardAvailableForLibraryCheck(card, selectedJlpt, clearedSeenIds, {
+            ignoreTiming: true,
+          })
         )
       ).slice(0, dailyCheckLimit)
     );
+
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
-    setNotice("Today’s Library Check memory was cleared for testing.");
+    setNotice("Extra check mode is on for this session. Some cards may not be due yet.");
   }
 
   function resetPracticeReveal() {
@@ -1434,9 +1509,11 @@ export default function LibraryStudyPage() {
     if (practiceDeck.length === 0) return;
 
     setPracticeIndex((prev) => {
+      if (practiceDeck.length <= 1) return prev;
       if (prev + 1 >= practiceDeck.length) return 0;
       return prev + 1;
     });
+
     resetPracticeReveal();
   }
 
@@ -1451,7 +1528,17 @@ export default function LibraryStudyPage() {
       return;
     }
 
-    goToNextPracticeCard();
+    if (practiceDeck.length <= 1) {
+      resetPracticeReveal();
+      return;
+    }
+
+    setPracticeIndex((prev) => {
+      if (prev + 1 >= practiceDeck.length) return 0;
+      return prev + 1;
+    });
+
+    resetPracticeReveal();
   }
 
   function goToPreviousPracticeCard() {
@@ -1779,18 +1866,18 @@ export default function LibraryStudyPage() {
       prev.map((card) =>
         card.studyIdentityKey === currentCard.studyIdentityKey
           ? {
-              ...card,
-              progress: heldProgress,
-              colorStatus: computeLibraryStudyColorStatus({
-                encounterCount: card.encounterCount,
-                settings: learningSettings,
-                readingGate: heldProgress.reading_gate_status,
-                meaningGate: heldProgress.meaning_gate_status,
-                heldBeforeReadingGate: true,
-                heldBeforeMeaningGate: heldProgress.held_before_meaning_gate,
-                mastered: heldProgress.mastered,
-              }),
-            }
+            ...card,
+            progress: heldProgress,
+            colorStatus: computeLibraryStudyColorStatus({
+              encounterCount: card.encounterCount,
+              settings: learningSettings,
+              readingGate: heldProgress.reading_gate_status,
+              meaningGate: heldProgress.meaning_gate_status,
+              heldBeforeReadingGate: true,
+              heldBeforeMeaningGate: heldProgress.held_before_meaning_gate,
+              mastered: heldProgress.mastered,
+            }),
+          }
           : card
       )
     );
@@ -1947,348 +2034,347 @@ export default function LibraryStudyPage() {
     setNotice("Card hidden from study.");
   }
 
-    if (loading) {
-      return (
-        <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-          <p className="text-lg text-gray-500">Loading Library Check...</p>
-        </main>
-      );
-    }
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
+        <p className="text-lg text-gray-500">Loading Library Check...</p>
+      </main>
+    );
+  }
 
-    if (needsSignIn) {
-      return (
-        <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-          <p className="text-gray-700">You need to sign in to use Library Check.</p>
-          <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
-            Go to Login
-          </button>
-        </main>
-      );
-    }
+  if (needsSignIn) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
+        <p className="text-gray-700">You need to sign in to use Library Check.</p>
+        <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
+          Go to Login
+        </button>
+      </main>
+    );
+  }
 
-    if (errorMsg) {
-      return (
-        <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-          <p className="text-red-700">{errorMsg}</p>
-          <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-            Back to Library
-          </button>
-        </main>
-      );
-    }
+  if (errorMsg) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
+        <p className="text-red-700">{errorMsg}</p>
+        <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
+          Back to Library
+        </button>
+      </main>
+    );
+  }
 
-    if (allCards.length === 0) {
-      return (
-        <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-          <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-            <p className="text-2xl font-semibold text-gray-700">
-              No saved vocab is ready for Library Check yet.
-            </p>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
-              Real reading encounters will unlock strict checks. You can also warm up with Word Sky.
-            </p>
+  if (allCards.length === 0) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
+        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+          <p className="text-2xl font-semibold text-gray-700">
+            No saved vocab is ready for Library Check yet.
+          </p>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
+            Real reading encounters will unlock strict checks. You can also warm up with Word Sky.
+          </p>
 
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/library-study/word-sky")}
-                className="rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-200"
-              >
-                Try Word Sky
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push("/books")}
-                className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium"
-              >
-                Back to Library
-              </button>
-            </div>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/word-sky")}
+              className="rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-200"
+            >
+              Try Word Sky
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/books")}
+              className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium"
+            >
+              Back to Library
+            </button>
           </div>
-        </main>
-      );
-    }
+        </div>
+      </main>
+    );
+  }
 
-    if (libraryMode === "check" && filteredCards.length === 0) {
-      return (
-        <main className="min-h-screen bg-slate-100 px-6 py-8">
-          <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-            <h1 className="text-2xl font-semibold">Library Check</h1>
-            <p className="mt-3 text-gray-600">
-              {selectedJlpt === "all"
-                ? "You’ve already checked all available Library Check cards today."
-                : "No cards match your current JLPT filter, or you already checked them today."}
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
+  if (libraryMode === "check" && deck.length === 0 && filteredCards.length === 0) {
+    return (
+      <main className="min-h-screen bg-slate-100 px-6 py-8">
+        <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold">Library Check</h1>
+          <p className="mt-3 text-gray-600">
+            {selectedJlpt === "all"
+              ? "You’ve already checked all available Library Check cards today."
+              : "No cards match your current JLPT filter, or you already checked them today."}
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              onClick={() => setSelectedJlpt("all")}
+              className="rounded bg-gray-700 px-4 py-2 text-white"
+            >
+              Clear JLPT Filter
+            </button>
+            <button
+              onClick={studyAgainToday}
+              className="rounded bg-amber-100 px-4 py-2 text-amber-900"
+            >
+              Check Again Today
+            </button>
+            <button
+              onClick={() => router.push("/books")}
+              className="rounded bg-gray-200 px-4 py-2"
+            >
+              Back to Library
+            </button>
+            {practiceFilteredCards.length > 0 ? (
               <button
-                onClick={() => setSelectedJlpt("all")}
-                className="rounded bg-gray-700 px-4 py-2 text-white"
+                onClick={() => setLibraryMode("practice")}
+                className="rounded bg-sky-100 px-4 py-2 text-sky-950"
               >
-                Clear JLPT Filter
+                Open Practice
               </button>
-              <button
-                onClick={studyAgainToday}
-                className="rounded bg-amber-100 px-4 py-2 text-amber-900"
-              >
-                Check Again Today
-              </button>
-              <button
-                onClick={() => router.push("/books")}
-                className="rounded bg-gray-200 px-4 py-2"
-              >
-                Back to Library
-              </button>
-              {practiceFilteredCards.length > 0 ? (
-                <button
-                  onClick={() => setLibraryMode("practice")}
-                  className="rounded bg-sky-100 px-4 py-2 text-sky-950"
-                >
-                  Open Practice
-                </button>
-              ) : null}
-            </div>
+            ) : null}
           </div>
-        </main>
-      );
-    }
+        </div>
+      </main>
+    );
+  }
 
-    if (
-      libraryMode === "check" &&
-      index >= deck.length &&
-      !endedEarly &&
-      meaningReviewItems.length > 0
-    ) {
-      return (
-        <main className="min-h-screen bg-slate-100 p-6">
-          <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-white p-6 shadow-sm">
-            <div className="text-center">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Meaning Review
+  if (
+    libraryMode === "check" &&
+    index >= deck.length &&
+    !endedEarly &&
+    meaningReviewItems.length > 0
+  ) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="text-center">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Meaning Review
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+              Double-check meaning answers
+            </h1>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+              Meaning can be fuzzy. Confirm the app’s call, or change it before the session closes.
+            </p>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            {meaningReviewItems.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-2xl font-semibold text-slate-950">
+                      {item.card.surface}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500">{item.card.reading}</div>
+                    <div
+                      className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.originalOk
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-rose-100 text-rose-800"
+                        }`}
+                    >
+                      App marked: {item.originalOk ? "passed" : "missed"}
+                    </div>
+                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                      <div className="rounded-xl bg-white px-3 py-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Your answer
+                        </div>
+                        <div className="mt-1 text-slate-900">{item.userAnswer || "—"}</div>
+                      </div>
+                      <div className="rounded-xl bg-white px-3 py-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Saved meaning
+                        </div>
+                        <div className="mt-1 text-slate-900">{item.correctAnswer}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid shrink-0 gap-2 sm:grid-cols-2 md:w-[260px] md:grid-cols-1">
+                    <button
+                      type="button"
+                      onClick={() => void countMeaningReviewAsPassed(item)}
+                      className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      Count as passed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        item.originalOk
+                          ? void countMeaningReviewAsMissed(item)
+                          : keepMeaningReviewMissed(item)
+                      }
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                    >
+                      Count as missed
+                    </button>
+                  </div>
+                </div>
               </div>
-              <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-                Double-check meaning answers
-              </h1>
-              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                Meaning can be fuzzy. Confirm the app’s call, or change it before the session closes.
+            ))}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (libraryMode === "check" && index >= deck.length) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
+        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold">
+            {endedEarly ? "Nice work today!" : "Nice work!"}
+          </h1>
+
+          {endedEarly ? (
+            <>
+              <p className="mt-3 text-gray-700">You gave your library some practice.</p>
+              <p className="mt-2 text-sm text-gray-500">Come back when you’re ready.</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-3 text-gray-700">You finished this Library Check session.</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Come back tomorrow to run into more old book memories.
+              </p>
+            </>
+          )}
+
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
+              Back to Library
+            </button>
+            <button onClick={restartDeck} className="rounded bg-gray-700 px-4 py-2 text-white">
+              Refresh Remaining Checks
+            </button>
+            <button
+              onClick={studyAgainToday}
+              className="rounded bg-amber-100 px-4 py-2 text-amber-900"
+            >
+              Check Again Today
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
+      <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">
+        <h1 className="text-2xl font-semibold">Library Study</h1>
+      </div>
+
+      <div className="mb-2 w-full max-w-3xl space-y-2">
+        <LibraryCheckIntroCard mode={libraryMode} onModeChange={setLibraryMode} />
+
+        <button
+          type="button"
+          onClick={() => router.push("/library-study/word-sky")}
+          className="w-full rounded-2xl border border-sky-100 bg-[#f5fbff] px-4 py-3 text-left shadow-sm transition hover:border-sky-200 hover:bg-sky-50"
+        >
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-sky-950">
+                Need more words, or bogged down with difficult words?
+              </div>
+              <div className="text-xs leading-5 text-slate-500">
+                Add easier words you may not need to look up in a book to your study.
+              </div>
+            </div>
+            <div className="text-sm font-semibold text-sky-900">Open Word Sky</div>
+          </div>
+        </button>
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500">
+                {libraryMode === "practice" ? "Practice Progress" : "Session Progress"}
+              </p>
+              <p className="text-base font-semibold text-slate-800">
+                Card{" "}
+                {libraryMode === "practice"
+                  ? `${practiceDeck.length > 0 ? practiceIndex + 1 : 0}/${practiceDeck.length}`
+                  : `${index + 1}/${deck.length}`}
               </p>
             </div>
 
-            <div className="mt-6 space-y-3">
-              {meaningReviewItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0">
-                      <div className="text-2xl font-semibold text-slate-950">
-                        {item.card.surface}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-500">{item.card.reading}</div>
-                      <div
-                        className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          item.originalOk
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-rose-100 text-rose-800"
-                        }`}
-                      >
-                        App marked: {item.originalOk ? "passed" : "missed"}
-                      </div>
-                      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                        <div className="rounded-xl bg-white px-3 py-2">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                            Your answer
-                          </div>
-                          <div className="mt-1 text-slate-900">{item.userAnswer || "—"}</div>
-                        </div>
-                        <div className="rounded-xl bg-white px-3 py-2">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                            Saved meaning
-                          </div>
-                          <div className="mt-1 text-slate-900">{item.correctAnswer}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid shrink-0 gap-2 sm:grid-cols-2 md:w-[260px] md:grid-cols-1">
-                      <button
-                        type="button"
-                        onClick={() => void countMeaningReviewAsPassed(item)}
-                        className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                      >
-                        Count as passed
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          item.originalOk
-                            ? void countMeaningReviewAsMissed(item)
-                            : keepMeaningReviewMissed(item)
-                        }
-                        className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                      >
-                        Count as missed
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </main>
-      );
-    }
-
-    if (libraryMode === "check" && index >= deck.length) {
-      return (
-        <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
-          <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-            <h1 className="text-2xl font-semibold">
-              {endedEarly ? "Nice work today!" : "Nice work!"}
-            </h1>
-
-            {endedEarly ? (
-              <>
-                <p className="mt-3 text-gray-700">You gave your library some practice.</p>
-                <p className="mt-2 text-sm text-gray-500">Come back when you’re ready.</p>
-              </>
-            ) : (
-              <>
-                <p className="mt-3 text-gray-700">You finished this Library Check session.</p>
-                <p className="mt-2 text-sm text-gray-500">
-                  Come back tomorrow to run into more old book memories.
-                </p>
-              </>
-            )}
-
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-                Back to Library
-              </button>
-              <button onClick={restartDeck} className="rounded bg-gray-700 px-4 py-2 text-white">
-                Refresh Remaining Checks
-              </button>
-              <button
-                onClick={studyAgainToday}
-                className="rounded bg-amber-100 px-4 py-2 text-amber-900"
-              >
-                Check Again Today
-              </button>
-            </div>
-          </div>
-        </main>
-      );
-    }
-
-    return (
-      <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
-        <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">
-            <h1 className="text-2xl font-semibold">Library Study</h1>
-          </div>
-
-        <div className="mb-2 w-full max-w-3xl space-y-2">
-          <LibraryCheckIntroCard mode={libraryMode} onModeChange={setLibraryMode} />
-
-          <button
-            type="button"
-            onClick={() => router.push("/library-study/word-sky")}
-            className="w-full rounded-2xl border border-sky-100 bg-[#f5fbff] px-4 py-3 text-left shadow-sm transition hover:border-sky-200 hover:bg-sky-50"
-          >
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-sky-950">
-                  Need more words, or bogged down with difficult words?
-                </div>
-                <div className="text-xs leading-5 text-slate-500">
-                  Add easier words you may not need to look up in a book to your study.
-                </div>
-              </div>
-              <div className="text-sm font-semibold text-sky-900">Open Word Sky</div>
-            </div>
-          </button>
-
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500">
-                  {libraryMode === "practice" ? "Practice Progress" : "Session Progress"}
-                </p>
-                <p className="text-base font-semibold text-slate-800">
-                  Card{" "}
-                  {libraryMode === "practice"
-                    ? `${practiceDeck.length > 0 ? practiceIndex + 1 : 0}/${practiceDeck.length}`
-                    : `${index + 1}/${deck.length}`}
-                </p>
-              </div>
-
-              <div className="text-right">
-                <p className="text-xs uppercase tracking-wide text-gray-500">
-                  {libraryMode === "practice" ? "Practice Pool" : "Cards Left"}
-                </p>
-                <p className="text-base font-semibold text-slate-800">
-                  {libraryMode === "practice"
-                    ? practiceDeck.length
-                    : Math.max(deck.length - index, 0)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <select
-                value={selectedJlpt}
-                onChange={(e) => setSelectedJlpt(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="all">All Levels</option>
-                <option value="N5">N5</option>
-                <option value="N4">N4</option>
-                <option value="N3">N3</option>
-                <option value="N2">N2</option>
-                <option value="N1">N1</option>
-                <option value="NON-JLPT">NON-JLPT</option>
-              </select>
-
-              {libraryMode === "practice" ? (
-                <select
-                  value={practiceColorFilter}
-                  onChange={(e) =>
-                    setPracticeColorFilter(e.target.value as PracticeColorFilter)
-                  }
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="all">All Colors</option>
-                  <option value="red">Red</option>
-                  <option value="orange">Orange</option>
-                  <option value="yellow">Yellow</option>
-                  <option value="green">Green</option>
-                  <option value="blue">Blue</option>
-                  <option value="purple">Purple</option>
-                  <option value="grey">Limbo</option>
-                  <option value="katakana">Katakana</option>
-                </select>
-              ) : null}
-
-              <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
-                {libraryMode === "practice" ? "Reveal practice" : "Automatic typed gates"}
-              </div>
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wide text-gray-500">
+                {libraryMode === "practice" ? "Practice Pool" : "Cards Left"}
+              </p>
+              <p className="text-base font-semibold text-slate-800">
+                {libraryMode === "practice"
+                  ? practiceDeck.length
+                  : Math.max(deck.length - index, 0)}
+              </p>
             </div>
           </div>
         </div>
 
-          {libraryMode === "practice" ? (
-            <LibraryPracticePanel
-              card={practiceCard}
-              total={practiceDeck.length}
-              revealStep={practiceRevealStep}
-              onAdvance={advancePracticeCard}
-              onNext={goToNextPracticeCard}
-              onPrevious={goToPreviousPracticeCard}
-              onShuffle={shufflePracticeDeck}
-            />
-          ) : (
-            <>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <select
+              value={selectedJlpt}
+              onChange={(e) => setSelectedJlpt(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="all">All Levels</option>
+              <option value="N5">N5</option>
+              <option value="N4">N4</option>
+              <option value="N3">N3</option>
+              <option value="N2">N2</option>
+              <option value="N1">N1</option>
+              <option value="NON-JLPT">NON-JLPT</option>
+            </select>
+
+            {libraryMode === "practice" ? (
+              <select
+                value={practiceColorFilter}
+                onChange={(e) =>
+                  setPracticeColorFilter(e.target.value as PracticeColorFilter)
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="all">All Colors</option>
+                <option value="red">Red</option>
+                <option value="orange">Orange</option>
+                <option value="yellow">Yellow</option>
+                <option value="green">Green</option>
+                <option value="blue">Blue</option>
+                <option value="purple">Purple</option>
+                <option value="grey">Limbo</option>
+                <option value="katakana">Katakana</option>
+              </select>
+            ) : null}
+
+            <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
+              {libraryMode === "practice" ? "Reveal practice" : "Automatic typed gates"}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {libraryMode === "practice" ? (
+        <LibraryPracticePanel
+          card={practiceCard}
+          total={practiceDeck.length}
+          revealStep={practiceRevealStep}
+          onAdvance={advancePracticeCard}
+          onNext={goToNextPracticeCard}
+          onPrevious={goToPreviousPracticeCard}
+          onShuffle={shufflePracticeDeck}
+        />
+      ) : (
+        <>
           {notice ? (
             <div className="mb-3 w-full max-w-2xl rounded-xl border border-amber-100 bg-[#fffaf0] px-4 py-2 text-sm text-amber-900">
               {notice}
@@ -2297,9 +2383,18 @@ export default function LibraryStudyPage() {
 
           <div className={libraryStudyCardClass(currentCard?.colorStatus)}>
             {currentCard ? (
-              <div className="absolute left-4 right-4 top-4 flex justify-center">
+              <div className="absolute left-4 right-4 top-4 flex items-start justify-between gap-3">
                 <div className={gatePromptClass(currentCard)}>
                   {gatePromptText(currentCard)}
+                </div>
+
+                <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                  <span
+                    className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
+                      currentCard.colorStatus
+                    )}`}
+                  />
+                  {libraryStudyColorName(currentCard.colorStatus)}
                 </div>
               </div>
             ) : null}
@@ -2320,22 +2415,13 @@ export default function LibraryStudyPage() {
               ) : null}
             </div>
 
-            {currentCard ? (
-              <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
-                <div className={libraryStudyChipClass(currentCard.colorStatus)}>
-                  {currentCard.encounterCount} encounter
-                  {currentCard.encounterCount === 1 ? "" : "s"}
-                </div>
-              </div>
-            ) : null}
-
             <div className="flex w-full flex-col items-center gap-6 pt-12 pb-10">
               {(studyMode === "reading_typing" ||
                 studyMode === "reading_mc" ||
                 studyMode === "complete_study") && (
                   <>
                     <div className={promptModeClass("reading")}>
-                      Reading
+                      READING
                     </div>
                     <div className="text-5xl font-bold">{currentCard?.surface}</div>
                   </>
@@ -2344,7 +2430,7 @@ export default function LibraryStudyPage() {
               {(studyMode === "meaning_typing" || studyMode === "meaning_mc") && (
                 <>
                   <div className={promptModeClass("meaning")}>
-                    Meaning
+                    MEANING
                   </div>
                   <div className="text-5xl font-bold">{currentCard?.surface}</div>
                   <div className="text-lg text-slate-500">{currentCard?.reading}</div>
@@ -2663,15 +2749,15 @@ export default function LibraryStudyPage() {
                 <div className="flex min-w-0 flex-1 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                   <div className="min-w-0">
                     <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Check Mode
+                      Check Mode
                     </div>
 
                     <div className="mt-1 text-sm font-semibold text-slate-900">
-                    {checkModeLabel(currentCard)}
+                      {checkModeLabel(currentCard)}
                     </div>
 
                     <p className="mt-1 truncate text-xs text-gray-600">
-                    {checkModeDescription(currentCard)}
+                      {checkModeDescription(currentCard)}
                     </p>
                   </div>
                 </div>
@@ -2704,8 +2790,8 @@ export default function LibraryStudyPage() {
               </div>
             </div>
           </div>
-          </>
-        )}
-      </main>
-    );
+        </>
+      )}
+    </main>
+  );
 }

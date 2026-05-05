@@ -379,21 +379,27 @@ export default function TeacherKanjiPage() {
       const mapRowsByCacheId = new Map<string, KanjiMapRow[]>();
 
       if (cacheIds.length > 0) {
-        const { data: mapRows, error: mapError } = await supabase
-          .from("vocabulary_kanji_map")
-          .select(
-            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading"
-          )
-          .in("vocabulary_cache_id", cacheIds)
-          .limit(10000);
+        const chunkSize = 100;
 
-        if (mapError) throw mapError;
+        for (let i = 0; i < cacheIds.length; i += chunkSize) {
+          const cacheIdChunk = cacheIds.slice(i, i + chunkSize);
 
-        for (const row of (mapRows ?? []) as KanjiMapRow[]) {
-          const cacheKey = String(row.vocabulary_cache_id);
-          const existing = mapRowsByCacheId.get(cacheKey) ?? [];
-          existing.push(row);
-          mapRowsByCacheId.set(cacheKey, existing);
+          const { data: mapRows, error: mapError } = await supabase
+            .from("vocabulary_kanji_map")
+            .select(
+              "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading"
+            )
+            .in("vocabulary_cache_id", cacheIdChunk)
+            .limit(5000);
+
+          if (mapError) throw mapError;
+
+          for (const row of (mapRows ?? []) as KanjiMapRow[]) {
+            const cacheKey = String(row.vocabulary_cache_id);
+            const existing = mapRowsByCacheId.get(cacheKey) ?? [];
+            existing.push(row);
+            mapRowsByCacheId.set(cacheKey, existing);
+          }
         }
       }
 

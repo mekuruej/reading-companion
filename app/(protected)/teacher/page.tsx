@@ -15,7 +15,7 @@ type TeacherCard = {
 const lessonPrepCards: TeacherCard[] = [
   {
     title: "My Students",
-    href: "/teacher/assign",
+    href: "/teacher/students",
     eyebrow: "Student setup",
     description:
       "View student setup tools, assign prepared books, and make sure each learner has the right reading support.",
