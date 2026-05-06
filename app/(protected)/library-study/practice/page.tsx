@@ -781,7 +781,7 @@ function LibraryPracticePanel({
     return (
       <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Practice Study
+          Review
         </div>
         <h2 className="mt-2 text-2xl font-semibold text-slate-950">No practice cards here yet.</h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
@@ -803,7 +803,7 @@ function LibraryPracticePanel({
       >
         <div className="absolute left-4 top-4 flex">
           <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-            Practice Study
+            Review
           </div>
         </div>
 
@@ -896,7 +896,7 @@ function LibraryPracticePanel({
       </div>
 
       <p className="text-center text-xs leading-5 text-slate-500">
-        Tap the card to reveal. Practice is review only and does not move colors.
+        Tap the card to reveal. Review does not move colors.
       </p>
     </div>
   );
@@ -2323,7 +2323,7 @@ export default function LibraryStudyPage() {
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <p className="text-lg text-gray-500">Loading Library Practice...</p>
+        <p className="text-lg text-gray-500">Loading Library Review...</p>
       </main>
     );
   }
@@ -2331,7 +2331,7 @@ export default function LibraryStudyPage() {
   if (needsSignIn) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-gray-700">You need to sign in to use Library Practice.</p>
+        <p className="text-gray-700">You need to sign in to use Library Review.</p>
         <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
           Go to Login
         </button>
@@ -2355,7 +2355,7 @@ export default function LibraryStudyPage() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
         <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
           <p className="text-2xl font-semibold text-gray-700">
-            No words are ready for Library Practice yet.
+            No words are ready for Library Review yet.
           </p>
 
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
@@ -2383,387 +2383,10 @@ export default function LibraryStudyPage() {
       </main>
     );
   }
-
-  if (false && libraryMode === "check" && !dailyCheckPlan) {
-    const allLevelsSelected = DAILY_CHECK_LEVELS.every((level) =>
-      setupLevels.includes(level)
-    );
-
-    const allLevelsDueCount = DAILY_CHECK_LEVELS.reduce(
-      (sum, level) => sum + availableCountBySetupLevel[level],
-      0
-    );
-
-    const allLevelsPoolCount = DAILY_CHECK_LEVELS.reduce(
-      (sum, level) => sum + poolCountBySetupLevel[level],
-      0
-    );
-
     return (
-      <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <div className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Daily Ability Check
-            </p>
-            <h1 className="mt-2 text-3xl font-black text-slate-950">
-              Choose today’s check
-            </h1>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-              Pick one or more levels. Once you start, your levels and card count are locked for today.
-            </p>
-          </div>
-
-          <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-900">Levels</div>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Choose one or more levels for today’s official check. The number under each level shows how many cards are available right now.
-            </p>
-
-            <label
-              className={`mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition ${allLevelsSelected
-                ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                }`}
-            >
-              <span className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={allLevelsSelected}
-                  onChange={toggleAllSetupLevels}
-                  className="h-4 w-4 accent-slate-900"
-                />
-                <span className="font-black">All Levels</span>
-              </span>
-
-              <span className={`text-xs ${allLevelsSelected ? "text-white/70" : "text-slate-400"}`}>
-                {allLevelsDueCount} due today · {allLevelsPoolCount} in pool
-              </span>
-            </label>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {DAILY_CHECK_LEVELS.map((level) => {
-                const selected = setupLevels.includes(level);
-                const availableCount = availableCountBySetupLevel[level];
-                const poolCount = poolCountBySetupLevel[level];
-
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => toggleSetupLevel(level)}
-                    className={`rounded-2xl border px-4 py-3 text-sm transition ${selected
-                      ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
-                  >
-                    <div className="font-black">{level}</div>
-                    <div className={`mt-1 text-xs ${selected ? "text-white/75" : "text-slate-400"}`}>
-                      {availableCount} due today
-                    </div>
-                    <div className={`mt-0.5 text-[11px] ${selected ? "text-white/60" : "text-slate-400"}`}>
-                      {poolCount} in pool
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-3 text-xs leading-5 text-slate-500">
-              If your selected levels have fewer cards than your daily check size, Mekuru can fill the rest from other available due words.
-            </p>
-          </section>
-
-          <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-900">Daily check size</div>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              This is your official Ability Check for today. Try to finish it, then use Practice or book study for more review.
-            </p>
-
-            <div className="mt-3 grid grid-cols-5 gap-2">
-              {DAILY_CHECK_LIMITS.map((limit) => {
-                const selected = setupDailyLimit === limit;
-
-                return (
-                  <button
-                    key={limit}
-                    type="button"
-                    onClick={() => setSetupDailyLimit(limit)}
-                    className={`rounded-2xl border px-3 py-3 text-sm font-black transition ${selected
-                      ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
-                  >
-                    {limit}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-            <div>Need more Ability Check cards?</div>
-            <div>
-              Use Word Sky to add easier words. For review only, use Library Practice or individual book study.
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={startDailyCheck}
-              disabled={setupLevels.length === 0}
-              className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:opacity-40"
-            >
-              Start Ability Check
-            </button>
-
-            {practiceFilteredCards.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setLibraryMode("practice")}
-                className="rounded-2xl border border-sky-200 bg-green-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-              >
-                Open Library Practice
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => router.push("/library-study/word-sky")}
-              className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-            >
-              Open Word Sky
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/book-flashcards")}
-              className="rounded-2xl border border-violet-200 bg-violet-100 px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-50"
-            >
-              Open Book Flashcards
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/books")}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              Back to Library
-            </button>
-          </div>
-        </div>
-      </main >
-    );
-  }
-
-  if (false && libraryMode === "check" && deck.length === 0 && filteredCards.length === 0) {
-    return (
-      <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">Library Practice</h1>
-
-          <p className="mt-3 text-gray-600">
-            No cards are available for today’s Ability Check.
-          </p>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Mekuru checked your selected levels first, then looked for other available cards.
-          </p>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Use Library Practice or individual book study if you want more review today.
-          </p>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            {libraryMode === "check" && isTeacherUser && dailyCheckPlan ? (
-              <button
-                type="button"
-                onClick={resetTeacherDailyCheckSetup}
-                className="w-full rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
-              >
-                Teacher reset: change today’s check setup
-              </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => router.push("/books")}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              Back to Library
-            </button>
-
-            {practiceFilteredCards.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setLibraryMode("practice")}
-                className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-              >
-                Open Library Practice
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (
-    false &&
-    libraryMode === "check" &&
-    index >= deck.length &&
-    !endedEarly &&
-    meaningReviewItems.length > 0
-  ) {
-    return (
-      <main className="min-h-screen bg-slate-100 p-6">
-        <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="text-center">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Meaning Review
-            </div>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-              Review meaning answers
-            </h1>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Correct answers are already saved. For missed answers, change the result only if the app was too strict.
-            </p>
-          </div>
-
-          <div className="mt-6 space-y-3">
-            {meaningReviewItems.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="min-w-0">
-                    <div className="text-2xl font-semibold text-slate-950">
-                      {item.card.surface}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-500">{item.card.reading}</div>
-                    <div
-                      className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.originalOk
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-rose-100 text-rose-800"
-                        }`}
-                    >
-                      App marked: {item.originalOk ? "passed" : "missed"}
-                    </div>
-                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                      <div className="rounded-xl bg-white px-3 py-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                          Your answer
-                        </div>
-                        <div className="mt-1 text-slate-900">{item.userAnswer || "—"}</div>
-                      </div>
-                      <div className="rounded-xl bg-white px-3 py-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                          Saved meaning
-                        </div>
-                        <div className="mt-1 text-slate-900">{item.correctAnswer}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid shrink-0 gap-2 sm:grid-cols-2 md:w-[260px] md:grid-cols-1">
-                    {item.originalOk ? (
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                        Marked as passed
-                        <div className="mt-1 text-xs font-normal text-emerald-700">
-                          No action needed
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => void countMeaningReviewAsPassed(item)}
-                          className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                        >
-                          Count as passed
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => keepMeaningReviewMissed(item)}
-                          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                        >
-                          Keep as missed
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={finishMeaningReview}
-              className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black"
-            >
-              Finish Review
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/books")}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              Back to Library
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (false && libraryMode === "check" && index >= deck.length) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
-        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">
-            {endedEarly ? "Nice work today!" : "Nice work!"}
-          </h1>
-
-          {endedEarly ? (
-            <>
-              <p className="mt-3 text-gray-700">You gave your library some practice.</p>
-              <p className="mt-2 text-sm text-gray-500">Come back when you’re ready.</p>
-            </>
-          ) : (
-            <>
-              <p className="mt-3 text-gray-700">You finished this Ability Check session.</p>
-              <p className="mt-2 text-sm text-gray-500">
-                Come back tomorrow to run into more old book memories.
-              </p>
-            </>
-          )}
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-              Back to Library
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLibraryMode("practice");
-                setNotice(null);
-              }}
-              className="rounded bg-sky-100 px-4 py-2 text-sky-950"
-            >
-              Open Library Practice
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
       <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">
-        <h1 className="text-2xl font-semibold">Library Practice</h1>
+        <h1 className="text-2xl font-semibold">Library Review</h1>
       </div>
 
       <div className="mb-2 w-full max-w-3xl space-y-2">
@@ -2771,10 +2394,10 @@ export default function LibraryStudyPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">
-                Library Practice
+                Library Review
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Review your existing words freely. Practice is review only and does not move colors.
+                Review your existing words freely. Review does not move colors.
               </p>
             </div>
           </div>
@@ -2788,7 +2411,7 @@ export default function LibraryStudyPage() {
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-sm font-semibold text-sky-950">
-                Want more easy practice words?
+                Want more easy review words?
               </div>
               <div className="text-xs leading-5 text-slate-500">
                 Use Word Sky to add easier words to your study pool.
@@ -2802,526 +2425,70 @@ export default function LibraryStudyPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">
-                {libraryMode === "practice" ? "Practice Progress" : "Session Progress"}
+                Review Progress
               </p>
               <p className="text-base font-semibold text-slate-800">
-                Card{" "}
-                {libraryMode === "practice"
-                  ? `${practiceDeck.length > 0 ? practiceIndex + 1 : 0}/${practiceDeck.length}`
-                  : `${index + 1}/${deck.length}`}
+                Card {`${practiceDeck.length > 0 ? practiceIndex + 1 : 0}/${practiceDeck.length}`}
               </p>
             </div>
 
             <div className="text-right">
               <p className="text-xs uppercase tracking-wide text-gray-500">
-                {libraryMode === "practice" ? "Practice Pool" : "Cards Left"}
+                Review Pool
               </p>
               <p className="text-base font-semibold text-slate-800">
-                {libraryMode === "practice"
-                  ? practiceDeck.length
-                  : Math.max(deck.length - index, 0)}
+                {practiceDeck.length}
               </p>
             </div>
           </div>
         </div>
 
-        {libraryMode === "check" && isTeacherUser && dailyCheckPlan ? (
-          <button
-            type="button"
-            onClick={() => {
-              clearSeenForToday();
-              setSeenTodayIds(new Set());
-              setDailyCheckPlan(null);
-              setDeck([]);
-              setIndex(0);
-              setNotice(null);
-              setEndedEarly(false);
-              resetCardState();
-            }}
-            className="w-full rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
-          >
-            Teacher reset: change today’s check setup
-          </button>
-        ) : null}
-
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row">
-            {libraryMode === "practice" ? (
-              <select
-                value={selectedJlpt}
-                onChange={(e) => setSelectedJlpt(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="all">All Levels</option>
-                <option value="N5">N5</option>
-                <option value="N4">N4</option>
-                <option value="N3">N3</option>
-                <option value="N2">N2</option>
-                <option value="N1">N1</option>
-                <option value="NON-JLPT">NON-JLPT</option>
-              </select>
-            ) : (
-              <div className="flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                Today’s levels: {dailyCheckPlan ? dailyCheckLevelsLabel(dailyCheckPlan.levels) : "Not started"}
-              </div>
-            )}
+            <select
+              value={selectedJlpt}
+              onChange={(e) => setSelectedJlpt(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="all">All Levels</option>
+              <option value="N5">N5</option>
+              <option value="N4">N4</option>
+              <option value="N3">N3</option>
+              <option value="N2">N2</option>
+              <option value="N1">N1</option>
+              <option value="NON-JLPT">NON-JLPT</option>
+            </select>
 
-            {libraryMode === "practice" ? (
-              <select
-                value={practiceColorFilter}
-                onChange={(e) =>
-                  setPracticeColorFilter(e.target.value as PracticeColorFilter)
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="all">All Colors</option>
-                <option value="red">Red</option>
-                <option value="orange">Orange</option>
-                <option value="yellow">Yellow</option>
-                <option value="green">Green</option>
-                <option value="blue">Blue</option>
-                <option value="purple">Purple</option>
-                <option value="grey">Limbo</option>
-                <option value="katakana">Katakana</option>
-              </select>
-            ) : null}
-
-            <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
-              {libraryMode === "practice" ? "Reveal practice" : "Automatic typed gates"}
-            </div>
+            <select
+              value={practiceColorFilter}
+              onChange={(e) =>
+                setPracticeColorFilter(e.target.value as PracticeColorFilter)
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="all">All Colors</option>
+              <option value="red">Red</option>
+              <option value="orange">Orange</option>
+              <option value="yellow">Yellow</option>
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+              <option value="purple">Purple</option>
+              <option value="grey">Limbo</option>
+              <option value="katakana">Katakana</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {libraryMode === "practice" ? (
-        <LibraryPracticePanel
-          card={practiceCard}
-          total={practiceDeck.length}
-          revealStep={practiceRevealStep}
-          onAdvance={advancePracticeCard}
-          onNext={goToNextPracticeCard}
-          onPrevious={goToPreviousPracticeCard}
-          onShuffle={shufflePracticeDeck}
-        />
-      ) : (
-        <>
-          {notice ? (
-            <div className="mb-3 w-full max-w-2xl rounded-xl border border-amber-100 bg-[#fffaf0] px-4 py-2 text-sm text-amber-900">
-              {notice}
-            </div>
-          ) : null}
-
-          <div className={libraryStudyCardClass(currentCard?.colorStatus)}>
-            {currentCard ? (
-              <div className="absolute left-4 right-4 top-4 flex items-start justify-between gap-3">
-                <div className={gatePromptClass(currentCard)}>
-                  {gatePromptText(currentCard)}
-                </div>
-
-                <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-m font-semibold text-slate-700 shadow-sm">
-                  <span
-                    className={`mr-1.5 inline-block h-5 w-5 rounded-full ${libraryStudyDotClass(
-                      currentCard.colorStatus
-                    )}`}
-                  />
-                  {libraryStudyColorName(currentCard.colorStatus)}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-              {isKatakanaOnly(currentCard?.surface) ? <KatakanaBadge /> : null}
-
-              {currentCard?.jlpt ? (
-                <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
-                  {currentCard.jlpt}
-                </div>
-              ) : null}
-
-              {currentCard?.progress?.definition_key ? (
-                <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
-                  Def {currentCard.progress.definition_key}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex w-full flex-col items-center gap-6 pt-12 pb-10">
-              {(studyMode === "reading_typing" ||
-                studyMode === "reading_mc" ||
-                studyMode === "complete_study") && (
-                  <>
-                    <div className={promptModeClass("reading")}>
-                      READING
-                    </div>
-                    <div className="text-5xl font-bold">{currentCard?.surface}</div>
-                  </>
-                )}
-
-              {(studyMode === "meaning_typing" || studyMode === "meaning_mc") && (
-                <>
-                  <div className={promptModeClass("meaning")}>
-                    MEANING
-                  </div>
-                  <div className="text-5xl font-bold">{currentCard?.surface}</div>
-                  <div className="text-lg text-slate-500">{currentCard?.reading}</div>
-                </>
-              )}
-
-              {(studyMode === "reading_to_kanji_mc" ||
-                studyMode === "reading_to_meaning_mc" ||
-                studyMode === "reading_to_meaning_typing") && (
-                  <>
-                    <div className="text-xs uppercase tracking-wide text-slate-500">
-                      {studyMode === "reading_to_kanji_mc"
-                        ? "Which word matches this reading?"
-                        : "What is the meaning of this reading?"}
-                    </div>
-                    <div className="text-4xl font-bold">{currentCard?.reading}</div>
-                  </>
-                )}
-
-              {studyMode === "reading_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {readingOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeKana(opt) === normalizeKana(currentCard!.reading);
-                    const isChosen =
-                      !!selectedAnswer && normalizeKana(opt) === normalizeKana(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {studyMode === "meaning_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {meaningOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
-                    const isChosen =
-                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {studyMode === "reading_to_kanji_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {surfaceOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeText(opt) === normalizeText(currentCard!.surface);
-                    const isChosen =
-                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {studyMode === "reading_to_meaning_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {meaningOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
-                    const isChosen =
-                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {(studyMode === "reading_typing" ||
-                studyMode === "meaning_typing" ||
-                studyMode === "reading_to_meaning_typing") && (
-                  <div className="w-full max-w-sm">
-                    <input
-                      ref={typingInputRef}
-                      value={typingInput}
-                      onChange={(e) => setTypingInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        if (!checked) {
-                          checkTypingSingle();
-                        }
-                      }}
-                      placeholder={
-                        studyMode === "reading_typing"
-                          ? "Type the reading"
-                          : "Type the meaning"
-                      }
-                      className="w-full rounded border px-4 py-3 text-base"
-                      disabled={!!checked}
-                    />
-
-                    <div className="mt-2 text-center text-xs uppercase tracking-wide text-slate-500">
-                      {studyMode === "reading_typing"
-                        ? "Type the reading"
-                        : "Type one meaning word"}
-                    </div>
-
-                    {!checked ? (
-                      <div className="mt-3 flex justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={checkTypingSingle}
-                          className="rounded bg-gray-700 px-4 py-2 text-white"
-                        >
-                          Check
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-
-              {studyMode === "complete_study" && (
-                <div className="w-full max-w-sm">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="mb-1 text-sm text-gray-500">Step 1: Reading</div>
-                      <input
-                        ref={twoStepStage === 1 ? typingInputRef : null}
-                        value={typingInput}
-                        onChange={(e) => setTypingInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter") return;
-
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          if (!firstStepChecked) {
-                            checkCompleteStudyStep1();
-                          }
-                        }}
-                        placeholder="Type the reading"
-                        className="w-full rounded border px-4 py-3 text-base"
-                        disabled={!!firstStepChecked}
-                      />
-                      <div className="mt-2">
-                        {!firstStepChecked ? (
-                          <button
-                            type="button"
-                            onClick={checkCompleteStudyStep1}
-                            className="rounded bg-gray-700 px-4 py-2 text-white"
-                          >
-                            Check Reading
-                          </button>
-                        ) : firstStepChecked.ok ? (
-                          <p className="text-green-700">✅ Reading correct!</p>
-                        ) : (
-                          <>
-                            <p className="text-red-700">❌ Reading: {firstStepChecked.correct}</p>
-                            <p className="mt-2 text-xs text-slate-400">
-                              Next card in a moment...
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-1 text-sm text-gray-500">Step 2: Meaning</div>
-                      <input
-                        ref={twoStepStage === 2 ? typingInputRef : null}
-                        value={secondStepInput}
-                        onChange={(e) => setSecondStepInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter") return;
-
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          if (firstStepChecked?.ok && !secondStepChecked) {
-                            checkCompleteStudyStep2();
-                          }
-                        }}
-                        placeholder="Type the meaning"
-                        className="w-full rounded border px-4 py-3 text-base"
-                        disabled={!firstStepChecked?.ok || !!secondStepChecked}
-                      />
-                      <div className="mt-2">
-                        {!secondStepChecked ? (
-                          <button
-                            type="button"
-                            onClick={checkCompleteStudyStep2}
-                            disabled={!firstStepChecked?.ok}
-                            className="rounded bg-gray-700 px-4 py-2 text-white disabled:opacity-50"
-                          >
-                            Check Meaning
-                          </button>
-                        ) : secondStepChecked.ok ? (
-                          <p className="text-green-700">✅ Meaning correct!</p>
-                        ) : (
-                          <>
-                            <p className="text-red-700">❌ Meaning: {secondStepChecked.correct}</p>
-                            <p className="mt-2 text-xs text-slate-400">
-                              Next card in a moment...
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {studyMode !== "complete_study" && checked ? (
-                <div className="mt-2 w-full max-w-sm text-center text-sm">
-                  {checked.ok ? (
-                    <p className="text-green-700">✅ Correct!</p>
-                  ) : (
-                    <>
-                      <p className="text-red-700">❌ Not quite.</p>
-                      <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
-                    </>
-                  )}
-
-                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                    <div className="text-lg font-semibold">{currentCard?.surface}</div>
-                    <div className="mt-1 text-sm text-slate-500">{currentCard?.reading}</div>
-                    <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
-                    <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
-                  </div>
-
-                  <p className="mt-3 text-xs text-slate-400">Next card in a moment...</p>
-                </div>
-              ) : null}
-
-              {studyMode === "complete_study" && secondStepChecked ? (
-                <div className="mt-2 w-full max-w-sm text-center text-sm">
-                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                    <div className="text-lg font-semibold">{currentCard?.surface}</div>
-                    <div className="mt-1 text-sm text-slate-500">{currentCard?.reading}</div>
-                    <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
-                    <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-2 w-full max-w-2xl space-y-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:justify-between">
-                <div className="flex min-w-0 flex-1 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                      Check Mode
-                    </div>
-
-                    <div className="mt-1 text-sm font-semibold text-slate-900">
-                      {checkModeLabel(currentCard)}
-                    </div>
-
-                    <p className="mt-1 truncate text-xs text-gray-600">
-                      {checkModeDescription(currentCard)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 md:w-[180px]">
-                  {canComeBackLater(currentCard) ? (
-                    <button
-                      type="button"
-                      onClick={comeBackLaterForCurrentCard}
-                      className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                    >
-                      <div className="leading-tight">Come back later</div>
-                      <div className="text-[10px] font-normal text-slate-500">
-                        Hold 90 days
-                      </div>
-                    </button>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    onClick={flagCurrentCard}
-                    className="min-h-[74px] w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
-                  >
-                    <div className="leading-tight">Flag</div>
-                    <div className="text-[10px] font-normal text-amber-700">
-                      Problem card
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <LibraryPracticePanel
+        card={practiceCard}
+        total={practiceDeck.length}
+        revealStep={practiceRevealStep}
+        onAdvance={advancePracticeCard}
+        onNext={goToNextPracticeCard}
+        onPrevious={goToPreviousPracticeCard}
+        onShuffle={shufflePracticeDeck}
+      />
     </main>
   );
 }

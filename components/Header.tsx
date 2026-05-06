@@ -350,7 +350,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Library Practice
+                    Library Review
                   </Link>
 
                   <Link

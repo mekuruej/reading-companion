@@ -13,11 +13,11 @@ const studyTools = [
     className: "border-emerald-200 bg-emerald-50 text-emerald-950",
   },
   {
-    title: "Library Practice",
+    title: "Library Review",
     href: "/library-study/practice",
     eyebrow: "Review only",
     description:
-      "Review your existing words freely. Practice does not move colors.",
+      "Review your existing words freely. Review does not move colors.",
     className: "border-sky-200 bg-sky-50 text-sky-950",
   },
   {

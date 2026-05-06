@@ -721,7 +721,7 @@ function LibraryCheckIntroCard({
             className={`rounded-lg px-3 py-2 transition ${mode === "practice" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
               }`}
           >
-            Practice
+            Review
           </button>
         </div>
       </div>
@@ -735,7 +735,7 @@ function LibraryCheckIntroCard({
 
           <div className="rounded-xl bg-slate-50 px-3 py-2">
             <div className="text-xs font-semibold text-slate-800">No gate movement</div>
-            <div className="text-[11px] leading-4 text-slate-500">Practice never passes or fails a word.</div>
+            <div className="text-[11px] leading-4 text-slate-500">Review never passes or fails a word.</div>
           </div>
 
           <div className="rounded-xl bg-violet-50 px-3 py-2">
@@ -781,7 +781,7 @@ function LibraryPracticePanel({
     return (
       <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Practice Study
+          Review Study
         </div>
         <h2 className="mt-2 text-2xl font-semibold text-slate-950">No practice cards here yet.</h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
@@ -803,7 +803,7 @@ function LibraryPracticePanel({
       >
         <div className="absolute left-4 top-4 flex">
           <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-            Practice Study
+            Review Study
           </div>
         </div>
 
@@ -896,7 +896,7 @@ function LibraryPracticePanel({
       </div>
 
       <p className="text-center text-xs leading-5 text-slate-500">
-        Tap the card to reveal. Practice does not move colors or count as passing an Ability Check gate.
+        Tap the card to reveal. Review does not move colors or count as passing an Ability Check gate.
       </p>
     </div>
   );
@@ -2474,7 +2474,7 @@ export default function LibraryStudyPage() {
           <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm font-semibold text-slate-900">Daily check size</div>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              This is your official Ability Check for today. Try to finish it, then use Practice or book study for more review.
+              This is your official Ability Check for today. Try to finish it, then use Review or book study for more review.
             </p>
 
             <div className="mt-3 grid grid-cols-5 gap-2">
@@ -2501,7 +2501,7 @@ export default function LibraryStudyPage() {
           <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
             <div>Need more Ability Check cards?</div>
             <div>
-              Use Word Sky to add easier words. For review only, use Library Practice or individual book study.
+              Use Word Sky to add easier words. For review only, use Library Review or individual book study.
             </div>
           </div>
 
@@ -2521,7 +2521,7 @@ export default function LibraryStudyPage() {
                 onClick={() => router.push("/library-study/practice")}
                 className="rounded-2xl border border-sky-200 bg-green-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
               >
-                Open Library Practice
+                Open Library Review
               </button>
             ) : null}
             <button
@@ -2567,7 +2567,7 @@ export default function LibraryStudyPage() {
           </p>
 
           <p className="mt-2 text-sm text-gray-500">
-            Use Library Practice or individual book study if you want more review today.
+            Use Library Review or individual book study if you want more review today.
           </p>
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -2595,7 +2595,7 @@ export default function LibraryStudyPage() {
                 onClick={() => router.push("/library-study/practice")}
                 className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
               >
-                Open Library Practice
+                Open Library Review
               </button>
             ) : null}
           </div>
@@ -2746,7 +2746,7 @@ export default function LibraryStudyPage() {
               onClick={() => router.push("/library-study/practice")}
               className="rounded bg-sky-100 px-4 py-2 text-sky-950"
             >
-              Open Library Practice
+              Open Library Review
             </button>
           </div>
         </div>
@@ -2777,7 +2777,7 @@ export default function LibraryStudyPage() {
               onClick={() => router.push("/library-study/practice")}
               className="rounded-2xl border border-sky-200 bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
             >
-              Open Library Practice
+              Open Library Review
             </button>
           </div>
         </div>
