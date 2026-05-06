@@ -2533,7 +2533,7 @@ export default function LibraryStudyPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push("/book-flashcards")}
+              onClick={() => router.push("/library-study/book-flashcards")}
               className="rounded-2xl border border-violet-200 bg-violet-100 px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-50"
             >
               Open Book Flashcards

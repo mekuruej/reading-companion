@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 function shouldHideSupportFooter(pathname: string) {
-  return pathname === "/book-hubs" || pathname.startsWith("/books/");
+  return pathname === "/library/book-hubs" || pathname.startsWith("/books/");
 }
 
 export default function SupportProjectFooterGate() {

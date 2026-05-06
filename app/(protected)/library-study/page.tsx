@@ -22,7 +22,7 @@ const studyTools = [
   },
   {
     title: "Book Flashcards",
-    href: "/book-flashcards",
+    href: "/library-study/book-flashcards",
     eyebrow: "Book-based study",
     description:
       "Study words from individual books when you want a focused book session.",

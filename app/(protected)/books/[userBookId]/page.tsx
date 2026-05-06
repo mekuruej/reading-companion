@@ -4469,7 +4469,7 @@ export default function BookHubPage() {
                       if (!newId) return;
 
                       if (newId === "all-book-hubs") {
-                        router.push("/book-hubs");
+                        router.push("/library/book-hubs");
                         return;
                       }
 

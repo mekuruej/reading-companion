@@ -92,13 +92,10 @@ export default function Header() {
     pathname === libraryHref ||
     pathname === "/books" ||
     /^\/users\/[^/]+\/books$/.test(pathname) ||
-    pathname === "/book-hubs" ||
     pathname === "/vocab";
   const discoverySectionActive = pathname.startsWith("/discovery");
   const studySectionActive =
     pathname.startsWith("/library-study") ||
-    pathname === "/study-coming-soon" ||
-    pathname === "/book-flashcards" ||
     pathname.startsWith("/kanji-reading-study");
   const profileSectionActive = pathname.startsWith("/community");
 
@@ -180,8 +177,8 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/book-hubs"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/book-hubs"
+                    href="/library/book-hubs"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/book-hubs"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
@@ -354,8 +351,8 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/book-flashcards"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/book-flashcards"
+                    href="/library-study/book-flashcards"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/book-flashcards"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
@@ -371,7 +368,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Kanji Readings
+                    Kanji Reading Study
                   </Link>
                   <Link
                     href="/library-study/word-sky"
