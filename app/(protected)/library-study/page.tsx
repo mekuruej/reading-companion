@@ -1,4 +1,4 @@
-// Study Tools
+// Study Hub
 //
 
 import Link from "next/link";
@@ -56,12 +56,14 @@ export default function StudyToolsPage() {
           </p>
 
           <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-            Study Tools
+            Study Hub
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Choose how you want to study today: check your ability, review
-            freely, focus on a book, or add easier words to your pool.
+            Choose how you want to study today:
+          </p>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+            Check your ability, review freely, focus on a book, or add easier words to your pool.
           </p>
         </div>
 

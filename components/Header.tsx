@@ -88,6 +88,7 @@ export default function Header() {
 
   const libraryHref = username ? `/users/${username}/books` : "/books";
   const librarySectionActive =
+    pathname.startsWith("/library") ||
     pathname === libraryHref ||
     pathname === "/books" ||
     /^\/users\/[^/]+\/books$/.test(pathname) ||
@@ -126,14 +127,31 @@ export default function Header() {
 
           <nav className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm md:mt-1 md:justify-end">
             <div className="relative" ref={libraryMenuRef}>
+              <Link
+                href="/library"
+                className={`rounded-full border px-3 py-1.5 transition md:hidden ${librarySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                onClick={() => {
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowStudyMenu(false);
+                  setShowProfileMenu(false);
+                }}
+              >
+                Library
+              </Link>
+
               <button
                 type="button"
                 onClick={() => {
                   setShowLibraryMenu((prev) => !prev);
                   setShowDiscoveryMenu(false);
                   setShowStudyMenu(false);
+                  setShowProfileMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${librarySectionActive
+                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${librarySectionActive
                   ? "border-stone-900 bg-stone-900 text-white"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                   }`}
@@ -142,7 +160,18 @@ export default function Header() {
               </button>
 
               {showLibraryMenu ? (
-                <div className="absolute left-1/2 z-50 mt-2 w-44 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg origin-top-center md:left-auto md:right-0 md:w-52 md:translate-x-0 md:origin-top-right">
+                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
+                  <Link
+                    href="/library"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowLibraryMenu(false)}
+                  >
+                    Library Hub
+                  </Link>
+
                   <Link
                     href={libraryHref}
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
@@ -260,12 +289,12 @@ export default function Header() {
                   <Link
                     href="/library-study"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Study Tools
+                    Study Hub
                   </Link>
                   <Link
                     href="/library-study/check"
@@ -301,10 +330,10 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/kanji-reading-study/coming-soon"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/kanji-reading-study")
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
+                    href="/library-study/kanji"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/kanji"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
