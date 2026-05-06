@@ -223,6 +223,22 @@ export default function Header() {
             </div>
 
             <div className="relative" ref={studyMenuRef}>
+              <Link
+                href="/library-study"
+                className={`rounded-full border px-3 py-1.5 transition md:hidden ${studySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                onClick={() => {
+                  setShowStudyMenu(false);
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowProfileMenu(false);
+                }}
+              >
+                Study
+              </Link>
+
               <button
                 type="button"
                 onClick={() => {
@@ -231,7 +247,7 @@ export default function Header() {
                   setShowDiscoveryMenu(false);
                   setShowProfileMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${studySectionActive
+                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${studySectionActive
                   ? "border-stone-900 bg-stone-900 text-white"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                   }`}
@@ -240,10 +256,20 @@ export default function Header() {
               </button>
 
               {showStudyMenu ? (
-                <div className="absolute right-0 z-50 mt-2 min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                <div className="absolute right-0 z-50 mt-2 hidden min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
                   <Link
                     href="/library-study"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowStudyMenu(false)}
+                  >
+                    Study Tools
+                  </Link>
+                  <Link
+                    href="/library-study/check"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/check"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
@@ -287,8 +313,8 @@ export default function Header() {
                   <Link
                     href="/library-study/word-sky"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/word-sky"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
