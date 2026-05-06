@@ -4,5 +4,5 @@
 import { redirect } from "next/navigation";
 
 export default function PublicProfilePage() {
-  redirect("/profile/setup");
+  redirect("/community/profile/setup");
 }

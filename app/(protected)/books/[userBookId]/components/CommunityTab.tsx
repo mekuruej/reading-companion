@@ -346,7 +346,7 @@ export default function CommunityTab({
               )}
               <div className="mt-3 text-xs leading-5 text-stone-500">
                 Has your level changed?{" "}
-                <Link href="/profile/setup" className="font-medium underline underline-offset-4">
+                <Link href="/community/profile/setup" className="font-medium underline underline-offset-4">
                   Change it in Profile Details
                 </Link>
                 .
@@ -388,7 +388,7 @@ export default function CommunityTab({
               )}
               <div className="mt-3 text-xs leading-5 text-stone-500">
                 Has your level changed?{" "}
-                <Link href="/profile/setup" className="font-medium underline underline-offset-4">
+                <Link href="/community/profile/setup" className="font-medium underline underline-offset-4">
                   Change it in Profile Details
                 </Link>
                 .

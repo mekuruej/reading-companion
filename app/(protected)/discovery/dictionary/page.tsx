@@ -436,7 +436,7 @@ export default function DictionaryPage() {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
-                    href={`/vocab/history?word=${encodeURIComponent(entry.word || query)}`}
+                    href={`/discovery/word-history?word=${encodeURIComponent(entry.word || query)}`}
                     className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 transition hover:bg-stone-50"
                   >
                     Open in Word History

@@ -94,17 +94,13 @@ export default function Header() {
     /^\/users\/[^/]+\/books$/.test(pathname) ||
     pathname === "/book-hubs" ||
     pathname === "/vocab";
-  const discoverySectionActive =
-    pathname === "/vocab/dictionary" || pathname.startsWith("/vocab/history");
+  const discoverySectionActive = pathname.startsWith("/discovery");
   const studySectionActive =
     pathname.startsWith("/library-study") ||
     pathname === "/study-coming-soon" ||
     pathname === "/book-flashcards" ||
     pathname.startsWith("/kanji-reading-study");
-  const profileSectionActive =
-    pathname === "/profile" ||
-    pathname.startsWith("/profile/") ||
-    pathname === "/stats";
+  const profileSectionActive = pathname.startsWith("/community");
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -209,14 +205,31 @@ export default function Header() {
             </div>
 
             <div className="relative" ref={discoveryMenuRef}>
+              <Link
+                href="/discovery"
+                className={`rounded-full border px-3 py-1.5 transition md:hidden ${discoverySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                onClick={() => {
+                  setShowDiscoveryMenu(false);
+                  setShowLibraryMenu(false);
+                  setShowStudyMenu(false);
+                  setShowProfileMenu(false);
+                }}
+              >
+                Discovery
+              </Link>
+
               <button
                 type="button"
                 onClick={() => {
                   setShowDiscoveryMenu((prev) => !prev);
                   setShowLibraryMenu(false);
                   setShowStudyMenu(false);
+                  setShowProfileMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${discoverySectionActive
+                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${discoverySectionActive
                   ? "border-stone-900 bg-stone-900 text-white"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                   }`}
@@ -225,10 +238,21 @@ export default function Header() {
               </button>
 
               {showDiscoveryMenu ? (
-                <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
                   <Link
-                    href="/vocab/dictionary"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/vocab/dictionary"
+                    href="/discovery"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Discovery Hub
+                  </Link>
+
+                  <Link
+                    href="/discovery/dictionary"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/dictionary"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
@@ -238,14 +262,25 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/vocab/history"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/vocab/history")
+                    href="/discovery/word-history"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/discovery/word-history")
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowDiscoveryMenu(false)}
                   >
                     Word History
+                  </Link>
+
+                  <Link
+                    href="/discovery/reader-insights"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Reader Insights
                   </Link>
                 </div>
               ) : null}
@@ -328,12 +363,11 @@ export default function Header() {
                   >
                     Book Flashcards
                   </Link>
-
                   <Link
                     href="/library-study/kanji"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/kanji"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
@@ -354,6 +388,22 @@ export default function Header() {
             </div>
 
             <div className="relative" ref={profileMenuRef}>
+              <Link
+                href="/community"
+                className={`rounded-full border px-3 py-1.5 transition md:hidden ${profileSectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowStudyMenu(false);
+                }}
+              >
+                Community
+              </Link>
+
               <button
                 type="button"
                 onClick={() => {
@@ -362,58 +412,67 @@ export default function Header() {
                   setShowDiscoveryMenu(false);
                   setShowStudyMenu(false);
                 }}
-                className={`rounded-full border px-3 py-1.5 transition ${profileSectionActive
+                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${profileSectionActive
                   ? "border-stone-900 bg-stone-900 text-white"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                   }`}
               >
-                Profile
+                Community
               </button>
 
               {showProfileMenu ? (
-                <div className="absolute right-0 z-50 mt-2 min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg">
+                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
                   <Link
-                    href="/profile"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/profile"
+                    href="/community"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
-                    Profile Home
+                    Community Hub
                   </Link>
 
                   <Link
-                    href="/stats"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/stats"
+                    href="/community/profile"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/profile" || pathname.startsWith("/community/profile/")
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
-                    Stats
+                    My Profile
                   </Link>
 
                   <Link
-                    href="/profile/social"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/profile/social"
+                    href="/community/stats"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
-                    Community
+                    My Stats
                   </Link>
-
                   <Link
-                    href="/profile/book-clubs-coming-soon"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/profile/book-clubs-coming-soon"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
+                    href="/community/book-clubs"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/book-clubs"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
                     Book Clubs
+                  </Link>
+                  <Link
+                    href="/discovery/reader-insights"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Reader Insights
                   </Link>
                 </div>
               ) : null}

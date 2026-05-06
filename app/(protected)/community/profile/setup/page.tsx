@@ -249,7 +249,7 @@ export default function ProfileSetupPage() {
     }
 
     setSuccessMsg("Profile saved.");
-    router.replace("/profile");
+    router.replace("/community/profile");
     router.refresh();
   };
 

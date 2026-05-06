@@ -15,9 +15,9 @@ type ProfileShellProps = {
 };
 
 const PROFILE_NAV = [
-  { href: "/profile", label: "Profile Home" },
-  { href: "/stats", label: "Stats" },
-  { href: "/profile/social", label: "Community" },
+  { href: "/community/profile", label: "Profile Home" },
+  { href: "/community/stats", label: "Stats" },
+  { href: "/community/profile/social", label: "Community" },
   { href: "/reading-groups", label: "Book Clubs" },
 ] as const;
 
@@ -64,11 +64,10 @@ export default function ProfileShell({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                    isActive
+                  className={`rounded-full border px-3 py-1.5 text-sm transition ${isActive
                       ? "border-stone-900 bg-stone-900 text-white"
                       : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </Link>

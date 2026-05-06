@@ -637,7 +637,7 @@ export default function VocabHistoryClient() {
 
     setNotFoundEntry(null);
     setOtherMatches([]);
-    router.replace("/vocab/history");
+    router.replace("/discovery/word-history");
   }
 
   function PatternSection({
@@ -673,7 +673,7 @@ export default function VocabHistoryClient() {
                     key={`${item.surface}|||${item.reading ?? ""}`}
                     type="button"
                     onClick={() => {
-                      router.push(`/vocab/history?word=${encodeURIComponent(item.surface)}`);
+                      router.push(`/discovery/word-history?word=${encodeURIComponent(item.surface)}`);
                     }}
                     className="w-full rounded-xl border p-3 text-left transition hover:bg-stone-50"
                   >
@@ -948,7 +948,7 @@ export default function VocabHistoryClient() {
       <div className="mt-8 flex justify-between">
         <button
           type="button"
-          onClick={() => router.push("/vocab/dictionary")}
+          onClick={() => router.push("/discovery/dictionary")}
           className="rounded bg-gray-200 px-4 py-2"
         >
           ← Dictionary
