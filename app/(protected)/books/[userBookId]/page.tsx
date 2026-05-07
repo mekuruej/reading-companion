@@ -3,16 +3,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BookInfoTab from "./components/BookInfoTab";
 import CommunityTab from "./components/CommunityTab";
 import ReadingTab from "./components/ReadingTab";
 import RatingTab from "./components/RatingTab";
-import TeacherTab from "./components/TeacherTab";
 import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
 import StoryTab from "./components/StoryTab";
 import VocabTab from "./components/VocabTab";
+import BookHubActionGrid from "./components/BookHubActionGrid";
+import BookFlagModal from "./components/BookFlagModal";
 
 type Book = {
   id: string;
@@ -86,15 +87,15 @@ type ReadingSession = {
   id: string;
   user_book_id: string;
   read_on: string;
-  start_page: number;
-  end_page: number;
+  start_page: number | null;
+  end_page: number | null;
   minutes_read: number | null;
   is_filler: boolean;
   created_at: string;
   session_mode: string | null;
 };
 
-type HubTab = "bookInfo" | "community" | "teacher" | "study" | "reading" | "story" | "rating";
+type HubTab = "bookInfo" | "community" | "study" | "reading" | "story" | "rating";
 type EditingPanel =
   | HubTab
   | "bookInfoDetails"
@@ -501,7 +502,6 @@ function normalizeKanjiQueueKey(surface: string | null | undefined, reading: str
 
 export default function BookHubPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const params = useParams<{ userBookId: string }>();
   const userBookId = params?.userBookId;
 
@@ -509,26 +509,24 @@ export default function BookHubPage() {
   const [row, setRow] = useState<UserBook | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [showBookFlagModal, setShowBookFlagModal] = useState(false);
+  const [bookFlagNote, setBookFlagNote] = useState("");
+  const [isSavingBookFlag, setIsSavingBookFlag] = useState(false);
+
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
   const [profileLevel, setProfileLevel] = useState<string>("");
+  const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
 
   const isTeacher = myRole === "teacher";
+  const isTeacherContext = isTeacher || isSuperTeacher;
   const canEditBookInfo = isSuperTeacher;
 
   const [editingTab, setEditingTab] = useState<EditingPanel | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<HubTab>(
-    searchParams.get("tab") === "teacher" ? "teacher" : "study"
-  );
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab === "teacher") {
-      setActiveTab("teacher");
-    }
-  }, [searchParams]);
+  const [activeTab, setActiveTab] = useState<HubTab>("study");
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
 
   const [startedAt, setStartedAt] = useState<string>("");
@@ -764,9 +762,6 @@ export default function BookHubPage() {
   const [wordExplorerError, setWordExplorerError] = useState<string | null>(null);
   const [wordExplorerResults, setWordExplorerResults] = useState<any[]>([]);
 
-  const canAccessKanjiReadings =
-    isSuperTeacher || isTeacher || isLinkedStudentToAnyTeacher;
-
   const [quickPreview, setQuickPreview] = useState<{
     surface: string;
     cacheSurface: string; // ✅ ADD THIS
@@ -853,23 +848,37 @@ export default function BookHubPage() {
     );
   }, [realReadingSessions]);
 
+  const pageTrackedReadingSessions = useMemo(() => {
+    return visualReadingSessions.filter(
+      (s) => s.start_page != null && s.end_page != null
+    );
+  }, [visualReadingSessions]);
+
   const timedSessions = useMemo(() => {
     return visualReadingSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
   }, [visualReadingSessions]);
 
+  const timedPageTrackedSessions = useMemo(() => {
+    return timedSessions.filter(
+      (s) => s.start_page != null && s.end_page != null
+    );
+  }, [timedSessions]);
+
   const totalPagesRead = useMemo(() => {
-    return visualReadingSessions.reduce((sum, s) => {
-      return sum + (s.end_page - s.start_page + 1);
+    return pageTrackedReadingSessions.reduce((sum, s) => {
+      return sum + ((s.end_page ?? 0) - (s.start_page ?? 0) + 1);
     }, 0);
-  }, [visualReadingSessions]);
+  }, [pageTrackedReadingSessions]);
 
   const totalTimedMinutes = useMemo(() => {
     return timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
   }, [timedSessions]);
 
   const totalTimedPages = useMemo(() => {
-    return timedSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
-  }, [timedSessions]);
+    return timedPageTrackedSessions.reduce((sum, s) => {
+      return sum + ((s.end_page ?? 0) - (s.start_page ?? 0) + 1);
+    }, 0);
+  }, [timedPageTrackedSessions]);
 
   const averageMinutesPerPage = useMemo(() => {
     if (!totalTimedPages) return null;
@@ -905,6 +914,11 @@ export default function BookHubPage() {
     if (visualReadingSessions.length === 0) return null;
     return visualReadingSessions[0]?.read_on ?? null;
   }, [visualReadingSessions]);
+
+  const lastEngagedDate = useMemo(() => {
+    if (realReadingSessions.length === 0) return null;
+    return realReadingSessions[0]?.read_on ?? null;
+  }, [realReadingSessions]);
 
   const visibleReadingSessions = useMemo(() => {
     return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
@@ -3188,6 +3202,24 @@ export default function BookHubPage() {
     const r = data as unknown as UserBook;
     setRow(r);
 
+    setBookHubOwnerName("");
+
+    if (r.user_id && r.user_id !== user.id) {
+      const { data: ownerProfile, error: ownerProfileError } = await supabase
+        .from("profiles")
+        .select("display_name, username")
+        .eq("id", r.user_id)
+        .maybeSingle();
+
+      if (ownerProfileError) {
+        console.error("Error loading Book Hub owner profile:", ownerProfileError);
+      }
+
+      setBookHubOwnerName(
+        ownerProfile?.display_name || ownerProfile?.username || "Student"
+      );
+    }
+
     const studentUserId = r.user_id ?? null;
 
     const isUuid =
@@ -4035,6 +4067,66 @@ export default function BookHubPage() {
     await load();
   };
 
+  async function flagBookForTeacherReview() {
+    if (!row?.id || !userId) return;
+
+    setError(null);
+    setSaveNotice(null);
+    setIsSavingBookFlag(true);
+
+    const title = row.books?.title ?? "this book";
+    const cleanNote = bookFlagNote.trim();
+
+    const message = cleanNote
+      ? `Book flagged for review: ${title}\n\nNote: ${cleanNote}`
+      : `Book flagged for review: ${title}`;
+
+    const { data: superTeachers, error: superTeacherError } = await supabase
+      .from("profiles")
+      .select("id, role, is_super_teacher")
+      .or("role.eq.super_teacher,is_super_teacher.eq.true");
+
+    if (superTeacherError) {
+      console.error("Error finding super teachers for book flag:", superTeacherError);
+    }
+
+    const recipientIds = Array.from(
+      new Set(
+        ((superTeachers ?? []) as any[])
+          .map((profile) => profile.id)
+          .filter(Boolean)
+      )
+    );
+
+    if (recipientIds.length === 0) {
+      setIsSavingBookFlag(false);
+      alert("Could not flag this book because no super teacher account was found.");
+      return;
+    }
+
+    const alerts = recipientIds.map((recipientId) => ({
+      user_id: recipientId,
+      user_book_id: row.id,
+      type: "book_flag",
+      message,
+    }));
+
+    const { error: alertError } = await supabase.from("user_alerts").insert(alerts);
+
+    setIsSavingBookFlag(false);
+
+    if (alertError) {
+      console.error("Error flagging book for review:", alertError);
+      alert(`Could not flag this book.\n${alertError.message}`);
+      return;
+    }
+
+    setBookFlagNote("");
+    setShowBookFlagModal(false);
+    setSaveNoticeTone("success");
+    setSaveNotice("Book flagged for review.");
+  }
+
   async function pullQuickWord() {
     const word = quickWord.trim();
     if (!word) return;
@@ -4350,11 +4442,17 @@ export default function BookHubPage() {
   }, [timedFluidSessions]);
 
   const curiosityPages = useMemo(() => {
-    return timedCuriositySessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
+    return timedCuriositySessions.reduce((sum, s) => {
+      if (s.start_page == null || s.end_page == null) return sum;
+      return sum + (s.end_page - s.start_page + 1);
+    }, 0);
   }, [timedCuriositySessions]);
 
   const fluidPages = useMemo(() => {
-    return timedFluidSessions.reduce((sum, s) => sum + (s.end_page - s.start_page + 1), 0);
+    return timedFluidSessions.reduce((sum, s) => {
+      if (s.start_page == null || s.end_page == null) return sum;
+      return sum + (s.end_page - s.start_page + 1);
+    }, 0);
   }, [timedFluidSessions]);
 
   const curiosityMinPerPage = useMemo(() => {
@@ -4394,8 +4492,30 @@ export default function BookHubPage() {
 
   const relatedLinksArr = Array.isArray(book.related_links) ? book.related_links : [];
 
+  const isViewingStudentBookHub =
+    isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
+
+  const bookHubContextLabel = isViewingStudentBookHub
+    ? `Student Book Hub · ${bookHubOwnerName || "Student"}`
+    : "My Book Hub";
+
   return (
     <main className="min-h-screen bg-stone-50 p-6">
+      {showBookFlagModal ? (
+        <BookFlagModal
+          bookTitle={book.title ?? "Untitled book"}
+          note={bookFlagNote}
+          isSaving={isSavingBookFlag}
+          onNoteChange={setBookFlagNote}
+          onCancel={() => {
+            if (isSavingBookFlag) return;
+            setShowBookFlagModal(false);
+            setBookFlagNote("");
+          }}
+          onSubmit={flagBookForTeacherReview}
+        />
+      ) : null}
+
       <div className="mx-auto max-w-6xl">
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="p-5 md:p-8">
@@ -4420,6 +4540,27 @@ export default function BookHubPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
                       {book.title}
                     </h1>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div
+                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${isViewingStudentBookHub
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-stone-200 bg-stone-50 text-stone-600"
+                          }`}
+                      >
+                        {bookHubContextLabel}
+                      </div>
+
+                      {isTeacherContext ? (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/teacher/books/${row.id}`)}
+                          className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800 transition hover:bg-violet-100"
+                        >
+                          Teacher Review →
+                        </button>
+                      ) : null}
+                    </div>
 
                     {book.title_reading ? (
                       <div className="mt-1 text-lg text-stone-500 md:text-xl">
@@ -4502,6 +4643,7 @@ export default function BookHubPage() {
                   </select>
                 </div>
               </div>
+
               <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
                 <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
 
@@ -4640,10 +4782,10 @@ export default function BookHubPage() {
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Days Read</div>
+                  <div className="text-xs text-stone-500">Days Engaged</div>
                   <div className="mt-1 font-medium">{daysRead != null ? daysRead : "—"}</div>
                   <div className="mt-1 text-[10px] text-stone-400">
-                    Logged dates only
+                    Reading or listening
                   </div>
                 </div>
 
@@ -4651,47 +4793,27 @@ export default function BookHubPage() {
                   <div className="text-xs text-stone-500">Pages Read</div>
                   <div className="mt-1 font-medium">{totalPagesRead || "—"}</div>
                   <div className="mt-1 text-[10px] text-stone-400">
-                    Logged sessions only
+                    Page-tracked only
                   </div>
                 </div>
 
                 <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Avg Pages/Session</div>
+                  <div className="text-xs text-stone-500">Words Saved</div>
                   <div className="mt-1 font-medium">
-                    {visualReadingSessions.length > 0
-                      ? (totalPagesRead / visualReadingSessions.length).toFixed(1)
-                      : "—"}
+                    {uniqueLookupCount != null ? uniqueLookupCount : "—"}
+                  </div>
+                  <div className="mt-1 text-[10px] text-stone-400">
+                    Unique saved words
                   </div>
                 </div>
 
                 <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Listening Time</div>
+                  <div className="text-xs text-stone-500">Last Engaged</div>
                   <div className="mt-1 font-medium">
-                    {listeningMinutes > 0 ? formatMinutes(listeningMinutes) : "—"}
+                    {lastEngagedDate ?? "—"}
                   </div>
-                </div>
-
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Curiosity Time (Intensive Reading)</div>
-                  <div className="mt-1 font-medium">{formatMinutes(curiosityMinutes)}</div>
-                </div>
-
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Curiosity Min/Page</div>
-                  <div className="mt-1 font-medium">
-                    {curiosityMinPerPage != null ? curiosityMinPerPage.toFixed(2) : "—"}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Fluid Time (Extensive Reading)</div>
-                  <div className="mt-1 font-medium">{formatMinutes(fluidMinutes)}</div>
-                </div>
-
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Fluid Min/Page</div>
-                  <div className="mt-1 font-medium">
-                    {fluidMinPerPage != null ? fluidMinPerPage.toFixed(2) : "—"}
+                  <div className="mt-1 text-[10px] text-stone-400">
+                    Latest session
                   </div>
                 </div>
               </div>
@@ -4720,97 +4842,44 @@ export default function BookHubPage() {
                 </div>
               ) : null}
 
-              <div className="pb-2">
-                <div className="mt-6 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeaveIfTimerActive()) return;
-                      router.push(`/vocab/single-add?userBookId=${row.id}`);
-                    }}
-                    className="rounded-xl border border-stone-900 bg-rose-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-rose-100 hover:shadow-md"
-                  >
-                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Curiosity Reading</div>
-                    <div className="text-base font-semibold text-stone-900 sm:text-lg">(Intensive)</div>
-                    <div className="mt-2 text-xs leading-5 text-stone-700">
-                      Read while saving vocab and logging a slower, mindful session.
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeaveIfTimerActive()) return;
-                      router.push(`/books/${row.id}/study`);
-                    }}
-                    className="rounded-xl border border-stone-900 bg-yellow-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-yellow-100 hover:shadow-md"
-                  >
-                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Study</div>
-                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Flashcards</div>
-                    <div className="mt-1 text-xs leading-4 text-stone-700">Review the words</div>
-                    <div className="mt-1 text-xs leading-4 text-stone-700">you saved from this book.</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeaveIfTimerActive()) return;
-                      router.push(`/books/${row.id}/readalong`);
-                    }}
-                    className="rounded-xl border border-stone-900 bg-emerald-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-emerald-100 hover:shadow-md"
-                  >
-                    <div className="text-base font-semibold text-stone-900 sm:text-lg">Fluid Reading</div>
-                    <div className="text-base font-semibold text-stone-900 sm:text-lg">(Extensive) </div>
-                    <div className="mt-2 text-xs leading-5 text-stone-700">
-                      Read without lookups, use saved-word support, and log a quicker session.
-                    </div>
-                  </button>
-
-                  {canAccessKanjiReadings ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!confirmLeaveIfTimerActive()) return;
-                        router.push(`/books/${row.id}/weekly-readings`);
-                      }}
-                      className="rounded-xl border border-stone-900 bg-blue-50 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:bg-blue-100 hover:shadow-md"
-                    >
-                      <div className="text-base font-semibold text-stone-900 sm:text-lg">Kanji</div>
-                      <div className="text-base font-semibold text-stone-900 sm:text-lg">Readings</div>
-                      <div className="mt-2 text-xs leading-5 text-stone-700">
-                        Practice onyomi and kunyomi from your saved vocabulary.
-                      </div>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        alert("Kanji Readings is available to teachers and enrolled students.");
-                      }}
-                      className="rounded-xl border border-stone-300 bg-stone-100 px-3.5 py-3 text-center opacity-80 shadow-sm transition-all hover:bg-stone-200 hover:shadow-md"
-                    >
-                      <div className="text-base font-semibold text-stone-700 sm:text-lg">Kanji 🔒</div>
-                      <div className="text-base font-semibold text-stone-700 sm:text-lg">Readings</div>
-                      <div className="mt-2 text-xs leading-5 text-stone-600">
-                        Available to teachers and enrolled students.
-                      </div>
-                    </button>
-                  )}
-                </div>
-              </div>
+              <BookHubActionGrid
+                onCuriosityReading={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/curiosity-reading`);
+                }}
+                onFluidReadingExtensive={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/readalong`);
+                }}
+                onFluidReadingJustReading={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/just-reading`);
+                }}
+                onListening={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/listening`);
+                }}
+                onStudyFlashcards={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/study`);
+                }}
+                onVocabularyList={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/words`);
+                }}
+                onBookStats={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/stats`);
+                }}
+                onFlagBook={() => {
+                  setBookFlagNote("");
+                  setShowBookFlagModal(true);
+                }}
+              />
 
               <div className="mt-2">
                 <div className="mb-4 w-full border-b border-stone-400 px-2">
                   <div className="flex flex-wrap items-end gap-3">
-                    {isTeacher && (
-                      <FilingTab
-                        active={activeTab === "teacher"}
-                        onClick={() => setActiveTab("teacher")}
-                      >
-                        Teacher
-                      </FilingTab>
-                    )}
-
                     <FilingTab
                       active={activeTab === "study"}
                       onClick={() => setActiveTab("study")}
@@ -5002,48 +5071,6 @@ export default function BookHubPage() {
                     row={row}
                     vocabTab={vocabTab}
                     setVocabTab={setVocabTab}
-                  />
-                </div>
-              )}
-
-              {activeTab === "teacher" && (
-                <div className="space-y-4">
-                  <div className="px-4 md:px-6">
-                    <div className="text-base font-semibold text-stone-900">Teacher</div>
-                  </div>
-
-                  <TeacherTab
-                    row={row}
-                    book={book}
-                    userId={userId}
-                    isEditingThisTab={isEditingThisTab}
-                    editingTab={editingTab}
-                    setEditingTab={setEditingTab}
-                    notes={notes}
-                    setNotes={setNotes}
-                    saveNotes={saveNotes}
-                    saveRecommendedLevel={saveRecommendedLevel}
-                    saveTeacherStudentUseRating={saveTeacherStudentUseRating}
-                    saveLanguageLearningPotential={saveLanguageLearningPotential}
-                    recommendedLevel={recommendedLevel}
-                    setRecommendedLevel={setRecommendedLevel}
-                    teacherStudentUseRating={teacherStudentUseRating}
-                    setTeacherStudentUseRating={setTeacherStudentUseRating}
-                    ratingRecommend={ratingRecommend}
-                    setRatingRecommend={setRatingRecommend}
-                    kanjiMapLoading={kanjiMapLoading}
-                    kanjiMapError={kanjiMapError}
-                    kanjiMapQueue={[]}
-                    needsKanjiEnrichmentCount={needsKanjiEnrichmentCount}
-                    editingKanjiRows={editingKanjiRows}
-                    openKanjiWordIds={openKanjiWordIds}
-                    savingKanjiWordId={savingKanjiWordId}
-                    handleWorkOnKanjiWord={handleWorkOnKanjiWord}
-                    updateKanjiMapRow={updateKanjiMapRow}
-                    saveKanjiWord={saveKanjiWord}
-                    setKanjiWordOpen={setKanjiWordOpen}
-                    hiraToKata={hiraToKata}
-                    removeWordFromKanjiEnrichment={removeWordFromKanjiEnrichment}
                   />
                 </div>
               )}

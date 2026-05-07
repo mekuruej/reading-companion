@@ -9,6 +9,7 @@ import {
   computeLibraryStudyColorStatus,
   type LibraryStudyColor,
   type LibraryStudyColorStatus,
+  type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
 
 const DEFAULT_LEARNING_SETTINGS = {
@@ -60,6 +61,15 @@ type GlobalEncounterRow = {
 type LibraryWordSummaryRow = {
   study_identity_key: string;
   total_encounter_count: number | null;
+};
+
+type LibraryWordProgressRow = {
+  study_identity_key: string;
+  reading_gate_status: LibraryStudyGateStatus | null;
+  meaning_gate_status: LibraryStudyGateStatus | null;
+  held_before_reading_gate: boolean | null;
+  held_before_meaning_gate: boolean | null;
+  mastered: boolean | null;
 };
 
 async function loadAllGlobalEncounterRows(ownerUserId: string) {
@@ -254,6 +264,10 @@ export default function BookWordsPage() {
     DEFAULT_LEARNING_SETTINGS
   );
   const [globalEncounterCounts, setGlobalEncounterCounts] = useState<Record<string, number>>({});
+
+  const [libraryProgressByKey, setLibraryProgressByKey] = useState<
+    Record<string, LibraryWordProgressRow>
+  >({});
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -713,9 +727,39 @@ export default function BookWordsPage() {
           }
 
           setGlobalEncounterCounts(counts);
+
+          const { data: progressRows, error: progressErr } = await supabase
+            .from("user_library_word_progress")
+            .select(
+              `
+        study_identity_key,
+        reading_gate_status,
+        meaning_gate_status,
+        held_before_reading_gate,
+        held_before_meaning_gate,
+        mastered
+      `
+            )
+            .eq("user_id", ownerUserId)
+            .returns<LibraryWordProgressRow[]>();
+
+          if (progressErr) {
+            console.warn("Library word progress is not available yet:", progressErr);
+            setLibraryProgressByKey({});
+          } else {
+            const progressMap: Record<string, LibraryWordProgressRow> = {};
+
+            for (const row of progressRows ?? []) {
+              if (!row.study_identity_key) continue;
+              progressMap[row.study_identity_key] = row;
+            }
+
+            setLibraryProgressByKey(progressMap);
+          }
         } catch (globalWordsErr) {
-          console.error("Error loading global word encounters:", globalWordsErr);
+          console.error("Error loading global word encounters/progress:", globalWordsErr);
           setGlobalEncounterCounts({});
+          setLibraryProgressByKey({});
         }
 
         let wordsQuery = supabase
@@ -1226,7 +1270,7 @@ export default function BookWordsPage() {
               >
                 <span className="block leading-tight">
                   <span className="block">Library</span>
-                  <span className="block">Encounters</span>
+                  <span className="block">Stage</span>
                 </span>
               </th>
 
@@ -1257,11 +1301,18 @@ export default function BookWordsPage() {
           <tbody>
             {filteredSorted.map((w) => {
               const rep = repeatCounts.get(repeatKey(w)) ?? 0;
-              const globalEncounterCount =
-                globalEncounterCounts[studyIdentityKey(w.surface, w.reading)] ?? rep;
+              const identityKey = studyIdentityKey(w.surface, w.reading);
+              const globalEncounterCount = globalEncounterCounts[identityKey] ?? rep;
+              const progress = libraryProgressByKey[identityKey];
+
               const status = computeLibraryStudyColorStatus({
                 encounterCount: globalEncounterCount,
                 settings: learningSettings,
+                readingGate: progress?.reading_gate_status ?? "not_started",
+                meaningGate: progress?.meaning_gate_status ?? "not_started",
+                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                mastered: progress?.mastered ?? false,
               });
 
               return (

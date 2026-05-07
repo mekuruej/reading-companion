@@ -480,6 +480,15 @@ export default function BooksPage() {
       ? "Me"
       : students.find((s) => s.id === viewingUserId)?.display_name || "Member";
 
+  const isViewingStudentLibrary =
+    isTeacher && !!viewingUserId && !!meId && viewingUserId !== meId;
+
+  const libraryOwnerLabel = isViewingStudentLibrary ? `${viewingLabel}’s` : "My";
+
+  const libraryContextLabel = isViewingStudentLibrary
+    ? `Student Library · ${viewingLabel}`
+    : null;
+
   async function loadMonthlyLibraryStats(
     userId: string,
     monthValue: string,
@@ -1826,14 +1835,24 @@ export default function BooksPage() {
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-screen-xl">
         <div className="mb-5 flex items-center justify-between gap-4 pr-6 sm:pr-10">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-semibold sm:text-3xl">My</span>
-            <img
-              src="/mekuru-logo.png"
-              alt="Mekuru"
-              className="h-12 w-12 object-contain sm:h-20 sm:w-20"
-            />
-            <span className="text-2xl font-semibold sm:text-3xl">Library</span>
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-semibold sm:text-3xl">
+                {libraryOwnerLabel}
+              </span>
+              <img
+                src="/mekuru-logo.png"
+                alt="Mekuru"
+                className="h-12 w-12 object-contain sm:h-20 sm:w-20"
+              />
+              <span className="text-2xl font-semibold sm:text-3xl">Library</span>
+            </div>
+
+            {libraryContextLabel ? (
+              <div className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                {libraryContextLabel}
+              </div>
+            ) : null}
           </div>
 
           <UserBar isTeacher={isTeacher} variant="logoutOnly" />
@@ -1864,8 +1883,8 @@ export default function BooksPage() {
                     type="button"
                     onClick={() => setLibrarySnapshotView("monthly")}
                     className={`rounded-lg px-3 py-1.5 transition ${librarySnapshotView === "monthly"
-                        ? "bg-white text-slate-950 shadow-sm"
-                        : "hover:bg-white/70"
+                      ? "bg-white text-slate-950 shadow-sm"
+                      : "hover:bg-white/70"
                       }`}
                   >
                     Monthly
@@ -1874,8 +1893,8 @@ export default function BooksPage() {
                     type="button"
                     onClick={() => setLibrarySnapshotView("colors")}
                     className={`rounded-lg px-3 py-1.5 transition ${librarySnapshotView === "colors"
-                        ? "bg-white text-slate-950 shadow-sm"
-                        : "hover:bg-white/70"
+                      ? "bg-white text-slate-950 shadow-sm"
+                      : "hover:bg-white/70"
                       }`}
                   >
                     Colors
@@ -2215,52 +2234,7 @@ export default function BooksPage() {
 
         <UserBar isTeacher={isTeacher} variant="labelOnly" />
 
-        <div className="mb-4 space-y-3">
-          {isTeacher ? (
-            <div className="mb-4 max-w-md space-y-2">
-              <div className="text-sm text-gray-700">
-                Viewing: <span className="font-medium">{viewingLabel}</span>
-              </div>
-
-              <select
-                value={viewingUserId || meId}
-                onChange={(e) => {
-                  const nextUserId = e.target.value;
-
-                  if (nextUserId === meId) {
-                    router.push(`/users/${myUsername}/books`);
-                    return;
-                  }
-
-                  const selectedUser = students.find((s) => s.id === nextUserId);
-
-                  if (selectedUser?.username) {
-                    router.push(`/users/${selectedUser.username}/books`);
-                  } else {
-                    setViewingUserId(nextUserId);
-                  }
-                }}
-                className="w-full rounded-lg border bg-white p-2"
-                disabled={!meId}
-              >
-                <option value={meId}>Me</option>
-
-                {students.some((s) => s.id !== meId) ? (
-                  <optgroup label="Users">
-                    {students
-                      .filter((s) => s.id !== meId)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.display_name}
-                          {s.level ? ` (${s.level})` : ""}
-                        </option>
-                      ))}
-                  </optgroup>
-                ) : null}
-              </select>
-            </div>
-          ) : null}
-        </div>
+        {null}
 
         <div className="mb-4 space-y-3">
           <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">

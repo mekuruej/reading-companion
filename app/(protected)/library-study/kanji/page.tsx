@@ -22,6 +22,26 @@ type UserBookWordRow = {
   page_number: number | null;
 };
 
+type VocabularyCacheRow = {
+  id: number;
+  surface: string | null;
+  reading: string | null;
+  jlpt: string | null;
+  senses_json: any[] | null;
+};
+
+type KanjiMapRow = {
+  id: number;
+  vocabulary_cache_id: number;
+  kanji: string | null;
+  kanji_position: number | null;
+  reading_type: "on" | "kun" | "other" | string | null;
+  base_reading: string | null;
+  realized_reading: string | null;
+  excluded_from_kanji_practice: boolean | null;
+  flagged_for_review: boolean | null;
+};
+
 type QuizCard = {
   key: string;
   kanjiMapId: number;
@@ -32,9 +52,10 @@ type QuizCard = {
   sourceWord: string;
   sourceMeaning: string | null;
   sourceReading: string | null;
-  userBookId: string;
-  userBookWordId: string;
-  bookTitle: string;
+  jlpt: string | null;
+  userBookId: string | null;
+  userBookWordId: string | null;
+  bookTitle: string | null;
   bookCover: string | null;
   strokeCount: number | null;
   radical: string | null;
@@ -45,7 +66,36 @@ type QuizCard = {
   baseReading: string | null;
 };
 
-type RecallResult = "correct" | "wrong" | "shown" | null;
+type RecallResult = "correct" | "wrong" | "shown" | "unverified" | null;
+type RecallMode = "wordForKanji" | "kanjiForReading";
+type CardQuestionMode = "readingChoice" | "kanjiChoice";
+type LevelFilter = "beginner" | "intermediate" | "advanced" | "unlabeled" | "all";
+
+function normalizeJlpt(value: string | null | undefined) {
+  const normalized = (value ?? "").trim().toUpperCase().replace(/^JLPT-/, "");
+  if (
+    normalized === "N5" ||
+    normalized === "N4" ||
+    normalized === "N3" ||
+    normalized === "N2" ||
+    normalized === "N1"
+  ) {
+    return normalized;
+  }
+  return "NON-JLPT";
+}
+
+function matchesLevelFilter(jlpt: string | null | undefined, level: LevelFilter) {
+  const normalized = normalizeJlpt(jlpt);
+
+  if (level === "all") return true;
+  if (level === "beginner") return normalized === "N5" || normalized === "N4";
+  if (level === "intermediate") return normalized === "N3" || normalized === "N2";
+  if (level === "advanced") return normalized === "N1";
+  if (level === "unlabeled") return normalized === "NON-JLPT";
+
+  return true;
+}
 
 function readingTypeLabel(val: "onyomi" | "kunyomi" | "other" | null | string) {
   const v = (val ?? "").toLowerCase().trim();
@@ -80,6 +130,41 @@ function normalizeWord(s: string) {
     .toLowerCase();
 }
 
+function kanjiChars(text: string) {
+  return text.match(/[\p{Script=Han}]/gu) ?? [];
+}
+
+function hasExactlyOneKanji(text: string) {
+  return kanjiChars(text).length === 1;
+}
+
+function stableNumberFromString(text: string) {
+  let total = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    total = (total * 31 + text.charCodeAt(i)) % 9973;
+  }
+  return total;
+}
+
+function meaningPreviewFromSenses(senses: any[] | null | undefined) {
+  if (!Array.isArray(senses)) return null;
+
+  for (const sense of senses) {
+    const definitions = Array.isArray(sense?.english_definitions)
+      ? sense.english_definitions
+        .map((definition: any) => String(definition).trim())
+        .filter(Boolean)
+      : [];
+
+    if (definitions.length === 0) continue;
+
+    const preview = definitions.slice(0, 3).join("; ");
+    return preview.length > 120 ? `${preview.slice(0, 117).trim()}...` : preview;
+  }
+
+  return null;
+}
+
 function hiraToKata(s: string) {
   return (s ?? "").replace(/[ぁ-ゖ]/g, (ch) =>
     String.fromCharCode(ch.charCodeAt(0) + 0x60)
@@ -102,16 +187,6 @@ function formatReadingForType(
   return reading;
 }
 
-function getKanjiPositionHint(sourceWord: string, kanji: string) {
-  if (!sourceWord || !kanji) return "";
-
-  const chars = Array.from(sourceWord);
-  const index = chars.findIndex((ch) => ch === kanji);
-
-  if (index === -1) return "";
-  return `${index + 1} of ${chars.length}`;
-}
-
 function isKunWithOkurigana(surface: string) {
   const hasKanji = /[\p{Script=Han}]/u.test(surface);
   const hasHiragana = /[\p{Script=Hiragana}]/u.test(surface);
@@ -128,10 +203,17 @@ function getTrailingReadingHint(sourceWord: string, kanji: string) {
   return chars.filter((_, i) => i !== index).join("");
 }
 
-function expandCardsForPractice(cards: QuizCard[]) {
-  return cards.flatMap((card) =>
-    card.flaggedForReview ? [card, { ...card, key: `${card.key}-priority` }] : [card]
-  );
+function selectOneCardPerKanji(cards: QuizCard[]) {
+  const byKanji = new Map<string, QuizCard>();
+
+  for (const card of shuffleArray(cards)) {
+    const existing = byKanji.get(card.kanji);
+    if (!existing || (card.flaggedForReview && !existing.flaggedForReview)) {
+      byKanji.set(card.kanji, card);
+    }
+  }
+
+  return Array.from(byKanji.values());
 }
 
 function chunkArray<T>(items: T[], size: number) {
@@ -140,6 +222,10 @@ function chunkArray<T>(items: T[], size: number) {
     chunks.push(items.slice(i, i + size));
   }
   return chunks;
+}
+
+function makeContextKey(surface: string | null | undefined, reading: string | null | undefined) {
+  return `${normalizeWord(surface ?? "")}|||${normalizeReading(reading ?? "")}`;
 }
 
 export default function KanjiReadingStudyPage() {
@@ -159,6 +245,8 @@ export default function KanjiReadingStudyPage() {
   const [guessInput, setGuessInput] = useState("");
   const [recallRevealed, setRecallRevealed] = useState(false);
   const [recallResult, setRecallResult] = useState<RecallResult>(null);
+  const [recallMatchedWord, setRecallMatchedWord] = useState<string | null>(null);
+  const [recallMatchedCard, setRecallMatchedCard] = useState<QuizCard | null>(null);
   const [skipTypingThisSession, setSkipTypingThisSession] = useState(false);
   const [endedEarly, setEndedEarly] = useState(false);
   const [usedRecallWords, setUsedRecallWords] = useState<string[]>([]);
@@ -168,21 +256,9 @@ export default function KanjiReadingStudyPage() {
 
   const [studyOnyomi, setStudyOnyomi] = useState(false);
   const [studyKunyomi, setStudyKunyomi] = useState(false);
-  const [bookFilter, setBookFilter] = useState<string>("all");
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>("beginner");
 
   const canAccessKanjiPractice = true;
-
-  const availableBooks = useMemo(() => {
-    const byId = new Map<string, string>();
-
-    for (const card of baseCards) {
-      if (!byId.has(card.userBookId)) byId.set(card.userBookId, card.bookTitle);
-    }
-
-    return Array.from(byId.entries())
-      .map(([id, title]) => ({ id, title }))
-      .sort((a, b) => a.title.localeCompare(b.title, "ja"));
-  }, [baseCards]);
 
   const wordReadingKinds = useMemo(() => {
     const byWord = new Map<string, Set<"onyomi" | "kunyomi">>();
@@ -202,7 +278,7 @@ export default function KanjiReadingStudyPage() {
 
   const filteredBaseCards = useMemo(() => {
     return baseCards.filter((card) => {
-      if (bookFilter !== "all" && card.userBookId !== bookFilter) {
+      if (!matchesLevelFilter(card.jlpt, levelFilter)) {
         return false;
       }
 
@@ -233,7 +309,7 @@ export default function KanjiReadingStudyPage() {
 
       return true;
     });
-  }, [baseCards, bookFilter, studyOnyomi, studyKunyomi, wordReadingKinds]);
+  }, [baseCards, levelFilter, studyOnyomi, studyKunyomi, wordReadingKinds]);
 
   useEffect(() => {
     buildDeckFromCards(filteredBaseCards);
@@ -257,6 +333,48 @@ export default function KanjiReadingStudyPage() {
           setNeedsSignIn(true);
           setLoading(false);
           return;
+        }
+
+        const { data: kanjiMapRows, error: kanjiMapErr } = await supabase
+          .from("vocabulary_kanji_map")
+          .select(
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, excluded_from_kanji_practice, flagged_for_review"
+          )
+          .not("kanji", "is", null)
+          .not("base_reading", "is", null)
+          .not("realized_reading", "is", null)
+          .limit(5000)
+          .returns<KanjiMapRow[]>();
+
+        if (kanjiMapErr) throw kanjiMapErr;
+
+        const activeKanjiMapRows = (kanjiMapRows ?? []).filter((row) => {
+          const hasReading = !!(row.realized_reading?.trim() || row.base_reading?.trim());
+          return hasReading && (!row.excluded_from_kanji_practice || !!row.flagged_for_review);
+        });
+
+        const vocabularyCacheIds = Array.from(
+          new Set(
+            activeKanjiMapRows
+              .map((row) => row.vocabulary_cache_id)
+              .filter((id): id is number => id != null)
+          )
+        );
+
+        const vocabularyById = new Map<number, VocabularyCacheRow>();
+
+        for (const cacheIdChunk of chunkArray(vocabularyCacheIds, 400)) {
+          const { data: cacheRows, error: cacheErr } = await supabase
+            .from("vocabulary_cache")
+            .select("id, surface, reading, jlpt, senses_json")
+            .in("id", cacheIdChunk)
+            .returns<VocabularyCacheRow[]>();
+
+          if (cacheErr) throw cacheErr;
+
+          for (const row of cacheRows ?? []) {
+            vocabularyById.set(row.id, row);
+          }
         }
 
         const { data: userBooks, error: userBooksErr } = await supabase
@@ -288,15 +406,10 @@ export default function KanjiReadingStudyPage() {
           });
         }
 
-        if (userBookIds.length === 0) {
-          setBaseCards([]);
-          return;
-        }
-
-        const allRows: UserBookWordRow[] = [];
+        const contextByKey = new Map<string, UserBookWordRow>();
 
         for (const userBookIdChunk of chunkArray(userBookIds, 200)) {
-          const { data: rows, error: cardsErr } = await supabase
+          const { data: rows, error: contextErr } = await supabase
             .from("user_book_words")
             .select(
               "id, user_book_id, surface, reading, meaning, created_at, hidden, vocabulary_cache_id, chapter_number, chapter_name, page_number"
@@ -304,91 +417,64 @@ export default function KanjiReadingStudyPage() {
             .in("user_book_id", userBookIdChunk)
             .not("reading", "is", null)
             .eq("hidden", false)
-            .order("created_at", { ascending: true })
+            .order("created_at", { ascending: false })
             .returns<UserBookWordRow[]>();
 
-          if (cardsErr) throw cardsErr;
-          allRows.push(...(rows ?? []));
+          if (contextErr) throw contextErr;
+
+          for (const row of rows ?? []) {
+            const key = makeContextKey(row.surface, row.reading);
+            if (!contextByKey.has(key)) contextByKey.set(key, row);
+          }
         }
 
-        const vocabularyCacheIds = Array.from(
-          new Set(
-            allRows
-              .map((r) => r.vocabulary_cache_id)
-              .filter((id): id is number => id != null)
-          )
-        );
+        const core: QuizCard[] = activeKanjiMapRows.flatMap((km) => {
+          const vocab = vocabularyById.get(km.vocabulary_cache_id);
+          const surface = vocab?.surface?.trim() ?? "";
+          const sourceReading = vocab?.reading?.trim() ?? "";
+          const reading = km.realized_reading?.trim() || km.base_reading?.trim() || "";
 
-        const kanjiMapRows: any[] = [];
+          if (!surface || !sourceReading || !km.kanji || !reading) return [];
 
-        for (const cacheIdChunk of chunkArray(vocabularyCacheIds, 400)) {
-          const { data, error: kanjiMapErr } = await supabase
-            .from("vocabulary_kanji_map")
-            .select(
-              "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, excluded_from_kanji_practice, flagged_for_review"
-            )
-            .in("vocabulary_cache_id", cacheIdChunk);
+          const context = contextByKey.get(makeContextKey(surface, sourceReading));
+          const sourceMeaning =
+            context?.meaning?.trim() || meaningPreviewFromSenses(vocab?.senses_json) || null;
+          const readingType: QuizCard["readingType"] =
+            km.reading_type === "on"
+              ? "onyomi"
+              : km.reading_type === "kun"
+                ? "kunyomi"
+                : km.reading_type === "other"
+                  ? "other"
+                  : null;
 
-          if (kanjiMapErr) throw kanjiMapErr;
-          kanjiMapRows.push(...(data ?? []));
-        }
-
-        const activeKanjiMapRows = (kanjiMapRows ?? []).filter(
-          (row: any) => !row.excluded_from_kanji_practice || !!row.flagged_for_review
-        );
-
-        const kanjiMapByCacheId = new Map<number, any[]>();
-
-        for (const row of activeKanjiMapRows) {
-          const bucket = kanjiMapByCacheId.get(row.vocabulary_cache_id) ?? [];
-          bucket.push(row);
-          kanjiMapByCacheId.set(row.vocabulary_cache_id, bucket);
-        }
-
-        const core: QuizCard[] = allRows.flatMap((r) => {
-          const surface = r.surface?.trim() ?? "";
-          const fallbackReading = r.reading?.trim() ?? "";
-
-          if (!surface || !fallbackReading) return [];
-
-          const cacheId = r.vocabulary_cache_id;
-          const kanjiRows = cacheId != null ? kanjiMapByCacheId.get(cacheId) ?? [] : [];
-
-          if (kanjiRows.length === 0) return [];
-
-          return kanjiRows.map((km: any, i: number) => {
-            const readingType: QuizCard["readingType"] =
-              km.reading_type === "on"
-                ? "onyomi"
-                : km.reading_type === "kun"
-                  ? "kunyomi"
-                  : km.reading_type === "other"
-                    ? "other"
-                    : null;
-
-            return {
-              key: `${r.id}-${km.kanji}-${i}`,
-              kanjiMapId: km.id,
-              flaggedForReview: !!km.flagged_for_review,
-              kanji: km.kanji,
-              reading: km.realized_reading?.trim() || km.base_reading?.trim() || "",
-              baseReading: km.base_reading?.trim() || null,
-              readingType,
-              sourceWord: surface,
-              sourceMeaning: r.meaning ?? null,
-              sourceReading: r.reading ?? null,
-              userBookId: r.user_book_id,
-              userBookWordId: r.id,
-              bookTitle: bookInfoByUserBookId.get(r.user_book_id)?.title ?? "Untitled Book",
-              bookCover: bookInfoByUserBookId.get(r.user_book_id)?.cover ?? null,
-              strokeCount: null,
-              radical: null,
-              radicalName: null,
-              chapterNumber: r.chapter_number ?? null,
-              chapterName: r.chapter_name ?? null,
-              pageNumber: r.page_number ?? null,
-            };
-          });
+          return [{
+            key: `global-${km.id}`,
+            kanjiMapId: km.id,
+            flaggedForReview: !!km.flagged_for_review,
+            kanji: km.kanji,
+            reading,
+            baseReading: km.base_reading?.trim() || null,
+            readingType,
+            sourceWord: surface,
+            sourceMeaning,
+            sourceReading,
+            jlpt: vocab?.jlpt ?? null,
+            userBookId: context?.user_book_id ?? null,
+            userBookWordId: context?.id ?? null,
+            bookTitle: context
+              ? bookInfoByUserBookId.get(context.user_book_id)?.title ?? "Untitled Book"
+              : null,
+            bookCover: context
+              ? bookInfoByUserBookId.get(context.user_book_id)?.cover ?? null
+              : null,
+            strokeCount: null,
+            radical: null,
+            radicalName: null,
+            chapterNumber: context?.chapter_number ?? null,
+            chapterName: context?.chapter_name ?? null,
+            pageNumber: context?.page_number ?? null,
+          }];
         });
 
         setBaseCards(core);
@@ -403,14 +489,6 @@ export default function KanjiReadingStudyPage() {
   }, []);
 
   const card = deck[index];
-
-  const isSmallSet =
-    bookFilter !== "all" &&
-    filteredBaseCards.length > 0 &&
-    filteredBaseCards.length < 8;
-
-  const kanjiPositionHint =
-    card ? getKanjiPositionHint(card.sourceWord, card.kanji) : "";
 
   const canStartRecall =
     !!card &&
@@ -429,8 +507,52 @@ export default function KanjiReadingStudyPage() {
     !!card.sourceWord &&
     (recallRevealed || canStartRecall);
 
+  const recallMode: RecallMode = useMemo(() => {
+    if (!card || !hasExactlyOneKanji(card.sourceWord) || !card.sourceReading) {
+      return "wordForKanji";
+    }
+
+    return stableNumberFromString(card.key) % 2 === 0 ? "kanjiForReading" : "wordForKanji";
+  }, [card]);
+
+  const cardQuestionMode: CardQuestionMode = useMemo(() => {
+    if (!card || !hasExactlyOneKanji(card.sourceWord) || !card.sourceReading) {
+      return "readingChoice";
+    }
+
+    return stableNumberFromString(`${card.key}-question`) % 2 === 0
+      ? "kanjiChoice"
+      : "readingChoice";
+  }, [card]);
+
   const options = useMemo(() => {
     if (!card || filteredBaseCards.length === 0) return [];
+
+    if (cardQuestionMode === "kanjiChoice") {
+      const correct = card.kanji;
+      const distractors: string[] = [];
+
+      const kanjiPool = Array.from(
+        new Set(
+          filteredBaseCards
+            .filter(
+              (c) =>
+                c.key !== card.key &&
+                hasExactlyOneKanji(c.sourceWord) &&
+                c.kanji !== correct
+            )
+            .map((c) => c.kanji)
+            .filter(Boolean)
+        )
+      );
+
+      for (const kanji of shuffleArray(kanjiPool)) {
+        if (!distractors.includes(kanji)) distractors.push(kanji);
+        if (distractors.length >= 2) break;
+      }
+
+      return shuffleArray([correct, ...distractors]).filter(Boolean);
+    }
 
     const correct = card.reading;
     const displayType = card.readingType;
@@ -482,18 +604,28 @@ export default function KanjiReadingStudyPage() {
     return shuffleArray([correct, ...distractors])
       .filter(Boolean)
       .map((r) => formatReadingForType(r, displayType));
-  }, [card, filteredBaseCards]);
+  }, [card, cardQuestionMode, filteredBaseCards]);
 
   useEffect(() => {
-    if (!checked?.ok) return;
+    if (!checked) return;
     if (inRecallFlow) return;
 
     const timer = window.setTimeout(() => {
       nextCard();
-    }, 2000);
+    }, 5000);
 
     return () => window.clearTimeout(timer);
   }, [checked, inRecallFlow]);
+
+  useEffect(() => {
+    if (!recallRevealed) return;
+
+    const timer = window.setTimeout(() => {
+      nextCard();
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [recallRevealed, recallResult, recallMatchedWord]);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -560,19 +692,9 @@ export default function KanjiReadingStudyPage() {
       console.error("Error creating kanji flag alert:", alertError);
     }
 
-    setNotice("✅ Flagged for review — it will come back later");
+    setNotice("✅ Flagged for review");
     setDeck((prev) => {
-      const currentCard = prev[index];
-      if (!currentCard) return prev;
-
-      const remaining = prev.filter((_, i) => i !== index);
-      const recycledCard = {
-        ...currentCard,
-        flaggedForReview: true,
-        key: `${currentCard.key}-flagged-${Date.now()}`,
-      };
-
-      return [...remaining, recycledCard];
+      return prev.filter((_, i) => i !== index);
     });
 
     if (index >= deck.length - 1) {
@@ -588,6 +710,8 @@ export default function KanjiReadingStudyPage() {
     setGuessInput("");
     setRecallRevealed(false);
     setRecallResult(null);
+    setRecallMatchedWord(null);
+    setRecallMatchedCard(null);
   }
 
   function buildDeckFromCards(cards: QuizCard[]) {
@@ -598,9 +722,9 @@ export default function KanjiReadingStudyPage() {
       return;
     }
 
-    const weightedCards = expandCardsForPractice(cards);
+    const dailyKanjiCards = selectOneCardPerKanji(cards);
 
-    const onePassDeck = shuffleArray(weightedCards).map((c, i) => ({
+    const onePassDeck = shuffleArray(dailyKanjiCards).map((c, i) => ({
       ...c,
       key: `${c.key}-deck-once-${i}`,
     }));
@@ -649,8 +773,14 @@ export default function KanjiReadingStudyPage() {
   function checkAnswer(choice: string) {
     if (!card || checked) return;
 
-    const displayedCorrect = formatReadingForType(card.reading, card.readingType);
-    const ok = normalizeReading(choice) === normalizeReading(displayedCorrect);
+    const displayedCorrect =
+      cardQuestionMode === "kanjiChoice"
+        ? card.kanji
+        : formatReadingForType(card.reading, card.readingType);
+    const ok =
+      cardQuestionMode === "kanjiChoice"
+        ? choice.trim() === displayedCorrect
+        : normalizeReading(choice) === normalizeReading(displayedCorrect);
 
     setSelected(choice);
     setChecked({ ok, correct: displayedCorrect });
@@ -665,7 +795,11 @@ export default function KanjiReadingStudyPage() {
     });
   }
 
-  function revealRecallCard(mode: Exclude<RecallResult, null>) {
+  function revealRecallCard(
+    mode: Exclude<RecallResult, null>,
+    matchedWord: string | null = null,
+    matchedCard: QuizCard | null = null
+  ) {
     if (card?.sourceWord) {
       const normalized = normalizeWord(card.sourceWord);
       setUsedRecallWords((prev) =>
@@ -674,6 +808,8 @@ export default function KanjiReadingStudyPage() {
     }
 
     setRecallResult(mode);
+    setRecallMatchedWord(matchedWord);
+    setRecallMatchedCard(matchedCard);
     setRecallRevealed(true);
     setCardsSinceLastRecall(0);
 
@@ -698,15 +834,38 @@ export default function KanjiReadingStudyPage() {
     if (!card || !inRecallFlow || recallRevealed) return;
 
     const typed = normalizeWord(guessInput);
-    const answer = normalizeWord(card.sourceWord);
+    const rawGuess = guessInput.trim();
 
     if (!typed) {
       revealRecallCard("shown");
       return;
     }
 
-    if (typed === answer) {
-      revealRecallCard("correct");
+    if (recallMode === "kanjiForReading") {
+      if (typed === card.kanji) {
+        revealRecallCard("correct", rawGuess);
+      } else {
+        revealRecallCard("wrong");
+      }
+
+      return;
+    }
+
+    const matchedKnownWord = baseCards.find(
+      (candidate) => {
+        if (!candidate.sourceWord.includes(card.kanji)) return false;
+
+        return (
+          normalizeWord(candidate.sourceWord) === typed ||
+          normalizeReading(candidate.sourceReading ?? "") === normalizeReading(rawGuess)
+        );
+      }
+    );
+
+    if (matchedKnownWord) {
+      revealRecallCard("correct", matchedKnownWord.sourceWord, matchedKnownWord);
+    } else if (rawGuess.includes(card.kanji)) {
+      revealRecallCard("unverified", rawGuess);
     } else {
       revealRecallCard("wrong");
     }
@@ -731,9 +890,7 @@ export default function KanjiReadingStudyPage() {
   }
 
   function finishForToday() {
-    setEndedEarly(true);
-    setIndex(deck.length);
-    resetCardState();
+    router.push("/library");
   }
 
   if (loading) {
@@ -926,36 +1083,37 @@ export default function KanjiReadingStudyPage() {
               Kanji Reading Study
             </h1>
             <p className="mt-2 text-left text-[15px] leading-7 text-gray-500">
-              Practice onyomi and kunyomi from saved vocabulary across your whole library.
-              The source book still stays visible, but the activity is no longer tied to one
-              book hub.
+              Practice onyomi and kunyomi of saved vocabulary across the app. If you have
+              also looked up the word, your source book will be shown.
             </p>
           </div>
         </div>
       </div>
 
-      <p className="mt-1 text-sm text-gray-500">Practice kanji readings across your library</p>
+      <p className="mt-1 max-w-3xl text-center text-sm leading-6 text-gray-500">
+        Kanji can have multiple onyomi or kunyomi, so each question is for one word shown
+        after your answer. Non-JLPT words are common in books, so advanced practice includes
+        them too.
+      </p>
       <p className="text-sm text-gray-500">
         Card {index + 1}/{deck.length}
       </p>
 
-      <div className="mt-3 flex items-center gap-2">
-        <label className="text-sm text-gray-600">Book:</label>
-        <select
-          value={bookFilter}
-          onChange={(e) => setBookFilter(e.target.value)}
-          className="rounded border bg-white px-3 py-2 text-sm"
-        >
-          <option value="all">All books</option>
-          {availableBooks.map((book) => (
-            <option key={book.id} value={book.id}>
-              {book.title}
-            </option>
-          ))}
-        </select>
-      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm">
+        <span className="font-medium text-stone-700">Level:</span>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+        <select
+          value={levelFilter}
+          onChange={(e) => setLevelFilter(e.target.value as LevelFilter)}
+          className="rounded border bg-white px-3 py-2 text-sm text-stone-800"
+        >
+          <option value="beginner">Beginner: N5/N4</option>
+          <option value="intermediate">Intermediate: N3/N2</option>
+          <option value="advanced">Advanced: N1</option>
+          <option value="unlabeled">Unlabeled</option>
+          <option value="all">All levels</option>
+        </select>
+
         <span className="font-medium text-stone-700">Study:</span>
 
         <label className="inline-flex items-center gap-2 text-stone-700">
@@ -976,14 +1134,6 @@ export default function KanjiReadingStudyPage() {
           <span>Kunyomi</span>
         </label>
       </div>
-
-      {isSmallSet && (
-        <p className="mt-2 text-center text-sm text-amber-600">
-          Only {filteredBaseCards.length} card
-          {filteredBaseCards.length === 1 ? "" : "s"} in this chapter — reviewing all
-          available.
-        </p>
-      )}
 
       {notice ? (
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
@@ -1006,7 +1156,7 @@ export default function KanjiReadingStudyPage() {
           </div>
         ) : null}
 
-        {card.readingType ? (
+        {cardQuestionMode === "readingChoice" && card.readingType ? (
           <div
             className={`absolute z-10 rounded-full px-3 py-1.5 text-sm font-medium ${card.flaggedForReview
               ? "left-4 top-14 bg-slate-100 text-slate-600"
@@ -1033,10 +1183,13 @@ export default function KanjiReadingStudyPage() {
 
         <div className="flex w-full flex-col items-center justify-center gap-6">
           <div className="flex w-full flex-col items-center gap-1">
-            <div className="text-xs uppercase tracking-wide text-slate-500">Kanji</div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">
+              {cardQuestionMode === "kanjiChoice" ? "Reading" : "Kanji"}
+            </div>
             <div className="text-5xl font-bold">
-              {card.kanji}
-              {(card.readingType === "other" ||
+              {cardQuestionMode === "kanjiChoice" ? card.sourceReading : card.kanji}
+              {cardQuestionMode === "readingChoice" &&
+                (card.readingType === "other" ||
                 (card.readingType === "kunyomi" && isKunWithOkurigana(card.sourceWord))) &&
                 card.sourceWord ? (
                 <span className="ml-1 font-medium text-slate-300">
@@ -1053,12 +1206,21 @@ export default function KanjiReadingStudyPage() {
               </div>
             ) : (
               options.map((opt, i) => {
-                const displayedCorrect = formatReadingForType(card.reading, card.readingType);
+                const displayedCorrect =
+                  cardQuestionMode === "kanjiChoice"
+                    ? card.kanji
+                    : formatReadingForType(card.reading, card.readingType);
 
                 const isCorrect =
-                  !!checked && normalizeReading(opt) === normalizeReading(displayedCorrect);
+                  !!checked &&
+                  (cardQuestionMode === "kanjiChoice"
+                    ? opt.trim() === displayedCorrect
+                    : normalizeReading(opt) === normalizeReading(displayedCorrect));
                 const isChosen =
-                  !!selected && normalizeReading(opt) === normalizeReading(selected);
+                  !!selected &&
+                  (cardQuestionMode === "kanjiChoice"
+                    ? opt.trim() === selected.trim()
+                    : normalizeReading(opt) === normalizeReading(selected));
 
                 let className = "w-full rounded border px-4 py-3 text-base ";
 
@@ -1098,7 +1260,8 @@ export default function KanjiReadingStudyPage() {
               {checked.ok ? (
                 <>
                   <p className="text-green-700">✅ Correct!</p>
-                  {card.readingType === "kunyomi" &&
+                  {cardQuestionMode === "readingChoice" &&
+                    card.readingType === "kunyomi" &&
                     isKunWithOkurigana(card.sourceWord) &&
                     card.baseReading &&
                     normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
@@ -1109,7 +1272,8 @@ export default function KanjiReadingStudyPage() {
                 <>
                   <p className="text-red-700">❌ Not quite.</p>
                   <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
-                  {card.readingType === "kunyomi" &&
+                  {cardQuestionMode === "readingChoice" &&
+                    card.readingType === "kunyomi" &&
                     isKunWithOkurigana(card.sourceWord) &&
                     card.baseReading &&
                     normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
@@ -1119,16 +1283,22 @@ export default function KanjiReadingStudyPage() {
               )}
 
               {!inRecallFlow ? (
-                <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                  <div className="text-lg font-semibold">{card.sourceWord}</div>
-                  <div className="mt-1 text-xs text-slate-400">{card.bookTitle}</div>
-                  {card.sourceReading ? (
-                    <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
-                  ) : null}
-                  {card.sourceMeaning ? (
-                    <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
-                  ) : null}
-                </div>
+                <>
+                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
+                    <div className="text-lg font-semibold">{card.sourceWord}</div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      {card.bookTitle ? `Seen in: ${card.bookTitle}` : "Shared kanji bank"}
+                    </div>
+                    {card.sourceReading ? (
+                      <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
+                    ) : null}
+                    {card.sourceMeaning ? (
+                      <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
+                    ) : null}
+                  </div>
+
+                  <p className="mt-2 text-xs text-slate-400">Next word comes automatically.</p>
+                </>
               ) : null}
 
               {inRecallFlow ? (
@@ -1139,14 +1309,16 @@ export default function KanjiReadingStudyPage() {
                   {!recallRevealed ? (
                     <>
                       <p className="text-center text-sm font-medium text-slate-800">
-                        Can you guess the word with this kanji?
+                        {recallMode === "kanjiForReading"
+                          ? "What kanji character does this word use?"
+                          : "Can you think of another word that uses this kanji?"}
                       </p>
 
-                      {kanjiPositionHint ? (
-                        <p className="mt-1 text-center text-xs text-slate-500">
-                          Hint: This kanji is character {kanjiPositionHint} in the word.
-                        </p>
-                      ) : null}
+                      <p className="mt-1 text-center text-xs text-slate-500">
+                        {recallMode === "kanjiForReading"
+                          ? card.sourceReading
+                          : "If Mekuru knows the word, we will show whether it is in the shared bank or your saved reading."}
+                      </p>
 
                       <input
                         type="text"
@@ -1157,9 +1329,14 @@ export default function KanjiReadingStudyPage() {
                           if (e.key === "Enter") {
                             e.preventDefault();
                             e.stopPropagation();
+                            submitGuess();
                           }
                         }}
-                        placeholder="Type your guess"
+                        placeholder={
+                          recallMode === "kanjiForReading"
+                            ? "Type the kanji"
+                            : "Type a word with this kanji"
+                        }
                         className="mt-3 w-full rounded border px-3 py-2 text-base"
                       />
 
@@ -1190,23 +1367,56 @@ export default function KanjiReadingStudyPage() {
                   ) : (
                     <>
                       <p className="text-center text-sm font-medium text-slate-800">
-                        {recallResult === "correct"
-                          ? "✅ Nice!"
-                          : recallResult === "wrong"
-                            ? "❌ Not quite."
-                            : "Shown"}
+                        {recallMode === "wordForKanji" && recallResult === "correct"
+                          ? "Yes, you found one in our vocabulary bank!"
+                          : recallMode === "wordForKanji" && recallResult === "unverified"
+                            ? "Possibly! I can't find it in our shared vocabulary bank yet, though!"
+                            : recallResult === "correct"
+                              ? "✅ That works!"
+                              : recallResult === "wrong"
+                                ? "❌ Not quite."
+                                : "Shown"}
                       </p>
 
-                      <div className="mt-3 rounded-xl border bg-white p-3 text-center">
-                        <div className="text-lg font-semibold">{card.sourceWord}</div>
-                        <div className="mt-1 text-xs text-slate-400">{card.bookTitle}</div>
-                        {card.sourceReading ? (
-                          <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
-                        ) : null}
-                        {card.sourceMeaning ? (
-                          <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
-                        ) : null}
-                      </div>
+                      {recallMatchedWord && recallMode !== "wordForKanji" ? (
+                        <p
+                          className={`mt-1 text-center text-sm ${
+                            recallResult === "unverified" ? "text-amber-700" : "text-green-700"
+                          }`}
+                        >
+                          Your answer: {recallMatchedWord}
+                        </p>
+                      ) : null}
+
+                      {recallMode !== "wordForKanji" ? (
+                        <div className="mt-3 rounded-xl border bg-white p-3 text-center">
+                          <div className="text-xs uppercase tracking-wide text-slate-400">
+                            Example from the bank
+                          </div>
+                          <div className="text-lg font-semibold">
+                            {(recallMatchedCard ?? card).sourceWord}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-400">
+                            {(recallMatchedCard ?? card).bookTitle
+                              ? `Seen in: ${(recallMatchedCard ?? card).bookTitle}`
+                              : "Shared kanji bank"}
+                          </div>
+                          {(recallMatchedCard ?? card).sourceReading ? (
+                            <div className="mt-1 text-sm text-slate-500">
+                              {(recallMatchedCard ?? card).sourceReading}
+                            </div>
+                          ) : null}
+                          {(recallMatchedCard ?? card).sourceMeaning ? (
+                            <div className="mt-1 text-sm text-slate-700">
+                              {(recallMatchedCard ?? card).sourceMeaning}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <p className="mt-3 text-center text-xs text-slate-400">
+                        Next word comes automatically.
+                      </p>
 
                       <div className="mt-3 flex justify-center">
                         <button
@@ -1232,26 +1442,10 @@ export default function KanjiReadingStudyPage() {
       <div className="mt-5 flex flex-wrap justify-center gap-3">
         <button
           type="button"
-          onClick={() => router.push(`/books/${encodeURIComponent(card.userBookId)}`)}
-          className="rounded bg-gray-200 px-4 py-2"
-        >
-          Book Hub
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/library-study")}
-          className="rounded bg-gray-200 px-4 py-2"
-        >
-          Study Hub
-        </button>
-
-        <button
-          type="button"
           onClick={finishForToday}
           className="rounded bg-gray-700 px-4 py-2 text-white"
         >
-          Finish for Today
+          Finished for the Day
         </button>
 
         <button

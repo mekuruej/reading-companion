@@ -20,7 +20,6 @@ type ReadAlongWord = {
 };
 
 type SupportMode = "full" | "reading" | "meaning";
-type FluidReadingMode = "just" | "supported";
 
 type PageChunk = {
     label: string;
@@ -82,7 +81,6 @@ export default function ReadAlongPage() {
     const [words, setWords] = useState<ReadAlongWord[]>([]);
     const [loading, setLoading] = useState(true);
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
-    const [fluidReadingMode, setFluidReadingMode] = useState<FluidReadingMode>("supported");
     const [pageIndex, setPageIndex] = useState(0);
     const [jumpPageInput, setJumpPageInput] = useState("");
     const [selectedChapterKey, setSelectedChapterKey] = useState("all");
@@ -108,23 +106,6 @@ export default function ReadAlongPage() {
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
     const [username, setUsername] = useState("");
-
-    const fluidModeStorageKey = `fluid-reading-mode:${userBookId}`;
-
-    useEffect(() => {
-        if (typeof window === "undefined" || !userBookId) return;
-
-        const savedMode = window.localStorage.getItem(fluidModeStorageKey);
-        if (savedMode === "just" || savedMode === "supported") {
-            setFluidReadingMode(savedMode);
-        }
-    }, [fluidModeStorageKey, userBookId]);
-
-    useEffect(() => {
-        if (typeof window === "undefined" || !userBookId) return;
-
-        window.localStorage.setItem(fluidModeStorageKey, fluidReadingMode);
-    }, [fluidModeStorageKey, fluidReadingMode, userBookId]);
 
     useEffect(() => {
         let cancelled = false;
@@ -610,7 +591,7 @@ export default function ReadAlongPage() {
                 <div>
                     <h1 className="text-2xl font-semibold text-stone-900">Fluid Reading</h1>
                     <p className="mt-1 text-sm text-stone-600">
-                        Use this for a quicker, smoother reading experience while you read along with your saved words or simply time your fluid reading. Choose between Just Reading and With Saved Word Support.
+                        Use this for a quicker, smoother reading experience while you read along with your saved words. New lookups can wait — this page is for keeping your reading momentum.
                     </p>
 
                     <p className="mt-2 text-xs text-stone-500">
@@ -624,37 +605,12 @@ export default function ReadAlongPage() {
                     </p>
                 </div>
 
-                <div className="rounded-2xl border border-stone-200 bg-white px-5 py-5 text-center">
-                    <div className="text-base font-semibold text-stone-900">How do you want to read today?</div>
-                    <div className="mt-4 flex justify-center">
-                        <div className="inline-flex overflow-hidden rounded-2xl border border-stone-300 bg-stone-100 p-1 text-sm shadow-sm">
-                            <button
-                                type="button"
-                                onClick={() => setFluidReadingMode("just")}
-                                className={`min-w-[160px] rounded-xl px-5 py-3 font-medium transition ${fluidReadingMode === "just"
-                                    ? "bg-stone-900 text-white shadow-sm"
-                                    : "text-stone-700 hover:bg-white"
-                                    }`}
-                            >
-                                Just Reading
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setFluidReadingMode("supported")}
-                                className={`min-w-[220px] rounded-xl px-5 py-3 font-medium transition ${fluidReadingMode === "supported"
-                                    ? "bg-stone-900 text-white shadow-sm"
-                                    : "text-stone-700 hover:bg-white"
-                                    }`}
-                            >
-                                With Saved Word Support
-                            </button>
-                        </div>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5 text-center">
+                    <div className="text-base font-semibold text-stone-900">
+                        Fluid Reading with Saved Word Support
                     </div>
-
-                    <p className="mt-4 text-sm text-stone-600">
-                        {fluidReadingMode === "just"
-                            ? "Quiet, timer-first reading with as little on-screen friction as possible."
-                            : "Momentum-first reading with optional light support from words you already saved."}
+                    <p className="mt-3 text-sm leading-6 text-stone-700">
+                        Read forward without stopping for new lookups. Use your saved words only as light support.
                     </p>
                 </div>
 
@@ -875,232 +831,198 @@ export default function ReadAlongPage() {
                     ) : null}
                 </div>
 
-                {fluidReadingMode === "just" ? (
-                    <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
-                        <div className="px-6 py-8 sm:px-10">
-                            <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
-                                <p className="text-2xl font-bold text-stone-800 sm:text-3xl">
-                                    Enjoy your reading!
-                                </p>
+                <div className="grid grid-cols-3 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setSupportMode("full")}
+                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "full"
+                            ? "bg-stone-900 text-white"
+                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                            }`}
+                    >
+                        <span className="sm:hidden">Full</span>
+                        <span className="hidden sm:inline">Full Support</span>
+                    </button>
 
-                                {bookCover ? (
-                                    <img
-                                        src={bookCover}
-                                        alt={`${bookTitle} cover`}
-                                        className="mt-4 h-[26rem] w-72 rounded-2xl object-cover shadow-xl"
-                                    />
-                                ) : (
-                                    <div className="mt-4 flex h-[26rem] w-72 items-center justify-center rounded-2xl bg-stone-200 text-sm text-stone-500">
-                                        No cover yet
-                                    </div>
-                                )}
+                    <button
+                        type="button"
+                        onClick={() => setSupportMode("reading")}
+                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "reading"
+                            ? "bg-stone-900 text-white"
+                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                            }`}
+                    >
+                        <span className="sm:hidden">Reading</span>
+                        <span className="hidden sm:inline">Reading Support</span>
+                    </button>
 
-                                <h2 className="mt-6 text-2xl font-semibold text-stone-900">
-                                    {bookTitle || "Fluid Reading"}
+                    <button
+                        type="button"
+                        onClick={() => setSupportMode("meaning")}
+                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "meaning"
+                            ? "bg-stone-900 text-white"
+                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                            }`}
+                    >
+                        <span className="sm:hidden">Meaning</span>
+                        <span className="hidden sm:inline">Meaning Support</span>
+                    </button>
+                </div>
+
+                {chapterOptions.length > 0 ? (
+                    <section className="mb-4 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h2 className="text-lg font-black text-stone-900">
+                                    {selectedChapterLabel}
                                 </h2>
-
-                                <p className="mt-3 max-w-md text-sm leading-6 text-stone-600">
-                                    Read without stopping for new lookups. Let the timer keep you company and just stay with the book.
+                                <p className="mt-1 text-sm text-stone-500">
+                                    Choose a chapter, or add a page number below for a more exact spot.
                                 </p>
+                            </div>
+
+                            <label className="w-full text-sm sm:w-72">
+                                <select
+                                    value={selectedChapterKey}
+                                    onChange={(event) => setSelectedChapterKey(event.target.value)}
+                                    className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                                >
+                                    <option value="all">All chapters</option>
+                                    {chapterOptions.map((chapter) => (
+                                        <option key={chapter.key} value={chapter.key}>
+                                            {chapter.label} · {chapter.wordCount} words
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+                    </section>
+                ) : null}
+
+                <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
+                    <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+                        <div className="space-y-3">
+                            {pages.length > 0 ? (
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={goPrev}
+                                        disabled={pageIndex === 0}
+                                        className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        ← Previous
+                                    </button>
+
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={jumpPageInput}
+                                            onChange={(e) => setJumpPageInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    jumpToPage(Number(jumpPageInput));
+                                                }
+                                            }}
+                                            placeholder="Page"
+                                            className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => jumpToPage(Number(jumpPageInput))}
+                                            className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
+                                        >
+                                            Go
+                                        </button>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={goNext}
+                                        disabled={pageIndex === pages.length - 1}
+                                        className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        Next →
+                                    </button>
+                                </div>
+                            ) : null}
+
+                            <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
+                                <div className="order-2 text-sm text-stone-500 sm:order-1">
+                                    {currentPage
+                                        ? `${currentPage.words.length} saved word${currentPage.words.length === 1 ? "" : "s"}`
+                                        : "No saved words yet"}
+                                </div>
+
+                                <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">
+                                    {currentPage ? currentPage.label : "Fluid Reading"}
+                                </div>
+
+                                <div className="order-3 text-sm text-stone-500 sm:text-right">
+                                    Tap the words to follow along with the book.
+                                </div>
                             </div>
                         </div>
                     </div>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-3 gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setSupportMode("full")}
-                                className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "full"
-                                    ? "bg-stone-900 text-white"
-                                    : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                    }`}
-                            >
-                                <span className="sm:hidden">Full</span>
-                                <span className="hidden sm:inline">Full Support</span>
-                            </button>
 
-                            <button
-                                type="button"
-                                onClick={() => setSupportMode("reading")}
-                                className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "reading"
-                                    ? "bg-stone-900 text-white"
-                                    : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                    }`}
-                            >
-                                <span className="sm:hidden">Reading</span>
-                                <span className="hidden sm:inline">Reading Support</span>
-                            </button>
+                    <div
+                        ref={scrollAreaRef}
+                        className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
+                    >
+                        {!currentPage || currentPage.words.length === 0 ? (
+                            <div className="mx-auto max-w-2xl py-16 text-center">
+                                <div className="text-2xl font-semibold text-stone-700">
+                                    No saved words here.
+                                </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setSupportMode("meaning")}
-                                className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "meaning"
-                                    ? "bg-stone-900 text-white"
-                                    : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                                    }`}
-                            >
-                                <span className="sm:hidden">Meaning</span>
-                                <span className="hidden sm:inline">Meaning Support</span>
-                            </button>
-                        </div>
+                                <p className="mt-3 text-sm text-stone-500">
+                                    Enjoy the story!
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
+                                {currentPage.words.map((w, index) => {
+                                    const isFaded = index <= fadedThroughIndex;
 
-                        {chapterOptions.length > 0 ? (
-                            <section className="mb-4 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                                    <div>
-                                        <h2 className="text-lg font-black text-stone-900">
-                                            {selectedChapterLabel}
-                                        </h2>
-                                        <p className="mt-1 text-sm text-stone-500">
-                                            Choose a chapter, or add a page number below for a more exact spot.
-                                        </p>
-                                    </div>
-
-                                    <label className="w-full text-sm sm:w-72">
-                                        <select
-                                            value={selectedChapterKey}
-                                            onChange={(event) => setSelectedChapterKey(event.target.value)}
-                                            className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                                    return (
+                                        <div
+                                            key={w.id}
+                                            ref={(el) => {
+                                                wordRefs.current[w.id] = el;
+                                            }}
+                                            onClick={() => handleProgressTap(index, w.id)}
+                                            className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
+                                                ? "border-stone-200 bg-stone-50 opacity-35"
+                                                : "border-stone-200 bg-white hover:bg-stone-50"
+                                                }`}
                                         >
-                                            <option value="all">All chapters</option>
-                                            {chapterOptions.map((chapter) => (
-                                                <option key={chapter.key} value={chapter.key}>
-                                                    {chapter.label} · {chapter.wordCount} words
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                </div>
-                            </section>
-                        ) : null}
-
-                        <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
-                            <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-                                <div className="space-y-3">
-                                    {pages.length > 0 ? (
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={goPrev}
-                                                disabled={pageIndex === 0}
-                                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                            >
-                                                ← Previous
-                                            </button>
-
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    min={1}
-                                                    value={jumpPageInput}
-                                                    onChange={(e) => setJumpPageInput(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === "Enter") {
-                                                            e.preventDefault();
-                                                            jumpToPage(Number(jumpPageInput));
-                                                        }
-                                                    }}
-                                                    placeholder="Page"
-                                                    className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => jumpToPage(Number(jumpPageInput))}
-                                                    className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white transition hover:bg-black"
-                                                >
-                                                    Go
-                                                </button>
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={goNext}
-                                                disabled={pageIndex === pages.length - 1}
-                                                className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                            >
-                                                Next →
-                                            </button>
-                                        </div>
-                                    ) : null}
-
-                                    <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
-                                        <div className="order-2 text-sm text-stone-500 sm:order-1">
-                                            {currentPage
-                                                ? `${currentPage.words.length} saved word${currentPage.words.length === 1 ? "" : "s"}`
-                                                : "No saved words yet"}
-                                        </div>
-
-                                        <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">
-                                            {currentPage ? currentPage.label : "Fluid Reading"}
-                                        </div>
-
-                                        <div className="order-3 text-sm text-stone-500 sm:text-right">
-                                            Tap the words to follow along with the book.
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div
-                                ref={scrollAreaRef}
-                                className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
-                            >
-                                {!currentPage || currentPage.words.length === 0 ? (
-                                    <div className="mx-auto max-w-2xl py-16 text-center">
-                                        <div className="text-2xl font-semibold text-stone-700">
-                                            No saved words here.
-                                        </div>
-
-                                        <p className="mt-3 text-sm text-stone-500">
-                                            Enjoy the story!
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
-                                        {currentPage.words.map((w, index) => {
-                                            const isFaded = index <= fadedThroughIndex;
-
-                                            return (
-                                                <div
-                                                    key={w.id}
-                                                    ref={(el) => {
-                                                        wordRefs.current[w.id] = el;
-                                                    }}
-                                                    onClick={() => handleProgressTap(index, w.id)}
-                                                    className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
-                                                        ? "border-stone-200 bg-stone-50 opacity-35"
-                                                        : "border-stone-200 bg-white hover:bg-stone-50"
-                                                        }`}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                                                            <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
-                                                                {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
-                                                            </div>
-
-                                                            {(supportMode === "full" || supportMode === "reading") && (
-                                                                <div className="text-sm text-stone-500 sm:text-base">
-                                                                    {w.reading || "—"}
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {(supportMode === "full" || supportMode === "meaning") && (
-                                                            <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
-                                                                {w.meaning || "—"}
-                                                            </div>
-                                                        )}
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                                    <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
+                                                        {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
                                                     </div>
+
+                                                    {(supportMode === "full" || supportMode === "reading") && (
+                                                        <div className="text-sm text-stone-500 sm:text-base">
+                                                            {w.reading || "—"}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+
+                                                {(supportMode === "full" || supportMode === "meaning") && (
+                                                    <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
+                                                        {w.meaning || "—"}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        </div>
-                    </>
-                )}
+                        )}
+                    </div>
+                </div>
             </div>
         </main>
     );

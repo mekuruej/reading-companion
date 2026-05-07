@@ -193,6 +193,7 @@ export default function SingleAddPage() {
 
   const [quickPreview, setQuickPreview] = useState<QuickPreview | null>(null);
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
+  const [showMobileSessionWords, setShowMobileSessionWords] = useState(false);
   const [quickLookupCandidates, setQuickLookupCandidates] = useState<QuickLookupCandidate[]>([]);
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
@@ -862,15 +863,15 @@ export default function SingleAddPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-100 px-6 py-8">
+    <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
         <div>
           <h1 className="text-2xl font-semibold text-stone-900">Curiosity Reading</h1>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 hidden text-sm text-stone-600 sm:block">
             Use this for a slower, exploratory reading experience. This is where you stop, investigate, save new words, and let lookup time count as part of the reading session.
           </p>
 
-          <p className="mt-2 text-xs text-stone-500">
+          <p className="mt-2 hidden text-xs text-stone-500 sm:block">
             Want to keep moving and time your reading without look-ups?{" "}
             {userBookId ? (
               <a
@@ -887,7 +888,7 @@ export default function SingleAddPage() {
 
         {userBookId ? (
           bookTitle ? (
-            <div className="mb-8 mt-6 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
               <button
                 type="button"
                 onClick={() => {
@@ -955,7 +956,7 @@ export default function SingleAddPage() {
 
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4">
           <div className="mb-2 text-sm font-medium text-stone-900">Log your reading session</div>
-  
+
           <div className="mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3">
             <div className="mb-2 text-center text-sm text-stone-600">
               Use the timer to track a curiosity reading session where you stop, check, and save new words.
@@ -1119,9 +1120,11 @@ export default function SingleAddPage() {
         </div>
 
         <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-          <div className="mb-3 text-sm font-medium text-stone-900">Single Add</div>
+          <div className="mb-3 text-sm font-medium text-stone-900">
+            Add words while reading
+          </div>
 
-          <div className="sticky top-4 z-10 -mx-1 rounded-2xl border border-stone-200 bg-white/95 p-4 shadow-sm backdrop-blur">
+          <div className="-mx-1 rounded-2xl border border-stone-200 bg-white/95 p-4 shadow-sm backdrop-blur sm:sticky sm:top-4 sm:z-10">
             <div className="mb-1 text-sm font-semibold text-stone-900">Search for a new word</div>
             <p className="mb-3 text-sm text-stone-600">
               This search box is only for new lookups. It will not overwrite the word you are
@@ -1256,11 +1259,10 @@ export default function SingleAddPage() {
                         setQuickError(null);
                         jumpToQuickEditor();
                       }}
-                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                        isSelected
-                          ? "border-sky-400 bg-white shadow-sm"
-                          : "border-sky-200 bg-white/80 hover:bg-white"
-                      }`}
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
+                        ? "border-sky-400 bg-white shadow-sm"
+                        : "border-sky-200 bg-white/80 hover:bg-white"
+                        }`}
                     >
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                         <span className="text-base font-semibold text-stone-900">
@@ -1283,11 +1285,10 @@ export default function SingleAddPage() {
           {quickPreview ? (
             <div
               ref={quickEditorCardRef}
-              className={`mt-4 scroll-mt-28 space-y-4 rounded-xl border p-4 ${
-                quickPreview.id
-                  ? "border-amber-200 bg-amber-50"
-                  : "border-stone-200 bg-stone-50"
-              }`}
+              className={`mt-4 scroll-mt-28 space-y-4 rounded-xl border p-4 ${quickPreview.id
+                ? "border-amber-200 bg-amber-50"
+                : "border-stone-200 bg-stone-50"
+                }`}
             >
               <div>
                 <div className="text-sm font-semibold text-stone-900">
@@ -1311,58 +1312,58 @@ export default function SingleAddPage() {
                   This is the edit word box. Change the saved word here. Use the search box above only for a brand-new lookup.
                 </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
-                  <input
-                    ref={quickEditorWordInputRef}
-                    value={quickPreview.surface}
-                    onChange={(e) =>
-                      setQuickPreview((prev) => (prev ? { ...prev, surface: e.target.value } : prev))
-                    }
-                    placeholder="Word"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-
-                  <label className="mt-2 flex items-center gap-2 text-sm text-stone-700">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
                     <input
-                      type="checkbox"
-                      checked={quickPreview.useAlternateSurface}
+                      ref={quickEditorWordInputRef}
+                      value={quickPreview.surface}
                       onChange={(e) =>
-                        setQuickPreview((prev) =>
-                          prev ? { ...prev, useAlternateSurface: e.target.checked } : prev
-                        )
+                        setQuickPreview((prev) => (prev ? { ...prev, surface: e.target.value } : prev))
                       }
+                      placeholder="Word"
+                      className="w-full rounded border bg-white px-3 py-2 text-sm"
                     />
-                    <span>Alternate kanji (in this book)</span>
-                  </label>
 
-                  {quickPreview.useAlternateSurface ? (
+                    <label className="mt-2 flex items-center gap-2 text-sm text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={quickPreview.useAlternateSurface}
+                        onChange={(e) =>
+                          setQuickPreview((prev) =>
+                            prev ? { ...prev, useAlternateSurface: e.target.checked } : prev
+                          )
+                        }
+                      />
+                      <span>Alternate kanji (in this book)</span>
+                    </label>
+
+                    {quickPreview.useAlternateSurface ? (
+                      <input
+                        value={quickPreview.alternateSurface}
+                        onChange={(e) =>
+                          setQuickPreview((prev) =>
+                            prev ? { ...prev, alternateSurface: e.target.value } : prev
+                          )
+                        }
+                        placeholder="Book form (e.g. 愉しい)"
+                        className="mt-2 w-full rounded border px-3 py-2 text-sm"
+                      />
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
                     <input
-                      value={quickPreview.alternateSurface}
+                      value={quickPreview.reading}
                       onChange={(e) =>
-                        setQuickPreview((prev) =>
-                          prev ? { ...prev, alternateSurface: e.target.value } : prev
-                        )
+                        setQuickPreview((prev) => (prev ? { ...prev, reading: e.target.value } : prev))
                       }
-                      placeholder="Book form (e.g. 愉しい)"
-                      className="mt-2 w-full rounded border px-3 py-2 text-sm"
+                      placeholder="Reading"
+                      className="w-full rounded border bg-white px-3 py-2 text-sm"
                     />
-                  ) : null}
+                  </div>
                 </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
-                  <input
-                    value={quickPreview.reading}
-                    onChange={(e) =>
-                      setQuickPreview((prev) => (prev ? { ...prev, reading: e.target.value } : prev))
-                    }
-                    placeholder="Reading"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
               </div>
 
               <div>
@@ -1479,15 +1480,31 @@ export default function SingleAddPage() {
           ) : null}
           {quickSessionWords.length > 0 ? (
             <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <div className="mb-3 text-sm font-medium text-stone-900">
-                Words saved into Vocab List this session
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-stone-900">
+                    Words saved this session
+                  </div>
+                  <p className="mt-1 text-xs text-stone-500">
+                    {quickSessionWords.length} word{quickSessionWords.length === 1 ? "" : "s"} saved
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMobileSessionWords((prev) => !prev)}
+                  className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 sm:hidden"
+                >
+                  {showMobileSessionWords ? "Hide list" : "Show list"}
+                </button>
               </div>
-              <p className="mb-3 text-sm text-stone-500">
+
+              <p className="mb-3 mt-3 hidden text-sm text-stone-500 sm:block">
                 Newer saved words stay at the top so you can keep moving without hunting for the
                 latest one.
               </p>
 
-              <div className="space-y-3">
+              <div className={`${showMobileSessionWords ? "block" : "hidden"} mt-3 space-y-3 sm:block`}>
                 {quickSessionWords.map((item) => (
                   <div key={item.id} className="rounded-lg border bg-white p-3">
                     <div className="flex items-start justify-between gap-3">

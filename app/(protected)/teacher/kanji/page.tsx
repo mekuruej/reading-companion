@@ -232,6 +232,7 @@ export default function TeacherKanjiPage() {
   const [loading, setLoading] = useState(true);
   const [preparingId, setPreparingId] = useState<string | null>(null);
   const [bulkOpening, setBulkOpening] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [savingEditorId, setSavingEditorId] = useState<string | null>(null);
   const [ignoringId, setIgnoringId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -503,6 +504,14 @@ export default function TeacherKanjiPage() {
       .slice(0, BULK_OPEN_LIMIT);
   }, [filteredItems]);
 
+  const openEditorItems = useMemo(() => {
+    return queueItems.filter(
+      (item) =>
+        editorOpenByWordId[item.userBookWordId] &&
+        (editorRowsByWordId[item.userBookWordId] ?? []).length > 0
+    );
+  }, [queueItems, editorOpenByWordId, editorRowsByWordId]);
+
   const summary = useMemo(() => {
     const unresolved = queueItems.filter(
       (item) => item.status !== "complete" && item.status !== "cleanup"
@@ -737,6 +746,80 @@ export default function TeacherKanjiPage() {
     }));
   }
 
+  async function saveKanjiRowsForItem(item: QueueItem) {
+    const rows = editorRowsByWordId[item.userBookWordId] ?? [];
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+      const { error: saveError } = await supabase
+        .from("vocabulary_kanji_map")
+        .update({
+          reading_type: row.reading_type,
+          base_reading: row.base_reading,
+          realized_reading: row.realized_reading,
+        })
+        .eq("id", row.id);
+
+      if (saveError) throw saveError;
+    }
+  }
+
+  async function saveAllOpenEditors() {
+    const itemsToSave = openEditorItems;
+
+    if (itemsToSave.length === 0) return;
+
+    const ok = window.confirm(
+      `Save readings for ${itemsToSave.length} open editor${itemsToSave.length === 1 ? "" : "s"
+      }?`
+    );
+
+    if (!ok) return;
+
+    setBulkSaving(true);
+    setError(null);
+
+    try {
+      for (const item of itemsToSave) {
+        await saveKanjiRowsForItem(item);
+      }
+
+      await loadQueue();
+
+      setEditorOpenByWordId((prev) => {
+        const next = { ...prev };
+
+        for (const item of itemsToSave) {
+          next[item.userBookWordId] = false;
+        }
+
+        return next;
+      });
+
+      setEditorRowsByWordId((prev) => {
+        const next = { ...prev };
+
+        for (const item of itemsToSave) {
+          delete next[item.userBookWordId];
+        }
+
+        return next;
+      });
+
+      setSaveMessage(
+        `Saved readings for ${itemsToSave.length} word${itemsToSave.length === 1 ? "" : "s"
+        }.`
+      );
+
+      window.setTimeout(() => setSaveMessage(null), 2500);
+    } catch (err: any) {
+      console.error("Error saving all open kanji editors:", err);
+      setError(err?.message ?? "Could not save all open kanji rows.");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   async function saveEditorRows(item: QueueItem) {
     const rows = editorRowsByWordId[item.userBookWordId] ?? [];
     if (rows.length === 0) return;
@@ -745,18 +828,7 @@ export default function TeacherKanjiPage() {
     setError(null);
 
     try {
-      for (const row of rows) {
-        const { error: saveError } = await supabase
-          .from("vocabulary_kanji_map")
-          .update({
-            reading_type: row.reading_type,
-            base_reading: row.base_reading,
-            realized_reading: row.realized_reading,
-          })
-          .eq("id", row.id);
-
-        if (saveError) throw saveError;
-      }
+      await saveKanjiRowsForItem(item);
 
       await loadQueue();
 
@@ -954,16 +1026,29 @@ export default function TeacherKanjiPage() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => void openFirstVisibleBatch()}
-                disabled={bulkOpening || bulkOpenItems.length === 0}
-                className="rounded-2xl border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {bulkOpening
-                  ? "Opening batch…"
-                  : `Open first ${bulkOpenItems.length || BULK_OPEN_LIMIT}`}
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => void openFirstVisibleBatch()}
+                  disabled={bulkOpening || bulkSaving || bulkOpenItems.length === 0}
+                  className="rounded-2xl border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkOpening
+                    ? "Opening batch…"
+                    : `Open first ${bulkOpenItems.length || BULK_OPEN_LIMIT}`}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void saveAllOpenEditors()}
+                  disabled={bulkSaving || openEditorItems.length === 0}
+                  className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkSaving
+                    ? "Saving all…"
+                    : `Save all open ${openEditorItems.length ? `(${openEditorItems.length})` : ""}`}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -1013,9 +1098,21 @@ export default function TeacherKanjiPage() {
                             <div className="text-2xl font-medium leading-tight text-stone-900 md:text-3xl">
                               {item.surface}
                             </div>
-                            <div className="mt-1 text-base text-stone-500 md:text-lg">
-                              {item.reading || "—"}
-                            </div>
+
+                            {item.reading ? (
+                              <>
+                                <div className="mt-1 text-base text-stone-500 md:text-lg">
+                                  {item.reading}
+                                </div>
+
+                                <div className="mt-1 text-sm font-semibold tracking-wide text-stone-400 md:text-base">
+                                  {hiraToKata(item.reading)}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="mt-1 text-base text-stone-500 md:text-lg">—</div>
+                            )}
+
                             <div className="mt-1 text-xs text-stone-400">
                               cache: {item.vocabularyCacheId ?? "none"}
                             </div>
@@ -1189,7 +1286,7 @@ export default function TeacherKanjiPage() {
                                   <button
                                     type="button"
                                     onClick={() => void saveEditorRows(item)}
-                                    disabled={savingEditorId === item.userBookWordId}
+                                    disabled={bulkSaving || savingEditorId === item.userBookWordId}
                                     className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
                                   >
                                     {savingEditorId === item.userBookWordId

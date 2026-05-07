@@ -10,14 +10,18 @@ import { supabase } from "@/lib/supabaseClient";
 
 export default function Header() {
   const [username, setUsername] = useState<string | null>(null);
+  const [profileRole, setProfileRole] = useState<string | null>(null);
+  const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
+  const [showTeacherMenu, setShowTeacherMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const pathname = usePathname();
   const libraryMenuRef = useRef<HTMLDivElement | null>(null);
   const discoveryMenuRef = useRef<HTMLDivElement | null>(null);
   const studyMenuRef = useRef<HTMLDivElement | null>(null);
+  const teacherMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -33,12 +37,14 @@ export default function Header() {
 
         if (!user) {
           setUsername(null);
+          setProfileRole(null);
+          setProfileIsSuperTeacher(false);
           return;
         }
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("username")
+          .select("username, role, is_super_teacher")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -46,10 +52,15 @@ export default function Header() {
 
         if (profileError) throw profileError;
         setUsername(profile?.username ?? null);
+        setProfileRole(profile?.role ?? null);
+        setProfileIsSuperTeacher(!!profile?.is_super_teacher);
+
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to load header data:", error);
           setUsername(null);
+          setProfileRole(null);
+          setProfileIsSuperTeacher(false);
         }
       }
     }
@@ -77,6 +88,10 @@ export default function Header() {
         setShowStudyMenu(false);
       }
 
+      if (teacherMenuRef.current && !teacherMenuRef.current.contains(target)) {
+        setShowTeacherMenu(false);
+      }
+
       if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setShowProfileMenu(false);
       }
@@ -98,6 +113,10 @@ export default function Header() {
     pathname.startsWith("/library-study") ||
     pathname.startsWith("/kanji-reading-study");
   const profileSectionActive = pathname.startsWith("/community");
+  const teacherSectionActive = pathname.startsWith("/teacher");
+  const showTeacherLink =
+    profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher;
+  const showSuperTeacherLinks = profileRole === "super_teacher" || profileIsSuperTeacher;
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -384,6 +403,116 @@ export default function Header() {
               ) : null}
             </div>
 
+            {showTeacherLink ? (
+              <div className="relative" ref={teacherMenuRef}>
+                <Link
+                  href="/teacher"
+                  className={`rounded-full border px-3 py-1.5 transition md:hidden ${teacherSectionActive
+                    ? "border-stone-900 bg-stone-900 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                    }`}
+                  onClick={() => {
+                    setShowLibraryMenu(false);
+                    setShowDiscoveryMenu(false);
+                    setShowStudyMenu(false);
+                    setShowTeacherMenu(false);
+                    setShowProfileMenu(false);
+                  }}
+                >
+                  Teacher
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTeacherMenu((prev) => !prev);
+                    setShowLibraryMenu(false);
+                    setShowDiscoveryMenu(false);
+                    setShowStudyMenu(false);
+                    setShowProfileMenu(false);
+                  }}
+                  className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${teacherSectionActive
+                    ? "border-stone-900 bg-stone-900 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                    }`}
+                >
+                  Teacher
+                </button>
+
+                {showTeacherMenu ? (
+                  <div className="absolute right-0 z-50 mt-2 hidden min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
+                    <Link
+                      href="/teacher"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      Teacher Hub
+                    </Link>
+
+                    <Link
+                      href="/teacher/students"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/students"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      My Students
+                    </Link>
+
+                    <Link
+                      href="/teacher/reading-fit"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/reading-fit"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      Reading Fit Queue
+                    </Link>
+
+                    {showSuperTeacherLinks ? (
+                      <Link
+                        href="/teacher/books"
+                        className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/books"
+                          ? "bg-stone-100 font-medium text-stone-900"
+                          : "text-stone-700 hover:bg-stone-50"
+                          }`}
+                        onClick={() => setShowTeacherMenu(false)}
+                      >
+                        Book Flags
+                      </Link>
+                    ) : null}
+
+                    <Link
+                      href="/teacher/kanji"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/kanji"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      Kanji Queue
+                    </Link>
+
+                    <Link
+                      href="/teacher/words"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/words"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      Word Flags
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="relative" ref={profileMenuRef}>
               <Link
                 href="/community"
@@ -454,8 +583,8 @@ export default function Header() {
                   <Link
                     href="/community/book-clubs"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/book-clubs"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowProfileMenu(false)}
                   >
