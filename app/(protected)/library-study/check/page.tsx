@@ -11,6 +11,7 @@ import {
   type LibraryStudyGateStatus,
   type LibraryStudyColorStatus,
 } from "@/lib/libraryStudyColor";
+import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 
@@ -139,6 +140,8 @@ type StudyMode =
 type LibraryStudyMode = "check" | "practice";
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
 type PracticeRevealStep = "word" | "reading" | "meaning";
+type PracticeStudyMode = "reveal" | "typing";
+type PracticeTypingStep = "reading" | "meaning";
 type PracticeColorFilter =
   | "all"
   | "red"
@@ -152,8 +155,8 @@ type PracticeColorFilter =
 
 const STORAGE_KEY = "library-study-seen-by-date";
 const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
-const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
-const REGULAR_GATE_RECHECK_WINDOW_DAYS = 3;
+const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
+const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
@@ -268,11 +271,7 @@ function normalizeText(value: string) {
 }
 
 function normalizeKana(value: string) {
-  return (value ?? "")
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
-    .toLowerCase();
+  return normalizeKanaReading(value ?? "");
 }
 
 function normalizeJlpt(value: string | null | undefined) {
@@ -485,6 +484,33 @@ function missedGateRecheckDays(card: StudyCard) {
   );
 }
 
+function regularGateRecheckDays(card: StudyCard) {
+  return (
+    REGULAR_GATE_RECHECK_MIN_DAYS +
+    (hashString(`${card.studyIdentityKey}::regular-gate`) % REGULAR_GATE_RECHECK_WINDOW_DAYS)
+  );
+}
+
+function lastStudiedTime(card: StudyCard) {
+  const value = card.progress?.last_studied_at;
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function rankDailyCheckCards(cards: StudyCard[]) {
+  return shuffleArray(cards).sort((a, b) => {
+    const lastStudiedDifference = lastStudiedTime(a) - lastStudiedTime(b);
+    if (lastStudiedDifference !== 0) return lastStudiedDifference;
+
+    return (
+      hashString(`${a.studyIdentityKey}::daily-rotation`) -
+      hashString(`${b.studyIdentityKey}::daily-rotation`)
+    );
+  });
+}
+
 function isMissedGateLimboDue(card: StudyCard, now = new Date()) {
   if (card.colorStatus.color !== "grey") return true;
 
@@ -509,11 +535,7 @@ function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
   if (card.colorStatus.color === "purple" || card.colorStatus.color === "grey") return true;
   if (!card.progress?.last_studied_at) return true;
 
-  const recheckDays =
-    REGULAR_GATE_RECHECK_MIN_DAYS +
-    (hashString(`${card.studyIdentityKey}::regular-gate`) % REGULAR_GATE_RECHECK_WINDOW_DAYS);
-
-  return daysSinceIso(card.progress.last_studied_at, now) >= recheckDays;
+  return daysSinceIso(card.progress.last_studied_at, now) >= regularGateRecheckDays(card);
 }
 
 function isCardAvailableForLibraryCheck(
@@ -573,16 +595,16 @@ function buildDailyCheckDeckSource(
 
   const fillerCards = availableCards.filter((card) => !primaryIds.has(card.id));
 
-  const shuffledPrimary = shuffleArray(primaryCards);
-  const shuffledFillers = shuffleArray(fillerCards);
+  const rotatedPrimary = rankDailyCheckCards(primaryCards);
+  const rotatedFillers = rankDailyCheckCards(fillerCards);
 
-  if (shuffledPrimary.length >= plan.dailyLimit) {
-    return shuffledPrimary.slice(0, plan.dailyLimit);
+  if (rotatedPrimary.length >= plan.dailyLimit) {
+    return rotatedPrimary.slice(0, plan.dailyLimit);
   }
 
   return [
-    ...shuffledPrimary,
-    ...shuffledFillers.slice(0, plan.dailyLimit - shuffledPrimary.length),
+    ...rotatedPrimary,
+    ...rotatedFillers.slice(0, plan.dailyLimit - rotatedPrimary.length),
   ];
 }
 
@@ -764,6 +786,7 @@ function LibraryPracticePanel({
   card,
   total,
   revealStep,
+  practiceMode,
   onAdvance,
   onNext,
   onPrevious,
@@ -772,11 +795,22 @@ function LibraryPracticePanel({
   card: StudyCard | undefined;
   total: number;
   revealStep: PracticeRevealStep;
+  practiceMode: PracticeStudyMode;
   onAdvance: () => void;
   onNext: () => void;
   onPrevious: () => void;
   onShuffle: () => void;
 }) {
+  const [typingStep, setTypingStep] = useState<PracticeTypingStep>("reading");
+  const [typingInput, setTypingInput] = useState("");
+  const [typingRevealed, setTypingRevealed] = useState(false);
+
+  useEffect(() => {
+    setTypingStep("reading");
+    setTypingInput("");
+    setTypingRevealed(false);
+  }, [card?.id, practiceMode]);
+
   if (!card) {
     return (
       <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
@@ -793,17 +827,102 @@ function LibraryPracticePanel({
 
   const showReading = revealStep === "reading" || revealStep === "meaning";
   const showMeaning = revealStep === "meaning";
+  const typingLabel = typingStep === "reading" ? "Reading" : "Meaning";
+  const typingAnswer = typingStep === "reading" ? card.reading : card.meaning;
+
+  function submitTypingPractice() {
+    if (!typingInput.trim()) return;
+    setTypingRevealed(true);
+  }
+
+  function moveTypingPracticeForward() {
+    if (typingStep === "reading") {
+      setTypingStep("meaning");
+      setTypingInput("");
+      setTypingRevealed(false);
+      return;
+    }
+
+    onNext();
+  }
 
   return (
     <div className="w-full max-w-2xl space-y-2">
-      <button
-        type="button"
-        onClick={onAdvance}
-        className="relative flex min-h-[30vh] w-full max-w-2xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[36vh]"
-      >
+      {practiceMode === "reveal" ? (
+        <button
+          type="button"
+          onClick={onAdvance}
+          className="relative flex min-h-[30vh] w-full max-w-2xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[36vh]"
+        >
+          <div className="absolute left-4 top-4 flex">
+            <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
+              Review Study
+            </div>
+          </div>
+
+          <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
+            <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+              <span
+                className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
+                  card.colorStatus
+                )}`}
+              />
+              {libraryStudyColorName(card.colorStatus)}
+            </div>
+
+            {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
+          </div>
+
+          <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+            {card.jlpt ? (
+              <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
+            ) : null}
+
+            {card.progress?.definition_key ? (
+              <div className={libraryStudyChipClass(card.colorStatus)}>
+                Def {card.progress.definition_key}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
+            <div className={libraryStudyChipClass(card.colorStatus)}>
+              {card.encounterCount} encounter{card.encounterCount === 1 ? "" : "s"}
+            </div>
+          </div>
+
+          <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Word
+            </div>
+            <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+
+            <div className="grid w-full max-w-md gap-3 text-center">
+              <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Reading
+                </div>
+                <div className={`mt-1 text-2xl font-semibold ${showReading ? "text-slate-900" : "text-slate-300"}`}>
+                  {showReading ? card.reading : "Hidden"}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Meaning
+                </div>
+                <div className={`mt-1 text-xl font-semibold ${showMeaning ? "text-slate-900" : "text-slate-300"}`}>
+                  {showMeaning ? card.meaning : "Hidden"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </button>
+      ) : (
+        <div className="relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[36vh]">
         <div className="absolute left-4 top-4 flex">
           <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-            Review Study
+            Typing Practice
           </div>
         </div>
 
@@ -840,31 +959,75 @@ function LibraryPracticePanel({
 
         <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Word
+            {typingLabel}
           </div>
           <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+          {typingStep === "meaning" ? (
+            <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
+          ) : null}
 
-          <div className="grid w-full max-w-md gap-3 text-center">
-            <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Reading
-              </div>
-              <div className={`mt-1 text-2xl font-semibold ${showReading ? "text-slate-900" : "text-slate-300"}`}>
-                {showReading ? card.reading : "Hidden"}
-              </div>
-            </div>
+          <div className="w-full max-w-md space-y-3">
+            <input
+              value={typingInput}
+              onChange={(e) => setTypingInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (typingRevealed) {
+                  moveTypingPracticeForward();
+                } else {
+                  submitTypingPractice();
+                }
+              }}
+              placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
+              inputMode="text"
+              autoCorrect="off"
+              autoCapitalize="none"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={typingRevealed}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
+            />
 
-            <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Meaning
+            {typingRevealed ? (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {typingLabel}
+                </div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">
+                  {typingAnswer || "—"}
+                </div>
+                <div className="mt-3 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={moveTypingPracticeForward}
+                    className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-950"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={moveTypingPracticeForward}
+                    className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800"
+                  >
+                    No
+                  </button>
+                </div>
               </div>
-              <div className={`mt-1 text-xl font-semibold ${showMeaning ? "text-slate-900" : "text-slate-300"}`}>
-                {showMeaning ? card.meaning : "Hidden"}
-              </div>
-            </div>
+            ) : (
+              <button
+                type="button"
+                onClick={submitTypingPractice}
+                className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Show answer
+              </button>
+            )}
           </div>
         </div>
-      </button>
+        </div>
+      )}
 
       <div className="grid gap-2 sm:grid-cols-3">
         <button
@@ -1048,6 +1211,7 @@ export default function LibraryStudyPage() {
   const [practiceDeck, setPracticeDeck] = useState<StudyCard[]>([]);
   const [practiceIndex, setPracticeIndex] = useState(0);
   const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
+  const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
   const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
   const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("check");
@@ -2888,9 +3052,34 @@ export default function LibraryStudyPage() {
               </select>
             ) : null}
 
-            <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
-              {libraryMode === "practice" ? "Reveal practice" : "Automatic typed gates"}
-            </div>
+            {libraryMode === "practice" ? (
+              <div className="grid shrink-0 grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1 text-sm font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setPracticeStudyMode("reveal")}
+                  className={`rounded-lg px-3 py-2 transition ${practiceStudyMode === "reveal"
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-slate-500"
+                    }`}
+                >
+                  Reveal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPracticeStudyMode("typing")}
+                  className={`rounded-lg px-3 py-2 transition ${practiceStudyMode === "typing"
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-slate-500"
+                    }`}
+                >
+                  Typing
+                </button>
+              </div>
+            ) : (
+              <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
+                Automatic typed gates
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2900,6 +3089,7 @@ export default function LibraryStudyPage() {
           card={practiceCard}
           total={practiceDeck.length}
           revealStep={practiceRevealStep}
+          practiceMode={practiceStudyMode}
           onAdvance={advancePracticeCard}
           onNext={goToNextPracticeCard}
           onPrevious={goToPreviousPracticeCard}
@@ -3122,21 +3312,26 @@ export default function LibraryStudyPage() {
                       }}
                       placeholder={
                         studyMode === "reading_typing"
-                          ? "Type the reading"
+                          ? "Type kana or Hepburn romaji"
                           : "Type the meaning"
                       }
+                      inputMode="text"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      spellCheck={false}
                       className="w-full rounded border px-4 py-3 text-base"
                       disabled={!!checked}
                     />
 
                     <div className="mt-2 text-center text-xs uppercase tracking-wide text-slate-500">
                       {studyMode === "reading_typing"
-                        ? "Type the reading"
+                        ? "Kana is best; romaji can bypass predictive text"
                         : "Type one meaning word"}
                     </div>
 
                     {!checked ? (
-                      <div className="mt-3 flex justify-center gap-2">
+                      <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
                         <button
                           type="button"
                           onClick={checkTypingSingle}
@@ -3144,6 +3339,16 @@ export default function LibraryStudyPage() {
                         >
                           Check
                         </button>
+
+                        {canComeBackLater(currentCard) ? (
+                          <button
+                            type="button"
+                            onClick={comeBackLaterForCurrentCard}
+                            className="rounded border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                          >
+                            This word is too hard for me
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -3168,10 +3373,20 @@ export default function LibraryStudyPage() {
                             checkCompleteStudyStep1();
                           }
                         }}
-                        placeholder="Type the reading"
+                        placeholder="Type kana or Hepburn romaji"
+                        inputMode="text"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        spellCheck={false}
                         className="w-full rounded border px-4 py-3 text-base"
                         disabled={!!firstStepChecked}
                       />
+                      {!firstStepChecked ? (
+                        <div className="mt-1 text-xs text-slate-500">
+                          Kana is best; romaji can bypass predictive text when needed.
+                        </div>
+                      ) : null}
                       <div className="mt-2">
                         {!firstStepChecked ? (
                           <button
@@ -3301,9 +3516,9 @@ export default function LibraryStudyPage() {
                       onClick={comeBackLaterForCurrentCard}
                       className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
                     >
-                      <div className="leading-tight">Come back later</div>
+                      <div className="leading-tight">Too hard for now</div>
                       <div className="text-[10px] font-normal text-slate-500">
-                        Hold 90 days
+                        Limbo · 90 days
                       </div>
                     </button>
                   ) : null}

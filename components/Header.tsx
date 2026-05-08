@@ -220,89 +220,7 @@ export default function Header() {
               ) : null}
             </div>
 
-            <div className="relative" ref={discoveryMenuRef}>
-              <Link
-                href="/discovery"
-                className={`rounded-full border px-3 py-1.5 transition md:hidden ${discoverySectionActive
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
-                onClick={() => {
-                  setShowDiscoveryMenu(false);
-                  setShowLibraryMenu(false);
-                  setShowStudyMenu(false);
-                  setShowProfileMenu(false);
-                }}
-              >
-                Discovery
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDiscoveryMenu((prev) => !prev);
-                  setShowLibraryMenu(false);
-                  setShowStudyMenu(false);
-                  setShowProfileMenu(false);
-                }}
-                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${discoverySectionActive
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
-              >
-                Discovery
-              </button>
-
-              {showDiscoveryMenu ? (
-                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
-                  <Link
-                    href="/discovery"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowDiscoveryMenu(false)}
-                  >
-                    Discovery Hub
-                  </Link>
-
-                  <Link
-                    href="/discovery/dictionary"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/dictionary"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowDiscoveryMenu(false)}
-                  >
-                    Dictionary
-                  </Link>
-
-                  <Link
-                    href="/discovery/word-history"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/discovery/word-history")
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowDiscoveryMenu(false)}
-                  >
-                    Word History
-                  </Link>
-
-                  <Link
-                    href="/discovery/reader-insights"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowDiscoveryMenu(false)}
-                  >
-                    Reader Insights
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="relative" ref={studyMenuRef}>
+<div className="relative" ref={studyMenuRef}>
               <Link
                 href="/library-study"
                 className={`rounded-full border px-3 py-1.5 transition md:hidden ${studySectionActive
@@ -403,6 +321,178 @@ export default function Header() {
               ) : null}
             </div>
 
+            <div className="relative" ref={discoveryMenuRef}>
+              <Link
+                href="/discovery"
+                className={`rounded-full border px-3 py-1.5 transition md:hidden ${discoverySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                onClick={() => {
+                  setShowDiscoveryMenu(false);
+                  setShowLibraryMenu(false);
+                  setShowStudyMenu(false);
+                  setShowProfileMenu(false);
+                }}
+              >
+                Discovery
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDiscoveryMenu((prev) => !prev);
+                  setShowLibraryMenu(false);
+                  setShowStudyMenu(false);
+                  setShowProfileMenu(false);
+                }}
+                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${discoverySectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+              >
+                Discovery
+              </button>
+
+              {showDiscoveryMenu ? (
+                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
+                  <Link
+                    href="/discovery"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Discovery Hub
+                  </Link>
+
+                  <Link
+                    href="/discovery/dictionary"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/dictionary"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Dictionary
+                  </Link>
+
+                  <Link
+                    href="/discovery/word-history"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/discovery/word-history")
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Word History
+                  </Link>
+
+                  <Link
+                    href="/discovery/reader-insights"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Reader Insights
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative" ref={profileMenuRef}>
+              <Link
+                href="/community"
+                className={`rounded-full border px-3 py-1.5 transition md:hidden ${profileSectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowStudyMenu(false);
+                }}
+              >
+                Community
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu((prev) => !prev);
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowStudyMenu(false);
+                }}
+                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${profileSectionActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+              >
+                Community
+              </button>
+
+              {showProfileMenu ? (
+                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
+                  <Link
+                    href="/community"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Community Hub
+                  </Link>
+
+                  <Link
+                    href="/community/profile"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/profile" || pathname.startsWith("/community/profile/")
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    My Profile
+                  </Link>
+
+                  <Link
+                    href="/community/stats"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    My Stats
+                  </Link>
+                  <Link
+                    href="/community/book-clubs"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/book-clubs"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Book Clubs
+                  </Link>
+                  <Link
+                    href="/discovery/reader-insights"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    Reader Insights
+                  </Link>
+                </div>
+              ) : null}
+            </div>
             {showTeacherLink ? (
               <div
                 className="relative order-last flex basis-full justify-center md:order-none md:block md:basis-auto"
@@ -515,97 +605,6 @@ export default function Header() {
                 ) : null}
               </div>
             ) : null}
-
-            <div className="relative" ref={profileMenuRef}>
-              <Link
-                href="/community"
-                className={`rounded-full border px-3 py-1.5 transition md:hidden ${profileSectionActive
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
-                onClick={() => {
-                  setShowProfileMenu(false);
-                  setShowLibraryMenu(false);
-                  setShowDiscoveryMenu(false);
-                  setShowStudyMenu(false);
-                }}
-              >
-                Community
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProfileMenu((prev) => !prev);
-                  setShowLibraryMenu(false);
-                  setShowDiscoveryMenu(false);
-                  setShowStudyMenu(false);
-                }}
-                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${profileSectionActive
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
-              >
-                Community
-              </button>
-
-              {showProfileMenu ? (
-                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
-                  <Link
-                    href="/community"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowProfileMenu(false)}
-                  >
-                    Community Hub
-                  </Link>
-
-                  <Link
-                    href="/community/profile"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/profile" || pathname.startsWith("/community/profile/")
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowProfileMenu(false)}
-                  >
-                    My Profile
-                  </Link>
-
-                  <Link
-                    href="/community/stats"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowProfileMenu(false)}
-                  >
-                    My Stats
-                  </Link>
-                  <Link
-                    href="/community/book-clubs"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/book-clubs"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowProfileMenu(false)}
-                  >
-                    Book Clubs
-                  </Link>
-                  <Link
-                    href="/discovery/reader-insights"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowProfileMenu(false)}
-                  >
-                    Reader Insights
-                  </Link>
-                </div>
-              ) : null}
-            </div>
           </nav>
         </div>
       </div>

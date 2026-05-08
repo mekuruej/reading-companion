@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 
@@ -121,16 +122,7 @@ function kataToHira(s: string) {
 }
 
 function normalizeReading(s: string) {
-  return kataToHira(s ?? "")
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/[・･]/g, "")
-    .replace(/ー/g, "")
-    .toLowerCase();
-}
-
-function isKanaOnly(s: string) {
-  return /^[ぁ-ゖァ-ヶー]+$/.test(s.trim());
+  return normalizeKanaReading(s ?? "");
 }
 
 function normalizeMeaning(s: string) {
@@ -1182,7 +1174,6 @@ export default function BookFlashcardsPage() {
 
       const ok =
         !!correctReading &&
-        isKanaOnly(userAnsRaw) &&
         normalizedUser === normalizedCorrect;
 
       if (ok) {
@@ -1878,20 +1869,15 @@ export default function BookFlashcardsPage() {
                                 checkCorrectionAnswer();
                               }
                             }}
-                            lang={
-                              studySet === "READING_MC" ||
-                                studySet === "FROM_READING_MC"
-                                ? "ja"
-                                : undefined
-                            }
                             autoCorrect="off"
                             autoCapitalize="none"
+                            autoComplete="off"
                             spellCheck={false}
                             autoFocus
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                             placeholder={
                               studySet === "READING_MC"
-                                ? "Type the reading"
+                                ? "Type kana or Hepburn romaji"
                                 : studySet === "FROM_READING_MC"
                                   ? "Type the kanji word"
                                   : "Type one meaning word"
@@ -1963,7 +1949,7 @@ export default function BookFlashcardsPage() {
 
                   {studySet === "READING" ? (
                     <p className="mb-2 text-xs text-gray-500">
-                      Reading quizzes can be answered in hiragana or katakana.
+                      Kana is best practice; Hepburn romaji also works if predictive text gets in the way.
                     </p>
                   ) : null}
 
@@ -2000,9 +1986,9 @@ export default function BookFlashcardsPage() {
                         }
                       }}
                       inputMode="text"
-                      lang={studySet === "READING" ? "ja" : undefined}
                       autoCorrect="off"
                       autoCapitalize="none"
+                      autoComplete="off"
                       spellCheck={false}
                       autoFocus
                       className="border p-2 rounded w-full"
@@ -2010,7 +1996,7 @@ export default function BookFlashcardsPage() {
                         readyForNextCard
                           ? "Press Enter for next card"
                           : studySet === "READING"
-                            ? "かなで入力（ひらがな・カタカナどちらでもOK）"
+                            ? "Type kana or Hepburn romaji"
                             : studySet === "MEANING"
                               ? "Type a meaning"
                               : studySet === "FROM_READING_MEANING"

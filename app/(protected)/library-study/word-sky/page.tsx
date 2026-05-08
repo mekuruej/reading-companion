@@ -476,8 +476,14 @@ export default function WordSkyPage() {
 
                   <button
                     type="button"
-                    onClick={() => clearClaim(selectedWord)}
-                    disabled={savingKey === selectedKey || !claims[selectedKey]}
+                    onClick={() => {
+                      if (claims[selectedKey]) {
+                        void clearClaim(selectedWord);
+                      } else {
+                        setSelectedWord(null);
+                      }
+                    }}
+                    disabled={savingKey === selectedKey}
                     className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
                   >
                     Leave it clear

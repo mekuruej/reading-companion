@@ -7,6 +7,10 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getLessonAlertInfo } from "@/lib/lessonAlerts";
 import {
+  computeLibraryStudyColorStatus,
+  getLibraryStudyEncounterStageCounts,
+} from "@/lib/libraryStudyColor";
+import {
   emptyLibraryStudyColorTotals,
   emptyLibraryStudyLimboTotals,
   fetchLibraryStudyColorBreakdown,
@@ -107,8 +111,47 @@ type UserBarVariant = "full" | "logoutOnly" | "labelOnly";
 type LibrarySnapshotView = "monthly" | "colors";
 type MekuruColor = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "grey";
 
+type AbilityCheckReminderSettings = {
+  red_stages?: number | null;
+  orange_stages?: number | null;
+  yellow_stages?: number | null;
+  skip_katakana_library_check?: boolean | null;
+  show_ability_check_reminder?: boolean | null;
+};
+
+type AbilityCheckSummaryRow = {
+  study_identity_key: string;
+  surface: string | null;
+  reading: string | null;
+  meaning: string | null;
+  total_encounter_count: number | null;
+  check_ready_encounter_count: number | null;
+  sample_user_book_word_id: string | null;
+};
+
+type AbilityCheckProgressRow = {
+  study_identity_key: string;
+  reading_gate_status: "not_started" | "passed" | "failed" | null;
+  meaning_gate_status: "not_started" | "passed" | "failed" | null;
+  held_before_reading_gate: boolean | null;
+  held_before_meaning_gate: boolean | null;
+  mastered: boolean | null;
+  mastered_at: string | null;
+  reading_gate_failed_at: string | null;
+  meaning_gate_failed_at: string | null;
+  last_studied_at: string | null;
+};
+
 const MEKURU_ENCOUNTER_COLORS: MekuruColor[] = ["red", "orange", "yellow"];
 const MEKURU_ABILITY_COLORS: MekuruColor[] = ["green", "blue", "purple"];
+const ABILITY_CHECK_SEEN_STORAGE_KEY = "library-study-seen-by-date";
+const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
+const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
+const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
+const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
+const MISSED_GATE_RECHECK_MIN_DAYS = 7;
+const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
+const PRE_READING_WAIT_RECHECK_DAYS = 90;
 
 function ymdInTimeZone(value: string | Date, timeZone: string) {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -129,6 +172,129 @@ function ymdInTimeZone(value: string | Date, timeZone: string) {
   if (!year || !month || !day) return null;
 
   return `${year}-${month}-${day}`;
+}
+
+function getTodayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function loadAbilityCheckSeenForToday() {
+  if (typeof window === "undefined") return new Set<string>();
+
+  try {
+    const raw = window.localStorage.getItem(ABILITY_CHECK_SEEN_STORAGE_KEY);
+    if (!raw) return new Set<string>();
+
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    return new Set(parsed[getTodayKey()] ?? []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function abilityCheckReminderHiddenToday() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(ABILITY_CHECK_REMINDER_HIDE_KEY) === getTodayKey();
+}
+
+function hideAbilityCheckReminderForToday() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function daysSinceIso(value: string | null | undefined, now = new Date()) {
+  if (!value) return Number.POSITIVE_INFINITY;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
+
+  return (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
+}
+
+function isKatakanaOnly(value: string | null | undefined) {
+  const text = (value ?? "").trim();
+  return text.length > 0 && /^[ァ-ヶー・･]+$/.test(text);
+}
+
+function isAbilityCheckCardDue(
+  summary: AbilityCheckSummaryRow,
+  progress: AbilityCheckProgressRow | null,
+  settings: Required<AbilityCheckReminderSettings>,
+  seenTodayIds: Set<string>,
+  now = new Date()
+) {
+  const surface = (summary.surface ?? "").trim();
+  const reading = (summary.reading ?? "").trim();
+  const meaning = (summary.meaning ?? "").trim();
+  const sampleId = summary.sample_user_book_word_id ?? "";
+
+  if (!surface || !reading || !meaning || !sampleId) return false;
+  if (seenTodayIds.has(sampleId)) return false;
+  if (settings.skip_katakana_library_check && isKatakanaOnly(surface)) return false;
+
+  const colorStatus = computeLibraryStudyColorStatus({
+    encounterCount: summary.total_encounter_count ?? 0,
+    settings,
+    readingGate: progress?.reading_gate_status ?? "not_started",
+    meaningGate: progress?.meaning_gate_status ?? "not_started",
+    heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+    heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+    mastered: progress?.mastered ?? false,
+  });
+
+  const included =
+    colorStatus.eligibleForLibraryStudy ||
+    colorStatus.nextGate === "mastery" ||
+    colorStatus.color === "purple";
+
+  if (!included) return false;
+
+  if (colorStatus.color === "purple") {
+    const lastCheck = progress?.last_studied_at ?? progress?.mastered_at;
+    return daysSinceIso(lastCheck, now) >= MASTERED_MAINTENANCE_INTERVAL_DAYS;
+  }
+
+  if (colorStatus.color === "grey") {
+    if (colorStatus.greyReason === "pre_reading_support") {
+      return daysSinceIso(progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
+    }
+
+    const recheckDays =
+      MISSED_GATE_RECHECK_MIN_DAYS +
+      (hashString(`${summary.study_identity_key}::missed-gate`) %
+        MISSED_GATE_RECHECK_WINDOW_DAYS);
+
+    if (colorStatus.greyReason === "reading_gate_support") {
+      return daysSinceIso(progress?.reading_gate_failed_at, now) >= recheckDays;
+    }
+
+    if (colorStatus.greyReason === "meaning_gate_support") {
+      return daysSinceIso(progress?.meaning_gate_failed_at, now) >= recheckDays;
+    }
+
+    return true;
+  }
+
+  if (!progress?.last_studied_at) return true;
+
+  const regularRecheckDays =
+    REGULAR_GATE_RECHECK_MIN_DAYS +
+    (hashString(`${summary.study_identity_key}::regular-gate`) %
+      REGULAR_GATE_RECHECK_WINDOW_DAYS);
+
+  return daysSinceIso(progress.last_studied_at, now) >= regularRecheckDays;
 }
 
 function ymdToDayNumber(ymd: string) {
@@ -474,6 +640,10 @@ export default function BooksPage() {
   const [previousMekuruLimboMovementTotals, setPreviousMekuruLimboMovementTotals] =
     useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
   const [mekuruColorCountsLoading, setMekuruColorCountsLoading] = useState(false);
+  const [abilityCheckReminderEnabled, setAbilityCheckReminderEnabled] = useState(true);
+  const [abilityCheckReminderCount, setAbilityCheckReminderCount] = useState(0);
+  const [abilityCheckReminderLoading, setAbilityCheckReminderLoading] = useState(false);
+  const [abilityCheckReminderHidden, setAbilityCheckReminderHidden] = useState(false);
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
@@ -699,6 +869,109 @@ export default function BooksPage() {
       setPreviousMekuruLimboMovementTotals(emptyLibraryStudyLimboTotals());
     } finally {
       setMekuruColorCountsLoading(false);
+    }
+  }
+
+  async function loadAbilityCheckReminder(userId: string) {
+    setAbilityCheckReminderLoading(true);
+
+    try {
+      let settings: AbilityCheckReminderSettings | null = null;
+      const { data: settingsWithReminder, error: settingsError } = await supabase
+        .from("user_learning_settings")
+        .select(
+          "red_stages, orange_stages, yellow_stages, skip_katakana_library_check, show_ability_check_reminder"
+        )
+        .eq("user_id", userId)
+        .maybeSingle<AbilityCheckReminderSettings>();
+
+      if (settingsError) {
+        const { data: fallbackSettings, error: fallbackError } = await supabase
+          .from("user_learning_settings")
+          .select("red_stages, orange_stages, yellow_stages, skip_katakana_library_check")
+          .eq("user_id", userId)
+          .maybeSingle<AbilityCheckReminderSettings>();
+
+        if (fallbackError) throw fallbackError;
+        settings = fallbackSettings;
+      } else {
+        settings = settingsWithReminder;
+      }
+
+      const resolvedSettings = {
+        red_stages: settings?.red_stages ?? 1,
+        orange_stages: settings?.orange_stages ?? 1,
+        yellow_stages: settings?.yellow_stages ?? 1,
+        skip_katakana_library_check: settings?.skip_katakana_library_check ?? true,
+        show_ability_check_reminder: settings?.show_ability_check_reminder ?? true,
+      };
+
+      setAbilityCheckReminderEnabled(resolvedSettings.show_ability_check_reminder);
+
+      if (!resolvedSettings.show_ability_check_reminder) {
+        setAbilityCheckReminderCount(0);
+        return;
+      }
+
+      const encounterThreshold = getLibraryStudyEncounterStageCounts(resolvedSettings).total;
+
+      const { data: summaryRows, error: summaryError } = await supabase
+        .from("user_library_word_summaries")
+        .select(
+          "study_identity_key, surface, reading, meaning, total_encounter_count, check_ready_encounter_count, sample_user_book_word_id"
+        )
+        .eq("user_id", userId)
+        .gt("check_ready_encounter_count", 0)
+        .gte("total_encounter_count", encounterThreshold)
+        .order("total_encounter_count", { ascending: false })
+        .limit(500)
+        .returns<AbilityCheckSummaryRow[]>();
+
+      if (summaryError) throw summaryError;
+
+      const summaries = summaryRows ?? [];
+      if (summaries.length === 0) {
+        setAbilityCheckReminderCount(0);
+        return;
+      }
+
+      const keys = summaries.map((row) => row.study_identity_key).filter(Boolean);
+      const progressByKey = new Map<string, AbilityCheckProgressRow>();
+
+      for (let i = 0; i < keys.length; i += 75) {
+        const chunk = keys.slice(i, i + 75);
+        const { data: progressRows, error: progressError } = await supabase
+          .from("user_library_word_progress")
+          .select(
+            "study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, mastered_at, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
+          )
+          .eq("user_id", userId)
+          .in("study_identity_key", chunk)
+          .returns<AbilityCheckProgressRow[]>();
+
+        if (progressError) throw progressError;
+
+        for (const row of progressRows ?? []) {
+          progressByKey.set(row.study_identity_key, row);
+        }
+      }
+
+      const seenTodayIds = loadAbilityCheckSeenForToday();
+      const availableCount = summaries.filter((summary) =>
+        isAbilityCheckCardDue(
+          summary,
+          progressByKey.get(summary.study_identity_key) ?? null,
+          resolvedSettings,
+          seenTodayIds
+        )
+      ).length;
+
+      setAbilityCheckReminderCount(availableCount);
+    } catch (error) {
+      console.error("Error loading Ability Check reminder:", error);
+      setAbilityCheckReminderCount(0);
+    } finally {
+      setAbilityCheckReminderLoading(false);
     }
   }
 
@@ -1514,6 +1787,17 @@ export default function BooksPage() {
   }, [viewingUserId]);
 
   useEffect(() => {
+    setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
+
+    if (!viewingUserId || !meId || viewingUserId !== meId) {
+      setAbilityCheckReminderCount(0);
+      return;
+    }
+
+    loadAbilityCheckReminder(viewingUserId);
+  }, [viewingUserId, meId]);
+
+  useEffect(() => {
     const loadAlerts = async () => {
       if (!viewingUserId || !meId) {
         setAlertBox(null);
@@ -1831,6 +2115,13 @@ export default function BooksPage() {
     );
   }
 
+  const showAbilityCheckReminder =
+    viewingUserId === meId &&
+    abilityCheckReminderEnabled &&
+    !abilityCheckReminderLoading &&
+    abilityCheckReminderCount > 0 &&
+    !abilityCheckReminderHidden;
+
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-screen-xl">
@@ -1858,6 +2149,43 @@ export default function BooksPage() {
           <UserBar isTeacher={isTeacher} variant="logoutOnly" />
         </div>
 
+        {showAbilityCheckReminder ? (
+          <div className="mb-5 rounded-3xl border border-sky-200 bg-sky-50 px-4 py-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-sky-950">
+                  Ability Check is ready today
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  You have {abilityCheckReminderCount} word
+                  {abilityCheckReminderCount === 1 ? "" : "s"} waiting for a quick typed check.
+                  This reminder only appears when cards are due.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/library-study/check")}
+                  className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
+                >
+                  Start Ability Check
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    hideAbilityCheckReminderForToday();
+                    setAbilityCheckReminderHidden(true);
+                  }}
+                  className="rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+                >
+                  Hide today
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mb-6 hidden w-full sm:block">
           <div className="max-w-[720px] rounded-3xl border border-slate-400/70 bg-slate-300/45 p-4 shadow-sm">
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -1872,7 +2200,8 @@ export default function BooksPage() {
                 ) : (
                   <div className="mt-1 space-y-0.5 text-xs text-slate-700">
                     <p>Current color state across your Library Study words.</p>
-                    <p>Arrows compare this calendar month with last calendar month and reset on the 1st.</p>
+                    <p>Arrows compare this month with last month and reset on the 1st.</p>
+                    <p></p>
                   </div>
                 )}
               </div>

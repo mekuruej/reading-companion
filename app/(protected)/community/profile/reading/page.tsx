@@ -17,6 +17,7 @@ type LearningSettings = {
   color_system: string;
   skip_katakana_library_check: boolean;
   library_check_daily_limit: number;
+  show_ability_check_reminder: boolean;
 };
 
 type MainStage = "red" | "orange" | "yellow" | "green" | "blue" | "grey" | "purple";
@@ -146,6 +147,7 @@ export default function ReadingProfilePage() {
           color_system: "rainbow",
           skip_katakana_library_check: true,
           library_check_daily_limit: 20,
+          show_ability_check_reminder: true,
         };
         setSettings(defaultSettings);
         return;
@@ -158,6 +160,8 @@ export default function ReadingProfilePage() {
         library_check_daily_limit: cleanDailyCheckLimit(
           (data as Partial<LearningSettings>).library_check_daily_limit
         ),
+        show_ability_check_reminder:
+          (data as Partial<LearningSettings>).show_ability_check_reminder ?? true,
       };
 
       setSettings(loadedSettings);
@@ -214,6 +218,7 @@ export default function ReadingProfilePage() {
           color_system: settings.color_system,
           skip_katakana_library_check: settings.skip_katakana_library_check,
           library_check_daily_limit: cleanDailyCheckLimit(settings.library_check_daily_limit),
+          show_ability_check_reminder: settings.show_ability_check_reminder,
         },
         { onConflict: "user_id" }
       );
@@ -237,7 +242,7 @@ export default function ReadingProfilePage() {
           setMessage(
             fallbackError
               ? fallbackError.message ?? "Error saving reading profile."
-              : "Reading profile saved. Run the daily-limit SQL to save the Library Check card limit."
+              : "Reading profile saved. Run the latest user-learning-settings SQL to save the Library Check card limit and reminder setting."
           );
         } else {
           setMessage(error.message ?? "Error saving reading profile.");
@@ -466,6 +471,29 @@ export default function ReadingProfilePage() {
               <span className="mt-1 block text-xs leading-5 text-stone-500">
                 They keep a small カ badge, but they will not enter the strict gate session when this
                 is on.
+              </span>
+            </span>
+          </label>
+
+          <label className="mt-4 flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={settings.show_ability_check_reminder}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  show_ability_check_reminder: e.target.checked,
+                })
+              }
+              className="mt-1"
+            />
+            <span>
+              <span className="font-semibold text-stone-900">
+                Show Ability Check reminder on my Library page
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-stone-500">
+                When words are ready today, Mekuru can show a quiet Library reminder. You can
+                still hide it for the day from the Library page.
               </span>
             </span>
           </label>
