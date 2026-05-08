@@ -404,7 +404,10 @@ export default function Header() {
             </div>
 
             {showTeacherLink ? (
-              <div className="relative" ref={teacherMenuRef}>
+              <div
+                className="relative order-last flex basis-full justify-center md:order-none md:block md:basis-auto"
+                ref={teacherMenuRef}
+              >
                 <Link
                   href="/teacher"
                   className={`rounded-full border px-3 py-1.5 transition md:hidden ${teacherSectionActive

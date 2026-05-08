@@ -1858,7 +1858,7 @@ export default function BooksPage() {
           <UserBar isTeacher={isTeacher} variant="logoutOnly" />
         </div>
 
-        <div className="mb-6 w-full">
+        <div className="mb-6 hidden w-full sm:block">
           <div className="max-w-[720px] rounded-3xl border border-slate-400/70 bg-slate-300/45 p-4 shadow-sm">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
@@ -1871,8 +1871,8 @@ export default function BooksPage() {
                   </p>
                 ) : (
                   <div className="mt-1 space-y-0.5 text-xs text-slate-700">
-                    <p>Color states across your Library Study words.</p>
-                    <p>Arrows compare this month with last month.</p>
+                    <p>Current color state across your Library Study words.</p>
+                    <p>Arrows compare this calendar month with last calendar month and reset on the 1st.</p>
                   </div>
                 )}
               </div>

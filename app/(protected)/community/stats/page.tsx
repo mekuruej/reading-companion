@@ -1602,6 +1602,31 @@ export default function StatsPage() {
     }));
   }, [range, sessions, words]);
 
+  const readingStreakStats = useMemo(() => {
+    let longestRun = 0;
+    let runningRun = 0;
+
+    for (const item of readingRhythmActivity) {
+      if (item.engaged) {
+        runningRun += 1;
+        longestRun = Math.max(longestRun, runningRun);
+      } else {
+        runningRun = 0;
+      }
+    }
+
+    let currentRun = 0;
+    for (let i = readingRhythmActivity.length - 1; i >= 0; i--) {
+      if (!readingRhythmActivity[i]?.engaged) break;
+      currentRun += 1;
+    }
+
+    return {
+      currentRun,
+      longestRun,
+    };
+  }, [readingRhythmActivity]);
+
   const savedWordRhythmActivity = useMemo(() => {
     const today = startOfToday();
     const dayCount = rangeDayCount(range, sessions, words);
@@ -3035,7 +3060,7 @@ export default function StatsPage() {
                 })}
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
                   <div className="text-xs text-slate-500">Reading pages</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
@@ -3054,6 +3079,31 @@ export default function StatsPage() {
                     {formatMinutesAsReadableTime(totals.listeningMinutes)}
                   </div>
                 </div>
+                <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
+                  <div className="text-xs text-slate-500">Current Run</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {readingStreakStats.currentRun}{" "}
+                    {readingStreakStats.currentRun === 1 ? "day" : "days"}
+                  </div>
+                  <div className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Consecutive engaged days ending today.
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-900/10 bg-white/85 px-4 py-3 shadow-sm">
+                  <div className="text-xs text-slate-500">Longest Run</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {readingStreakStats.longestRun}{" "}
+                    {readingStreakStats.longestRun === 1 ? "day" : "days"}
+                  </div>
+                  <div className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Best engaged-day streak in this window.
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+                An engaged day means you read, listened, or saved vocabulary. Current Run always
+                ends today; Longest Run follows the selected time filter.
               </div>
             </SectionBand>
 
