@@ -383,17 +383,54 @@ export default function WordHistorySearchPage() {
       </p>
 
       {bookTitle ? (
-        <div className="mb-6 flex items-center gap-3">
-          {bookCover ? (
-            <img src={bookCover} alt="" className="h-16 w-12 rounded object-cover" />
-          ) : null}
-          <div>
-            <p className="text-sm text-gray-700">
-              In book: <span className="font-medium">{bookTitle}</span>
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              This version only tracks appearances inside this specific book.
-            </p>
+        <div className="mb-6 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <button
+            type="button"
+            onClick={() => {
+              router.push(`/books/${encodeURIComponent(userBookId)}`);
+            }}
+            className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+            title={`Go to ${bookTitle} Book Hub`}
+          >
+            {bookCover ? (
+              <img
+                src={bookCover}
+                alt={`Go to ${bookTitle} Book Hub`}
+                className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
+              />
+            ) : null}
+
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+              <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
+                {bookTitle}
+              </div>
+              <p className="mt-1 text-sm text-stone-500">
+                Word history inside this book
+              </p>
+            </div>
+          </button>
+
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+              }}
+              className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+            >
+              Vocab List
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                router.push(`/books/${encodeURIComponent(userBookId)}`);
+              }}
+              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+            >
+              Book Hub
+            </button>
           </div>
         </div>
       ) : null}

@@ -165,14 +165,13 @@ export default function AddWordPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [lookupCandidates, setLookupCandidates] = useState<JishoCandidate[]>([]);
+  const [savedNotice, setSavedNotice] = useState("");
 
   const [editingSessionWordId, setEditingSessionWordId] = useState<string | null>(null);
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
-  const [showEditor, setShowEditor] = useState(false);
 
   const wordInputRef = useRef<HTMLInputElement | null>(null);
-  const editorCardRef = useRef<HTMLDivElement | null>(null);
-  const editorWordInputRef = useRef<HTMLInputElement | null>(null);
+  const wordFieldsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -225,26 +224,6 @@ export default function AddWordPage() {
     );
   }, [chapterNumber, chapterName, userBookId]);
 
-  function jumpToEditor() {
-    window.setTimeout(() => {
-      const editor = editorCardRef.current;
-      if (!editor) return;
-
-      const smallScreen = isSmallViewport();
-      const top = window.scrollY + editor.getBoundingClientRect().top - (smallScreen ? 18 : 132);
-      window.scrollTo({
-        top: Math.max(0, top),
-        behavior: "smooth",
-      });
-
-      if (smallScreen) {
-        editorWordInputRef.current?.focus({ preventScroll: true });
-      } else {
-        editorWordInputRef.current?.focus();
-      }
-    }, 0);
-  }
-
   function prepareForNextWord() {
     window.setTimeout(() => {
       const input = wordInputRef.current;
@@ -252,11 +231,6 @@ export default function AddWordPage() {
 
       if (isSmallViewport()) {
         input.focus({ preventScroll: true });
-        const top = window.scrollY + input.getBoundingClientRect().top - 18;
-        window.scrollTo({
-          top: Math.max(0, top),
-          behavior: "smooth",
-        });
         return;
       }
 
@@ -264,7 +238,23 @@ export default function AddWordPage() {
     }, 0);
   }
 
-  function clearForm(keepLocation = true) {
+  function jumpToWordFields() {
+    window.setTimeout(() => {
+      const target = wordFieldsRef.current;
+      if (!target) return;
+
+      const top = window.scrollY + target.getBoundingClientRect().top - (isSmallViewport() ? 18 : 96);
+      window.scrollTo({
+        top: Math.max(0, top),
+        behavior: "smooth",
+      });
+    }, 0);
+  }
+
+  function clearForm(
+    keepLocation = true,
+    options: { preserveSavedNotice?: boolean } = {}
+  ) {
     setWord("");
     setAlternateSurface("");
     setUseAlternateSurface(false);
@@ -276,14 +266,19 @@ export default function AddWordPage() {
     setMeaningChoiceIndex(0);
     setHideKanjiInReadingSupport(false);
     setEditingSessionWordId(null);
-    setShowEditor(false);
     setLookupCandidates([]);
+    setMessage("");
+    if (!options.preserveSavedNotice) {
+      setSavedNotice("");
+    }
 
     if (!keepLocation) {
       setPageNumber("");
       setChapterNumber("");
       setChapterName("");
     }
+
+    window.setTimeout(() => wordInputRef.current?.focus({ preventScroll: true }), 0);
   }
 
   function applyJisho(entry: JishoChoice) {
@@ -311,14 +306,14 @@ export default function AddWordPage() {
     setChapterNumber(sessionWord.chapterNumber);
     setChapterName(sessionWord.chapterName);
     setHideKanjiInReadingSupport(sessionWord.hideKanjiInReadingSupport);
-    setShowEditor(true);
     setLookupCandidates([]);
     setMessage(`Editing "${sessionWord.surface}"`);
-    jumpToEditor();
+    window.setTimeout(() => wordInputRef.current?.focus({ preventScroll: true }), 0);
   }
 
   async function handleLookup() {
     setMessage("");
+    setSavedNotice("");
 
     const cleanWord = word.trim();
     if (!cleanWord) {
@@ -346,10 +341,8 @@ export default function AddWordPage() {
         setMeaning("");
         setJlpt("NON-JLPT");
         setIsCommon(false);
-        setShowEditor(true);
         setLookupCandidates([]);
         setMessage("❌ No dictionary result found. You can still enter it manually.");
-        jumpToEditor();
         return;
       }
 
@@ -363,13 +356,11 @@ export default function AddWordPage() {
       });
 
       setLookupCandidates(candidates);
-      setShowEditor(true);
       setMessage(
         candidates.length > 1
           ? "✅ Dictionary info loaded. Pick the reading that matches your book if needed."
           : "✅ Dictionary info loaded."
       );
-      jumpToEditor();
 
     } catch (err: any) {
       console.error("Lookup error:", err);
@@ -554,7 +545,8 @@ export default function AddWordPage() {
           newSessionWord,
           ...prev.filter((item) => item.id !== newSessionWord.id),
         ]);
-        setMessage(`✅ Saved "${finalSurface}".`);
+        setSavedNotice(`Saved: ${finalSurface}`);
+        setMessage("");
       } else {
         const { data: updatedRow, error } = await supabase
           .from("user_book_words")
@@ -602,10 +594,11 @@ export default function AddWordPage() {
           updatedSessionWord,
           ...prev.filter((item) => item.id !== updatedSessionWord.id),
         ]);
-        setMessage(`✅ Updated "${finalSurface}".`);
+        setSavedNotice(`Saved: ${finalSurface}`);
+        setMessage("");
       }
 
-      clearForm(true);
+      clearForm(true, { preserveSavedNotice: true });
       prepareForNextWord();
     } catch (err: any) {
       console.error("Save error:", err);
@@ -679,91 +672,71 @@ export default function AddWordPage() {
         ) : null}
 
         <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-          <div className="mb-3 text-sm font-medium text-stone-900">Single Add</div>
+          <div className="mb-3">
+            <div className="text-sm font-semibold text-stone-900">Add / Edit Word</div>
+            <p className="mt-1 text-sm text-stone-600">
+              Search, adjust, and save from one place. Page and chapter stay ready for the next word.
+            </p>
+          </div>
 
-          <div className="grid gap-4">
-            <div>
-              <div className="flex flex-wrap gap-2">
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
+          <div className={`space-y-4 rounded-xl border p-4 ${editingSessionWordId
+            ? "border-amber-200 bg-amber-50"
+            : "border-stone-200 bg-stone-50"
+            }`}
+          >
+            {editingSessionWordId ? (
+              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800">
+                Editing "{word}"
+              </div>
+            ) : null}
 
-                    if (!word.trim() || lookupLoading) return;
-
-                    void handleLookup();
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!word.trim() || lookupLoading) return;
+                void handleLookup();
+              }}
+              className="space-y-1"
+            >
+              <label className="block text-sm font-medium text-stone-700">
+                Search / Edit Word
+              </label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  ref={wordInputRef}
+                  value={word}
+                  onChange={(event) => {
+                    setWord(event.target.value);
+                    setSavedNotice("");
+                    if (lookupCandidates.length > 0) setLookupCandidates([]);
                   }}
-                  className="flex w-full flex-col gap-3 sm:flex-row sm:items-center"
-                >
-                  <input
-                    ref={wordInputRef}
-                    value={word}
-                    onChange={(event) => setWord(event.target.value)}
-                    placeholder="Search a word..."
-                    className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-500"
-                  />
-
-                  <button
-                    type="submit"
-                    disabled={lookupLoading || !word.trim()}
-                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                  >
-                    {lookupLoading ? "Searching..." : "Search"}
-                  </button>
-                </form>
+                  placeholder="Search or edit a word..."
+                  className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                />
 
                 <button
-                  type="button"
-                  onClick={() => {
-                    setReading("");
-                    setMeaning("");
-                    setMeaningChoices([]);
-                    setMeaningChoiceIndex(null);
-                    setJlpt("NON-JLPT");
-                    setIsCommon(false);
-                    setShowEditor(true);
-                    setLookupCandidates([]);
-                    setMessage("");
-                    jumpToEditor();
-                  }}
-                  className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+                  type="submit"
+                  disabled={lookupLoading || !word.trim()}
+                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
                 >
-                  Manual Entry
+                  {lookupLoading ? "Searching..." : "Search"}
                 </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="cursor-not-allowed rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-400 select-none"
-                  >
-                    Kanji Lookup
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled
-                    className="shrink-0 rounded-xl bg-stone-100 px-5 py-3 text-sm font-medium text-stone-400"
-                  >
-                    Grammar Lookup
-                  </button>
-
-                  <span className="select-none text-sm text-stone-400">(coming soon...)</span>
-                </div>
               </div>
+            </form>
 
-              {message ? (
-                <div className="mt-2 text-sm text-stone-600">{message}</div>
-              ) : null}
+            {message ? (
+              <div className={`text-sm ${message.startsWith("❌") ? "text-red-700" : "text-stone-600"}`}>
+                {message}
+              </div>
+            ) : null}
 
               {lookupCandidates.length > 1 ? (
-                <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
                   <div className="text-sm font-medium text-sky-900">
-                    More dictionary matches for "{word.trim()}"
+                    Dictionary choices for "{word.trim()}"
                   </div>
                   <p className="mt-1 text-sm text-sky-800">
-                    If the first result is not the right reading, choose the one that matches your
-                    book.
+                    Choose the reading and meaning that match your book.
                   </p>
 
                   <div className="mt-3 space-y-2">
@@ -779,12 +752,11 @@ export default function AddWordPage() {
                           type="button"
                           onClick={() => {
                             applyJisho(candidate);
-                            setShowEditor(true);
                             setMessage(
                               `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
                               }.`
                             );
-                            jumpToEditor();
+                            jumpToWordFields();
                           }}
                           className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
                               ? "border-sky-400 bg-white shadow-sm"
@@ -814,92 +786,40 @@ export default function AddWordPage() {
                 </div>
               ) : null}
 
-              {showEditor ? (
-                <div
-                  ref={editorCardRef}
-                  className="mt-4 space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4"
-                >
-                  <div>
-                    <div className="text-sm font-semibold text-stone-900">
-                      {editingSessionWordId ? "Edit selected word" : "Review before saving"}
-                    </div>
-                    {editingSessionWordId ? (
-                      <div className="mt-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-emerald-800">
-                        This is the edit word box. Change the saved word here. Use the search box above only for a brand-new lookup.
-                      </div>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <p className="text-sm text-stone-600">
-                          Check the result here before saving it into your Vocab List.
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              <div ref={wordFieldsRef} className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
+                  <input
+                    value={reading}
+                    onChange={(e) => setReading(e.target.value)}
+                    placeholder="Reading"
+                    className="w-full rounded border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
 
-                  {editingSessionWordId ? (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-                      Editing "{word}"
-                    </div>
-                  ) : null}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-stone-700">
+                    Alternate surface
+                  </label>
+                  <input
+                    value={alternateSurface}
+                    onChange={(e) => {
+                      setAlternateSurface(e.target.value);
+                      setUseAlternateSurface(e.target.value.trim().length > 0);
+                    }}
+                    placeholder="Book form, if different"
+                    className="w-full rounded border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
 
-                  <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <div>
-                          <div className="mb-1 text-sm font-medium text-stone-700">Word</div>
-                          <input
-                            ref={editorWordInputRef}
-                            value={useAlternateSurface ? alternateSurface : word}
-                            onChange={(e) => {
-                              const next = e.target.value;
-                              if (useAlternateSurface) {
-                                setAlternateSurface(next);
-                              } else {
-                                setWord(next);
-                              }
-                            }}
-                            placeholder="Word"
-                            className="w-full rounded border bg-white px-3 py-2 text-sm"
-                          />
-                        </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-stone-700">Meaning</label>
 
-                        <label className="flex items-center gap-2 text-sm text-stone-700">
-                          <input
-                            type="checkbox"
-                            checked={useAlternateSurface}
-                            onChange={(e) => setUseAlternateSurface(e.target.checked)}
-                          />
-                          <span>Alternate kanji (in this book)</span>
-                        </label>
-
-                        {useAlternateSurface ? (
-                          <input
-                            value={alternateSurface}
-                            onChange={(e) => setAlternateSurface(e.target.value)}
-                            placeholder="Book form (e.g. 愉しい)"
-                            className="w-full rounded border px-3 py-2 text-sm"
-                          />
-                        ) : null}
-                      </div>
-
-                      <div>
-                        <div className="mb-1 text-sm font-medium text-stone-700">Reading</div>
-                        <input
-                          value={reading}
-                          onChange={(e) => setReading(e.target.value)}
-                          placeholder="Reading"
-                          className="w-full rounded border bg-white px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="mb-2 text-sm font-medium text-stone-700">Meaning</div>
-
-                    <div className="space-y-2">
-                      {meaningChoices.length > 0 ? (
-                        meaningChoices.map((choice, index) => (
+                <div className="space-y-2">
+                  {meaningChoices.length > 0 ? (
+                    <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
+                      {meaningChoices.map((choice, index) => (
                           <label
                             key={index}
                             className="flex items-start gap-2 text-sm text-stone-700"
@@ -914,28 +834,29 @@ export default function AddWordPage() {
                             />
                             <span>{choice || "—"}</span>
                           </label>
-                        ))
-                      ) : (
-                        <p className="text-sm text-stone-500">
-                          No dictionary meanings loaded. Enter your own meaning below.
-                        </p>
-                      )}
-
-                      <textarea
-                        value={meaningChoiceIndex == null ? meaning : ""}
-                        onChange={(e) => {
-                          setMeaningChoiceIndex(null);
-                          setMeaning(e.target.value);
-                        }}
-                        placeholder="Type your meaning"
-                        className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
-                      />
+                      ))}
                     </div>
-                  </div>
+                  ) : (
+                    <p className="text-sm text-stone-500">
+                      No dictionary meanings loaded. Enter your own meaning below.
+                    </p>
+                  )}
+
+                  <textarea
+                    value={meaningChoiceIndex == null ? meaning : ""}
+                    onChange={(e) => {
+                      setMeaningChoiceIndex(null);
+                      setMeaning(e.target.value);
+                    }}
+                    placeholder="Type your meaning"
+                    className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <div className="mb-1 text-sm font-medium text-stone-700">Page</div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-stone-700">Page</span>
                       <input
                         type="number"
                         min={1}
@@ -945,27 +866,27 @@ export default function AddWordPage() {
                         placeholder="Page"
                         className="w-full rounded border px-3 py-2 text-sm"
                       />
-                    </div>
+                    </label>
 
-                    <div>
-                      <div className="mb-1 text-sm font-medium text-stone-700">Chapter</div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-stone-700">Chapter number</span>
                       <input
                         value={chapterNumber}
                         onChange={(e) => setChapterNumber(e.target.value)}
-                        placeholder="Chapter"
+                        placeholder="Chapter #"
                         className="w-full rounded border px-3 py-2 text-sm"
                       />
-                    </div>
+                    </label>
 
-                    <div>
-                      <div className="mb-1 text-sm font-medium text-stone-700">Chapter Name</div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-stone-700">Chapter name</span>
                       <input
                         value={chapterName}
                         onChange={(e) => setChapterName(e.target.value)}
                         placeholder="Chapter name"
                         className="w-full rounded border px-3 py-2 text-sm"
                       />
-                    </div>
+                    </label>
                   </div>
 
                   <label className="flex items-start gap-2 text-sm text-stone-700">
@@ -977,14 +898,14 @@ export default function AddWordPage() {
                     <span>Hide kanji in Read Along (does not affect Vocab List)</span>
                   </label>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => void handleSave()}
-                      disabled={saving}
+                      disabled={saving || !word.trim()}
                       className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
                     >
-                      {saving ? "Saving..." : editingSessionWordId ? "Update Word" : "Save to Vocab List"}
+                      {saving ? "Saving..." : "Save Word"}
                     </button>
 
                     <button
@@ -992,30 +913,32 @@ export default function AddWordPage() {
                       onClick={() => clearForm(true)}
                       className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
                     >
-                      {editingSessionWordId ? "Cancel Edit" : "Cancel"}
+                      Clear Word Fields
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
-                      className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-                    >
-                      Vocab List
-                    </button>
+                    {savedNotice ? (
+                      <span className="text-sm font-medium text-emerald-700">{savedNotice}</span>
+                    ) : null}
                   </div>
-                </div>
-              ) : null}
-            </div>
+          </div>
 
             {sessionWords.length > 0 ? (
               <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-                <div className="mb-3 text-sm font-medium text-stone-900">
-                  Words saved into Vocab List this session
+                <div>
+                  <div className="text-sm font-medium text-stone-900">
+                    Recently added
+                  </div>
+                  <p className="mt-1 text-xs text-stone-500">
+                    {sessionWords.length} word{sessionWords.length === 1 ? "" : "s"} saved this session
+                  </p>
                 </div>
 
-                <div className="space-y-3">
-                  {sessionWords.map((item) => (
-                    <div key={item.id} className="rounded-lg border bg-white p-3">
+                <div className="mt-3 space-y-3">
+                  {sessionWords.slice(0, 2).map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""}`}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 text-sm">
                           <div className="font-medium text-stone-900">{item.surface}</div>
@@ -1048,9 +971,82 @@ export default function AddWordPage() {
                     </div>
                   ))}
                 </div>
+
+                {sessionWords.length > 1 ? (
+                  <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
+                    <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                      Saved words from this session
+                    </summary>
+                    <div className="space-y-3 border-t border-stone-200 p-3">
+                      {sessionWords.slice(1).map((item) => (
+                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 text-sm">
+                              <div className="font-medium text-stone-900">{item.surface}</div>
+                              <div className="text-stone-500">{item.reading || "—"}</div>
+                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                            </div>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => loadSessionWordIntoForm(item)}
+                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void deleteSessionWord(item.id)}
+                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+
+                {sessionWords.length > 2 ? (
+                  <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
+                    <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                      Saved words from this session
+                    </summary>
+                    <div className="space-y-3 border-t border-stone-200 p-3">
+                      {sessionWords.slice(2).map((item) => (
+                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 text-sm">
+                              <div className="font-medium text-stone-900">{item.surface}</div>
+                              <div className="text-stone-500">{item.reading || "—"}</div>
+                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                            </div>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => loadSessionWordIntoForm(item)}
+                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void deleteSessionWord(item.id)}
+                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
               </div>
             ) : null}
-          </div>
         </div>
       </div>
     </main >

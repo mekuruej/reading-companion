@@ -593,16 +593,6 @@ export default function ReadAlongPage() {
                     <p className="mt-1 text-sm text-stone-600">
                         Use this for a quicker, smoother reading experience while you read along with your saved words. New lookups can wait — this page is for keeping your reading momentum.
                     </p>
-
-                    <p className="mt-2 text-xs text-stone-500">
-                        Want to look up words while reading?{" "}
-                        <a
-                            href={`/vocab/single-add?userBookId=${userBookId}`}
-                            className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800"
-                        >
-                            Head to Curiosity Reading
-                        </a>
-                    </p>
                 </div>
 
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5 text-center">
@@ -615,47 +605,52 @@ export default function ReadAlongPage() {
                 </div>
 
                 {bookTitle ? (
-                    <div className="mb-2 mt-2 flex items-center gap-4">
+                    <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
                         <button
                             type="button"
                             onClick={() => {
-                                router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                                router.push(`/books/${encodeURIComponent(userBookId)}`);
                             }}
-                            className="flex items-center gap-4 rounded-xl px-1 text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                            title={`Go to ${bookTitle} Vocab List`}
+                            className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                            title={`Go to ${bookTitle} Book Hub`}
                         >
                             {bookCover ? (
                                 <img
                                     src={bookCover}
-                                    alt={`Go to ${bookTitle} Vocab List`}
+                                    alt={`Go to ${bookTitle} Book Hub`}
                                     className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
                                 />
                             ) : null}
 
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
-                                <div className="text-base font-semibold text-stone-900 hover:text-emerald-700">
+                                <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
                                     {bookTitle}
                                 </div>
-                                {hasFinishedTimer ? (
-                                    <p className="mt-1 text-sm text-emerald-700">Open Vocab List</p>
-                                ) : null}
                             </div>
                         </button>
 
-                        {hasFinishedTimer ? (
+                        <div className="flex flex-wrap gap-2 sm:justify-end">
                             <button
                                 type="button"
                                 onClick={() => {
-                                    if (userBookId) {
-                                        router.push(`/books/${encodeURIComponent(userBookId)}`);
-                                    }
+                                    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
                                 }}
-                                className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-700"
+                                className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
                             >
-                                Open Book Hub
+                                Vocab List
                             </button>
-                        ) : null}
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    router.push(`/books/${encodeURIComponent(userBookId)}`);
+                                }}
+                                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+                            >
+                                Book Hub
+                            </button>
+                        </div>
                     </div>
                 ) : null}
 

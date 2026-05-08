@@ -599,31 +599,48 @@ export default function WordDetailPage() {
     <main className="min-h-screen p-6">
       <div className="mx-auto w-full max-w-4xl">
         {/* Header */}
-        <div className="mb-4 flex w-full items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            {bookCover ? <img src={bookCover} alt="" className="h-16 w-12 shrink-0 rounded" /> : null}
+        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <button
+            type="button"
+            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+            className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+            title={`Go to ${bookTitle || "this book"} Book Hub`}
+          >
+            {bookCover ? (
+              <img
+                src={bookCover}
+                alt={`Go to ${bookTitle || "this book"} Book Hub`}
+                className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
+              />
+            ) : null}
 
             <div className="min-w-0">
-              <div className="text-xs text-gray-500">From</div>
-              <div className="truncate font-medium">{bookTitle || "Book"}</div>
-              <div className="truncate text-xs text-gray-500">
+              <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+              <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
+                {bookTitle || "Book"}
+              </div>
+              <p className="mt-1 truncate text-sm text-stone-500">
                 {chapter ? chapter : null}
                 {word.page_number != null ? ` • p. ${word.page_number}` : null}
-              </div>
+              </p>
             </div>
-          </div>
+          </button>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             <button
-              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-              className="rounded bg-gray-200 px-3 py-2"
-              title="Go to this book hub"
+              type="button"
+              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
+              className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
             >
-              Book Hub
+              Vocab List
             </button>
 
-            <button onClick={() => router.back()} className="rounded bg-gray-100 px-3 py-2">
-              ← Back
+            <button
+              type="button"
+              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+            >
+              Book Hub
             </button>
           </div>
         </div>

@@ -355,7 +355,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Ability Check
+                    Color Ability Check
                   </Link>
 
                   <Link

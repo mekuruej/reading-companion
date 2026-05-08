@@ -2,7 +2,7 @@
 //
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -273,9 +273,6 @@ export default function BookWordsPage() {
   const [bookCover, setBookCover] = useState("");
 
   const [userId, setUserId] = useState<string | null>(null);
-  const [bookOptions, setBookOptions] = useState<
-    { id: string; title: string; started_at: string | null; finished_at: string | null; dnf_at: string | null }[]
-  >([]);
 
   const [words, setWords] = useState<WordRow[]>([]);
   const [query, setQuery] = useState("");
@@ -302,35 +299,6 @@ export default function BookWordsPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
-
-  const stickyControlsRef = useRef<HTMLDivElement | null>(null);
-  const [stickyOffset, setStickyOffset] = useState(0);
-
-  useLayoutEffect(() => {
-    function measure() {
-      if (!stickyControlsRef.current) return;
-      setStickyOffset(stickyControlsRef.current.offsetHeight);
-    }
-
-    measure();
-
-    const el = stickyControlsRef.current;
-    if (!el) return;
-
-    let ro: ResizeObserver | null = null;
-
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => measure());
-      ro.observe(el);
-    }
-
-    window.addEventListener("resize", measure);
-
-    return () => {
-      window.removeEventListener("resize", measure);
-      if (ro) ro.disconnect();
-    };
-  }, []);
 
   function sameOrderGroup(a: WordRow, b: WordRow) {
     return (
@@ -588,45 +556,6 @@ export default function BookWordsPage() {
       alert(e?.message ?? "Failed to unhide word");
     }
   }
-
-  useEffect(() => {
-    async function loadBookOptions() {
-      if (!userId) return;
-
-      const { data, error } = await supabase
-        .from("user_books")
-        .select(`
-          id,
-          started_at,
-          finished_at,
-          dnf_at,
-          books (
-            title
-          )
-        `)
-        .eq("user_id", userId);
-
-      if (error) {
-        console.error("Error loading book options:", error);
-        setBookOptions([]);
-        return;
-      }
-
-      setBookOptions(
-        (data ?? [])
-          .map((item: any) => ({
-            id: item.id,
-            title: item.books?.title ?? "Untitled",
-            started_at: item.started_at ?? null,
-            finished_at: item.finished_at ?? null,
-            dnf_at: item.dnf_at ?? null,
-          }))
-          .sort((a, b) => a.title.localeCompare(b.title))
-      );
-    }
-
-    loadBookOptions();
-  }, [userId]);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -895,14 +824,6 @@ export default function BookWordsPage() {
     });
   }, [filtered]);
 
-  const currentlyReadingOptions = useMemo(() => {
-    return bookOptions.filter((b: any) => b.started_at && !b.finished_at && !b.dnf_at);
-  }, [bookOptions]);
-
-  const otherBookOptions = useMemo(() => {
-    return bookOptions.filter((b: any) => !(b.started_at && !b.finished_at && !b.dnf_at));
-  }, [bookOptions]);
-
   const headerStickyStyle = { top: "0px" };
 
   if (loading) {
@@ -1108,101 +1029,48 @@ export default function BookWordsPage() {
         </p>
       </div>
 
-      <div
-        ref={stickyControlsRef}
-        className="sticky top-0 z-30 border-b border-stone-200 bg-white/95 backdrop-blur"
-      >
-        <div className="grid gap-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="border-b border-stone-200">
+        <div className="space-y-3 py-4">
           <button
             type="button"
             onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="flex min-w-0 items-start gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 text-left shadow-sm transition hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-400"
-            title="Open Book Hub"
+            className="flex w-full flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 text-left shadow-sm transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400 sm:flex-row sm:items-center sm:justify-between sm:p-4"
+            title={`Go to ${bookTitle || "this book"} Book Hub`}
           >
-            {bookCover ? (
-              <img
-                src={bookCover}
-                alt={bookTitle || "Book cover"}
-                className="h-20 w-14 shrink-0 rounded-lg object-cover shadow-sm"
-              />
-            ) : null}
+            <div className="flex min-w-0 items-center gap-4">
+              {bookCover ? (
+                <img
+                  src={bookCover}
+                  alt={`Go to ${bookTitle || "this book"} Book Hub`}
+                  className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
+                />
+              ) : null}
 
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-stone-500">
-                For Book
-              </p>
-              <h1 className="mt-1 break-words text-2xl font-semibold leading-tight text-stone-900">
-                {bookTitle || "Words"}
-              </h1>
-              <p className="mt-1 text-sm text-stone-500">
-                Total: {words.length} • Showing: {filteredSorted.length}
-              </p>
-              <p className="mt-3 text-sm font-medium text-emerald-700">
-                Open Book Hub
-              </p>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+                <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
+                  {bookTitle || "Words"}
+                </div>
+                <p className="mt-1 text-sm text-stone-500">
+                  Total: {words.length} • Showing: {filteredSorted.length}
+                </p>
+              </div>
             </div>
+
+            <span className="inline-flex w-fit rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800">
+              Book Hub
+            </span>
           </button>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4 shadow-sm">
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="min-w-0">
-                <div className="mb-1.5 text-[11px] uppercase tracking-[0.18em] text-stone-500">
-                  Switch Book
-                </div>
-                <select
-                  value={userBookId}
-                  onChange={(e) => {
-                    const newValue = e.target.value;
-                    if (!newValue) return;
+          <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-3 shadow-sm">
+            <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_220px]">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Try 犬, いぬ, dog, p45, etc."
+                className="h-12 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+              />
 
-                    if (newValue === "all-vocab") {
-                      router.push("/vocab");
-                      return;
-                    }
-
-                    if (newValue === userBookId) return;
-                    router.push(`/books/${encodeURIComponent(newValue)}/words`);
-                  }}
-                  className="h-14 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-                >
-                  <option value="all-vocab">All Vocab Lists</option>
-
-                  {currentlyReadingOptions.length > 0 ? (
-                    <optgroup label="Currently Reading">
-                      {currentlyReadingOptions.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.title}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : null}
-
-                  {otherBookOptions.length > 0 ? (
-                    <optgroup label="Other Books">
-                      {otherBookOptions.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.title}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : null}
-                </select>
-              </div>
-
-              <div className="min-w-0">
-                <div className="mb-1.5 text-[11px] uppercase tracking-[0.18em] text-stone-500">
-                  Search
-                </div>
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Try 犬, いぬ, dog, p45, etc."
-                  className="h-14 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-                />
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
               <label className="flex h-14 items-center gap-3 rounded-xl border border-stone-300 bg-white px-4 text-sm text-stone-900 shadow-sm">
                 <input
                   type="checkbox"
@@ -1213,20 +1081,18 @@ export default function BookWordsPage() {
                 <span className="font-medium">Hidden Words Only</span>
               </label>
 
-              <div className="min-w-0">
-                <select
-                  value={chapterFilter}
-                  onChange={(e) => setChapterFilter(e.target.value)}
-                  className="h-14 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-                >
-                  <option value="all">All chapters</option>
-                  {chapterOptions.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={chapterFilter}
+                onChange={(e) => setChapterFilter(e.target.value)}
+                className="h-14 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+              >
+                <option value="all">All chapters</option>
+                {chapterOptions.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
