@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
+type StudentRelationshipStatus = "future" | "current" | "past";
 
 type StudentProfile = {
     id: string;
@@ -18,6 +19,14 @@ type StudentProfile = {
     lesson_day: string | null;
     app_access_type: string | null;
     app_access_expires_at: string | null;
+};
+
+type TeacherStudentLink = {
+    teacher_id?: string | null;
+    student_id?: string | null;
+    relationship_status?: string | null;
+    student_status?: string | null;
+    status?: string | null;
 };
 
 type UserBookRow = {
@@ -45,6 +54,7 @@ type UserBookRow = {
 };
 
 type StudentCard = StudentProfile & {
+    relationshipStatus: StudentRelationshipStatus;
     currentBookTitle: string | null;
     currentBookCoverUrl: string | null;
     currentBookId: string | null;
@@ -82,11 +92,224 @@ function formatRelativeDate(dateStr: string | null) {
     return d.toLocaleDateString();
 }
 
-function isActiveStudentProfile(profile: StudentProfile) {
+function isStudentProfile(profile: StudentProfile) {
     const isStudentRole = profile.role === "member" || profile.role === "student";
-    const isTrialAccess = profile.app_access_type === "trial";
 
-    return isStudentRole && !isTrialAccess;
+    return isStudentRole;
+}
+
+function getStudentRelationshipStatus(profile: StudentProfile): StudentRelationshipStatus {
+    const expiresAt = profile.app_access_expires_at
+        ? new Date(profile.app_access_expires_at)
+        : null;
+    const isExpired = expiresAt ? expiresAt.getTime() < Date.now() : false;
+
+    if (isExpired) return "past";
+    if (profile.app_access_type === "trial") return "future";
+
+    return "current";
+}
+
+function normalizeRelationshipStatus(value: string | null | undefined): StudentRelationshipStatus | null {
+    const normalized = (value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+    if (
+        normalized === "future" ||
+        normalized === "prospective" ||
+        normalized === "trial" ||
+        normalized === "invited" ||
+        normalized === "upcoming"
+    ) {
+        return "future";
+    }
+
+    if (
+        normalized === "past" ||
+        normalized === "former" ||
+        normalized === "archived" ||
+        normalized === "inactive" ||
+        normalized === "complete" ||
+        normalized === "completed"
+    ) {
+        return "past";
+    }
+
+    if (normalized === "current" || normalized === "active") {
+        return "current";
+    }
+
+    return null;
+}
+
+function getLinkRelationshipStatus(link: TeacherStudentLink | null | undefined) {
+    return (
+        normalizeRelationshipStatus(link?.relationship_status) ??
+        normalizeRelationshipStatus(link?.student_status) ??
+        normalizeRelationshipStatus(link?.status)
+    );
+}
+
+function relationshipLabel(status: StudentRelationshipStatus) {
+    if (status === "future") return "Future";
+    if (status === "past") return "Past";
+    return "Current";
+}
+
+function relationshipClasses(status: StudentRelationshipStatus) {
+    if (status === "future") return "border-sky-200 bg-sky-50 text-sky-800";
+    if (status === "past") return "border-stone-200 bg-stone-100 text-stone-500";
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function StudentCardArticle({ student }: { student: StudentCard }) {
+    const displayName = student.display_name || student.username || "Unnamed student";
+
+    return (
+        <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4">
+                <div className="flex items-start gap-4">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-3xl font-black text-stone-500">
+                        {displayName.charAt(0).toUpperCase()}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                                <h3 className="text-2xl font-black leading-tight text-stone-900">
+                                    {displayName}
+                                </h3>
+
+                                {student.username ? (
+                                    <p className="mt-1 text-base text-stone-500">
+                                        @{student.username}
+                                    </p>
+                                ) : null}
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <span
+                                    className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${relationshipClasses(
+                                        student.relationshipStatus
+                                    )}`}
+                                >
+                                    {relationshipLabel(student.relationshipStatus)}
+                                </span>
+                                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-semibold text-stone-500">
+                                    {student.level || "No level"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid gap-3 text-sm text-stone-600 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                            Lesson
+                        </p>
+                        <p className="mt-2 text-lg font-medium text-stone-700">
+                            {formatLessonDay(student.lesson_day)}
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                            Last engaged
+                        </p>
+                        <p className="mt-2 text-lg font-medium text-stone-700">
+                            {formatRelativeDate(student.lastEngagedAt)}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                        Current / recent book
+                    </p>
+
+                    {student.currentBookTitle ? (
+                        <div className="mt-3 flex items-center gap-4">
+                            {student.currentBookCoverUrl ? (
+                                <img
+                                    src={student.currentBookCoverUrl}
+                                    alt=""
+                                    className="h-20 w-14 rounded object-cover"
+                                />
+                            ) : (
+                                <div className="h-20 w-14 rounded bg-stone-100" />
+                            )}
+
+                            <div className="min-w-0">
+                                <p className="truncate text-lg font-semibold text-stone-800">
+                                    {student.currentBookTitle}
+                                </p>
+                                <p className="mt-1 text-sm text-stone-500">
+                                    {student.totalBooks} library{" "}
+                                    {student.totalBooks === 1 ? "book" : "books"}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="mt-3 text-sm text-stone-500">
+                            No books in this student’s library yet.
+                        </p>
+                    )}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {student.username ? (
+                        <Link
+                            href={`/users/${student.username}/books`}
+                            className="rounded-2xl border border-stone-900 bg-stone-900 px-4 py-3 text-center text-base font-semibold text-white hover:bg-black"
+                        >
+                            Library
+                        </Link>
+                    ) : (
+                        <button
+                            type="button"
+                            disabled
+                            className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
+                        >
+                            No username
+                        </button>
+                    )}
+
+                    {student.currentBookId ? (
+                        <Link
+                            href={`/books/${student.currentBookId}`}
+                            className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-3 text-center text-base font-semibold text-white hover:bg-emerald-800"
+                        >
+                            Book Hub
+                        </Link>
+                    ) : (
+                        <button
+                            type="button"
+                            disabled
+                            className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
+                        >
+                            No Book Hub
+                        </button>
+                    )}
+
+                    <button
+                        type="button"
+                        disabled
+                        className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
+                    >
+                        Notes later
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled
+                        className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
+                    >
+                        Stats later
+                    </button>
+                </div>
+            </div>
+        </article>
+    );
 }
 
 export default function TeacherStudentsPage() {
@@ -139,29 +362,30 @@ export default function TeacherStudentsPage() {
             }
 
             let studentProfiles: StudentProfile[] = [];
+            const relationshipStatusByStudentId = new Map<string, StudentRelationshipStatus>();
 
             if (meProfile?.role === "super_teacher" || meProfile?.is_super_teacher) {
-                const { data: allProfiles, error: allProfilesError } = await supabase
-                    .from("profiles")
-                    .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
-                    .order("display_name", { ascending: true });
-
-                if (allProfilesError) throw allProfilesError;
-
-                studentProfiles = ((allProfiles ?? []) as StudentProfile[]).filter(
-                    (profile) => profile.id !== user.id && isActiveStudentProfile(profile)
-                );
-            } else {
                 const { data: links, error: linksError } = await supabase
                     .from("teacher_students")
-                    .select("student_id")
-                    .eq("teacher_id", user.id);
+                    .select("*");
 
                 if (linksError) throw linksError;
 
-                const studentIds = (links ?? [])
-                    .map((row: any) => row.student_id)
-                    .filter(Boolean) as string[];
+                const studentIds = Array.from(
+                    new Set(
+                        ((links ?? []) as TeacherStudentLink[])
+                            .map((row) => row.student_id)
+                            .filter(Boolean) as string[]
+                    )
+                );
+
+                for (const link of (links ?? []) as TeacherStudentLink[]) {
+                    const studentId = link.student_id;
+                    if (!studentId || relationshipStatusByStudentId.has(studentId)) continue;
+
+                    const status = getLinkRelationshipStatus(link);
+                    if (status) relationshipStatusByStudentId.set(studentId, status);
+                }
 
                 if (studentIds.length > 0) {
                     const { data: linkedProfiles, error: linkedProfilesError } = await supabase
@@ -173,7 +397,55 @@ export default function TeacherStudentsPage() {
                     if (linkedProfilesError) throw linkedProfilesError;
 
                     studentProfiles = ((linkedProfiles ?? []) as StudentProfile[]).filter(
-                        (profile) => isActiveStudentProfile(profile)
+                        (profile) => profile.id !== user.id && isStudentProfile(profile)
+                    );
+                } else {
+                    const { data: allProfiles, error: allProfilesError } = await supabase
+                        .from("profiles")
+                        .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
+                        .order("display_name", { ascending: true });
+
+                    if (allProfilesError) throw allProfilesError;
+
+                    studentProfiles = ((allProfiles ?? []) as StudentProfile[]).filter(
+                        (profile) => profile.id !== user.id && isStudentProfile(profile)
+                    );
+                }
+            } else {
+                const { data: links, error: linksError } = await supabase
+                    .from("teacher_students")
+                    .select("*")
+                    .eq("teacher_id", user.id);
+
+                if (linksError) throw linksError;
+
+                const studentIds = Array.from(
+                    new Set(
+                        ((links ?? []) as TeacherStudentLink[])
+                            .map((row) => row.student_id)
+                            .filter(Boolean) as string[]
+                    )
+                );
+
+                for (const link of (links ?? []) as TeacherStudentLink[]) {
+                    const studentId = link.student_id;
+                    if (!studentId) continue;
+
+                    const status = getLinkRelationshipStatus(link);
+                    if (status) relationshipStatusByStudentId.set(studentId, status);
+                }
+
+                if (studentIds.length > 0) {
+                    const { data: linkedProfiles, error: linkedProfilesError } = await supabase
+                        .from("profiles")
+                        .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
+                        .in("id", studentIds)
+                        .order("display_name", { ascending: true });
+
+                    if (linkedProfilesError) throw linkedProfilesError;
+
+                    studentProfiles = ((linkedProfiles ?? []) as StudentProfile[]).filter(
+                        (profile) => isStudentProfile(profile)
                     );
                 }
             }
@@ -260,6 +532,9 @@ export default function TeacherStudentsPage() {
 
                 return {
                     ...student,
+                    relationshipStatus:
+                        relationshipStatusByStudentId.get(student.id) ??
+                        getStudentRelationshipStatus(student),
                     currentBookTitle: currentBookData?.title ?? null,
                     currentBookCoverUrl: currentBookData?.cover_url ?? null,
                     currentBookId: currentBook?.id ?? null,
@@ -292,12 +567,23 @@ export default function TeacherStudentsPage() {
     const summary = useMemo(() => {
         return {
             totalStudents: students.length,
+            futureStudents: students.filter((student) => student.relationshipStatus === "future").length,
+            currentStudents: students.filter((student) => student.relationshipStatus === "current").length,
+            pastStudents: students.filter((student) => student.relationshipStatus === "past").length,
             activeReaders: students.filter((student) => !!student.currentBookId).length,
             assignedPrepBooks: students.reduce(
                 (total, student) => total + student.assignedPrepCount,
                 0
             ),
             withRecentActivity: students.filter((student) => !!student.lastEngagedAt).length,
+        };
+    }, [students]);
+
+    const groupedStudents = useMemo(() => {
+        return {
+            future: students.filter((student) => student.relationshipStatus === "future"),
+            current: students.filter((student) => student.relationshipStatus === "current"),
+            past: students.filter((student) => student.relationshipStatus === "past"),
         };
     }, [students]);
 
@@ -355,24 +641,24 @@ export default function TeacherStudentsPage() {
                     ) : null}
 
                     <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-                            <p className="text-xs text-stone-500">Students</p>
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                            <p className="text-xs text-emerald-700">Current students</p>
                             <p className="mt-1 text-2xl font-black text-stone-900">
-                                {summary.totalStudents}
+                                {summary.currentStudents}
                             </p>
-                            <p className="mt-1 text-xs text-stone-500">Linked learners.</p>
+                            <p className="mt-1 text-xs text-emerald-700">Active teacher relationships.</p>
                         </div>
 
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-                            <p className="text-xs text-emerald-700">With books</p>
+                        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+                            <p className="text-xs text-sky-700">Future students</p>
                             <p className="mt-1 text-2xl font-black text-emerald-900">
-                                {summary.activeReaders}
+                                {summary.futureStudents}
                             </p>
-                            <p className="mt-1 text-xs text-emerald-700">Students with library items.</p>
+                            <p className="mt-1 text-xs text-sky-700">Trials, prep, and upcoming learners.</p>
                         </div>
 
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                            <p className="text-xs text-amber-700">Assigned prep</p>
+                            <p className="text-xs text-amber-700">Assigned prep books</p>
                             <p className="mt-1 text-2xl font-black text-amber-900">
                                 {summary.assignedPrepBooks}
                             </p>
@@ -380,11 +666,11 @@ export default function TeacherStudentsPage() {
                         </div>
 
                         <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-                            <p className="text-xs text-stone-500">Recent activity</p>
+                            <p className="text-xs text-stone-500">Past students</p>
                             <p className="mt-1 text-2xl font-black text-stone-900">
-                                {summary.withRecentActivity}
+                                {summary.pastStudents}
                             </p>
-                            <p className="mt-1 text-xs text-stone-500">Students with reading sessions.</p>
+                            <p className="mt-1 text-xs text-stone-500">Archived or expired access.</p>
                         </div>
                     </section>
 
@@ -404,152 +690,53 @@ export default function TeacherStudentsPage() {
                                 </p>
                             </div>
                         ) : (
-                            <div className="grid gap-4 md:grid-cols-2">
-                                {students.map((student) => {
-                                    const displayName =
-                                        student.display_name || student.username || "Unnamed student";
-
-                                    return (
-                                        <article
-                                            key={student.id}
-                                            className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm"
-                                        >
-                                            <div className="flex flex-col gap-4">
-                                                <div className="flex items-start gap-4">
-                                                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-3xl font-black text-stone-500">
-                                                        {displayName.charAt(0).toUpperCase()}
-                                                    </div>
-
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex flex-wrap items-start justify-between gap-2">
-                                                            <div className="min-w-0">
-                                                                <h3 className="text-2xl font-black leading-tight text-stone-900">
-                                                                    {displayName}
-                                                                </h3>
-
-                                                                {student.username ? (
-                                                                    <p className="mt-1 text-base text-stone-500">
-                                                                        @{student.username}
-                                                                    </p>
-                                                                ) : null}
-                                                            </div>
-
-                                                            <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-semibold text-stone-500">
-                                                                {student.level || "No level"}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid gap-3 text-sm text-stone-600 sm:grid-cols-2">
-                                                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
-                                                            Lesson
-                                                        </p>
-                                                        <p className="mt-2 text-lg font-medium text-stone-700">
-                                                            {formatLessonDay(student.lesson_day)}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
-                                                            Last engaged
-                                                        </p>
-                                                        <p className="mt-2 text-lg font-medium text-stone-700">
-                                                            {formatRelativeDate(student.lastEngagedAt)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="rounded-2xl border border-stone-200 bg-white p-4">
-                                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
-                                                        Current / recent book
-                                                    </p>
-
-                                                    {student.currentBookTitle ? (
-                                                        <div className="mt-3 flex items-center gap-4">
-                                                            {student.currentBookCoverUrl ? (
-                                                                <img
-                                                                    src={student.currentBookCoverUrl}
-                                                                    alt=""
-                                                                    className="h-20 w-14 rounded object-cover"
-                                                                />
-                                                            ) : (
-                                                                <div className="h-20 w-14 rounded bg-stone-100" />
-                                                            )}
-
-                                                            <div className="min-w-0">
-                                                                <p className="truncate text-lg font-semibold text-stone-800">
-                                                                    {student.currentBookTitle}
-                                                                </p>
-                                                                <p className="mt-1 text-sm text-stone-500">
-                                                                    {student.totalBooks} library{" "}
-                                                                    {student.totalBooks === 1 ? "book" : "books"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="mt-3 text-sm text-stone-500">
-                                                            No books in this student’s library yet.
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                                    {student.username ? (
-                                                        <Link
-                                                            href={`/users/${student.username}/books`}
-                                                            className="rounded-2xl border border-stone-900 bg-stone-900 px-4 py-3 text-center text-base font-semibold text-white hover:bg-black"
-                                                        >
-                                                            Library
-                                                        </Link>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            disabled
-                                                            className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
-                                                        >
-                                                            No username
-                                                        </button>
-                                                    )}
-
-                                                    {student.currentBookId ? (
-                                                        <Link
-                                                            href={`/books/${student.currentBookId}`}
-                                                            className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-3 text-center text-base font-semibold text-white hover:bg-emerald-800"
-                                                        >
-                                                            Book Hub
-                                                        </Link>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            disabled
-                                                            className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
-                                                        >
-                                                            No Book Hub
-                                                        </button>
-                                                    )}
-
-                                                    <button
-                                                        type="button"
-                                                        disabled
-                                                        className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
-                                                    >
-                                                        Notes later
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        disabled
-                                                        className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
-                                                    >
-                                                        Stats later
-                                                    </button>
-                                                </div>
+                            <div className="space-y-8">
+                                {([
+                                    {
+                                        key: "future",
+                                        title: "Future Students",
+                                        detail: "Trial, prep, and upcoming learners.",
+                                        items: groupedStudents.future,
+                                    },
+                                    {
+                                        key: "current",
+                                        title: "Current Students",
+                                        detail: "Learners you are actively working with now.",
+                                        items: groupedStudents.current,
+                                    },
+                                    {
+                                        key: "past",
+                                        title: "Past Students",
+                                        detail: "Expired or archived student relationships.",
+                                        items: groupedStudents.past,
+                                    },
+                                ] as const).map((group) => (
+                                    <div key={group.key}>
+                                        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                            <div>
+                                                <h3 className="text-base font-black text-stone-900">
+                                                    {group.title}
+                                                </h3>
+                                                <p className="text-sm text-stone-500">{group.detail}</p>
                                             </div>
-                                        </article>
-                                    );
-                                })}
+                                            <span className="text-sm font-semibold text-stone-400">
+                                                {group.items.length}
+                                            </span>
+                                        </div>
+
+                                        {group.items.length === 0 ? (
+                                            <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-sm text-stone-500">
+                                                No {group.title.toLowerCase()} yet.
+                                            </div>
+                                        ) : (
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                {group.items.map((student) => (
+                                                    <StudentCardArticle key={student.id} student={student} />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </section>

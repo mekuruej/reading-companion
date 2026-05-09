@@ -46,7 +46,7 @@ export default function BooksRedirectPage() {
         !!profile?.target_language;
 
       if (!isComplete) {
-        router.replace("/community/profile/setup");
+        router.replace("/community/profile/settings");
         return;
       }
 

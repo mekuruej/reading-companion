@@ -1,4 +1,4 @@
-// Setup Profile
+// Edit Profile
 // 
 
 "use client";
@@ -19,17 +19,55 @@ type PublicProfileRow = {
   public_name_choice: "display_name" | "username" | null;
 };
 
+const NATIVE_LANGUAGE_OPTIONS = [
+  "English",
+  "Japanese",
+  "Korean",
+  "Chinese",
+  "Spanish",
+  "French",
+  "German",
+  "Portuguese",
+  "Italian",
+  "Vietnamese",
+  "Thai",
+  "Indonesian",
+  "Russian",
+  "Arabic",
+  "Hindi",
+] as const;
+
+const NATIVE_LANGUAGE_OTHER = "Other";
+
 function SectionLabel({
   title,
   detail,
+  eyebrow,
 }: {
   title: string;
   detail: string;
+  eyebrow?: string;
 }) {
   return (
     <div>
+      {eyebrow ? (
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+          {eyebrow}
+        </div>
+      ) : null}
       <h2 className="text-lg font-semibold text-stone-900">{title}</h2>
       <p className="mt-1 text-sm leading-6 text-stone-600">{detail}</p>
+    </div>
+  );
+}
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-stone-100 bg-white px-4 py-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-sm font-semibold text-stone-900">{value || "—"}</div>
     </div>
   );
 }
@@ -44,7 +82,8 @@ export default function ProfileSetupPage() {
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
-  const [nativeLanguage, setNativeLanguage] = useState("");
+  const [nativeLanguageChoice, setNativeLanguageChoice] = useState("");
+  const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("Japanese");
   const [level, setLevel] = useState("");
   const [existingRole, setExistingRole] = useState<ProfileRole | null>(null);
@@ -101,7 +140,22 @@ export default function ProfileSetupPage() {
 
       setDisplayName(profile?.display_name ?? "");
       setUsername(profile?.username ?? "");
-      setNativeLanguage(profile?.native_language ?? "");
+      const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
+      if (
+        loadedNativeLanguage &&
+        NATIVE_LANGUAGE_OPTIONS.includes(
+          loadedNativeLanguage as (typeof NATIVE_LANGUAGE_OPTIONS)[number]
+        )
+      ) {
+        setNativeLanguageChoice(loadedNativeLanguage);
+        setCustomNativeLanguage("");
+      } else if (loadedNativeLanguage) {
+        setNativeLanguageChoice(NATIVE_LANGUAGE_OTHER);
+        setCustomNativeLanguage(loadedNativeLanguage);
+      } else {
+        setNativeLanguageChoice("");
+        setCustomNativeLanguage("");
+      }
       setTargetLanguage(profile?.target_language ?? "Japanese");
       setLevel(profile?.level ?? "");
       setExistingRole((profile?.role as ProfileRole | null) ?? null);
@@ -153,6 +207,10 @@ export default function ProfileSetupPage() {
   const handleSave = async () => {
     setErrorMsg("");
     setSuccessMsg("");
+    const selectedNativeLanguage =
+      nativeLanguageChoice === NATIVE_LANGUAGE_OTHER
+        ? customNativeLanguage.trim()
+        : nativeLanguageChoice.trim();
 
     if (!displayName.trim()) {
       setErrorMsg("Please enter a display name.");
@@ -164,8 +222,8 @@ export default function ProfileSetupPage() {
       return;
     }
 
-    if (!nativeLanguage.trim()) {
-      setErrorMsg("Please enter your native language.");
+    if (!selectedNativeLanguage) {
+      setErrorMsg("Please choose your native language.");
       return;
     }
 
@@ -217,7 +275,7 @@ export default function ProfileSetupPage() {
           id: user.id,
           display_name: displayName.trim(),
           username: cleanUsername,
-          native_language: nativeLanguage.trim(),
+          native_language: selectedNativeLanguage,
           target_language: targetLanguage.trim(),
           level: level.trim(),
           role: existingRole ?? "member",
@@ -256,8 +314,8 @@ export default function ProfileSetupPage() {
   if (loading) {
     return (
       <ProfileShell
-        title="Profile Edits"
-        description="Keep your required setup details and optional public profile information together in one place."
+        title="Edit Profile"
+        description="Update your account basics and the reader details you may choose to show publicly."
       >
         <div className="mx-auto w-full max-w-4xl rounded-xl border bg-white p-6 text-center shadow-sm">
           <p className="text-stone-600">Loading profile details...</p>
@@ -273,27 +331,34 @@ export default function ProfileSetupPage() {
 
   return (
     <ProfileShell
-      title="Profile Edits"
-      description="This is your main profile setup screen. A few fields are required to get started, and the public-sharing fields can be finished later."
+      title="Edit Profile"
+      description="Update the basics Mekuru uses for your account and the public details other readers may see."
     >
       <div className="mx-auto max-w-4xl space-y-4">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-          <div className="font-semibold">Required now</div>
-          <div className="mt-1">
-            Display name, username, native language, target language, and your Japanese reading
-            level help Mekuru personalize the app right away.
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+            Profile Preview
           </div>
-          <div className="mt-3 font-semibold">Optional for later</div>
-          <div className="mt-1">
-            Public name choice, public reading level, favorite genres, and bio can all be filled in
-            whenever you are ready.
+          <h2 className="mt-2 text-lg font-semibold text-sky-950">
+            {chosenPublicName}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-sky-950/75">
+            This page has two jobs: account basics help Mekuru work correctly, and public details
+            shape how you appear around the community.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <PreviewRow label="Username" value={username.trim() ? `@${username.trim()}` : ""} />
+            <PreviewRow label="Reading level" value={level || "Not set"} />
+            <PreviewRow label="Public level" value={publicLevel === "None" ? "Hidden" : publicLevel} />
           </div>
         </div>
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <SectionLabel
-            title="Core Profile"
-            detail="These are the main details Mekuru uses for your account and reading setup."
+            eyebrow="Account basics"
+            title="Core profile"
+            detail="These details keep your account, Library link, and reading setup working smoothly."
           />
 
           <div className="mt-5 grid gap-5 md:grid-cols-2">
@@ -316,18 +381,37 @@ export default function ProfileSetupPage() {
                 placeholder="devon"
               />
               <p className="mt-1 text-xs text-stone-500">
-                Lowercase letters, numbers, and underscores only.
+                Lowercase letters, numbers, and underscores only. Your Library link uses this name.
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-stone-800">Native language</label>
-              <input
-                value={nativeLanguage}
-                onChange={(e) => setNativeLanguage(e.target.value)}
+              <select
+                value={nativeLanguageChoice}
+                onChange={(e) => setNativeLanguageChoice(e.target.value)}
                 className="mt-1 w-full rounded-xl border px-3 py-2"
-                placeholder="English"
-              />
+              >
+                <option value="">Choose a language</option>
+                {NATIVE_LANGUAGE_OPTIONS.map((language) => (
+                  <option key={language} value={language}>
+                    {language}
+                  </option>
+                ))}
+                <option value={NATIVE_LANGUAGE_OTHER}>Other</option>
+              </select>
+              {nativeLanguageChoice === NATIVE_LANGUAGE_OTHER ? (
+                <input
+                  value={customNativeLanguage}
+                  onChange={(e) => setCustomNativeLanguage(e.target.value)}
+                  className="mt-2 w-full rounded-xl border px-3 py-2"
+                  placeholder="Type your language"
+                />
+              ) : null}
+              <p className="mt-1 text-xs text-stone-500">
+                One primary language for now. You can use Other for bilingual or less common
+                answers.
+              </p>
             </div>
 
             <div>
@@ -340,7 +424,7 @@ export default function ProfileSetupPage() {
                 <option value="Japanese">Japanese</option>
               </select>
               <p className="mt-1 text-xs text-stone-500">
-                Japanese is currently the supported language.
+                Japanese is currently the only supported language.
               </p>
             </div>
           </div>
@@ -348,8 +432,9 @@ export default function ProfileSetupPage() {
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <SectionLabel
-            title="Japanese Reading Level"
-            detail="This level is used as the default starting point for reading-fit questions across the app."
+            eyebrow="Reading fit"
+            title="Japanese reading level"
+            detail="This is the default starting point for reading-fit questions. Your Reading Profile controls color support separately."
           />
 
           <div className="mt-4 space-y-2">
@@ -379,8 +464,9 @@ export default function ProfileSetupPage() {
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <SectionLabel
-            title="Public Sharing"
-            detail="These are optional details other readers may see. You can leave them simple for now and come back later."
+            eyebrow="Community"
+            title="Public reader profile"
+            detail="These details are optional. Keep them simple now, or use them to make your reader profile feel more like you."
           />
 
           <div className="mt-5 space-y-5">
@@ -408,7 +494,7 @@ export default function ProfileSetupPage() {
 
             <div>
               <label className="block text-sm font-medium text-stone-800">
-                Japanese Reading Level (public)
+                Japanese reading level shown publicly
               </label>
               <select
                 className="mt-1 w-full rounded-xl border px-3 py-2"
@@ -486,14 +572,16 @@ export default function ProfileSetupPage() {
         {errorMsg ? <p className="text-sm text-red-600">{errorMsg}</p> : null}
         {successMsg ? <p className="text-sm text-emerald-700">{successMsg}</p> : null}
 
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full rounded-xl bg-stone-900 px-4 py-3 text-white disabled:opacity-60"
-        >
-          {saving ? "Saving..." : "Save profile"}
-        </button>
+        <div className="sticky bottom-4 z-10 rounded-2xl border border-stone-200 bg-white/95 p-3 shadow-lg backdrop-blur">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full rounded-xl bg-stone-900 px-4 py-3 text-white disabled:opacity-60"
+          >
+            {saving ? "Saving..." : "Save profile"}
+          </button>
+        </div>
       </div>
     </ProfileShell>
   );

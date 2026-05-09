@@ -43,6 +43,7 @@ type WordRow = {
   reading: string | null;
   vocabulary_cache_id: number | null;
   created_at: string | null;
+  ignore_kanji_enrichment?: boolean | null;
 };
 
 type KanjiMapRow = {
@@ -53,17 +54,35 @@ type KanjiMapRow = {
   reading_type: "on" | "kun" | "other" | null;
   base_reading: string | null;
   realized_reading: string | null;
+  flagged_for_review?: boolean | null;
+  flagged_at?: string | null;
+  excluded_from_kanji_practice?: boolean | null;
+};
+
+type VocabularyCacheRow = {
+  id: number;
+  surface: string | null;
+  reading: string | null;
 };
 
 type QueueStatus =
+  | "flagged_review"
   | "missing_cache"
   | "missing_rows"
   | "missing_positions"
   | "incomplete_rows"
   | "cleanup"
-  | "complete";
+  | "complete"
+  | "excluded";
 
-type StatusFilter = "unresolved" | QueueStatus | "all";
+type StatusFilter =
+  | "all"
+  | "active"
+  | "flagged_review"
+  | "needs_reading"
+  | "needs_work"
+  | "complete"
+  | "excluded";
 
 type QueueItem = {
   userBookWordId: string;
@@ -80,6 +99,7 @@ type QueueItem = {
   mapRowCount: number;
   completePositionCount: number;
   incompleteRowCount: number;
+  flaggedMapRowCount: number;
   status: QueueStatus;
 };
 
@@ -104,18 +124,20 @@ function getBookTitle(book: UserBookRow["books"]) {
 
 function statusLabel(status: QueueStatus) {
   switch (status) {
+    case "flagged_review":
+      return "Flagged";
     case "missing_cache":
-      return "No cache row";
     case "missing_rows":
-      return "No kanji rows";
     case "missing_positions":
-      return "Missing kanji row";
+      return "Needs work";
     case "incomplete_rows":
-      return "Needs readings";
+      return "Needs reading";
     case "cleanup":
-      return "Cleanup only";
+      return "Needs reading";
     case "complete":
       return "Complete";
+    case "excluded":
+      return "Excluded";
     default:
       return status;
   }
@@ -123,35 +145,87 @@ function statusLabel(status: QueueStatus) {
 
 function statusTone(status: QueueStatus) {
   switch (status) {
-    case "missing_cache":
+    case "flagged_review":
       return "border-red-200 bg-red-50 text-red-700";
+    case "missing_cache":
     case "missing_rows":
     case "missing_positions":
       return "border-amber-200 bg-amber-50 text-amber-700";
     case "incomplete_rows":
-      return "border-yellow-200 bg-yellow-50 text-yellow-700";
     case "cleanup":
-      return "border-blue-200 bg-blue-50 text-blue-700";
+      return "border-yellow-200 bg-yellow-50 text-yellow-700";
     case "complete":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "excluded":
+      return "border-stone-200 bg-stone-100 text-stone-600";
     default:
       return "border-stone-200 bg-stone-50 text-stone-700";
   }
+}
+
+function statusDetailLabel(status: QueueStatus) {
+  switch (status) {
+    case "flagged_review":
+      return "Flagged from Kanji Study";
+    case "missing_cache":
+      return "Choose whether to include it";
+    case "missing_rows":
+      return "Open editor to make rows";
+    case "missing_positions":
+      return "Open editor to add missing kanji";
+    case "incomplete_rows":
+      return "Needs reading details";
+    case "cleanup":
+      return "Check extra rows";
+    case "complete":
+      return "Complete";
+    case "excluded":
+      return "Hidden from kanji readings";
+    default:
+      return status;
+  }
+}
+
+function isNeedsReadingStatus(status: QueueStatus) {
+  return status === "incomplete_rows" || status === "cleanup";
+}
+
+function isNeedsWorkStatus(status: QueueStatus) {
+  return status === "missing_cache" || status === "missing_rows" || status === "missing_positions";
+}
+
+function isActiveStatus(status: QueueStatus) {
+  return status !== "complete" && status !== "excluded";
 }
 
 function getQueueStatus(params: {
   vocabularyCacheId: number | null;
   surface: string;
   mapRows: KanjiMapRow[];
+  ignored?: boolean | null;
 }): {
   status: QueueStatus;
   kanjiCount: number;
   mapRowCount: number;
   completePositionCount: number;
   incompleteRowCount: number;
+  flaggedMapRowCount: number;
 } {
   const kanjiCount = kanjiChars(params.surface).length;
   const mapRows = params.mapRows;
+  const flaggedMapRowCount = mapRows.filter((row) => row.flagged_for_review).length;
+  const excludedMapRowCount = mapRows.filter((row) => row.excluded_from_kanji_practice).length;
+
+  if (params.ignored || (mapRows.length > 0 && excludedMapRowCount === mapRows.length)) {
+    return {
+      status: "excluded",
+      kanjiCount,
+      mapRowCount: mapRows.length,
+      completePositionCount: 0,
+      incompleteRowCount: 0,
+      flaggedMapRowCount,
+    };
+  }
 
   if (!params.vocabularyCacheId) {
     return {
@@ -160,6 +234,7 @@ function getQueueStatus(params: {
       mapRowCount: 0,
       completePositionCount: 0,
       incompleteRowCount: 0,
+      flaggedMapRowCount: 0,
     };
   }
 
@@ -186,6 +261,18 @@ function getQueueStatus(params: {
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
       incompleteRowCount,
+      flaggedMapRowCount,
+    };
+  }
+
+  if (flaggedMapRowCount > 0) {
+    return {
+      status: "flagged_review",
+      kanjiCount,
+      mapRowCount: mapRows.length,
+      completePositionCount: completePositions.size,
+      incompleteRowCount,
+      flaggedMapRowCount,
     };
   }
 
@@ -196,6 +283,7 @@ function getQueueStatus(params: {
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
       incompleteRowCount,
+      flaggedMapRowCount,
     };
   }
 
@@ -206,6 +294,7 @@ function getQueueStatus(params: {
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
       incompleteRowCount,
+      flaggedMapRowCount,
     };
   }
 
@@ -216,6 +305,7 @@ function getQueueStatus(params: {
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
       incompleteRowCount,
+      flaggedMapRowCount,
     };
   }
 
@@ -225,6 +315,7 @@ function getQueueStatus(params: {
     mapRowCount: mapRows.length,
     completePositionCount: completePositions.size,
     incompleteRowCount,
+    flaggedMapRowCount,
   };
 }
 
@@ -243,7 +334,7 @@ export default function TeacherKanjiPage() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [studentFilter, setStudentFilter] = useState("all");
   const [bookFilter, setBookFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("unresolved");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
 
   const [editorOpenByWordId, setEditorOpenByWordId] = useState<Record<string, boolean>>({});
   const [editorRowsByWordId, setEditorRowsByWordId] = useState<Record<string, KanjiMapRow[]>>({});
@@ -354,10 +445,11 @@ export default function TeacherKanjiPage() {
 
       const { data: words, error: wordsError } = await supabase
         .from("user_book_words")
-        .select("id, user_book_id, surface, reading, vocabulary_cache_id, created_at")
+        .select(
+          "id, user_book_id, surface, reading, vocabulary_cache_id, created_at, ignore_kanji_enrichment"
+        )
         .in("user_book_id", userBookIds)
         .eq("is_manual_override", false)
-        .eq("ignore_kanji_enrichment", false)
         .gte("created_at", KANJI_ENRICHMENT_TEST_START)
         .limit(5000);
 
@@ -388,7 +480,7 @@ export default function TeacherKanjiPage() {
           const { data: mapRows, error: mapError } = await supabase
             .from("vocabulary_kanji_map")
             .select(
-              "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading"
+              "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
             )
             .in("vocabulary_cache_id", cacheIdChunk)
             .limit(5000);
@@ -401,6 +493,52 @@ export default function TeacherKanjiPage() {
             existing.push(row);
             mapRowsByCacheId.set(cacheKey, existing);
           }
+        }
+      }
+
+      const knownCacheIds = new Set(cacheIds.map((id) => String(id)));
+      const { data: flaggedRows, error: flaggedRowsError } = await supabase
+        .from("vocabulary_kanji_map")
+        .select(
+          "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+        )
+        .eq("flagged_for_review", true)
+        .limit(1000);
+
+      if (flaggedRowsError) throw flaggedRowsError;
+
+      const flaggedCacheIds = Array.from(
+        new Set(
+          ((flaggedRows ?? []) as KanjiMapRow[])
+            .map((row) => Number(row.vocabulary_cache_id))
+            .filter((id) => Number.isFinite(id))
+        )
+      );
+
+      for (const row of (flaggedRows ?? []) as KanjiMapRow[]) {
+        const cacheKey = String(row.vocabulary_cache_id);
+        if (knownCacheIds.has(cacheKey)) continue;
+
+        const existing = mapRowsByCacheId.get(cacheKey) ?? [];
+        existing.push(row);
+        mapRowsByCacheId.set(cacheKey, existing);
+      }
+
+      const cacheRowsById = new Map<number, VocabularyCacheRow>();
+      const flaggedOnlyCacheIds = flaggedCacheIds.filter(
+        (id) => !knownCacheIds.has(String(id))
+      );
+
+      if (flaggedOnlyCacheIds.length > 0) {
+        const { data: cacheRows, error: cacheRowsError } = await supabase
+          .from("vocabulary_cache")
+          .select("id, surface, reading")
+          .in("id", flaggedOnlyCacheIds);
+
+        if (cacheRowsError) throw cacheRowsError;
+
+        for (const row of (cacheRows ?? []) as VocabularyCacheRow[]) {
+          cacheRowsById.set(Number(row.id), row);
         }
       }
 
@@ -418,6 +556,7 @@ export default function TeacherKanjiPage() {
           vocabularyCacheId: word.vocabulary_cache_id,
           surface,
           mapRows,
+          ignored: word.ignore_kanji_enrichment,
         });
 
         return {
@@ -438,10 +577,40 @@ export default function TeacherKanjiPage() {
         };
       });
 
-      nextItems.sort((a, b) => {
-        const aDone = a.status === "complete" || a.status === "cleanup";
-        const bDone = b.status === "complete" || b.status === "cleanup";
+      for (const cacheId of flaggedOnlyCacheIds) {
+        const cacheRow = cacheRowsById.get(cacheId);
+        const surface = String(cacheRow?.surface ?? "");
+        if (!surface || !hasKanji(surface)) continue;
 
+        const mapRows = mapRowsByCacheId.get(String(cacheId)) ?? [];
+        const statusInfo = getQueueStatus({
+          vocabularyCacheId: cacheId,
+          surface,
+          mapRows,
+        });
+
+        nextItems.push({
+          userBookWordId: `cache:${cacheId}`,
+          userBookId: "",
+          userId: "",
+          studentName: "Shared kanji bank",
+          username: null,
+          bookTitle: "Flagged from Kanji Study",
+          surface,
+          reading: String(cacheRow?.reading ?? ""),
+          vocabularyCacheId: cacheId,
+          createdAt: null,
+          ...statusInfo,
+        });
+      }
+
+      nextItems.sort((a, b) => {
+        const aDone = a.status === "complete" || a.status === "excluded";
+        const bDone = b.status === "complete" || b.status === "excluded";
+        const aFlagged = a.status === "flagged_review";
+        const bFlagged = b.status === "flagged_review";
+
+        if (aFlagged !== bFlagged) return aFlagged ? -1 : 1;
         if (aDone !== bDone) return aDone ? 1 : -1;
         if (a.studentName !== b.studentName) return a.studentName.localeCompare(b.studentName);
         if (a.bookTitle !== b.bookTitle) return a.bookTitle.localeCompare(b.bookTitle);
@@ -477,6 +646,7 @@ export default function TeacherKanjiPage() {
     const map = new Map<string, string>();
 
     for (const item of queueItems) {
+      if (!item.userBookId) continue;
       map.set(item.userBookId, item.bookTitle);
     }
 
@@ -488,11 +658,16 @@ export default function TeacherKanjiPage() {
       if (studentFilter !== "all" && item.userId !== studentFilter) return false;
       if (bookFilter !== "all" && item.userBookId !== bookFilter) return false;
 
-      if (statusFilter === "unresolved") {
-        return item.status !== "complete" && item.status !== "cleanup";
+      if (statusFilter === "active") {
+        return isActiveStatus(item.status);
       }
 
-      if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (statusFilter === "flagged_review") return item.status === "flagged_review";
+      if (statusFilter === "needs_reading") return isNeedsReadingStatus(item.status);
+      if (statusFilter === "needs_work") return isNeedsWorkStatus(item.status);
+      if (statusFilter === "complete") return item.status === "complete";
+      if (statusFilter === "excluded") return item.status === "excluded";
+      if (statusFilter !== "all") return false;
 
       return true;
     });
@@ -500,7 +675,7 @@ export default function TeacherKanjiPage() {
 
   const bulkOpenItems = useMemo(() => {
     return filteredItems
-      .filter((item) => item.status !== "complete" && item.status !== "cleanup")
+      .filter((item) => isActiveStatus(item.status))
       .slice(0, BULK_OPEN_LIMIT);
   }, [filteredItems]);
 
@@ -513,39 +688,41 @@ export default function TeacherKanjiPage() {
   }, [queueItems, editorOpenByWordId, editorRowsByWordId]);
 
   const summary = useMemo(() => {
-    const unresolved = queueItems.filter(
-      (item) => item.status !== "complete" && item.status !== "cleanup"
-    );
+    const active = queueItems.filter((item) => isActiveStatus(item.status));
 
     return {
       total: queueItems.length,
-      unresolved: unresolved.length,
-      missingCache: queueItems.filter((item) => item.status === "missing_cache").length,
-      needsReadings: queueItems.filter((item) => item.status === "incomplete_rows").length,
-      missingRows: queueItems.filter(
-        (item) => item.status === "missing_rows" || item.status === "missing_positions"
-      ).length,
+      active: active.length,
+      flagged: queueItems.filter((item) => item.status === "flagged_review").length,
+      needsReading: queueItems.filter((item) => isNeedsReadingStatus(item.status)).length,
+      needsWork: queueItems.filter((item) => isNeedsWorkStatus(item.status)).length,
+      complete: queueItems.filter((item) => item.status === "complete").length,
+      excluded: queueItems.filter((item) => item.status === "excluded").length,
     };
   }, [queueItems]);
 
   async function ensureKanjiRows(item: QueueItem) {
     const surface = item.surface.trim();
     const reading = item.reading.trim();
+    const isCacheOnlyItem = item.userBookWordId.startsWith("cache:");
 
     if (!surface) {
       throw new Error("This word has no surface text.");
     }
 
-    const { data: existingCache, error: cacheLookupError } = await supabase
-      .from("vocabulary_cache")
-      .select("id")
-      .eq("surface", surface)
-      .eq("reading", reading)
-      .maybeSingle();
+    let cacheId = item.vocabularyCacheId ?? null;
 
-    if (cacheLookupError) throw cacheLookupError;
+    if (!cacheId) {
+      const { data: existingCache, error: cacheLookupError } = await supabase
+        .from("vocabulary_cache")
+        .select("id")
+        .eq("surface", surface)
+        .eq("reading", reading)
+        .maybeSingle();
 
-    let cacheId = existingCache?.id ?? null;
+      if (cacheLookupError) throw cacheLookupError;
+      cacheId = existingCache?.id ?? null;
+    }
 
     if (!cacheId) {
       const { data: createdCache, error: createCacheError } = await supabase
@@ -561,16 +738,18 @@ export default function TeacherKanjiPage() {
       cacheId = createdCache.id;
     }
 
-    const { error: updateWordError } = await supabase
-      .from("user_book_words")
-      .update({
-        vocabulary_cache_id: cacheId,
-        is_manual_override: false,
-        ignore_kanji_enrichment: false,
-      })
-      .eq("id", item.userBookWordId);
+    if (!isCacheOnlyItem) {
+      const { error: updateWordError } = await supabase
+        .from("user_book_words")
+        .update({
+          vocabulary_cache_id: cacheId,
+          is_manual_override: false,
+          ignore_kanji_enrichment: false,
+        })
+        .eq("id", item.userBookWordId);
 
-    if (updateWordError) throw updateWordError;
+      if (updateWordError) throw updateWordError;
+    }
 
     const chars = kanjiChars(surface);
 
@@ -595,6 +774,7 @@ export default function TeacherKanjiPage() {
         vocabulary_cache_id: cacheId,
         kanji,
         kanji_position: index,
+        reading_type: "on",
       }))
       .filter((row) => !existingByPosition.has(row.kanji_position));
 
@@ -626,7 +806,7 @@ export default function TeacherKanjiPage() {
     const { data: rows, error: rowsError } = await supabase
       .from("vocabulary_kanji_map")
       .select(
-        "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading"
+        "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at"
       )
       .eq("vocabulary_cache_id", cacheId)
       .order("kanji_position", { ascending: true });
@@ -667,8 +847,9 @@ export default function TeacherKanjiPage() {
     if (bulkOpenItems.length === 0) return;
 
     const ok = window.confirm(
-      `Open editors for the first ${bulkOpenItems.length} visible unresolved item${bulkOpenItems.length === 1 ? "" : "s"
-      }?`
+      `Open editors for the first ${bulkOpenItems.length} visible item${
+        bulkOpenItems.length === 1 ? "" : "s"
+      } that need attention?`
     );
 
     if (!ok) return;
@@ -762,6 +943,15 @@ export default function TeacherKanjiPage() {
 
       if (saveError) throw saveError;
     }
+
+    if (item.vocabularyCacheId && item.flaggedMapRowCount > 0) {
+      const { error: clearFlagError } = await supabase
+        .from("vocabulary_kanji_map")
+        .update({ flagged_for_review: false })
+        .eq("vocabulary_cache_id", item.vocabularyCacheId);
+
+      if (clearFlagError) throw clearFlagError;
+    }
   }
 
   async function saveAllOpenEditors() {
@@ -854,29 +1044,73 @@ export default function TeacherKanjiPage() {
   }
 
   async function ignoreWord(item: QueueItem) {
-    const ok = window.confirm(`Remove ${item.surface} from the kanji enrichment queue?`);
+    const ok = window.confirm(`Exclude ${item.surface} from kanji readings?`);
     if (!ok) return;
 
     setIgnoringId(item.userBookWordId);
     setError(null);
 
     try {
-      const { error: ignoreError } = await supabase
-        .from("user_book_words")
-        .update({
-          ignore_kanji_enrichment: true,
-          kanji_enrichment_ignore_reason: "Ignored from Teacher Kanji page",
-          kanji_enrichment_ignored_at: new Date().toISOString(),
-          kanji_enrichment_ignored_by: currentUserId,
-        })
-        .eq("id", item.userBookWordId);
+      if (item.vocabularyCacheId) {
+        const { error: excludeError } = await supabase
+          .from("vocabulary_kanji_map")
+          .update({
+            excluded_from_kanji_practice: true,
+            flagged_for_review: false,
+          })
+          .eq("vocabulary_cache_id", item.vocabularyCacheId);
 
-      if (ignoreError) throw ignoreError;
+        if (excludeError) throw excludeError;
+      }
+
+      if (!item.userBookWordId.startsWith("cache:")) {
+        const { error: ignoreError } = await supabase
+          .from("user_book_words")
+          .update({
+            ignore_kanji_enrichment: true,
+            kanji_enrichment_ignore_reason: "Ignored from Teacher Kanji page",
+            kanji_enrichment_ignored_at: new Date().toISOString(),
+            kanji_enrichment_ignored_by: currentUserId,
+          })
+          .eq("id", item.userBookWordId);
+
+        if (ignoreError) throw ignoreError;
+      }
 
       await loadQueue();
+      setSaveMessage(`Removed ${item.surface} from kanji readings.`);
+      window.setTimeout(() => setSaveMessage(null), 2500);
     } catch (err: any) {
       console.error("Error ignoring kanji queue item:", err);
-      setError(err?.message ?? "Could not ignore this word.");
+      setError(err?.message ?? "Could not remove this word from the queue.");
+    } finally {
+      setIgnoringId(null);
+    }
+  }
+
+  async function clearKanjiFlag(item: QueueItem) {
+    if (!item.vocabularyCacheId) {
+      setError("This flagged word has no vocabulary cache id.");
+      return;
+    }
+
+    setIgnoringId(item.userBookWordId);
+    setError(null);
+
+    try {
+      const { error: clearFlagError } = await supabase
+        .from("vocabulary_kanji_map")
+        .update({ flagged_for_review: false })
+        .eq("vocabulary_cache_id", item.vocabularyCacheId);
+
+      if (clearFlagError) throw clearFlagError;
+
+      await loadQueue();
+      setSaveMessage(`Cleared the kanji flag for ${item.surface}.`);
+      window.setTimeout(() => setSaveMessage(null), 2500);
+    } catch (err: any) {
+      console.error("Error clearing kanji flag:", err);
+      setError(err?.message ?? "Could not clear this kanji flag.");
     } finally {
       setIgnoringId(null);
     }
@@ -932,30 +1166,35 @@ export default function TeacherKanjiPage() {
           ) : null}
 
 
-          <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-              <p className="text-xs text-stone-500">Total tracked</p>
-              <p className="mt-1 text-2xl font-black text-stone-900">{summary.total}</p>
-            </div>
-
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-              <p className="text-xs text-amber-700">Unresolved</p>
-              <p className="mt-1 text-2xl font-black text-amber-900">{summary.unresolved}</p>
+          <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+              <p className="text-xs text-indigo-700">Total tracked</p>
+              <p className="mt-1 text-2xl font-black text-indigo-950">{summary.total}</p>
             </div>
 
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm">
-              <p className="text-xs text-red-700">No cache</p>
-              <p className="mt-1 text-2xl font-black text-red-900">{summary.missingCache}</p>
+              <p className="text-xs text-red-700">Flagged</p>
+              <p className="mt-1 text-2xl font-black text-red-900">{summary.flagged}</p>
             </div>
 
-            <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 shadow-sm">
-              <p className="text-xs text-yellow-700">Needs readings</p>
-              <p className="mt-1 text-2xl font-black text-yellow-900">{summary.needsReadings}</p>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+              <p className="text-xs text-sky-700">Needs reading</p>
+              <p className="mt-1 text-2xl font-black text-sky-950">{summary.needsReading}</p>
             </div>
 
-            <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-              <p className="text-xs text-stone-500">Missing rows</p>
-              <p className="mt-1 text-2xl font-black text-stone-900">{summary.missingRows}</p>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <p className="text-xs text-amber-700">Needs work</p>
+              <p className="mt-1 text-2xl font-black text-amber-900">{summary.needsWork}</p>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+              <p className="text-xs text-emerald-700">Complete</p>
+              <p className="mt-1 text-2xl font-black text-emerald-900">{summary.complete}</p>
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-stone-100 p-4 shadow-sm">
+              <p className="text-xs text-stone-600">Excluded</p>
+              <p className="mt-1 text-2xl font-black text-stone-800">{summary.excluded}</p>
             </div>
           </section>
 
@@ -1006,14 +1245,13 @@ export default function TeacherKanjiPage() {
                   onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
                   className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
                 >
-                  <option value="unresolved">Unresolved only</option>
+                  <option value="active">Needs attention</option>
                   <option value="all">All</option>
-                  <option value="missing_cache">No cache row</option>
-                  <option value="missing_rows">No kanji rows</option>
-                  <option value="missing_positions">Missing kanji row</option>
-                  <option value="incomplete_rows">Needs readings</option>
-                  <option value="cleanup">Cleanup only</option>
+                  <option value="flagged_review">Flagged</option>
+                  <option value="needs_reading">Needs reading</option>
+                  <option value="needs_work">Needs work</option>
                   <option value="complete">Complete</option>
+                  <option value="excluded">Excluded</option>
                 </select>
               </label>
             </div>
@@ -1022,7 +1260,7 @@ export default function TeacherKanjiPage() {
               <div>
                 <p className="text-sm font-semibold text-stone-900">Bulk open</p>
                 <p className="mt-1 text-xs text-stone-500">
-                  Prepare rows and open inline editors for the first {BULK_OPEN_LIMIT} visible unresolved items.
+                  Prepare rows and open editors for the first {BULK_OPEN_LIMIT} visible items that need attention.
                 </p>
               </div>
 
@@ -1051,6 +1289,205 @@ export default function TeacherKanjiPage() {
               </div>
             </div>
           </section>
+
+          {openEditorItems.length > 0 ? (
+            <section className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-black uppercase tracking-wide text-emerald-900">
+                    Open kanji editors
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-800">
+                    All opened words stay together here so the kanji rows do not get scattered through the queue.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditorOpenByWordId((prev) => {
+                      const next = { ...prev };
+                      for (const item of openEditorItems) {
+                        next[item.userBookWordId] = false;
+                      }
+                      return next;
+                    })
+                  }
+                  className="rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+                >
+                  Close all editors
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4">
+                {openEditorItems.map((item) => (
+                  <div
+                    key={item.userBookWordId}
+                    className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-3xl font-semibold leading-tight text-stone-900 md:text-4xl">
+                          {item.surface}
+                        </p>
+                        {item.reading ? (
+                          <div className="mt-2 flex flex-wrap gap-2 text-base font-semibold md:text-lg">
+                            <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-stone-600">
+                              {item.reading}
+                            </span>
+                            <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-stone-600">
+                              {hiraToKata(item.reading)}
+                            </span>
+                          </div>
+                        ) : null}
+                        <p className="mt-1 text-xs leading-5 text-stone-500">
+                          {item.studentName} · {item.bookTitle}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditorOpenByWordId((prev) => ({
+                            ...prev,
+                            [item.userBookWordId]: false,
+                          }))
+                        }
+                        className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(editorRowsByWordId[item.userBookWordId] ?? []).map((row) => (
+                        <div
+                          key={row.id}
+                          className="grid gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 md:grid-cols-[80px_140px_1fr_1fr]"
+                        >
+                          <div>
+                            <div className="text-xs font-semibold text-stone-500">
+                              Kanji
+                            </div>
+                            <div className="mt-1 text-3xl font-semibold text-stone-900">
+                              {row.kanji}
+                            </div>
+                          </div>
+
+                          <label className="text-sm">
+                            <span className="mb-1 block text-xs font-semibold text-stone-500">
+                              Type
+                            </span>
+                            <select
+                              value={row.reading_type ?? "on"}
+                              onChange={(event) =>
+                                updateEditorRow(
+                                  item.userBookWordId,
+                                  row.id,
+                                  "reading_type",
+                                  event.target.value
+                                )
+                              }
+                              className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                            >
+                              <option value="on">On</option>
+                              <option value="kun">Kun</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </label>
+
+                          <label className="text-sm">
+                            <span className="mb-1 block text-xs font-semibold text-stone-500">
+                              Base reading
+                            </span>
+                            <input
+                              value={row.base_reading ?? ""}
+                              onChange={(event) =>
+                                updateEditorRow(
+                                  item.userBookWordId,
+                                  row.id,
+                                  "base_reading",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="ところ"
+                              className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                            />
+                            {row.base_reading ? (
+                              <div className="mt-1 text-xs text-stone-500">
+                                {hiraToKata(row.base_reading)}
+                              </div>
+                            ) : null}
+                          </label>
+
+                          <label className="text-sm">
+                            <span className="mb-1 block text-xs font-semibold text-stone-500">
+                              Realized reading
+                            </span>
+                            <input
+                              value={row.realized_reading ?? ""}
+                              onChange={(event) =>
+                                updateEditorRow(
+                                  item.userBookWordId,
+                                  row.id,
+                                  "realized_reading",
+                                  event.target.value
+                                )
+                              }
+                              placeholder="どころ"
+                              className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                            />
+                            {row.realized_reading ? (
+                              <div className="mt-1 text-xs text-stone-500">
+                                {hiraToKata(row.realized_reading)}
+                              </div>
+                            ) : null}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                      {item.flaggedMapRowCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => void clearKanjiFlag(item)}
+                          disabled={ignoringId === item.userBookWordId}
+                          className="rounded-2xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {ignoringId === item.userBookWordId
+                            ? "Clearing…"
+                            : "Clear flag only"}
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => void ignoreWord(item)}
+                        disabled={ignoringId === item.userBookWordId}
+                        className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                      >
+                        {ignoringId === item.userBookWordId
+                          ? "Removing…"
+                          : "Exclude from kanji readings"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => void saveEditorRows(item)}
+                        disabled={bulkSaving || savingEditorId === item.userBookWordId}
+                        className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                      >
+                        {savingEditorId === item.userBookWordId
+                          ? "Saving…"
+                          : "Save readings"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="mt-6 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
             {filteredItems.length === 0 ? (
@@ -1123,9 +1560,13 @@ export default function TeacherKanjiPage() {
                               className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(
                                 item.status
                               )}`}
+                              title={statusDetailLabel(item.status)}
                             >
                               {statusLabel(item.status)}
                             </span>
+                            <div className="mt-1 text-xs text-stone-400">
+                              {statusDetailLabel(item.status)}
+                            </div>
                           </td>
 
                           <td className="px-4 py-4 text-xs text-stone-600">
@@ -1133,6 +1574,11 @@ export default function TeacherKanjiPage() {
                             <div>Rows: {item.mapRowCount}</div>
                             <div>Complete: {item.completePositionCount}</div>
                             <div>Incomplete: {item.incompleteRowCount}</div>
+                            {item.flaggedMapRowCount > 0 ? (
+                              <div className="font-semibold text-red-700">
+                                Flagged: {item.flaggedMapRowCount}
+                              </div>
+                            ) : null}
                           </td>
 
                           <td className="px-4 py-4">
@@ -1143,15 +1589,34 @@ export default function TeacherKanjiPage() {
                                 disabled={preparingId === item.userBookWordId}
                                 className="rounded-xl border border-stone-900 bg-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black disabled:opacity-50"
                               >
-                                {preparingId === item.userBookWordId ? "Opening…" : "Open editor"}
+                                {preparingId === item.userBookWordId
+                                  ? "Opening…"
+                                  : editorOpenByWordId[item.userBookWordId]
+                                    ? "Editor open above"
+                                    : "Open editor"}
                               </button>
 
-                              <Link
-                                href={`/books/${item.userBookId}?tab=teacher`}
-                                className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
-                              >
-                                Open Book Hub
-                              </Link>
+                              {item.userBookId ? (
+                                <Link
+                                  href={`/books/${item.userBookId}?tab=teacher`}
+                                  className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+                                >
+                                  Open Book Hub
+                                </Link>
+                              ) : null}
+
+                              {item.flaggedMapRowCount > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void clearKanjiFlag(item)}
+                                  disabled={ignoringId === item.userBookWordId}
+                                  className="rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  {ignoringId === item.userBookWordId
+                                    ? "Clearing…"
+                                    : "Clear flag only"}
+                                </button>
+                              ) : null}
 
                               <button
                                 type="button"
@@ -1159,145 +1624,14 @@ export default function TeacherKanjiPage() {
                                 disabled={ignoringId === item.userBookWordId}
                                 className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-500 hover:bg-stone-50 disabled:opacity-50"
                               >
-                                {ignoringId === item.userBookWordId ? "Ignoring…" : "Ignore"}
+                                {ignoringId === item.userBookWordId
+                                  ? "Removing…"
+                                  : "Exclude from kanji readings"}
                               </button>
                             </div>
                           </td>
                         </tr>
 
-                        {editorOpenByWordId[item.userBookWordId] ? (
-                          <tr>
-                            <td colSpan={6} className="bg-stone-50 px-4 py-4">
-                              <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-                                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                  <div>
-                                    <p className="text-sm font-semibold text-stone-900">
-                                      Enrich readings for {item.surface}
-                                    </p>
-                                    <p className="mt-1 text-xs text-stone-500">
-                                      Enter the reading type, base reading, and realized reading for each kanji.
-                                    </p>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setEditorOpenByWordId((prev) => ({
-                                        ...prev,
-                                        [item.userBookWordId]: false,
-                                      }))
-                                    }
-                                    className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50"
-                                  >
-                                    Close
-                                  </button>
-                                </div>
-
-                                <div className="space-y-3">
-                                  {(editorRowsByWordId[item.userBookWordId] ?? []).map((row) => (
-                                    <div
-                                      key={row.id}
-                                      className="grid gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 md:grid-cols-[80px_140px_1fr_1fr]"
-                                    >
-                                      <div>
-                                        <div className="text-xs font-semibold text-stone-500">
-                                          Kanji
-                                        </div>
-                                        <div className="mt-1 text-3xl font-semibold text-stone-900">
-                                          {row.kanji}
-                                        </div>
-                                      </div>
-
-                                      <label className="text-sm">
-                                        <span className="mb-1 block text-xs font-semibold text-stone-500">
-                                          Type
-                                        </span>
-                                        <select
-                                          value={row.reading_type ?? ""}
-                                          onChange={(event) =>
-                                            updateEditorRow(
-                                              item.userBookWordId,
-                                              row.id,
-                                              "reading_type",
-                                              event.target.value
-                                            )
-                                          }
-                                          className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                                        >
-                                          <option value="">Select</option>
-                                          <option value="on">On</option>
-                                          <option value="kun">Kun</option>
-                                          <option value="other">Other</option>
-                                        </select>
-                                      </label>
-
-                                      <label className="text-sm">
-                                        <span className="mb-1 block text-xs font-semibold text-stone-500">
-                                          Base reading
-                                        </span>
-                                        <input
-                                          value={row.base_reading ?? ""}
-                                          onChange={(event) =>
-                                            updateEditorRow(
-                                              item.userBookWordId,
-                                              row.id,
-                                              "base_reading",
-                                              event.target.value
-                                            )
-                                          }
-                                          placeholder="ところ"
-                                          className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                                        />
-                                        {row.base_reading ? (
-                                          <div className="mt-1 text-xs text-stone-500">
-                                            {hiraToKata(row.base_reading)}
-                                          </div>
-                                        ) : null}
-                                      </label>
-
-                                      <label className="text-sm">
-                                        <span className="mb-1 block text-xs font-semibold text-stone-500">
-                                          Realized reading
-                                        </span>
-                                        <input
-                                          value={row.realized_reading ?? ""}
-                                          onChange={(event) =>
-                                            updateEditorRow(
-                                              item.userBookWordId,
-                                              row.id,
-                                              "realized_reading",
-                                              event.target.value
-                                            )
-                                          }
-                                          placeholder="どころ"
-                                          className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                                        />
-                                        {row.realized_reading ? (
-                                          <div className="mt-1 text-xs text-stone-500">
-                                            {hiraToKata(row.realized_reading)}
-                                          </div>
-                                        ) : null}
-                                      </label>
-                                    </div>
-                                  ))}
-                                </div>
-
-                                <div className="mt-4 flex justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => void saveEditorRows(item)}
-                                    disabled={bulkSaving || savingEditorId === item.userBookWordId}
-                                    className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
-                                  >
-                                    {savingEditorId === item.userBookWordId
-                                      ? "Saving…"
-                                      : "Save readings"}
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : null}
                       </Fragment>
                     ))}
                   </tbody>

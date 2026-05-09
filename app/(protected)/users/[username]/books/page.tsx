@@ -2119,7 +2119,6 @@ export default function BooksPage() {
     viewingUserId === meId &&
     abilityCheckReminderEnabled &&
     !abilityCheckReminderLoading &&
-    abilityCheckReminderCount > 0 &&
     !abilityCheckReminderHidden;
 
   return (
@@ -2154,12 +2153,14 @@ export default function BooksPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-sm font-semibold text-sky-950">
-                  Ability Check is ready today
+                  Ability Check reminder
                 </div>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  You have {abilityCheckReminderCount} word
-                  {abilityCheckReminderCount === 1 ? "" : "s"} waiting for a quick typed check.
-                  This reminder only appears when cards are due.
+                  {abilityCheckReminderCount > 0
+                    ? `You have ${abilityCheckReminderCount} word${
+                        abilityCheckReminderCount === 1 ? "" : "s"
+                      } due first. Mekuru can fill the rest from your ready pool.`
+                    : "No cards are especially due right now, but you can still do your daily Ability Check routine."}
                 </p>
               </div>
 

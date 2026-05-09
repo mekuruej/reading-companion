@@ -85,6 +85,17 @@ type LibraryWordSummaryRow = {
   sample_book_cover_url: string | null;
 };
 
+type LibraryWordClaimRow = {
+  id: string;
+  study_identity_key: string;
+  surface: string | null;
+  reading: string | null;
+  meaning: string | null;
+  claimed_color: "green" | string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 type LibraryCheckGate = "reading" | "meaning";
 
 type StudyCard = {
@@ -298,6 +309,10 @@ function studyIdentityKey(surface: string | null | undefined, reading: string | 
   return `${normalizedSurface}||${normalizedReading}`;
 }
 
+function isClaimCardId(id: string | null | undefined) {
+  return (id ?? "").startsWith("claim:");
+}
+
 function getBookMeta(row: UserBookJoinRow) {
   const book = Array.isArray(row.books) ? row.books[0] : row.books;
   return {
@@ -333,6 +348,35 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
   }
 
   return allRows;
+}
+
+async function loadLibraryWordClaims(userId: string) {
+  const { data, error } = await supabase
+    .from("user_library_word_claims")
+    .select(
+      `
+        id,
+        study_identity_key,
+        surface,
+        reading,
+        meaning,
+        claimed_color,
+        created_at,
+        updated_at
+      `
+    )
+    .eq("user_id", userId)
+    .eq("claimed_color", "green")
+    .order("updated_at", { ascending: false })
+    .limit(500)
+    .returns<LibraryWordClaimRow[]>();
+
+  if (error) {
+    console.warn("Word Sky claims did not load for Ability Check:", error);
+    return [];
+  }
+
+  return data ?? [];
 }
 
 function uniqueStrings(values: string[]) {
@@ -383,6 +427,106 @@ async function loadLibraryProgressByKey(userId: string, studyKeys: string[]) {
   }
 
   return progressByKey;
+}
+
+function progressWithWordSkyClaim(
+  userId: string,
+  key: string,
+  surface: string,
+  reading: string,
+  progress: LibraryWordProgressRow | null,
+  claim: LibraryWordClaimRow | null | undefined
+): LibraryWordProgressRow | null {
+  if (!claim || claim.claimed_color !== "green") return progress;
+
+  const hasExistingGateHistory =
+    progress &&
+    (
+      progress.reading_gate_status !== "not_started" ||
+      progress.meaning_gate_status !== "not_started" ||
+      progress.held_before_reading_gate ||
+      progress.held_before_meaning_gate ||
+      progress.mastered
+    );
+
+  if (hasExistingGateHistory) return progress;
+
+  return {
+    id: progress?.id,
+    user_id: userId,
+    study_identity_key: key,
+    surface,
+    reading,
+    definition_key: "",
+    reading_gate_status: "passed",
+    meaning_gate_status: progress?.meaning_gate_status ?? "not_started",
+    held_before_reading_gate: false,
+    held_before_meaning_gate: false,
+    mastered: false,
+    reading_gate_attempts: progress?.reading_gate_attempts ?? 0,
+    meaning_gate_attempts: progress?.meaning_gate_attempts ?? 0,
+    reading_gate_passed_at:
+      progress?.reading_gate_passed_at ?? claim.updated_at ?? claim.created_at ?? null,
+    reading_gate_failed_at: progress?.reading_gate_failed_at ?? null,
+    meaning_gate_passed_at: progress?.meaning_gate_passed_at ?? null,
+    meaning_gate_failed_at: progress?.meaning_gate_failed_at ?? null,
+    mastered_at: progress?.mastered_at ?? null,
+    last_studied_at: progress?.last_studied_at ?? null,
+  };
+}
+
+function makeClaimStudyCard(
+  userId: string,
+  claim: LibraryWordClaimRow,
+  colorSettings: LearningSettingsRow,
+  progressByKey: Map<string, LibraryWordProgressRow>
+): StudyCard | null {
+  const key = claim.study_identity_key;
+  const surface = (claim.surface ?? "").trim();
+  const reading = (claim.reading ?? "").trim();
+  const meaning = (claim.meaning ?? "").trim();
+
+  if (!key || !surface || !reading || !meaning) return null;
+
+  if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
+    return null;
+  }
+
+  const progress = progressWithWordSkyClaim(
+    userId,
+    key,
+    surface,
+    reading,
+    progressByKey.get(key) ?? null,
+    claim
+  );
+
+  const colorStatus = computeLibraryStudyColorStatus({
+    encounterCount: 0,
+    settings: colorSettings,
+    readingGate: progress?.reading_gate_status ?? "not_started",
+    meaningGate: progress?.meaning_gate_status ?? "not_started",
+    heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+    heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+    mastered: progress?.mastered ?? false,
+  });
+
+  return {
+    id: `claim:${key}`,
+    userBookId: "",
+    bookTitle: "Word Sky",
+    bookCoverUrl: null,
+    surface,
+    reading,
+    meaning,
+    jlpt: null,
+    encounterCount: 0,
+    encounterIds: [],
+    colorStatus,
+    activeGate: pickLibraryCheckGate(colorStatus, key),
+    studyIdentityKey: key,
+    progress,
+  };
 }
 
 function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
@@ -1251,10 +1395,8 @@ export default function LibraryStudyPage() {
   const filteredCards = useMemo(() => {
     if (!dailyCheckPlan) return [];
 
-    return buildDailyCheckDeckSource(allCards, dailyCheckPlan, seenTodayIds, {
-      ignoreTiming: isTeacherUser,
-    });
-  }, [allCards, dailyCheckPlan, seenTodayIds, isTeacherUser]);
+    return buildDailyCheckDeckSource(allCards, dailyCheckPlan, seenTodayIds);
+  }, [allCards, dailyCheckPlan, seenTodayIds]);
 
   const practiceFilteredCards = useMemo(() => {
     return allCards.filter((card) =>
@@ -1352,7 +1494,7 @@ export default function LibraryStudyPage() {
 
       setActiveTodayKey((previousKey) => {
         if (previousKey !== todayKey) {
-          const todaysPlan = isTeacherUser ? null : loadDailyCheckPlanForToday();
+          const todaysPlan = loadDailyCheckPlanForToday();
 
           setSeenTodayIds(loadSeenForToday());
           setDailyCheckPlan(todaysPlan);
@@ -1370,7 +1512,7 @@ export default function LibraryStudyPage() {
     }
 
     setSeenTodayIds(loadSeenForToday());
-    setDailyCheckPlan(isTeacherUser ? null : loadDailyCheckPlanForToday());
+    setDailyCheckPlan(loadDailyCheckPlanForToday());
     resetForCurrentDay();
 
     const interval = window.setInterval(resetForCurrentDay, 60_000);
@@ -1383,7 +1525,7 @@ export default function LibraryStudyPage() {
       window.removeEventListener("focus", resetForCurrentDay);
       document.removeEventListener("visibilitychange", resetForCurrentDay);
     };
-  }, [isTeacherUser]);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -1423,10 +1565,6 @@ export default function LibraryStudyPage() {
           role === "teacher" || role === "super_teacher" || superTeacherFlag;
 
         setIsTeacherUser(teacherAccess);
-
-        if (teacherAccess) {
-          setDailyCheckPlan(null);
-        }
 
         const { data: userBooks, error: userBooksErr } = await supabase
           .from("user_books")
@@ -1474,9 +1612,14 @@ export default function LibraryStudyPage() {
         const colorSettings = {
           ...DEFAULT_LEARNING_SETTINGS,
           ...(learningSettings ?? {}),
+          library_check_daily_limit: cleanDailyCheckLimit(
+            learningSettings?.library_check_daily_limit ??
+              DEFAULT_LEARNING_SETTINGS.library_check_daily_limit
+          ),
         };
         const encounterThreshold = getLibraryStudyEncounterStageCounts(colorSettings).total;
         setLearningSettings(colorSettings);
+        setSetupDailyLimit(cleanDailyCheckLimit(colorSettings.library_check_daily_limit));
 
         const metaById = new Map<string, { title: string; cover_url: string | null }>();
         for (const row of userBooks ?? []) {
@@ -1506,10 +1649,17 @@ export default function LibraryStudyPage() {
           .limit(500)
           .returns<LibraryWordSummaryRow[]>();
 
+        const claimRows = await loadLibraryWordClaims(user.id);
+        const claimByKey = new Map<string, LibraryWordClaimRow>();
+        for (const claim of claimRows) {
+          if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
+        }
+
         if (!summaryErr && summaryRows && summaryRows.length > 0) {
-          const studyKeys = summaryRows
-            .map((row) => row.study_identity_key)
-            .filter(Boolean);
+          const studyKeys = uniqueStrings([
+            ...summaryRows.map((row) => row.study_identity_key).filter(Boolean),
+            ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
+          ]);
 
           const progressByKey = new Map<string, LibraryWordProgressRow>();
 
@@ -1533,7 +1683,14 @@ export default function LibraryStudyPage() {
               const reading = (summary.reading ?? "").trim();
               const meaning = (summary.meaning ?? "").trim();
               const encounterCount = summary.total_encounter_count ?? 0;
-              const progress = progressByKey.get(summary.study_identity_key) ?? null;
+              const progress = progressWithWordSkyClaim(
+                user.id,
+                summary.study_identity_key,
+                surface,
+                reading,
+                progressByKey.get(summary.study_identity_key) ?? null,
+                claimByKey.get(summary.study_identity_key)
+              );
 
               if (!surface || !reading || !meaning || !summary.sample_user_book_word_id) {
                 return null;
@@ -1572,15 +1729,31 @@ export default function LibraryStudyPage() {
             })
             .filter((card): card is StudyCard => Boolean(card));
 
-          setAllCards(cards);
+          const summaryCardKeys = new Set(cards.map((card) => card.studyIdentityKey));
+          const claimCards = claimRows
+            .filter((claim) => !summaryCardKeys.has(claim.study_identity_key))
+            .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
+            .filter((card): card is StudyCard => Boolean(card));
+          const allStudyCards = [...cards, ...claimCards];
+
+          setAllCards(allStudyCards);
           setDebugInfo({
             threshold: encounterThreshold,
             rawRows: summaryRows.length,
             completeGroups: summaryRows.length,
-            eligibleCards: cards.length,
-            filteredCards: cards.length,
+            eligibleCards: allStudyCards.length,
+            filteredCards: allStudyCards.length,
             topCompleteGroups: summaryRows.slice(0, 8).map((summary) => {
-              const progress = progressByKey.get(summary.study_identity_key) ?? null;
+              const surface = summary.surface?.trim() ?? "";
+              const reading = summary.reading?.trim() ?? "";
+              const progress = progressWithWordSkyClaim(
+                user.id,
+                summary.study_identity_key,
+                surface,
+                reading,
+                progressByKey.get(summary.study_identity_key) ?? null,
+                claimByKey.get(summary.study_identity_key)
+              );
               const encounterCount = summary.total_encounter_count ?? 0;
               const status = computeLibraryStudyColorStatus({
                 encounterCount,
@@ -1625,8 +1798,10 @@ export default function LibraryStudyPage() {
         }
 
         const progressByKey = new Map<string, LibraryWordProgressRow>();
-        const studyKeys = Array.from(groupedWords.entries())
-          .map(([key]) => key);
+        const studyKeys = uniqueStrings([
+          ...Array.from(groupedWords.entries()).map(([key]) => key),
+          ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
+        ]);
 
         if (studyKeys.length > 0) {
           try {
@@ -1646,7 +1821,16 @@ export default function LibraryStudyPage() {
           .map(([key, group]) => {
             const representative = group[0];
             const meta = metaById.get(representative.user_book_id);
-            const progress = progressByKey.get(key) ?? null;
+            const surface = representative.surface!.trim();
+            const reading = representative.reading!.trim();
+            const progress = progressWithWordSkyClaim(
+              user.id,
+              key,
+              surface,
+              reading,
+              progressByKey.get(key) ?? null,
+              claimByKey.get(key)
+            );
 
             if (
               colorSettings.skip_katakana_library_check &&
@@ -1670,8 +1854,8 @@ export default function LibraryStudyPage() {
               userBookId: representative.user_book_id,
               bookTitle: meta?.title ?? "Untitled",
               bookCoverUrl: meta?.cover_url ?? null,
-              surface: representative.surface!.trim(),
-              reading: representative.reading!.trim(),
+              surface,
+              reading,
               meaning: representative.meaning!.trim(),
               jlpt: representative.jlpt ?? null,
               encounterCount: group.length,
@@ -1684,17 +1868,31 @@ export default function LibraryStudyPage() {
           })
           .filter((card): card is StudyCard => Boolean(card));
 
-        setAllCards(cards);
+        const groupedCardKeys = new Set(cards.map((card) => card.studyIdentityKey));
+        const claimCards = claimRows
+          .filter((claim) => !groupedCardKeys.has(claim.study_identity_key))
+          .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
+          .filter((card): card is StudyCard => Boolean(card));
+        const allStudyCards = [...cards, ...claimCards];
+
+        setAllCards(allStudyCards);
         setDebugInfo({
           threshold: encounterThreshold,
           rawRows: words?.length ?? 0,
           completeGroups: groupedWords.size,
-          eligibleCards: cards.length,
-          filteredCards: cards.length,
+          eligibleCards: allStudyCards.length,
+          filteredCards: allStudyCards.length,
           topCompleteGroups: Array.from(groupedWords.entries())
             .map(([key, group]) => {
               const representative = group[0];
-              const progress = progressByKey.get(key) ?? null;
+              const progress = progressWithWordSkyClaim(
+                user.id,
+                key,
+                representative.surface?.trim() ?? "",
+                representative.reading?.trim() ?? "",
+                progressByKey.get(key) ?? null,
+                claimByKey.get(key)
+              );
               const status = computeLibraryStudyColorStatus({
                 encounterCount: group.length,
                 settings: colorSettings,
@@ -1738,10 +1936,7 @@ export default function LibraryStudyPage() {
     const nextDeckSource = buildDailyCheckDeckSource(
       allCards,
       dailyCheckPlan,
-      seenTodayIds,
-      {
-        ignoreTiming: isTeacherUser,
-      }
+      seenTodayIds
     );
 
     setDeck(nextDeckSource);
@@ -1752,7 +1947,7 @@ export default function LibraryStudyPage() {
     // Do not include seenTodayIds here.
     // Answering cards should not rebuild the active daily deck.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allCards, dailyCheckPlan, activeTodayKey, isTeacherUser]);
+  }, [allCards, dailyCheckPlan, activeTodayKey]);
 
   useEffect(() => {
     setPracticeDeck(shuffleArray(practiceFilteredCards));
@@ -1882,14 +2077,7 @@ export default function LibraryStudyPage() {
       startedAt: new Date().toISOString(),
     };
 
-    if (isTeacherUser) {
-      // Teachers are testing/building, so don't let old localStorage seen cards
-      // secretly wipe out the deck after setup.
-      clearSeenForToday();
-      setSeenTodayIds(new Set());
-    } else {
-      saveDailyCheckPlanForToday(plan);
-    }
+    saveDailyCheckPlanForToday(plan);
 
     setDailyCheckPlan(plan);
     setForceCheckAgainToday(false);
@@ -2076,7 +2264,7 @@ export default function LibraryStudyPage() {
         (currentCard as any).user_book_id ??
         (currentCard as any).userBookId ??
         null,
-      userBookWordId: currentCard.id,
+      userBookWordId: isClaimCardId(currentCard.id) ? null : currentCard.id,
       studyMode: "study_flashcards",
       cardType,
       result,
@@ -2468,6 +2656,24 @@ export default function LibraryStudyPage() {
 
     const ok = window.confirm("Hide this card from study?");
     if (!ok) return;
+
+    if (isClaimCardId(currentCard.id)) {
+      const { error } = await supabase
+        .from("user_library_word_claims")
+        .delete()
+        .eq("user_id", currentUserId)
+        .eq("study_identity_key", currentCard.studyIdentityKey);
+
+      if (error) {
+        console.error("Error hiding Word Sky claim:", error);
+        alert(`Could not flag card.\n${error.message}`);
+        return;
+      }
+
+      setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
+      setNotice("Word Sky claim removed from study.");
+      return;
+    }
 
     const { error } = await supabase
       .from("user_book_words")

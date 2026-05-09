@@ -109,9 +109,7 @@ export default function Header() {
     /^\/users\/[^/]+\/books$/.test(pathname) ||
     pathname === "/vocab";
   const discoverySectionActive = pathname.startsWith("/discovery");
-  const studySectionActive =
-    pathname.startsWith("/library-study") ||
-    pathname.startsWith("/kanji-reading-study");
+  const studySectionActive = pathname.startsWith("/library-study");
   const profileSectionActive = pathname.startsWith("/community");
   const teacherSectionActive = pathname.startsWith("/teacher");
   const showTeacherLink =
