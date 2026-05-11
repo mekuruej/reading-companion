@@ -1010,7 +1010,7 @@ export default function BookFlashcardsPage() {
     ]);
 
     if (oldLogError) {
-      console.error("Error writing old study log:", oldLogError);
+      console.warn("Error writing old study log:", oldLogError);
     }
 
     const newLogResult = await recordStudyEvent({
@@ -1026,7 +1026,7 @@ export default function BookFlashcardsPage() {
     });
 
     if (!newLogResult.ok) {
-      console.error("Error writing unified study event:", newLogResult.error);
+      console.warn("Error writing unified study event:", newLogResult.error);
     }
   }
 

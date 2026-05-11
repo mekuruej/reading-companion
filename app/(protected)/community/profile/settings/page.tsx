@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileShell from "@/components/profile/ProfileShell";
 import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
 import { supabase } from "@/lib/supabaseClient";
@@ -306,6 +307,8 @@ export default function ProfileSettingsPage() {
             })}
           </div>
         </div>
+
+        <MekuruReadingLevelGuide />
 
         {message ? <p className="text-sm text-red-600">{message}</p> : null}
 

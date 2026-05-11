@@ -109,7 +109,9 @@ export default function Header() {
     /^\/users\/[^/]+\/books$/.test(pathname) ||
     pathname === "/vocab";
   const discoverySectionActive = pathname.startsWith("/discovery");
-  const studySectionActive = pathname.startsWith("/library-study");
+  const studySectionActive =
+    pathname.startsWith("/library-study") ||
+    pathname.startsWith("/kanji-reading-study");
   const profileSectionActive = pathname.startsWith("/community");
   const teacherSectionActive = pathname.startsWith("/teacher");
   const showTeacherLink =
@@ -171,6 +173,18 @@ export default function Header() {
 
               {showLibraryMenu ? (
                 <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
+                  
+                  <Link
+                    href={libraryHref}
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowLibraryMenu(false)}
+                  >
+                    My Mekuru Library
+                  </Link>
+                  
                   <Link
                     href="/library"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library"
@@ -180,17 +194,6 @@ export default function Header() {
                     onClick={() => setShowLibraryMenu(false)}
                   >
                     Library Hub
-                  </Link>
-
-                  <Link
-                    href={libraryHref}
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowLibraryMenu(false)}
-                  >
-                    Library Home
                   </Link>
 
                   <Link
@@ -218,7 +221,7 @@ export default function Header() {
               ) : null}
             </div>
 
-<div className="relative" ref={studyMenuRef}>
+            <div className="relative" ref={studyMenuRef}>
               <Link
                 href="/library-study"
                 className={`rounded-full border px-3 py-1.5 transition md:hidden ${studySectionActive

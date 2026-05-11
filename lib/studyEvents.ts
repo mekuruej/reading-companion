@@ -20,6 +20,37 @@ type RecordStudyEventInput = {
   meaning?: string | null;
 };
 
+function cleanUuid(value: string | null | undefined) {
+  const text = (value ?? "").trim();
+  if (!text) return null;
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    text
+  )
+    ? text
+    : null;
+}
+
+function describeSupabaseError(error: unknown) {
+  if (!error || typeof error !== "object") return error;
+
+  const err = error as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+    name?: string;
+  };
+
+  return {
+    message: err.message ?? null,
+    details: err.details ?? null,
+    hint: err.hint ?? null,
+    code: err.code ?? null,
+    name: err.name ?? null,
+  };
+}
+
 export async function recordStudyEvent(input: RecordStudyEventInput) {
   const {
     data: { user },
@@ -27,14 +58,14 @@ export async function recordStudyEvent(input: RecordStudyEventInput) {
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    console.error("Could not record study event: no user found", userError);
+    console.warn("Could not record study event: no user found", describeSupabaseError(userError));
     return { ok: false, error: userError ?? new Error("No user found") };
   }
 
   const { error } = await supabase.from("user_study_events").insert({
     user_id: user.id,
-    user_book_id: input.userBookId ?? null,
-    user_book_word_id: input.userBookWordId ?? null,
+    user_book_id: cleanUuid(input.userBookId),
+    user_book_word_id: cleanUuid(input.userBookWordId),
     study_mode: input.studyMode ?? "study_flashcards",
     card_type: input.cardType ?? null,
     result: input.result ?? "reviewed",
@@ -45,7 +76,12 @@ export async function recordStudyEvent(input: RecordStudyEventInput) {
   });
 
   if (error) {
-    console.error("Error recording study event:", error);
+    console.warn("Error recording study event:", describeSupabaseError(error), {
+      studyMode: input.studyMode ?? "study_flashcards",
+      cardType: input.cardType ?? null,
+      hasUserBookId: Boolean(cleanUuid(input.userBookId)),
+      hasUserBookWordId: Boolean(cleanUuid(input.userBookWordId)),
+    });
     return { ok: false, error };
   }
 

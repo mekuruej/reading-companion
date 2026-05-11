@@ -81,6 +81,7 @@ type UserBook = {
 type LookupRow = {
   surface?: string | null;
   meaning?: string | null;
+  created_at?: string | null;
 };
 
 type ReadingSession = {
@@ -418,6 +419,18 @@ function bookTypeLabel(value: string | null | undefined) {
   );
 }
 
+function isDuplicateBookIsbnError(error: unknown) {
+  const code = (error as { code?: string } | null)?.code;
+  const message = String((error as { message?: string } | null)?.message ?? "");
+
+  return (
+    code === "23505" &&
+    (message.includes("books_isbn13_unique") ||
+      message.includes("books_isbn_unique") ||
+      message.toLowerCase().includes("isbn"))
+  );
+}
+
 function progressModeLabel(value: string | null | undefined) {
   switch (value) {
     case "pages":
@@ -528,6 +541,7 @@ export default function BookHubPage() {
 
   const [activeTab, setActiveTab] = useState<HubTab>("study");
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
+  const [lastSavedWord, setLastSavedWord] = useState<string>("");
 
   const [startedAt, setStartedAt] = useState<string>("");
   const [finishedAt, setFinishedAt] = useState<string>("");
@@ -881,7 +895,7 @@ export default function BookHubPage() {
   }, [timedPageTrackedSessions]);
 
   const averageMinutesPerPage = useMemo(() => {
-    if (!totalTimedPages) return null;
+    if (!totalTimedPages || !totalTimedMinutes) return null;
     return totalTimedMinutes / totalTimedPages;
   }, [totalTimedMinutes, totalTimedPages]);
 
@@ -914,11 +928,6 @@ export default function BookHubPage() {
     if (visualReadingSessions.length === 0) return null;
     return visualReadingSessions[0]?.read_on ?? null;
   }, [visualReadingSessions]);
-
-  const lastEngagedDate = useMemo(() => {
-    if (realReadingSessions.length === 0) return null;
-    return realReadingSessions[0]?.read_on ?? null;
-  }, [realReadingSessions]);
 
   const visibleReadingSessions = useMemo(() => {
     return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
@@ -3073,16 +3082,20 @@ export default function BookHubPage() {
   const loadUniqueLookupCount = async (id: string) => {
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("surface, meaning")
-      .eq("user_book_id", id);
+      .select("surface, meaning, created_at")
+      .eq("user_book_id", id)
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error loading lookup count:", error);
       setUniqueLookupCount(null);
+      setLastSavedWord("");
       return;
     }
 
     const rows = (data ?? []) as LookupRow[];
+    const newestWord = rows.find((r) => (r.surface ?? "").trim() || (r.meaning ?? "").trim());
+    setLastSavedWord((newestWord?.surface ?? newestWord?.meaning ?? "").trim());
 
     const set = new Set<string>();
     for (const r of rows) {
@@ -3938,38 +3951,56 @@ export default function BookHubPage() {
       })
       .eq("id", row.id);
 
+    const bookUpdatePayload = {
+      author: authorName || null,
+      translator: translatorName || null,
+      illustrator: illustratorName || null,
+      publisher: publisherRecord?.name_ja ?? (publisherName || null),
+      publisher_id: publisherRecord?.id ?? null,
+      published_date: publishedDate || null,
+      book_type: bookType || null,
+      page_count,
+      series_number,
+      isbn: isbn || null,
+      isbn13: isbn13 || null,
+      publisher_reading: publisherReading || null,
+      publisher_image_url: publisherImg || null,
+      related_links,
+      cover_url: coverUrl || null,
+      author_image_url: authorImg || null,
+      translator_image_url: translatorImg || null,
+      illustrator_image_url: illustratorImg || null,
+      author_reading: authorReading || null,
+      translator_reading: translatorReading || null,
+      illustrator_reading: illustratorReading || null,
+    };
+
     const booksUpdate = supabase
       .from("books")
-      .update({
-        author: authorName || null,
-        translator: translatorName || null,
-        illustrator: illustratorName || null,
-        publisher: publisherRecord?.name_ja ?? (publisherName || null),
-        publisher_id: publisherRecord?.id ?? null,
-        published_date: publishedDate || null,
-        book_type: bookType || null,
-        page_count,
-        series_number,
-        isbn: isbn || null,
-        isbn13: isbn13 || null,
-        publisher_reading: publisherReading || null,
-        publisher_image_url: publisherImg || null,
-        related_links,
-        cover_url: coverUrl || null,
-        author_image_url: authorImg || null,
-        translator_image_url: translatorImg || null,
-        illustrator_image_url: illustratorImg || null,
-        author_reading: authorReading || null,
-        translator_reading: translatorReading || null,
-        illustrator_reading: illustratorReading || null,
-      })
+      .update(bookUpdatePayload)
       .eq("id", row.books.id);
 
     const [uRes, bRes] = await Promise.all([userBooksUpdate, booksUpdate]);
+    let bookSaveWarning: string | null = null;
+    let finalBookError = bRes.error;
 
-    if (uRes.error || bRes.error) {
+    if (finalBookError && isDuplicateBookIsbnError(finalBookError)) {
+      const { isbn: _isbn, isbn13: _isbn13, ...bookUpdateWithoutIsbn } = bookUpdatePayload;
+      const retryResult = await supabase
+        .from("books")
+        .update(bookUpdateWithoutIsbn)
+        .eq("id", row.books.id);
+
+      finalBookError = retryResult.error;
+      if (!finalBookError) {
+        bookSaveWarning =
+          "Saved book details, but kept the existing ISBN because that ISBN already belongs to another book record.";
+      }
+    }
+
+    if (uRes.error || finalBookError) {
       setError(
-        `user_books: ${uRes.error?.message ?? "ok"} | books: ${bRes.error?.message ?? "ok"}`
+        `user_books: ${uRes.error?.message ?? "ok"} | books: ${finalBookError?.message ?? "ok"}`
       );
       setSaving(false);
       return;
@@ -4044,9 +4075,11 @@ export default function BookHubPage() {
 
     if (savedBookOnlyRoles.length > 0) {
       setSaveNoticeTone("warning");
-      setSaveNotice(
-        `Saved to the book, but not to shared people records for: ${savedBookOnlyRoles.join(", ")}.`
-      );
+      const noticeParts = [
+        `Saved to the book, but not to shared people records for: ${savedBookOnlyRoles.join(", ")}.`,
+      ];
+      if (bookSaveWarning) noticeParts.push(bookSaveWarning);
+      setSaveNotice(noticeParts.join(" "));
     } else if (createdSharedRoles.length > 0 || linkedSharedRoles.length > 0) {
       const parts: string[] = [];
       if (createdSharedRoles.length > 0) {
@@ -4055,8 +4088,14 @@ export default function BookHubPage() {
       if (linkedSharedRoles.length > 0) {
         parts.push(`Linked shared records for: ${linkedSharedRoles.join(", ")}`);
       }
+      if (bookSaveWarning) {
+        parts.push(bookSaveWarning);
+      }
       setSaveNoticeTone("success");
       setSaveNotice(parts.join(". "));
+    } else if (bookSaveWarning) {
+      setSaveNoticeTone("warning");
+      setSaveNotice(bookSaveWarning);
     } else {
       setSaveNoticeTone("success");
       setSaveNotice("Saved.");
@@ -4752,7 +4791,7 @@ export default function BookHubPage() {
                     {finished
                       ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · 100%`
                       : readingSessions.length > 0 && progressPercent != null && furthestPage != null
-                        ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · ${progressPercent}% · On page ${furthestPage}`
+                        ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · ${progressPercent}% · On page ${furthestPage}${lastSavedWord ? ` · Last saved word: ${lastSavedWord}` : ""}`
                         : started
                           ? "In progress"
                           : "Not started"}
@@ -4808,12 +4847,14 @@ export default function BookHubPage() {
                 </div>
 
                 <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Last Engaged</div>
+                  <div className="text-xs text-stone-500">Avg Min/Page</div>
                   <div className="mt-1 font-medium">
-                    {lastEngagedDate ?? "—"}
+                    {averageMinutesPerPage != null
+                      ? averageMinutesPerPage.toFixed(1)
+                      : "—"}
                   </div>
                   <div className="mt-1 text-[10px] text-stone-400">
-                    Latest session
+                    Timed page-tracked reading
                   </div>
                 </div>
               </div>

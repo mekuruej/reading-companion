@@ -899,11 +899,11 @@ function TrendChart({
 }) {
   const displayItems = items.length > 24 ? items.slice(-24) : items;
   const width = 760;
-  const height = 320;
+  const height = 285;
   const left = 64;
   const right = 76;
-  const top = 26;
-  const bottom = 42;
+  const top = 24;
+  const bottom = 38;
   const innerWidth = width - left - right;
   const innerHeight = height - top - bottom;
   const maxBooks = Math.max(1, ...displayItems.map((item) => item.books));
@@ -3336,7 +3336,7 @@ export default function StatsPage() {
                   {abilityComparisonRows.map((row) => (
                     <div
                       key={row.bookType ?? "other"}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      className="rounded-2xl border border-slate-300 bg-slate-200/70 p-4 shadow-inner"
                     >
                       <div className="mb-3 text-sm font-semibold text-slate-900">
                         {bookTypeLabel(row.bookType)}
@@ -3588,7 +3588,7 @@ export default function StatsPage() {
             <SectionBand
               eyebrow="Library Study"
               title="Color totals in this window"
-              description="Current color states for words encountered or claimed during the selected time filter. Book type does not affect these stats. Practice review does not move these colors."
+              description="This Stats view follows the time filter at the top: it only counts words encountered or claimed inside the selected window. The book category filter does not affect it. Your Library and Profile pages show the live all-time color snapshot. Book type does not affect these stats. Practice review does not move these colors."
               tone={filteredSectionTone}
             >
               <div className="space-y-4">

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileShell from "@/components/profile/ProfileShell";
 import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
 import { supabase } from "@/lib/supabaseClient";
@@ -429,6 +430,8 @@ export default function ProfileSetupPage() {
             </div>
           </div>
         </div>
+
+        <MekuruReadingLevelGuide />
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <SectionLabel

@@ -34,6 +34,7 @@ type UserBookWordRow = {
   surface: string | null;
   reading: string | null;
   meaning: string | null;
+  meaning_choice_index: number | null;
   jlpt: string | null;
   hidden: boolean | null;
   created_at: string;
@@ -112,6 +113,7 @@ type StudyCard = {
   activeGate: LibraryCheckGate;
   studyIdentityKey: string;
   progress: LibraryWordProgressRow | null;
+  definitionNumber: number | null;
 };
 
 type MeaningReviewItem = {
@@ -324,6 +326,17 @@ function getBookMeta(row: UserBookJoinRow) {
   };
 }
 
+function definitionNumberFromIndex(index: number | null | undefined) {
+  return typeof index === "number" && index >= 0 ? index + 1 : null;
+}
+
+function definitionLabel(card: StudyCard | null | undefined) {
+  const progressDefinition = card?.progress?.definition_key?.trim();
+  if (progressDefinition) return `Def #${progressDefinition}`;
+  if (card?.definitionNumber != null) return `Def #${card.definitionNumber}`;
+  return "";
+}
+
 async function loadAllLibraryCheckWords(userBookIds: string[]) {
   const allRows: UserBookWordRow[] = [];
   let from = 0;
@@ -332,7 +345,7 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
     const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("id, user_book_id, surface, reading, meaning, jlpt, hidden, created_at")
+      .select("id, user_book_id, surface, reading, meaning, meaning_choice_index, jlpt, hidden, created_at")
       .in("user_book_id", userBookIds)
       .or("hidden.is.null,hidden.eq.false")
       .order("created_at", { ascending: false })
@@ -529,6 +542,7 @@ function makeClaimStudyCard(
     activeGate: pickLibraryCheckGate(colorStatus, key),
     studyIdentityKey: key,
     progress,
+    definitionNumber: null,
   };
 }
 
@@ -1002,9 +1016,9 @@ function LibraryPracticePanel({
               <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
             ) : null}
 
-            {card.progress?.definition_key ? (
+            {definitionLabel(card) ? (
               <div className={libraryStudyChipClass(card.colorStatus)}>
-                Def {card.progress.definition_key}
+                {definitionLabel(card)}
               </div>
             ) : null}
           </div>
@@ -1068,9 +1082,9 @@ function LibraryPracticePanel({
             <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
           ) : null}
 
-          {card.progress?.definition_key ? (
+          {definitionLabel(card) ? (
             <div className={libraryStudyChipClass(card.colorStatus)}>
-              Def {card.progress.definition_key}
+              {definitionLabel(card)}
             </div>
           ) : null}
         </div>
@@ -1638,6 +1652,31 @@ export default function LibraryStudyPage() {
         }
 
         if (!summaryErr && summaryRows && summaryRows.length > 0) {
+          const definitionNumberByWordId = new Map<string, number>();
+          const sampleWordIds = uniqueStrings(
+            summaryRows.map((row) => row.sample_user_book_word_id).filter(Boolean)
+          );
+
+          if (sampleWordIds.length > 0) {
+            const { data: sampleWords, error: sampleWordsErr } = await supabase
+              .from("user_book_words")
+              .select("id, meaning_choice_index")
+              .in("id", sampleWordIds);
+
+            if (sampleWordsErr) {
+              console.warn("Could not load definition numbers for Library Practice:", sampleWordsErr);
+            } else {
+              for (const word of sampleWords ?? []) {
+                const definitionNumber = definitionNumberFromIndex(
+                  (word as any).meaning_choice_index
+                );
+                if (definitionNumber != null) {
+                  definitionNumberByWordId.set((word as any).id, definitionNumber);
+                }
+              }
+            }
+          }
+
           const studyKeys = uniqueStrings([
             ...summaryRows.map((row) => row.study_identity_key).filter(Boolean),
             ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
@@ -1707,6 +1746,7 @@ export default function LibraryStudyPage() {
                 activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
                 studyIdentityKey: summary.study_identity_key,
                 progress,
+                definitionNumber: definitionNumberByWordId.get(summary.sample_user_book_word_id) ?? null,
               };
             })
             .filter((card): card is StudyCard => Boolean(card));
@@ -1846,6 +1886,7 @@ export default function LibraryStudyPage() {
               activeGate: pickLibraryCheckGate(colorStatus, key),
               studyIdentityKey: key,
               progress,
+              definitionNumber: definitionNumberFromIndex(representative.meaning_choice_index),
             };
           })
           .filter((card): card is StudyCard => Boolean(card));

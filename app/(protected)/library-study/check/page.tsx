@@ -35,6 +35,7 @@ type UserBookWordRow = {
   surface: string | null;
   reading: string | null;
   meaning: string | null;
+  meaning_choice_index: number | null;
   jlpt: string | null;
   hidden: boolean | null;
   created_at: string;
@@ -113,6 +114,7 @@ type StudyCard = {
   activeGate: LibraryCheckGate;
   studyIdentityKey: string;
   progress: LibraryWordProgressRow | null;
+  definitionNumber: number | null;
 };
 
 type MeaningReviewItem = {
@@ -165,6 +167,7 @@ type PracticeColorFilter =
   | "katakana";
 
 const STORAGE_KEY = "library-study-seen-by-date";
+const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
 const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
 const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
 const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
@@ -198,6 +201,7 @@ type DailyCheckPlan = {
   levels: DailyCheckLevel[];
   dailyLimit: DailyCheckLimit;
   startedAt: string;
+  cardIds?: string[];
 };
 
 function isDailyCheckLevel(value: string): value is DailyCheckLevel {
@@ -243,6 +247,9 @@ function loadDailyCheckPlanForToday() {
       levels: cleanLevels,
       dailyLimit: cleanLimit as DailyCheckLimit,
       startedAt: plan.startedAt || new Date().toISOString(),
+      cardIds: Array.isArray(plan.cardIds)
+        ? plan.cardIds.filter((id) => typeof id === "string" && id.trim())
+        : undefined,
     };
   } catch {
     return null;
@@ -321,6 +328,17 @@ function getBookMeta(row: UserBookJoinRow) {
   };
 }
 
+function definitionNumberFromIndex(index: number | null | undefined) {
+  return typeof index === "number" && index >= 0 ? index + 1 : null;
+}
+
+function definitionLabel(card: StudyCard | null | undefined) {
+  const progressDefinition = card?.progress?.definition_key?.trim();
+  if (progressDefinition) return `Def #${progressDefinition}`;
+  if (card?.definitionNumber != null) return `Def #${card.definitionNumber}`;
+  return "";
+}
+
 async function loadAllLibraryCheckWords(userBookIds: string[]) {
   const allRows: UserBookWordRow[] = [];
   let from = 0;
@@ -329,7 +347,7 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
     const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("id, user_book_id, surface, reading, meaning, jlpt, hidden, created_at")
+      .select("id, user_book_id, surface, reading, meaning, meaning_choice_index, jlpt, hidden, created_at")
       .in("user_book_id", userBookIds)
       .or("hidden.is.null,hidden.eq.false")
       .order("created_at", { ascending: false })
@@ -526,6 +544,7 @@ function makeClaimStudyCard(
     activeGate: pickLibraryCheckGate(colorStatus, key),
     studyIdentityKey: key,
     progress,
+    definitionNumber: null,
   };
 }
 
@@ -707,6 +726,20 @@ function isCardAvailableForLibraryCheck(
   );
 }
 
+function isCardReadyForDailyFill(
+  card: StudyCard,
+  selectedJlpt: string,
+  seenTodayIds: Set<string>
+) {
+  const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
+
+  return (
+    jlptMatch &&
+    includeLibraryCheckCard(card.colorStatus) &&
+    !seenTodayIds.has(card.id)
+  );
+}
+
 function availableDailyCheckCountForLevel(
   cards: StudyCard[],
   level: DailyCheckLevel,
@@ -725,31 +758,82 @@ function buildDailyCheckDeckSource(
   seenTodayIds: Set<string>,
   options: { ignoreTiming?: boolean } = {}
 ) {
-  const availableCards = cards.filter((card) =>
+  const dueCards = cards.filter((card) =>
     isCardAvailableForLibraryCheck(card, "all", seenTodayIds, {
       ignoreTiming: options.ignoreTiming,
     })
   );
 
-  const primaryCards = availableCards.filter((card) =>
+  const readyFillCards = options.ignoreTiming
+    ? dueCards
+    : cards.filter((card) => isCardReadyForDailyFill(card, "all", seenTodayIds));
+
+  const primaryDueCards = dueCards.filter((card) =>
     cardMatchesDailyCheckLevels(card, plan.levels)
   );
 
-  const primaryIds = new Set(primaryCards.map((card) => card.id));
+  const primaryDueIds = new Set(primaryDueCards.map((card) => card.id));
 
-  const fillerCards = availableCards.filter((card) => !primaryIds.has(card.id));
+  const primaryFillCards = readyFillCards.filter(
+    (card) => cardMatchesDailyCheckLevels(card, plan.levels) && !primaryDueIds.has(card.id)
+  );
 
-  const rotatedPrimary = rankDailyCheckCards(primaryCards);
+  const primaryIds = new Set([
+    ...primaryDueCards.map((card) => card.id),
+    ...primaryFillCards.map((card) => card.id),
+  ]);
+
+  const fillerCards = readyFillCards.filter((card) => !primaryIds.has(card.id));
+
+  const rotatedDue = rankDailyCheckCards(primaryDueCards);
+  const rotatedPrimaryFill = rankDailyCheckCards(primaryFillCards);
   const rotatedFillers = rankDailyCheckCards(fillerCards);
 
-  if (rotatedPrimary.length >= plan.dailyLimit) {
-    return rotatedPrimary.slice(0, plan.dailyLimit);
+  if (rotatedDue.length >= plan.dailyLimit) {
+    return rotatedDue.slice(0, plan.dailyLimit);
   }
 
   return [
-    ...rotatedPrimary,
-    ...rotatedFillers.slice(0, plan.dailyLimit - rotatedPrimary.length),
-  ];
+    ...rotatedDue,
+    ...rotatedPrimaryFill,
+    ...rotatedFillers,
+  ].slice(0, plan.dailyLimit);
+}
+
+function buildExtraCheckDeckSource(
+  cards: StudyCard[],
+  seenTodayIds: Set<string>,
+  dailyLimit: number
+) {
+  return rankDailyCheckCards(
+    cards.filter((card) => isCardReadyForDailyFill(card, "all", seenTodayIds))
+  ).slice(0, dailyLimit);
+}
+
+function extraReadyCount(cards: StudyCard[], seenTodayIds: Set<string>) {
+  return cards.filter((card) => isCardReadyForDailyFill(card, "all", seenTodayIds)).length;
+}
+
+function checkSessionSummary(deck: StudyCard[]) {
+  const dueCount = deck.filter((card) =>
+    isCardAvailableForLibraryCheck(card, "all", new Set())
+  ).length;
+
+  return {
+    dueCount,
+    fillCount: Math.max(0, deck.length - dueCount),
+  };
+}
+
+function checkSessionSummaryText(deck: StudyCard[]) {
+  const summary = checkSessionSummary(deck);
+  if (deck.length === 0) return "";
+
+  if (summary.fillCount === 0) {
+    return `${summary.dueCount} due card${summary.dueCount === 1 ? "" : "s"}`;
+  }
+
+  return `${summary.dueCount} due + ${summary.fillCount} ready fill`;
 }
 
 function totalDailyCheckPoolCountForLevel(
@@ -1022,9 +1106,9 @@ function LibraryPracticePanel({
               <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
             ) : null}
 
-            {card.progress?.definition_key ? (
+            {definitionLabel(card) ? (
               <div className={libraryStudyChipClass(card.colorStatus)}>
-                Def {card.progress.definition_key}
+                {definitionLabel(card)}
               </div>
             ) : null}
           </div>
@@ -1088,9 +1172,9 @@ function LibraryPracticePanel({
             <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
           ) : null}
 
-          {card.progress?.definition_key ? (
+          {definitionLabel(card) ? (
             <div className={libraryStudyChipClass(card.colorStatus)}>
-              Def {card.progress.definition_key}
+              {definitionLabel(card)}
             </div>
           ) : null}
         </div>
@@ -1335,6 +1419,11 @@ function clearSeenForToday() {
   } catch {
     // ignore localStorage failures
   }
+}
+
+function markAbilityCheckCompletedToday() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ABILITY_CHECK_COMPLETED_KEY, getTodayKey());
 }
 
 export default function LibraryStudyPage() {
@@ -1656,6 +1745,31 @@ export default function LibraryStudyPage() {
         }
 
         if (!summaryErr && summaryRows && summaryRows.length > 0) {
+          const definitionNumberByWordId = new Map<string, number>();
+          const sampleWordIds = uniqueStrings(
+            summaryRows.map((row) => row.sample_user_book_word_id).filter(Boolean)
+          );
+
+          if (sampleWordIds.length > 0) {
+            const { data: sampleWords, error: sampleWordsErr } = await supabase
+              .from("user_book_words")
+              .select("id, meaning_choice_index")
+              .in("id", sampleWordIds);
+
+            if (sampleWordsErr) {
+              console.warn("Could not load definition numbers for Ability Check:", sampleWordsErr);
+            } else {
+              for (const word of sampleWords ?? []) {
+                const definitionNumber = definitionNumberFromIndex(
+                  (word as any).meaning_choice_index
+                );
+                if (definitionNumber != null) {
+                  definitionNumberByWordId.set((word as any).id, definitionNumber);
+                }
+              }
+            }
+          }
+
           const studyKeys = uniqueStrings([
             ...summaryRows.map((row) => row.study_identity_key).filter(Boolean),
             ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
@@ -1725,6 +1839,7 @@ export default function LibraryStudyPage() {
                 activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
                 studyIdentityKey: summary.study_identity_key,
                 progress,
+                definitionNumber: definitionNumberByWordId.get(summary.sample_user_book_word_id) ?? null,
               };
             })
             .filter((card): card is StudyCard => Boolean(card));
@@ -1864,6 +1979,7 @@ export default function LibraryStudyPage() {
               activeGate: pickLibraryCheckGate(colorStatus, key),
               studyIdentityKey: key,
               progress,
+              definitionNumber: definitionNumberFromIndex(representative.meaning_choice_index),
             };
           })
           .filter((card): card is StudyCard => Boolean(card));
@@ -1933,11 +2049,30 @@ export default function LibraryStudyPage() {
       return;
     }
 
-    const nextDeckSource = buildDailyCheckDeckSource(
-      allCards,
-      dailyCheckPlan,
-      seenTodayIds
-    );
+    const cardById = new Map(allCards.map((card) => [card.id, card]));
+    const savedDeckSource = dailyCheckPlan.cardIds
+      ?.map((id) => cardById.get(id))
+      .filter((card): card is StudyCard => Boolean(card))
+      .filter((card) => !seenTodayIds.has(card.id));
+
+    const nextDeckSource =
+      dailyCheckPlan.cardIds && dailyCheckPlan.cardIds.length > 0
+        ? savedDeckSource ?? []
+        : buildDailyCheckDeckSource(
+            allCards,
+            dailyCheckPlan,
+            seenTodayIds
+          );
+
+    if (!dailyCheckPlan.cardIds || dailyCheckPlan.cardIds.length === 0) {
+      const planWithCards = {
+        ...dailyCheckPlan,
+        cardIds: nextDeckSource.map((card) => card.id),
+      };
+
+      saveDailyCheckPlanForToday(planWithCards);
+      setDailyCheckPlan(planWithCards);
+    }
 
     setDeck(nextDeckSource);
     setIndex(0);
@@ -2018,6 +2153,15 @@ export default function LibraryStudyPage() {
 
     return () => window.clearTimeout(timer);
   }, [currentCard, index, studyMode, twoStepStage]);
+
+  useEffect(() => {
+    if (libraryMode !== "check") return;
+    if (endedEarly) return;
+    if (deck.length === 0) return;
+    if (index < deck.length) return;
+
+    markAbilityCheckCompletedToday();
+  }, [libraryMode, endedEarly, deck.length, index]);
 
   function resetCardState() {
     setSelectedAnswer(null);
@@ -2113,26 +2257,16 @@ export default function LibraryStudyPage() {
   }
 
   function studyAgainToday() {
-    clearSeenForToday();
-
-    const clearedSeenIds = new Set<string>();
-    setSeenTodayIds(clearedSeenIds);
     setForceCheckAgainToday(true);
 
-    setDeck(
-      shuffleArray(
-        allCards.filter((card) =>
-          isCardAvailableForLibraryCheck(card, selectedJlpt, clearedSeenIds, {
-            ignoreTiming: true,
-          })
-        )
-      ).slice(0, dailyCheckLimit)
-    );
+    const nextDeckSource = buildExtraCheckDeckSource(allCards, seenTodayIds, dailyCheckLimit);
+
+    setDeck(nextDeckSource);
 
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
-    setNotice("Extra check mode is on for this session. Some cards may not be due yet.");
+    setNotice("Keep checking mode is on. These are extra ready words beyond today’s official set.");
   }
 
   function resetPracticeReveal() {
@@ -2837,14 +2971,14 @@ export default function LibraryStudyPage() {
               })}
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-500">
-              If your selected levels have fewer cards than your daily check size, Mekuru can fill the rest from other available due words.
+              Mekuru includes due cards first, then fills the rest of your daily size from ready words when possible.
             </p>
           </section>
 
           <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm font-semibold text-slate-900">Daily check size</div>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              This is your official Ability Check for today. Try to finish it, then use Review or book study for more review.
+              This is your official Ability Check for today. If you leave before finishing, Mekuru keeps your place and the reminder stays on.
             </p>
 
             <div className="mt-3 grid grid-cols-5 gap-2">
@@ -3102,7 +3236,7 @@ export default function LibraryStudyPage() {
             <>
               <p className="mt-3 text-gray-700">You finished this Ability Check session.</p>
               <p className="mt-2 text-sm text-gray-500">
-                Come back tomorrow to run into more old book memories.
+                Your daily reminder is complete. You can keep checking extra ready words if you want.
               </p>
             </>
           )}
@@ -3111,6 +3245,15 @@ export default function LibraryStudyPage() {
             <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
               Back to Library
             </button>
+            {!endedEarly && extraReadyCount(allCards, seenTodayIds) > 0 ? (
+              <button
+                type="button"
+                onClick={studyAgainToday}
+                className="rounded bg-emerald-100 px-4 py-2 text-emerald-950"
+              >
+                Keep checking
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => router.push("/library-study/practice")}
@@ -3140,6 +3283,11 @@ export default function LibraryStudyPage() {
               <p className="mt-1 text-sm leading-6 text-slate-600">
                 A once-a-day check for words that are ready to move by ability.
               </p>
+              {deck.length > 0 ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Today’s set: {checkSessionSummaryText(deck)}
+                </p>
+              ) : null}
             </div>
 
             <button
@@ -3336,9 +3484,9 @@ export default function LibraryStudyPage() {
                 </div>
               ) : null}
 
-              {currentCard?.progress?.definition_key ? (
+              {definitionLabel(currentCard) ? (
                 <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
-                  Def {currentCard.progress.definition_key}
+                  {definitionLabel(currentCard)}
                 </div>
               ) : null}
             </div>

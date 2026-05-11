@@ -163,6 +163,10 @@ export default function AddWordPage() {
 
   const [lookupLoading, setLookupLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [superTeacherRole, setSuperTeacherRole] = useState<string | null>(null);
+  const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
+  const [superToolSaving, setSuperToolSaving] = useState<"cache" | "wordSky" | null>(null);
+  const [superToolMessage, setSuperToolMessage] = useState("");
   const [message, setMessage] = useState("");
   const [lookupCandidates, setLookupCandidates] = useState<JishoCandidate[]>([]);
   const [savedNotice, setSavedNotice] = useState("");
@@ -172,6 +176,7 @@ export default function AddWordPage() {
 
   const wordInputRef = useRef<HTMLInputElement | null>(null);
   const wordFieldsRef = useRef<HTMLDivElement | null>(null);
+  const isSuperTeacher = superTeacherRole === "super_teacher" || profileIsSuperTeacher;
 
   useEffect(() => {
     if (!userBookId) return;
@@ -186,6 +191,24 @@ export default function AddWordPage() {
     }
 
     async function loadBookInfo() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.id) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, is_super_teacher")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        setSuperTeacherRole(profile?.role ?? null);
+        setProfileIsSuperTeacher(!!profile?.is_super_teacher);
+      } else {
+        setSuperTeacherRole(null);
+        setProfileIsSuperTeacher(false);
+      }
+
       const { data, error } = await supabase
         .from("user_books")
         .select(
@@ -395,6 +418,87 @@ export default function AddWordPage() {
     );
 
     return maxPageOrder + 1;
+  }
+
+  function buildCurrentWordPayload() {
+    const cleanWord = word.trim();
+    const cleanAlternateSurface = alternateSurface.trim();
+    const cleanReading = reading.trim();
+    const cleanMeaning = meaning.trim();
+    const finalSurface = useAlternateSurface ? cleanAlternateSurface : cleanWord;
+    const cleanedMeanings = meaningChoices.map((choice) => choice.trim()).filter(Boolean);
+    const meanings = cleanMeaning
+      ? [cleanMeaning, ...cleanedMeanings.filter((choice) => choice !== cleanMeaning)]
+      : cleanedMeanings;
+
+    return {
+      surface: finalSurface,
+      reading: cleanReading,
+      meaning: cleanMeaning || meanings[0] || "",
+      meanings,
+      jlpt_level: normalizeJlpt(jlpt),
+    };
+  }
+
+  async function saveToGlobalWordData(approveForWordSky: boolean) {
+    setSuperToolMessage("");
+    setMessage("");
+
+    const payload = buildCurrentWordPayload();
+
+    if (!payload.surface) {
+      setSuperToolMessage("❌ Enter a word first.");
+      return;
+    }
+
+    if (!payload.reading) {
+      setSuperToolMessage("❌ Add a reading first.");
+      return;
+    }
+
+    if (!payload.meaning) {
+      setSuperToolMessage("❌ Add a meaning first.");
+      return;
+    }
+
+    setSuperToolSaving(approveForWordSky ? "wordSky" : "cache");
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch("/api/word-sky/approve", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
+        body: JSON.stringify({
+          ...payload,
+          approveForWordSky,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Could not update global word data.");
+      }
+
+      setSuperToolMessage(
+        approveForWordSky
+          ? `✅ Saved to cache and approved for Word Sky: ${payload.surface}`
+          : `✅ Saved to vocabulary cache: ${payload.surface}`
+      );
+    } catch (err: any) {
+      console.error("Super teacher word tool error:", err);
+      setSuperToolMessage(`❌ ${err?.message ?? "Could not update global word data."}`);
+    } finally {
+      setSuperToolSaving(null);
+    }
   }
 
   function sameGroup(
@@ -631,30 +735,56 @@ export default function AddWordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-6 py-8">
+    <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-2 text-2xl font-semibold">Add Word</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-stone-900">Add Word</h1>
+          <p className="mt-1 hidden text-sm text-stone-600 sm:block">
+            Save a word from this book, adjust the reading and meaning, and keep your page and
+            chapter ready for the next entry.
+          </p>
+        </div>
 
         {bookTitle ? (
-          <div className="mb-6 flex items-center gap-3">
-            {bookCover ? (
-              <button
-                type="button"
-                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-                className="shrink-0 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
-                title="Back to Book Hub"
-              >
+          <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+            <button
+              type="button"
+              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+              className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+              title={`Go to ${bookTitle} Book Hub`}
+            >
+              {bookCover ? (
                 <img
                   src={bookCover}
                   alt={`Go to ${bookTitle} Book Hub`}
-                  className="h-16 w-12 rounded object-cover hover:opacity-90"
+                  className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
                 />
+              ) : null}
+
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+                <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
+                  {bookTitle}
+                </div>
+              </div>
+            </button>
+
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
+                className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+              >
+                Vocab List
               </button>
-            ) : null}
-            <div>
-              <p className="text-sm text-gray-700">
-                For book: <span className="font-medium">{bookTitle}</span>
-              </p>
+
+              <button
+                type="button"
+                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+              >
+                Book Hub
+              </button>
             </div>
           </div>
         ) : (
@@ -920,6 +1050,53 @@ export default function AddWordPage() {
                       <span className="text-sm font-medium text-emerald-700">{savedNotice}</span>
                     ) : null}
                   </div>
+
+                  {isSuperTeacher && (
+                    <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                      <div className="text-sm font-semibold text-amber-950">
+                        Super teacher tools
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-amber-800">
+                        These actions update global word data. They do not have to save the word
+                        to this book.
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void saveToGlobalWordData(false)}
+                          disabled={superToolSaving != null}
+                          className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          {superToolSaving === "cache"
+                            ? "Saving..."
+                            : "Save to vocabulary cache only"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void saveToGlobalWordData(true)}
+                          disabled={superToolSaving != null}
+                          className="rounded-xl bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-50"
+                        >
+                          {superToolSaving === "wordSky"
+                            ? "Approving..."
+                            : "Save to cache + approve for Word Sky"}
+                        </button>
+                      </div>
+
+                      {superToolMessage ? (
+                        <p
+                          className={`mt-2 text-sm font-medium ${superToolMessage.startsWith("❌")
+                              ? "text-red-700"
+                              : "text-emerald-700"
+                            }`}
+                        >
+                          {superToolMessage}
+                        </p>
+                      ) : null}
+                    </section>
+                  )}
           </div>
 
             {sessionWords.length > 0 ? (
