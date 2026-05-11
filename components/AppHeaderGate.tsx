@@ -6,10 +6,24 @@
 import { usePathname } from "next/navigation";
 import Header from "./Header";
 
+const HIDDEN_HEADER_ROUTES = new Set([
+  "/",
+  "/japanese",
+  "/english",
+  "/reading-companion",
+  "/dashboard",
+  "/login",
+  "/legal",
+  "/terms",
+  "/privacy",
+]);
+
 export default function AppHeaderGate() {
   const pathname = usePathname();
 
-  if (pathname === "/" || pathname === "/legal") return null;
+  if (HIDDEN_HEADER_ROUTES.has(pathname)) {
+    return null;
+  }
 
   return <Header />;
 }

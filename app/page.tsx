@@ -8,7 +8,7 @@ export default function HomePage() {
     <main className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-950">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center opacity-40"
+        className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center opacity-60"
         style={{ backgroundImage: "url('/mekuru-home-photo.jpg')" }}
       />
 
@@ -122,7 +122,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/dashboard"
+              href="/reading-companion"
               className="group flex min-h-[210px] flex-col justify-between rounded-[1.75rem] border border-slate-400 bg-slate-700 p-6 text-white shadow-md transition hover:-translate-y-1 hover:bg-slate-800 hover:shadow-xl"
             >
               <div>
