@@ -65,8 +65,12 @@ export default function DashboardPage() {
           <div className="grid w-full gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-slate-300 bg-white/85 p-5 text-left shadow-sm">
               <div className="mb-4 flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-3xl shadow-inner">
-                  ⚗️
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-300 bg-slate-100 shadow-inner">
+                  <img
+                    src="/reader-roles/alchemist.svg"
+                    alt="Alchemist icon"
+                    className="h-12 w-12 object-contain opacity-80"
+                  />
                 </div>
               </div>
 
@@ -88,8 +92,12 @@ export default function DashboardPage() {
 
             <div className="rounded-2xl border border-slate-300 bg-white/85 p-5 text-left shadow-sm">
               <div className="mb-4 flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-3xl shadow-inner">
-                  🦉
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-300 bg-slate-100 shadow-inner">
+                  <img
+                    src="/reader-roles/sage.svg"
+                    alt="Sage icon"
+                    className="h-12 w-12 object-contain opacity-80"
+                  />
                 </div>
               </div>
 
@@ -110,8 +118,12 @@ export default function DashboardPage() {
 
             <div className="rounded-2xl border border-slate-300 bg-white/85 p-5 text-left shadow-sm">
               <div className="mb-4 flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-3xl shadow-inner">
-                  ✨
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-300 bg-slate-100 shadow-inner">
+                  <img
+                    src="/reader-roles/magician.svg"
+                    alt="Magician icon"
+                    className="h-12 w-12 object-contain opacity-80"
+                  />
                 </div>
               </div>
 
