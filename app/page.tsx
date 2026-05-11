@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-export default function HomePage() {
+export default function ReadingCompanionPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-950">
       <div
