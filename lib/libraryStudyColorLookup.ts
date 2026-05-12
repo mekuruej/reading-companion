@@ -46,11 +46,20 @@ export function makeLibraryStudyColorKey(
   return `${(surface ?? "").trim()}|||${(reading ?? "").trim()}`;
 }
 
-function encounterStageLabel(color: LibraryStudyColor) {
-  if (color === "red") return "1";
-  if (color === "orange") return "2";
-  if (color === "yellow") return "3";
-  return null;
+function encounterStageLabel(colorStatus: LibraryStudyColorStatus) {
+  if (
+    colorStatus.color !== "red" &&
+    colorStatus.color !== "orange" &&
+    colorStatus.color !== "yellow"
+  ) {
+    return null;
+  }
+
+  if ((colorStatus.stageCount ?? 1) <= 1) {
+    return null;
+  }
+
+  return colorStatus.stageNumber == null ? null : String(colorStatus.stageNumber);
 }
 
 function uniqueLookupPairs(words: WordForColorLookup[]) {
@@ -171,7 +180,7 @@ export async function fetchLibraryStudyColorInfoByWord(
 
     result[key] = {
       colorStatus,
-      stageLabel: encounterStageLabel(colorStatus.color),
+      stageLabel: encounterStageLabel(colorStatus),
       studyIdentityKey: summary.study_identity_key,
       encounterCount,
     };
