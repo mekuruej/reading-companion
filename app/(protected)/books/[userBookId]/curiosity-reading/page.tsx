@@ -6,6 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { KANJI_DATA } from "@/lib/kanjiData";
+import LibraryColorBadge from "@/components/LibraryColorBadge";
+import {
+  fetchLibraryStudyColorInfoByWord,
+  makeLibraryStudyColorKey,
+  type LibraryStudyWordColorInfo,
+} from "@/lib/libraryStudyColorLookup";
 
 type QuickPreview = {
   id: string | null;
@@ -213,6 +219,9 @@ export default function CuriosityReadingPage() {
 
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
+  const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
+    Record<string, LibraryStudyWordColorInfo>
+  >({});
   const [quickLookupCandidates, setQuickLookupCandidates] = useState<QuickLookupCandidate[]>([]);
   const [savedQuickNotice, setSavedQuickNotice] = useState("");
 
@@ -392,6 +401,54 @@ export default function CuriosityReadingPage() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isRunning, isPaused]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLibraryColors() {
+      const wordsToCheck = [
+        ...quickSessionWords.map((item) => ({
+          surface: item.surface,
+          reading: item.reading,
+        })),
+        {
+          surface: quickPreview.surface,
+          reading: quickPreview.reading,
+        },
+      ];
+
+      const hasAnyLookupWord = wordsToCheck.some(
+        (item) => item.surface?.trim() && item.reading?.trim()
+      );
+
+      if (!hasAnyLookupWord) {
+        setLibraryColorByWordKey({});
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user?.id) return;
+
+      const next = await fetchLibraryStudyColorInfoByWord(
+        supabase,
+        user.id,
+        wordsToCheck
+      );
+
+      if (!cancelled) {
+        setLibraryColorByWordKey(next);
+      }
+    }
+
+    void loadLibraryColors();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quickSessionWords, quickPreview.surface, quickPreview.reading]);
 
   function prepareForNextQuickWord() {
     window.setTimeout(() => {
@@ -896,9 +953,13 @@ export default function CuriosityReadingPage() {
     setMessage("");
   }
 
-
+  const quickPreviewLibraryColorInfo =
+    libraryColorByWordKey[
+    makeLibraryStudyColorKey(quickPreview.surface, quickPreview.reading)
+    ] ?? null;
 
   const filteredKanji = KANJI_DATA.filter((entry: KanjiEntry) => {
+
     if (selectedPieces.length === 0) return false;
 
     const normalizedSelected = selectedPieces.map(normalizePiece);
@@ -1170,43 +1231,56 @@ export default function CuriosityReadingPage() {
               </div>
             ) : null}
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-stone-700">
-                Search / Edit Word
-              </label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  ref={quickWordInputRef}
-                  type="text"
-                  value={quickPreview.surface}
-                  onChange={(e) => {
-                    setQuickPreview((prev) => ({
-                      ...prev,
-                      surface: e.target.value,
-                      cacheSurface: e.target.value.trim() ? prev.cacheSurface : "",
-                    }));
-                    setSavedQuickNotice("");
-                    if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void pullQuickWord();
-                    }
-                  }}
-                  placeholder="Search or edit a word..."
-                  className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-                />
+            <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-stone-700">
+                  Search / Edit Word
+                </label>
 
-                <button
-                  type="button"
-                  onClick={() => void pullQuickWord()}
-                  disabled={quickLoading || !quickPreview.surface.trim()}
-                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                >
-                  {quickLoading ? "Searching..." : "Search"}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    ref={quickWordInputRef}
+                    type="text"
+                    value={quickPreview.surface}
+                    onChange={(e) => {
+                      setQuickPreview((prev) => ({
+                        ...prev,
+                        surface: e.target.value,
+                        cacheSurface: e.target.value.trim() ? prev.cacheSurface : "",
+                      }));
+                      setSavedQuickNotice("");
+                      if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void pullQuickWord();
+                      }
+                    }}
+                    placeholder="Search or edit a word..."
+                    className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => void pullQuickWord()}
+                    disabled={quickLoading || !quickPreview.surface.trim()}
+                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                  >
+                    {quickLoading ? "Searching..." : "Search"}
+                  </button>
+                </div>
               </div>
+
+              {quickPreviewLibraryColorInfo ? (
+                <div className="flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
+                  <span>Library status:</span>
+                  <LibraryColorBadge
+                    colorStatus={quickPreviewLibraryColorInfo.colorStatus}
+                    stageLabel={quickPreviewLibraryColorInfo.stageLabel}
+                  />
+                </div>
+              ) : null}
             </div>
 
             {quickError ? (
@@ -1436,42 +1510,55 @@ export default function CuriosityReadingPage() {
               </div>
 
               <div className="mt-3 space-y-3">
-                {quickSessionWords.slice(0, 2).map((item, index) => (
-                  <div
-                    key={item.id}
-                    className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 text-sm">
-                        <div className="font-medium text-stone-900">{item.surface}</div>
-                        <div className="text-stone-500">{item.reading || "—"}</div>
-                        <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                        <div className="mt-1 text-xs text-stone-500">
-                          Page {item.page || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
-                          {item.chapterName || "—"}
+                {quickSessionWords.slice(0, 2).map((item, index) => {
+                  const colorInfo =
+                    libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 text-sm">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="font-medium text-stone-900">{item.surface}</div>
+                            {colorInfo ? (
+                              <LibraryColorBadge
+                                colorStatus={colorInfo.colorStatus}
+                                stageLabel={colorInfo.stageLabel}
+                              />
+                            ) : null}
+                          </div>
+                          <div className="text-stone-500">{item.reading || "—"}</div>
+                          <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                          <div className="mt-1 text-xs text-stone-500">
+                            Page {item.page || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
+                            {item.chapterName || "—"}
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => loadQuickSessionWordIntoPreview(item)}
+                            className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void deleteQuickWordById(item.id)}
+                            className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => loadQuickSessionWordIntoPreview(item)}
-                          className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void deleteQuickWordById(item.id)}
-                          className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                        >
-                          Delete
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {quickSessionWords.length > 1 ? (
@@ -1481,35 +1568,48 @@ export default function CuriosityReadingPage() {
                   </summary>
 
                   <div className="space-y-3 border-t border-stone-200 p-3">
-                    {quickSessionWords.slice(1).map((item) => (
-                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 text-sm">
-                            <div className="font-medium text-stone-900">{item.surface}</div>
-                            <div className="text-stone-500">{item.reading || "—"}</div>
-                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                          </div>
+                    {quickSessionWords.slice(1).map((item) => {
+                      const colorInfo =
+                        libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
-                          <div className="flex shrink-0 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => loadQuickSessionWordIntoPreview(item)}
-                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                            >
-                              Edit
-                            </button>
+                      return (
+                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 text-sm">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="font-medium text-stone-900">{item.surface}</div>
+                                {colorInfo ? (
+                                  <LibraryColorBadge
+                                    colorStatus={colorInfo.colorStatus}
+                                    stageLabel={colorInfo.stageLabel}
+                                  />
+                                ) : null}
+                              </div>
+                              <div className="text-stone-500">{item.reading || "—"}</div>
+                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                            </div>
 
-                            <button
-                              type="button"
-                              onClick={() => void deleteQuickWordById(item.id)}
-                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                            >
-                              Delete
-                            </button>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => loadQuickSessionWordIntoPreview(item)}
+                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => void deleteQuickWordById(item.id)}
+                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                 </details>
@@ -1522,35 +1622,48 @@ export default function CuriosityReadingPage() {
                   </summary>
 
                   <div className="space-y-3 border-t border-stone-200 p-3">
-                    {quickSessionWords.slice(2).map((item) => (
-                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 text-sm">
-                            <div className="font-medium text-stone-900">{item.surface}</div>
-                            <div className="text-stone-500">{item.reading || "—"}</div>
-                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                          </div>
+                    {quickSessionWords.slice(2).map((item) => {
+                      const colorInfo =
+                        libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
-                          <div className="flex shrink-0 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => loadQuickSessionWordIntoPreview(item)}
-                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                            >
-                              Edit
-                            </button>
+                      return (
+                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 text-sm">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="font-medium text-stone-900">{item.surface}</div>
+                                {colorInfo ? (
+                                  <LibraryColorBadge
+                                    colorStatus={colorInfo.colorStatus}
+                                    stageLabel={colorInfo.stageLabel}
+                                  />
+                                ) : null}
+                              </div>
+                              <div className="text-stone-500">{item.reading || "—"}</div>
+                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                            </div>
 
-                            <button
-                              type="button"
-                              onClick={() => void deleteQuickWordById(item.id)}
-                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                            >
-                              Delete
-                            </button>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => loadQuickSessionWordIntoPreview(item)}
+                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => void deleteQuickWordById(item.id)}
+                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </details>
               ) : null}

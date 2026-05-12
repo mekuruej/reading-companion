@@ -5,6 +5,12 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import LibraryColorBadge from "@/components/LibraryColorBadge";
+import {
+  fetchLibraryStudyColorInfoByWord,
+  makeLibraryStudyColorKey,
+  type LibraryStudyWordColorInfo,
+} from "@/lib/libraryStudyColorLookup";
 
 type JishoChoice = {
   surface: string;
@@ -173,6 +179,9 @@ export default function AddWordPage() {
 
   const [editingSessionWordId, setEditingSessionWordId] = useState<string | null>(null);
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
+  const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
+    Record<string, LibraryStudyWordColorInfo>
+  >({});
 
   const wordInputRef = useRef<HTMLInputElement | null>(null);
   const wordFieldsRef = useRef<HTMLDivElement | null>(null);
@@ -251,6 +260,56 @@ export default function AddWordPage() {
       })
     );
   }, [chapterNumber, chapterName, userBookId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLibraryColors() {
+      const currentSurface = useAlternateSurface ? alternateSurface : word;
+
+      const wordsToCheck = [
+        ...sessionWords.map((item) => ({
+          surface: item.surface,
+          reading: item.reading,
+        })),
+        {
+          surface: currentSurface,
+          reading,
+        },
+      ];
+
+      const hasAnyLookupWord = wordsToCheck.some(
+        (item) => item.surface?.trim() && item.reading?.trim()
+      );
+
+      if (!hasAnyLookupWord) {
+        setLibraryColorByWordKey({});
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user?.id) return;
+
+      const next = await fetchLibraryStudyColorInfoByWord(
+        supabase,
+        user.id,
+        wordsToCheck
+      );
+
+      if (!cancelled) {
+        setLibraryColorByWordKey(next);
+      }
+    }
+
+    void loadLibraryColors();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionWords, word, alternateSurface, useAlternateSurface, reading]);
 
   function prepareForNextWord() {
     window.setTimeout(() => {
@@ -744,6 +803,13 @@ export default function AddWordPage() {
     setMessage("✅ Word deleted from Vocab List.");
   }
 
+  const currentColorSurface = useAlternateSurface ? alternateSurface : word;
+
+  const currentLibraryColorInfo =
+    libraryColorByWordKey[
+    makeLibraryStudyColorKey(currentColorSurface, reading)
+    ] ?? null;
+
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
@@ -830,305 +896,330 @@ export default function AddWordPage() {
               </div>
             ) : null}
 
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (!word.trim() || lookupLoading) return;
-                void handleLookup();
-              }}
-              className="space-y-1"
-            >
-              <label className="block text-sm font-medium text-stone-700">
-                Search / Edit Word
-              </label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  ref={wordInputRef}
-                  value={word}
-                  onChange={(event) => {
-                    setWord(event.target.value);
-                    setSavedNotice("");
-                    if (lookupCandidates.length > 0) setLookupCandidates([]);
-                  }}
-                  placeholder="Search or edit a word..."
-                  className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-                />
-
-                <button
-                  type="submit"
-                  disabled={lookupLoading || !word.trim()}
-                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                >
-                  {lookupLoading ? "Searching..." : "Search"}
-                </button>
-              </div>
-            </form>
-
-            {message ? (
-              <div className={`text-sm ${message.startsWith("❌") ? "text-red-700" : "text-stone-600"}`}>
-                {message}
-              </div>
-            ) : null}
-
-            {lookupCandidates.length > 1 ? (
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
-                <div className="text-sm font-medium text-sky-900">
-                  Dictionary choices for "{word.trim()}"
-                </div>
-                <p className="mt-1 text-sm text-sky-800">
-                  Choose the reading and meaning that match your book.
-                </p>
-
-                <div className="mt-3 space-y-2">
-                  {lookupCandidates.map((candidate) => {
-                    const isSelected =
-                      candidate.surface === word &&
-                      candidate.reading === reading &&
-                      candidate.defaultMeaning === meaning;
-
-                    return (
-                      <button
-                        key={candidate.id}
-                        type="button"
-                        onClick={() => {
-                          applyJisho(candidate);
-                          setMessage(
-                            `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
-                            }.`
-                          );
-                          jumpToWordFields();
-                        }}
-                        className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
-                          ? "border-sky-400 bg-white shadow-sm"
-                          : "border-sky-200 bg-white/80 hover:bg-white"
-                          }`}
-                      >
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <span className="text-base font-semibold text-stone-900">
-                            {candidate.surface}
-                          </span>
-                          <span className="text-sm text-stone-600">
-                            {candidate.reading || "No reading listed"}
-                          </span>
-                          {candidate.jlpt !== "NON-JLPT" ? (
-                            <span className="text-xs font-medium text-sky-700">
-                              {candidate.jlpt}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 text-sm text-stone-700">
-                          {candidate.defaultMeaning || "No meaning listed"}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            <div ref={wordFieldsRef} className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
-                <input
-                  value={reading}
-                  onChange={(e) => setReading(e.target.value)}
-                  placeholder="Reading"
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">
-                  Alternate surface
+            <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!word.trim() || lookupLoading) return;
+                  void handleLookup();
+                }}
+                className="space-y-1"
+              >
+                <label className="block text-sm font-medium text-stone-700">
+                  Search / Edit Word
                 </label>
-                <input
-                  value={alternateSurface}
-                  onChange={(e) => {
-                    setAlternateSurface(e.target.value);
-                    setUseAlternateSurface(e.target.value.trim().length > 0);
-                  }}
-                  placeholder="Book form, if different"
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-stone-700">Meaning</label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    ref={wordInputRef}
+                    value={word}
+                    onChange={(event) => {
+                      setWord(event.target.value);
+                      setSavedNotice("");
+                      if (lookupCandidates.length > 0) setLookupCandidates([]);
+                    }}
+                    placeholder="Search or edit a word..."
+                    className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                  />
 
-              <div className="space-y-2">
-                {meaningChoices.length > 0 ? (
-                  <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
-                    {meaningChoices.map((choice, index) => (
-                      <label
-                        key={index}
-                        className="flex items-start gap-2 text-sm text-stone-700"
-                      >
-                        <input
-                          type="radio"
-                          checked={meaningChoiceIndex === index}
-                          onChange={() => {
-                            setMeaningChoiceIndex(index);
-                            setMeaning(choice);
-                          }}
-                        />
-                        <span>{choice || "—"}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-stone-500">
-                    No dictionary meanings loaded. Enter your own meaning below.
-                  </p>
-                )}
+                  <button
+                    type="submit"
+                    disabled={lookupLoading || !word.trim()}
+                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+                  >
+                    {lookupLoading ? "Searching..." : "Search"}
+                  </button>
+                </div>
+              </form>
 
-                <textarea
-                  value={meaningChoiceIndex == null ? meaning : ""}
-                  onChange={(e) => {
-                    setMeaningChoiceIndex(null);
-                    setMeaning(e.target.value);
-                  }}
-                  placeholder="Type your meaning"
-                  className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">Page</span>
-                <input
-                  type="number"
-                  min={1}
-                  inputMode="numeric"
-                  value={pageNumber}
-                  onChange={(e) => setPageNumber(e.target.value)}
-                  placeholder="Page"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">Chapter number</span>
-                <input
-                  value={chapterNumber}
-                  onChange={(e) => setChapterNumber(e.target.value)}
-                  placeholder="Chapter #"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">Chapter name</span>
-                <input
-                  value={chapterName}
-                  onChange={(e) => setChapterName(e.target.value)}
-                  placeholder="Chapter name"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </label>
-            </div>
-
-            <label className="flex items-start gap-2 text-sm text-stone-700">
-              <input
-                type="checkbox"
-                checked={hideKanjiInReadingSupport}
-                onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
-              />
-              <span>Hide kanji in Read Along (does not affect Vocab List)</span>
-            </label>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={saving || !word.trim()}
-                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save Word"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => clearForm(true)}
-                className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-              >
-                Clear Word Fields
-              </button>
-
-              {savedNotice ? (
-                <span className="text-sm font-medium text-emerald-700">{savedNotice}</span>
+              {currentLibraryColorInfo ? (
+                <div className="flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
+                  <span>Library status:</span>
+                  <LibraryColorBadge
+                    colorStatus={currentLibraryColorInfo.colorStatus}
+                    stageLabel={currentLibraryColorInfo.stageLabel}
+                  />
+                </div>
               ) : null}
             </div>
 
-            {isSuperTeacher && (
-              <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                <div className="text-sm font-semibold text-amber-950">
-                  Super teacher tools
-                </div>
-                <p className="mt-1 text-xs leading-5 text-amber-800">
-                  These actions update global word data. They do not have to save the word
-                  to this book.
-                </p>
+          {message ? (
+            <div className={`text-sm ${message.startsWith("❌") ? "text-red-700" : "text-stone-600"}`}>
+              {message}
+            </div>
+          ) : null}
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void saveToGlobalWordData(false)}
-                    disabled={superToolSaving != null}
-                    className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                  >
-                    {superToolSaving === "cache"
-                      ? "Saving..."
-                      : "Save to vocabulary cache only"}
-                  </button>
+          {lookupCandidates.length > 1 ? (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+              <div className="text-sm font-medium text-sky-900">
+                Dictionary choices for "{word.trim()}"
+              </div>
+              <p className="mt-1 text-sm text-sky-800">
+                Choose the reading and meaning that match your book.
+              </p>
 
-                  <button
-                    type="button"
-                    onClick={() => void saveToGlobalWordData(true)}
-                    disabled={superToolSaving != null}
-                    className="rounded-xl bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-50"
-                  >
-                    {superToolSaving === "wordSky"
-                      ? "Approving..."
-                      : "Save to cache + approve for Word Sky"}
-                  </button>
-                </div>
+              <div className="mt-3 space-y-2">
+                {lookupCandidates.map((candidate) => {
+                  const isSelected =
+                    candidate.surface === word &&
+                    candidate.reading === reading &&
+                    candidate.defaultMeaning === meaning;
 
-                {superToolMessage ? (
-                  <p
-                    className={`mt-2 text-sm font-medium ${superToolMessage.startsWith("❌")
-                      ? "text-red-700"
-                      : "text-emerald-700"
-                      }`}
-                  >
-                    {superToolMessage}
-                  </p>
-                ) : null}
-              </section>
-            )}
+                  return (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      onClick={() => {
+                        applyJisho(candidate);
+                        setMessage(
+                          `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
+                          }.`
+                        );
+                        jumpToWordFields();
+                      }}
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
+                        ? "border-sky-400 bg-white shadow-sm"
+                        : "border-sky-200 bg-white/80 hover:bg-white"
+                        }`}
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="text-base font-semibold text-stone-900">
+                          {candidate.surface}
+                        </span>
+                        <span className="text-sm text-stone-600">
+                          {candidate.reading || "No reading listed"}
+                        </span>
+                        {candidate.jlpt !== "NON-JLPT" ? (
+                          <span className="text-xs font-medium text-sky-700">
+                            {candidate.jlpt}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 text-sm text-stone-700">
+                        {candidate.defaultMeaning || "No meaning listed"}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <div ref={wordFieldsRef} className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
+              <input
+                value={reading}
+                onChange={(e) => setReading(e.target.value)}
+                placeholder="Reading"
+                className="w-full rounded border bg-white px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-stone-700">
+                Alternate surface
+              </label>
+              <input
+                value={alternateSurface}
+                onChange={(e) => {
+                  setAlternateSurface(e.target.value);
+                  setUseAlternateSurface(e.target.value.trim().length > 0);
+                }}
+                placeholder="Book form, if different"
+                className="w-full rounded border bg-white px-3 py-2 text-sm"
+              />
+            </div>
           </div>
 
-          {sessionWords.length > 0 ? (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <div>
-                <div className="text-sm font-medium text-stone-900">
-                  Recently added
+          <div>
+            <label className="mb-2 block text-sm font-medium text-stone-700">Meaning</label>
+
+            <div className="space-y-2">
+              {meaningChoices.length > 0 ? (
+                <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
+                  {meaningChoices.map((choice, index) => (
+                    <label
+                      key={index}
+                      className="flex items-start gap-2 text-sm text-stone-700"
+                    >
+                      <input
+                        type="radio"
+                        checked={meaningChoiceIndex === index}
+                        onChange={() => {
+                          setMeaningChoiceIndex(index);
+                          setMeaning(choice);
+                        }}
+                      />
+                      <span>{choice || "—"}</span>
+                    </label>
+                  ))}
                 </div>
-                <p className="mt-1 text-xs text-stone-500">
-                  {sessionWords.length} word{sessionWords.length === 1 ? "" : "s"} saved this session
+              ) : (
+                <p className="text-sm text-stone-500">
+                  No dictionary meanings loaded. Enter your own meaning below.
                 </p>
+              )}
+
+              <textarea
+                value={meaningChoiceIndex == null ? meaning : ""}
+                onChange={(e) => {
+                  setMeaningChoiceIndex(null);
+                  setMeaning(e.target.value);
+                }}
+                placeholder="Type your meaning"
+                className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-stone-700">Page</span>
+              <input
+                type="number"
+                min={1}
+                inputMode="numeric"
+                value={pageNumber}
+                onChange={(e) => setPageNumber(e.target.value)}
+                placeholder="Page"
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-stone-700">Chapter number</span>
+              <input
+                value={chapterNumber}
+                onChange={(e) => setChapterNumber(e.target.value)}
+                placeholder="Chapter #"
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-stone-700">Chapter name</span>
+              <input
+                value={chapterName}
+                onChange={(e) => setChapterName(e.target.value)}
+                placeholder="Chapter name"
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-start gap-2 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={hideKanjiInReadingSupport}
+              onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
+            />
+            <span>Hide kanji in Read Along (does not affect Vocab List)</span>
+          </label>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving || !word.trim()}
+              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Word"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => clearForm(true)}
+              className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+            >
+              Clear Word Fields
+            </button>
+
+            {savedNotice ? (
+              <span className="text-sm font-medium text-emerald-700">{savedNotice}</span>
+            ) : null}
+          </div>
+
+          {isSuperTeacher && (
+            <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+              <div className="text-sm font-semibold text-amber-950">
+                Super teacher tools
+              </div>
+              <p className="mt-1 text-xs leading-5 text-amber-800">
+                These actions update global word data. They do not have to save the word
+                to this book.
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveToGlobalWordData(false)}
+                  disabled={superToolSaving != null}
+                  className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  {superToolSaving === "cache"
+                    ? "Saving..."
+                    : "Save to vocabulary cache only"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void saveToGlobalWordData(true)}
+                  disabled={superToolSaving != null}
+                  className="rounded-xl bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-50"
+                >
+                  {superToolSaving === "wordSky"
+                    ? "Approving..."
+                    : "Save to cache + approve for Word Sky"}
+                </button>
               </div>
 
-              <div className="mt-3 space-y-3">
-                {sessionWords.slice(0, 2).map((item, index) => (
+              {superToolMessage ? (
+                <p
+                  className={`mt-2 text-sm font-medium ${superToolMessage.startsWith("❌")
+                    ? "text-red-700"
+                    : "text-emerald-700"
+                    }`}
+                >
+                  {superToolMessage}
+                </p>
+              ) : null}
+            </section>
+          )}
+        </div>
+
+        {sessionWords.length > 0 ? (
+          <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div>
+              <div className="text-sm font-medium text-stone-900">
+                Recently added
+              </div>
+              <p className="mt-1 text-xs text-stone-500">
+                {sessionWords.length} word{sessionWords.length === 1 ? "" : "s"} saved this session
+              </p>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {sessionWords.slice(0, 2).map((item, index) => {
+                const colorInfo =
+                  libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+
+                return (
                   <div
                     key={item.id}
                     className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 text-sm">
-                        <div className="font-medium text-stone-900">{item.surface}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-medium text-stone-900">{item.surface}</div>
+                          {colorInfo ? (
+                            <LibraryColorBadge
+                              colorStatus={colorInfo.colorStatus}
+                              stageLabel={colorInfo.stageLabel}
+                            />
+                          ) : null}
+                        </div>
                         <div className="text-stone-500">{item.reading || "—"}</div>
                         <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
                         <div className="mt-1 text-xs text-stone-500">
@@ -1156,86 +1247,97 @@ export default function AddWordPage() {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-
-              {sessionWords.length > 1 ? (
-                <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                    Saved words from this session
-                  </summary>
-                  <div className="space-y-3 border-t border-stone-200 p-3">
-                    {sessionWords.slice(1).map((item) => (
-                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 text-sm">
-                            <div className="font-medium text-stone-900">{item.surface}</div>
-                            <div className="text-stone-500">{item.reading || "—"}</div>
-                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                          </div>
-                          <div className="flex shrink-0 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => loadSessionWordIntoForm(item)}
-                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void deleteSessionWord(item.id)}
-                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              ) : null}
-
-              {sessionWords.length > 2 ? (
-                <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                    Saved words from this session
-                  </summary>
-                  <div className="space-y-3 border-t border-stone-200 p-3">
-                    {sessionWords.slice(2).map((item) => (
-                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 text-sm">
-                            <div className="font-medium text-stone-900">{item.surface}</div>
-                            <div className="text-stone-500">{item.reading || "—"}</div>
-                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                          </div>
-                          <div className="flex shrink-0 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => loadSessionWordIntoForm(item)}
-                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void deleteSessionWord(item.id)}
-                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              ) : null}
+                );
+              })}
             </div>
-          ) : null}
-        </div>
+
+            {sessionWords.length > 1 ? (
+              <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
+                <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                  Saved words from this session
+                </summary>
+                <div className="space-y-3 border-t border-stone-200 p-3">
+                  {sessionWords.slice(1).map((item) => {
+                    const colorInfo =
+                      libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+
+                    return (
+                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 text-sm">
+                            <div className="font-medium text-stone-900">{item.surface}</div>
+                            <div className="text-stone-500">{item.reading || "—"}</div>
+                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => loadSessionWordIntoForm(item)}
+                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteSessionWord(item.id)}
+                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            ) : null}
+
+            {sessionWords.length > 2 ? (
+              <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
+                <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                  Saved words from this session
+                </summary>
+                <div className="space-y-3 border-t border-stone-200 p-3">
+                  {sessionWords.slice(1).map((item) => {
+                    const colorInfo =
+                      libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+
+                    return (
+                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 text-sm">
+                            <div className="font-medium text-stone-900">{item.surface}</div>
+                            <div className="text-stone-500">{item.reading || "—"}</div>
+                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => loadSessionWordIntoForm(item)}
+                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteSessionWord(item.id)}
+                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
       </div>
+    </div>
     </main >
   );
 }
