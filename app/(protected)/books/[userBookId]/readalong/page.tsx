@@ -1,4 +1,4 @@
-// Read Along Page
+// Fluid Reading - Extensive
 // 
 
 "use client";
@@ -654,6 +654,36 @@ export default function ReadAlongPage() {
                     </div>
                 ) : null}
 
+                {chapterOptions.length > 0 ? (
+                    <section className="mb-4 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h2 className="text-lg font-black text-stone-900">
+                                    {selectedChapterLabel}
+                                </h2>
+                                <p className="mt-1 text-sm text-stone-500">
+                                    Choose a chapter, or add a page number below for a more exact spot.
+                                </p>
+                            </div>
+
+                            <label className="w-full text-sm sm:w-72">
+                                <select
+                                    value={selectedChapterKey}
+                                    onChange={(event) => setSelectedChapterKey(event.target.value)}
+                                    className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                                >
+                                    <option value="all">All chapters</option>
+                                    {chapterOptions.map((chapter) => (
+                                        <option key={chapter.key} value={chapter.key}>
+                                            {chapter.label} · {chapter.wordCount} words
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+                    </section>
+                ) : null}
+
                 <div className="rounded-xl border border-stone-200 bg-white px-3 py-3">
                     <div className="mb-2 text-center text-sm text-stone-600">
                         Use the timer to track your fluid reading session, whether you read quietly or with saved word support.
@@ -863,36 +893,6 @@ export default function ReadAlongPage() {
                         <span className="hidden sm:inline">Meaning Support</span>
                     </button>
                 </div>
-
-                {chapterOptions.length > 0 ? (
-                    <section className="mb-4 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                            <div>
-                                <h2 className="text-lg font-black text-stone-900">
-                                    {selectedChapterLabel}
-                                </h2>
-                                <p className="mt-1 text-sm text-stone-500">
-                                    Choose a chapter, or add a page number below for a more exact spot.
-                                </p>
-                            </div>
-
-                            <label className="w-full text-sm sm:w-72">
-                                <select
-                                    value={selectedChapterKey}
-                                    onChange={(event) => setSelectedChapterKey(event.target.value)}
-                                    className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                                >
-                                    <option value="all">All chapters</option>
-                                    {chapterOptions.map((chapter) => (
-                                        <option key={chapter.key} value={chapter.key}>
-                                            {chapter.label} · {chapter.wordCount} words
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
-                    </section>
-                ) : null}
 
                 <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
                     <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">

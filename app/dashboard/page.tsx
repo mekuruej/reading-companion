@@ -73,21 +73,31 @@ export default function DashboardPage() {
                   />
                 </div>
               </div>
-
               <div className="text-sm font-semibold text-stone-900">
                 The Alchemists
               </div>
               <div className="mt-1 text-sm text-stone-500">
-                aka the looker-uppers
+                aka looker-uppers
               </div>
-              <p className="mt-2 text-sm leading-6 text-stone-700">
-                The Alchemists are devoted to nuance, unknown words, and the
-                dangerous phrase “just one more quick search.” They gather
-                vocabulary, grammar, and kanji like rare ingredients and are
-                always one step away from brewing a new potion. They may slow
-                down the journey, but when the party meets a truly cursed
-                sentence, everyone suddenly remembers how useful they are.
-              </p>
+
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-stone-700">
+                <li>
+                  Devoted to nuance, unknown words, and the divisive phrase,
+                  “just one more quick look-up.”
+                </li>
+                <li>
+                  Endlessly gathering vocabulary, grammar, and kanji in their back
+                  pockets for the next useful potion.
+                </li>
+                <li>
+                  They slow down the journey, but are the first people the others
+                  seek out when the group is in hot water.
+                </li>
+                <li>
+                  They think Magicians are reckless, but secretly admire how they fly
+                  through the story without needing to bottle everything up for later.
+                </li>
+              </ul>
             </div>
 
             <div className="rounded-2xl border border-slate-300 bg-white/85 p-5 text-left shadow-sm">
@@ -105,15 +115,29 @@ export default function DashboardPage() {
                 The Sages
               </div>
               <div className="mt-1 text-sm text-stone-500">
-                aka the selective-looker-uppers
+                aka selective looker-uppers
               </div>
-              <p className="mt-2 text-sm leading-6 text-stone-700">
-                The Sages try to keep the peace. They know when to stop, when to skip,
-                and when to pretend not to hear the Alchemists and Magicians arguing
-                again. Calm, practical, and slightly tired, they carry the map, notice the
-                warning signs, and quietly believe they are the only reason the reading
-                journey survives at all.
-              </p>
+
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-stone-700">
+                <li>The peacekeepers of the reading journey.</li>
+                <li>
+                  Known for sensing when to stop, examine something more closely, keep moving,
+                  or run ahead.
+                </li>
+                <li>
+                  Calm and practical.
+                </li>
+                <li>
+                  They carry the map and guide the
+                  others, noticing warning signs and avoiding places where one could easily
+                  get stuck.
+                </li>
+                <li>
+                  They have gotten good at ignoring the Alchemists and Magicians arguing
+                  because they already believe they are the reason the reading journey keeps
+                  moving forward.
+                </li>
+              </ul>
             </div>
 
             <div className="rounded-2xl border border-slate-300 bg-white/85 p-5 text-left shadow-sm">
@@ -131,16 +155,26 @@ export default function DashboardPage() {
                 The Magicians
               </div>
               <div className="mt-1 text-sm text-stone-500">
-                aka the non-looker-uppers
+                aka non-looker-uppers
               </div>
-              <p className="mt-2 text-sm leading-6 text-stone-700">
-                The Magicians believe the story must go on, preferably without
-                interruption. They move through unknown words with alarming
-                confidence and often behave as though they were personally
-                chosen by the gods of narrative flow. They claim the Alchemists
-                waste far too much time, but they are suspiciously grateful
-                whenever a potion is needed.
-              </p>
+
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-stone-700">
+                <li>
+                  They believe wholeheartedly in the magic of the story and prefer to fly
+                  forward without interruption.
+                </li>
+                <li>
+                  They jump over unknown words with alarming confidence and glide over nasty
+                  grammar with a swipe of their wands.
+                </li>
+                <li>
+                  They are convinced the Alchemists waste far too much time, but are
+                  suspiciously grateful whenever a potion is needed.
+                </li>
+                <li>
+                  Deep down, they know that accurately made potions are essential for skilled magic, but they will absolutely pretend they can manage without all those ingredients.
+                </li>
+              </ul>
             </div>
           </div>
         </section>

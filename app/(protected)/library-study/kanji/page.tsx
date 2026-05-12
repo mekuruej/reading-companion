@@ -1311,7 +1311,7 @@ export default function KanjiReadingStudyPage() {
                       <p className="text-center text-sm font-medium text-slate-800">
                         {recallMode === "kanjiForReading"
                           ? "What kanji character does this word use?"
-                          : "Can you think of another word that uses this kanji?"}
+                          : "Can you think of a word that uses this kanji?"}
                       </p>
 
                       <p className="mt-1 text-center text-xs text-slate-500">

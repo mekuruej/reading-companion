@@ -29,8 +29,8 @@ export default function HomePage() {
               <Image
                 src="/mekuru-logo.png"
                 alt="MEKURU logo"
-                width={56}
-                height={56}
+                width={200}
+                height={200}
                 className="h-full w-full object-contain p-1"
                 priority
               />
@@ -63,9 +63,9 @@ export default function HomePage() {
             <h2 className="max-w-4xl text-4xl font-black leading-[1.08] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
               Read more deeply.
               <br />
-              Talk more naturally.
+              Think more flexibly.
               <br />
-              Stay with the story.
+              Keeping turning the page.
             </h2>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-700">
@@ -88,7 +88,7 @@ export default function HomePage() {
                   Read real Japanese with support
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Private reading lessons, book clubs, vocabulary support, and
+                  Private reading lessons, vocabulary support, book clubs, and
                   real-text reading practice for Japanese learners.
                 </p>
               </div>

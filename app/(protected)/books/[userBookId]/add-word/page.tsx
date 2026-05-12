@@ -238,6 +238,11 @@ export default function AddWordPage() {
 
   useEffect(() => {
     if (!userBookId) return;
+
+    const hasAnyChapterInfo = chapterNumber.trim() || chapterName.trim();
+
+    if (!hasAnyChapterInfo) return;
+
     localStorage.setItem(
       `chapter_userBook_${userBookId}`,
       JSON.stringify({
@@ -331,7 +336,12 @@ export default function AddWordPage() {
     setHideKanjiInReadingSupport(sessionWord.hideKanjiInReadingSupport);
     setLookupCandidates([]);
     setMessage(`Editing "${sessionWord.surface}"`);
-    window.setTimeout(() => wordInputRef.current?.focus({ preventScroll: true }), 0);
+
+    jumpToWordFields();
+
+    window.setTimeout(() => {
+      wordInputRef.current?.focus({ preventScroll: true });
+    }, 150);
   }
 
   async function handleLookup() {
@@ -860,370 +870,370 @@ export default function AddWordPage() {
               </div>
             ) : null}
 
-              {lookupCandidates.length > 1 ? (
-                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
-                  <div className="text-sm font-medium text-sky-900">
-                    Dictionary choices for "{word.trim()}"
-                  </div>
-                  <p className="mt-1 text-sm text-sky-800">
-                    Choose the reading and meaning that match your book.
-                  </p>
+            {lookupCandidates.length > 1 ? (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+                <div className="text-sm font-medium text-sky-900">
+                  Dictionary choices for "{word.trim()}"
+                </div>
+                <p className="mt-1 text-sm text-sky-800">
+                  Choose the reading and meaning that match your book.
+                </p>
 
-                  <div className="mt-3 space-y-2">
-                    {lookupCandidates.map((candidate) => {
-                      const isSelected =
-                        candidate.surface === word &&
-                        candidate.reading === reading &&
-                        candidate.defaultMeaning === meaning;
+                <div className="mt-3 space-y-2">
+                  {lookupCandidates.map((candidate) => {
+                    const isSelected =
+                      candidate.surface === word &&
+                      candidate.reading === reading &&
+                      candidate.defaultMeaning === meaning;
 
-                      return (
-                        <button
-                          key={candidate.id}
-                          type="button"
-                          onClick={() => {
-                            applyJisho(candidate);
-                            setMessage(
-                              `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
-                              }.`
-                            );
-                            jumpToWordFields();
-                          }}
-                          className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
-                              ? "border-sky-400 bg-white shadow-sm"
-                              : "border-sky-200 bg-white/80 hover:bg-white"
-                            }`}
-                        >
-                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                            <span className="text-base font-semibold text-stone-900">
-                              {candidate.surface}
+                    return (
+                      <button
+                        key={candidate.id}
+                        type="button"
+                        onClick={() => {
+                          applyJisho(candidate);
+                          setMessage(
+                            `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
+                            }.`
+                          );
+                          jumpToWordFields();
+                        }}
+                        className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
+                          ? "border-sky-400 bg-white shadow-sm"
+                          : "border-sky-200 bg-white/80 hover:bg-white"
+                          }`}
+                      >
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                          <span className="text-base font-semibold text-stone-900">
+                            {candidate.surface}
+                          </span>
+                          <span className="text-sm text-stone-600">
+                            {candidate.reading || "No reading listed"}
+                          </span>
+                          {candidate.jlpt !== "NON-JLPT" ? (
+                            <span className="text-xs font-medium text-sky-700">
+                              {candidate.jlpt}
                             </span>
-                            <span className="text-sm text-stone-600">
-                              {candidate.reading || "No reading listed"}
-                            </span>
-                            {candidate.jlpt !== "NON-JLPT" ? (
-                              <span className="text-xs font-medium text-sky-700">
-                                {candidate.jlpt}
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="mt-1 text-sm text-stone-700">
-                            {candidate.defaultMeaning || "No meaning listed"}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 text-sm text-stone-700">
+                          {candidate.defaultMeaning || "No meaning listed"}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : null}
+              </div>
+            ) : null}
 
-              <div ref={wordFieldsRef} className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
-                  <input
-                    value={reading}
-                    onChange={(e) => setReading(e.target.value)}
-                    placeholder="Reading"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">
-                    Alternate surface
-                  </label>
-                  <input
-                    value={alternateSurface}
-                    onChange={(e) => {
-                      setAlternateSurface(e.target.value);
-                      setUseAlternateSurface(e.target.value.trim().length > 0);
-                    }}
-                    placeholder="Book form, if different"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-                </div>
+            <div ref={wordFieldsRef} className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
+                <input
+                  value={reading}
+                  onChange={(e) => setReading(e.target.value)}
+                  placeholder="Reading"
+                  className="w-full rounded border bg-white px-3 py-2 text-sm"
+                />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-stone-700">Meaning</label>
-
-                <div className="space-y-2">
-                  {meaningChoices.length > 0 ? (
-                    <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
-                      {meaningChoices.map((choice, index) => (
-                          <label
-                            key={index}
-                            className="flex items-start gap-2 text-sm text-stone-700"
-                          >
-                            <input
-                              type="radio"
-                              checked={meaningChoiceIndex === index}
-                              onChange={() => {
-                                setMeaningChoiceIndex(index);
-                                setMeaning(choice);
-                              }}
-                            />
-                            <span>{choice || "—"}</span>
-                          </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-stone-500">
-                      No dictionary meanings loaded. Enter your own meaning below.
-                    </p>
-                  )}
-
-                  <textarea
-                    value={meaningChoiceIndex == null ? meaning : ""}
-                    onChange={(e) => {
-                      setMeaningChoiceIndex(null);
-                      setMeaning(e.target.value);
-                    }}
-                    placeholder="Type your meaning"
-                    className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
-                  />
-                </div>
+                <label className="mb-1 block text-sm font-medium text-stone-700">
+                  Alternate surface
+                </label>
+                <input
+                  value={alternateSurface}
+                  onChange={(e) => {
+                    setAlternateSurface(e.target.value);
+                    setUseAlternateSurface(e.target.value.trim().length > 0);
+                  }}
+                  placeholder="Book form, if different"
+                  className="w-full rounded border bg-white px-3 py-2 text-sm"
+                />
               </div>
+            </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-stone-700">Page</span>
-                      <input
-                        type="number"
-                        min={1}
-                        inputMode="numeric"
-                        value={pageNumber}
-                        onChange={(e) => setPageNumber(e.target.value)}
-                        placeholder="Page"
-                        className="w-full rounded border px-3 py-2 text-sm"
-                      />
-                    </label>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-stone-700">Meaning</label>
 
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-stone-700">Chapter number</span>
-                      <input
-                        value={chapterNumber}
-                        onChange={(e) => setChapterNumber(e.target.value)}
-                        placeholder="Chapter #"
-                        className="w-full rounded border px-3 py-2 text-sm"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-stone-700">Chapter name</span>
-                      <input
-                        value={chapterName}
-                        onChange={(e) => setChapterName(e.target.value)}
-                        placeholder="Chapter name"
-                        className="w-full rounded border px-3 py-2 text-sm"
-                      />
-                    </label>
+              <div className="space-y-2">
+                {meaningChoices.length > 0 ? (
+                  <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
+                    {meaningChoices.map((choice, index) => (
+                      <label
+                        key={index}
+                        className="flex items-start gap-2 text-sm text-stone-700"
+                      >
+                        <input
+                          type="radio"
+                          checked={meaningChoiceIndex === index}
+                          onChange={() => {
+                            setMeaningChoiceIndex(index);
+                            setMeaning(choice);
+                          }}
+                        />
+                        <span>{choice || "—"}</span>
+                      </label>
+                    ))}
                   </div>
+                ) : (
+                  <p className="text-sm text-stone-500">
+                    No dictionary meanings loaded. Enter your own meaning below.
+                  </p>
+                )}
 
-                  <label className="flex items-start gap-2 text-sm text-stone-700">
-                    <input
-                      type="checkbox"
-                      checked={hideKanjiInReadingSupport}
-                      onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
-                    />
-                    <span>Hide kanji in Read Along (does not affect Vocab List)</span>
-                  </label>
+                <textarea
+                  value={meaningChoiceIndex == null ? meaning : ""}
+                  onChange={(e) => {
+                    setMeaningChoiceIndex(null);
+                    setMeaning(e.target.value);
+                  }}
+                  placeholder="Type your meaning"
+                  className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleSave()}
-                      disabled={saving || !word.trim()}
-                      className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save Word"}
-                    </button>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-stone-700">Page</span>
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={pageNumber}
+                  onChange={(e) => setPageNumber(e.target.value)}
+                  placeholder="Page"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </label>
 
-                    <button
-                      type="button"
-                      onClick={() => clearForm(true)}
-                      className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-                    >
-                      Clear Word Fields
-                    </button>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-stone-700">Chapter number</span>
+                <input
+                  value={chapterNumber}
+                  onChange={(e) => setChapterNumber(e.target.value)}
+                  placeholder="Chapter #"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </label>
 
-                    {savedNotice ? (
-                      <span className="text-sm font-medium text-emerald-700">{savedNotice}</span>
-                    ) : null}
-                  </div>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-stone-700">Chapter name</span>
+                <input
+                  value={chapterName}
+                  onChange={(e) => setChapterName(e.target.value)}
+                  placeholder="Chapter name"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
 
-                  {isSuperTeacher && (
-                    <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                      <div className="text-sm font-semibold text-amber-950">
-                        Super teacher tools
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-amber-800">
-                        These actions update global word data. They do not have to save the word
-                        to this book.
-                      </p>
+            <label className="flex items-start gap-2 text-sm text-stone-700">
+              <input
+                type="checkbox"
+                checked={hideKanjiInReadingSupport}
+                onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
+              />
+              <span>Hide kanji in Read Along (does not affect Vocab List)</span>
+            </label>
 
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void saveToGlobalWordData(false)}
-                          disabled={superToolSaving != null}
-                          className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                        >
-                          {superToolSaving === "cache"
-                            ? "Saving..."
-                            : "Save to vocabulary cache only"}
-                        </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={saving || !word.trim()}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save Word"}
+              </button>
 
-                        <button
-                          type="button"
-                          onClick={() => void saveToGlobalWordData(true)}
-                          disabled={superToolSaving != null}
-                          className="rounded-xl bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-50"
-                        >
-                          {superToolSaving === "wordSky"
-                            ? "Approving..."
-                            : "Save to cache + approve for Word Sky"}
-                        </button>
-                      </div>
+              <button
+                type="button"
+                onClick={() => clearForm(true)}
+                className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+              >
+                Clear Word Fields
+              </button>
 
-                      {superToolMessage ? (
-                        <p
-                          className={`mt-2 text-sm font-medium ${superToolMessage.startsWith("❌")
-                              ? "text-red-700"
-                              : "text-emerald-700"
-                            }`}
-                        >
-                          {superToolMessage}
-                        </p>
-                      ) : null}
-                    </section>
-                  )}
+              {savedNotice ? (
+                <span className="text-sm font-medium text-emerald-700">{savedNotice}</span>
+              ) : null}
+            </div>
+
+            {isSuperTeacher && (
+              <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                <div className="text-sm font-semibold text-amber-950">
+                  Super teacher tools
+                </div>
+                <p className="mt-1 text-xs leading-5 text-amber-800">
+                  These actions update global word data. They do not have to save the word
+                  to this book.
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveToGlobalWordData(false)}
+                    disabled={superToolSaving != null}
+                    className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    {superToolSaving === "cache"
+                      ? "Saving..."
+                      : "Save to vocabulary cache only"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void saveToGlobalWordData(true)}
+                    disabled={superToolSaving != null}
+                    className="rounded-xl bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-50"
+                  >
+                    {superToolSaving === "wordSky"
+                      ? "Approving..."
+                      : "Save to cache + approve for Word Sky"}
+                  </button>
+                </div>
+
+                {superToolMessage ? (
+                  <p
+                    className={`mt-2 text-sm font-medium ${superToolMessage.startsWith("❌")
+                      ? "text-red-700"
+                      : "text-emerald-700"
+                      }`}
+                  >
+                    {superToolMessage}
+                  </p>
+                ) : null}
+              </section>
+            )}
           </div>
 
-            {sessionWords.length > 0 ? (
-              <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-                <div>
-                  <div className="text-sm font-medium text-stone-900">
-                    Recently added
-                  </div>
-                  <p className="mt-1 text-xs text-stone-500">
-                    {sessionWords.length} word{sessionWords.length === 1 ? "" : "s"} saved this session
-                  </p>
+          {sessionWords.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+              <div>
+                <div className="text-sm font-medium text-stone-900">
+                  Recently added
                 </div>
+                <p className="mt-1 text-xs text-stone-500">
+                  {sessionWords.length} word{sessionWords.length === 1 ? "" : "s"} saved this session
+                </p>
+              </div>
 
-                <div className="mt-3 space-y-3">
-                  {sessionWords.slice(0, 2).map((item, index) => (
-                    <div
-                      key={item.id}
-                      className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 text-sm">
-                          <div className="font-medium text-stone-900">{item.surface}</div>
-                          <div className="text-stone-500">{item.reading || "—"}</div>
-                          <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                          <div className="mt-1 text-xs text-stone-500">
-                            Page {item.pageNumber || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
-                            {item.chapterName || "—"}
-                          </div>
-                        </div>
-
-                        <div className="flex shrink-0 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => loadSessionWordIntoForm(item)}
-                            className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => void deleteSessionWord(item.id)}
-                            className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                          >
-                            Delete
-                          </button>
+              <div className="mt-3 space-y-3">
+                {sessionWords.slice(0, 2).map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 text-sm">
+                        <div className="font-medium text-stone-900">{item.surface}</div>
+                        <div className="text-stone-500">{item.reading || "—"}</div>
+                        <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                        <div className="mt-1 text-xs text-stone-500">
+                          Page {item.pageNumber || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
+                          {item.chapterName || "—"}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
 
-                {sessionWords.length > 1 ? (
-                  <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
-                    <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                      Saved words from this session
-                    </summary>
-                    <div className="space-y-3 border-t border-stone-200 p-3">
-                      {sessionWords.slice(1).map((item) => (
-                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 text-sm">
-                              <div className="font-medium text-stone-900">{item.surface}</div>
-                              <div className="text-stone-500">{item.reading || "—"}</div>
-                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                            </div>
-                            <div className="flex shrink-0 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => loadSessionWordIntoForm(item)}
-                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void deleteSessionWord(item.id)}
-                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => loadSessionWordIntoForm(item)}
+                          className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                        >
+                          Edit
+                        </button>
 
-                {sessionWords.length > 2 ? (
-                  <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
-                    <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                      Saved words from this session
-                    </summary>
-                    <div className="space-y-3 border-t border-stone-200 p-3">
-                      {sessionWords.slice(2).map((item) => (
-                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 text-sm">
-                              <div className="font-medium text-stone-900">{item.surface}</div>
-                              <div className="text-stone-500">{item.reading || "—"}</div>
-                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                            </div>
-                            <div className="flex shrink-0 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => loadSessionWordIntoForm(item)}
-                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void deleteSessionWord(item.id)}
-                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => void deleteSessionWord(item.id)}
+                          className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  </details>
-                ) : null}
+                  </div>
+                ))}
               </div>
-            ) : null}
+
+              {sessionWords.length > 1 ? (
+                <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                    Saved words from this session
+                  </summary>
+                  <div className="space-y-3 border-t border-stone-200 p-3">
+                    {sessionWords.slice(1).map((item) => (
+                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 text-sm">
+                            <div className="font-medium text-stone-900">{item.surface}</div>
+                            <div className="text-stone-500">{item.reading || "—"}</div>
+                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => loadSessionWordIntoForm(item)}
+                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteSessionWord(item.id)}
+                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+
+              {sessionWords.length > 2 ? (
+                <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                    Saved words from this session
+                  </summary>
+                  <div className="space-y-3 border-t border-stone-200 p-3">
+                    {sessionWords.slice(2).map((item) => (
+                      <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 text-sm">
+                            <div className="font-medium text-stone-900">{item.surface}</div>
+                            <div className="text-stone-500">{item.reading || "—"}</div>
+                            <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => loadSessionWordIntoForm(item)}
+                              className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteSessionWord(item.id)}
+                              className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </main >
