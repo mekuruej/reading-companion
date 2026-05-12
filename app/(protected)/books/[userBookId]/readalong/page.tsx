@@ -6,6 +6,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import LibraryColorBadge from "@/components/LibraryColorBadge";
+import {
+    fetchLibraryStudyColorInfoByWord,
+    makeLibraryStudyColorKey,
+    type LibraryStudyWordColorInfo,
+} from "@/lib/libraryStudyColorLookup";
 
 type ReadAlongWord = {
     id: string;
@@ -79,8 +85,12 @@ export default function ReadAlongPage() {
     const searchParams = useSearchParams();
 
     const [words, setWords] = useState<ReadAlongWord[]>([]);
+    const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
+        Record<string, LibraryStudyWordColorInfo>
+    >({});
     const [loading, setLoading] = useState(true);
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
+
     const [pageIndex, setPageIndex] = useState(0);
     const [jumpPageInput, setJumpPageInput] = useState("");
     const [selectedChapterKey, setSelectedChapterKey] = useState("all");
@@ -173,6 +183,90 @@ export default function ReadAlongPage() {
 
         loadWords();
     }, [userBookId]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadLibraryColors() {
+            const wordsToCheck = words.map((word) => ({
+                surface: word.surface,
+                reading: word.reading,
+            }));
+
+            const hasAnyLookupWord = wordsToCheck.some(
+                (word) => word.surface?.trim() && word.reading?.trim()
+            );
+
+            if (!hasAnyLookupWord) {
+                setLibraryColorByWordKey({});
+                return;
+            }
+
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user?.id) return;
+
+            const next = await fetchLibraryStudyColorInfoByWord(
+                supabase,
+                user.id,
+                wordsToCheck
+            );
+
+            if (!cancelled) {
+                setLibraryColorByWordKey(next);
+            }
+        }
+
+        void loadLibraryColors();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [words]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadLibraryColors() {
+            const wordsToCheck = words.map((word) => ({
+                surface: word.surface,
+                reading: word.reading,
+            }));
+
+            const hasAnyLookupWord = wordsToCheck.some(
+                (word) => word.surface?.trim() && word.reading?.trim()
+            );
+
+            if (!hasAnyLookupWord) {
+                setLibraryColorByWordKey({});
+                return;
+            }
+
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user?.id) return;
+
+            const next = await fetchLibraryStudyColorInfoByWord(
+                supabase,
+                user.id,
+                wordsToCheck
+            );
+
+            if (!cancelled) {
+                setLibraryColorByWordKey(next);
+            }
+        }
+
+        void loadLibraryColors();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [words]);
 
     const chapterOptions = useMemo(() => {
         const map = new Map<
@@ -979,6 +1073,8 @@ export default function ReadAlongPage() {
                             <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
                                 {currentPage.words.map((w, index) => {
                                     const isFaded = index <= fadedThroughIndex;
+                                    const colorInfo =
+                                        libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
 
                                     return (
                                         <div
@@ -987,13 +1083,22 @@ export default function ReadAlongPage() {
                                                 wordRefs.current[w.id] = el;
                                             }}
                                             onClick={() => handleProgressTap(index, w.id)}
-                                            className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
+                                            className={`relative cursor-pointer rounded-2xl border px-4 py-3 pr-28 transition ${isFaded
                                                 ? "border-stone-200 bg-stone-50 opacity-35"
                                                 : "border-stone-200 bg-white hover:bg-stone-50"
                                                 }`}
                                         >
+                                            {colorInfo ? (
+                                                <div className="absolute right-4 top-3">
+                                                    <LibraryColorBadge
+                                                        colorStatus={colorInfo.colorStatus}
+                                                        stageLabel={colorInfo.stageLabel}
+                                                    />
+                                                </div>
+                                            ) : null}
+
                                             <div className="min-w-0">
-                                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                                     <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
                                                         {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
                                                     </div>

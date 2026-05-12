@@ -2246,7 +2246,7 @@ export default function BooksPage() {
 
                 <button
                   type="button"
-                  onClick={() => router.push("/community/stats")}
+                  onClick={() => router.push("/community/stats/old")}
                   className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 hover:bg-white"
                 >
                   See Full Stats

@@ -4,7 +4,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  fetchLibraryStudyColorInfoByWord,
+  makeLibraryStudyColorKey,
+  type LibraryStudyWordColorInfo,
+} from "@/lib/libraryStudyColorLookup";
 import {
   computeLibraryStudyColorStatus,
   type LibraryStudyColor,
@@ -60,6 +66,8 @@ type GlobalEncounterRow = {
 
 type LibraryWordSummaryRow = {
   study_identity_key: string;
+  surface: string | null;
+  reading: string | null;
   total_encounter_count: number | null;
 };
 
@@ -264,7 +272,9 @@ export default function BookWordsPage() {
     DEFAULT_LEARNING_SETTINGS
   );
   const [globalEncounterCounts, setGlobalEncounterCounts] = useState<Record<string, number>>({});
-
+  const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
+    Record<string, LibraryStudyWordColorInfo>
+  >({});
   const [libraryProgressByKey, setLibraryProgressByKey] = useState<
     Record<string, LibraryWordProgressRow>
   >({});
@@ -629,10 +639,11 @@ export default function BookWordsPage() {
 
         try {
           const counts: Record<string, number> = {};
+          const normalizedKeyByStudyIdentityKey: Record<string, string> = {};
 
           const { data: summaryRows, error: summaryErr } = await supabase
             .from("user_library_word_summaries")
-            .select("study_identity_key, total_encounter_count")
+            .select("study_identity_key, surface, reading, total_encounter_count")
             .eq("user_id", ownerUserId)
             .returns<LibraryWordSummaryRow[]>();
 
@@ -640,7 +651,15 @@ export default function BookWordsPage() {
             for (const row of summaryRows) {
               const key = row.study_identity_key;
               if (!key) continue;
-              counts[key] = row.total_encounter_count ?? 0;
+
+              const encounterCount = row.total_encounter_count ?? 0;
+              counts[key] = encounterCount;
+
+              const normalizedKey = studyIdentityKey(row.surface, row.reading);
+              if (normalizedKey) {
+                counts[normalizedKey] = encounterCount;
+                normalizedKeyByStudyIdentityKey[key] = normalizedKey;
+              }
             }
           } else {
             if (summaryErr) {
@@ -680,7 +699,13 @@ export default function BookWordsPage() {
 
             for (const row of progressRows ?? []) {
               if (!row.study_identity_key) continue;
+
               progressMap[row.study_identity_key] = row;
+
+              const normalizedKey = normalizedKeyByStudyIdentityKey[row.study_identity_key];
+              if (normalizedKey) {
+                progressMap[normalizedKey] = row;
+              }
             }
 
             setLibraryProgressByKey(progressMap);
@@ -766,6 +791,48 @@ export default function BookWordsPage() {
 
     load();
   }, [userBookId, showHidden]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLibraryColorsForVocabList() {
+      const wordsToCheck = words.map((word) => ({
+        surface: word.surface,
+        reading: word.reading,
+      }));
+
+      const hasAnyLookupWord = wordsToCheck.some(
+        (word) => word.surface?.trim() && word.reading?.trim()
+      );
+
+      if (!hasAnyLookupWord) {
+        setLibraryColorByWordKey({});
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user?.id) return;
+
+      const next = await fetchLibraryStudyColorInfoByWord(
+        supabase,
+        user.id,
+        wordsToCheck
+      );
+
+      if (!cancelled) {
+        setLibraryColorByWordKey(next);
+      }
+    }
+
+    void loadLibraryColorsForVocabList();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [words]);
 
   const repeatCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -1170,6 +1237,8 @@ export default function BookWordsPage() {
               const identityKey = studyIdentityKey(w.surface, w.reading);
               const globalEncounterCount = globalEncounterCounts[identityKey] ?? rep;
               const progress = libraryProgressByKey[identityKey];
+              const sharedColorInfo =
+                libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
 
               const status = computeLibraryStudyColorStatus({
                 encounterCount: globalEncounterCount,
@@ -1230,12 +1299,21 @@ export default function BookWordsPage() {
                   </td>
 
                   <td className="p-2 text-center text-xs text-gray-600 align-middle">
-                    <span className="mx-auto flex w-8 -translate-x-1 items-center justify-center">
-                      <LibraryStudyStatusBadge
-                        status={status}
-                        showNumbers={learningSettings.show_badge_numbers}
-                        encounterCount={globalEncounterCount}
-                      />
+                    <span className="mx-auto flex justify-center">
+                      {sharedColorInfo ? (
+                        <LibraryColorBadge
+                          colorStatus={sharedColorInfo.colorStatus}
+                          stageLabel={sharedColorInfo.stageLabel}
+                          size="md"
+                          dotOnly
+                        />
+                      ) : (
+                        <LibraryStudyStatusBadge
+                          status={status}
+                          showNumbers={learningSettings.show_badge_numbers}
+                          encounterCount={globalEncounterCount}
+                        />
+                      )}
                     </span>
                   </td>
 

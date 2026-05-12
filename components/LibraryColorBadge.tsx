@@ -19,6 +19,7 @@ type LibraryColorBadgeProps = {
   label?: string | null;
   stageLabel?: string | number | null;
   size?: "sm" | "md";
+  dotOnly?: boolean;
 };
 
 function colorFromStatus(
@@ -77,6 +78,21 @@ function dotClass(color: MekuruColor) {
   return "bg-slate-300";
 }
 
+function dotOnlyClass(color: MekuruColor, size: "sm" | "md") {
+  const sizing = size === "sm" ? "h-4 w-4" : "h-5 w-5";
+  const base = `inline-block rounded-full border shadow-sm ${sizing}`;
+
+  if (color === "red") return `${base} border-red-800 bg-red-500`;
+  if (color === "orange") return `${base} border-orange-700 bg-orange-500`;
+  if (color === "yellow") return `${base} border-yellow-500 bg-yellow-300`;
+  if (color === "green") return `${base} border-emerald-800 bg-emerald-500`;
+  if (color === "blue") return `${base} border-sky-800 bg-sky-500`;
+  if (color === "purple") return `${base} border-violet-800 bg-violet-500`;
+  if (color === "grey") return `${base} border-slate-700 bg-slate-500`;
+
+  return `${base} border-slate-400 bg-slate-300`;
+}
+
 function badgeClass(color: MekuruColor, size: "sm" | "md") {
   const base =
     "inline-flex items-center rounded-full border bg-white font-semibold shadow-sm";
@@ -128,7 +144,9 @@ export default function LibraryColorBadge({
   label,
   stageLabel,
   size = "sm",
+  dotOnly = false,
 }: LibraryColorBadgeProps) {
+
   const resolvedColor = colorFromStatus(colorStatus, color);
   const resolvedLabel = makeBadgeLabel({
     colorStatus,
@@ -137,15 +155,26 @@ export default function LibraryColorBadge({
     stageLabel,
   });
 
+  const title = titleFromStatus(resolvedColor, resolvedLabel, colorStatus);
+
+  if (dotOnly) {
+    return (
+      <span
+        className={dotOnlyClass(resolvedColor, size)}
+        title={title}
+        aria-label={title}
+      />
+    );
+  }
+
   return (
     <span
       className={badgeClass(resolvedColor, size)}
-      title={titleFromStatus(resolvedColor, resolvedLabel, colorStatus)}
+      title={title}
     >
       <span
-        className={`inline-block rounded-full ${
-          size === "sm" ? "h-2 w-2" : "h-2.5 w-2.5"
-        } ${dotClass(resolvedColor)}`}
+        className={`inline-block rounded-full ${size === "sm" ? "h-2 w-2" : "h-2.5 w-2.5"
+          } ${dotClass(resolvedColor)}`}
       />
       {resolvedLabel}
     </span>
