@@ -17,6 +17,7 @@ type LibraryColorBadgeProps = {
   colorStatus?: LibraryStudyColorStatus | null;
   color?: MekuruColor | null;
   label?: string | null;
+  stageLabel?: string | number | null;
   size?: "sm" | "md";
 };
 
@@ -31,6 +32,36 @@ function labelFromColor(color: MekuruColor) {
   if (color === "grey") return "Limbo";
   if (color === "none") return "Not ready";
   return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
+function limboLabelFromStatus(colorStatus?: LibraryStudyColorStatus | null) {
+  if (colorStatus?.greyReason === "pre_reading_support") return "L1";
+  if (colorStatus?.greyReason === "reading_gate_support") return "L2";
+  if (colorStatus?.greyReason === "meaning_gate_support") return "L3";
+
+  return "Limbo";
+}
+
+function titleFromStatus(
+  color: MekuruColor,
+  label: string,
+  colorStatus?: LibraryStudyColorStatus | null
+) {
+  if (color === "grey") {
+    if (colorStatus?.greyReason === "pre_reading_support") {
+      return "Library Study color: L1 — held before reading check";
+    }
+
+    if (colorStatus?.greyReason === "reading_gate_support") {
+      return "Library Study color: L2 — reading needs support";
+    }
+
+    if (colorStatus?.greyReason === "meaning_gate_support") {
+      return "Library Study color: L3 — meaning needs support";
+    }
+  }
+
+  return `Library Study color: ${label}`;
 }
 
 function dotClass(color: MekuruColor) {
@@ -65,24 +96,56 @@ function badgeClass(color: MekuruColor, size: "sm" | "md") {
   return `${base} ${sizing} border-slate-100 text-slate-600`;
 }
 
+function makeBadgeLabel({
+  colorStatus,
+  color,
+  label,
+  stageLabel,
+}: {
+  colorStatus?: LibraryStudyColorStatus | null;
+  color: MekuruColor;
+  label?: string | null;
+  stageLabel?: string | number | null;
+}) {
+  if (label) return label;
+
+  if (color === "grey") {
+    return limboLabelFromStatus(colorStatus);
+  }
+
+  const baseLabel = labelFromColor(color);
+
+  if (stageLabel != null && stageLabel !== "") {
+    return `${baseLabel} ${stageLabel}`;
+  }
+
+  return baseLabel;
+}
+
 export default function LibraryColorBadge({
   colorStatus,
   color,
   label,
+  stageLabel,
   size = "sm",
 }: LibraryColorBadgeProps) {
   const resolvedColor = colorFromStatus(colorStatus, color);
-  const resolvedLabel = label ?? labelFromColor(resolvedColor);
+  const resolvedLabel = makeBadgeLabel({
+    colorStatus,
+    color: resolvedColor,
+    label,
+    stageLabel,
+  });
 
   return (
     <span
       className={badgeClass(resolvedColor, size)}
-      title={`Library Study color: ${resolvedLabel}`}
+      title={titleFromStatus(resolvedColor, resolvedLabel, colorStatus)}
     >
       <span
-        className={`inline-block rounded-full ${size === "sm" ? "h-2 w-2" : "h-2.5 w-2.5"} ${dotClass(
-          resolvedColor
-        )}`}
+        className={`inline-block rounded-full ${
+          size === "sm" ? "h-2 w-2" : "h-2.5 w-2.5"
+        } ${dotClass(resolvedColor)}`}
       />
       {resolvedLabel}
     </span>
