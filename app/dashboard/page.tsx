@@ -40,15 +40,42 @@ export default function DashboardPage() {
           <div className="rounded-3xl border border-slate-200 bg-white/85 px-6 py-6 text-center shadow-sm">
             <h2 className="text-3xl font-semibold">Welcome to Mekuru</h2>
             <p className="mt-3 text-gray-500">
+              Every word carries the memory of where you met it.
+              <br />
               ページをめくって、話しまくろう！
             </p>
-
             <button
               onClick={() => router.push("/books")}
-              className="mt-6 w-full rounded-xl bg-slate-800 px-4 py-3 text-white shadow-md transition hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-lg"
+              className="mt-5 w-full rounded-xl bg-slate-800 px-4 py-3 text-white shadow-md transition hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-lg"
             >
               Go to My Library
             </button>
+
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              MEKURU app access is currently for enrolled students and invited beta readers.
+            </p>
+
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              No account yet? Please join the beta waitlist or contact me before signing in.
+            </p>
+
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <a
+                href="https://forms.gle/5QLgohvkNvDBzTuH9"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
+              >
+                Join the beta waitlist
+              </a>
+
+              <a
+                href="mailto:mekuru.ej@gmail.com"
+                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
+              >
+                Contact me
+              </a>
+            </div>
           </div>
         </section>
 
