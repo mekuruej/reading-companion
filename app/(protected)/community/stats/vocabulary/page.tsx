@@ -1,4 +1,5 @@
 // Vocabulary Growth
+// All-time vocabulary growth + saved words → study rhythm.
 
 "use client";
 
@@ -25,6 +26,19 @@ type WordRow = {
   surface: string | null;
   reading?: string | null;
   meaning: string | null;
+};
+
+type StudyEventRow = {
+  id?: string | null;
+  user_book_id: string | null;
+  user_book_word_id?: string | null;
+  created_at: string;
+  study_mode?: string | null;
+  result?: string | null;
+  is_correct?: boolean | null;
+  surface?: string | null;
+  reading?: string | null;
+  meaning?: string | null;
 };
 
 type RawUserBookRow = {
@@ -119,11 +133,31 @@ const BOOK_CATEGORY_FILTERS: {
     },
   ];
 
+const STATS_QUERY_PAGE_SIZE = 1000;
+const USER_BOOK_ID_CHUNK_SIZE = 200;
+const VOCABULARY_RHYTHM_DAY_COUNT = 365;
+const COLLAPSED_VOCABULARY_RHYTHM_DAY_COUNT = 90;
+
+// Change this if your study-event table has a different name.
+const STUDY_EVENT_TABLE = "user_study_events";
+
 function ymdLocal(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function startOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
 function monthStartYmd() {
@@ -146,7 +180,7 @@ function sessionPages(row: SessionRow) {
   return end - start;
 }
 
-function wordKey(word: WordRow) {
+function wordKey(word: WordRow | StudyEventRow) {
   return `${word.surface ?? ""}::${word.reading ?? ""}::${word.meaning ?? ""}`.trim();
 }
 
@@ -214,6 +248,28 @@ function formatDecimal(value: number | null, digits = 1) {
   return value.toFixed(digits);
 }
 
+function formatPercent(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value}%`;
+}
+
+function isCorrectStudyEvent(event: StudyEventRow) {
+  return event.result === "correct" || event.is_correct === true;
+}
+
+function isIncorrectStudyEvent(event: StudyEventRow) {
+  return event.result === "incorrect" || event.is_correct === false;
+}
+
+function isSkippedStudyEvent(event: StudyEventRow) {
+  return event.result === "skipped";
+}
+
+function isKanjiStudyEvent(event: StudyEventRow) {
+  const mode = event.study_mode ?? "";
+  return mode === "kanji_reading_flashcards" || mode.includes("kanji");
+}
+
 function StatCard({
   label,
   value,
@@ -234,6 +290,24 @@ function StatCard({
         {value}
       </div>
       {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
+    </div>
+  );
+}
+
+function SmallMetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold text-slate-900">{value}</div>
+      {hint ? <div className="mt-1 text-[11px] text-slate-500">{hint}</div> : null}
     </div>
   );
 }
@@ -283,23 +357,29 @@ function BarStrip({
 
   return (
     <div className="space-y-3">
-      {items.map((item) => (
-        <div key={item.label}>
-          <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-            <span className="truncate text-slate-700">{item.label}</span>
-            <span className="shrink-0 font-medium text-slate-900">
-              {item.value}
-              {valueSuffix}
-            </span>
-          </div>
-          <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className={`h-full rounded-full ${colorClass}`}
-              style={{ width: `${Math.max(6, (item.value / max) * 100)}%` }}
-            />
-          </div>
+      {items.length === 0 ? (
+        <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+          No data yet.
         </div>
-      ))}
+      ) : (
+        items.map((item) => (
+          <div key={item.label}>
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+              <span className="truncate text-slate-700">{item.label}</span>
+              <span className="shrink-0 font-medium text-slate-900">
+                {item.value}
+                {valueSuffix}
+              </span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full ${colorClass}`}
+                style={{ width: `${Math.max(6, (item.value / max) * 100)}%` }}
+              />
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
@@ -441,14 +521,122 @@ function PieChart({
   );
 }
 
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+
+  return chunks;
+}
+
+async function fetchAllReadingSessionsForBooks(userBookIds: string[]) {
+  const allRows: SessionRow[] = [];
+
+  for (const idChunk of chunkArray(userBookIds, USER_BOOK_ID_CHUNK_SIZE)) {
+    let from = 0;
+
+    while (true) {
+      const to = from + STATS_QUERY_PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from("user_book_reading_sessions")
+        .select(
+          "user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler"
+        )
+        .in("user_book_id", idChunk)
+        .range(from, to);
+
+      if (error) throw error;
+
+      const rows = (data ?? []) as SessionRow[];
+      allRows.push(...rows);
+
+      if (rows.length < STATS_QUERY_PAGE_SIZE) break;
+
+      from += STATS_QUERY_PAGE_SIZE;
+    }
+  }
+
+  return allRows;
+}
+
+async function fetchAllWordsForBooks(userBookIds: string[]) {
+  const allRows: WordRow[] = [];
+
+  for (const idChunk of chunkArray(userBookIds, USER_BOOK_ID_CHUNK_SIZE)) {
+    let from = 0;
+
+    while (true) {
+      const to = from + STATS_QUERY_PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .select("id, user_book_id, created_at, surface, reading, meaning")
+        .in("user_book_id", idChunk)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const rows = (data ?? []) as WordRow[];
+      allRows.push(...rows);
+
+      if (rows.length < STATS_QUERY_PAGE_SIZE) break;
+
+      from += STATS_QUERY_PAGE_SIZE;
+    }
+  }
+
+  return allRows;
+}
+
+async function fetchAllStudyEventsForBooks(userBookIds: string[]) {
+  const allRows: StudyEventRow[] = [];
+
+  for (const idChunk of chunkArray(userBookIds, USER_BOOK_ID_CHUNK_SIZE)) {
+    let from = 0;
+
+    while (true) {
+      const to = from + STATS_QUERY_PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from(STUDY_EVENT_TABLE)
+        .select(
+          "id, user_book_id, user_book_word_id, created_at, study_mode, result, is_correct, surface, reading, meaning"
+        )
+        .in("user_book_id", idChunk)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        console.warn("Could not load vocabulary study events:", error.message);
+        return allRows;
+      }
+
+      const rows = (data ?? []) as StudyEventRow[];
+      allRows.push(...rows);
+
+      if (rows.length < STATS_QUERY_PAGE_SIZE) break;
+
+      from += STATS_QUERY_PAGE_SIZE;
+    }
+  }
+
+  return allRows;
+}
+
 export default function VocabularyGrowthPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [rows, setRows] = useState<UserBookRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [words, setWords] = useState<WordRow[]>([]);
+  const [studyEvents, setStudyEvents] = useState<StudyEventRow[]>([]);
   const [bookCategoryFilter, setBookCategoryFilter] =
     useState<BookCategoryFilter>("all");
+  const [showFullVocabularyRhythm, setShowFullVocabularyRhythm] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -469,6 +657,7 @@ export default function VocabularyGrowthPage() {
           setRows([]);
           setSessions([]);
           setWords([]);
+          setStudyEvents([]);
           return;
         }
 
@@ -505,35 +694,22 @@ export default function VocabularyGrowthPage() {
           setRows(loadedRows);
           setSessions([]);
           setWords([]);
+          setStudyEvents([]);
           return;
         }
 
-        const [
-          { data: sessionData, error: sessionError },
-          { data: wordData, error: wordError },
-        ] = await Promise.all([
-          supabase
-            .from("user_book_reading_sessions")
-            .select(
-              "user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler"
-            )
-            .in("user_book_id", userBookIds),
-          supabase
-            .from("user_book_words")
-            .select("id, user_book_id, created_at, surface, reading, meaning")
-            .in("user_book_id", userBookIds),
+        const [sessionData, wordData, studyEventData] = await Promise.all([
+          fetchAllReadingSessionsForBooks(userBookIds),
+          fetchAllWordsForBooks(userBookIds),
+          fetchAllStudyEventsForBooks(userBookIds),
         ]);
-
-        if (sessionError) throw sessionError;
-        if (wordError) throw wordError;
 
         if (!isMounted) return;
 
         setRows(loadedRows);
-        setSessions(
-          ((sessionData ?? []) as SessionRow[]).filter((row) => !row.is_filler)
-        );
-        setWords((wordData ?? []) as WordRow[]);
+        setSessions(sessionData.filter((row) => !row.is_filler));
+        setWords(wordData);
+        setStudyEvents(studyEventData);
       } catch (error: any) {
         console.error("Error loading vocabulary growth:", error);
         if (!isMounted) return;
@@ -541,6 +717,7 @@ export default function VocabularyGrowthPage() {
         setRows([]);
         setSessions([]);
         setWords([]);
+        setStudyEvents([]);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -611,6 +788,13 @@ export default function VocabularyGrowthPage() {
     return words.filter((word) => filteredVocabularyBookIds.has(word.user_book_id));
   }, [words, filteredVocabularyBookIds]);
 
+  const filteredStudyEvents = useMemo(() => {
+    return studyEvents.filter(
+      (event) =>
+        !!event.user_book_id && filteredVocabularyBookIds.has(event.user_book_id)
+    );
+  }, [studyEvents, filteredVocabularyBookIds]);
+
   const monthlyWords = useMemo(() => {
     return filteredWords.filter((word) => isThisMonth(word.created_at));
   }, [filteredWords]);
@@ -642,6 +826,290 @@ export default function VocabularyGrowthPage() {
       ).length,
     };
   }, [filteredVocabularyBookMetrics, filteredWords, monthlyWords]);
+
+  const studySignals = useMemo(() => {
+    const studyDays = new Set<string>();
+    const studiedBooks = new Set<string>();
+    const studiedCards = new Set<string>();
+    const studiedWords = new Set<string>();
+
+    const byBook = new Map<
+      string,
+      {
+        userBookId: string;
+        title: string;
+        total: number;
+        vocab: number;
+        kanji: number;
+        correct: number;
+        incorrect: number;
+        shown: number;
+        lastStudiedAt: number;
+      }
+    >();
+
+    const bookTitleByUserBookId = new Map(
+      rows.map((row) => [row.id, row.books?.title ?? "Untitled"])
+    );
+
+    let correct = 0;
+    let incorrect = 0;
+    let reviewed = 0;
+    let skipped = 0;
+
+    for (const event of filteredStudyEvents) {
+      studyDays.add(ymdLocal(new Date(event.created_at)));
+
+      if (event.user_book_id) {
+        studiedBooks.add(event.user_book_id);
+
+        const title = bookTitleByUserBookId.get(event.user_book_id) ?? "Untitled";
+        const eventTime = new Date(event.created_at).getTime();
+
+        const bookStats =
+          byBook.get(event.user_book_id) ??
+          {
+            userBookId: event.user_book_id,
+            title,
+            total: 0,
+            vocab: 0,
+            kanji: 0,
+            correct: 0,
+            incorrect: 0,
+            shown: 0,
+            lastStudiedAt: 0,
+          };
+
+        bookStats.total += 1;
+
+        if (isKanjiStudyEvent(event)) {
+          bookStats.kanji += 1;
+        } else {
+          bookStats.vocab += 1;
+        }
+
+        if (isCorrectStudyEvent(event)) {
+          bookStats.correct += 1;
+        } else if (isIncorrectStudyEvent(event)) {
+          bookStats.incorrect += 1;
+        } else {
+          bookStats.shown += 1;
+        }
+
+        if (Number.isFinite(eventTime)) {
+          bookStats.lastStudiedAt = Math.max(bookStats.lastStudiedAt, eventTime);
+        }
+
+        byBook.set(event.user_book_id, bookStats);
+      }
+
+      const studyItemKey = String(
+        event.user_book_word_id ??
+        `${event.study_mode ?? "study"}|||${event.user_book_id ?? ""}|||${event.surface ?? ""
+        }|||${event.reading ?? ""}|||${event.meaning ?? ""}`
+      );
+
+      if (studyItemKey.trim()) {
+        studiedCards.add(studyItemKey);
+      }
+
+      const wordStudyKey = String(
+        event.user_book_word_id ??
+        `${event.surface ?? ""}|||${event.reading ?? ""}|||${event.meaning ?? ""
+        }`
+      );
+
+      if (wordStudyKey.trim()) {
+        studiedWords.add(wordStudyKey);
+      }
+
+      if (isCorrectStudyEvent(event)) {
+        correct += 1;
+      } else if (isIncorrectStudyEvent(event)) {
+        incorrect += 1;
+      } else if (isSkippedStudyEvent(event)) {
+        skipped += 1;
+      } else {
+        reviewed += 1;
+      }
+    }
+
+    const answered = correct + incorrect;
+    const accuracyPercent =
+      answered > 0 ? Math.round((correct / answered) * 100) : null;
+
+    const bookStudyItems = Array.from(byBook.values())
+      .map((item) => {
+        const answered = item.correct + item.incorrect;
+
+        const studyTypeLabel =
+          item.vocab > 0 && item.kanji > 0
+            ? "Mixed"
+            : item.kanji > 0
+              ? "Kanji"
+              : item.vocab > 0
+                ? "Vocab"
+                : "—";
+
+        const studyTypeDetail =
+          item.vocab > 0 && item.kanji > 0
+            ? `Vocab ${item.vocab} · Kanji ${item.kanji}`
+            : item.kanji > 0
+              ? `${item.kanji} card${item.kanji === 1 ? "" : "s"}`
+              : item.vocab > 0
+                ? `${item.vocab} card${item.vocab === 1 ? "" : "s"}`
+                : null;
+
+        return {
+          ...item,
+          studyTypeLabel,
+          studyTypeDetail,
+          accuracyPercent:
+            answered > 0 ? Math.round((item.correct / answered) * 100) : null,
+        };
+      })
+      .sort((a, b) => {
+        if (b.incorrect !== a.incorrect) return b.incorrect - a.incorrect;
+
+        const aAccuracy = a.accuracyPercent ?? 101;
+        const bAccuracy = b.accuracyPercent ?? 101;
+
+        if (aAccuracy !== bAccuracy) return aAccuracy - bAccuracy;
+
+        return b.total - a.total;
+      })
+      .slice(0, 6);
+
+    const answerMixItems = [
+      { label: "Correct", value: correct, colorClass: "bg-emerald-500" },
+      { label: "Still sticky", value: incorrect, colorClass: "bg-rose-500" },
+      { label: "Reviewed", value: reviewed, colorClass: "bg-sky-500" },
+      { label: "Skipped", value: skipped, colorClass: "bg-slate-400" },
+    ].filter((item) => item.value > 0);
+
+    return {
+      totalEvents: filteredStudyEvents.length,
+      studyDays: studyDays.size,
+      studiedBooks: studiedBooks.size,
+      studiedCards: studiedCards.size,
+      studiedWords: studiedWords.size,
+      correct,
+      incorrect,
+      reviewed,
+      skipped,
+      accuracyPercent,
+      bookStudyItems,
+      answerMixItems,
+    };
+  }, [rows, filteredStudyEvents]);
+
+  const vocabularyRhythmActivity = useMemo(() => {
+    const today = startOfToday();
+    const start = addDays(today, -(VOCABULARY_RHYTHM_DAY_COUNT - 1));
+
+    const buckets = new Map<
+      string,
+      {
+        words: number;
+        studyEvents: number;
+        correct: number;
+        incorrect: number;
+        reviewed: number;
+        skipped: number;
+      }
+    >();
+
+    for (let i = 0; i < VOCABULARY_RHYTHM_DAY_COUNT; i++) {
+      buckets.set(ymdLocal(addDays(start, i)), {
+        words: 0,
+        studyEvents: 0,
+        correct: 0,
+        incorrect: 0,
+        reviewed: 0,
+        skipped: 0,
+      });
+    }
+
+    for (const word of filteredWords) {
+      const day = ymdLocal(new Date(word.created_at));
+      if (!buckets.has(day)) continue;
+
+      const bucket = buckets.get(day)!;
+      bucket.words += 1;
+    }
+
+    for (const event of filteredStudyEvents) {
+      const day = ymdLocal(new Date(event.created_at));
+      if (!buckets.has(day)) continue;
+
+      const bucket = buckets.get(day)!;
+      bucket.studyEvents += 1;
+
+      if (isCorrectStudyEvent(event)) {
+        bucket.correct += 1;
+      } else if (isIncorrectStudyEvent(event)) {
+        bucket.incorrect += 1;
+      } else if (isSkippedStudyEvent(event)) {
+        bucket.skipped += 1;
+      } else {
+        bucket.reviewed += 1;
+      }
+    }
+
+    return Array.from(buckets.entries()).map(([day, value]) => ({
+      day,
+      ...value,
+    }));
+  }, [filteredWords, filteredStudyEvents]);
+
+  const visibleVocabularyRhythmActivity = useMemo(() => {
+    if (showFullVocabularyRhythm) return vocabularyRhythmActivity;
+
+    return vocabularyRhythmActivity.slice(
+      -COLLAPSED_VOCABULARY_RHYTHM_DAY_COUNT
+    );
+  }, [showFullVocabularyRhythm, vocabularyRhythmActivity]);
+
+  const vocabularyRhythmSummary = useMemo(() => {
+    const savedWordDays = visibleVocabularyRhythmActivity.filter(
+      (item) => item.words > 0
+    ).length;
+
+    const studyDays = visibleVocabularyRhythmActivity.filter(
+      (item) => item.studyEvents > 0
+    ).length;
+
+    const overlapDays = visibleVocabularyRhythmActivity.filter(
+      (item) => item.words > 0 && item.studyEvents > 0
+    ).length;
+
+    const activeVocabularyDays = visibleVocabularyRhythmActivity.filter(
+      (item) => item.words > 0 || item.studyEvents > 0
+    ).length;
+
+    const wordsSaved = visibleVocabularyRhythmActivity.reduce(
+      (sum, item) => sum + item.words,
+      0
+    );
+
+    const studyEvents = visibleVocabularyRhythmActivity.reduce(
+      (sum, item) => sum + item.studyEvents,
+      0
+    );
+
+    return {
+      savedWordDays,
+      studyDays,
+      overlapDays,
+      activeVocabularyDays,
+      wordsSaved,
+      studyEvents,
+    };
+  }, [visibleVocabularyRhythmActivity]);
+
+  const vocabularyRhythmWindowLabel = showFullVocabularyRhythm
+    ? "Past year"
+    : "Recent 90 days";
 
   const vocabularyTypeMetrics = useMemo(() => {
     const grouped = new Map<string, TypeMetric>();
@@ -743,11 +1211,12 @@ export default function VocabularyGrowthPage() {
               Vocabulary growth
             </p>
             <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-              Vocabulary Growth
+              All-time Vocabulary Growth
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-              Saved words, word density, and the books that are stretching your
-              Japanese vocabulary.
+              An all-time look at the vocabulary you’ve saved while reading
+              Japanese: word volume, word density, and which books are feeding
+              the stickiest study cards.
             </p>
           </div>
         </div>
@@ -761,7 +1230,7 @@ export default function VocabularyGrowthPage() {
         <SectionBand
           eyebrow="Book category"
           title={selectedFilter?.title ?? "All Reading"}
-          description="Choose a broad kind of reading material. This changes the vocabulary totals, charts, and book examples below."
+          description="Choose a broad kind of reading material. This changes the vocabulary totals, charts, study rhythm, and book examples below."
           tone="border-sky-300 bg-white"
         >
           <div className="grid gap-3 md:grid-cols-4">
@@ -801,7 +1270,7 @@ export default function VocabularyGrowthPage() {
           <StatCard
             label="Words Saved"
             value={vocabularyTotals.wordsSaved}
-            hint="All saved vocabulary"
+            hint="All-time saved vocabulary"
             tone="border-violet-200 bg-violet-50"
           />
           <StatCard
@@ -828,10 +1297,260 @@ export default function VocabularyGrowthPage() {
           />
         </div>
 
+        <SectionBand
+          eyebrow="Vocabulary Rhythm"
+          title="Saved words → study rhythm"
+          description={`${vocabularyRhythmWindowLabel}: which days you saved vocabulary and which days you came back to study it. This respects the book category filter above.`}
+          tone="border-violet-200 bg-violet-50/70"
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-full border border-violet-200 bg-white/80 px-3 py-1 text-xs font-semibold text-violet-800">
+              Showing: {vocabularyRhythmWindowLabel}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowFullVocabularyRhythm((prev) => !prev)}
+              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              {showFullVocabularyRhythm ? "Collapse to recent 90 days" : "Show full past year"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-[repeat(14,minmax(0,1fr))] xl:grid-cols-[repeat(28,minmax(0,1fr))]">
+            {visibleVocabularyRhythmActivity.map((item, index) => {
+              const hasSavedWords = item.words > 0;
+              const hasStudy = item.studyEvents > 0;
+              const intensity = item.words + item.studyEvents;
+              const previousItem = visibleVocabularyRhythmActivity[index - 1];
+              const startsMonth =
+                index === 0 || item.day.slice(0, 7) !== previousItem?.day.slice(0, 7);
+
+              const monthLabel = new Date(`${item.day}T00:00:00`).toLocaleString("en-US", {
+                month: "short",
+              }).toUpperCase();
+
+              const monthTextClass =
+                hasSavedWords || hasStudy ? "text-white drop-shadow-sm" : "text-slate-500";
+
+              const colorClass =
+                !hasSavedWords && !hasStudy
+                  ? "bg-slate-100"
+                  : hasSavedWords && hasStudy
+                    ? intensity < 5
+                      ? "bg-violet-300"
+                      : intensity < 12
+                        ? "bg-violet-500"
+                        : "bg-violet-700"
+                    : hasStudy
+                      ? intensity < 5
+                        ? "bg-sky-300"
+                        : intensity < 12
+                          ? "bg-sky-500"
+                          : "bg-sky-700"
+                      : intensity < 3
+                        ? "bg-amber-200"
+                        : intensity < 8
+                          ? "bg-amber-400"
+                          : "bg-amber-600";
+
+              return (
+                <div key={item.day} className="space-y-1">
+                  <div
+                    className={`relative h-10 rounded-lg border border-white/70 ${colorClass}`}
+                    title={`${item.day}: ${item.words} saved word${item.words === 1 ? "" : "s"
+                      }, ${item.studyEvents} study card${item.studyEvents === 1 ? "" : "s"
+                      }`}
+                  >
+                    {startsMonth ? (
+                      <span
+                        className={`absolute left-1 top-1 text-[8px] font-black tracking-wide ${monthTextClass}`}
+                      >
+                        {monthLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-center text-[9px] text-slate-500">
+                    {item.day.slice(8)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-amber-400" />
+              Saved words
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-sky-500" />
+              Studied
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-violet-500" />
+              Saved + studied
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <SmallMetricCard
+              label="Active vocab days"
+              value={vocabularyRhythmSummary.activeVocabularyDays}
+              hint="Saved or studied"
+            />
+            <SmallMetricCard
+              label="Saved word days"
+              value={vocabularyRhythmSummary.savedWordDays}
+              hint="Words entered the system"
+            />
+            <SmallMetricCard
+              label="Study days"
+              value={vocabularyRhythmSummary.studyDays}
+              hint="Book Study or Kanji practice"
+            />
+            <SmallMetricCard
+              label="Words saved"
+              value={vocabularyRhythmSummary.wordsSaved}
+              hint={vocabularyRhythmWindowLabel}
+            />
+            <SmallMetricCard
+              label="Cards reviewed"
+              value={vocabularyRhythmSummary.studyEvents}
+              hint={vocabularyRhythmWindowLabel}
+            />
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white/70 p-4">
+            <div className="text-sm font-semibold text-slate-900">
+              Study rhythm
+            </div>
+
+            <div className="mt-2 text-sm leading-6 text-slate-600">
+              {vocabularyRhythmSummary.wordsSaved === 0 &&
+                vocabularyRhythmSummary.studyEvents === 0
+                ? "No vocabulary activity in this window yet. Save words while reading, then review a few cards to start building a rhythm."
+                : vocabularyRhythmSummary.studyEvents === 0
+                  ? `You saved ${vocabularyRhythmSummary.wordsSaved} word${vocabularyRhythmSummary.wordsSaved === 1 ? "" : "s"
+                  } in this window, but haven’t studied them yet.`
+                  : vocabularyRhythmSummary.wordsSaved === 0
+                    ? `You reviewed ${vocabularyRhythmSummary.studyEvents} card${vocabularyRhythmSummary.studyEvents === 1 ? "" : "s"
+                    } in this window, but did not save new words.`
+                    : `You saved ${vocabularyRhythmSummary.wordsSaved} word${vocabularyRhythmSummary.wordsSaved === 1 ? "" : "s"
+                    } and reviewed ${vocabularyRhythmSummary.studyEvents} card${vocabularyRhythmSummary.studyEvents === 1 ? "" : "s"
+                    } in this window. ${vocabularyRhythmSummary.overlapDays} day${vocabularyRhythmSummary.overlapDays === 1 ? "" : "s"
+                    } included both saving and studying.`}
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <SmallMetricCard
+                label="Unique words studied"
+                value={studySignals.studiedWords}
+              />
+              <SmallMetricCard
+                label="Books represented"
+                value={studySignals.studiedBooks}
+              />
+              <SmallMetricCard
+                label="Study accuracy"
+                value={formatPercent(studySignals.accuracyPercent)}
+                hint="Correct ÷ answered"
+              />
+            </div>
+
+            {studySignals.answerMixItems.length > 0 ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                {studySignals.answerMixItems.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${item.colorClass}`} />
+                      <div className="text-[11px] text-slate-500">{item.label}</div>
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {item.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white/80 p-4">
+            <div className="text-sm font-semibold text-slate-900">
+              Books with sticky study words
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Books rise here when their study cards have more missed answers.
+              This is about vocabulary/kanji friction by source book, not color movement.
+            </p>
+
+            {studySignals.bookStudyItems.length === 0 ? (
+              <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+                No book-linked study cards yet.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {studySignals.bookStudyItems.map((book) => {
+                  const answered = book.correct + book.incorrect;
+                  const stickyPercent =
+                    answered > 0 ? Math.round((book.incorrect / answered) * 100) : null;
+
+                  return (
+                    <div
+                      key={book.userBookId}
+                      className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-slate-950">
+                            {book.title}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {book.studyTypeLabel}
+                            {book.studyTypeDetail ? ` · ${book.studyTypeDetail}` : ""}
+                          </div>
+                        </div>
+
+                        <div className="text-right text-xs text-slate-500">
+                          <div>
+                            Accuracy:{" "}
+                            <span className="font-semibold text-slate-900">
+                              {formatPercent(book.accuracyPercent)}
+                            </span>
+                          </div>
+                          <div>
+                            Still sticky:{" "}
+                            <span className="font-semibold text-slate-900">
+                              {book.incorrect}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                        <SmallMetricCard label="Cards" value={book.total} />
+                        <SmallMetricCard label="Correct" value={book.correct} />
+                        <SmallMetricCard label="Sticky" value={book.incorrect} />
+                        <SmallMetricCard
+                          label="Sticky rate"
+                          value={stickyPercent == null ? "—" : `${stickyPercent}%`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </SectionBand>
+
         <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
           <SectionBand
             eyebrow="Book type"
-            title="Words saved by book type"
+            title="All-time words saved by book type"
             description="A word-weighted view of which kinds of books are adding the most vocabulary to your library."
             tone="border-slate-200 bg-white"
           >
@@ -887,9 +1606,9 @@ export default function VocabularyGrowthPage() {
                             ((item.wordsPerPage ?? 0) /
                               Math.max(
                                 1,
-                                ...(densestBooks.map(
+                                ...densestBooks.map(
                                   (book) => book.wordsPerPage ?? 0
-                                ))
+                                )
                               )) *
                             100
                           )}%`,
