@@ -107,6 +107,8 @@ export default function LoginPage() {
             supabaseClient={supabase}
             appearance={{ theme: ThemeSupa }}
             providers={["google"]}
+            view="sign_in"
+            showLinks={false}
             redirectTo={
               typeof window !== "undefined"
                 ? `${window.location.origin}/login`
