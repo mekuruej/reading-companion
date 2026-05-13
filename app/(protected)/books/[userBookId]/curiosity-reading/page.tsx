@@ -12,6 +12,7 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import { todayYmdAppTimeZone } from "@/lib/timeZone";
 
 type QuickPreview = {
   id: string | null;
@@ -894,7 +895,7 @@ export default function CuriosityReadingPage() {
     const start = Number(sessionStartPage);
     const end = Number(sessionEndPage);
     const minutes = Math.max(1, Math.round(elapsed / 60));
-    const readOn = new Date().toISOString().slice(0, 10);
+    const readOn = todayYmdAppTimeZone();
 
     if (!Number.isFinite(start) || !Number.isFinite(end)) {
       setMessage("❌ Please fill in start page and end page.");

@@ -14,6 +14,7 @@ import StoryTab from "./components/StoryTab";
 import VocabTab from "./components/VocabTab";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
+import { todayYmdAppTimeZone } from "@/lib/timeZone";
 
 type Book = {
   id: string;
@@ -690,7 +691,7 @@ export default function BookHubPage() {
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [sessionDate, setSessionDate] = useState<string>(() =>
-    formatYmd(new Date())
+    todayYmdAppTimeZone()
   );
 
   useEffect(() => {
@@ -700,7 +701,7 @@ export default function BookHubPage() {
   }, [profileLevel]);
 
   useEffect(() => {
-    setSessionDate(formatYmd(new Date()));
+    setSessionDate(todayYmdAppTimeZone());
   }, []);
 
   const realReadingSessions = useMemo(() => {
@@ -988,7 +989,7 @@ export default function BookHubPage() {
 
   function cancelEditingReadingSession() {
     setEditingReadingSessionId(null);
-    setSessionDate(formatYmd(new Date()));
+    setSessionDate(todayYmdAppTimeZone());
     setSessionStartPage("");
     setSessionEndPage("");
     setSessionMinutesRead("");
@@ -2255,7 +2256,7 @@ export default function BookHubPage() {
       .from("user_book_reading_sessions")
       .insert({
         user_book_id: row.id,
-        read_on: startedAt || new Date().toISOString().slice(0, 10),
+        read_on: startedAt || todayYmdAppTimeZone(),
         start_page: 1,
         end_page: earliestTrackedStartPage - 1,
         minutes_read: null,
@@ -2279,7 +2280,7 @@ export default function BookHubPage() {
       .from("user_book_reading_sessions")
       .insert({
         user_book_id: row.id,
-        read_on: finishedAt || new Date().toISOString().slice(0, 10),
+        read_on: finishedAt || todayYmdAppTimeZone(),
         start_page: furthestTrackedPage + 1,
         end_page: book.page_count,
         minutes_read: null,
@@ -2882,18 +2883,18 @@ export default function BookHubPage() {
   }
 
   async function markStartedToday() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayYmdAppTimeZone();
     await saveBookStatusDates(today, "", "");
   }
 
   async function markFinishedToday() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayYmdAppTimeZone();
     const nextStartedAt = startedAt || today;
     await saveBookStatusDates(nextStartedAt, today, "");
   }
 
   async function markDnfToday() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayYmdAppTimeZone();
     const nextStartedAt = startedAt || today;
     await saveBookStatusDates(nextStartedAt, "", today);
   }

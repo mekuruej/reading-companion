@@ -12,6 +12,7 @@ import {
     makeLibraryStudyColorKey,
     type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import { todayYmdAppTimeZone } from "@/lib/timeZone";
 
 type ReadAlongWord = {
     id: string;
@@ -522,7 +523,7 @@ export default function ReadAlongPage() {
             return;
         }
 
-        const readOn = sessionDate || new Date().toISOString().slice(0, 10);
+        const readOn = sessionDate || todayYmdAppTimeZone();
 
         const { error } = await supabase.from("user_book_reading_sessions").insert({
             user_book_id: userBookId,
@@ -788,7 +789,7 @@ export default function ReadAlongPage() {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    const today = new Date().toISOString().slice(0, 10);
+                                    const today = todayYmdAppTimeZone();
 
                                     setSessionDate(today);
                                     setStartTime(Date.now());

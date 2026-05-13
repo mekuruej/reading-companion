@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { todayYmdAppTimeZone } from "@/lib/timeZone";
 
 type SessionMode = "fluid" | "listening";
 
@@ -48,6 +49,7 @@ export default function SimpleTimedSessionPage({
     const [loading, setLoading] = useState(true);
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
+    const [showFinishedNav, setShowFinishedNav] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
 
     const [sessionDate, setSessionDate] = useState("");
@@ -199,7 +201,7 @@ export default function SimpleTimedSessionPage({
 
         const minutesNum = Number(sessionMinutesRead || Math.max(1, Math.round(elapsed / 60)));
 
-        const readOn = sessionDate || new Date().toISOString().slice(0, 10);
+        const readOn = sessionDate || todayYmdAppTimeZone();
 
         const { error } = await supabase.from("user_book_reading_sessions").insert({
             user_book_id: userBookId,
@@ -223,14 +225,14 @@ export default function SimpleTimedSessionPage({
         setIsPaused(false);
         setSessionMinutesRead("");
         setTimerSaveMessage(saveSuccessMessage);
+        setShowFinishedNav(true);
 
         setTimeout(() => {
             setTimerSaveMessage("");
         }, 4000);
     }
-
     function startTimer() {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayYmdAppTimeZone();
 
         setSessionDate(today);
         setStartTime(Date.now());
@@ -238,6 +240,7 @@ export default function SimpleTimedSessionPage({
         setIsRunning(true);
         setIsPaused(false);
         setHasFinishedTimer(false);
+        setShowFinishedNav(false);
         setShowTimedSessionForm(false);
         setTimerSaveMessage("");
         setSessionMinutesRead("");
@@ -266,6 +269,7 @@ export default function SimpleTimedSessionPage({
         setIsRunning(false);
         setIsPaused(false);
         setHasFinishedTimer(true);
+        setShowFinishedNav(false);
         void openTimedSessionFormWithDefaults();
     }
 
@@ -293,6 +297,58 @@ export default function SimpleTimedSessionPage({
                 {errorMessage ? (
                     <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {errorMessage}
+                    </div>
+                ) : null}
+
+                {showFinishedNav && userBookId && bookTitle ? (
+                    <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                router.push(`/books/${encodeURIComponent(userBookId)}`);
+                            }}
+                            className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                            title={`Go to ${bookTitle} Book Hub`}
+                        >
+                            {bookCover ? (
+                                <img
+                                    src={bookCover}
+                                    alt={`Go to ${bookTitle} Book Hub`}
+                                    className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
+                                />
+                            ) : null}
+
+                            <div className="min-w-0">
+                                <p className="text-xs uppercase tracking-wide text-stone-500">
+                                    For book
+                                </p>
+                                <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
+                                    {bookTitle}
+                                </div>
+                            </div>
+                        </button>
+
+                        <div className="flex flex-wrap gap-2 sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                                }}
+                                className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+                            >
+                                Vocab List
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    router.push(`/books/${encodeURIComponent(userBookId)}`);
+                                }}
+                                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+                            >
+                                Book Hub
+                            </button>
+                        </div>
                     </div>
                 ) : null}
 
