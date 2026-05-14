@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   computeLibraryStudyColorStatus,
   getLibraryStudyEncounterStageCounts,
@@ -602,18 +602,14 @@ function hashString(value: string) {
   return Math.abs(hash);
 }
 
-function pickLibraryCheckGate(status: LibraryStudyColorStatus, seed: string): LibraryCheckGate {
+function pickLibraryCheckGate(status: LibraryStudyColorStatus, _seed: string): LibraryCheckGate {
   if (status.nextGate === "reading") return "reading";
   if (status.nextGate === "meaning") return "meaning";
-  return hashString(`${seed}::${getTodayKey()}`) % 2 === 0 ? "reading" : "meaning";
+  return "reading";
 }
 
 function includeLibraryCheckCard(status: LibraryStudyColorStatus) {
-  return (
-    status.eligibleForLibraryStudy ||
-    status.nextGate === "mastery" ||
-    status.color === "purple"
-  );
+  return status.eligibleForLibraryStudy || status.nextGate === "reading" || status.nextGate === "meaning";
 }
 
 function isMasteredMaintenanceDue(card: StudyCard, now = new Date()) {
@@ -794,26 +790,20 @@ function gatePromptClass(card: StudyCard | undefined) {
 
 function checkModeLabel(card: StudyCard | undefined) {
   if (!card) return "Ability Check";
-  if (card.colorStatus.color === "purple") {
-    return card.activeGate === "reading" ? "Mastered Reading Review" : "Mastered Meaning Review";
-  }
-  if (card.colorStatus.nextGate === "mastery") {
-    return card.activeGate === "reading" ? "Mastery Reading Check" : "Mastery Meaning Check";
-  }
   if (card.activeGate === "reading") return "Reading Check";
   if (card.activeGate === "meaning") return "Meaning Check";
   return "Ability Check";
 }
 
 function checkModeDescription(card: StudyCard | undefined) {
-  if (!card) return "Automatic typed gates move words through your library colors";
+  if (!card) return "Review mode does not move Library Study colors.";
   if (card.activeGate === "reading") {
-    return "Show word + meaning -> type the reading";
+    return "Practice the reading without moving this word.";
   }
   if (card.activeGate === "meaning") {
-    return "Show word + reading -> type one meaning word";
+    return "Practice the meaning without moving this word.";
   }
-  return "Automatic typed gates move words through your library colors";
+  return "Review mode does not move Library Study colors.";
 }
 
 function promptModeClass(gate: LibraryCheckGate | undefined) {
@@ -847,8 +837,8 @@ function LibraryCheckIntroCard({
 }) {
   const colorSteps = [
     { label: "Yellow", className: "bg-yellow-300", text: "ready for gate checks" },
-    { label: "Green", className: "bg-emerald-500", text: "reading passed" },
-    { label: "Blue", className: "bg-sky-500", text: "meaning passed" },
+    { label: "Green", className: "bg-emerald-500", text: "reading gate" },
+    { label: "Blue", className: "bg-sky-500", text: "meaning gate" },
     { label: "Purple", className: "bg-violet-500", text: "mastered" },
   ];
 
@@ -994,7 +984,7 @@ function LibraryPracticePanel({
         >
           <div className="absolute left-4 top-4 flex">
             <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-              Review
+              Review{card.jlpt ? ` · ${card.jlpt}` : ""}
             </div>
           </div>
 
@@ -1012,10 +1002,6 @@ function LibraryPracticePanel({
           </div>
 
           <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-            {card.jlpt ? (
-              <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
-            ) : null}
-
             {definitionLabel(card) ? (
               <div className={libraryStudyChipClass(card.colorStatus)}>
                 {definitionLabel(card)}
@@ -1025,7 +1011,7 @@ function LibraryPracticePanel({
 
           <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
             <div className={libraryStudyChipClass(card.colorStatus)}>
-              {card.encounterCount} encounter{card.encounterCount === 1 ? "" : "s"}
+              Read {card.encounterCount}x
             </div>
           </div>
 
@@ -1060,7 +1046,7 @@ function LibraryPracticePanel({
         <div className="relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[36vh]">
         <div className="absolute left-4 top-4 flex">
           <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-            Typing Practice
+            Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}
           </div>
         </div>
 
@@ -1078,10 +1064,6 @@ function LibraryPracticePanel({
         </div>
 
         <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-          {card.jlpt ? (
-            <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
-          ) : null}
-
           {definitionLabel(card) ? (
             <div className={libraryStudyChipClass(card.colorStatus)}>
               {definitionLabel(card)}
@@ -1091,7 +1073,7 @@ function LibraryPracticePanel({
 
         <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
           <div className={libraryStudyChipClass(card.colorStatus)}>
-            {card.encounterCount} encounter{card.encounterCount === 1 ? "" : "s"}
+            Read {card.encounterCount}x
           </div>
         </div>
 
@@ -1335,6 +1317,7 @@ function clearSeenForToday() {
 
 export default function LibraryStudyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -1382,6 +1365,25 @@ export default function LibraryStudyPage() {
   const [activeTodayKey, setActiveTodayKey] = useState(getTodayKey());
   const [forceCheckAgainToday, setForceCheckAgainToday] = useState(false);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
+
+  useEffect(() => {
+    const requestedColor = searchParams.get("color");
+    const allowedColors: PracticeColorFilter[] = [
+      "all",
+      "red",
+      "orange",
+      "yellow",
+      "green",
+      "blue",
+      "purple",
+      "grey",
+      "katakana",
+    ];
+
+    if (requestedColor && allowedColors.includes(requestedColor as PracticeColorFilter)) {
+      setPracticeColorFilter(requestedColor as PracticeColorFilter);
+    }
+  }, [searchParams]);
 
   const currentCard = deck[index];
   const practiceCard = practiceDeck[practiceIndex];
@@ -2309,7 +2311,6 @@ export default function LibraryStudyPage() {
     const now = new Date().toISOString();
     const existing = activeCard.progress;
     const isMasteryCheck =
-      activeCard.colorStatus.nextGate === "mastery" ||
       activeCard.colorStatus.color === "purple" ||
       Boolean(existing?.mastered);
 

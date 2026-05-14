@@ -7,6 +7,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
+type HabitTimeRange =
+  | "this_month"
+  | "past_90_days"
+  | "past_6_months"
+  | "past_year";
 
 type SessionRow = {
   user_book_id: string;
@@ -66,6 +71,98 @@ function formatMinutesAsReadableTime(totalMinutes: number) {
   if (minutes === 0) return `${hours} hr`;
 
   return `${hours} hr ${minutes} min`;
+}
+
+const HABIT_TIME_FILTERS: {
+  value: HabitTimeRange;
+  title: string;
+  description: string;
+}[] = [
+    {
+      value: "this_month",
+      title: "This Month",
+      description: "Your current reading rhythm.",
+    },
+    {
+      value: "past_90_days",
+      title: "Past 90 Days",
+      description: "A wider view of recent consistency.",
+    },
+    {
+      value: "past_6_months",
+      title: "Half Year",
+      description: "About six months of reading and listening rhythm.",
+    },
+    {
+      value: "past_year",
+      title: "Past Year",
+      description: "A long view of reading, listening, and return patterns.",
+    },
+  ];
+
+const COLLAPSED_READING_RHYTHM_DAY_COUNT = 90;
+
+function readingHabitsTheme(value: HabitTimeRange) {
+  if (value === "this_month") {
+    return {
+      pageHeader: "border-sky-300 bg-white",
+      section: "border-sky-300 bg-white",
+      softSection: "border-sky-300 bg-sky-50/30",
+      statOne: "border-sky-300 bg-sky-50/35",
+      statTwo: "border-sky-300 bg-white",
+      statThree: "border-sky-300 bg-sky-50/25",
+      statFour: "border-sky-300 bg-white",
+      plainCard: "border-sky-300 bg-white",
+      activeButton: "border-sky-600 bg-sky-600 text-white shadow-md",
+      inactiveButton: "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100",
+    };
+  }
+
+  if (value === "past_90_days") {
+    return {
+      pageHeader: "border-emerald-300 bg-white",
+      section: "border-emerald-300 bg-white",
+      softSection: "border-emerald-300 bg-emerald-50/30",
+      statOne: "border-emerald-300 bg-emerald-50/35",
+      statTwo: "border-emerald-300 bg-white",
+      statThree: "border-emerald-300 bg-emerald-50/25",
+      statFour: "border-emerald-300 bg-white",
+      plainCard: "border-emerald-300 bg-white",
+      activeButton: "border-emerald-600 bg-emerald-600 text-white shadow-md",
+      inactiveButton:
+        "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+    };
+  }
+
+  if (value === "past_6_months") {
+    return {
+      pageHeader: "border-violet-300 bg-white",
+      section: "border-violet-300 bg-white",
+      softSection: "border-violet-300 bg-violet-50/30",
+      statOne: "border-violet-300 bg-violet-50/35",
+      statTwo: "border-violet-300 bg-white",
+      statThree: "border-violet-300 bg-violet-50/25",
+      statFour: "border-violet-300 bg-white",
+      plainCard: "border-violet-300 bg-white",
+      activeButton: "border-violet-600 bg-violet-600 text-white shadow-md",
+      inactiveButton:
+        "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100",
+    };
+  }
+
+  return {
+    pageHeader: "border-amber-300 bg-white",
+    section: "border-amber-300 bg-white",
+    softSection: "border-amber-300 bg-amber-50/30",
+    statOne: "border-amber-300 bg-amber-50/35",
+    statTwo: "border-amber-300 bg-white",
+    statThree: "border-amber-300 bg-amber-50/25",
+    statFour: "border-amber-300 bg-white",
+    plainCard: "border-amber-300 bg-white",
+    activeButton: "border-amber-600 bg-amber-500 text-white shadow-md",
+    inactiveButton:
+      "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
+  };
 }
 
 function StatCard({
@@ -450,6 +547,8 @@ export default function ReadingHabitsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [timeRange, setTimeRange] = useState<HabitTimeRange>("this_month");
+  const [showFullReadingRhythm, setShowFullReadingRhythm] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -519,9 +618,42 @@ export default function ReadingHabitsPage() {
     };
   }, []);
 
-  const monthlySessions = useMemo(() => {
-    return sessions.filter((row) => isThisMonth(row.read_on));
-  }, [sessions]);
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((row) => {
+      if (!row.read_on) return false;
+
+      const readDate = new Date(`${row.read_on}T00:00:00`);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+
+      let startDate: Date;
+
+      if (timeRange === "past_90_days") {
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 89);
+        startDate.setHours(0, 0, 0, 0);
+      } else if (timeRange === "past_6_months") {
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 6);
+        startDate.setHours(0, 0, 0, 0);
+      } else if (timeRange === "past_year") {
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 364);
+        startDate.setHours(0, 0, 0, 0);
+      } else {
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      }
+
+      return readDate >= startDate && readDate <= today;
+    });
+  }, [sessions, timeRange]);
+
+  const selectedTimeFilter = HABIT_TIME_FILTERS.find(
+    (option) => option.value === timeRange
+  );
+
+  const selectedTimeLabel = selectedTimeFilter?.title ?? "This Month";
+  const selectedTheme = readingHabitsTheme(timeRange);
 
   const habitStats = useMemo(() => {
     let fluidMinutes = 0;
@@ -539,7 +671,7 @@ export default function ReadingHabitsPage() {
 
     const activeDays = new Set<string>();
 
-    for (const row of monthlySessions) {
+    for (const row of filteredSessions) {
       if (row.read_on) activeDays.add(row.read_on);
 
       const minutes = Number(row.minutes_read) || 0;
@@ -582,38 +714,161 @@ export default function ReadingHabitsPage() {
       curiosityMinutesPerPage:
         timedCuriosityPages > 0 ? curiosityMinutes / timedCuriosityPages : null,
     };
-  }, [monthlySessions]);
+  }, [filteredSessions]);
 
-  const dayMetrics = useMemo(() => {
-    const now = new Date();
+  const readingRhythmActivity = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const days = Array.from({ length: now.getDate() }, (_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth(), index + 1);
+    let startDate: Date;
+
+    if (timeRange === "past_90_days") {
+      startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - 89);
+    } else if (timeRange === "past_6_months") {
+      startDate = new Date(today);
+      startDate.setMonth(startDate.getMonth() - 6);
+    } else if (timeRange === "past_year") {
+      startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - 364);
+    } else {
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    startDate.setHours(0, 0, 0, 0);
+
+    const dayCount =
+      Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) +
+      1;
+
+    const days = Array.from({ length: dayCount }, (_, index) => {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + index);
 
       return {
-        date: ymdLocal(date),
-        label: String(index + 1),
+        day: ymdLocal(date),
         minutes: 0,
         pages: 0,
         sessions: 0,
+        fluidSessions: 0,
+        curiositySessions: 0,
+        listeningSessions: 0,
+        fluidMinutes: 0,
+        curiosityMinutes: 0,
+        listeningMinutes: 0,
       };
     });
 
-    const dayMap = new Map(days.map((day) => [day.date, day]));
+    const dayMap = new Map(days.map((day) => [day.day, day]));
 
-    for (const row of monthlySessions) {
+    for (const row of filteredSessions) {
       if (!row.read_on) continue;
 
       const metric = dayMap.get(row.read_on);
       if (!metric) continue;
 
-      metric.minutes += Number(row.minutes_read) || 0;
-      metric.pages += sessionPages(row);
+      const minutes = Number(row.minutes_read) || 0;
+      const pages = row.session_mode === "listening" ? 0 : sessionPages(row);
+
+      metric.minutes += minutes;
+      metric.pages += pages;
       metric.sessions += 1;
+
+      if (row.session_mode === "curiosity") {
+        metric.curiositySessions += 1;
+        metric.curiosityMinutes += minutes;
+      } else if (row.session_mode === "listening") {
+        metric.listeningSessions += 1;
+        metric.listeningMinutes += minutes;
+      } else {
+        metric.fluidSessions += 1;
+        metric.fluidMinutes += minutes;
+      }
     }
 
     return days;
-  }, [monthlySessions]);
+  }, [filteredSessions, timeRange]);
+
+  const visibleReadingRhythmActivity = useMemo(() => {
+    if (
+      showFullReadingRhythm ||
+      readingRhythmActivity.length <= COLLAPSED_READING_RHYTHM_DAY_COUNT
+    ) {
+      return readingRhythmActivity;
+    }
+
+    return readingRhythmActivity.slice(-COLLAPSED_READING_RHYTHM_DAY_COUNT);
+  }, [readingRhythmActivity, showFullReadingRhythm]);
+
+  const readingRhythmWindowLabel =
+    readingRhythmActivity.length <= COLLAPSED_READING_RHYTHM_DAY_COUNT ||
+      showFullReadingRhythm
+      ? selectedTimeLabel
+      : `Recent 90 days of ${selectedTimeLabel.toLowerCase()}`;
+
+  const readingRhythmSummary = useMemo(() => {
+    const activeDays = visibleReadingRhythmActivity.filter(
+      (item) => item.sessions > 0
+    ).length;
+
+    const fluidDays = visibleReadingRhythmActivity.filter(
+      (item) => item.fluidSessions > 0
+    ).length;
+
+    const curiosityDays = visibleReadingRhythmActivity.filter(
+      (item) => item.curiositySessions > 0
+    ).length;
+
+    const listeningDays = visibleReadingRhythmActivity.filter(
+      (item) => item.listeningSessions > 0
+    ).length;
+
+    const mixedDays = visibleReadingRhythmActivity.filter((item) => {
+      const activeModes = [
+        item.fluidSessions > 0,
+        item.curiositySessions > 0,
+        item.listeningSessions > 0,
+      ].filter(Boolean).length;
+
+      return activeModes >= 2;
+    }).length;
+
+    const minutes = visibleReadingRhythmActivity.reduce(
+      (sum, item) => sum + item.minutes,
+      0
+    );
+
+    const sessions = visibleReadingRhythmActivity.reduce(
+      (sum, item) => sum + item.sessions,
+      0
+    );
+
+    const pages = visibleReadingRhythmActivity.reduce(
+      (sum, item) => sum + item.pages,
+      0
+    );
+
+    return {
+      activeDays,
+      fluidDays,
+      curiosityDays,
+      listeningDays,
+      mixedDays,
+      minutes,
+      sessions,
+      pages,
+    };
+  }, [visibleReadingRhythmActivity]);
+
+  const dayMetrics = useMemo(() => {
+    return visibleReadingRhythmActivity.map((item) => ({
+      date: item.day,
+      label: item.day.slice(8),
+      minutes: item.minutes,
+      pages: item.pages,
+      sessions: item.sessions,
+    }));
+  }, [visibleReadingRhythmActivity]);
 
   const timePie = useMemo(
     () => [
@@ -710,7 +965,7 @@ export default function ReadingHabitsPage() {
             ← Back to Stats Home
           </Link>
 
-          <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className={`mt-5 rounded-3xl border-2 p-5 shadow-sm ${selectedTheme.pageHeader}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
               Reading rhythm
             </p>
@@ -718,8 +973,8 @@ export default function ReadingHabitsPage() {
               Reading Habits
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-              A more visual look at how you are reading this month: modes,
-              sessions, pace, and daily rhythm.
+              A more visual look at your reading rhythm for {selectedTimeLabel.toLowerCase()}:
+              modes, sessions, time, and daily rhythm.
             </p>
           </div>
         </div>
@@ -730,48 +985,83 @@ export default function ReadingHabitsPage() {
           </div>
         ) : null}
 
+        <SectionBand
+          eyebrow={`Time range — ${selectedTimeLabel}`}
+          title={selectedTimeLabel}
+          description="Choose the window for your reading rhythm. The stats below update to match this range."
+          tone={selectedTheme.section}
+        >
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {HABIT_TIME_FILTERS.map((option) => {
+              const selected = timeRange === option.value;
+              const optionTheme = readingHabitsTheme(option.value);
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setTimeRange(option.value);
+                    setShowFullReadingRhythm(false);
+                  }}
+                  className={`rounded-xl border-2 px-3 py-2 text-left transition ${selected ? optionTheme.activeButton : optionTheme.inactiveButton
+                    }`}
+                >
+                  <div className="text-sm font-black">{option.title}</div>
+                  <div
+                    className={`mt-0.5 text-xs leading-4 ${selected ? "text-white/85" : ""
+                      }`}
+                  >
+                    {option.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </SectionBand>
+
         <div className="grid gap-4 md:grid-cols-4">
           <StatCard
             label="Active Days"
             value={habitStats.activeDays}
             hint="Days with at least one reading session"
-            tone="border-indigo-200 bg-indigo-50"
+            tone={selectedTheme.statOne}
           />
           <StatCard
             label="Reading Sessions"
             value={habitStats.readingSessions}
             hint="Fluid + curiosity sessions"
-            tone="border-emerald-200 bg-emerald-50"
+            tone={selectedTheme.statTwo}
           />
           <StatCard
             label="Listening Sessions"
             value={habitStats.listeningSessions}
             hint="Ear-training sessions"
-            tone="border-sky-200 bg-sky-50"
+            tone={selectedTheme.statThree}
           />
           <StatCard
             label="Pages Read"
             value={habitStats.pagesRead}
             hint="Fluid + curiosity page movement"
-            tone="border-amber-200 bg-amber-50"
+            tone={selectedTheme.statFour}
           />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
           <SectionBand
-            eyebrow="Mode balance"
+            eyebrow={`Mode balance — ${selectedTimeLabel}`}
             title="Time by reading mode"
             description="This uses logged minutes from Fluid, Curiosity, and Listening sessions."
-            tone="border-slate-200 bg-white"
+            tone={selectedTheme.section}
           >
             <PieChart items={timePie} size={190} />
           </SectionBand>
 
           <SectionBand
-            eyebrow="Reading flow"
+            eyebrow={`Reading flow — ${selectedTimeLabel}`}
             title="Mode strip"
-            description="A quick view of what kind of reading month this is. Longer sections mean more logged time in that mode."
-            tone="border-slate-200 bg-white"
+            description="A quick view of what kind of reading window this is. Longer sections mean more logged time in that mode."
+            tone={selectedTheme.section}
           >
             <ModeStrip items={modeStripItems} />
 
@@ -790,29 +1080,192 @@ export default function ReadingHabitsPage() {
         </div>
 
         <SectionBand
-          eyebrow="Daily rhythm"
-          title="Activity by day"
-          description="Bars use logged minutes when available. Untimed sessions still get a small marker so the day does not disappear."
-          tone="border-slate-200 bg-white"
+          eyebrow={`Reading Rhythm — ${selectedTimeLabel}`}
+          title="Reading rhythm by day"
+          description={`${readingRhythmWindowLabel}: which days you read, listened, or mixed modes. Untimed sessions still count as activity.`}
+          tone={selectedTheme.softSection}
         >
-          <DailyActivityChart items={dayMetrics} />
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-semibold text-sky-800">
+              Showing: {readingRhythmWindowLabel}
+            </div>
+
+            {readingRhythmActivity.length > COLLAPSED_READING_RHYTHM_DAY_COUNT ? (
+              <button
+                type="button"
+                onClick={() => setShowFullReadingRhythm((prev) => !prev)}
+                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                {showFullReadingRhythm
+                  ? "Collapse to recent 90 days"
+                  : `Show full ${selectedTimeLabel.toLowerCase()}`}
+              </button>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-[repeat(14,minmax(0,1fr))] xl:grid-cols-[repeat(28,minmax(0,1fr))]">
+            {visibleReadingRhythmActivity.map((item, index) => {
+              const hasFluid = item.fluidSessions > 0;
+              const hasCuriosity = item.curiositySessions > 0;
+              const hasListening = item.listeningSessions > 0;
+              const activeModeCount = [hasFluid, hasCuriosity, hasListening].filter(
+                Boolean
+              ).length;
+              const isMixed = activeModeCount >= 2;
+              const intensity = item.sessions + Math.floor(item.minutes / 30);
+
+              const colorClass =
+                item.sessions === 0
+                  ? "bg-slate-100"
+                  : isMixed
+                    ? intensity < 3
+                      ? "bg-violet-300"
+                      : intensity < 6
+                        ? "bg-violet-500"
+                        : "bg-violet-700"
+                    : hasListening
+                      ? intensity < 3
+                        ? "bg-sky-300"
+                        : intensity < 6
+                          ? "bg-sky-500"
+                          : "bg-sky-700"
+                      : hasCuriosity
+                        ? intensity < 3
+                          ? "bg-amber-200"
+                          : intensity < 6
+                            ? "bg-amber-400"
+                            : "bg-amber-600"
+                        : intensity < 3
+                          ? "bg-emerald-300"
+                          : intensity < 6
+                            ? "bg-emerald-500"
+                            : "bg-emerald-700";
+
+              const previousItem = visibleReadingRhythmActivity[index - 1];
+              const startsMonth =
+                index === 0 || item.day.slice(0, 7) !== previousItem?.day.slice(0, 7);
+
+              const monthLabel = new Date(`${item.day}T00:00:00`).toLocaleString(
+                "en-US",
+                {
+                  month: "short",
+                }
+              ).toUpperCase();
+
+              const monthTextClass =
+                item.sessions > 0 ? "text-white drop-shadow-sm" : "text-slate-500";
+
+              return (
+                <div key={item.day} className="space-y-1">
+                  <div
+                    className={`relative h-10 rounded-lg border border-white/70 ${colorClass}`}
+                    title={`${item.day}: ${item.sessions} session${item.sessions === 1 ? "" : "s"
+                      }, ${item.pages} page${item.pages === 1 ? "" : "s"}, ${item.minutes
+                      } minute${item.minutes === 1 ? "" : "s"}`}
+                  >
+                    {startsMonth ? (
+                      <span
+                        className={`absolute left-1 top-1 text-[8px] font-black tracking-wide ${monthTextClass}`}
+                      >
+                        {monthLabel}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="text-center text-[9px] text-slate-500">
+                    {item.day.slice(8)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-emerald-500" />
+              Fluid
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-amber-400" />
+              Curiosity
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-sky-500" />
+              Listening
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-violet-500" />
+              Mixed modes
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+              <div className="text-xs text-slate-500">Active days</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {readingRhythmSummary.activeDays}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+              <div className="text-xs text-slate-500">Fluid days</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {readingRhythmSummary.fluidDays}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+              <div className="text-xs text-slate-500">Curiosity days</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {readingRhythmSummary.curiosityDays}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+              <div className="text-xs text-slate-500">Listening days</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {readingRhythmSummary.listeningDays}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+              <div className="text-xs text-slate-500">Mixed-mode days</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {readingRhythmSummary.mixedDays}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white/70 p-4">
+            <div className="text-sm font-semibold text-slate-900">
+              Reading rhythm
+            </div>
+
+            <div className="mt-2 text-sm leading-6 text-slate-600">
+              {readingRhythmSummary.sessions === 0
+                ? "No reading sessions in this window yet. One tiny session is enough to start a rhythm."
+                : `You logged ${readingRhythmSummary.sessions} session${readingRhythmSummary.sessions === 1 ? "" : "s"
+                }, ${formatMinutesAsReadableTime(readingRhythmSummary.minutes)}, and ${readingRhythmSummary.pages
+                } page${readingRhythmSummary.pages === 1 ? "" : "s"} in this window.`}
+            </div>
+          </div>
         </SectionBand>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <SectionBand
-            eyebrow="Pages"
+            eyebrow={`Pages — ${selectedTimeLabel}`}
             title="Reading pages by mode"
             description="Listening is intentionally not included because it does not always move page progress."
-            tone="border-slate-200 bg-white"
+            tone={selectedTheme.section}
           >
             <PieChart items={pagesPie} size={180} />
           </SectionBand>
 
           <SectionBand
-            eyebrow="Sessions"
+            eyebrow={`Sessions — ${selectedTimeLabel}`}
             title="Session balance"
-            description="A simple comparison of reading sessions and listening sessions this month."
-            tone="border-slate-200 bg-white"
+            description="A simple comparison of reading sessions and listening sessions in this window."
+            tone={selectedTheme.section}
           >
             <BarStrip
               items={sessionBars}
@@ -827,7 +1280,7 @@ export default function ReadingHabitsPage() {
             label="Total Logged Time"
             value={formatMinutesAsReadableTime(habitStats.totalMinutes)}
             hint="Fluid + curiosity + listening"
-            tone="border-slate-200 bg-white"
+            tone={selectedTheme.statOne}
           />
           <StatCard
             label="Fluid Pace Per Page"
@@ -837,7 +1290,7 @@ export default function ReadingHabitsPage() {
                 : `${formatDecimal(habitStats.fluidMinutesPerPage)} min/page`
             }
             hint="Timed fluid sessions only"
-            tone="border-emerald-200 bg-emerald-50"
+            tone={selectedTheme.statTwo}
           />
           <StatCard
             label="Curiosity Pace Per Page"
@@ -849,7 +1302,7 @@ export default function ReadingHabitsPage() {
                 )} min/page`
             }
             hint="Timed curiosity sessions only"
-            tone="border-amber-200 bg-amber-50"
+            tone={selectedTheme.statThree}
           />
         </div>
       </div>

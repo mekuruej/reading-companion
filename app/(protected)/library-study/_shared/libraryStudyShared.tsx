@@ -83,7 +83,7 @@ export type LibraryWordSummaryRow = {
   sample_book_cover_url: string | null;
 };
 
-export type LibraryCheckGate = "reading" | "meaning";
+export type LibraryCheckGate = "readiness" | "reading" | "meaning";
 
 export type StudyCard = {
   id: string;
@@ -260,19 +260,20 @@ export function libraryStudyColorName(status: LibraryStudyColorStatus | undefine
 
 export function pickLibraryCheckGate(
   status: LibraryStudyColorStatus,
-  seed: string,
-  date = new Date()
+  _seed: string,
+  _date = new Date()
 ): LibraryCheckGate {
+  if (status.color === "yellow" && status.eligibleForLibraryStudy) return "readiness";
   if (status.nextGate === "reading") return "reading";
   if (status.nextGate === "meaning") return "meaning";
-  return hashString(`${seed}::${getTodayKey(date)}`) % 2 === 0 ? "reading" : "meaning";
+  return "reading";
 }
 
 export function includeLibraryCheckCard(status: LibraryStudyColorStatus) {
   return (
     status.eligibleForLibraryStudy ||
-    status.nextGate === "mastery" ||
-    status.color === "purple"
+    status.nextGate === "reading" ||
+    status.nextGate === "meaning"
   );
 }
 

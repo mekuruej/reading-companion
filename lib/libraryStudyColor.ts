@@ -15,7 +15,7 @@ export type LibraryStudyColor =
 
 export type LibraryStudyGateStatus = "not_started" | "passed" | "failed";
 
-export type LibraryStudyNextGate = "reading" | "meaning" | "mastery" | null;
+export type LibraryStudyNextGate = "reading" | "meaning" | null;
 
 export type LibraryStudyGreyReason =
   | "pre_reading_support"
@@ -36,6 +36,7 @@ export type ComputeLibraryStudyColorInput = {
   meaningGate?: LibraryStudyGateStatus | null;
   heldBeforeReadingGate?: boolean | null;
   heldBeforeMeaningGate?: boolean | null;
+  readyForReadingGate?: boolean | null;
   mastered?: boolean | null;
 };
 
@@ -129,7 +130,7 @@ export function computeLibraryStudyColorStatus(
   const readingGate = input.readingGate ?? "not_started";
   const meaningGate = input.meaningGate ?? "not_started";
 
-  if (input.mastered) {
+  if (input.mastered || meaningGate === "passed") {
     return {
       ...encounter,
       color: "purple",
@@ -139,19 +140,6 @@ export function computeLibraryStudyColorStatus(
       nextGate: null,
       greyReason: null,
       reason: "Mastered.",
-    };
-  }
-
-  if (meaningGate === "passed") {
-    return {
-      ...encounter,
-      color: "blue",
-      stageNumber: null,
-      stageCount: null,
-      eligibleForLibraryStudy: true,
-      nextGate: "mastery",
-      greyReason: null,
-      reason: "Meaning gate passed.",
     };
   }
 
@@ -171,13 +159,13 @@ export function computeLibraryStudyColorStatus(
 
     return {
       ...encounter,
-      color: "green",
+      color: "blue",
       stageNumber: null,
       stageCount: null,
       eligibleForLibraryStudy: true,
       nextGate: "meaning",
       greyReason: null,
-      reason: "Reading gate passed.",
+      reason: "Ready for the meaning gate.",
     };
   }
 
@@ -206,6 +194,19 @@ export function computeLibraryStudyColorStatus(
       nextGate: "reading",
       greyReason: "pre_reading_support",
       reason: "Held for support before the reading gate.",
+    };
+  }
+
+  if (hasEnoughEncounters && input.readyForReadingGate) {
+    return {
+      ...encounter,
+      color: "green",
+      stageNumber: null,
+      stageCount: null,
+      eligibleForLibraryStudy: true,
+      nextGate: "reading",
+      greyReason: null,
+      reason: "Ready for the reading gate.",
     };
   }
 

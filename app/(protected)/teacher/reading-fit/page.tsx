@@ -29,6 +29,8 @@ type UserBookRow = {
   finished_at: string | null;
   reader_level: string | null;
   rating_difficulty: number | null;
+  rating_overall: number | null;
+  teacher_review_cleared_at: string | null;
   books: BookRow | BookRow[] | null;
 };
 
@@ -42,8 +44,10 @@ type ReadingFitItem = {
   finishedAt: string | null;
   readerLevel: string | null;
   ratingDifficulty: number | null;
+  ratingEntertainment: number | null;
   missingReaderLevel: boolean;
   missingDifficulty: boolean;
+  missingEntertainment: boolean;
 };
 
 function getBook(bookRow: UserBookRow["books"]) {
@@ -93,27 +97,38 @@ function bookTypeLabel(value: string | null | undefined) {
   }
 }
 
+function formatRating(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+
+  return Number(value)
+    .toFixed(2)
+    .replace(/\.00$/, "")
+    .replace(/0$/, "");
+}
+
 function difficultyLabel(value: number | null) {
-  switch (value) {
-    case 1:
-      return "Extremely difficult";
-    case 2:
-      return "Very difficult";
-    case 3:
-      return "Challenging but manageable";
-    case 4:
-      return "Pretty comfortable";
-    case 5:
-      return "Very easy";
-    default:
-      return "Missing";
-  }
+  if (value == null) return "Missing";
+
+  const labels: Record<number, string> = {
+    1: "Very hard",
+    1.5: "Hard and tiring",
+    2: "Hard, but manageable",
+    2.5: "A real stretch",
+    3: "A stretch, but okay",
+    3.5: "Mostly okay",
+    4: "Comfortable overall",
+    4.5: "Very comfortable",
+    5: "Very easy",
+  };
+
+  return labels[value] ?? "Ease rating";
 }
 
 export default function TeacherReadingFitPage() {
-  const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [items, setItems] = useState<ReadingFitItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [clearingId, setClearingId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadReadingFitQueue();
@@ -190,6 +205,8 @@ export default function TeacherReadingFitPage() {
               finished_at,
               reader_level,
               rating_difficulty,
+              rating_overall,
+              teacher_review_cleared_at,
               books (
                 title,
                 cover_url,
@@ -198,6 +215,7 @@ export default function TeacherReadingFitPage() {
             `)
             .in("user_id", studentIds)
             .not("finished_at", "is", null)
+            .is("teacher_review_cleared_at", null)
             .order("finished_at", { ascending: false }),
         ]);
 
@@ -212,27 +230,38 @@ export default function TeacherReadingFitPage() {
       const nextItems = ((userBooksData ?? []) as UserBookRow[])
         .map((row) => {
           const book = getBook(row.books);
+          const profile = profileById.get(row.user_id);
+          const studentName =
+            profile?.display_name ||
+            profile?.username ||
+            "Unknown student";
+
           const missingReaderLevel = !String(row.reader_level ?? "").trim();
           const missingDifficulty = row.rating_difficulty == null;
+          const missingEntertainment = row.rating_overall == null;
 
           return {
             id: row.id,
             userId: row.user_id,
-            studentName:
-              row.user_id === user.id
-                ? "Me"
-                : displayName(profileById.get(row.user_id)),
+            studentName,
             title: book?.title ?? "Untitled Book",
-            coverUrl: book?.cover_url ?? null,
-            bookType: book?.book_type ?? null,
+            coverUrl: book?.cover_url ?? "",
+            bookType: bookTypeLabel(book?.book_type),
             finishedAt: row.finished_at,
             readerLevel: row.reader_level,
             ratingDifficulty: row.rating_difficulty,
+            ratingEntertainment: row.rating_overall,
             missingReaderLevel,
             missingDifficulty,
+            missingEntertainment,
           };
         })
-        .filter((item) => item.missingReaderLevel || item.missingDifficulty);
+        .filter(
+          (item) =>
+            item.missingReaderLevel ||
+            item.missingDifficulty ||
+            item.missingEntertainment
+        );
 
       setItems(nextItems);
     } catch (error: any) {
@@ -244,11 +273,62 @@ export default function TeacherReadingFitPage() {
     }
   }
 
+  async function markAsReviewed(itemId: string) {
+    const confirmed = window.confirm(
+      "Clear this book from the Teacher Review Index? Missing ratings will stay blank, but the book will leave this review queue."
+    );
+
+    if (!confirmed) return;
+
+    setClearingId(itemId);
+
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+
+      if (authError) throw authError;
+
+      const user = auth?.user;
+
+      if (!user) {
+        throw new Error("Please sign in to clear review items.");
+      }
+
+      const { error } = await supabase
+        .from("user_books")
+        .update({
+          teacher_review_cleared_at: new Date().toISOString(),
+          teacher_review_cleared_by: user.id,
+          teacher_review_clear_note: "Manually cleared from Teacher Review Index.",
+        })
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      setItems((currentItems) =>
+        currentItems.filter((item) => item.id !== itemId)
+      );
+    } catch (error: any) {
+      console.error("Error clearing Teacher Review Index item:", {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        raw: error,
+      });
+
+      window.alert(error?.message ?? "Could not clear this review item.");
+    } finally {
+      setClearingId(null);
+    }
+  }
+
   const summary = useMemo(() => {
     return {
       total: items.length,
       missingReaderLevel: items.filter((item) => item.missingReaderLevel).length,
       missingDifficulty: items.filter((item) => item.missingDifficulty).length,
+      missingEntertainment: items.filter((item) => item.missingEntertainment)
+        .length,
     };
   }, [items]);
 
@@ -262,12 +342,13 @@ export default function TeacherReadingFitPage() {
             </p>
 
             <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
-              Reading Fit Needed
+              Teacher Review Index
             </h1>
 
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-              Finished books missing Community Reading Fit signals. Please fill these in
-              after finishing so Mekuru can learn what fits which readers.
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
+              Finished books missing learner reflection signals. Use this index to find
+              books that still need reader level, ease rating, or entertainment rating.
+              Teacher placement ratings can move here later.
             </p>
           </div>
 
@@ -279,7 +360,7 @@ export default function TeacherReadingFitPage() {
           </Link>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
             <div className="text-3xl font-black text-stone-900">{summary.total}</div>
             <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
@@ -301,7 +382,15 @@ export default function TeacherReadingFitPage() {
               {summary.missingDifficulty}
             </div>
             <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
-              missing difficulty rating
+              missing ease rating
+            </div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-4">
+            <div className="text-2xl font-black text-stone-900">
+              {summary.missingEntertainment}
+            </div>
+            <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+              missing entertainment rating
             </div>
           </div>
         </div>
@@ -320,7 +409,7 @@ export default function TeacherReadingFitPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-800 shadow-sm">
-            All finished books have Community Reading Fit signals. Beautiful. Tiny data goblin appeased.
+            All finished books have the learner reflection signals this index is checking. Beautiful. Tiny data goblin appeased.
           </div>
         ) : (
           <div className="grid gap-4">
@@ -363,13 +452,12 @@ export default function TeacherReadingFitPage() {
                       {item.title}
                     </h2>
 
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-4 grid gap-2 md:grid-cols-3">
                       <div
-                        className={`rounded-2xl border px-4 py-3 text-sm ${
-                          item.missingReaderLevel
-                            ? "border-amber-200 bg-amber-50 text-amber-800"
-                            : "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        }`}
+                        className={`rounded-2xl border px-4 py-3 text-sm ${item.missingReaderLevel
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          }`}
                       >
                         <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
                           Reader Level
@@ -380,18 +468,35 @@ export default function TeacherReadingFitPage() {
                       </div>
 
                       <div
-                        className={`rounded-2xl border px-4 py-3 text-sm ${
-                          item.missingDifficulty
-                            ? "border-amber-200 bg-amber-50 text-amber-800"
-                            : "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        }`}
+                        className={`rounded-2xl border px-4 py-3 text-sm ${item.missingDifficulty
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          }`}
                       >
                         <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                          Difficulty for Reader
+                          Ease Rating
                         </div>
                         <div className="mt-1 font-semibold">
-                          {item.ratingDifficulty
-                            ? `${item.ratingDifficulty}/5 · ${difficultyLabel(item.ratingDifficulty)}`
+                          {item.ratingDifficulty != null
+                            ? `${formatRating(item.ratingDifficulty)}/5 · ${difficultyLabel(
+                              item.ratingDifficulty
+                            )}`
+                            : "Missing"}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`rounded-2xl border px-4 py-3 text-sm ${item.missingEntertainment
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          }`}
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
+                          Entertainment Rating
+                        </div>
+                        <div className="mt-1 font-semibold">
+                          {item.ratingEntertainment != null
+                            ? `${formatRating(item.ratingEntertainment)}/5`
                             : "Missing"}
                         </div>
                       </div>
@@ -411,6 +516,15 @@ export default function TeacherReadingFitPage() {
                       >
                         Teacher Review →
                       </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => markAsReviewed(item.id)}
+                        disabled={clearingId === item.id}
+                        className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        {clearingId === item.id ? "Clearing..." : "Mark as Reviewed"}
+                      </button>
                     </div>
                   </div>
                 </div>

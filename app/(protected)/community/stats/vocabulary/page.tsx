@@ -243,6 +243,58 @@ function bookCategoryForBookType(
   return "text_dense";
 }
 
+function vocabularyGrowthTheme(value: BookCategoryFilter) {
+  if (value === "image_supported") {
+    return {
+      pageHeader: "border-emerald-300 bg-white",
+      section: "border-emerald-300 bg-white",
+      softSection: "border-emerald-300 bg-emerald-50/25",
+      statOne: "border-emerald-300 bg-emerald-50/35",
+      statTwo: "border-emerald-300 bg-white",
+      statThree: "border-emerald-300 bg-emerald-50/25",
+      statFour: "border-emerald-300 bg-white",
+      plainCard: "border-emerald-300 bg-white",
+    };
+  }
+
+  if (value === "bridge_books") {
+    return {
+      pageHeader: "border-violet-300 bg-white",
+      section: "border-violet-300 bg-white",
+      softSection: "border-violet-300 bg-violet-50/25",
+      statOne: "border-violet-300 bg-violet-50/35",
+      statTwo: "border-violet-300 bg-white",
+      statThree: "border-violet-300 bg-violet-50/25",
+      statFour: "border-violet-300 bg-white",
+      plainCard: "border-violet-300 bg-white",
+    };
+  }
+
+  if (value === "text_dense") {
+    return {
+      pageHeader: "border-amber-300 bg-white",
+      section: "border-amber-300 bg-white",
+      softSection: "border-amber-300 bg-amber-50/25",
+      statOne: "border-amber-300 bg-amber-50/35",
+      statTwo: "border-amber-300 bg-white",
+      statThree: "border-amber-300 bg-amber-50/25",
+      statFour: "border-amber-300 bg-white",
+      plainCard: "border-amber-300 bg-white",
+    };
+  }
+
+  return {
+    pageHeader: "border-sky-300 bg-white",
+    section: "border-sky-300 bg-white",
+    softSection: "border-sky-300 bg-sky-50/25",
+    statOne: "border-sky-300 bg-sky-50/35",
+    statTwo: "border-sky-300 bg-white",
+    statThree: "border-sky-300 bg-sky-50/25",
+    statFour: "border-sky-300 bg-white",
+    plainCard: "border-sky-300 bg-white",
+  };
+}
+
 function formatDecimal(value: number | null, digits = 1) {
   if (value == null || !Number.isFinite(value)) return "—";
   return value.toFixed(digits);
@@ -803,6 +855,10 @@ export default function VocabularyGrowthPage() {
     (option) => option.value === bookCategoryFilter
   );
 
+  const selectedFilterLabel = selectedFilter?.title ?? "All Reading";
+
+  const selectedTheme = vocabularyGrowthTheme(bookCategoryFilter);
+
   const vocabularyTotals = useMemo(() => {
     const pagesRead = filteredVocabularyBookMetrics.reduce(
       (sum, item) => sum + item.pagesRead,
@@ -1206,7 +1262,7 @@ export default function VocabularyGrowthPage() {
             ← Back to Stats Home
           </Link>
 
-          <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className={`mt-5 rounded-3xl border-2 p-5 shadow-sm ${selectedTheme.pageHeader}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
               Vocabulary growth
             </p>
@@ -1228,10 +1284,10 @@ export default function VocabularyGrowthPage() {
         ) : null}
 
         <SectionBand
-          eyebrow="Book category"
-          title={selectedFilter?.title ?? "All Reading"}
+          eyebrow={`Book category — ${selectedFilterLabel}`}
+          title={selectedFilterLabel}
           description="Choose a broad kind of reading material. This changes the vocabulary totals, charts, study rhythm, and book examples below."
-          tone="border-sky-300 bg-white"
+          tone={selectedTheme.section}
         >
           <div className="grid gap-3 md:grid-cols-4">
             {BOOK_CATEGORY_FILTERS.map((option) => {
@@ -1271,19 +1327,19 @@ export default function VocabularyGrowthPage() {
             label="Words Saved"
             value={vocabularyTotals.wordsSaved}
             hint="All-time saved vocabulary"
-            tone="border-violet-200 bg-violet-50"
+            tone={selectedTheme.statOne}
           />
           <StatCard
             label="Unique Words"
             value={vocabularyTotals.uniqueWords}
             hint="Surface + reading + meaning"
-            tone="border-indigo-200 bg-indigo-50"
+            tone={selectedTheme.statTwo}
           />
           <StatCard
             label="This Month"
             value={vocabularyTotals.monthlyWordsSaved}
             hint={`${vocabularyTotals.monthlyUniqueWords} unique this month`}
-            tone="border-emerald-200 bg-emerald-50"
+            tone={selectedTheme.statThree}
           />
           <StatCard
             label="Words Per Page"
@@ -1293,15 +1349,15 @@ export default function VocabularyGrowthPage() {
                 : formatDecimal(vocabularyTotals.wordsPerPage)
             }
             hint={`${vocabularyTotals.pagesRead} pages counted`}
-            tone="border-amber-200 bg-amber-50"
+            tone={selectedTheme.statFour}
           />
         </div>
 
         <SectionBand
           eyebrow="Vocabulary Rhythm"
-          title="Saved words → study rhythm"
+          title={`Saved words → study rhythm — ${selectedFilterLabel}`}
           description={`${vocabularyRhythmWindowLabel}: which days you saved vocabulary and which days you came back to study it. This respects the book category filter above.`}
-          tone="border-violet-200 bg-violet-50/70"
+          tone={selectedTheme.softSection}
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="rounded-full border border-violet-200 bg-white/80 px-3 py-1 text-xs font-semibold text-violet-800">
@@ -1550,18 +1606,18 @@ export default function VocabularyGrowthPage() {
         <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
           <SectionBand
             eyebrow="Book type"
-            title="All-time words saved by book type"
+            title={`All-time words saved by book type — ${selectedFilterLabel}`}
             description="A word-weighted view of which kinds of books are adding the most vocabulary to your library."
-            tone="border-slate-200 bg-white"
+            tone={selectedTheme.section}
           >
             <PieChart items={wordsByBookTypePie} size={190} />
           </SectionBand>
 
           <SectionBand
             eyebrow="Word volume"
-            title="Vocabulary-heavy books"
+            title={`Vocabulary-heavy books — ${selectedFilterLabel}`}
             description="These books have contributed the most saved words overall."
-            tone="border-slate-200 bg-white"
+            tone={selectedTheme.section}
           >
             <BarStrip
               items={wordiestBooks.map((item) => ({
@@ -1577,9 +1633,9 @@ export default function VocabularyGrowthPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <SectionBand
             eyebrow="Density"
-            title="Words per page"
+            title={`Words per page — ${selectedFilterLabel}`}
             description="This is often a better difficulty signal than raw word count because it accounts for how much you read."
-            tone="border-slate-200 bg-white"
+            tone={selectedTheme.section}
           >
             <div className="space-y-3">
               {densestBooks.length === 0 ? (
@@ -1623,9 +1679,9 @@ export default function VocabularyGrowthPage() {
 
           <SectionBand
             eyebrow="Book type table"
-            title="Vocabulary by category"
+            title={`Vocabulary by category — ${selectedFilterLabel}`}
             description="A table version for comparing book categories without guessing from the chart."
-            tone="border-slate-200 bg-white"
+            tone={selectedTheme.section}
           >
             <div className="overflow-hidden rounded-2xl border border-slate-200">
               <table className="w-full text-left text-sm">
@@ -1673,9 +1729,9 @@ export default function VocabularyGrowthPage() {
 
         <SectionBand
           eyebrow="Recent saves"
-          title="Recently saved words"
+          title={`Recently saved words — ${selectedFilterLabel}`}
           description="A quick reminder of the newest words entering your reading life."
-          tone="border-slate-200 bg-white"
+          tone={selectedTheme.section}
         >
           {recentWords.length === 0 ? (
             <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">

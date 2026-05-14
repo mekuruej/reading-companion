@@ -145,12 +145,13 @@ type AbilityCheckProgressRow = {
 const MEKURU_ENCOUNTER_COLORS: MekuruColor[] = ["red", "orange", "yellow"];
 const MEKURU_ABILITY_COLORS: MekuruColor[] = ["green", "blue", "purple"];
 const ABILITY_CHECK_SEEN_STORAGE_KEY = "library-study-seen-by-date";
+const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
 const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
-const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
 const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
 const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
+const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
 const PRE_READING_WAIT_RECHECK_DAYS = 90;
 
 function ymdInTimeZone(value: string | Date, timeZone: string) {
@@ -201,9 +202,19 @@ function abilityCheckReminderHiddenToday() {
   return window.localStorage.getItem(ABILITY_CHECK_REMINDER_HIDE_KEY) === getTodayKey();
 }
 
+function abilityCheckCompletedToday() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(ABILITY_CHECK_COMPLETED_KEY) === getTodayKey();
+}
+
 function hideAbilityCheckReminderForToday() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
+}
+
+function isKatakanaOnly(value: string | null | undefined) {
+  const text = (value ?? "").trim();
+  return text.length > 0 && /^[ァ-ヶー・･]+$/.test(text);
 }
 
 function hashString(value: string) {
@@ -223,12 +234,18 @@ function daysSinceIso(value: string | null | undefined, now = new Date()) {
   return (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
 }
 
-function isKatakanaOnly(value: string | null | undefined) {
-  const text = (value ?? "").trim();
-  return text.length > 0 && /^[ァ-ヶー・･]+$/.test(text);
+function isReadyForReadingGateProgress(progress: AbilityCheckProgressRow | null | undefined) {
+  return Boolean(
+    progress &&
+    progress.reading_gate_status === "not_started" &&
+    progress.meaning_gate_status === "not_started" &&
+    !progress.held_before_reading_gate &&
+    !progress.held_before_meaning_gate &&
+    !progress.mastered
+  );
 }
 
-function isAbilityCheckCardDue(
+function isAbilityCheckCardInDailyPool(
   summary: AbilityCheckSummaryRow,
   progress: AbilityCheckProgressRow | null,
   settings: Required<AbilityCheckReminderSettings>,
@@ -251,24 +268,23 @@ function isAbilityCheckCardDue(
     meaningGate: progress?.meaning_gate_status ?? "not_started",
     heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
     heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+    readyForReadingGate: isReadyForReadingGateProgress(progress),
     mastered: progress?.mastered ?? false,
   });
 
   const included =
     colorStatus.eligibleForLibraryStudy ||
-    colorStatus.nextGate === "mastery" ||
-    colorStatus.color === "purple";
+    colorStatus.nextGate === "reading" ||
+    colorStatus.nextGate === "meaning";
 
   if (!included) return false;
 
-  if (colorStatus.color === "purple") {
-    const lastCheck = progress?.last_studied_at ?? progress?.mastered_at;
-    return daysSinceIso(lastCheck, now) >= MASTERED_MAINTENANCE_INTERVAL_DAYS;
-  }
-
   if (colorStatus.color === "grey") {
     if (colorStatus.greyReason === "pre_reading_support") {
-      return daysSinceIso(progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
+      const waitDays = progress?.held_before_meaning_gate
+        ? PRE_READING_WAIT_RECHECK_DAYS
+        : PRE_READING_SOFT_WAIT_RECHECK_DAYS;
+      return daysSinceIso(progress?.last_studied_at, now) >= waitDays;
     }
 
     const recheckDays =
@@ -908,7 +924,7 @@ export default function BooksPage() {
 
       setAbilityCheckReminderEnabled(resolvedSettings.show_ability_check_reminder);
 
-      if (!resolvedSettings.show_ability_check_reminder) {
+      if (!resolvedSettings.show_ability_check_reminder || abilityCheckCompletedToday()) {
         setAbilityCheckReminderCount(0);
         return;
       }
@@ -958,7 +974,7 @@ export default function BooksPage() {
 
       const seenTodayIds = loadAbilityCheckSeenForToday();
       const availableCount = summaries.filter((summary) =>
-        isAbilityCheckCardDue(
+        isAbilityCheckCardInDailyPool(
           summary,
           progressByKey.get(summary.study_identity_key) ?? null,
           resolvedSettings,
@@ -2159,7 +2175,7 @@ export default function BooksPage() {
                 <p className="mt-1 text-sm leading-6 text-slate-600">
                   You have {abilityCheckReminderCount} word
                   {abilityCheckReminderCount === 1 ? "" : "s"} waiting for a quick typed check.
-                  This reminder only appears when cards are due.
+                  Due cards come first, then Mekuru fills from your ready pool.
                 </p>
               </div>
 
@@ -2246,7 +2262,7 @@ export default function BooksPage() {
 
                 <button
                   type="button"
-                  onClick={() => router.push("/community/stats/old")}
+                  onClick={() => router.push("/community/stats")}
                   className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 hover:bg-white"
                 >
                   See Full Stats

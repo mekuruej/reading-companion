@@ -4,6 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import LibraryColorBadge from "@/components/LibraryColorBadge";
+import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
@@ -1580,6 +1582,10 @@ export default function BookFlashcardsPage() {
   const showMeaning =
     steps.indexOf("meaning") === -1 ? false : stepIndex >= steps.indexOf("meaning");
 
+  const cardColorStatus = card
+    ? computeLibraryStudyColorStatus({ encounterCount: card.totalCount })
+    : null;
+
   function Row({
     label,
     value,
@@ -1748,8 +1754,18 @@ export default function BookFlashcardsPage() {
         </div>
 
         <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+          <LibraryColorBadge colorStatus={cardColorStatus} size="sm" />
+        </div>
+
+        <div className="absolute bottom-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
           <div className="text-xs font-medium leading-none">
             Def #{((card?.meaningChoiceIndex ?? 0) as number) + 1}
+          </div>
+        </div>
+
+        <div className="absolute bottom-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
+          <div className="text-xs font-medium leading-none">
+            Read {card?.totalCount ?? 0}x
           </div>
         </div>
 

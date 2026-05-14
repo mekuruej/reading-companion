@@ -236,6 +236,54 @@ function paceLabel(item: BookMetric) {
     return "Pushes back";
 }
 
+function readingAbilityTheme(value: ReadingAbilityFilter) {
+    if (value === "image_supported") {
+        return {
+            pageHeader: "border-emerald-300 bg-white",
+            section: "border-emerald-300 bg-white",
+            softSection: "border-emerald-300 bg-emerald-50/25",
+            statOne: "border-emerald-300 bg-emerald-50/35",
+            statTwo: "border-emerald-300 bg-white",
+            statThree: "border-emerald-300 bg-emerald-50/25",
+            plainCard: "border-emerald-300 bg-white",
+        };
+    }
+
+    if (value === "bridge_books") {
+        return {
+            pageHeader: "border-violet-300 bg-white",
+            section: "border-violet-300 bg-white",
+            softSection: "border-violet-300 bg-violet-50/25",
+            statOne: "border-violet-300 bg-violet-50/35",
+            statTwo: "border-violet-300 bg-white",
+            statThree: "border-violet-300 bg-violet-50/25",
+            plainCard: "border-violet-300 bg-white",
+        };
+    }
+
+    if (value === "text_dense") {
+        return {
+            pageHeader: "border-amber-300 bg-white",
+            section: "border-amber-300 bg-white",
+            softSection: "border-amber-300 bg-amber-50/25",
+            statOne: "border-amber-300 bg-amber-50/35",
+            statTwo: "border-amber-300 bg-white",
+            statThree: "border-amber-300 bg-amber-50/25",
+            plainCard: "border-amber-300 bg-white",
+        };
+    }
+
+    return {
+        pageHeader: "border-sky-300 bg-white",
+        section: "border-sky-300 bg-white",
+        softSection: "border-sky-300 bg-sky-50/25",
+        statOne: "border-sky-300 bg-sky-50/35",
+        statTwo: "border-sky-300 bg-white",
+        statThree: "border-sky-300 bg-sky-50/25",
+        plainCard: "border-sky-300 bg-white",
+    };
+}
+
 function StatCard({
     label,
     value,
@@ -687,6 +735,10 @@ export default function ReadingAbilityPage() {
         (option) => option.value === bookTypeFilter
     );
 
+    const selectedFilterLabel = selectedFilter?.title ?? "All Reading";
+
+    const selectedTheme = readingAbilityTheme(bookTypeFilter);
+
     const abilityTotals = useMemo(() => {
         const pagesRead = filteredBookMetrics.reduce(
             (sum, item) => sum + item.pagesRead,
@@ -961,7 +1013,7 @@ export default function ReadingAbilityPage() {
                         ← Back to Stats Home
                     </Link>
 
-                    <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className={`mt-5 rounded-3xl border-2 p-5 shadow-sm ${selectedTheme.pageHeader}`}>
                         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
                             Reading Ability
                         </p>
@@ -982,10 +1034,10 @@ export default function ReadingAbilityPage() {
                 ) : null}
 
                 <SectionBand
-                    eyebrow="Book category"
+                    eyebrow={`Book category — ${selectedFilterLabel}`}
                     title={selectedFilter?.title ?? "All Reading"}
                     description="Choose a broad kind of reading material. This changes the stats and book examples below."
-                    tone="border-sky-300 bg-white"
+                    tone={selectedTheme.section}
                 >
                     <div className="grid gap-3 md:grid-cols-4">
                         {READING_ABILITY_FILTERS.map((option) => {
@@ -1029,7 +1081,7 @@ export default function ReadingAbilityPage() {
                                 : `${Math.round(abilityTotals.timedCoveragePercent)}%`
                         }
                         hint={`${abilityTotals.timedPages} timed pages · ${abilityTotals.untimedPages} untimed pages`}
-                        tone="border-indigo-200 bg-indigo-50"
+                        tone={selectedTheme.statOne}
                     />
 
                     <StatCard
@@ -1040,7 +1092,7 @@ export default function ReadingAbilityPage() {
                                 : `${formatDecimal(abilityTotals.fluidMinutesPerPage)} min/page`
                         }
                         hint="Time per page during fluid reading"
-                        tone="border-emerald-200 bg-emerald-50"
+                        tone={selectedTheme.statTwo}
                     />
 
                     <StatCard
@@ -1053,14 +1105,14 @@ export default function ReadingAbilityPage() {
                                 )} min/page`
                         }
                         hint="Time per page during curiosity reading"
-                        tone="border-amber-200 bg-amber-50"
+                        tone={selectedTheme.statThree}
                     />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-2xl border-2 border-slate-200 bg-white p-4 shadow-sm">
+                    <div className={`rounded-2xl border-2 p-4 shadow-sm ${selectedTheme.plainCard}`}>
                         <div className="text-xs font-medium uppercase text-slate-600">
-                            Fluid Reading Range
+                            Fluid Reading Range — {selectedFilterLabel}
                         </div>
 
                         <div className="mt-3 space-y-3">
@@ -1096,9 +1148,9 @@ export default function ReadingAbilityPage() {
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border-2 border-slate-200 bg-white p-4 shadow-sm">
+                    <div className={`rounded-2xl border-2 p-4 shadow-sm ${selectedTheme.plainCard}`}>
                         <div className="text-xs font-medium uppercase text-slate-600">
-                            Curiosity Reading Range
+                            Curiosity Reading Range — {selectedFilterLabel}
                         </div>
 
                         <div className="mt-3 space-y-3">
@@ -1136,11 +1188,11 @@ export default function ReadingAbilityPage() {
                 </div>
 
                 <SectionBand
-                    eyebrow="Pace"
+                    eyebrow={`Pace — ${selectedFilterLabel}`}
                     title="How your books felt to read"
-                    description="Books are grouped by minutes per page only. Saved-word density belongs with vocabulary stats."
-                    tone="border-slate-200 bg-white"
-                >
+                    description="Books are grouped by minutes per page only."
+                    tone={selectedTheme.softSection}
+                    >
                     <div className="grid gap-6 xl:grid-cols-[1fr_1.25fr] xl:items-start">
                         <PieChart items={pacePie} />
 
@@ -1186,13 +1238,13 @@ export default function ReadingAbilityPage() {
                     </div>
                 </SectionBand>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4">
                     <SectionBand
-                        eyebrow="Book type"
+                        eyebrow={`Book type — ${selectedFilterLabel}`}
                         title="Ability by book type"
-                        description="This groups your reading by book category and compares page movement, timed pages, and word density."
-                        tone="border-slate-200 bg-white"
-                    >
+                        description="This groups your reading by book category and compares page movement and timed reading pace."
+                        tone={selectedTheme.section}
+                        >
                         <div className="space-y-5">
                             <BarStrip
                                 items={abilityTypeMetrics.map((item) => ({
@@ -1210,7 +1262,6 @@ export default function ReadingAbilityPage() {
                                             <th className="px-3 py-2">Type</th>
                                             <th className="px-3 py-2">Pages</th>
                                             <th className="px-3 py-2">Min/page</th>
-                                            <th className="px-3 py-2">Words/page</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -1225,9 +1276,6 @@ export default function ReadingAbilityPage() {
                                                 <td className="px-3 py-2 text-slate-700">
                                                     {formatDecimal(item.averageMinutesPerPage)}
                                                 </td>
-                                                <td className="px-3 py-2 text-slate-700">
-                                                    {formatDecimal(item.wordsPerPage)}
-                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1236,63 +1284,14 @@ export default function ReadingAbilityPage() {
                         </div>
                     </SectionBand>
 
-                    <SectionBand
-                        eyebrow="Density"
-                        title="Word support range"
-                        description="A quick look at which books asked for more or less vocabulary support."
-                        tone="border-slate-200 bg-white"
-                    >
-                        <div className="space-y-4">
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <div className="text-xs text-slate-500">Most words per page</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {abilityStandouts.mostWordsPerPage?.wordsPerPage != null
-                                        ? `${formatDecimal(
-                                            abilityStandouts.mostWordsPerPage.wordsPerPage
-                                        )} words/page`
-                                        : "—"}
-                                </div>
-                                <div className="truncate text-sm text-slate-700">
-                                    {abilityStandouts.mostWordsPerPage?.title ??
-                                        "No vocabulary density yet"}
-                                </div>
-                            </div>
-
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <div className="text-xs text-slate-500">Fewest words per page</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {abilityStandouts.leastWordsPerPage?.wordsPerPage != null
-                                        ? `${formatDecimal(
-                                            abilityStandouts.leastWordsPerPage.wordsPerPage
-                                        )} words/page`
-                                        : "—"}
-                                </div>
-                                <div className="truncate text-sm text-slate-700">
-                                    {abilityStandouts.leastWordsPerPage?.title ??
-                                        "No vocabulary density yet"}
-                                </div>
-                            </div>
-
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <div className="text-xs text-slate-500">Average words per page</div>
-                                <div className="mt-1 text-lg font-semibold text-slate-900">
-                                    {abilityTotals.averageWordsPerPage == null
-                                        ? "—"
-                                        : `${formatDecimal(
-                                            abilityTotals.averageWordsPerPage
-                                        )} words/page`}
-                                </div>
-                            </div>
-                        </div>
-                    </SectionBand>
                 </div>
 
                 <SectionBand
-                    eyebrow="Comparison"
+                    eyebrow={`Comparison — ${selectedFilterLabel}`}
                     title="Books that pushed back / books that flowed"
                     description="Within each book type, this compares the slowest and fastest timed reading experiences."
-                    tone="border-slate-200 bg-white"
-                >
+                    tone={selectedTheme.section}
+                    >
                     {abilityComparisonRows.length === 0 ? (
                         <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
                             No timed reading comparison yet. Add minutes to reading sessions to

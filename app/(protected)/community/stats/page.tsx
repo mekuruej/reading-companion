@@ -37,37 +37,37 @@ type SnapshotStats = {
 const statCards = [
   {
     title: "Reading Habits",
-    description: "Look at reading days, sessions, and mode patterns.",
+    description: "Look at reading days, sessions, time, and mode patterns.",
     href: "/community/stats/reading-habits",
     tag: "Consistency",
   },
   {
     title: "Vocabulary Growth",
-    description: "Track saved words, repeat encounters, and study movement.",
+    description: "Track saved words, vocabulary-heavy books, and saved-word study rhythm.",
     href: "/community/stats/vocabulary",
     tag: "Vocabulary",
   },
   {
     title: "Book Difficulty",
-    description: "Explore reader fit, difficulty signals, and book-level patterns.",
+    description: "Explore reader fit, difficulty ratings, and book-level patterns.",
     href: "/community/stats/book-difficulty",
     tag: "Book insight",
   },
   {
     title: "Reading Ability",
-    description: "Explore pace, support, difficulty, and reader-fit patterns.",
+    description: "Explore pace, support needs, and reading difficulty by book type.",
     href: "/community/stats/reading-ability",
     tag: "Reading skill",
   },
   {
     title: "Monthly Details",
-    description: "Open the full version of your monthly reading snapshot.",
+    description: "Review this month’s reading, listening, saved words, and engagement.",
     href: "/community/stats/monthly",
     tag: "Snapshot details",
   },
   {
     title: "Reading Colors",
-    description: "See the full color meanings, counts, and study status details.",
+    description: "See color meanings, encounter stages, and Ability Check progress.",
     href: "/community/stats/colors",
     tag: "Color details",
   },

@@ -462,7 +462,7 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/community/stats/old"
+                    href="/community/stats/"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"

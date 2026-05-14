@@ -56,7 +56,7 @@ export default function DashboardPage() {
             </p>
 
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              No account yet? Please join the beta waitlist or contact me before signing in.
+              No account yet? Please join the beta waitlist or contact me with questions.
             </p>
 
             <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -69,12 +69,15 @@ export default function DashboardPage() {
                 Join the beta waitlist
               </a>
 
-              <a
-                href="mailto:mekuru.ej@gmail.com"
-                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
-              >
-                Contact me
-              </a>
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                Contact:{" "}
+                <a
+                  href="mailto:mekuru.ej@gmail.com"
+                  className="font-semibold underline underline-offset-4 hover:text-stone-900"
+                >
+                  mekuru.ej@gmail.com
+                </a>
+              </p>
             </div>
           </div>
         </section>

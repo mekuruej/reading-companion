@@ -202,7 +202,7 @@ export default function TeacherHubPage() {
     if (studentIds.length > 0) {
       const { data: userBooks } = await supabase
         .from("user_books")
-        .select("id, finished_at, reader_level, rating_difficulty")
+        .select("id, finished_at, reader_level, rating_difficulty, rating_overall")
         .in("user_id", studentIds);
 
       const userBookIds = (userBooks ?? []).map((book: any) => book.id).filter(Boolean);
@@ -210,9 +210,13 @@ export default function TeacherHubPage() {
       readingFitCount = (userBooks ?? []).filter((book: any) => {
         const isFinished = !!book.finished_at;
         const missingReaderLevel = !String(book.reader_level ?? "").trim();
-        const missingDifficulty = book.rating_difficulty == null;
+        const missingEaseRating = book.rating_difficulty == null;
+        const missingEntertainmentRating = book.rating_overall == null;
 
-        return isFinished && (missingReaderLevel || missingDifficulty);
+        return (
+          isFinished &&
+          (missingReaderLevel || missingEaseRating || missingEntertainmentRating)
+        );
       }).length;
 
       if (userBookIds.length > 0) {
@@ -237,14 +241,14 @@ export default function TeacherHubPage() {
 
   const workbenchCards: TeacherCard[] = [
     {
-      title: "Reading Fit Needed",
+      title: "Teacher Review Index",
       href: "/teacher/reading-fit",
-      eyebrow: "Community signals",
+      eyebrow: "Missing ratings",
       description:
-        "Finished books missing Community Reading Fit signals. Please fill these in after finishing so Mekuru can learn what fits which readers.",
+        "Review finished books missing learner reflection signals: reader level, ease rating, or entertainment rating. Teacher placement ratings can move here later.",
       status: "Active",
       count: counts.readingFit,
-      countLabel: "missing fit signals",
+      countLabel: "finished books to review",
     },
     ...(isSuperTeacher
       ? [

@@ -854,37 +854,6 @@ export default function BookInfoTab({
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-stone-900">My Copy</div>
-          {!isEditingMyCopy ? (
-            <button
-              type="button"
-              onClick={onEditMyCopy}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-            >
-              Edit
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={saving}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          )}
-        </div>
-
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded border bg-white p-3 text-sm">
             <div className="text-stone-600">Format</div>

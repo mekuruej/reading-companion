@@ -97,7 +97,7 @@ type LibraryWordClaimRow = {
   updated_at: string | null;
 };
 
-type LibraryCheckGate = "reading" | "meaning";
+type LibraryCheckGate = "readiness" | "reading" | "meaning";
 
 type StudyCard = {
   id: string;
@@ -142,16 +142,9 @@ type LibraryCheckDebug = {
 
 type StudyMode =
   | "reading_typing"
-  | "meaning_typing"
-  | "reading_to_meaning_typing"
-  | "reading_mc"
-  | "meaning_mc"
-  | "reading_to_kanji_mc"
-  | "reading_to_meaning_mc"
-  | "complete_study";
+  | "meaning_typing";
 
 type LibraryStudyMode = "check" | "practice";
-type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
 type PracticeRevealStep = "word" | "reading" | "meaning";
 type PracticeStudyMode = "reveal" | "typing";
 type PracticeTypingStep = "reading" | "meaning";
@@ -168,11 +161,11 @@ type PracticeColorFilter =
 
 const STORAGE_KEY = "library-study-seen-by-date";
 const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
-const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
 const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
 const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
+const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
 const PRE_READING_WAIT_RECHECK_DAYS = 90;
 
@@ -493,6 +486,17 @@ function progressWithWordSkyClaim(
   };
 }
 
+function isReadyForReadingGateProgress(progress: LibraryWordProgressRow | null | undefined) {
+  return Boolean(
+    progress?.id &&
+    progress.reading_gate_status === "not_started" &&
+    progress.meaning_gate_status === "not_started" &&
+    !progress.held_before_reading_gate &&
+    !progress.held_before_meaning_gate &&
+    !progress.mastered
+  );
+}
+
 function makeClaimStudyCard(
   userId: string,
   claim: LibraryWordClaimRow,
@@ -526,6 +530,7 @@ function makeClaimStudyCard(
     meaningGate: progress?.meaning_gate_status ?? "not_started",
     heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
     heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+    readyForReadingGate: isReadyForReadingGateProgress(progress),
     mastered: progress?.mastered ?? false,
   });
 
@@ -604,31 +609,15 @@ function hashString(value: string) {
   return Math.abs(hash);
 }
 
-function pickLibraryCheckGate(status: LibraryStudyColorStatus, seed: string): LibraryCheckGate {
+function pickLibraryCheckGate(status: LibraryStudyColorStatus, _seed: string): LibraryCheckGate {
+  if (status.color === "yellow" && status.eligibleForLibraryStudy) return "readiness";
   if (status.nextGate === "reading") return "reading";
   if (status.nextGate === "meaning") return "meaning";
-  return hashString(`${seed}::${getTodayKey()}`) % 2 === 0 ? "reading" : "meaning";
+  return "reading";
 }
 
 function includeLibraryCheckCard(status: LibraryStudyColorStatus) {
-  return (
-    status.eligibleForLibraryStudy ||
-    status.nextGate === "mastery" ||
-    status.color === "purple"
-  );
-}
-
-function isMasteredMaintenanceDue(card: StudyCard, now = new Date()) {
-  if (card.colorStatus.color !== "purple") return true;
-
-  const lastCheck = card.progress?.last_studied_at ?? card.progress?.mastered_at;
-  if (!lastCheck) return true;
-
-  const lastCheckDate = new Date(lastCheck);
-  if (Number.isNaN(lastCheckDate.getTime())) return true;
-
-  const elapsedMs = now.getTime() - lastCheckDate.getTime();
-  return elapsedMs >= MASTERED_MAINTENANCE_INTERVAL_DAYS * 24 * 60 * 60 * 1000;
+  return status.eligibleForLibraryStudy || status.nextGate === "reading" || status.nextGate === "meaning";
 }
 
 function daysSinceIso(value: string | null | undefined, now = new Date()) {
@@ -678,7 +667,11 @@ function isMissedGateLimboDue(card: StudyCard, now = new Date()) {
   if (card.colorStatus.color !== "grey") return true;
 
   if (card.colorStatus.greyReason === "pre_reading_support") {
-    return daysSinceIso(card.progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
+    const recheckDays = card.progress?.held_before_meaning_gate
+      ? PRE_READING_WAIT_RECHECK_DAYS
+      : PRE_READING_SOFT_WAIT_RECHECK_DAYS;
+
+    return daysSinceIso(card.progress?.last_studied_at, now) >= recheckDays;
   }
 
   const recheckDays = missedGateRecheckDays(card);
@@ -720,7 +713,6 @@ function isCardAvailableForLibraryCheck(
 
   return (
     notSeenToday &&
-    isMasteredMaintenanceDue(card) &&
     isMissedGateLimboDue(card) &&
     isRegularGateRecheckDue(card)
   );
@@ -736,7 +728,9 @@ function isCardReadyForDailyFill(
   return (
     jlptMatch &&
     includeLibraryCheckCard(card.colorStatus) &&
-    !seenTodayIds.has(card.id)
+    !seenTodayIds.has(card.id) &&
+    isMissedGateLimboDue(card) &&
+    isRegularGateRecheckDue(card)
   );
 }
 
@@ -802,16 +796,23 @@ function buildDailyCheckDeckSource(
 
 function buildExtraCheckDeckSource(
   cards: StudyCard[],
-  seenTodayIds: Set<string>,
-  dailyLimit: number
+  seenTodayIds: Set<string>
 ) {
   return rankDailyCheckCards(
-    cards.filter((card) => isCardReadyForDailyFill(card, "all", seenTodayIds))
-  ).slice(0, dailyLimit);
+    cards.filter(
+      (card) =>
+        includeLibraryCheckCard(card.colorStatus) &&
+        !seenTodayIds.has(card.id)
+    )
+  );
 }
 
 function extraReadyCount(cards: StudyCard[], seenTodayIds: Set<string>) {
-  return cards.filter((card) => isCardReadyForDailyFill(card, "all", seenTodayIds)).length;
+  return cards.filter(
+    (card) =>
+      includeLibraryCheckCard(card.colorStatus) &&
+      !seenTodayIds.has(card.id)
+  ).length;
 }
 
 function checkSessionSummary(deck: StudyCard[]) {
@@ -864,16 +865,24 @@ function isCardAvailableForLibraryPractice(
 function gatePromptText(card: StudyCard | undefined) {
   if (!card) return "Ability Check";
 
-  if (card.activeGate === "meaning") {
-    return "This is a MEANING gate";
+  if (card.activeGate === "readiness") {
+    return "Readiness Check";
   }
 
-  return "This is a READING gate";
+  if (card.activeGate === "meaning") {
+    return "Meaning Check";
+  }
+
+  return "Reading Check";
 }
 
 function gatePromptClass(card: StudyCard | undefined) {
   const base =
     "rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wide shadow-sm sm:px-5 sm:py-2 sm:text-sm";
+
+  if (card?.activeGate === "readiness") {
+    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950`;
+  }
 
   if (card?.activeGate === "meaning") {
     return `${base} border-sky-300 bg-sky-100 text-sky-950`;
@@ -884,31 +893,83 @@ function gatePromptClass(card: StudyCard | undefined) {
 
 function checkModeLabel(card: StudyCard | undefined) {
   if (!card) return "Ability Check";
-  if (card.colorStatus.color === "purple") {
-    return card.activeGate === "reading" ? "Mastered Reading Review" : "Mastered Meaning Review";
-  }
-  if (card.colorStatus.nextGate === "mastery") {
-    return card.activeGate === "reading" ? "Mastery Reading Check" : "Mastery Meaning Check";
-  }
+  if (card.activeGate === "readiness") return "Readiness Check";
   if (card.activeGate === "reading") return "Reading Check";
   if (card.activeGate === "meaning") return "Meaning Check";
   return "Ability Check";
 }
 
 function checkModeDescription(card: StudyCard | undefined) {
-  if (!card) return "Automatic typed gates move words through your library colors";
+  if (!card) return "Ability Check moves words through readiness, reading, and meaning gates.";
+  if (card.activeGate === "readiness") {
+    return "Decide whether this word is ready to enter the Reading Gate.";
+  }
   if (card.activeGate === "reading") {
-    return "Show word + meaning -> type the reading";
+    return "Green gate: show word + meaning, then type the reading.";
   }
   if (card.activeGate === "meaning") {
-    return "Show word + reading -> type one meaning word";
+    return "Blue gate: show word + reading, then type one meaning word.";
   }
-  return "Automatic typed gates move words through your library colors";
+  return "Ability Check moves words through readiness, reading, and meaning gates.";
+}
+
+function studyModeForActiveGate(card: StudyCard | undefined): StudyMode {
+  if (card?.activeGate === "reading") return "reading_typing";
+  if (card?.activeGate === "meaning") return "meaning_typing";
+  return "reading_typing";
+}
+
+function AbilityCheckFaq() {
+  return (
+    <details className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm">
+      <summary className="cursor-pointer text-sm font-black text-slate-900">
+        Ability Check FAQ
+      </summary>
+
+      <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-600 md:grid-cols-2">
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="font-black text-slate-900">What is Ability Check?</div>
+          <p className="mt-1">
+            A short daily gate check for words that are ready to move through reading,
+            meaning, and mastery.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="font-black text-slate-900">Why don’t I see Red and Orange?</div>
+          <p className="mt-1">
+            Red and Orange build quietly from real reading encounters. Words arrive here
+            once they reach Yellow readiness.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="font-black text-slate-900">Why can’t I choose a study mode?</div>
+          <p className="mt-1">
+            Ability Check chooses the gate for the card. Yellow checks readiness, Green asks
+            reading, and Blue asks meaning.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="font-black text-slate-900">Can I keep studying?</div>
+          <p className="mt-1">
+            Yes. Finishing your chosen daily set clears the reminder, then you can keep
+            checking more unseen cards if they are available.
+          </p>
+        </div>
+      </div>
+    </details>
+  );
 }
 
 function promptModeClass(gate: LibraryCheckGate | undefined) {
   const base =
     "animate-pulse rounded-2xl border px-5 py-2.5 text-xl font-black uppercase tracking-[0.12em] shadow-sm sm:rounded-3xl sm:px-9 sm:py-4 sm:text-3xl sm:tracking-[0.16em]";
+
+  if (gate === "readiness") {
+    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950`;
+  }
 
   if (gate === "meaning") {
     return `${base} border-sky-300 bg-sky-100 text-sky-950`;
@@ -937,8 +998,8 @@ function LibraryCheckIntroCard({
 }) {
   const colorSteps = [
     { label: "Yellow", className: "bg-yellow-300", text: "ready for gate checks" },
-    { label: "Green", className: "bg-emerald-500", text: "reading passed" },
-    { label: "Blue", className: "bg-sky-500", text: "meaning passed" },
+    { label: "Green", className: "bg-emerald-500", text: "reading gate" },
+    { label: "Blue", className: "bg-sky-500", text: "meaning gate" },
     { label: "Purple", className: "bg-violet-500", text: "mastered" },
   ];
 
@@ -1084,7 +1145,7 @@ function LibraryPracticePanel({
         >
           <div className="absolute left-4 top-4 flex">
             <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-              Review Study
+              Review Study{card.jlpt ? ` · ${card.jlpt}` : ""}
             </div>
           </div>
 
@@ -1102,10 +1163,6 @@ function LibraryPracticePanel({
           </div>
 
           <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-            {card.jlpt ? (
-              <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
-            ) : null}
-
             {definitionLabel(card) ? (
               <div className={libraryStudyChipClass(card.colorStatus)}>
                 {definitionLabel(card)}
@@ -1115,7 +1172,7 @@ function LibraryPracticePanel({
 
           <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
             <div className={libraryStudyChipClass(card.colorStatus)}>
-              {card.encounterCount} encounter{card.encounterCount === 1 ? "" : "s"}
+              Read {card.encounterCount}x
             </div>
           </div>
 
@@ -1150,7 +1207,7 @@ function LibraryPracticePanel({
         <div className="relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[36vh]">
         <div className="absolute left-4 top-4 flex">
           <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-            Typing Practice
+            Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}
           </div>
         </div>
 
@@ -1168,10 +1225,6 @@ function LibraryPracticePanel({
         </div>
 
         <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-          {card.jlpt ? (
-            <div className={libraryStudyChipClass(card.colorStatus)}>{card.jlpt}</div>
-          ) : null}
-
           {definitionLabel(card) ? (
             <div className={libraryStudyChipClass(card.colorStatus)}>
               {definitionLabel(card)}
@@ -1181,7 +1234,7 @@ function LibraryPracticePanel({
 
         <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
           <div className={libraryStudyChipClass(card.colorStatus)}>
-            {card.encounterCount} encounter{card.encounterCount === 1 ? "" : "s"}
+            Read {card.encounterCount}x
           </div>
         </div>
 
@@ -1312,25 +1365,6 @@ function errorMessage(error: unknown) {
   );
 }
 
-function uniqueByNormalized(
-  values: string[],
-  normalize: (value: string) => string,
-  exclude: string
-) {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const excludeNorm = normalize(exclude);
-
-  for (const value of values) {
-    const norm = normalize(value);
-    if (!norm || norm === excludeNorm || seen.has(norm)) continue;
-    seen.add(norm);
-    out.push(value);
-  }
-
-  return out;
-}
-
 function matchesAnyMeaning(input: string, fullMeaning: string) {
   const normalizedInput = normalizeText(input);
   if (!normalizedInput) return false;
@@ -1407,20 +1441,6 @@ function saveSeenForToday(values: Set<string>) {
   }
 }
 
-function clearSeenForToday() {
-  if (typeof window === "undefined") return;
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    const today = getTodayKey();
-    delete parsed[today];
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-  } catch {
-    // ignore localStorage failures
-  }
-}
-
 function markAbilityCheckCompletedToday() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ABILITY_CHECK_COMPLETED_KEY, getTodayKey());
@@ -1431,7 +1451,6 @@ export default function LibraryStudyPage() {
   const typingInputRef = useRef<HTMLInputElement | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isTeacherUser, setIsTeacherUser] = useState(false);
   const [learningSettings, setLearningSettings] =
     useState<LearningSettingsRow>(DEFAULT_LEARNING_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -1454,30 +1473,19 @@ export default function LibraryStudyPage() {
   const [setupDailyLimit, setSetupDailyLimit] = useState<DailyCheckLimit>(20);
   const [practiceColorFilter, setPracticeColorFilter] =
     useState<PracticeColorFilter>("all");
-  const [studyMode, setStudyMode] = useState<StudyMode>("reading_typing");
 
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
   const [typingInput, setTypingInput] = useState("");
-
-  const [twoStepStage, setTwoStepStage] = useState<1 | 2>(1);
-  const [firstStepChecked, setFirstStepChecked] = useState<null | { ok: boolean; correct: string }>(
-    null
-  );
-  const [secondStepInput, setSecondStepInput] = useState("");
-  const [secondStepChecked, setSecondStepChecked] = useState<
-    null | { ok: boolean; correct: string }
-  >(null);
 
   const [endedEarly, setEndedEarly] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
   const [activeTodayKey, setActiveTodayKey] = useState(getTodayKey());
-  const [forceCheckAgainToday, setForceCheckAgainToday] = useState(false);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
 
   const currentCard = deck[index];
   const practiceCard = practiceDeck[practiceIndex];
+  const activeStudyMode = studyModeForActiveGate(currentCard);
   const dailyCheckLimit =
     dailyCheckPlan?.dailyLimit ?? cleanDailyCheckLimit(learningSettings.library_check_daily_limit);
 
@@ -1535,48 +1543,6 @@ export default function LibraryStudyPage() {
     setDebugInfo((prev) => (prev ? { ...prev, filteredCards: filteredCards.length } : prev));
   }, [filteredCards.length]);
 
-  const meaningOptions = useMemo(() => {
-    if (!currentCard) return [];
-
-    const distractors = uniqueByNormalized(
-      filteredCards
-        .filter((card) => card.id !== currentCard.id)
-        .map((card) => card.meaning),
-      normalizeText,
-      currentCard.meaning
-    ).slice(0, 3);
-
-    return shuffleArray([currentCard.meaning, ...distractors]);
-  }, [currentCard, filteredCards]);
-
-  const readingOptions = useMemo(() => {
-    if (!currentCard) return [];
-
-    const distractors = uniqueByNormalized(
-      filteredCards
-        .filter((card) => card.id !== currentCard.id)
-        .map((card) => card.reading),
-      normalizeKana,
-      currentCard.reading
-    ).slice(0, 3);
-
-    return shuffleArray([currentCard.reading, ...distractors]);
-  }, [currentCard, filteredCards]);
-
-  const surfaceOptions = useMemo(() => {
-    if (!currentCard) return [];
-
-    const distractors = uniqueByNormalized(
-      filteredCards
-        .filter((card) => card.id !== currentCard.id)
-        .map((card) => card.surface),
-      normalizeText,
-      currentCard.surface
-    ).slice(0, 3);
-
-    return shuffleArray([currentCard.surface, ...distractors]);
-  }, [currentCard, filteredCards]);
-
   useEffect(() => {
     function resetForCurrentDay() {
       const todayKey = getTodayKey();
@@ -1587,7 +1553,6 @@ export default function LibraryStudyPage() {
 
           setSeenTodayIds(loadSeenForToday());
           setDailyCheckPlan(todaysPlan);
-          setForceCheckAgainToday(false);
           setNotice(null);
           setEndedEarly(false);
           setIndex(0);
@@ -1636,24 +1601,6 @@ export default function LibraryStudyPage() {
         }
 
         setCurrentUserId(user.id);
-
-        const { data: profileRow, error: profileErr } = await supabase
-          .from("profiles")
-          .select("role, is_super_teacher")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profileErr) {
-          console.warn("Could not load profile role for Library Study:", profileErr);
-        }
-
-        const role = ((profileRow as any)?.role ?? "member") as ProfileRole;
-        const superTeacherFlag = Boolean((profileRow as any)?.is_super_teacher);
-
-        const teacherAccess =
-          role === "teacher" || role === "super_teacher" || superTeacherFlag;
-
-        setIsTeacherUser(teacherAccess);
 
         const { data: userBooks, error: userBooksErr } = await supabase
           .from("user_books")
@@ -1821,6 +1768,7 @@ export default function LibraryStudyPage() {
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
                 heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
                 heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                readyForReadingGate: isReadyForReadingGateProgress(progress),
                 mastered: progress?.mastered ?? false,
               });
 
@@ -1877,6 +1825,7 @@ export default function LibraryStudyPage() {
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
                 heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
                 heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                readyForReadingGate: isReadyForReadingGateProgress(progress),
                 mastered: progress?.mastered ?? false,
               });
 
@@ -1961,6 +1910,7 @@ export default function LibraryStudyPage() {
               meaningGate: progress?.meaning_gate_status ?? "not_started",
               heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
               heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+              readyForReadingGate: isReadyForReadingGateProgress(progress),
               mastered: progress?.mastered ?? false,
             });
 
@@ -2016,6 +1966,7 @@ export default function LibraryStudyPage() {
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
                 heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
                 heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                readyForReadingGate: isReadyForReadingGateProgress(progress),
                 mastered: progress?.mastered ?? false,
               });
 
@@ -2050,24 +2001,39 @@ export default function LibraryStudyPage() {
     }
 
     const cardById = new Map(allCards.map((card) => [card.id, card]));
-    const savedDeckSource = dailyCheckPlan.cardIds
-      ?.map((id) => cardById.get(id))
+    const savedCardIds = (dailyCheckPlan.cardIds ?? []).filter((id) => cardById.has(id));
+    const planCardIds = [...savedCardIds];
+    const plannedIds = new Set(planCardIds);
+
+    if (planCardIds.length < dailyCheckPlan.dailyLimit) {
+      const fillCards = buildDailyCheckDeckSource(
+        allCards,
+        { ...dailyCheckPlan, cardIds: undefined },
+        seenTodayIds
+      );
+
+      for (const card of fillCards) {
+        if (plannedIds.has(card.id)) continue;
+        plannedIds.add(card.id);
+        planCardIds.push(card.id);
+        if (planCardIds.length >= dailyCheckPlan.dailyLimit) break;
+      }
+    }
+
+    const nextDeckSource = planCardIds
+      .map((id) => cardById.get(id))
       .filter((card): card is StudyCard => Boolean(card))
       .filter((card) => !seenTodayIds.has(card.id));
 
-    const nextDeckSource =
-      dailyCheckPlan.cardIds && dailyCheckPlan.cardIds.length > 0
-        ? savedDeckSource ?? []
-        : buildDailyCheckDeckSource(
-            allCards,
-            dailyCheckPlan,
-            seenTodayIds
-          );
+    const planNeedsSave =
+      !dailyCheckPlan.cardIds ||
+      dailyCheckPlan.cardIds.length !== planCardIds.length ||
+      dailyCheckPlan.cardIds.some((id, index) => id !== planCardIds[index]);
 
-    if (!dailyCheckPlan.cardIds || dailyCheckPlan.cardIds.length === 0) {
+    if (planNeedsSave) {
       const planWithCards = {
         ...dailyCheckPlan,
-        cardIds: nextDeckSource.map((card) => card.id),
+        cardIds: planCardIds,
       };
 
       saveDailyCheckPlanForToday(planWithCards);
@@ -2091,22 +2057,6 @@ export default function LibraryStudyPage() {
   }, [practiceFilteredCards]);
 
   useEffect(() => {
-    if (!currentCard) return;
-    if (studyMode !== "reading_typing" && studyMode !== "meaning_typing") return;
-    if (checked || firstStepChecked || secondStepChecked) return;
-
-    const activeGate = currentCard.activeGate;
-
-    if (activeGate === "reading" && studyMode !== "reading_typing") {
-      setStudyMode("reading_typing");
-      resetCardState();
-    } else if (activeGate === "meaning" && studyMode !== "meaning_typing") {
-      setStudyMode("meaning_typing");
-      resetCardState();
-    }
-  }, [currentCard, studyMode, checked, firstStepChecked, secondStepChecked]);
-
-  useEffect(() => {
     if (!checked) return;
 
     const timer = window.setTimeout(() => {
@@ -2117,31 +2067,9 @@ export default function LibraryStudyPage() {
   }, [checked]);
 
   useEffect(() => {
-    if (!firstStepChecked || firstStepChecked.ok) return;
-
-    const timer = window.setTimeout(() => {
-      movePastCurrentCard();
-    }, 5000);
-
-    return () => window.clearTimeout(timer);
-  }, [firstStepChecked]);
-
-  useEffect(() => {
-    if (!secondStepChecked) return;
-
-    const timer = window.setTimeout(() => {
-      movePastCurrentCard();
-    }, secondStepChecked.ok ? 5000 : 5000);
-
-    return () => window.clearTimeout(timer);
-  }, [secondStepChecked]);
-
-  useEffect(() => {
     const needsTypingFocus =
-      studyMode === "reading_typing" ||
-      studyMode === "meaning_typing" ||
-      studyMode === "reading_to_meaning_typing" ||
-      studyMode === "complete_study";
+      activeStudyMode === "reading_typing" ||
+      activeStudyMode === "meaning_typing";
 
     if (!needsTypingFocus) return;
     if (!currentCard) return;
@@ -2152,7 +2080,7 @@ export default function LibraryStudyPage() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [currentCard, index, studyMode, twoStepStage]);
+  }, [activeStudyMode, currentCard, index]);
 
   useEffect(() => {
     if (libraryMode !== "check") return;
@@ -2164,13 +2092,8 @@ export default function LibraryStudyPage() {
   }, [libraryMode, endedEarly, deck.length, index]);
 
   function resetCardState() {
-    setSelectedAnswer(null);
     setChecked(null);
     setTypingInput("");
-    setTwoStepStage(1);
-    setFirstStepChecked(null);
-    setSecondStepInput("");
-    setSecondStepChecked(null);
   }
 
   function markCardSeen(cardId: string) {
@@ -2224,49 +2147,21 @@ export default function LibraryStudyPage() {
     saveDailyCheckPlanForToday(plan);
 
     setDailyCheckPlan(plan);
-    setForceCheckAgainToday(false);
     setNotice(null);
     setEndedEarly(false);
     setIndex(0);
     resetCardState();
-  }
-
-  function resetTeacherDailyCheckSetup() {
-    clearSeenForToday();
-    setSeenTodayIds(new Set());
-    setDailyCheckPlan(null);
-    setDeck([]);
-    setIndex(0);
-    setNotice(null);
-    setEndedEarly(false);
-    resetCardState();
-  }
-
-  function restartDeck() {
-    const nextDeckSource = allCards.filter((card) =>
-      isCardAvailableForLibraryCheck(card, selectedJlpt, seenTodayIds, {
-        ignoreTiming: forceCheckAgainToday,
-      })
-    );
-
-    setDeck(shuffleArray(nextDeckSource).slice(0, dailyCheckLimit));
-    setIndex(0);
-    resetCardState();
-    setEndedEarly(false);
-    setNotice(null);
   }
 
   function studyAgainToday() {
-    setForceCheckAgainToday(true);
-
-    const nextDeckSource = buildExtraCheckDeckSource(allCards, seenTodayIds, dailyCheckLimit);
+    const nextDeckSource = buildExtraCheckDeckSource(allCards, seenTodayIds);
 
     setDeck(nextDeckSource);
 
     setIndex(0);
     resetCardState();
     setEndedEarly(false);
-    setNotice("Keep checking mode is on. These are extra ready words beyond today’s official set.");
+    setNotice("Keep checking mode is on. These are extra unseen Ability Check words for today.");
   }
 
   function resetPracticeReveal() {
@@ -2382,7 +2277,7 @@ export default function LibraryStudyPage() {
     return (
       card?.colorStatus.color === "yellow" &&
       card.colorStatus.nextGate === "reading" &&
-      card.activeGate === "reading"
+      (card.activeGate === "readiness" || card.activeGate === "reading")
     );
   }
 
@@ -2419,11 +2314,6 @@ export default function LibraryStudyPage() {
 
     const now = new Date().toISOString();
     const existing = activeCard.progress;
-    const isMasteryCheck =
-      activeCard.colorStatus.nextGate === "mastery" ||
-      activeCard.colorStatus.color === "purple" ||
-      Boolean(existing?.mastered);
-
     if (!options.forceMeaning && activeCard.activeGate !== gate) return;
 
     const nextProgress: LibraryWordProgressRow = {
@@ -2456,6 +2346,11 @@ export default function LibraryStudyPage() {
         nextProgress.reading_gate_passed_at = now;
       } else {
         nextProgress.reading_gate_failed_at = now;
+        nextProgress.meaning_gate_status = "not_started";
+        nextProgress.meaning_gate_passed_at = null;
+        nextProgress.meaning_gate_failed_at = null;
+        nextProgress.mastered = false;
+        nextProgress.mastered_at = null;
       }
     } else {
       nextProgress.meaning_gate_status = ok ? "passed" : "failed";
@@ -2463,30 +2358,14 @@ export default function LibraryStudyPage() {
       nextProgress.meaning_gate_attempts += 1;
       if (ok) {
         nextProgress.meaning_gate_passed_at = now;
+        nextProgress.reading_gate_status = "passed";
+        nextProgress.mastered = true;
+        nextProgress.mastered_at = now;
       } else {
         nextProgress.meaning_gate_failed_at = now;
-      }
-    }
-
-    if (isMasteryCheck) {
-      if (ok) {
         nextProgress.reading_gate_status = "passed";
-        nextProgress.meaning_gate_status = "passed";
-        nextProgress.mastered = true;
-        nextProgress.mastered_at = nextProgress.mastered_at ?? now;
-      } else {
         nextProgress.mastered = false;
         nextProgress.mastered_at = null;
-
-        if (gate === "reading") {
-          nextProgress.reading_gate_status = "failed";
-          nextProgress.meaning_gate_status = "not_started";
-          nextProgress.meaning_gate_passed_at = null;
-          nextProgress.meaning_gate_failed_at = null;
-        } else {
-          nextProgress.reading_gate_status = "passed";
-          nextProgress.meaning_gate_status = "failed";
-        }
       }
     }
 
@@ -2550,11 +2429,12 @@ export default function LibraryStudyPage() {
     // The saved progress is picked up next time, so a word cannot climb twice in one sitting.
   }
 
-  async function comeBackLaterForCurrentCard() {
+  async function comeBackLaterForCurrentCard(waitKind: "soft" | "hard" = "hard") {
     if (!currentUserId || !currentCard || !canComeBackLater(currentCard)) return;
 
     const now = new Date().toISOString();
     const existing = currentCard.progress;
+    const isHardHold = waitKind === "hard";
 
     const { data, error } = await supabase
       .from("user_library_word_progress")
@@ -2568,7 +2448,7 @@ export default function LibraryStudyPage() {
           reading_gate_status: existing?.reading_gate_status ?? "not_started",
           meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
           held_before_reading_gate: true,
-          held_before_meaning_gate: existing?.held_before_meaning_gate ?? false,
+          held_before_meaning_gate: isHardHold,
           mastered: existing?.mastered ?? false,
           reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
           meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
@@ -2622,7 +2502,7 @@ export default function LibraryStudyPage() {
       reading_gate_status: existing?.reading_gate_status ?? "not_started",
       meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
       held_before_reading_gate: true,
-      held_before_meaning_gate: existing?.held_before_meaning_gate ?? false,
+      held_before_meaning_gate: isHardHold,
       mastered: existing?.mastered ?? false,
       reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
       meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
@@ -2646,7 +2526,8 @@ export default function LibraryStudyPage() {
               readingGate: heldProgress.reading_gate_status,
               meaningGate: heldProgress.meaning_gate_status,
               heldBeforeReadingGate: true,
-              heldBeforeMeaningGate: heldProgress.held_before_meaning_gate,
+              heldBeforeMeaningGate: isHardHold,
+              readyForReadingGate: false,
               mastered: heldProgress.mastered,
             }),
           }
@@ -2656,6 +2537,101 @@ export default function LibraryStudyPage() {
 
     markCardSeen(currentCard.id);
     nextCardWithoutMarkingSeen();
+  }
+
+  async function moveCurrentCardToReadingGate() {
+    if (!currentUserId || !currentCard || currentCard.activeGate !== "readiness") return;
+
+    const existing = currentCard.progress;
+
+    const { data, error } = await supabase
+      .from("user_library_word_progress")
+      .upsert(
+        {
+          user_id: currentUserId,
+          study_identity_key: currentCard.studyIdentityKey,
+          surface: currentCard.surface,
+          reading: currentCard.reading,
+          definition_key: "",
+          reading_gate_status: "not_started",
+          meaning_gate_status: "not_started",
+          held_before_reading_gate: false,
+          held_before_meaning_gate: false,
+          mastered: false,
+          reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
+          meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
+          reading_gate_passed_at: existing?.reading_gate_passed_at ?? null,
+          reading_gate_failed_at: existing?.reading_gate_failed_at ?? null,
+          meaning_gate_passed_at: null,
+          meaning_gate_failed_at: null,
+          mastered_at: null,
+          last_studied_at: existing?.last_studied_at ?? null,
+        },
+        { onConflict: "user_id,study_identity_key,definition_key" }
+      )
+      .select(
+        `
+          id,
+          user_id,
+          study_identity_key,
+          surface,
+          reading,
+          definition_key,
+          reading_gate_status,
+          meaning_gate_status,
+          held_before_reading_gate,
+          held_before_meaning_gate,
+          mastered,
+          reading_gate_attempts,
+          meaning_gate_attempts,
+          reading_gate_passed_at,
+          reading_gate_failed_at,
+          meaning_gate_passed_at,
+          meaning_gate_failed_at,
+          mastered_at,
+          last_studied_at
+        `
+      )
+      .single<LibraryWordProgressRow>();
+
+    if (error) {
+      console.error("Error moving Ability Check card to reading gate:", error);
+      setNotice("Could not move this word to the Reading Gate.");
+      return;
+    }
+
+    const readyProgress = data;
+    if (!readyProgress) {
+      setNotice("Could not move this word to the Reading Gate.");
+      return;
+    }
+    const updateCard = (card: StudyCard): StudyCard => {
+      if (card.studyIdentityKey !== currentCard.studyIdentityKey) return card;
+
+      const colorStatus = computeLibraryStudyColorStatus({
+        encounterCount: card.encounterCount,
+        settings: learningSettings,
+        readingGate: readyProgress.reading_gate_status,
+        meaningGate: readyProgress.meaning_gate_status,
+        heldBeforeReadingGate: readyProgress.held_before_reading_gate,
+        heldBeforeMeaningGate: readyProgress.held_before_meaning_gate,
+        readyForReadingGate: isReadyForReadingGateProgress(readyProgress),
+        mastered: readyProgress.mastered,
+      });
+
+      return {
+        ...card,
+        progress: readyProgress,
+        colorStatus,
+        activeGate: pickLibraryCheckGate(colorStatus, card.studyIdentityKey),
+      };
+    };
+
+    setAllCards((prev) => prev.map(updateCard));
+    markCardSeen(currentCard.id);
+    nextCardWithoutMarkingSeen();
+    resetCardState();
+    setNotice(null);
   }
 
   async function countMeaningReviewAsPassed(item: MeaningReviewItem) {
@@ -2672,59 +2648,23 @@ export default function LibraryStudyPage() {
     setMeaningReviewItems((prev) => prev.filter((review) => review.id !== item.id));
   }
 
-  function checkMultipleChoice(choice: string) {
-    if (!currentCard || checked) return;
-
-    let correct = currentCard.meaning;
-    let ok = false;
-
-    if (studyMode === "reading_mc") {
-      correct = currentCard.reading;
-      ok = normalizeKana(choice) === normalizeKana(correct);
-    }
-    else if (studyMode === "meaning_mc" || studyMode === "reading_to_meaning_mc") {
-      correct = currentCard.meaning;
-      ok = normalizeText(choice) === normalizeText(correct);
-    }
-    else if (studyMode === "reading_to_kanji_mc") {
-      correct = currentCard.surface;
-      ok = normalizeText(choice) === normalizeText(correct);
-    }
-
-    setSelectedAnswer(choice);
-    if (
-      (studyMode === "meaning_mc" || studyMode === "reading_to_meaning_mc")
-    ) {
-      queueMeaningReview(currentCard, choice, correct, studyMode, ok);
-    }
-
-    setChecked({ ok, correct });
-
-    recordCurrentStudyEvent(
-      ok ? "correct" : "incorrect",
-      ok,
-      studyMode
-    );
-  }
-
   function checkTypingSingle() {
     if (!currentCard || checked) return;
 
+    const currentStudyMode = activeStudyMode;
     let correct = currentCard.reading;
     let ok = false;
 
-    if (studyMode === "reading_typing") {
+    if (currentStudyMode === "reading_typing") {
       correct = currentCard.reading;
       ok = normalizeKana(typingInput) === normalizeKana(correct);
-    } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
+    } else if (currentStudyMode === "meaning_typing") {
       correct = currentCard.meaning;
       ok = matchesAnyMeaning(typingInput, correct);
     }
 
-    if (
-      (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing")
-    ) {
-      queueMeaningReview(currentCard, typingInput.trim(), correct, studyMode, ok);
+    if (currentStudyMode === "meaning_typing") {
+      queueMeaningReview(currentCard, typingInput.trim(), correct, currentStudyMode, ok);
     }
 
     setChecked({ ok, correct });
@@ -2732,57 +2672,14 @@ export default function LibraryStudyPage() {
     recordCurrentStudyEvent(
       ok ? "correct" : "incorrect",
       ok,
-      studyMode
+      currentStudyMode
     );
 
-    if (studyMode === "reading_typing") {
+    if (currentStudyMode === "reading_typing") {
       void saveTypedGateProgress("reading", ok);
-    } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
+    } else if (currentStudyMode === "meaning_typing") {
       void saveTypedGateProgress("meaning", ok);
     }
-  }
-
-  function checkCompleteStudyStep1() {
-    if (!currentCard || firstStepChecked) return;
-
-    const ok = normalizeKana(typingInput) === normalizeKana(currentCard.reading);
-    setFirstStepChecked({ ok, correct: currentCard.reading });
-
-    recordCurrentStudyEvent(
-      ok ? "correct" : "incorrect",
-      ok,
-      "complete_study_reading_step"
-    );
-
-    void saveTypedGateProgress("reading", ok);
-
-    if (ok) {
-      setTwoStepStage(2);
-      setSecondStepInput("");
-    }
-  }
-
-  function checkCompleteStudyStep2() {
-    if (!currentCard || !firstStepChecked?.ok || secondStepChecked) return;
-
-    const ok = matchesAnyMeaning(secondStepInput, currentCard.meaning);
-    queueMeaningReview(
-      currentCard,
-      secondStepInput.trim(),
-      currentCard.meaning,
-      "complete_study_meaning_step",
-      ok
-    );
-
-    setSecondStepChecked({ ok, correct: currentCard.meaning });
-
-    recordCurrentStudyEvent(
-      ok ? "correct" : "incorrect",
-      ok,
-      "complete_study_meaning_step"
-    );
-
-    void saveTypedGateProgress("meaning", ok, { forceMeaning: true });
   }
 
   async function flagCurrentCard() {
@@ -2916,6 +2813,10 @@ export default function LibraryStudyPage() {
             </p>
           </div>
 
+          <div className="mt-5">
+            <AbilityCheckFaq />
+          </div>
+
           <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm font-semibold text-slate-900">Levels</div>
             <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -2971,14 +2872,14 @@ export default function LibraryStudyPage() {
               })}
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-500">
-              Mekuru includes due cards first, then fills the rest of your daily size from ready words when possible.
+              Mekuru starts with due cards, then fills the rest from ready words when possible.
             </p>
           </section>
 
           <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm font-semibold text-slate-900">Daily check size</div>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              This is your official Ability Check for today. If you leave before finishing, Mekuru keeps your place and the reminder stays on.
+              This is today’s Ability Check. If you leave before finishing, Mekuru keeps your place and the reminder stays on.
             </p>
 
             <div className="mt-3 grid grid-cols-5 gap-2">
@@ -3005,7 +2906,7 @@ export default function LibraryStudyPage() {
           <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
             <div>Need more Ability Check cards?</div>
             <div>
-              Use Word Sky to add easier words. For review only, use Library Review or individual book study.
+              Use Word Sky to add easier words. For extra practice that does not move colors, use Library Review or book flashcards.
             </div>
           </div>
 
@@ -3067,24 +2968,14 @@ export default function LibraryStudyPage() {
           </p>
 
           <p className="mt-2 text-sm text-gray-500">
-            Mekuru checked your selected levels first, then looked for other available cards.
+            Mekuru checked your selected levels first, then looked for other ready cards.
           </p>
 
           <p className="mt-2 text-sm text-gray-500">
-            Use Library Review or individual book study if you want more review today.
+            Use Library Review or book flashcards if you want more practice today.
           </p>
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            {libraryMode === "check" && isTeacherUser && dailyCheckPlan ? (
-              <button
-                type="button"
-                onClick={resetTeacherDailyCheckSetup}
-                className="w-full rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
-              >
-                Teacher reset: change today’s check setup
-              </button>
-            ) : null}
-
             <button
               type="button"
               onClick={() => router.push("/books")}
@@ -3220,48 +3111,93 @@ export default function LibraryStudyPage() {
   }
 
   if (libraryMode === "check" && index >= deck.length) {
+    const extraCount = extraReadyCount(allCards, seenTodayIds);
+
     return (
       <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
-        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">
-            {endedEarly ? "Nice work today!" : "Nice work!"}
+        <div className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-sm">
+          {!endedEarly ? (
+            <>
+              <span className="pointer-events-none absolute left-10 top-8 h-2 w-2 animate-[dailySpark_1000ms_ease-out_forwards] rounded-full bg-emerald-300" />
+              <span className="pointer-events-none absolute right-12 top-10 h-2 w-2 animate-[dailySpark_1100ms_ease-out_120ms_forwards] rounded-full bg-sky-300" />
+              <span className="pointer-events-none absolute bottom-12 left-1/2 h-1.5 w-1.5 animate-[dailySpark_950ms_ease-out_200ms_forwards] rounded-full bg-amber-300" />
+            </>
+          ) : null}
+
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl shadow-sm">
+            {endedEarly ? "✓" : "★"}
+          </div>
+
+          <h1 className="mt-4 text-2xl font-black text-slate-950">
+            {endedEarly ? "Saved your place" : "Daily Ability Check complete"}
           </h1>
 
           {endedEarly ? (
             <>
               <p className="mt-3 text-gray-700">You gave your library some practice.</p>
-              <p className="mt-2 text-sm text-gray-500">Come back when you’re ready.</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Your reminder will stay on until you finish today’s check.
+              </p>
             </>
           ) : (
             <>
-              <p className="mt-3 text-gray-700">You finished this Ability Check session.</p>
+              <p className="mt-3 text-gray-700">
+                You finished the cards you chose for today.
+              </p>
               <p className="mt-2 text-sm text-gray-500">
-                Your daily reminder is complete. You can keep checking extra ready words if you want.
+                Your reminder is complete. Keep studying is optional.
               </p>
             </>
           )}
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-              Back to Library
-            </button>
-            {!endedEarly && extraReadyCount(allCards, seenTodayIds) > 0 ? (
+            {!endedEarly && extraCount > 0 ? (
               <button
                 type="button"
                 onClick={studyAgainToday}
-                className="rounded bg-emerald-100 px-4 py-2 text-emerald-950"
+                className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
               >
-                Keep checking
+                Keep studying
               </button>
             ) : null}
             <button
+              onClick={() => router.push("/books")}
+              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              Back to Library
+            </button>
+            <button
               type="button"
               onClick={() => router.push("/library-study/practice")}
-              className="rounded bg-sky-100 px-4 py-2 text-sky-950"
+              className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
             >
               Open Library Review
             </button>
           </div>
+
+          <style jsx>{`
+            @keyframes dailySpark {
+              0% {
+                opacity: 0;
+                transform: scale(0.2);
+                box-shadow:
+                  0 0 0 0 currentColor,
+                  0 0 0 0 currentColor,
+                  0 0 0 0 currentColor;
+              }
+              35% {
+                opacity: 1;
+              }
+              100% {
+                opacity: 0;
+                transform: scale(1.15);
+                box-shadow:
+                  16px -10px 0 -1px currentColor,
+                  -14px -8px 0 -1px currentColor,
+                  2px 16px 0 -1px currentColor;
+              }
+            }
+          `}</style>
         </div>
       </main>
     );
@@ -3281,7 +3217,7 @@ export default function LibraryStudyPage() {
                 Ability Check
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                A once-a-day check for words that are ready to move by ability.
+                A daily gate check for Yellow, Green, and Blue words.
               </p>
               {deck.length > 0 ? (
                 <p className="mt-1 text-xs text-slate-500">
@@ -3318,6 +3254,8 @@ export default function LibraryStudyPage() {
           </div>
         </button>
 
+        <AbilityCheckFaq />
+
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -3344,25 +3282,6 @@ export default function LibraryStudyPage() {
             </div>
           </div>
         </div>
-
-        {libraryMode === "check" && isTeacherUser && dailyCheckPlan ? (
-          <button
-            type="button"
-            onClick={() => {
-              clearSeenForToday();
-              setSeenTodayIds(new Set());
-              setDailyCheckPlan(null);
-              setDeck([]);
-              setIndex(0);
-              setNotice(null);
-              setEndedEarly(false);
-              resetCardState();
-            }}
-            className="w-full rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
-          >
-            Teacher reset: change today’s check setup
-          </button>
-        ) : null}
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -3431,7 +3350,7 @@ export default function LibraryStudyPage() {
               </div>
             ) : (
               <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
-                Automatic typed gates
+                Daily gate check
               </div>
             )}
           </div>
@@ -3464,26 +3383,21 @@ export default function LibraryStudyPage() {
                   {gatePromptText(currentCard)}
                 </div>
 
-                <div className="rounded-full border border-slate-100 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 shadow-sm sm:px-3 sm:py-1.5 sm:text-sm">
-                  <span
-                    className={`mr-1 inline-block h-2.5 w-2.5 rounded-full sm:mr-1.5 sm:h-5 sm:w-5 ${libraryStudyDotClass(
-                      currentCard.colorStatus
-                    )}`}
-                  />
-                  {libraryStudyColorName(currentCard.colorStatus)}
+                <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+                  <div className="rounded-full border border-slate-100 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 shadow-sm sm:px-3 sm:py-1.5 sm:text-sm">
+                    <span
+                      className={`mr-1 inline-block h-2.5 w-2.5 rounded-full sm:mr-1.5 sm:h-5 sm:w-5 ${libraryStudyDotClass(
+                        currentCard.colorStatus
+                      )}`}
+                    />
+                    {libraryStudyColorName(currentCard.colorStatus)}
+                  </div>
+                  {isKatakanaOnly(currentCard.surface) ? <KatakanaBadge /> : null}
                 </div>
               </div>
             ) : null}
 
             <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5 sm:bottom-4 sm:left-4 sm:gap-2">
-              {isKatakanaOnly(currentCard?.surface) ? <KatakanaBadge /> : null}
-
-              {currentCard?.jlpt ? (
-                <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
-                  {currentCard.jlpt}
-                </div>
-              ) : null}
-
               {definitionLabel(currentCard) ? (
                 <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
                   {definitionLabel(currentCard)}
@@ -3491,10 +3405,72 @@ export default function LibraryStudyPage() {
               ) : null}
             </div>
 
+            {currentCard ? (
+              <div className="absolute bottom-3 right-3 flex flex-wrap justify-end gap-1.5 sm:bottom-4 sm:right-4 sm:gap-2">
+                <div className={libraryStudyChipClass(currentCard.colorStatus)}>
+                  Read {currentCard.encounterCount}x
+                </div>
+              </div>
+            ) : null}
+
             <div className="flex w-full flex-col items-center gap-6 pt-12 pb-10">
-              {(studyMode === "reading_typing" ||
-                studyMode === "reading_mc" ||
-                studyMode === "complete_study") && (
+              {currentCard?.activeGate === "readiness" ? (
+                <>
+                  <div className={promptModeClass("readiness")}>
+                    READINESS
+                  </div>
+                  <div className="text-5xl font-bold">{currentCard.surface}</div>
+                  <div className="grid w-full max-w-md gap-3 text-center">
+                    <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Reading
+                      </div>
+                      <div className="mt-1 text-2xl font-semibold text-slate-900">
+                        {currentCard.reading}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Meaning
+                      </div>
+                      <div className="mt-1 text-xl font-semibold text-slate-900">
+                        {currentCard.meaning}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid w-full max-w-md gap-2 sm:grid-cols-3">
+                    <button
+                      type="button"
+                      onClick={() => void moveCurrentCardToReadingGate()}
+                      className="rounded-2xl border border-emerald-200 bg-emerald-100 px-4 py-3 text-sm font-black text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+                    >
+                      Ready for Reading Gate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void comeBackLaterForCurrentCard("soft")}
+                      className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-white"
+                    >
+                      A bit hard
+                      <span className="mt-1 block text-[10px] font-normal text-sky-700">
+                        Ask in about 1 month
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void comeBackLaterForCurrentCard("hard")}
+                      className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    >
+                      Too hard
+                      <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                        Ask in about 90 days
+                      </span>
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {currentCard?.activeGate !== "readiness" && activeStudyMode === "reading_typing" && (
                   <>
                     <div className={promptModeClass("reading")}>
                       READING
@@ -3503,7 +3479,7 @@ export default function LibraryStudyPage() {
                   </>
                 )}
 
-              {(studyMode === "meaning_typing" || studyMode === "meaning_mc") && (
+              {currentCard?.activeGate !== "readiness" && activeStudyMode === "meaning_typing" && (
                 <>
                   <div className={promptModeClass("meaning")}>
                     MEANING
@@ -3513,142 +3489,7 @@ export default function LibraryStudyPage() {
                 </>
               )}
 
-              {(studyMode === "reading_to_kanji_mc" ||
-                studyMode === "reading_to_meaning_mc" ||
-                studyMode === "reading_to_meaning_typing") && (
-                  <>
-                    <div className="text-xs uppercase tracking-wide text-slate-500">
-                      {studyMode === "reading_to_kanji_mc"
-                        ? "Which word matches this reading?"
-                        : "What is the meaning of this reading?"}
-                    </div>
-                    <div className="text-4xl font-bold">{currentCard?.reading}</div>
-                  </>
-                )}
-
-              {studyMode === "reading_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {readingOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeKana(opt) === normalizeKana(currentCard!.reading);
-                    const isChosen =
-                      !!selectedAnswer && normalizeKana(opt) === normalizeKana(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {studyMode === "meaning_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {meaningOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
-                    const isChosen =
-                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {studyMode === "reading_to_kanji_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {surfaceOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeText(opt) === normalizeText(currentCard!.surface);
-                    const isChosen =
-                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {studyMode === "reading_to_meaning_mc" && (
-                <div className="flex w-full max-w-sm flex-col gap-3">
-                  {meaningOptions.map((opt, i) => {
-                    const isCorrect =
-                      !!checked && normalizeText(opt) === normalizeText(currentCard!.meaning);
-                    const isChosen =
-                      !!selectedAnswer && normalizeText(opt) === normalizeText(selectedAnswer);
-
-                    let className = "w-full rounded border px-4 py-3 text-base ";
-                    if (!checked) className += "bg-white hover:bg-gray-50";
-                    else if (isCorrect) className += "border-green-400 bg-green-100";
-                    else if (isChosen) className += "border-red-400 bg-red-100";
-                    else className += "bg-white";
-
-                    return (
-                      <button
-                        key={`${opt}-${i}`}
-                        type="button"
-                        disabled={!!checked}
-                        onClick={() => checkMultipleChoice(opt)}
-                        className={className}
-                      >
-                        <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {(studyMode === "reading_typing" ||
-                studyMode === "meaning_typing" ||
-                studyMode === "reading_to_meaning_typing") && (
+              {currentCard?.activeGate !== "readiness" && (
                   <div className="w-full max-w-sm">
                     <input
                       ref={typingInputRef}
@@ -3665,7 +3506,7 @@ export default function LibraryStudyPage() {
                         }
                       }}
                       placeholder={
-                        studyMode === "reading_typing"
+                        activeStudyMode === "reading_typing"
                           ? "Type kana or Hepburn romaji"
                           : "Type the meaning"
                       }
@@ -3679,7 +3520,7 @@ export default function LibraryStudyPage() {
                     />
 
                     <div className="mt-2 text-center text-xs uppercase tracking-wide text-slate-500">
-                      {studyMode === "reading_typing"
+                      {activeStudyMode === "reading_typing"
                         ? "Kana is best; romaji can bypass predictive text"
                         : "Type one meaning word"}
                     </div>
@@ -3697,7 +3538,7 @@ export default function LibraryStudyPage() {
                         {canComeBackLater(currentCard) ? (
                           <button
                             type="button"
-                            onClick={comeBackLaterForCurrentCard}
+                            onClick={() => void comeBackLaterForCurrentCard("hard")}
                             className="rounded border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                           >
                             This word is too hard for me
@@ -3706,116 +3547,48 @@ export default function LibraryStudyPage() {
                       </div>
                     ) : null}
                   </div>
-                )}
-
-              {studyMode === "complete_study" && (
-                <div className="w-full max-w-sm">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="mb-1 text-sm text-gray-500">Step 1: Reading</div>
-                      <input
-                        ref={twoStepStage === 1 ? typingInputRef : null}
-                        value={typingInput}
-                        onChange={(e) => setTypingInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter") return;
-
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          if (!firstStepChecked) {
-                            checkCompleteStudyStep1();
-                          }
-                        }}
-                        placeholder="Type kana or Hepburn romaji"
-                        inputMode="text"
-                        autoCorrect="off"
-                        autoCapitalize="none"
-                        autoComplete="off"
-                        spellCheck={false}
-                        className="w-full rounded border px-4 py-3 text-base"
-                        disabled={!!firstStepChecked}
-                      />
-                      {!firstStepChecked ? (
-                        <div className="mt-1 text-xs text-slate-500">
-                          Kana is best; romaji can bypass predictive text when needed.
-                        </div>
-                      ) : null}
-                      <div className="mt-2">
-                        {!firstStepChecked ? (
-                          <button
-                            type="button"
-                            onClick={checkCompleteStudyStep1}
-                            className="rounded bg-gray-700 px-4 py-2 text-white"
-                          >
-                            Check Reading
-                          </button>
-                        ) : firstStepChecked.ok ? (
-                          <p className="text-green-700">✅ Reading correct!</p>
-                        ) : (
-                          <>
-                            <p className="text-red-700">❌ Reading: {firstStepChecked.correct}</p>
-                            <p className="mt-2 text-xs text-slate-400">
-                              Next card in a moment...
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-1 text-sm text-gray-500">Step 2: Meaning</div>
-                      <input
-                        ref={twoStepStage === 2 ? typingInputRef : null}
-                        value={secondStepInput}
-                        onChange={(e) => setSecondStepInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter") return;
-
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          if (firstStepChecked?.ok && !secondStepChecked) {
-                            checkCompleteStudyStep2();
-                          }
-                        }}
-                        placeholder="Type the meaning"
-                        className="w-full rounded border px-4 py-3 text-base"
-                        disabled={!firstStepChecked?.ok || !!secondStepChecked}
-                      />
-                      <div className="mt-2">
-                        {!secondStepChecked ? (
-                          <button
-                            type="button"
-                            onClick={checkCompleteStudyStep2}
-                            disabled={!firstStepChecked?.ok}
-                            className="rounded bg-gray-700 px-4 py-2 text-white disabled:opacity-50"
-                          >
-                            Check Meaning
-                          </button>
-                        ) : secondStepChecked.ok ? (
-                          <p className="text-green-700">✅ Meaning correct!</p>
-                        ) : (
-                          <>
-                            <p className="text-red-700">❌ Meaning: {secondStepChecked.correct}</p>
-                            <p className="mt-2 text-xs text-slate-400">
-                              Next card in a moment...
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
               )}
 
-              {studyMode !== "complete_study" && checked ? (
+              {checked ? (
                 <div className="mt-2 w-full max-w-sm text-center text-sm">
-                  {checked.ok ? (
-                    <p className="text-green-700">✅ Correct!</p>
+                  {checked.ok && activeStudyMode === "meaning_typing" ? (
+                    <div className="relative overflow-hidden rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-violet-950 shadow-sm">
+                      <span className="pointer-events-none absolute left-5 top-4 h-2 w-2 animate-[purpleBurst_900ms_ease-out_forwards] rounded-full bg-violet-400 shadow-[0_0_0_0_rgba(139,92,246,0.6)]" />
+                      <span className="pointer-events-none absolute right-8 top-5 h-1.5 w-1.5 animate-[purpleBurst_1000ms_ease-out_120ms_forwards] rounded-full bg-fuchsia-300 shadow-[0_0_0_0_rgba(217,70,239,0.55)]" />
+                      <span className="pointer-events-none absolute bottom-5 left-1/2 h-1.5 w-1.5 animate-[purpleBurst_950ms_ease-out_220ms_forwards] rounded-full bg-amber-200 shadow-[0_0_0_0_rgba(251,191,36,0.5)]" />
+                      <div className="text-lg font-black">This word became Purple!</div>
+                      <div className="mt-1 text-xs text-violet-700">
+                        Mastered words leave normal Ability Check.
+                      </div>
+                      <style jsx>{`
+                        @keyframes purpleBurst {
+                          0% {
+                            opacity: 0;
+                            transform: scale(0.2);
+                            box-shadow:
+                              0 0 0 0 currentColor,
+                              0 0 0 0 currentColor,
+                              0 0 0 0 currentColor;
+                          }
+                          35% {
+                            opacity: 1;
+                          }
+                          100% {
+                            opacity: 0;
+                            transform: scale(1.2);
+                            box-shadow:
+                              18px -10px 0 -1px currentColor,
+                              -16px -8px 0 -1px currentColor,
+                              2px 18px 0 -1px currentColor;
+                          }
+                        }
+                      `}</style>
+                    </div>
+                  ) : checked.ok ? (
+                    <p className="text-green-700">Correct!</p>
                   ) : (
                     <>
-                      <p className="text-red-700">❌ Not quite.</p>
+                      <p className="text-red-700">Not quite.</p>
                       <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
                     </>
                   )}
@@ -3828,17 +3601,6 @@ export default function LibraryStudyPage() {
                   </div>
 
                   <p className="mt-3 text-xs text-slate-400">Next card in a moment...</p>
-                </div>
-              ) : null}
-
-              {studyMode === "complete_study" && secondStepChecked ? (
-                <div className="mt-2 w-full max-w-sm text-center text-sm">
-                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                    <div className="text-lg font-semibold">{currentCard?.surface}</div>
-                    <div className="mt-1 text-sm text-slate-500">{currentCard?.reading}</div>
-                    <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
-                    <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
-                  </div>
                 </div>
               ) : null}
             </div>
@@ -3867,7 +3629,7 @@ export default function LibraryStudyPage() {
                   {canComeBackLater(currentCard) ? (
                     <button
                       type="button"
-                      onClick={comeBackLaterForCurrentCard}
+                      onClick={() => void comeBackLaterForCurrentCard("hard")}
                       className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
                     >
                       <div className="leading-tight">Too hard for now</div>

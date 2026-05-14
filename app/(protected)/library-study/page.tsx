@@ -21,12 +21,20 @@ const studyTools = [
     className: "border-sky-200 bg-sky-50 text-sky-950",
   },
   {
+    title: "久しぶり Review",
+    href: "/library-study/practice?color=purple",
+    eyebrow: "Mastered words",
+    description:
+      "Lightly revisit Purple words every now and then without moving normal Ability Check.",
+    className: "border-violet-200 bg-violet-50 text-violet-950",
+  },
+  {
     title: "Book Flashcards",
     href: "/library-study/book-flashcards",
     eyebrow: "Book-based study",
     description:
       "Study words from individual books when you want a focused book session.",
-    className: "border-violet-200 bg-violet-50 text-violet-950",
+    className: "border-indigo-200 bg-indigo-50 text-indigo-950",
   },
   {
     title: "Kanji Readings",
