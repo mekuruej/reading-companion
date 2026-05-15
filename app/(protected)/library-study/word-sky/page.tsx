@@ -88,7 +88,7 @@ function colorClass(color: ClaimedColor | null) {
 }
 
 function colorLabel(color: ClaimedColor) {
-  if (color === "green") return "I can read it";
+  if (color === "green") return "Ready for Reading Gate";
   if (color === "blue") return "I know a meaning";
   return "Settled";
 }

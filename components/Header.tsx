@@ -173,7 +173,7 @@ export default function Header() {
 
               {showLibraryMenu ? (
                 <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
-                  
+
                   <Link
                     href={libraryHref}
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === libraryHref || pathname === "/books" || /^\/users\/[^/]+\/books$/.test(pathname)
@@ -184,7 +184,7 @@ export default function Header() {
                   >
                     My Mekuru Library
                   </Link>
-                  
+
                   <Link
                     href="/library"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library"
@@ -204,18 +204,18 @@ export default function Header() {
                       }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
-                    Book Hubs
+                    Book Hub Index
                   </Link>
 
                   <Link
-                    href="/vocab"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/vocab"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
+                    href="/library/vocab-list-index"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
-                    Vocab Lists
+                    Vocab List Index
                   </Link>
                 </div>
               ) : null}
@@ -274,7 +274,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Ability Check
+                    Ability Check (Due Cards)
                   </Link>
 
                   <Link
@@ -462,7 +462,7 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/community/stats/"
+                    href="/community/stats"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"

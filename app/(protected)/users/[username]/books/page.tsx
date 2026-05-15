@@ -44,6 +44,8 @@ type UserBookRow = {
   format_type: string | null;
   progress_mode: string | null;
   show_page_numbers: boolean | null;
+  rating_overall?: number | null;
+  rating_difficulty?: number | null;
   is_teacher_prep?: boolean | null;
   teacher_prep_kind?: string | null;
   prepared_by?: string | null;
@@ -110,6 +112,22 @@ type MonthOption = {
 type UserBarVariant = "full" | "logoutOnly" | "labelOnly";
 type LibrarySnapshotView = "monthly" | "colors";
 type MekuruColor = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "grey";
+type LibrarySortMode =
+  | "status"
+  | "title"
+  | "last_engaged"
+  | "last_read"
+  | "rating_high"
+  | "rating_low"
+  | "difficulty_high"
+  | "difficulty_low"
+  | "pace_fast"
+  | "pace_slow";
+
+function isListeningFormat(value: string | null | undefined) {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized === "listening" || normalized === "audiobook" || normalized.includes("audio");
+}
 
 type AbilityCheckReminderSettings = {
   red_stages?: number | null;
@@ -176,11 +194,7 @@ function ymdInTimeZone(value: string | Date, timeZone: string) {
 }
 
 function getTodayKey() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return ymdInTimeZone(new Date(), "Asia/Tokyo") ?? new Date().toISOString().slice(0, 10);
 }
 
 function loadAbilityCheckSeenForToday() {
@@ -278,6 +292,14 @@ function isAbilityCheckCardInDailyPool(
     colorStatus.nextGate === "meaning";
 
   if (!included) return false;
+
+  if (
+    colorStatus.color === "red" &&
+    progress?.held_before_reading_gate &&
+    progress?.held_before_meaning_gate
+  ) {
+    return daysSinceIso(progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
+  }
 
   if (colorStatus.color === "grey") {
     if (colorStatus.greyReason === "pre_reading_support") {
@@ -618,13 +640,10 @@ export default function BooksPage() {
   }, [rows, bookTypeFilter, formatFilter]);
 
   const allValidRows = filteredRows.filter((r) => !!r.books);
-  const teacherPrepBooks = allValidRows.filter((r) => !!r.is_teacher_prep);
   const validRows = allValidRows.filter((r) => !r.is_teacher_prep);
 
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
-  const [sortMode, setSortMode] = useState<
-    "status" | "title" | "last_engaged" | "last_read"
-  >("status");
+  const [sortMode, setSortMode] = useState<LibrarySortMode>("status");
 
   const [librarySnapshotView, setLibrarySnapshotView] =
     useState<LibrarySnapshotView>("monthly");
@@ -660,6 +679,8 @@ export default function BooksPage() {
   const [abilityCheckReminderCount, setAbilityCheckReminderCount] = useState(0);
   const [abilityCheckReminderLoading, setAbilityCheckReminderLoading] = useState(false);
   const [abilityCheckReminderHidden, setAbilityCheckReminderHidden] = useState(false);
+  const [abilityCheckReminderCompleted, setAbilityCheckReminderCompleted] = useState(false);
+  const [abilityCheckReminderDayKey, setAbilityCheckReminderDayKey] = useState(getTodayKey());
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
@@ -924,7 +945,10 @@ export default function BooksPage() {
 
       setAbilityCheckReminderEnabled(resolvedSettings.show_ability_check_reminder);
 
-      if (!resolvedSettings.show_ability_check_reminder || abilityCheckCompletedToday()) {
+      const completedToday = abilityCheckCompletedToday();
+      setAbilityCheckReminderCompleted(completedToday);
+
+      if (!resolvedSettings.show_ability_check_reminder || completedToday) {
         setAbilityCheckReminderCount(0);
         return;
       }
@@ -1024,6 +1048,8 @@ export default function BooksPage() {
         format_type,
         progress_mode,
         show_page_numbers,
+        rating_overall,
+        rating_difficulty,
         is_teacher_prep,
         teacher_prep_kind,
         prepared_by,
@@ -1054,12 +1080,14 @@ export default function BooksPage() {
 
     const userBookIds = loadedRows.map((r: any) => r.id);
     const pageCountByUserBookId: Record<string, number | null> = {};
+    const formatTypeByUserBookId: Record<string, string | null> = {};
 
     for (const r of loadedRows) {
       pageCountByUserBookId[r.id] = r.books?.page_count ?? null;
+      formatTypeByUserBookId[r.id] = r.format_type ?? null;
     }
 
-    await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId);
+    await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId, formatTypeByUserBookId);
 
     if (isTeacher && targetUserId === meId) {
       const studentAlertUserIds = isSuperTeacher
@@ -1485,7 +1513,8 @@ export default function BooksPage() {
 
   async function loadReadingStatsForBooks(
     userBookIds: string[],
-    pageCountByUserBookId: Record<string, number | null>
+    pageCountByUserBookId: Record<string, number | null>,
+    formatTypeByUserBookId: Record<string, string | null>
   ) {
     if (userBookIds.length === 0) {
       setReadingStatsByUserBookId({});
@@ -1494,7 +1523,7 @@ export default function BooksPage() {
 
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("user_book_id, start_page, end_page, minutes_read, read_on")
+      .select("user_book_id, start_page, end_page, minutes_read, read_on, session_mode")
       .in("user_book_id", userBookIds);
 
     if (error) {
@@ -1528,6 +1557,13 @@ export default function BooksPage() {
       const endPage = Number((row as any).end_page);
       const rawMinutes = (row as any).minutes_read;
       const readOn = (row as any).read_on as string | null;
+      const sessionMode = (row as any).session_mode as string | null;
+      const hasPageRange =
+        Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage;
+      const countsForVisualPace =
+        hasPageRange &&
+        !isListeningFormat(sessionMode) &&
+        !isListeningFormat(formatTypeByUserBookId[userBookId]);
 
       if (!grouped[userBookId]) {
         grouped[userBookId] = {
@@ -1548,9 +1584,16 @@ export default function BooksPage() {
       }
       const minutesRead = rawMinutes == null ? null : Number(rawMinutes);
 
-      grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
+      if (Number.isFinite(endPage)) {
+        grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
+      }
 
-      if (minutesRead != null && Number.isFinite(minutesRead) && minutesRead > 0) {
+      if (
+        countsForVisualPace &&
+        minutesRead != null &&
+        Number.isFinite(minutesRead) &&
+        minutesRead > 0
+      ) {
         grouped[userBookId].totalTimedPages += endPage - startPage + 1;
         grouped[userBookId].totalTimedMinutes += minutesRead;
       }
@@ -1804,6 +1847,7 @@ export default function BooksPage() {
 
   useEffect(() => {
     setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
+    setAbilityCheckReminderCompleted(abilityCheckCompletedToday());
 
     if (!viewingUserId || !meId || viewingUserId !== meId) {
       setAbilityCheckReminderCount(0);
@@ -1811,7 +1855,31 @@ export default function BooksPage() {
     }
 
     loadAbilityCheckReminder(viewingUserId);
-  }, [viewingUserId, meId]);
+  }, [viewingUserId, meId, abilityCheckReminderDayKey]);
+
+  useEffect(() => {
+    function refreshAbilityCheckReminderDay() {
+      const todayKey = getTodayKey();
+      setAbilityCheckReminderDayKey((previous) =>
+        previous === todayKey ? previous : todayKey
+      );
+      setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
+      setAbilityCheckReminderCompleted(abilityCheckCompletedToday());
+    }
+
+    refreshAbilityCheckReminderDay();
+
+    const interval = window.setInterval(refreshAbilityCheckReminderDay, 60_000);
+
+    window.addEventListener("focus", refreshAbilityCheckReminderDay);
+    document.addEventListener("visibilitychange", refreshAbilityCheckReminderDay);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshAbilityCheckReminderDay);
+      document.removeEventListener("visibilitychange", refreshAbilityCheckReminderDay);
+    };
+  }, []);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -1919,10 +1987,6 @@ export default function BooksPage() {
     loadAlerts();
   }, [viewingUserId, meId, isTeacher, students]);
 
-  const sortedTeacherPrepBooks = useMemo(() => {
-    return sortLibraryItems(teacherPrepBooks);
-  }, [teacherPrepBooks, sortMode, readingStatsByUserBookId]);
-
   const currentlyReading = validRows.filter(
     (r) => !!r.started_at && !r.finished_at && !r.dnf_at
   );
@@ -1981,6 +2045,21 @@ export default function BooksPage() {
     return "Not started";
   }
 
+  function compareNullableNumber(
+    aValue: number | null | undefined,
+    bValue: number | null | undefined,
+    direction: "asc" | "desc"
+  ) {
+    const aHasValue = typeof aValue === "number" && Number.isFinite(aValue);
+    const bHasValue = typeof bValue === "number" && Number.isFinite(bValue);
+
+    if (!aHasValue && !bHasValue) return 0;
+    if (!aHasValue) return 1;
+    if (!bHasValue) return -1;
+
+    return direction === "asc" ? aValue - bValue : bValue - aValue;
+  }
+
   function sortLibraryItems(items: UserBookRow[]) {
     const copy = [...items];
 
@@ -2009,6 +2088,38 @@ export default function BooksPage() {
         const aDate = a.finished_at ? new Date(a.finished_at).getTime() : 0;
         const bDate = b.finished_at ? new Date(b.finished_at).getTime() : 0;
         return bDate - aDate;
+      }
+
+      if (sortMode === "rating_high") {
+        return compareNullableNumber(a.rating_overall, b.rating_overall, "desc");
+      }
+
+      if (sortMode === "rating_low") {
+        return compareNullableNumber(a.rating_overall, b.rating_overall, "asc");
+      }
+
+      if (sortMode === "difficulty_high") {
+        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "asc");
+      }
+
+      if (sortMode === "difficulty_low") {
+        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "desc");
+      }
+
+      if (sortMode === "pace_fast") {
+        return compareNullableNumber(
+          readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
+          readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
+          "asc"
+        );
+      }
+
+      if (sortMode === "pace_slow") {
+        return compareNullableNumber(
+          readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
+          readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
+          "desc"
+        );
       }
 
       return getStatusOrder(a) - getStatusOrder(b);
@@ -2135,8 +2246,8 @@ export default function BooksPage() {
     viewingUserId === meId &&
     abilityCheckReminderEnabled &&
     !abilityCheckReminderLoading &&
-    abilityCheckReminderCount > 0 &&
-    !abilityCheckReminderHidden;
+    !abilityCheckReminderHidden &&
+    !abilityCheckReminderCompleted;
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
@@ -2172,11 +2283,20 @@ export default function BooksPage() {
                 <div className="text-sm font-semibold text-sky-950">
                   Ability Check is ready today
                 </div>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  You have {abilityCheckReminderCount} word
-                  {abilityCheckReminderCount === 1 ? "" : "s"} waiting for a quick typed check.
-                  Due cards come first, then Mekuru fills from your ready pool.
-                </p>
+                {abilityCheckReminderCount > 0 ? (
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    You have {abilityCheckReminderCount} due card
+                    {abilityCheckReminderCount === 1 ? "" : "s"}. Ability Check is intentionally
+                    small and spaced. For more study, use Library Review, Word Sky, or book
+                    flashcards.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    No Ability Check cards are due today. That is normal: Ability Check only shows
+                    spaced cards when they are ready. For extra study, use Library Review, Word Sky,
+                    or book flashcards.
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -2202,288 +2322,95 @@ export default function BooksPage() {
           </div>
         ) : null}
 
-        <div className="mb-6 hidden w-full sm:block">
-          <div className="max-w-[720px] rounded-3xl border border-slate-400/70 bg-slate-300/45 p-4 shadow-sm">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900 sm:text-base">
-                  {librarySnapshotView === "monthly" ? "Monthly Snapshot" : "Mekuru Color Counts"}
-                </h2>
-                {librarySnapshotView === "monthly" ? (
-                  <p className="mt-1 text-xs text-slate-700">
-                    Effort across all books for this month
-                  </p>
-                ) : (
-                  <div className="mt-1 space-y-0.5 text-xs text-slate-700">
-                    <p>Current color state across your Library Study words.</p>
-                    <p>Arrows compare this month with last month and reset on the 1st.</p>
-                    <p></p>
+        <div className="mb-8 w-full">
+          <details className="max-w-[1200px] rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm">
+            <summary className="cursor-pointer text-sm font-black text-slate-900">
+              How do I use this library?
+            </summary>
+
+            <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
+              After requesting a book and adding it to your library, you can choose how
+              you want to read, study, listen, or review.
+            </p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push("/library/curiosity-reading-index")}
+                  className="rounded-2xl border border-rose-100 bg-rose-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-rose-100"
+                >
+                  <div className="text-sm font-black text-slate-950">
+                    Read + Save Words
                   </div>
-                )}
+                  <p className="mt-1 truncate text-xs text-slate-600">
+                    Time your reading while looking up new words.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => router.push("/library/saved-word-reading-index")}
+                  className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-indigo-100"
+                >
+                  <div className="text-sm font-black text-slate-950">
+                    Saved Word Reading
+                  </div>
+                  <p className="mt-1 truncate text-xs text-slate-600">
+                    Time your reading your saved-word support.
+                  </p>
+                </button>
               </div>
 
-              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-                <div className="grid grid-cols-2 rounded-xl border border-slate-400 bg-slate-50 p-1 text-xs font-semibold text-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setLibrarySnapshotView("monthly")}
-                    className={`rounded-lg px-3 py-1.5 transition ${librarySnapshotView === "monthly"
-                      ? "bg-white text-slate-950 shadow-sm"
-                      : "hover:bg-white/70"
-                      }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLibrarySnapshotView("colors")}
-                    className={`rounded-lg px-3 py-1.5 transition ${librarySnapshotView === "colors"
-                      ? "bg-white text-slate-950 shadow-sm"
-                      : "hover:bg-white/70"
-                      }`}
-                  >
-                    Colors
-                  </button>
-                </div>
+              <div className="grid gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push("/library/just-reading-index")}
+                  className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-emerald-100"
+                >
+                  <div className="text-sm font-black text-slate-950">Just Read</div>
+                  <p className="mt-1 truncate text-xs text-slate-600">
+                    Just time and read, the old-fashioned way.
+                  </p>
+                </button>
 
-                {librarySnapshotView === "monthly" ? (
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="w-[160px] rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900"
-                  >
-                    {monthOptions.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => router.push("/library/just-listening-index")}
+                  className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
+                >
+                  <div className="text-sm font-black text-slate-950">Just Listen</div>
+                  <p className="mt-1 truncate text-xs text-slate-600">
+                    Time and track your listening for ear-training purposes.
+                  </p>
+                </button>
+              </div>
+
+              <div className="grid gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push("/library-study")}
+                  className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
+                >
+                  <div className="text-sm font-black text-slate-950">Study Hub</div>
+                  <p className="mt-1 truncate text-xs text-slate-600">
+                    Study saved words in a variety of ways.
+                  </p>
+                </button>
 
                 <button
                   type="button"
                   onClick={() => router.push("/community/stats")}
-                  className="rounded-xl border border-slate-400 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 hover:bg-white"
+                  className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
                 >
-                  See Full Stats
+                  <div className="text-sm font-black text-slate-950">Stats Hub</div>
+                  <p className="mt-1 truncate text-xs text-slate-600">
+                    See habits, vocab, and progress.
+                  </p>
                 </button>
               </div>
             </div>
-
-            {librarySnapshotView === "monthly" ? (
-              <>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                    <div className="text-[11px] text-slate-600">Days Engaged</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {monthlyStatsLoading ? "…" : monthlyStats.daysRead}
-                    </div>
-                    <div className="mt-1 text-[10px] text-slate-500">Read, listened, or saved words</div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                    <div className="text-[11px] text-slate-600">Pages Read</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {monthlyStatsLoading ? "…" : monthlyStats.pagesRead}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                    <div className="text-[11px] text-slate-600">Words Saved</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {monthlyStatsLoading ? "…" : monthlyStats.totalWordsLookedUp}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5">
-                    <div className="text-[11px] text-slate-600">Time Total</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {monthlyStatsLoading ? "…" : formatMinutesAsReadableTime(monthlyStats.totalTimeMinutes)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
-                    <div className="text-[11px] text-slate-500">Current Run</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">
-                      {monthlyStatsLoading
-                        ? "…"
-                        : monthlyStats.currentRunDays > 0
-                          ? `${monthlyStats.currentRunDays} day${monthlyStats.currentRunDays === 1 ? "" : "s"
-                          }`
-                          : "—"}
-                    </div>
-                    <div className="mt-1 text-[10px] text-slate-500">
-                      Consecutive engaged days ending today
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-4 py-3">
-                    <div className="text-[11px] text-slate-500">Longest Run This Month</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">
-                      {monthlyStatsLoading
-                        ? "…"
-                        : monthlyStats.longestRunDays > 0
-                          ? `${monthlyStats.longestRunDays} day${monthlyStats.longestRunDays === 1 ? "" : "s"
-                          }`
-                          : "—"}
-                    </div>
-                    <div className="mt-1 text-[10px] text-slate-500">
-                      Best streak anywhere in this month
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <MekuruColorRowLabel label="Based on encounters" />
-                  <div className="grid grid-cols-3 gap-2">
-                    {MEKURU_ENCOUNTER_COLORS.map((color) => (
-                      <div
-                        key={color}
-                        className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5"
-                      >
-                        <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                          <span className={`h-2.5 w-2.5 rounded-full ${mekuruColorDotClass(color)}`} />
-                          {mekuruColorLabel(color)}
-                        </div>
-                        <div className="mt-1 text-lg font-semibold text-slate-900">
-                          {mekuruColorCountsLoading ? (
-                            "…"
-                          ) : (
-                            <span className="flex items-baseline gap-2">
-                              {mekuruColorTotals[color]}
-                              <MekuruColorDelta
-                                value={
-                                  mekuruColorMovementTotals[color] -
-                                  previousMekuruColorMovementTotals[color]
-                                }
-                              />
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <MekuruColorRowLabel label="Based on ability" />
-                  <div className="grid grid-cols-3 gap-2">
-                    {MEKURU_ABILITY_COLORS.map((color) => (
-                      <div
-                        key={color}
-                        className="rounded-2xl border border-slate-300/80 bg-white/75 p-2.5"
-                      >
-                        <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                          <span className={`h-2.5 w-2.5 rounded-full ${mekuruColorDotClass(color)}`} />
-                          {mekuruColorLabel(color)}
-                        </div>
-                        <div className="mt-1 text-lg font-semibold text-slate-900">
-                          {mekuruColorCountsLoading ? (
-                            "…"
-                          ) : (
-                            <span className="flex items-baseline gap-2">
-                              {mekuruColorTotals[color]}
-                              <MekuruColorDelta
-                                value={
-                                  mekuruColorMovementTotals[color] -
-                                  previousMekuruColorMovementTotals[color]
-                                }
-                              />
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <MekuruColorRowLabel label="Between gates" />
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
-                      <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                        <span className={`h-2 w-2 rounded-full ${mekuruColorDotClass("grey")}`} />
-                        Limbo total
-                      </div>
-                      <div className="mt-1 text-base font-semibold text-slate-900">
-                        {mekuruColorCountsLoading ? (
-                          "…"
-                        ) : (
-                          <span className="flex items-baseline gap-2">
-                            {mekuruColorTotals.grey}
-                            <MekuruColorDelta
-                              value={
-                                mekuruColorMovementTotals.grey -
-                                previousMekuruColorMovementTotals.grey
-                              }
-                            />
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
-                      <div className="text-[10px] text-slate-500">Before Reading</div>
-                      <div className="mt-1 text-base font-semibold text-slate-900">
-                        {mekuruColorCountsLoading ? (
-                          "…"
-                        ) : (
-                          <span className="flex items-baseline gap-2">
-                            {mekuruLimboTotals.pre_reading_support}
-                            <MekuruColorDelta
-                              value={
-                                mekuruLimboMovementTotals.pre_reading_support -
-                                previousMekuruLimboMovementTotals.pre_reading_support
-                              }
-                            />
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
-                      <div className="text-[10px] text-slate-500">Reading Missed</div>
-                      <div className="mt-1 text-base font-semibold text-slate-900">
-                        {mekuruColorCountsLoading ? (
-                          "…"
-                        ) : (
-                          <span className="flex items-baseline gap-2">
-                            {mekuruLimboTotals.reading_gate_support}
-                            <MekuruColorDelta
-                              value={
-                                mekuruLimboMovementTotals.reading_gate_support -
-                                previousMekuruLimboMovementTotals.reading_gate_support
-                              }
-                            />
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-slate-300/80 bg-white/80 px-3 py-2">
-                      <div className="text-[10px] text-slate-500">Meaning Missed</div>
-                      <div className="mt-1 text-base font-semibold text-slate-900">
-                        {mekuruColorCountsLoading ? (
-                          "…"
-                        ) : (
-                          <span className="flex items-baseline gap-2">
-                            {mekuruLimboTotals.meaning_gate_support}
-                            <MekuruColorDelta
-                              value={
-                                mekuruLimboMovementTotals.meaning_gate_support -
-                                previousMekuruLimboMovementTotals.meaning_gate_support
-                              }
-                            />
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          </details>
         </div>
 
         {false && isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
@@ -2623,17 +2550,19 @@ export default function BooksPage() {
 
             <select
               value={sortMode}
-              onChange={(e) =>
-                setSortMode(
-                  e.target.value as "status" | "title" | "last_engaged" | "last_read"
-                )
-              }
+              onChange={(e) => setSortMode(e.target.value as LibrarySortMode)}
               className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
             >
               <option value="status">Book Status</option>
               <option value="title">Title</option>
               <option value="last_read">Recently Finished</option>
               <option value="last_engaged">Last Engaged with</option>
+              <option value="rating_high">High to Low Rating</option>
+              <option value="rating_low">Low to High Rating</option>
+              <option value="difficulty_high">High to Low Difficulty</option>
+              <option value="difficulty_low">Low to High Difficulty</option>
+              <option value="pace_fast">Fastest to Slowest Pace</option>
+              <option value="pace_slow">Slowest to Fastest Pace</option>
             </select>
           </div>
         </div>
@@ -2656,18 +2585,9 @@ export default function BooksPage() {
               <Section title="DNF" subtitle="Did not finish" items={dnf} />
             </>
           ) : (
-            <>
-              {isTeacher ? (
-                <Section
-                  title="Teacher Trial Prep"
-                  subtitle="Prep copies for trial lessons"
-                  items={sortedTeacherPrepBooks}
-                />
-              ) : null}
-              <ul className={gridClass}>
-                {sortedValidRows.map((row) => renderBookCard(row))}
-              </ul>
-            </>
+            <ul className={gridClass}>
+              {sortedValidRows.map((row) => renderBookCard(row))}
+            </ul>
           )
         ) : (
           <>

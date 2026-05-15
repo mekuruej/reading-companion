@@ -129,6 +129,7 @@ export function computeLibraryStudyColorStatus(
   const encounter = computeEncounterColor(input.encounterCount, input.settings);
   const readingGate = input.readingGate ?? "not_started";
   const meaningGate = input.meaningGate ?? "not_started";
+  const hasEnoughEncounters = encounter.encounterStep >= encounter.totalEncounterSteps;
 
   if (input.mastered || meaningGate === "passed") {
     return {
@@ -169,6 +170,24 @@ export function computeLibraryStudyColorStatus(
     };
   }
 
+  if (
+    hasEnoughEncounters &&
+    readingGate === "not_started" &&
+    input.heldBeforeReadingGate &&
+    input.heldBeforeMeaningGate
+  ) {
+    return {
+      ...encounter,
+      color: "red",
+      stageNumber: 2,
+      stageCount: 3,
+      eligibleForLibraryStudy: true,
+      nextGate: "reading",
+      greyReason: null,
+      reason: "Sent back into early support.",
+    };
+  }
+
   if (readingGate === "failed") {
     return {
       ...encounter,
@@ -181,8 +200,6 @@ export function computeLibraryStudyColorStatus(
       reason: "Held for support after the reading gate was missed.",
     };
   }
-
-  const hasEnoughEncounters = encounter.encounterStep >= encounter.totalEncounterSteps;
 
   if (hasEnoughEncounters && input.heldBeforeReadingGate) {
     return {

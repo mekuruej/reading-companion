@@ -47,33 +47,6 @@ function stagePill(stage: MainStage) {
   return `${base} bg-slate-500 text-white`;
 }
 
-function ReadingStyleCard({
-  active,
-  title,
-  description,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-2xl border p-4 text-left transition ${
-        active
-          ? "border-stone-900 bg-stone-100"
-          : "border-stone-200 bg-white hover:bg-stone-50"
-      }`}
-    >
-      <div className="text-sm font-semibold text-stone-900">{title}</div>
-      <div className="mt-2 text-sm leading-6 text-stone-600">{description}</div>
-    </button>
-  );
-}
-
 function ColorStepCard({
   stage,
   title,
@@ -118,10 +91,6 @@ function GroupLabel({
       <p className="mt-2 text-center text-xs leading-5 text-stone-500">{detail}</p>
     </div>
   );
-}
-
-function totalEncounterSteps(settings: LearningSettings) {
-  return settings.red_stages + settings.orange_stages + settings.yellow_stages;
 }
 
 function isMissingSettingsColumnError(error: unknown) {
@@ -206,28 +175,6 @@ export default function ReadingProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function applyProfilePreset(profile: LearningSettings["learning_profile"]) {
-    if (!settings) return;
-
-    const updated: LearningSettings = { ...settings, learning_profile: profile };
-
-    if (profile === "Beginner") {
-      updated.red_stages = 3;
-      updated.orange_stages = 3;
-      updated.yellow_stages = 3;
-    } else if (profile === "Intermediate") {
-      updated.red_stages = 2;
-      updated.orange_stages = 2;
-      updated.yellow_stages = 2;
-    } else if (profile === "Advanced") {
-      updated.red_stages = 1;
-      updated.orange_stages = 1;
-      updated.yellow_stages = 1;
-    }
-
-    setSettings(updated);
   }
 
   async function saveSettings() {
@@ -335,9 +282,9 @@ export default function ReadingProfilePage() {
             important and worth noticing.
           </p>
           <p className="mt-3 text-xs leading-5 text-sky-900/70">
-            If you choose multiple red, orange, or yellow stages, small badge numbers can show the
-            current step inside that color. After the final yellow step, encounters keep counting,
-            but color movement comes from Ability Check.
+            Your reading style preset controls the encounter support behind the scenes. After the
+            final yellow step, encounters keep counting, but color movement comes from Ability
+            Check.
           </p>
         </div>
 
@@ -359,25 +306,19 @@ export default function ReadingProfilePage() {
                   stage="red"
                   title="Early encounter support"
                   detail="You have started meeting this word in real reading, but it is still too new for Ability Check."
-                  note={`Currently set to ${settings.red_stages} stage${
-                    settings.red_stages === 1 ? "" : "s"
-                  }.`}
+                  note="This is controlled by your reading style preset."
                 />
                 <ColorStepCard
                   stage="orange"
                   title="Repeated encounter support"
                   detail="The word is showing up again, but Mekuru is still gathering reading support before testing it."
-                  note={`Currently set to ${settings.orange_stages} stage${
-                    settings.orange_stages === 1 ? "" : "s"
-                  }.`}
+                  note="Encounters keep building quietly in the background."
                 />
                 <ColorStepCard
                   stage="yellow"
                   title="Ready for gate checks"
                   detail="The final yellow stage means the word has enough encounter support for Ability Check."
-                  note={`Currently set to ${settings.yellow_stages} stage${
-                    settings.yellow_stages === 1 ? "" : "s"
-                  }.`}
+                  note="Yellow is the readiness checkpoint before the Reading Gate."
                 />
               </div>
             </div>
@@ -413,84 +354,6 @@ export default function ReadingProfilePage() {
                   note="Limbo is support, not punishment."
                 />
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">Reading style preset</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-600">
-            Choose how much encounter support you usually want before words become eligible for
-            Ability Check.
-          </p>
-
-          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold leading-6 text-amber-900">
-            This controls how many real reading encounters a word needs before it can appear in
-            Ability Check. It does not count quiz answers.
-          </p>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <ReadingStyleCard
-              active={settings.learning_profile === "Beginner"}
-              title="More support"
-              description="Recommended for beginners: 3 red, 3 orange, and 3 yellow stages before Ability Check."
-              onClick={() => applyProfilePreset("Beginner")}
-            />
-            <ReadingStyleCard
-              active={settings.learning_profile === "Intermediate"}
-              title="Balanced"
-              description="Recommended for intermediate readers: 2 red, 2 orange, and 2 yellow stages before Ability Check."
-              onClick={() => applyProfilePreset("Intermediate")}
-            />
-            <ReadingStyleCard
-              active={settings.learning_profile === "Advanced"}
-              title="Lighter support"
-              description="Recommended for advanced readers: 1 red, 1 orange, and 1 yellow stage before Ability Check."
-              onClick={() => applyProfilePreset("Advanced")}
-            />
-          </div>
-
-          <div className="mt-6 border-t border-stone-200 pt-5">
-            <h3 className="text-base font-semibold text-stone-900">Encounter support stages</h3>
-            <p className="mt-1 text-sm leading-6 text-stone-600">
-              Red, orange, and yellow are based on real reading encounters, not quiz performance.
-              The final yellow stage is the normal threshold for Ability Check.
-            </p>
-
-            <p className="mt-3 text-sm leading-6 text-stone-700">
-              Your current setup uses{" "}
-              <span className="font-semibold">{totalEncounterSteps(settings)} encounter steps</span>{" "}
-              before a word is ready for its first Ability Check gate.
-            </p>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              {(["red", "orange", "yellow"] as const).map((color) => (
-                <div key={color}>
-                  <label className="block text-sm font-medium capitalize text-stone-800">
-                    {color} stages
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={settings[`${color}_stages` as keyof LearningSettings] as number}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        [`${color}_stages`]: Number(e.target.value),
-                        learning_profile: "Custom",
-                      } as LearningSettings)
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
-              If too many hard words are showing up in Ability Check, a gentle custom setup is to
-              leave red and orange lower and add extra yellow stages. That keeps words visible as
-              almost-ready without sending them to a gate too quickly.
             </div>
           </div>
         </div>

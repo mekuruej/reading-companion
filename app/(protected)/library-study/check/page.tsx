@@ -14,6 +14,7 @@ import {
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
+import { todayYmdAppTimeZone } from "@/lib/timeZone";
 
 type UserBookJoinRow = {
   id: string;
@@ -469,15 +470,14 @@ function progressWithWordSkyClaim(
     surface,
     reading,
     definition_key: "",
-    reading_gate_status: "passed",
-    meaning_gate_status: progress?.meaning_gate_status ?? "not_started",
+    reading_gate_status: "not_started",
+    meaning_gate_status: "not_started",
     held_before_reading_gate: false,
     held_before_meaning_gate: false,
     mastered: false,
     reading_gate_attempts: progress?.reading_gate_attempts ?? 0,
     meaning_gate_attempts: progress?.meaning_gate_attempts ?? 0,
-    reading_gate_passed_at:
-      progress?.reading_gate_passed_at ?? claim.updated_at ?? claim.created_at ?? null,
+    reading_gate_passed_at: progress?.reading_gate_passed_at ?? null,
     reading_gate_failed_at: progress?.reading_gate_failed_at ?? null,
     meaning_gate_passed_at: progress?.meaning_gate_passed_at ?? null,
     meaning_gate_failed_at: progress?.meaning_gate_failed_at ?? null,
@@ -610,6 +610,7 @@ function hashString(value: string) {
 }
 
 function pickLibraryCheckGate(status: LibraryStudyColorStatus, _seed: string): LibraryCheckGate {
+  if (status.color === "red" && status.eligibleForLibraryStudy) return "readiness";
   if (status.color === "yellow" && status.eligibleForLibraryStudy) return "readiness";
   if (status.nextGate === "reading") return "reading";
   if (status.nextGate === "meaning") return "meaning";
@@ -687,7 +688,19 @@ function isMissedGateLimboDue(card: StudyCard, now = new Date()) {
   return true;
 }
 
+function isBackToRedSupportCard(card: StudyCard) {
+  return (
+    card.colorStatus.color === "red" &&
+    card.progress?.held_before_reading_gate === true &&
+    card.progress?.held_before_meaning_gate === true
+  );
+}
+
 function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
+  if (isBackToRedSupportCard(card)) {
+    return daysSinceIso(card.progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
+  }
+
   if (card.colorStatus.color === "purple" || card.colorStatus.color === "grey") return true;
   if (!card.progress?.last_studied_at) return true;
 
@@ -792,27 +805,6 @@ function buildDailyCheckDeckSource(
     ...rotatedPrimaryFill,
     ...rotatedFillers,
   ].slice(0, plan.dailyLimit);
-}
-
-function buildExtraCheckDeckSource(
-  cards: StudyCard[],
-  seenTodayIds: Set<string>
-) {
-  return rankDailyCheckCards(
-    cards.filter(
-      (card) =>
-        includeLibraryCheckCard(card.colorStatus) &&
-        !seenTodayIds.has(card.id)
-    )
-  );
-}
-
-function extraReadyCount(cards: StudyCard[], seenTodayIds: Set<string>) {
-  return cards.filter(
-    (card) =>
-      includeLibraryCheckCard(card.colorStatus) &&
-      !seenTodayIds.has(card.id)
-  ).length;
 }
 
 function checkSessionSummary(deck: StudyCard[]) {
@@ -1401,11 +1393,7 @@ function matchesAnyMeaning(input: string, fullMeaning: string) {
 }
 
 function getTodayKey() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return todayYmdAppTimeZone();
 }
 
 function loadSeenForToday() {
@@ -2153,17 +2141,6 @@ export default function LibraryStudyPage() {
     resetCardState();
   }
 
-  function studyAgainToday() {
-    const nextDeckSource = buildExtraCheckDeckSource(allCards, seenTodayIds);
-
-    setDeck(nextDeckSource);
-
-    setIndex(0);
-    resetCardState();
-    setEndedEarly(false);
-    setNotice("Keep checking mode is on. These are extra unseen Ability Check words for today.");
-  }
-
   function resetPracticeReveal() {
     setPracticeRevealStep("word");
   }
@@ -2904,9 +2881,10 @@ export default function LibraryStudyPage() {
           </section>
 
           <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-            <div>Need more Ability Check cards?</div>
+            <div>Want more study after the strict check?</div>
             <div>
-              Use Word Sky to add easier words. For extra practice that does not move colors, use Library Review or book flashcards.
+              Use Library Review or book flashcards for extra practice that does not move colors.
+              Use Word Sky to add easier words to the Reading Gate.
             </div>
           </div>
 
@@ -2960,39 +2938,53 @@ export default function LibraryStudyPage() {
   if (libraryMode === "check" && deck.length === 0 && filteredCards.length === 0) {
     return (
       <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">Ability Check</h1>
+        <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Strict due cards
+          </p>
+          <h1 className="mt-2 text-2xl font-black text-slate-950">Ability Check</h1>
 
           <p className="mt-3 text-gray-600">
-            No cards are available for today’s Ability Check.
+            No cards are due for today’s Ability Check.
           </p>
 
-          <p className="mt-2 text-sm text-gray-500">
-            Mekuru checked your selected levels first, then looked for other ready cards.
-          </p>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Use Library Review or book flashcards if you want more practice today.
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-gray-500">
+            That is normal. Ability Check is intentionally small and spaced, so even a big library
+            may only have a few due cards on some days. If you want to continue studying, try one
+            of these other study options.
           </p>
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/books")}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              Back to Library
-            </button>
-
             {practiceFilteredCards.length > 0 ? (
               <button
                 type="button"
                 onClick={() => router.push("/library-study/practice")}
                 className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-              >
-                Open Library Review
-              </button>
+            >
+              Open Library Review
+            </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/word-sky")}
+              className="rounded-2xl border border-amber-200 bg-amber-100 px-5 py-3 text-sm font-semibold text-amber-950 shadow-sm transition hover:bg-amber-50"
+            >
+              Word Sky
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/practice?color=purple")}
+              className="rounded-2xl border border-violet-200 bg-violet-100 px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-50"
+            >
+              久しぶり Review
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/book-flashcards")}
+              className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+            >
+              Book Flashcards
+            </button>
           </div>
         </div>
       </main>
@@ -3111,8 +3103,6 @@ export default function LibraryStudyPage() {
   }
 
   if (libraryMode === "check" && index >= deck.length) {
-    const extraCount = extraReadyCount(allCards, seenTodayIds);
-
     return (
       <main className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
         <div className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-sm">
@@ -3145,21 +3135,12 @@ export default function LibraryStudyPage() {
                 You finished the cards you chose for today.
               </p>
               <p className="mt-2 text-sm text-gray-500">
-                Your reminder is complete. Keep studying is optional.
+                Ability Check stays strict. Use another study space if you want more practice.
               </p>
             </>
           )}
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            {!endedEarly && extraCount > 0 ? (
-              <button
-                type="button"
-                onClick={studyAgainToday}
-                className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
-              >
-                Keep studying
-              </button>
-            ) : null}
             <button
               onClick={() => router.push("/books")}
               className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
@@ -3172,6 +3153,27 @@ export default function LibraryStudyPage() {
               className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
             >
               Open Library Review
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/practice?color=purple")}
+              className="rounded-2xl border border-violet-200 bg-violet-100 px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-50"
+            >
+              久しぶり Review
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/word-sky")}
+              className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
+            >
+              Open Word Sky
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/book-flashcards")}
+              className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+            >
+              Open Book Flashcards
             </button>
           </div>
 
@@ -3463,7 +3465,7 @@ export default function LibraryStudyPage() {
                     >
                       Too hard
                       <span className="mt-1 block text-[10px] font-normal text-slate-500">
-                        Ask in about 90 days
+                        Red support · about 90 days
                       </span>
                     </button>
                   </div>
@@ -3541,7 +3543,7 @@ export default function LibraryStudyPage() {
                             onClick={() => void comeBackLaterForCurrentCard("hard")}
                             className="rounded border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                           >
-                            This word is too hard for me
+                            Send back to Red support
                           </button>
                         ) : null}
                       </div>
@@ -3634,7 +3636,7 @@ export default function LibraryStudyPage() {
                     >
                       <div className="leading-tight">Too hard for now</div>
                       <div className="text-[10px] font-normal text-slate-500">
-                        Limbo · 90 days
+                        Red support · 90 days
                       </div>
                     </button>
                   ) : null}
