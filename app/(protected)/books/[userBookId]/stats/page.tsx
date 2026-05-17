@@ -101,15 +101,15 @@ function statusLabel(row: UserBook | null) {
 function difficultyText(value: number | null) {
     switch (value) {
         case 1:
-            return "Extremely difficult";
+            return "Very easy";
         case 2:
-            return "Very difficult";
+            return "Pretty comfortable";
         case 3:
             return "Challenging but manageable";
         case 4:
-            return "Pretty comfortable";
+            return "Hard, but doable";
         case 5:
-            return "Very easy";
+            return "Extremely difficult";
         default:
             return "Not rated yet";
     }
@@ -437,12 +437,12 @@ export default function BookStatsPage() {
             };
         }
 
-        // Difficulty scale: 1 = hardest, 5 = easiest.
-        // This book is "harder than" books with a higher/easier rating.
+        // Difficulty scale: 1 = easiest, 5 = hardest.
+        // This book is "harder than" books with a lower/easier rating.
         const easierBooks = sameTypeRatedBooks.filter(
             (item) =>
                 item.rating_difficulty != null &&
-                item.rating_difficulty > (row.rating_difficulty as number)
+                item.rating_difficulty < (row.rating_difficulty as number)
         );
 
         const percentHarderThan = Math.round(

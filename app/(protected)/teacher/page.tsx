@@ -238,7 +238,6 @@ export default function TeacherHubPage() {
     });
   }
 
-
   const workbenchCards: TeacherCard[] = [
     {
       title: "Teacher Review Index",

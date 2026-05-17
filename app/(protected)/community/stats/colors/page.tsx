@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
+type MainStage = ColorKey | "grey";
 
 function ymdLocal(date: Date) {
   const year = date.getFullYear();
@@ -97,6 +98,70 @@ function limboValue(
   key: LibraryStudyLimboReason
 ) {
   return totals[key] ?? 0;
+}
+
+function colorLabel(stage: MainStage) {
+  if (stage === "grey") return "Limbo";
+  return stage.charAt(0).toUpperCase() + stage.slice(1);
+}
+
+function stagePill(stage: MainStage) {
+  const base =
+    "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold";
+
+  if (stage === "red") return `${base} bg-red-600 text-white`;
+  if (stage === "orange") return `${base} bg-orange-500 text-white`;
+  if (stage === "yellow") return `${base} bg-yellow-300 text-stone-900`;
+  if (stage === "green") return `${base} bg-green-600 text-white`;
+  if (stage === "blue") return `${base} bg-blue-600 text-white`;
+  if (stage === "purple") return `${base} bg-purple-600 text-white`;
+  return `${base} bg-slate-500 text-white`;
+}
+
+function GroupLabel({
+  title,
+  detail,
+}: {
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-stone-200" />
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+          {title}
+        </div>
+        <div className="h-px flex-1 bg-stone-200" />
+      </div>
+      <p className="mt-2 text-center text-xs leading-5 text-stone-500">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+function ColorStepCard({
+  stage,
+  title,
+  detail,
+  note,
+}: {
+  stage: MainStage;
+  title: string;
+  detail: string;
+  note: string;
+}) {
+  return (
+    <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3">
+      <span className={stagePill(stage)}>{colorLabel(stage)}</span>
+      <div className="mt-2 text-sm font-semibold leading-5 text-stone-900">
+        {title}
+      </div>
+      <div className="mt-1 text-xs leading-5 text-stone-600">{detail}</div>
+      <div className="mt-2 text-[11px] leading-4 text-stone-500">{note}</div>
+    </div>
+  );
 }
 
 export default function ReadingColorsPage() {
@@ -312,23 +377,38 @@ export default function ReadingColorsPage() {
           Reading Colors
         </h1>
 
-        <div className="mt-4 rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4 shadow-sm sm:p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm">
-              <img
-                src="/parrot.svg"
-                alt=""
-                aria-hidden="true"
-                className="h-full w-full object-contain"
-              />
-            </div>
-
+        <details className="group mt-4 rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4 shadow-sm sm:p-5">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-700">
                 Why colors?
               </p>
+              <p className="mt-1 text-sm leading-6 text-stone-600">
+                Mekuru uses colors to notice words, track movement, and separate
+                reading encounters from Ability Check gates.
+              </p>
+            </div>
 
-              <div className="mt-2 space-y-3 text-sm leading-6 text-stone-700 sm:text-base">
+            <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm group-open:hidden">
+              Open
+            </span>
+            <span className="hidden rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-black text-sky-700 shadow-sm group-open:inline-flex">
+              Close
+            </span>
+          </summary>
+
+          <div className="mt-5 border-t border-sky-100 pt-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm">
+                <img
+                  src="/parrot.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+
+              <div className="space-y-3 text-sm leading-6 text-stone-700 sm:text-base">
                 <p>
                   Do you ever look up a word and feel sure you have looked it up
                   before? Or feel like you should know a word, only to realize it is
@@ -348,8 +428,70 @@ export default function ReadingColorsPage() {
                 </p>
               </div>
             </div>
+
+            <div className="mt-6 space-y-6 rounded-2xl border border-white/80 bg-white/80 p-4">
+              <div>
+                <GroupLabel
+                  title="Based on encounters"
+                  detail="Red, orange, and yellow come from real reading encounters, not quiz answers."
+                />
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <ColorStepCard
+                    stage="red"
+                    title="Early encounter support"
+                    detail="You have started meeting this word in real reading, but it is still too new for Ability Check."
+                    note="If a word feels far above your level, Mekuru can give it more time."
+                  />
+                  <ColorStepCard
+                    stage="orange"
+                    title="Repeated encounter support"
+                    detail="The word is showing up again, but Mekuru is still gathering reading support before testing it."
+                    note="Encounters keep building quietly in the background."
+                  />
+                  <ColorStepCard
+                    stage="yellow"
+                    title="Ready for gate checks"
+                    detail="Yellow means the word has enough encounter support to ask whether it is ready for Ability Check."
+                    note="Yellow is the readiness checkpoint before the Reading Gate."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <GroupLabel
+                  title="Based on ability"
+                  detail="Green, blue, purple, and Limbo come from Ability Check results."
+                />
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  <ColorStepCard
+                    stage="green"
+                    title="Reading Gate"
+                    detail="The word is ready for a reading question in Ability Check."
+                    note="Pass this gate to move toward meaning."
+                  />
+                  <ColorStepCard
+                    stage="blue"
+                    title="Meaning Gate"
+                    detail="The reading is supported, and the word is ready for a meaning question."
+                    note="Advanced words may care about the saved definition number."
+                  />
+                  <ColorStepCard
+                    stage="purple"
+                    title="Mastered"
+                    detail="The word has cleared the major study gates and is no longer demanding regular attention."
+                    note="Purple cards return only occasionally."
+                  />
+                  <ColorStepCard
+                    stage="grey"
+                    title="Limbo: between gates"
+                    detail="The word is being held before the next gate, either because it is not ready yet or because a gate was missed."
+                    note="Limbo is support, not punishment."
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
       </div>
 
       {errorMsg ? (

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 const libraryCards = [
   {
-    title: "Library Home",
+    title: "My Mekuru Library",
     href: "/books",
     eyebrow: "Your books",
     description: "See your books, reading progress, and monthly reading snapshot.",

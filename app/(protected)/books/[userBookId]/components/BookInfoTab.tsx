@@ -153,20 +153,12 @@ type BookInfoTabProps = {
   illustratorReading: string;
   setIllustratorReading: (value: string) => void;
 
-  formatType: string;
-  setFormatType: (value: string) => void;
-  progressMode: string;
-  setProgressMode: (value: string) => void;
-  showPageNumbers: boolean;
-  setShowPageNumbers: (value: boolean) => void;
 
   relatedLinksArr: any[];
   linksText: string;
   setLinksText: (value: string) => void;
 
   bookTypeLabel: (value: string | null | undefined) => string;
-  formatTypeLabel: (value: string | null | undefined) => string;
-  progressModeLabel: (value: string | null | undefined) => string;
   displayLinkLabel: (value: any) => string;
   displayLinkUrl: (value: any) => string;
 
@@ -281,20 +273,12 @@ export default function BookInfoTab({
   illustratorReading,
   setIllustratorReading,
 
-  formatType,
-  setFormatType,
-  progressMode,
-  setProgressMode,
-  showPageNumbers,
-  setShowPageNumbers,
 
   relatedLinksArr,
   linksText,
   setLinksText,
 
   bookTypeLabel,
-  formatTypeLabel,
-  progressModeLabel,
   displayLinkLabel,
   displayLinkUrl,
 
@@ -853,65 +837,6 @@ export default function BookInfoTab({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Format</div>
-            {!isEditingMyCopy ? (
-              <div className="mt-1 font-medium">{formatTypeLabel(formatType)}</div>
-            ) : (
-              <select
-                value={formatType}
-                onChange={(e) => setFormatType(e.target.value)}
-                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-              >
-                <option value="">—</option>
-                <option value="paperback">Paperback</option>
-                <option value="hardcover">Hardcover</option>
-                <option value="ebook">eBook</option>
-                <option value="audiobook">Audiobook</option>
-                <option value="other">Other</option>
-              </select>
-            )}
-          </div>
-
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Progress Mode</div>
-            {!isEditingMyCopy ? (
-              <div className="mt-1 font-medium">{progressModeLabel(progressMode)}</div>
-            ) : (
-              <select
-                value={progressMode}
-                onChange={(e) => setProgressMode(e.target.value)}
-                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-              >
-                <option value="">—</option>
-                <option value="pages">Pages</option>
-                <option value="percent">Percent</option>
-                <option value="chapters">Chapters</option>
-                <option value="time">Time</option>
-              </select>
-            )}
-          </div>
-
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Use page numbers in this book</div>
-            {!isEditingMyCopy ? (
-              <div className="mt-1 font-medium">{showPageNumbers ? "Yes" : "No"}</div>
-            ) : (
-              <label className="mt-2 flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showPageNumbers}
-                  onChange={(e) => setShowPageNumbers(e.target.checked)}
-                />
-                <span>Show page numbers</span>
-              </label>
-            )}
-          </div>
-        </div>
-      </div>
-
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>

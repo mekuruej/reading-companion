@@ -268,18 +268,18 @@ function difficultyLabel(value: number | null | undefined) {
   if (value == null) return "Unrated";
 
   const labels: Record<number, string> = {
-    1: "1 · Very hard",
-    1.5: "1.5 · Very hard",
-    2: "2 · Challenging",
-    2.5: "2.5 · A real stretch",
+    1: "1 · Very easy",
+    1.5: "1.5 · Easy",
+    2: "2 · Comfortable",
+    2.5: "2.5 · Mostly manageable",
     3: "3 · Manageable",
-    3.5: "3.5 · Mostly manageable",
-    4: "4 · Comfortable",
-    4.5: "4.5 · Very comfortable",
-    5: "5 · Very easy",
+    3.5: "3.5 · A real stretch",
+    4: "4 · Challenging",
+    4.5: "4.5 · Very hard",
+    5: "5 · Extremely difficult",
   };
 
-  return labels[value] ?? `${formatRating(value)} · Ease rating`;
+  return labels[value] ?? `${formatRating(value)} · Difficulty rating`;
 }
 
 function pageCountBucket(pageCount: number | null | undefined) {
@@ -816,7 +816,7 @@ export default function BookDifficultyPage() {
 
   const hardestBooks = useMemo(() => {
     const pushedBackRows = finishedRatedDifficultyRows.filter(
-      (row) => row.rating_difficulty === 1
+      (row) => row.rating_difficulty === 5
     );
 
     return balancedBookTypeRows(
@@ -829,7 +829,7 @@ export default function BookDifficultyPage() {
 
   const easiestBooks = useMemo(() => {
     const comfortableRows = finishedRatedDifficultyRows.filter(
-      (row) => row.rating_difficulty === 5
+      (row) => row.rating_difficulty === 1
     );
 
     return balancedBookTypeRows(
@@ -952,9 +952,9 @@ export default function BookDifficultyPage() {
           />
 
           <StatCard
-            label="Avg Ease Rating"
+            label="Avg Difficulty"
             value={formatDecimal(totals.averageDifficulty)}
-            hint={`${totals.ratedDifficulty} finished ratings · 1 hard / 5 easy`}
+            hint={`${totals.ratedDifficulty} finished ratings · 1 easy / 5 hard`}
             tone={selectedTheme.statTwo}
           />
 
@@ -986,7 +986,7 @@ export default function BookDifficultyPage() {
           <SectionBand
             eyebrow={`Difficulty — ${selectedTimeLabel}`}
             title="Difficulty ratings"
-            description="How your finished books are distributed across your own ratings. Here, 1 means hardest and 5 means easiest."
+            description="How your finished books are distributed across your own ratings. Here, 1 means easiest and 5 means hardest."
             tone={selectedTheme.softSection}
           >
             <PieChart items={difficultyPie} size={190} />
@@ -1025,7 +1025,7 @@ export default function BookDifficultyPage() {
           <SectionBand
             eyebrow={`Hardest — ${selectedTimeLabel}`}
             title="Books that pushed back"
-            description="A representative mix of finished books rated 1 for ease. These are the books that pushed back most, relative to their book types."
+            description="A representative mix of finished books rated 5 for difficulty. These are the books that pushed back most, relative to their book types."
             tone={selectedTheme.section}
           >
             <BarStrip
@@ -1041,7 +1041,7 @@ export default function BookDifficultyPage() {
           <SectionBand
             eyebrow={`Easiest — ${selectedTimeLabel}`}
             title="Books that felt comfortable"
-            description="A representative mix of finished books rated 5 for ease. These are the books that felt most comfortable, relative to their book types."
+            description="A representative mix of finished books rated 1 for difficulty. These are the books that felt most comfortable, relative to their book types."
             tone={selectedTheme.section}
           >
             <BarStrip

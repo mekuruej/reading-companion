@@ -8,19 +8,7 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
-  const [hasSession, setHasSession] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    if (!checking && hasSession) {
-      if (username) {
-        router.replace(`/users/${username}/books`);
-      } else {
-        router.replace("/books");
-      }
-    }
-  }, [checking, hasSession, username, router]);
 
   useEffect(() => {
     let alive = true;
@@ -33,24 +21,10 @@ export default function LoginPage() {
       if (!alive) return;
 
       if (session?.user?.id) {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
-        if (!alive) return;
-
-        if (!error && data?.username) {
-          router.replace(`/users/${data.username}/books`);
-          return;
-        } else {
-          router.replace("/books");
-          return;
-        }
+        router.replace("/dashboard");
+        return;
       }
 
-      setHasSession(false);
       setChecking(false);
     };
 
@@ -62,21 +36,8 @@ export default function LoginPage() {
       if (!alive) return;
 
       if (session?.user?.id) {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
-        if (!alive) return;
-
-        if (!error && data?.username) {
-          router.replace(`/users/${data.username}/books`);
-        } else {
-          router.replace("/books");
-        }
+        router.replace("/dashboard");
       } else {
-        setHasSession(false);
         setChecking(false);
       }
     });
@@ -111,7 +72,7 @@ export default function LoginPage() {
             showLinks={false}
             redirectTo={
               typeof window !== "undefined"
-                ? `${window.location.origin}/login`
+                ? `${window.location.origin}/dashboard`
                 : undefined
             }
           />

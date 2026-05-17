@@ -52,7 +52,7 @@ export default function ReadingCompanionPage() {
           </p>
 
           <h2 className="mt-3 text-4xl font-black">
-            MEKURU Reading Companion
+            MEKURU Reading Companion Web App
           </h2>
 
           <p className="mt-4 leading-7 text-slate-700">

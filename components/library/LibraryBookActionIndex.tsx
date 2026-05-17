@@ -165,7 +165,7 @@ function BookSection({
                                             {actionLabel}
                                         </div>
 
-                                        <h3 className="mt-2 line-clamp-3 text-sm font-black leading-snug text-slate-950">
+                                        <h3 className="mt-2 line-clamp-3 text-s font-semibold leading-snug text-slate-950">
                                             {bookTitle}
                                         </h3>
 

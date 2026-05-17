@@ -186,6 +186,7 @@ const DAILY_CHECK_PLAN_STORAGE_KEY = "library-study-daily-check-plan-by-date";
 const DAILY_CHECK_JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const DAILY_CHECK_LEVELS = [...DAILY_CHECK_JLPT_LEVELS, "NON-JLPT"] as const;
 const DAILY_CHECK_LIMITS = [10, 20, 30, 40, 50] as const;
+const ABILITY_CHECK_MIN_DUE_CARDS = 10;
 
 type DailyCheckLevel = (typeof DAILY_CHECK_LEVELS)[number];
 type DailyCheckLimit = (typeof DAILY_CHECK_LIMITS)[number];
@@ -946,8 +947,8 @@ function AbilityCheckFaq() {
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <div className="font-black text-slate-900">Can I keep studying?</div>
           <p className="mt-1">
-            Yes. Finishing your chosen daily set clears the reminder, then you can keep
-            checking more unseen cards if they are available.
+            Yes. The Library reminder only appears after 10 cards are due, but you can
+            open Ability Check anytime and study the cards that are ready.
           </p>
         </div>
       </div>
@@ -1072,6 +1073,10 @@ function LibraryPracticePanel({
   onNext,
   onPrevious,
   onShuffle,
+  onMeaningAnswered,
+  onTypingMissed,
+  meaningReviewCount,
+  onReviewMeanings,
 }: {
   card: StudyCard | undefined;
   total: number;
@@ -1081,15 +1086,29 @@ function LibraryPracticePanel({
   onNext: () => void;
   onPrevious: () => void;
   onShuffle: () => void;
+  onMeaningAnswered: (
+    card: StudyCard,
+    userAnswer: string,
+    correctAnswer: string,
+    ok: boolean
+  ) => void;
+  onTypingMissed: (card: StudyCard, gate: "reading" | "meaning") => void;
+  meaningReviewCount: number;
+  onReviewMeanings: () => void;
 }) {
   const [typingStep, setTypingStep] = useState<PracticeTypingStep>("reading");
   const [typingInput, setTypingInput] = useState("");
-  const [typingRevealed, setTypingRevealed] = useState(false);
+  const [typingFeedback, setTypingFeedback] = useState<null | {
+    ok: boolean;
+    answer: string;
+    label: string;
+  }>(null);
+  const typingPracticeInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setTypingStep("reading");
     setTypingInput("");
-    setTypingRevealed(false);
+    setTypingFeedback(null);
   }, [card?.id, practiceMode]);
 
   if (!card) {
@@ -1109,22 +1128,40 @@ function LibraryPracticePanel({
   const showReading = revealStep === "reading" || revealStep === "meaning";
   const showMeaning = revealStep === "meaning";
   const typingLabel = typingStep === "reading" ? "Reading" : "Meaning";
-  const typingAnswer = typingStep === "reading" ? card.reading : card.meaning;
 
   function submitTypingPractice() {
     if (!typingInput.trim()) return;
-    setTypingRevealed(true);
-  }
 
-  function moveTypingPracticeForward() {
+    const userAnswer = typingInput.trim();
+    const correctAnswer = typingStep === "reading" ? card.reading : card.meaning;
+    const ok =
+      typingStep === "reading"
+        ? normalizeKana(userAnswer) === normalizeKana(correctAnswer)
+        : matchesAnyMeaning(userAnswer, correctAnswer);
+
+    setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
+
     if (typingStep === "reading") {
-      setTypingStep("meaning");
-      setTypingInput("");
-      setTypingRevealed(false);
+      if (!ok) onTypingMissed(card, "reading");
+
+      window.setTimeout(() => {
+        setTypingStep("meaning");
+        setTypingInput("");
+        setTypingFeedback(null);
+        window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
+      }, ok ? 900 : 1700);
       return;
     }
 
-    onNext();
+    onMeaningAnswered(card, userAnswer, correctAnswer, ok);
+    if (!ok) onTypingMissed(card, "meaning");
+
+    window.setTimeout(() => {
+      onNext();
+      window.setTimeout(() => {
+        window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
+      }, 0);
+    }, ok ? 1800 : 2600);
   }
 
   return (
@@ -1241,17 +1278,14 @@ function LibraryPracticePanel({
 
           <div className="w-full max-w-md space-y-3">
             <input
+              ref={typingPracticeInputRef}
               value={typingInput}
               onChange={(e) => setTypingInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
                 e.preventDefault();
                 e.stopPropagation();
-                if (typingRevealed) {
-                  moveTypingPracticeForward();
-                } else {
-                  submitTypingPractice();
-                }
+                if (!typingFeedback) submitTypingPractice();
               }}
               placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
               inputMode="text"
@@ -1259,34 +1293,27 @@ function LibraryPracticePanel({
               autoCapitalize="none"
               autoComplete="off"
               spellCheck={false}
-              disabled={typingRevealed}
+              disabled={typingFeedback != null}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
             />
 
-            {typingRevealed ? (
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+            {typingFeedback ? (
+              <div
+                className={`rounded-2xl border px-4 py-3 ${
+                  typingFeedback.ok
+                    ? "border-emerald-100 bg-emerald-50"
+                    : "border-rose-100 bg-rose-50"
+                }`}
+              >
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {typingLabel}
+                  {typingFeedback.ok ? "Looks right" : "Check this one"}
                 </div>
                 <div className="mt-1 text-xl font-semibold text-slate-900">
-                  {typingAnswer || "—"}
+                  {typingFeedback.label}: {typingFeedback.answer}
                 </div>
-                <div className="mt-3 flex justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={moveTypingPracticeForward}
-                    className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-950"
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={moveTypingPracticeForward}
-                    className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800"
-                  >
-                    No
-                  </button>
-                </div>
+                <p className="mt-2 text-xs font-medium text-slate-500">
+                  Next card comes automatically.
+                </p>
               </div>
             ) : (
               <button
@@ -1321,6 +1348,17 @@ function LibraryPracticePanel({
           Skip
         </button>
 
+        {practiceMode === "typing" ? (
+          <button
+            type="button"
+            onClick={onReviewMeanings}
+            disabled={meaningReviewCount === 0}
+            className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-950 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Review meanings and finish{meaningReviewCount ? ` (${meaningReviewCount})` : ""}
+          </button>
+        ) : null}
+
         <button
           type="button"
           onClick={onShuffle}
@@ -1332,7 +1370,9 @@ function LibraryPracticePanel({
       </div>
 
       <p className="text-center text-xs leading-5 text-slate-500">
-        Tap the card to reveal. Review does not move colors or count as passing an Ability Check gate.
+        {practiceMode === "reveal"
+          ? "Tap the card to reveal. Review does not move colors or count as passing an Ability Check gate."
+          : "Reading checks automatically. Meaning answers can be reviewed when you finish."}
       </p>
     </div>
   );
@@ -1470,6 +1510,7 @@ export default function LibraryStudyPage() {
   const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
   const [activeTodayKey, setActiveTodayKey] = useState(getTodayKey());
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
+  const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
 
   const currentCard = deck[index];
   const practiceCard = practiceDeck[practiceIndex];
@@ -2123,6 +2164,18 @@ export default function LibraryStudyPage() {
       return;
     }
 
+    const selectedDueCount = setupLevels.reduce(
+      (sum, level) => sum + availableCountBySetupLevel[level],
+      0
+    );
+
+    if (selectedDueCount < ABILITY_CHECK_MIN_DUE_CARDS) {
+      setNotice(
+        `Ability Check opens when ${ABILITY_CHECK_MIN_DUE_CARDS} or more cards are due. You have ${selectedDueCount} due right now.`
+      );
+      return;
+    }
+
     const todayKey = getTodayKey();
 
     const plan: DailyCheckPlan = {
@@ -2226,6 +2279,30 @@ export default function LibraryStudyPage() {
     setMeaningReviewItems([]);
   }
 
+  function finishPracticeMeaningReview() {
+    setMeaningReviewItems([]);
+    setShowPracticeMeaningReview(false);
+    router.push("/books");
+  }
+
+  function queuePracticeMeaningReview(
+    card: StudyCard,
+    userAnswer: string,
+    correctAnswer: string,
+    ok: boolean
+  ) {
+    queueMeaningReview(card, userAnswer, correctAnswer, "practice_meaning_typing", ok);
+  }
+
+  function handlePracticeTypingMiss(card: StudyCard, gate: "reading" | "meaning") {
+    if (card.colorStatus.color !== "purple") return;
+
+    void saveTypedGateProgress(gate, false, {
+      card,
+      forceMeaning: gate === "meaning",
+    });
+  }
+
   function queueMeaningReview(
     card: StudyCard,
     userAnswer: string,
@@ -2291,6 +2368,10 @@ export default function LibraryStudyPage() {
 
     const now = new Date().toISOString();
     const existing = activeCard.progress;
+    const isMasteryCheck =
+      activeCard.colorStatus.color === "purple" ||
+      Boolean(existing?.mastered);
+
     if (!options.forceMeaning && activeCard.activeGate !== gate) return;
 
     const nextProgress: LibraryWordProgressRow = {
@@ -2343,6 +2424,28 @@ export default function LibraryStudyPage() {
         nextProgress.reading_gate_status = "passed";
         nextProgress.mastered = false;
         nextProgress.mastered_at = null;
+      }
+    }
+
+    if (isMasteryCheck) {
+      if (ok) {
+        nextProgress.reading_gate_status = "passed";
+        nextProgress.meaning_gate_status = "passed";
+        nextProgress.mastered = true;
+        nextProgress.mastered_at = nextProgress.mastered_at ?? now;
+      } else {
+        nextProgress.mastered = false;
+        nextProgress.mastered_at = null;
+
+        if (gate === "reading") {
+          nextProgress.reading_gate_status = "failed";
+          nextProgress.meaning_gate_status = "not_started";
+          nextProgress.meaning_gate_passed_at = null;
+          nextProgress.meaning_gate_failed_at = null;
+        } else {
+          nextProgress.reading_gate_status = "passed";
+          nextProgress.meaning_gate_status = "failed";
+        }
       }
     }
 
@@ -2775,6 +2878,65 @@ export default function LibraryStudyPage() {
       0
     );
 
+    if (allLevelsDueCount < ABILITY_CHECK_MIN_DUE_CARDS) {
+      return (
+        <main className="min-h-screen bg-slate-100 px-6 py-8">
+          <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Strict due cards
+            </p>
+            <h1 className="mt-2 text-2xl font-black text-slate-950">
+              Ability Check is resting today
+            </h1>
+
+            <p className="mt-3 text-gray-600">
+              Ability Check opens when at least {ABILITY_CHECK_MIN_DUE_CARDS} cards are due.
+              You have {allLevelsDueCount} due right now.
+            </p>
+
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-gray-500">
+              This space is intentionally small and spaced. It becomes more regularly available
+              after you read and save a lot of words, or after you add comfortable words from Word Sky.
+              If you want to study now, try one of these other study options.
+            </p>
+
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              {practiceFilteredCards.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => router.push("/library-study/practice")}
+                  className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
+                >
+                  Open Library Review
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => router.push("/library-study/word-sky")}
+                className="rounded-2xl border border-amber-200 bg-amber-100 px-5 py-3 text-sm font-semibold text-amber-950 shadow-sm transition hover:bg-amber-50"
+              >
+                Word Sky
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/library-study/practice?color=purple")}
+                className="rounded-2xl border border-violet-200 bg-violet-100 px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-50"
+              >
+                久しぶり Review
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/library-study/book-flashcards")}
+                className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+              >
+                Book Flashcards
+              </button>
+            </div>
+          </div>
+        </main>
+      );
+    }
+
     return (
       <main className="min-h-screen bg-slate-100 px-6 py-8">
         <div className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -2949,9 +3111,10 @@ export default function LibraryStudyPage() {
           </p>
 
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-gray-500">
-            That is normal. Ability Check is intentionally small and spaced, so even a big library
-            may only have a few due cards on some days. If you want to continue studying, try one
-            of these other study options.
+            That is normal. Ability Check opens when at least {ABILITY_CHECK_MIN_DUE_CARDS} cards
+            are due, and it becomes more regularly available after you read and save a lot of words
+            or add comfortable words from Word Sky. If you want to study now, try one of these
+            other study options.
           </p>
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -2984,6 +3147,90 @@ export default function LibraryStudyPage() {
               className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
             >
               Book Flashcards
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (
+    libraryMode === "practice" &&
+    showPracticeMeaningReview &&
+    meaningReviewItems.length > 0
+  ) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="text-center">
+            <div className="text-xs font-semibold uppercase tracking-wide text-violet-500">
+              久しぶり Review
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+              Review meaning answers
+            </h1>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+              Regular review does not move colors. Purple review can move forgotten words back to the gate they need.
+            </p>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            {meaningReviewItems.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="text-2xl font-semibold text-slate-950">
+                      {item.card.surface}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500">{item.card.reading}</div>
+                  </div>
+                  <div
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      item.originalOk
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-rose-100 text-rose-800"
+                    }`}
+                  >
+                    {item.originalOk ? "Matched" : "Moved back if Purple"}
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Your answer
+                    </div>
+                    <div className="mt-1 text-slate-900">{item.userAnswer || "—"}</div>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Saved meaning
+                    </div>
+                    <div className="mt-1 text-slate-900">{item.correctAnswer}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={finishPracticeMeaningReview}
+              className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black"
+            >
+              Finish Review
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowPracticeMeaningReview(false)}
+              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              Back to practice
             </button>
           </div>
         </div>
@@ -3369,6 +3616,10 @@ export default function LibraryStudyPage() {
           onNext={goToNextPracticeCard}
           onPrevious={goToPreviousPracticeCard}
           onShuffle={shufflePracticeDeck}
+          onMeaningAnswered={queuePracticeMeaningReview}
+          onTypingMissed={handlePracticeTypingMiss}
+          meaningReviewCount={meaningReviewItems.length}
+          onReviewMeanings={() => setShowPracticeMeaningReview(true)}
         />
       ) : (
         <>

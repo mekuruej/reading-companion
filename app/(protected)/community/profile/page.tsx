@@ -42,15 +42,6 @@ const profileActions = [
     descriptionClassName: "text-amber-900/75",
     arrowClassName: "bg-white/80 text-amber-900",
   },
-  {
-    title: "Edit Reading Profile",
-    href: "/community/profile/reading",
-    description: "Adjust reading support, color logic, and Ability Check settings.",
-    className: "border-violet-200 bg-violet-50 hover:bg-violet-100/70",
-    textClassName: "text-violet-950",
-    descriptionClassName: "text-violet-900/75",
-    arrowClassName: "bg-white/80 text-violet-900",
-  },
 ];
 
 function firstInitial(name: string) {

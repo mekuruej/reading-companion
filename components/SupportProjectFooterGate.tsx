@@ -33,8 +33,9 @@ export default function SupportProjectFooterGate() {
   return (
     <footer className="mt-12 border-t border-slate-200 bg-white/70 px-6 py-6 text-center text-sm text-slate-500">
       <p className="mb-3">
-        Contributions through Ko-fi go directly toward building and improving the
-        MEKURU reading app.
+        Support Mekuru
+        <br />
+        Help this small reading project grow.
       </p>
 
       <a

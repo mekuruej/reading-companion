@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import AuthReturnRedirect from "@/components/AuthReturnRedirect";
 
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-950">
+      <AuthReturnRedirect />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center opacity-60"
@@ -139,7 +141,7 @@ export default function HomePage() {
               </div>
 
               <p className="mt-6 text-sm font-bold group-hover:underline">
-                Student login →
+                App explanation →
               </p>
             </Link>
           </div>

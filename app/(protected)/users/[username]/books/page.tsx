@@ -165,6 +165,9 @@ const MEKURU_ABILITY_COLORS: MekuruColor[] = ["green", "blue", "purple"];
 const ABILITY_CHECK_SEEN_STORAGE_KEY = "library-study-seen-by-date";
 const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
 const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
+const SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY =
+  "super-teacher-kanji-enrichment-reminder-hidden-date";
+const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
 const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
 const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
@@ -224,6 +227,16 @@ function abilityCheckCompletedToday() {
 function hideAbilityCheckReminderForToday() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
+}
+
+function superTeacherKanjiReminderHiddenToday() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY) === getTodayKey();
+}
+
+function hideSuperTeacherKanjiReminderForToday() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY, getTodayKey());
 }
 
 function isKatakanaOnly(value: string | null | undefined) {
@@ -389,18 +402,22 @@ function formatMinutesAsReadableTime(totalMinutes: number) {
 }
 
 function formatRelativeDate(dateStr: string) {
-  const d = new Date(dateStr);
-  const now = new Date();
+  const dateKey =
+    /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+      ? dateStr
+      : ymdInTimeZone(dateStr, "Asia/Tokyo");
+  const todayKey = ymdInTimeZone(new Date(), "Asia/Tokyo");
 
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (!dateKey || !todayKey) return dateStr;
+
+  const diffDays = ymdToDayNumber(todayKey) - ymdToDayNumber(dateKey);
 
   if (diffDays <= 0) return "today";
   if (diffDays === 1) return "yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
 
-  return d.toLocaleDateString();
+  return dateKey;
 }
 
 function UserBar({
@@ -681,6 +698,8 @@ export default function BooksPage() {
   const [abilityCheckReminderHidden, setAbilityCheckReminderHidden] = useState(false);
   const [abilityCheckReminderCompleted, setAbilityCheckReminderCompleted] = useState(false);
   const [abilityCheckReminderDayKey, setAbilityCheckReminderDayKey] = useState(getTodayKey());
+  const [superTeacherKanjiReminderHidden, setSuperTeacherKanjiReminderHidden] =
+    useState(false);
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
@@ -1707,6 +1726,7 @@ export default function BooksPage() {
 
       setMyRole(role);
       setIsSuperTeacher(superTeacherFlag);
+      setSuperTeacherKanjiReminderHidden(superTeacherKanjiReminderHiddenToday());
 
       if (role === "super_teacher" || superTeacherFlag) {
         await loadPendingBookRequests();
@@ -1865,6 +1885,7 @@ export default function BooksPage() {
       );
       setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
       setAbilityCheckReminderCompleted(abilityCheckCompletedToday());
+      setSuperTeacherKanjiReminderHidden(superTeacherKanjiReminderHiddenToday());
     }
 
     refreshAbilityCheckReminderDay();
@@ -2099,11 +2120,11 @@ export default function BooksPage() {
       }
 
       if (sortMode === "difficulty_high") {
-        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "asc");
+        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "desc");
       }
 
       if (sortMode === "difficulty_low") {
-        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "desc");
+        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "asc");
       }
 
       if (sortMode === "pace_fast") {
@@ -2245,9 +2266,14 @@ export default function BooksPage() {
   const showAbilityCheckReminder =
     viewingUserId === meId &&
     abilityCheckReminderEnabled &&
+    abilityCheckReminderCount >= ABILITY_CHECK_REMINDER_MIN_DUE_CARDS &&
     !abilityCheckReminderLoading &&
     !abilityCheckReminderHidden &&
     !abilityCheckReminderCompleted;
+  const showSuperTeacherKanjiReminder =
+    viewingUserId === meId &&
+    (myRole === "super_teacher" || isSuperTeacher) &&
+    !superTeacherKanjiReminderHidden;
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
@@ -2292,21 +2318,25 @@ export default function BooksPage() {
                   </p>
                 ) : (
                   <p className="mt-1 text-sm leading-6 text-slate-600">
-                    No Ability Check cards are due today. That is normal: Ability Check only shows
-                    spaced cards when they are ready. For extra study, use Library Review, Word Sky,
-                    or book flashcards.
+                    No Ability Check cards are due today. That is normal, especially in the beginning!
+                    Ability Check only shows spaced cards when they are ready.
+                    <br />
+                    For extra study, use Library Review or Book Flashcards. To boost words in your
+                    Ability Check, try Word Sky or read and add more words!
                   </p>
                 )}
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/library-study/check")}
-                  className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
-                >
-                  Start Ability Check
-                </button>
+                {abilityCheckReminderCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/library-study/check")}
+                    className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
+                  >
+                    Start Ability Check
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
@@ -2314,6 +2344,41 @@ export default function BooksPage() {
                     setAbilityCheckReminderHidden(true);
                   }}
                   className="rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+                >
+                  {abilityCheckReminderCount > 0 ? "Hide today" : "Hide"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {showSuperTeacherKanjiReminder ? (
+          <div className="mb-5 rounded-3xl border border-violet-200 bg-violet-50 px-4 py-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-violet-950">
+                  Kanji enrichment reminder
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  A little kanji cleanup keeps the shared Kanji Reading Study bank healthier.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/teacher/kanji")}
+                  className="rounded-xl bg-violet-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800"
+                >
+                  Open Kanji Queue
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    hideSuperTeacherKanjiReminderForToday();
+                    setSuperTeacherKanjiReminderHidden(true);
+                  }}
+                  className="rounded-xl border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-900 transition hover:bg-violet-100"
                 >
                   Hide today
                 </button>

@@ -1072,29 +1072,44 @@ export default function KanjiReadingStudyPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-6 py-4">
-      <div className="mb-1 flex w-full max-w-5xl flex-col items-center justify-center gap-8 md:flex-row">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-amber-100 text-3xl md:mt-4">
-          漢
+      <div className="mb-2 w-full max-w-3xl rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-4 shadow-sm">
+        <div className="flex items-center justify-center gap-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm">
+            漢
+          </div>
+          <h1 className="text-center text-2xl font-semibold text-emerald-950">
+            Kanji Reading Study
+          </h1>
         </div>
 
-        <div className="flex w-full items-center md:w-[430px]">
-          <div>
-            <h1 className="text-center text-2xl font-semibold md:text-left">
-              Kanji Reading Study
-            </h1>
-            <p className="mt-2 text-left text-[15px] leading-7 text-gray-500">
+        <details className="group mt-4 rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-sm leading-6 text-gray-600 shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <span className="font-semibold text-emerald-950">
+              About this study
+            </span>
+            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 group-open:hidden">
+              Open
+            </span>
+            <span className="hidden rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 group-open:inline-flex">
+              Close
+            </span>
+          </summary>
+
+          <div className="mt-3 border-t border-emerald-100 pt-3">
+            <p>
               Practice onyomi and kunyomi of saved vocabulary across the app. If you have
-              also looked up the word, your source book will be shown.
+              also looked up the word, your source book will be shown. Kanji can have
+              multiple onyomi or kunyomi, so each question is for one word shown after
+              your answer. Non-JLPT words are common in books, so they have their own filter.
+            </p>
+            <p className="mt-2">
+              If kanji is not your forte, we recommend studying only onyomi at first,
+              because it can help you read multiple words in the future.
             </p>
           </div>
-        </div>
+        </details>
       </div>
 
-      <p className="mt-1 max-w-3xl text-center text-sm leading-6 text-gray-500">
-        Kanji can have multiple onyomi or kunyomi, so each question is for one word shown
-        after your answer. Non-JLPT words are common in books, so advanced practice includes
-        them too.
-      </p>
       <p className="text-sm text-gray-500">
         Card {index + 1}/{deck.length}
       </p>

@@ -39,6 +39,11 @@ export type LibraryStudyWordColorInfo = {
   encounterCount: number;
 };
 
+type FetchLibraryStudyColorInfoOptions = {
+  includeMissingAsFirstEncounter?: boolean;
+  encounterCountOffsetByKey?: Record<string, number>;
+};
+
 export function makeLibraryStudyColorKey(
   surface?: string | null,
   reading?: string | null
@@ -81,7 +86,8 @@ function uniqueLookupPairs(words: WordForColorLookup[]) {
 export async function fetchLibraryStudyColorInfoByWord(
   supabaseClient: any,
   userId: string,
-  words: WordForColorLookup[]
+  words: WordForColorLookup[],
+  options?: FetchLibraryStudyColorInfoOptions
 ): Promise<Record<string, LibraryStudyWordColorInfo>> {
   const lookupPairs = uniqueLookupPairs(words);
 
@@ -162,9 +168,13 @@ export async function fetchLibraryStudyColorInfoByWord(
 
   const result: Record<string, LibraryStudyWordColorInfo> = {};
 
+  const returnedKeys = new Set<string>();
+
   for (const summary of summaries) {
     const progress = progressByKey.get(summary.study_identity_key) ?? null;
-    const encounterCount = summary.total_encounter_count ?? 0;
+    const key = makeLibraryStudyColorKey(summary.surface, summary.reading);
+    const offset = options?.encounterCountOffsetByKey?.[key] ?? 0;
+    const encounterCount = (summary.total_encounter_count ?? 0) + offset;
 
     const colorStatus = computeLibraryStudyColorStatus({
       encounterCount,
@@ -176,7 +186,7 @@ export async function fetchLibraryStudyColorInfoByWord(
       mastered: progress?.mastered ?? false,
     });
 
-    const key = makeLibraryStudyColorKey(summary.surface, summary.reading);
+    returnedKeys.add(key);
 
     result[key] = {
       colorStatus,
@@ -184,6 +194,31 @@ export async function fetchLibraryStudyColorInfoByWord(
       studyIdentityKey: summary.study_identity_key,
       encounterCount,
     };
+  }
+
+  if (options?.includeMissingAsFirstEncounter) {
+    for (const pair of lookupPairs) {
+      const key = makeLibraryStudyColorKey(pair.surface, pair.reading);
+      if (returnedKeys.has(key)) continue;
+
+      const encounterCount = Math.max(1, options.encounterCountOffsetByKey?.[key] ?? 1);
+      const colorStatus = computeLibraryStudyColorStatus({
+        encounterCount,
+        settings,
+        readingGate: "not_started",
+        meaningGate: "not_started",
+        heldBeforeReadingGate: false,
+        heldBeforeMeaningGate: false,
+        mastered: false,
+      });
+
+      result[key] = {
+        colorStatus,
+        stageLabel: encounterStageLabel(colorStatus),
+        studyIdentityKey: key,
+        encounterCount,
+      };
+    }
   }
 
   return result;

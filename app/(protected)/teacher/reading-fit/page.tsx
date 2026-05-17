@@ -110,18 +110,18 @@ function difficultyLabel(value: number | null) {
   if (value == null) return "Missing";
 
   const labels: Record<number, string> = {
-    1: "Very hard",
-    1.5: "Hard and tiring",
-    2: "Hard, but manageable",
-    2.5: "A real stretch",
+    1: "Very easy",
+    1.5: "Easy",
+    2: "Comfortable overall",
+    2.5: "Mostly okay",
     3: "A stretch, but okay",
-    3.5: "Mostly okay",
-    4: "Comfortable overall",
-    4.5: "Very comfortable",
-    5: "Very easy",
+    3.5: "A real stretch",
+    4: "Hard, but manageable",
+    4.5: "Hard and tiring",
+    5: "Very hard",
   };
 
-  return labels[value] ?? "Ease rating";
+  return labels[value] ?? "Difficulty rating";
 }
 
 export default function TeacherReadingFitPage() {
@@ -474,7 +474,7 @@ export default function TeacherReadingFitPage() {
                           }`}
                       >
                         <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                          Ease Rating
+                          Difficulty Rating
                         </div>
                         <div className="mt-1 font-semibold">
                           {item.ratingDifficulty != null

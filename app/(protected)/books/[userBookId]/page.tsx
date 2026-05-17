@@ -239,15 +239,15 @@ const GENRE_OPTIONS = [
 ] as const;
 
 const DIFFICULTY_OPTIONS = [
-  { value: 1, label: "Extremely difficult" },
-  { value: 1.5, label: "Very difficult" },
-  { value: 2, label: "Hard, but doable" },
-  { value: 2.5, label: "A real stretch" },
+  { value: 1, label: "Very easy" },
+  { value: 1.5, label: "Easy" },
+  { value: 2, label: "Pretty comfortable" },
+  { value: 2.5, label: "Mostly manageable" },
   { value: 3, label: "Challenging but manageable" },
-  { value: 3.5, label: "Mostly manageable" },
-  { value: 4, label: "Pretty comfortable" },
-  { value: 4.5, label: "Easy" },
-  { value: 5, label: "Very easy" },
+  { value: 3.5, label: "A real stretch" },
+  { value: 4, label: "Hard, but doable" },
+  { value: 4.5, label: "Very difficult" },
+  { value: 5, label: "Extremely difficult" },
 ] as const;
 
 function safeDate(s: string | null) {
@@ -2906,13 +2906,22 @@ export default function BookHubPage() {
     await saveBookStatusDates(today, "", "");
   }
 
+  function openReadingReflection() {
+    setActiveTab("reflection");
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("reading-reflection-panel")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   async function markFinishedToday() {
     const today = todayYmdAppTimeZone();
     const nextStartedAt = startedAt || today;
     await saveBookStatusDates(nextStartedAt, today, "");
-    setActiveTab("reflection");
     setSaveNoticeTone("success");
-    setSaveNotice("Finished! Add a reflection while the book is fresh.");
+    setSaveNotice(null);
+    openReadingReflection();
   }
 
   async function markDnfToday() {
@@ -4838,6 +4847,21 @@ export default function BookHubPage() {
                   </p>
                 </div>
 
+                {finishedAt ? (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <div className="text-sm font-semibold text-amber-950">
+                      Finished! Add a reflection while the book is fresh.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openReadingReflection}
+                      className="mt-3 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600"
+                    >
+                      Go to Reading Reflection
+                    </button>
+                  </div>
+                ) : null}
+
                 {canFillBeginningPages || canFillEndingPages ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {canFillBeginningPages ? (
@@ -5026,21 +5050,21 @@ export default function BookHubPage() {
                       active={activeTab === "study"}
                       onClick={() => setActiveTab("study")}
                     >
-                      Vocab
+                      Vocab Tools
                     </FilingTab>
 
                     <FilingTab
                       active={activeTab === "reading"}
                       onClick={() => setActiveTab("reading")}
                     >
-                      Reading
+                      Reading Sessions
                     </FilingTab>
 
                     <FilingTab
                       active={activeTab === "story"}
                       onClick={() => setActiveTab("story")}
                     >
-                      Story
+                      Story Details
                     </FilingTab>
 
                     <FilingTab
@@ -5151,14 +5175,6 @@ export default function BookHubPage() {
                     BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
                     Detail={Detail}
                     PersonRow={PersonRow}
-                    formatType={formatType}
-                    setFormatType={setFormatType}
-                    progressMode={progressMode}
-                    setProgressMode={setProgressMode}
-                    showPageNumbers={showPageNumbers}
-                    setShowPageNumbers={setShowPageNumbers}
-                    formatTypeLabel={formatTypeLabel}
-                    progressModeLabel={progressModeLabel}
                   />
                 </div>
               )}
@@ -5308,7 +5324,7 @@ export default function BookHubPage() {
               )}
 
               {activeTab === "reflection" && (
-                <div className="space-y-4">
+                <div id="reading-reflection-panel" className="space-y-4 scroll-mt-6">
                   <div className="px-4 md:px-6">
                     <div className="text-base font-semibold text-stone-900">
                       Reading Reflection
@@ -5656,9 +5672,9 @@ function DifficultyField({
   const label = DIFFICULTY_OPTIONS.find((o) => o.value === value)?.label ?? "";
 
   return (
-    <div className="rounded border bg-white p-3 text-sm">
+      <div className="rounded border bg-white p-3 text-sm">
       <div className="text-stone-600">Difficulty for Me</div>
-      <div className="mt-1 text-xs text-stone-500">1 = hardest · 5 = easiest</div>
+      <div className="mt-1 text-xs text-stone-500">1 = easiest · 5 = hardest</div>
 
       {!editing ? (
         <>

@@ -390,16 +390,6 @@ export default function Header() {
                     Word History
                   </Link>
 
-                  <Link
-                    href="/discovery/reader-insights"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowDiscoveryMenu(false)}
-                  >
-                    Reader Insights
-                  </Link>
                 </div>
               ) : null}
             </div>
@@ -480,16 +470,6 @@ export default function Header() {
                     onClick={() => setShowProfileMenu(false)}
                   >
                     Book Clubs
-                  </Link>
-                  <Link
-                    href="/discovery/reader-insights"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/reader-insights"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowProfileMenu(false)}
-                  >
-                    Reader Insights
                   </Link>
                 </div>
               ) : null}
