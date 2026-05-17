@@ -87,6 +87,21 @@ type KanjiEnrichmentAlertItem = {
   studentName: string | null;
 };
 
+type LearningTaskRow = {
+  id: string;
+  created_by: string;
+  learner_id: string;
+  user_book_id: string | null;
+  task_type: string;
+  title: string;
+  instructions: string | null;
+  task_payload: Record<string, any> | null;
+  status: string;
+  due_on: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+};
+
 type ReadingSessionStats = {
   progressPercent: number | null;
   averageMinutesPerPage: number | null;
@@ -615,6 +630,9 @@ export default function BooksPage() {
   const [alertBox, setAlertBox] = useState<AlertBoxState>(null);
   const [teacherPrepAlerts, setTeacherPrepAlerts] = useState<TeacherPrepItem[]>([]);
   const [kanjiEnrichmentAlerts, setKanjiEnrichmentAlerts] = useState<KanjiEnrichmentAlertItem[]>([]);
+  const [learningTasks, setLearningTasks] = useState<LearningTaskRow[]>([]);
+  const [learningTasksLoading, setLearningTasksLoading] = useState(false);
+  const [learningTasksError, setLearningTasksError] = useState<string | null>(null);
 
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
@@ -1031,6 +1049,54 @@ export default function BooksPage() {
       setAbilityCheckReminderCount(0);
     } finally {
       setAbilityCheckReminderLoading(false);
+    }
+  }
+
+  async function loadLearningTasks(userId: string, options: { createdBy?: string | null } = {}) {
+    setLearningTasksLoading(true);
+    setLearningTasksError(null);
+
+    try {
+      let query = supabase
+        .from("learning_tasks")
+        .select(
+          `
+          id,
+          created_by,
+          learner_id,
+          user_book_id,
+          task_type,
+          title,
+          instructions,
+          task_payload,
+          status,
+          due_on,
+          cancelled_at,
+          created_at
+        `
+        )
+        .eq("learner_id", userId)
+        .eq("status", "assigned")
+        .is("cancelled_at", null)
+        .order("due_on", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (options.createdBy) {
+        query = query.eq("created_by", options.createdBy);
+      }
+
+      const { data, error } = await query.returns<LearningTaskRow[]>();
+
+      if (error) throw error;
+
+      setLearningTasks(data ?? []);
+    } catch (error) {
+      console.error("Error loading learning tasks:", error);
+      setLearningTasksError(error instanceof Error ? error.message : "Could not load learning tasks.");
+      setLearningTasks([]);
+    } finally {
+      setLearningTasksLoading(false);
     }
   }
 
@@ -1856,6 +1922,21 @@ export default function BooksPage() {
   }, [viewingUserId, meId, myRole]);
 
   useEffect(() => {
+    const canViewLearningTasks =
+      viewingUserId === meId || (isTeacher && viewingUserId !== meId);
+
+    if (!viewingUserId || !meId || !canViewLearningTasks) {
+      setLearningTasks([]);
+      setLearningTasksError(null);
+      return;
+    }
+
+    loadLearningTasks(viewingUserId, {
+      createdBy: isViewingStudentLibrary ? meId : null,
+    });
+  }, [viewingUserId, meId, isTeacher]);
+
+  useEffect(() => {
     if (!viewingUserId || !selectedMonth) return;
     loadMonthlyLibraryStats(viewingUserId, selectedMonth, myTimeZone);
   }, [viewingUserId, selectedMonth, myTimeZone]);
@@ -2274,6 +2355,42 @@ export default function BooksPage() {
     viewingUserId === meId &&
     (myRole === "super_teacher" || isSuperTeacher) &&
     !superTeacherKanjiReminderHidden;
+  const showLearningTasks =
+    (viewingUserId === meId || isViewingStudentLibrary) &&
+    !learningTasksLoading &&
+    learningTasks.length > 0;
+  const showLearningTasksError =
+    (viewingUserId === meId || isViewingStudentLibrary) &&
+    !learningTasksLoading &&
+    !!learningTasksError;
+
+  function learningTaskTypeLabel(taskType: string) {
+    if (taskType === "reread_pages") return "Reread pages";
+    if (taskType === "review_book_words") return "Review book words";
+    if (taskType === "review_recent_words") return "Review recent words";
+    if (taskType === "kanji_reading_practice") return "Kanji Reading";
+    return "Learning task";
+  }
+
+  function learningTaskReadingHref(task: LearningTaskRow) {
+    if (task.task_type !== "reread_pages" || !task.user_book_id) return null;
+
+    const mode = String(task.task_payload?.mode ?? "reader_choice");
+
+    if (mode === "fluid_reading_saved_words") {
+      return `/books/${task.user_book_id}/readalong`;
+    }
+
+    if (mode === "curiosity_reading") {
+      return `/books/${task.user_book_id}/curiosity-reading`;
+    }
+
+    if (mode === "just_reading") {
+      return `/books/${task.user_book_id}/just-reading`;
+    }
+
+    return `/books/${task.user_book_id}`;
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
@@ -2384,6 +2501,84 @@ export default function BooksPage() {
                 </button>
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {showLearningTasks ? (
+          <div className="mb-5 rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-emerald-950">
+                  {isViewingStudentLibrary
+                    ? `${viewingLabel}’s learning tasks`
+                    : "Learning tasks from your teacher"}
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  These are small study directions for your next reading or review session.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-2">
+              {learningTasks.map((task) => {
+                const bookTitle =
+                  rows.find((row) => row.id === task.user_book_id)?.books?.title ?? null;
+                const pageStart = task.task_payload?.page_start;
+                const pageEnd = task.task_payload?.page_end;
+                const readingHref = learningTaskReadingHref(task);
+                const pageLabel =
+                  pageStart && pageEnd
+                    ? pageStart === pageEnd
+                      ? `p.${pageStart}`
+                      : `pp.${pageStart}-${pageEnd}`
+                    : null;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-left shadow-sm"
+                  >
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">
+                          {task.title}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                          {learningTaskTypeLabel(task.task_type)}
+                        </div>
+                        {task.instructions ? (
+                          <div className="mt-1 text-xs leading-5 text-slate-600">
+                            {task.instructions}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="text-xs font-semibold text-emerald-700">
+                        {[bookTitle, pageLabel, task.due_on ? `Due ${task.due_on}` : null]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    </div>
+
+                    {readingHref ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(readingHref)}
+                        className="mt-3 rounded-xl bg-emerald-800 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-900"
+                      >
+                        Open Reading
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {showLearningTasksError ? (
+          <div className="mb-5 rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 shadow-sm">
+            Learning tasks could not load: {learningTasksError}
           </div>
         ) : null}
 

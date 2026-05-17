@@ -124,7 +124,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/reading-companion"
+              href="/dashboard"
               className="group flex min-h-[210px] flex-col justify-between rounded-[1.75rem] border border-slate-400 bg-slate-700 p-6 text-white shadow-md transition hover:-translate-y-1 hover:bg-slate-800 hover:shadow-xl"
             >
               <div>
@@ -141,7 +141,7 @@ export default function HomePage() {
               </div>
 
               <p className="mt-6 text-sm font-bold group-hover:underline">
-                App explanation →
+                Student entrance →
               </p>
             </Link>
           </div>

@@ -47,15 +47,33 @@ export default function AppAccessGate({ children }: Props) {
           .from("profiles")
           .select("role, app_access_type, app_access_expires_at")
           .eq("id", session.user.id)
-          .single();
+          .maybeSingle();
 
-        if (error || !profile) {
+        if (error) {
           console.error("Error checking app access:", error);
 
           if (!cancelled) {
             setRedirectingTo("/login");
             setChecking(false);
             router.replace("/login");
+          }
+          return;
+        }
+
+        if (!profile) {
+          if (!cancelled) {
+            if (
+              pathname === "/community/profile/settings" ||
+              pathname === "/community/profile/setup"
+            ) {
+              setAllowed(true);
+              setChecking(false);
+              return;
+            }
+
+            setRedirectingTo("/community/profile/settings");
+            setChecking(false);
+            router.replace("/community/profile/settings");
           }
           return;
         }

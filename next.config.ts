@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: "/reading-companion",
+        destination: "/dashboard",
+        permanent: false,
+      },
+      {
         source: "/",
         has: [
           {

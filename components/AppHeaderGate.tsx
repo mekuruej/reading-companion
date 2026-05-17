@@ -10,7 +10,6 @@ const HIDDEN_HEADER_ROUTES = new Set([
   "/",
   "/japanese",
   "/english",
-  "/reading-companion",
   "/dashboard",
   "/login",
   "/legal",

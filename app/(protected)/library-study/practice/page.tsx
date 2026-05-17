@@ -950,11 +950,29 @@ function LibraryPracticePanel({
   }>(null);
   const typingPracticeInputRef = useRef<HTMLInputElement | null>(null);
 
+  function focusTypingPracticeInput() {
+    for (const delay of [0, 80, 220]) {
+      window.setTimeout(() => {
+        typingPracticeInputRef.current?.focus({ preventScroll: true });
+        typingPracticeInputRef.current?.select();
+      }, delay);
+    }
+  }
+
   useEffect(() => {
     setTypingStep("reading");
     setTypingInput("");
     setTypingFeedback(null);
   }, [card?.id, practiceMode]);
+
+  useEffect(() => {
+    if (practiceMode !== "typing") return;
+    if (typingFeedback) return;
+
+    const timer = window.setTimeout(focusTypingPracticeInput, 40);
+
+    return () => window.clearTimeout(timer);
+  }, [card?.id, practiceMode, typingFeedback, typingStep]);
 
   if (!card) {
     return (
@@ -993,7 +1011,7 @@ function LibraryPracticePanel({
         setTypingStep("meaning");
         setTypingInput("");
         setTypingFeedback(null);
-        window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
+        focusTypingPracticeInput();
       }, ok ? 900 : 1700);
       return;
     }
@@ -1002,10 +1020,11 @@ function LibraryPracticePanel({
     if (!ok) onTypingMissed(card, "meaning");
 
     window.setTimeout(() => {
+      setTypingStep("reading");
+      setTypingInput("");
+      setTypingFeedback(null);
       onNext();
-      window.setTimeout(() => {
-        window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
-      }, 0);
+      focusTypingPracticeInput();
     }, ok ? 1800 : 2600);
   }
 
@@ -1113,7 +1132,7 @@ function LibraryPracticePanel({
         </div>
 
         <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
             {typingLabel}
           </div>
           <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
@@ -2892,6 +2911,44 @@ export default function LibraryStudyPage() {
                     </div>
                     <div className="mt-1 text-slate-900">{item.correctAnswer}</div>
                   </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {item.originalOk ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => countMeaningReviewAsPassed(item)}
+                        className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
+                      >
+                        Keep correct
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => countMeaningReviewAsMissed(item)}
+                        className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-50"
+                      >
+                        Actually missed it
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => countMeaningReviewAsPassed(item)}
+                        className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800"
+                      >
+                        Actually got it
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => keepMeaningReviewMissed(item)}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Keep moved back
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

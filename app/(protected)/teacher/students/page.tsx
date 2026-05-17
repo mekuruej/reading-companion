@@ -63,6 +63,25 @@ type StudentCard = StudentProfile & {
     lastEngagedAt: string | null;
 };
 
+type TaskBookOption = {
+    id: string;
+    userId: string;
+    title: string;
+};
+
+type RereadTaskMode =
+    | "reader_choice"
+    | "fluid_reading_saved_words"
+    | "curiosity_reading"
+    | "just_reading";
+
+const REREAD_TASK_MODE_OPTIONS: { value: RereadTaskMode; label: string }[] = [
+    { value: "fluid_reading_saved_words", label: "Fluid Reading with Saved Word Support" },
+    { value: "curiosity_reading", label: "Curiosity Reading" },
+    { value: "just_reading", label: "Just Reading" },
+    { value: "reader_choice", label: "Reader’s choice / Book Hub" },
+];
+
 function getBook(bookRow: UserBookRow["books"]) {
     if (Array.isArray(bookRow)) return bookRow[0] ?? null;
     return bookRow ?? null;
@@ -317,7 +336,22 @@ export default function TeacherStudentsPage() {
     const [canAccess, setCanAccess] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [students, setStudents] = useState<StudentCard[]>([]);
+    const [taskBooksByStudentId, setTaskBooksByStudentId] = useState<
+        Record<string, TaskBookOption[]>
+    >({});
     const [error, setError] = useState<string | null>(null);
+    const [taskLearnerId, setTaskLearnerId] = useState("");
+    const [taskUserBookId, setTaskUserBookId] = useState("");
+    const [taskTitle, setTaskTitle] = useState("Reread today’s lesson pages");
+    const [taskInstructions, setTaskInstructions] = useState(
+        "Reread using Fluid Reading with Saved Word Support."
+    );
+    const [taskPageStart, setTaskPageStart] = useState("");
+    const [taskPageEnd, setTaskPageEnd] = useState("");
+    const [taskReadingMode, setTaskReadingMode] =
+        useState<RereadTaskMode>("fluid_reading_saved_words");
+    const [taskSaving, setTaskSaving] = useState(false);
+    const [taskMessage, setTaskMessage] = useState<string | null>(null);
 
     async function loadStudents() {
         setLoading(true);
@@ -482,12 +516,26 @@ export default function TeacherStudentsPage() {
             if (userBooksError) throw userBooksError;
 
             const booksByStudentId = new Map<string, UserBookRow[]>();
+            const nextTaskBookOptions: Record<string, TaskBookOption[]> = {};
 
             for (const row of (userBooks ?? []) as UserBookRow[]) {
                 const existing = booksByStudentId.get(row.user_id) ?? [];
                 existing.push(row);
                 booksByStudentId.set(row.user_id, existing);
+
+                const book = getBook(row.books);
+                if (book?.title) {
+                    const options = nextTaskBookOptions[row.user_id] ?? [];
+                    options.push({
+                        id: row.id,
+                        userId: row.user_id,
+                        title: book.title,
+                    });
+                    nextTaskBookOptions[row.user_id] = options;
+                }
             }
+
+            setTaskBooksByStudentId(nextTaskBookOptions);
 
             const userBookIds = ((userBooks ?? []) as UserBookRow[]).map((row) => row.id);
 
@@ -555,6 +603,7 @@ export default function TeacherStudentsPage() {
             console.error("Error loading teacher students:", err);
             setError(err?.message ?? "Could not load students.");
             setStudents([]);
+            setTaskBooksByStudentId({});
         } finally {
             setLoading(false);
         }
@@ -563,6 +612,107 @@ export default function TeacherStudentsPage() {
     useEffect(() => {
         void loadStudents();
     }, []);
+
+    useEffect(() => {
+        if (students.length === 0) return;
+        if (taskLearnerId && students.some((student) => student.id === taskLearnerId)) return;
+
+        const firstCurrentStudent =
+            students.find((student) => student.relationshipStatus === "current") ?? students[0];
+
+        setTaskLearnerId(firstCurrentStudent.id);
+        setTaskUserBookId(firstCurrentStudent.currentBookId ?? "");
+    }, [students, taskLearnerId]);
+
+    useEffect(() => {
+        if (!taskLearnerId) {
+            setTaskUserBookId("");
+            return;
+        }
+
+        const options = taskBooksByStudentId[taskLearnerId] ?? [];
+        if (!taskUserBookId || !options.some((book) => book.id === taskUserBookId)) {
+            setTaskUserBookId(options[0]?.id ?? "");
+        }
+    }, [taskBooksByStudentId, taskLearnerId, taskUserBookId]);
+
+    async function createRereadTask() {
+        setTaskMessage(null);
+
+        if (!currentUserId) {
+            setTaskMessage("Please sign in again.");
+            return;
+        }
+
+        if (!taskLearnerId) {
+            setTaskMessage("Choose a learner.");
+            return;
+        }
+
+        const cleanTitle = taskTitle.trim();
+        if (!cleanTitle) {
+            setTaskMessage("Add a task title.");
+            return;
+        }
+
+        const cleanInstructions = taskInstructions.trim();
+        const pageStart =
+            taskPageStart.trim() === "" ? null : Number(taskPageStart.trim());
+        const pageEnd = taskPageEnd.trim() === "" ? null : Number(taskPageEnd.trim());
+
+        if (
+            (pageStart != null && (!Number.isFinite(pageStart) || pageStart <= 0)) ||
+            (pageEnd != null && (!Number.isFinite(pageEnd) || pageEnd <= 0))
+        ) {
+            setTaskMessage("Page numbers should be positive numbers.");
+            return;
+        }
+
+        if ((pageStart == null) !== (pageEnd == null)) {
+            setTaskMessage("Use both page fields, or leave both blank.");
+            return;
+        }
+
+        if (pageStart != null && pageEnd != null && pageEnd < pageStart) {
+            setTaskMessage("End page cannot be before start page.");
+            return;
+        }
+
+        const taskPayload: Record<string, unknown> = {
+            mode: taskReadingMode,
+        };
+
+        if (pageStart != null && pageEnd != null) {
+            taskPayload.page_start = pageStart;
+            taskPayload.page_end = pageEnd;
+        }
+
+        setTaskSaving(true);
+
+        try {
+            const { error: insertError } = await supabase.from("learning_tasks").insert({
+                created_by: currentUserId,
+                learner_id: taskLearnerId,
+                user_book_id: taskUserBookId || null,
+                task_type: "reread_pages",
+                title: cleanTitle,
+                instructions: cleanInstructions || null,
+                task_payload: taskPayload,
+                status: "assigned",
+            });
+
+            if (insertError) throw insertError;
+
+            setTaskMessage("Learning task created.");
+            setTaskPageStart("");
+            setTaskPageEnd("");
+        } catch (err: any) {
+            console.error("Error creating learning task:", err);
+            setTaskMessage(err?.message ?? "Could not create learning task.");
+        } finally {
+            setTaskSaving(false);
+        }
+    }
 
     const summary = useMemo(() => {
         return {
@@ -674,11 +824,133 @@ export default function TeacherStudentsPage() {
                         </div>
                     </section>
 
+                    <section className="mt-8 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                                    Learning Tasks
+                                </p>
+                                <h2 className="mt-1 text-lg font-black text-stone-900">
+                                    Create a reread task
+                                </h2>
+                                <p className="mt-1 text-sm leading-6 text-stone-600">
+                                    A small manual task for a learner. For now, tasks appear on the learner’s Library page.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                Learner
+                                <select
+                                    value={taskLearnerId}
+                                    onChange={(event) => setTaskLearnerId(event.target.value)}
+                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                >
+                                    {students.map((student) => (
+                                        <option key={student.id} value={student.id}>
+                                            {student.display_name || student.username || "Unnamed learner"}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                Linked book
+                                <select
+                                    value={taskUserBookId}
+                                    onChange={(event) => setTaskUserBookId(event.target.value)}
+                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                >
+                                    <option value="">No linked book</option>
+                                    {(taskBooksByStudentId[taskLearnerId] ?? []).map((book) => (
+                                        <option key={book.id} value={book.id}>
+                                            {book.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="grid gap-1 text-sm font-semibold text-stone-700 lg:col-span-2">
+                                Reading type
+                                <select
+                                    value={taskReadingMode}
+                                    onChange={(event) =>
+                                        setTaskReadingMode(event.target.value as RereadTaskMode)
+                                    }
+                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                >
+                                    {REREAD_TASK_MODE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="grid gap-1 text-sm font-semibold text-stone-700 lg:col-span-2">
+                                Title
+                                <input
+                                    value={taskTitle}
+                                    onChange={(event) => setTaskTitle(event.target.value)}
+                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                />
+                            </label>
+
+                            <label className="grid gap-1 text-sm font-semibold text-stone-700 lg:col-span-2">
+                                Instructions
+                                <textarea
+                                    value={taskInstructions}
+                                    onChange={(event) => setTaskInstructions(event.target.value)}
+                                    rows={3}
+                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                />
+                            </label>
+
+                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                Start page
+                                <input
+                                    value={taskPageStart}
+                                    onChange={(event) => setTaskPageStart(event.target.value)}
+                                    inputMode="numeric"
+                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                    placeholder="Optional"
+                                />
+                            </label>
+
+                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                End page
+                                <input
+                                    value={taskPageEnd}
+                                    onChange={(event) => setTaskPageEnd(event.target.value)}
+                                    inputMode="numeric"
+                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                    placeholder="Optional"
+                                />
+                            </label>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={createRereadTask}
+                                disabled={taskSaving || students.length === 0}
+                                className="rounded-2xl bg-emerald-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:opacity-50"
+                            >
+                                {taskSaving ? "Creating..." : "Create Task"}
+                            </button>
+
+                            {taskMessage ? (
+                                <p className="text-sm font-medium text-emerald-900">{taskMessage}</p>
+                            ) : null}
+                        </div>
+                    </section>
+
                     <section className="mt-8">
                         <div className="mb-3">
                             <h2 className="text-lg font-black text-stone-900">Student List</h2>
                             <p className="mt-1 text-sm text-stone-500">
-                                Open a student’s library from here instead of using the Library dropdown.
+                                View a student’s library, assign books, and check their reading setup from one place.
                             </p>
                         </div>
 

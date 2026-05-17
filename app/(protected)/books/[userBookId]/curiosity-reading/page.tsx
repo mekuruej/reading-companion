@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { KANJI_DATA } from "@/lib/kanjiData";
+import KanjiComponentLookup from "@/components/KanjiComponentLookup";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import {
   fetchLibraryStudyColorInfoByWord,
@@ -58,11 +58,6 @@ type QuickLookupCandidate = {
   selectedMeaningIndex: number;
   meaning: string;
   isCustomMeaning: boolean;
-};
-
-type KanjiEntry = {
-  kanji: string;
-  pieces: string[];
 };
 
 function makeBlankQuickPreview(meta = { page: "", chapterNumber: "", chapterName: "" }): QuickPreview {
@@ -217,6 +212,7 @@ export default function CuriosityReadingPage() {
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
+  const [scratchWord, setScratchWord] = useState("");
 
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
@@ -228,8 +224,6 @@ export default function CuriosityReadingPage() {
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
   const quickWordFieldsRef = useRef<HTMLDivElement | null>(null);
-
-  const [selectedPieces, setSelectedPieces] = useState<string[]>([]);
 
   // Timer
   const [isRunning, setIsRunning] = useState(false);
@@ -243,17 +237,6 @@ export default function CuriosityReadingPage() {
   const [sessionEndPage, setSessionEndPage] = useState("");
 
   const quickMetaStorageKey = `single-add-meta:${userBookId}`;
-
-  const PIECE_NORMALIZATION: Record<string, string> = {
-    氵: "水",
-    扌: "手",
-    亻: "人",
-    忄: "心",
-  };
-
-  function normalizePiece(piece: string) {
-    return PIECE_NORMALIZATION[piece] ?? piece;
-  }
 
   useEffect(() => {
     setUserBookId(routeUserBookId);
@@ -436,7 +419,10 @@ export default function CuriosityReadingPage() {
       const next = await fetchLibraryStudyColorInfoByWord(
         supabase,
         user.id,
-        wordsToCheck
+        wordsToCheck,
+        {
+          includeMissingAsFirstEncounter: true,
+        }
       );
 
       if (!cancelled) {
@@ -449,7 +435,7 @@ export default function CuriosityReadingPage() {
     return () => {
       cancelled = true;
     };
-  }, [quickSessionWords, quickPreview.surface, quickPreview.reading]);
+  }, [quickSessionWords, quickPreview.surface, quickPreview.reading, quickPreview.id]);
 
   function prepareForNextQuickWord() {
     window.setTimeout(() => {
@@ -959,18 +945,6 @@ export default function CuriosityReadingPage() {
     makeLibraryStudyColorKey(quickPreview.surface, quickPreview.reading)
     ] ?? null;
 
-  const filteredKanji = KANJI_DATA.filter((entry: KanjiEntry) => {
-
-    if (selectedPieces.length === 0) return false;
-
-    const normalizedSelected = selectedPieces.map(normalizePiece);
-    const normalizedEntryPieces = entry.pieces.map(normalizePiece);
-
-    return normalizedSelected.every((piece) =>
-      normalizedEntryPieces.includes(piece)
-    );
-  });
-
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
@@ -1235,8 +1209,11 @@ export default function CuriosityReadingPage() {
             <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
               <div>
                 <label className="mb-1 block text-sm font-medium text-stone-700">
-                  Search / Edit Word
+                  Rapid search
                 </label>
+                <p className="mb-1 text-xs text-stone-500">
+                  Already know the kanji? Search with a simple Enter tap.
+                </p>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
@@ -1273,15 +1250,81 @@ export default function CuriosityReadingPage() {
                 </div>
               </div>
 
-              {quickPreviewLibraryColorInfo ? (
+              {quickPreview.surface.trim() && quickPreview.reading.trim() ? (
                 <div className="flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
-                  <span>Library status:</span>
-                  <LibraryColorBadge
-                    colorStatus={quickPreviewLibraryColorInfo.colorStatus}
-                    stageLabel={quickPreviewLibraryColorInfo.stageLabel}
-                  />
+                  <span>Current library status:</span>
+                  {quickPreviewLibraryColorInfo ? (
+                    <LibraryColorBadge
+                      colorStatus={quickPreviewLibraryColorInfo.colorStatus}
+                      stageLabel={quickPreviewLibraryColorInfo.stageLabel}
+                    />
+                  ) : (
+                    <LibraryColorBadge color="none" label="Not in library yet" />
+                  )}
                 </div>
               ) : null}
+            </div>
+
+            <div className="lg:hidden">
+              <KanjiComponentLookup
+                onPickKanji={(kanji) => {
+                  setQuickPreview((prev) => ({
+                    ...prev,
+                    surface: `${prev.surface}${kanji}`,
+                  }));
+                  setSavedQuickNotice("");
+                  if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+                  window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
+                }}
+              />
+            </div>
+
+            <div className="hidden rounded-xl border border-stone-200 bg-white/75 p-3 lg:block">
+              <label className="block text-sm font-medium text-stone-700">
+                Build your word
+              </label>
+              <p className="mt-1 text-xs text-stone-500">
+                Still figuring out the kanji? Try it here first. Nothing will search until you’re ready.
+              </p>
+
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={scratchWord}
+                  onChange={(event) => setScratchWord(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }
+                  }}
+                  placeholder="Try building the word here..."
+                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                />
+                <button
+                  type="button"
+                  disabled={!scratchWord.trim()}
+                  onClick={() => {
+                    const nextWord = scratchWord.trim();
+                    setQuickPreview((prev) => ({
+                      ...prev,
+                      surface: nextWord,
+                      cacheSurface: nextWord ? prev.cacheSurface : "",
+                    }));
+                    setSavedQuickNotice("");
+                    if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+                    window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
+                  }}
+                  className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+                >
+                  Use this word
+                </button>
+              </div>
+
+              <KanjiComponentLookup
+                onPickKanji={(kanji) => {
+                  setScratchWord((prev) => `${prev}${kanji}`);
+                }}
+              />
             </div>
 
             {quickError ? (

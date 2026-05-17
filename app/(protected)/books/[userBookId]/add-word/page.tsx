@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import KanjiComponentLookup from "@/components/KanjiComponentLookup";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import {
   fetchLibraryStudyColorInfoByWord,
@@ -151,6 +152,7 @@ export default function AddWordPage() {
   const [bookCover, setBookCover] = useState("");
 
   const [word, setWord] = useState("");
+  const [scratchWord, setScratchWord] = useState("");
   const [alternateSurface, setAlternateSurface] = useState("");
   const [useAlternateSurface, setUseAlternateSurface] = useState(false);
 
@@ -266,7 +268,6 @@ export default function AddWordPage() {
 
     async function loadLibraryColors() {
       const currentSurface = useAlternateSurface ? alternateSurface : word;
-
       const wordsToCheck = [
         ...sessionWords.map((item) => ({
           surface: item.surface,
@@ -296,7 +297,10 @@ export default function AddWordPage() {
       const next = await fetchLibraryStudyColorInfoByWord(
         supabase,
         user.id,
-        wordsToCheck
+        wordsToCheck,
+        {
+          includeMissingAsFirstEncounter: true,
+        }
       );
 
       if (!cancelled) {
@@ -309,7 +313,7 @@ export default function AddWordPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionWords, word, alternateSurface, useAlternateSurface, reading]);
+  }, [sessionWords, word, alternateSurface, useAlternateSurface, reading, editingSessionWordId]);
 
   function prepareForNextWord() {
     window.setTimeout(() => {
@@ -906,8 +910,11 @@ export default function AddWordPage() {
                 className="space-y-1"
               >
                 <label className="block text-sm font-medium text-stone-700">
-                  Search / Edit Word
+                  Rapid search
                 </label>
+                <p className="text-xs text-stone-500">
+                  Already know the kanji? Search with a simple Enter tap.
+                </p>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
@@ -932,15 +939,73 @@ export default function AddWordPage() {
                 </div>
               </form>
 
-              {currentLibraryColorInfo ? (
+              {currentColorSurface.trim() && reading.trim() ? (
                 <div className="flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
-                  <span>Library status:</span>
-                  <LibraryColorBadge
-                    colorStatus={currentLibraryColorInfo.colorStatus}
-                    stageLabel={currentLibraryColorInfo.stageLabel}
-                  />
+                  <span>Current library status:</span>
+                  {currentLibraryColorInfo ? (
+                    <LibraryColorBadge
+                      colorStatus={currentLibraryColorInfo.colorStatus}
+                      stageLabel={currentLibraryColorInfo.stageLabel}
+                    />
+                  ) : (
+                    <LibraryColorBadge color="none" label="Not in library yet" />
+                  )}
                 </div>
               ) : null}
+            </div>
+
+            <div className="lg:hidden">
+              <KanjiComponentLookup
+                onPickKanji={(kanji) => {
+                  setWord((prev) => `${prev}${kanji}`);
+                  setSavedNotice("");
+                  if (lookupCandidates.length > 0) setLookupCandidates([]);
+                  window.requestAnimationFrame(() => wordInputRef.current?.focus());
+                }}
+              />
+            </div>
+
+            <div className="hidden rounded-xl border border-stone-200 bg-white/75 p-3 lg:block">
+              <label className="block text-sm font-medium text-stone-700">
+                Build your word
+              </label>
+              <p className="mt-1 text-xs text-stone-500">
+                Still figuring out the kanji? Try it here first. Nothing will search until you’re ready.
+              </p>
+
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={scratchWord}
+                  onChange={(event) => setScratchWord(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }
+                  }}
+                  placeholder="Try building the word here..."
+                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                />
+                <button
+                  type="button"
+                  disabled={!scratchWord.trim()}
+                  onClick={() => {
+                    setWord(scratchWord.trim());
+                    setSavedNotice("");
+                    if (lookupCandidates.length > 0) setLookupCandidates([]);
+                    window.requestAnimationFrame(() => wordInputRef.current?.focus());
+                  }}
+                  className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+                >
+                  Use this word
+                </button>
+              </div>
+
+              <KanjiComponentLookup
+                onPickKanji={(kanji) => {
+                  setScratchWord((prev) => `${prev}${kanji}`);
+                }}
+              />
             </div>
 
           {message ? (
