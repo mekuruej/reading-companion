@@ -490,6 +490,11 @@ function progressWithWordSkyClaim(
   };
 }
 
+function preReadingSupportCycle(progress: LibraryWordProgressRow | null | undefined) {
+  if (!progress?.held_before_reading_gate) return null;
+  return Math.max(2, (progress.reading_gate_attempts ?? 0) + 1);
+}
+
 function makeClaimStudyCard(
   userId: string,
   claim: LibraryWordClaimRow,
@@ -523,6 +528,7 @@ function makeClaimStudyCard(
     meaningGate: progress?.meaning_gate_status ?? "not_started",
     heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
     heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+    preReadingSupportCycle: preReadingSupportCycle(progress),
     mastered: progress?.mastered ?? false,
   });
 
@@ -1786,6 +1792,7 @@ export default function LibraryStudyPage() {
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
                 heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
                 heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                preReadingSupportCycle: preReadingSupportCycle(progress),
                 mastered: progress?.mastered ?? false,
               });
 
@@ -1842,6 +1849,7 @@ export default function LibraryStudyPage() {
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
                 heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
                 heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                preReadingSupportCycle: preReadingSupportCycle(progress),
                 mastered: progress?.mastered ?? false,
               });
 
@@ -1926,6 +1934,7 @@ export default function LibraryStudyPage() {
               meaningGate: progress?.meaning_gate_status ?? "not_started",
               heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
               heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+              preReadingSupportCycle: preReadingSupportCycle(progress),
               mastered: progress?.mastered ?? false,
             });
 
@@ -1981,6 +1990,7 @@ export default function LibraryStudyPage() {
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
                 heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
                 heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                preReadingSupportCycle: preReadingSupportCycle(progress),
                 mastered: progress?.mastered ?? false,
               });
 
@@ -2617,6 +2627,7 @@ export default function LibraryStudyPage() {
               meaningGate: heldProgress.meaning_gate_status,
               heldBeforeReadingGate: true,
               heldBeforeMeaningGate: heldProgress.held_before_meaning_gate,
+              preReadingSupportCycle: preReadingSupportCycle(heldProgress),
               mastered: heldProgress.mastered,
             }),
           }

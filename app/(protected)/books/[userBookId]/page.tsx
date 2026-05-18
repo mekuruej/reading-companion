@@ -710,12 +710,6 @@ export default function BookHubPage() {
   );
 
   useEffect(() => {
-    if (profileLevel) {
-      setReaderLevel(profileLevel);
-    }
-  }, [profileLevel]);
-
-  useEffect(() => {
     setSessionDate(todayYmdAppTimeZone());
   }, []);
 
@@ -3909,7 +3903,7 @@ export default function BookHubPage() {
       const { error: userBookError } = await supabase
         .from("user_books")
         .update({
-          reader_level: profileLevel || readerLevel || null,
+          reader_level: readerLevel || null,
           rating_difficulty: rd,
         })
         .eq("id", row.id);
@@ -4045,7 +4039,7 @@ export default function BookHubPage() {
         teacher_student_use_rating: tsur,
         favorite_quotes: favoriteQuotes.trim() || null,
         memorable_words: memorableWords.trim() || null,
-        reader_level: profileLevel || readerLevel || null,
+        reader_level: readerLevel || null,
         recommended_level: recommendedLevel || null,
         format_type: formatType || null,
         progress_mode: progressMode || null,

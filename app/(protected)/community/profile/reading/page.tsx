@@ -17,7 +17,6 @@ type LearningSettings = {
   show_badge_numbers: boolean;
   color_system: string;
   skip_katakana_library_check: boolean;
-  library_check_daily_limit: number;
   show_ability_check_reminder: boolean;
 };
 
@@ -26,13 +25,6 @@ type MainStage = "red" | "orange" | "yellow" | "green" | "blue" | "grey" | "purp
 function colorLabel(stage: MainStage) {
   if (stage === "grey") return "Limbo";
   return stage.charAt(0).toUpperCase() + stage.slice(1);
-}
-
-function cleanDailyCheckLimit(value: number | null | undefined) {
-  if (value === 10 || value === 20 || value === 30 || value === 40 || value === 50) {
-    return value;
-  }
-  return 20;
 }
 
 function stagePill(stage: MainStage) {
@@ -101,7 +93,6 @@ function isMissingSettingsColumnError(error: unknown) {
     code === "42703" ||
     code === "PGRST204" ||
     message.includes("show_ability_check_reminder") ||
-    message.includes("library_check_daily_limit") ||
     message.includes("schema cache")
   );
 }
@@ -153,7 +144,6 @@ export default function ReadingProfilePage() {
           show_badge_numbers: true,
           color_system: "rainbow",
           skip_katakana_library_check: true,
-          library_check_daily_limit: 20,
           show_ability_check_reminder: true,
         };
         setSettings(defaultSettings);
@@ -164,9 +154,6 @@ export default function ReadingProfilePage() {
         ...(data as LearningSettings),
         skip_katakana_library_check:
           (data as Partial<LearningSettings>).skip_katakana_library_check ?? true,
-        library_check_daily_limit: cleanDailyCheckLimit(
-          (data as Partial<LearningSettings>).library_check_daily_limit
-        ),
         show_ability_check_reminder:
           (data as Partial<LearningSettings>).show_ability_check_reminder ?? true,
       };
@@ -202,7 +189,6 @@ export default function ReadingProfilePage() {
           show_badge_numbers: settings.show_badge_numbers,
           color_system: settings.color_system,
           skip_katakana_library_check: settings.skip_katakana_library_check,
-          library_check_daily_limit: cleanDailyCheckLimit(settings.library_check_daily_limit),
           show_ability_check_reminder: settings.show_ability_check_reminder,
         },
         { onConflict: "user_id" }
@@ -227,7 +213,7 @@ export default function ReadingProfilePage() {
           setMessage(
             fallbackError
               ? fallbackError.message ?? "Error saving reading profile."
-              : "Reading profile saved. Run the latest user-learning-settings SQL to save the Ability Check card limit and reminder setting."
+              : "Reading profile saved. Run the latest user-learning-settings SQL to save the Ability Check reminder setting."
           );
         } else {
           setMessage(error.message ?? "Error saving reading profile.");
@@ -361,36 +347,9 @@ export default function ReadingProfilePage() {
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-stone-900">Ability Check session</h2>
           <p className="mt-1 text-sm leading-6 text-stone-600">
-            Keep the strict gate session small enough to finish. Practice can still show the larger
-            pool whenever you want.
+            Ability Check stays strict and only opens when enough cards are due. Practice can still
+            show a larger review set whenever you want.
           </p>
-
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-stone-800">
-              Cards per Ability Check session
-            </label>
-            <p className="mt-1 text-xs leading-5 text-stone-500">
-              This becomes your default daily Ability Check size. Mekuru fills it with due cards
-              first, then uses the wider ready pool if it needs more cards. If you do not have many
-              words available yet, try finding some easy words in Word Sky.
-            </p>
-            <select
-              value={cleanDailyCheckLimit(settings.library_check_daily_limit)}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  library_check_daily_limit: Number(e.target.value),
-                })
-              }
-              className="mt-1 w-full rounded-xl border px-3 py-2"
-            >
-              <option value={10}>10 cards</option>
-              <option value={20}>20 cards</option>
-              <option value={30}>30 cards</option>
-              <option value={40}>40 cards</option>
-              <option value={50}>50 cards</option>
-            </select>
-          </div>
 
           <label className="mt-4 flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
             <input

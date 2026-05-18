@@ -18,6 +18,9 @@ type SimpleTimedSessionPageProps = {
     description: string;
     saveSuccessMessage: string;
     backLabel?: string;
+    startLocationLabel?: string;
+    endLocationLabel?: string;
+    sessionLocationNote?: string;
 };
 
 function formatTimer(totalSeconds: number) {
@@ -41,6 +44,9 @@ export default function SimpleTimedSessionPage({
     description,
     saveSuccessMessage,
     backLabel = "Back to Book Hub",
+    startLocationLabel = "Start page optional",
+    endLocationLabel = "End page optional",
+    sessionLocationNote = "Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers.",
 }: SimpleTimedSessionPageProps) {
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -462,7 +468,7 @@ export default function SimpleTimedSessionPage({
 
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                         <div>
-                                            <div className="mb-1 text-sm text-stone-600">Start page optional</div>
+                                            <div className="mb-1 text-sm text-stone-600">{startLocationLabel}</div>
                                             <input
                                                 type="number"
                                                 min={1}
@@ -474,7 +480,7 @@ export default function SimpleTimedSessionPage({
                                         </div>
 
                                         <div>
-                                            <div className="mb-1 text-sm text-stone-600">End page optional</div>
+                                            <div className="mb-1 text-sm text-stone-600">{endLocationLabel}</div>
                                             <input
                                                 type="number"
                                                 min={1}
@@ -489,7 +495,7 @@ export default function SimpleTimedSessionPage({
                                     <div className="mt-3 space-y-1 text-sm text-stone-500">
                                         <div>Time: {formatTimer(elapsed)}</div>
                                         <div className="text-xs">
-                                            Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers.
+                                            {sessionLocationNote}
                                         </div>
                                     </div>
 

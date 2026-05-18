@@ -2366,30 +2366,45 @@ export default function BooksPage() {
 
   function learningTaskTypeLabel(taskType: string) {
     if (taskType === "reread_pages") return "Reread pages";
-    if (taskType === "review_book_words") return "Review book words";
+    if (taskType === "review_book_words") return "Study book flashcards";
     if (taskType === "review_recent_words") return "Review recent words";
     if (taskType === "kanji_reading_practice") return "Kanji Reading";
+    if (taskType === "listening") return "Listening";
     return "Learning task";
   }
 
-  function learningTaskReadingHref(task: LearningTaskRow) {
-    if (task.task_type !== "reread_pages" || !task.user_book_id) return null;
+  function learningTaskAction(task: LearningTaskRow) {
+    if (task.task_type === "kanji_reading_practice") {
+      return { href: "/library-study/kanji", label: "Open Kanji Reading" };
+    }
+
+    if (!task.user_book_id) return null;
+
+    if (task.task_type === "review_book_words") {
+      return { href: `/books/${task.user_book_id}/study`, label: "Open Flashcards" };
+    }
+
+    if (task.task_type === "listening") {
+      return { href: `/books/${task.user_book_id}/listening`, label: "Open Listening" };
+    }
+
+    if (task.task_type !== "reread_pages") return null;
 
     const mode = String(task.task_payload?.mode ?? "reader_choice");
 
     if (mode === "fluid_reading_saved_words") {
-      return `/books/${task.user_book_id}/readalong`;
+      return { href: `/books/${task.user_book_id}/readalong`, label: "Open Reading" };
     }
 
     if (mode === "curiosity_reading") {
-      return `/books/${task.user_book_id}/curiosity-reading`;
+      return { href: `/books/${task.user_book_id}/curiosity-reading`, label: "Open Reading" };
     }
 
     if (mode === "just_reading") {
-      return `/books/${task.user_book_id}/just-reading`;
+      return { href: `/books/${task.user_book_id}/just-reading`, label: "Open Reading" };
     }
 
-    return `/books/${task.user_book_id}`;
+    return { href: `/books/${task.user_book_id}`, label: "Open Book Hub" };
   }
 
   return (
@@ -2525,13 +2540,27 @@ export default function BooksPage() {
                   rows.find((row) => row.id === task.user_book_id)?.books?.title ?? null;
                 const pageStart = task.task_payload?.page_start;
                 const pageEnd = task.task_payload?.page_end;
-                const readingHref = learningTaskReadingHref(task);
+                const taskAction = learningTaskAction(task);
+                const chapterNumber = task.task_payload?.chapter_number;
+                const savedFrom = task.task_payload?.saved_from;
+                const savedTo = task.task_payload?.saved_to;
+                const cardCount = task.task_payload?.card_count;
                 const pageLabel =
                   pageStart && pageEnd
                     ? pageStart === pageEnd
                       ? `p.${pageStart}`
                       : `pp.${pageStart}-${pageEnd}`
                     : null;
+                const taskDetails = [
+                  bookTitle,
+                  pageLabel,
+                  chapterNumber ? `Chapter ${chapterNumber}` : null,
+                  savedFrom || savedTo
+                    ? `Saved ${savedFrom || "…"} to ${savedTo || "…"}`
+                    : null,
+                  cardCount ? `${cardCount} cards` : null,
+                  task.due_on ? `Due ${task.due_on}` : null,
+                ].filter(Boolean);
 
                 return (
                   <div
@@ -2554,19 +2583,17 @@ export default function BooksPage() {
                       </div>
 
                       <div className="text-xs font-semibold text-emerald-700">
-                        {[bookTitle, pageLabel, task.due_on ? `Due ${task.due_on}` : null]
-                          .filter(Boolean)
-                          .join(" · ")}
+                        {taskDetails.join(" · ")}
                       </div>
                     </div>
 
-                    {readingHref ? (
+                    {taskAction ? (
                       <button
                         type="button"
-                        onClick={() => router.push(readingHref)}
+                        onClick={() => router.push(taskAction.href)}
                         className="mt-3 rounded-xl bg-emerald-800 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-900"
                       >
-                        Open Reading
+                        {taskAction.label}
                       </button>
                     ) : null}
                   </div>

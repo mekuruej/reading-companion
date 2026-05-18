@@ -27,6 +27,7 @@ type ProgressRow = {
   meaning_gate_status: LibraryStudyGateStatus | null;
   held_before_reading_gate: boolean | null;
   held_before_meaning_gate: boolean | null;
+  reading_gate_attempts: number | null;
   mastered: boolean | null;
 };
 
@@ -69,6 +70,11 @@ export function emptyLibraryStudyLimboTotals(): LibraryStudyLimboTotals {
 
 function shouldClaimUpgradeColor(color: LibraryStudyColor) {
   return color === "none" || color === "red" || color === "orange" || color === "yellow" || color === "grey";
+}
+
+function preReadingSupportCycle(progress: ProgressRow | null | undefined) {
+  if (!progress?.held_before_reading_gate) return null;
+  return Math.max(2, (progress.reading_gate_attempts ?? 0) + 1);
 }
 
 async function loadColorSettings(userId: string): Promise<LibraryStudyColorSettings> {
@@ -129,7 +135,7 @@ export async function fetchLibraryStudyColorBreakdown(
       supabase
         .from("user_library_word_progress")
         .select(
-          "study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered"
+          "study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, reading_gate_attempts, mastered"
         )
         .eq("user_id", userId)
         .limit(20000)
@@ -169,6 +175,7 @@ export async function fetchLibraryStudyColorBreakdown(
       meaningGate: progress?.meaning_gate_status ?? "not_started",
       heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
       heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+      preReadingSupportCycle: preReadingSupportCycle(progress),
       mastered: progress?.mastered ?? false,
     });
 

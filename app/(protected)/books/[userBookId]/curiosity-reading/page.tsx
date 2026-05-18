@@ -1305,15 +1305,16 @@ export default function CuriosityReadingPage() {
                   disabled={!scratchWord.trim()}
                   onClick={() => {
                     const nextWord = scratchWord.trim();
-                    setQuickPreview((prev) => ({
-                      ...prev,
-                      surface: nextWord,
-                      cacheSurface: nextWord ? prev.cacheSurface : "",
-                    }));
-                    setSavedQuickNotice("");
-                    if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-                    window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
-                  }}
+	                    setQuickPreview((prev) => ({
+	                      ...prev,
+	                      surface: nextWord,
+	                      cacheSurface: nextWord ? prev.cacheSurface : "",
+	                    }));
+	                    setScratchWord("");
+	                    setSavedQuickNotice("");
+	                    if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+	                    window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
+	                  }}
                   className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
                 >
                   Use this word

@@ -989,12 +989,13 @@ export default function AddWordPage() {
                 <button
                   type="button"
                   disabled={!scratchWord.trim()}
-                  onClick={() => {
-                    setWord(scratchWord.trim());
-                    setSavedNotice("");
-                    if (lookupCandidates.length > 0) setLookupCandidates([]);
-                    window.requestAnimationFrame(() => wordInputRef.current?.focus());
-                  }}
+	                  onClick={() => {
+	                    setWord(scratchWord.trim());
+	                    setScratchWord("");
+	                    setSavedNotice("");
+	                    if (lookupCandidates.length > 0) setLookupCandidates([]);
+	                    window.requestAnimationFrame(() => wordInputRef.current?.focus());
+	                  }}
                   className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
                 >
                   Use this word

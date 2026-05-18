@@ -316,13 +316,17 @@ export default function BookStatsPage() {
     const book = row?.books ?? null;
     const realSessions = useMemo(() => sessions.filter((s) => !s.is_filler), [sessions]);
 
-    const pageTrackedSessions = useMemo(() => {
-        return realSessions.filter((s) => s.start_page != null && s.end_page != null);
+    const visualReadingSessions = useMemo(() => {
+        return realSessions.filter((s) => s.session_mode === "curiosity" || s.session_mode === "fluid");
     }, [realSessions]);
 
+    const pageTrackedSessions = useMemo(() => {
+        return visualReadingSessions.filter((s) => s.start_page != null && s.end_page != null);
+    }, [visualReadingSessions]);
+
     const timedSessions = useMemo(() => {
-        return realSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
-    }, [realSessions]);
+        return visualReadingSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
+    }, [visualReadingSessions]);
 
     const timedPageTrackedSessions = useMemo(() => {
         return timedSessions.filter((s) => s.start_page != null && s.end_page != null);

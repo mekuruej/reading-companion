@@ -682,6 +682,7 @@ export default function TeacherKanjiPage() {
   const openEditorItems = useMemo(() => {
     return queueItems.filter(
       (item) =>
+        item.status !== "excluded" &&
         editorOpenByWordId[item.userBookWordId] &&
         (editorRowsByWordId[item.userBookWordId] ?? []).length > 0
     );
@@ -1076,6 +1077,16 @@ export default function TeacherKanjiPage() {
 
         if (ignoreError) throw ignoreError;
       }
+
+      setEditorOpenByWordId((prev) => ({
+        ...prev,
+        [item.userBookWordId]: false,
+      }));
+      setEditorRowsByWordId((prev) => {
+        const next = { ...prev };
+        delete next[item.userBookWordId];
+        return next;
+      });
 
       await loadQueue();
       setSaveMessage(`Removed ${item.surface} from kanji readings.`);

@@ -263,8 +263,6 @@ export default function ReadingColorsPage() {
         key: "red" as const,
         label: "Red",
         shortMeaning: "New / needs support",
-        detail:
-          "Words that are still new, difficult, or not ready for Ability Check yet. These need more encounters, more time, or gentler support.",
         cardClasses: "border-red-200 bg-red-50 text-red-700",
         dotClass: "bg-red-500",
         valueClass: "text-red-900",
@@ -273,8 +271,6 @@ export default function ReadingColorsPage() {
         key: "orange" as const,
         label: "Orange",
         shortMeaning: "Starting to repeat",
-        detail:
-          "Words that are beginning to show up again. They may feel familiar, but they are still building enough reading history for a readiness check.",
         cardClasses: "border-orange-200 bg-orange-50 text-orange-700",
         dotClass: "bg-orange-500",
         valueClass: "text-orange-900",
@@ -283,8 +279,6 @@ export default function ReadingColorsPage() {
         key: "yellow" as const,
         label: "Yellow",
         shortMeaning: "Readiness checkpoint",
-        detail:
-          "Words with enough encounters to pause and ask: is this ready for the Reading Gate, too hard right now, or better saved for later?",
         cardClasses: "border-yellow-200 bg-yellow-50 text-yellow-700",
         dotClass: "bg-yellow-400",
         valueClass: "text-yellow-900",
@@ -293,8 +287,6 @@ export default function ReadingColorsPage() {
         key: "green" as const,
         label: "Green",
         shortMeaning: "Reading Gate",
-        detail:
-          "Words at the reading gate. Ability Check should focus on whether you can recognize or produce the reading before moving the word forward.",
         cardClasses: "border-green-200 bg-green-50 text-green-700",
         dotClass: "bg-green-500",
         valueClass: "text-green-900",
@@ -303,8 +295,6 @@ export default function ReadingColorsPage() {
         key: "blue" as const,
         label: "Blue",
         shortMeaning: "Meaning Gate",
-        detail:
-          "Words at the meaning gate. Ability Check should focus on whether you understand the saved meaning or definition target.",
         cardClasses: "border-blue-200 bg-blue-50 text-blue-700",
         dotClass: "bg-blue-500",
         valueClass: "text-blue-900",
@@ -313,8 +303,6 @@ export default function ReadingColorsPage() {
         key: "purple" as const,
         label: "Purple",
         shortMeaning: "Mastered",
-        detail:
-          "Words that have passed the main gates. Purple words should leave normal Ability Check and only return later through a light 久しぶり review mode.",
         cardClasses: "border-purple-200 bg-purple-50 text-purple-700",
         dotClass: "bg-purple-500",
         valueClass: "text-purple-900",
@@ -325,16 +313,6 @@ export default function ReadingColorsPage() {
 
   const limboItems = useMemo(
     () => [
-      {
-        key: "pre_reading_support" as const,
-        label: "Before Reading Gate",
-        shortMeaning: "Not ready yet",
-        detail:
-          "Words being held before the Reading Gate. These may need more encounters, more time, or gentler support before Ability Check.",
-        cardClasses: "border-slate-200 bg-slate-50 text-slate-700",
-        dotClass: "bg-slate-300",
-        valueClass: "text-slate-800",
-      },
       {
         key: "reading_gate_support" as const,
         label: "Reading Gate Missed",
@@ -502,14 +480,10 @@ export default function ReadingColorsPage() {
 
       <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-purple-500">
-          How to read this page
-        </p>
-        <h2 className="mt-1 text-xl font-black text-stone-900">
           How to read the movement
-        </h2>
+        </p>
         <p className="mt-2 text-xs leading-5 text-stone-600 sm:text-sm">
-          Counts update when words gain reading encounters or move through Ability
-          Check. The arrows compare <strong>this month so far</strong> with{" "}
+          The arrows compare <strong>this month so far</strong> with{" "}
           <strong>the same stretch last month</strong>, so the comparison stays
           fair on both the 1st and the 30th.
         </p>
@@ -581,10 +555,6 @@ export default function ReadingColorsPage() {
                   </p>
                 </div>
               </div>
-
-              <p className="mt-4 text-sm leading-6 text-stone-700">
-                {item.detail}
-              </p>
             </div>
           );
         })}
@@ -598,12 +568,35 @@ export default function ReadingColorsPage() {
             Words waiting for support
           </h2>
           <p className="mt-2 text-sm leading-6 text-stone-600">
-            Limbo words are not failed words. They are words being held before a
-            gate or sent back for more support after a check.
+            Limbo words are not failed words. They are words sent back for more
+            support after a gate check.
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-black text-white">
+                Red 2
+              </span>
+              <span className="rounded-full bg-orange-500 px-2.5 py-1 text-xs font-black text-white">
+                Orange 2
+              </span>
+              <span className="rounded-full bg-yellow-300 px-2.5 py-1 text-xs font-black text-stone-900">
+                Yellow 2
+              </span>
+            </div>
+            <h3 className="mt-4 text-lg font-black">Extra encounter support</h3>
+            <p className="mt-1 text-sm font-bold">Chosen before a gate</p>
+            <p className="mt-4 text-sm leading-6 text-stone-700">
+              If a word reaches Yellow but still feels too far above your level,
+              you can send it into another encounter loop. Red 2, Orange 2, and
+              Yellow 2 mean Mekuru is waiting for more real reading encounters
+              before asking again. The number can keep growing: Red 3, Orange 3,
+              Yellow 3, and so on.
+            </p>
+          </div>
+
           {limboItems.map((item) => {
             const monthValue = limboValue(monthLimboTotals, item.key);
             const previousValue =

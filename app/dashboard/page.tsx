@@ -9,6 +9,29 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/lib/supabaseClient";
 
+const POST_LOGIN_TARGET = "/books";
+const POST_LOGIN_PARAM = "after_login";
+const POST_LOGIN_VALUE = "library";
+const PROFILE_SETUP_TARGET = "/community/profile/settings";
+
+type ProfileBasics = {
+  username: string | null;
+  display_name: string | null;
+  native_language: string | null;
+  target_language: string | null;
+  level: string | null;
+};
+
+function isProfileReady(profile: ProfileBasics | null) {
+  return Boolean(
+    profile?.username &&
+      profile?.display_name &&
+      profile?.native_language &&
+      profile?.target_language &&
+      profile?.level
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [checkingSession, setCheckingSession] = useState(true);
@@ -17,9 +40,39 @@ export default function DashboardPage() {
   useEffect(() => {
     let alive = true;
 
+    async function routeSignedInUser(userId: string, shouldOpenLibraryAfterLogin: boolean) {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("username, display_name, native_language, target_language, level")
+        .eq("id", userId)
+        .maybeSingle<ProfileBasics>();
+
+      if (!alive) return true;
+
+      if (error) {
+        console.error("Error checking dashboard profile:", error);
+        setIsLoggedIn(true);
+        setCheckingSession(false);
+        return true;
+      }
+
+      if (!isProfileReady(profile ?? null)) {
+        router.replace(PROFILE_SETUP_TARGET);
+        return true;
+      }
+
+      if (shouldOpenLibraryAfterLogin) {
+        router.replace(POST_LOGIN_TARGET);
+        return true;
+      }
+
+      return false;
+    }
+
     async function loadSession() {
       const params = new URLSearchParams(window.location.search);
       const authCode = params.get("code");
+      const shouldOpenLibraryAfterLogin = params.get(POST_LOGIN_PARAM) === POST_LOGIN_VALUE;
 
       if (authCode) {
         const { error } = await supabase.auth.exchangeCodeForSession(authCode);
@@ -37,6 +90,11 @@ export default function DashboardPage() {
 
       if (!alive) return;
 
+      if (session?.user?.id) {
+        const routed = await routeSignedInUser(session.user.id, shouldOpenLibraryAfterLogin);
+        if (routed) return;
+      }
+
       setIsLoggedIn(Boolean(session?.user));
       setCheckingSession(false);
     }
@@ -45,8 +103,16 @@ export default function DashboardPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!alive) return;
+
+      const params = new URLSearchParams(window.location.search);
+      const shouldOpenLibraryAfterLogin = params.get(POST_LOGIN_PARAM) === POST_LOGIN_VALUE;
+
+      if (event === "SIGNED_IN" && session?.user && shouldOpenLibraryAfterLogin) {
+        void routeSignedInUser(session.user.id, true);
+        return;
+      }
 
       setIsLoggedIn(Boolean(session?.user));
       setCheckingSession(false);
@@ -129,7 +195,7 @@ export default function DashboardPage() {
                     showLinks={false}
                     redirectTo={
                       typeof window !== "undefined"
-                        ? `${window.location.origin}/dashboard`
+                        ? `${window.location.origin}/dashboard?${POST_LOGIN_PARAM}=${POST_LOGIN_VALUE}`
                         : undefined
                     }
                   />

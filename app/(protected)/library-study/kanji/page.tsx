@@ -1097,9 +1097,8 @@ export default function KanjiReadingStudyPage() {
 
           <div className="mt-3 border-t border-emerald-100 pt-3">
             <p>
-              Practice onyomi and kunyomi of saved vocabulary across the app. If you have
-              also looked up the word, your source book will be shown. Kanji can have
-              multiple onyomi or kunyomi, so each question is for one word shown after
+              Practice onyomi and kunyomi of saved vocabulary across the app. Kanji can have
+              multiple onyomi or kunyomi, so each question is for one specific word shown after
               your answer. Non-JLPT words are common in books, so they have their own filter.
             </p>
             <p className="mt-2">

@@ -37,6 +37,7 @@ export type ComputeLibraryStudyColorInput = {
   heldBeforeReadingGate?: boolean | null;
   heldBeforeMeaningGate?: boolean | null;
   readyForReadingGate?: boolean | null;
+  preReadingSupportCycle?: number | null;
   mastered?: boolean | null;
 };
 
@@ -123,6 +124,55 @@ function computeEncounterColor(
   };
 }
 
+function cleanSupportCycle(value: number | null | undefined) {
+  if (!Number.isFinite(value ?? 0)) return 2;
+  return Math.max(2, Math.floor(value ?? 2));
+}
+
+function computePreReadingSupportColor(
+  encounterCount: number,
+  settings: LibraryStudyColorSettings | null | undefined,
+  supportCycle: number | null | undefined
+): Pick<
+  LibraryStudyColorStatus,
+  "color" | "stageNumber" | "stageCount" | "encounterStep" | "totalEncounterSteps"
+> {
+  const stages = getLibraryStudyEncounterStageCounts(settings);
+  const cycle = cleanSupportCycle(supportCycle);
+  const safeEncounterCount = Math.max(0, Math.floor(encounterCount || 0));
+  const cycleStartEncounter = stages.total + (cycle - 2) * 2;
+  const cycleProgress = Math.max(0, safeEncounterCount - cycleStartEncounter);
+  const cycleStep = Math.min(cycleProgress, 2);
+
+  if (cycleStep === 0) {
+    return {
+      color: "red",
+      stageNumber: cycle,
+      stageCount: cycle,
+      encounterStep: safeEncounterCount,
+      totalEncounterSteps: cycleStartEncounter + 2,
+    };
+  }
+
+  if (cycleStep === 1) {
+    return {
+      color: "orange",
+      stageNumber: cycle,
+      stageCount: cycle,
+      encounterStep: safeEncounterCount,
+      totalEncounterSteps: cycleStartEncounter + 2,
+    };
+  }
+
+  return {
+    color: "yellow",
+    stageNumber: cycle,
+    stageCount: cycle,
+    encounterStep: safeEncounterCount,
+    totalEncounterSteps: cycleStartEncounter + 2,
+  };
+}
+
 export function computeLibraryStudyColorStatus(
   input: ComputeLibraryStudyColorInput
 ): LibraryStudyColorStatus {
@@ -173,18 +223,23 @@ export function computeLibraryStudyColorStatus(
   if (
     hasEnoughEncounters &&
     readingGate === "not_started" &&
-    input.heldBeforeReadingGate &&
-    input.heldBeforeMeaningGate
+    input.heldBeforeReadingGate
   ) {
+    const supportEncounter = computePreReadingSupportColor(
+      input.encounterCount,
+      input.settings,
+      input.preReadingSupportCycle
+    );
+
     return {
-      ...encounter,
-      color: "red",
-      stageNumber: 2,
-      stageCount: 3,
-      eligibleForLibraryStudy: true,
-      nextGate: "reading",
+      ...supportEncounter,
+      eligibleForLibraryStudy: supportEncounter.color === "yellow",
+      nextGate: supportEncounter.color === "yellow" ? "reading" : null,
       greyReason: null,
-      reason: "Sent back into early support.",
+      reason:
+        supportEncounter.color === "yellow"
+          ? "Ready to check again after extra support."
+          : "Building extra encounter support.",
     };
   }
 
@@ -198,19 +253,6 @@ export function computeLibraryStudyColorStatus(
       nextGate: "reading",
       greyReason: "reading_gate_support",
       reason: "Held for support after the reading gate was missed.",
-    };
-  }
-
-  if (hasEnoughEncounters && input.heldBeforeReadingGate) {
-    return {
-      ...encounter,
-      color: "grey",
-      stageNumber: null,
-      stageCount: null,
-      eligibleForLibraryStudy: true,
-      nextGate: "reading",
-      greyReason: "pre_reading_support",
-      reason: "Held for support before the reading gate.",
     };
   }
 

@@ -69,11 +69,26 @@ type TaskBookOption = {
     title: string;
 };
 
+type LearningTaskType =
+    | "reread_pages"
+    | "review_book_words"
+    | "kanji_reading_practice"
+    | "listening";
+
 type RereadTaskMode =
     | "reader_choice"
     | "fluid_reading_saved_words"
     | "curiosity_reading"
     | "just_reading";
+
+type BookFlashcardFilter = "whole_book" | "chapter" | "page_range" | "saved_date_range";
+
+const LEARNING_TASK_TYPE_OPTIONS: { value: LearningTaskType; label: string }[] = [
+    { value: "reread_pages", label: "Reread pages" },
+    { value: "review_book_words", label: "Study book flashcards" },
+    { value: "kanji_reading_practice", label: "Kanji Reading practice" },
+    { value: "listening", label: "Listening" },
+];
 
 const REREAD_TASK_MODE_OPTIONS: { value: RereadTaskMode; label: string }[] = [
     { value: "fluid_reading_saved_words", label: "Fluid Reading with Saved Word Support" },
@@ -81,6 +96,32 @@ const REREAD_TASK_MODE_OPTIONS: { value: RereadTaskMode; label: string }[] = [
     { value: "just_reading", label: "Just Reading" },
     { value: "reader_choice", label: "Reader’s choice / Book Hub" },
 ];
+
+const BOOK_FLASHCARD_FILTER_OPTIONS: { value: BookFlashcardFilter; label: string }[] = [
+    { value: "whole_book", label: "Whole book" },
+    { value: "chapter", label: "Chapter" },
+    { value: "page_range", label: "Page range" },
+    { value: "saved_date_range", label: "Saved date range" },
+];
+
+const DEFAULT_TASK_COPY: Record<LearningTaskType, { title: string; instructions: string }> = {
+    reread_pages: {
+        title: "Reread today’s lesson pages",
+        instructions: "Reread using Fluid Reading with Saved Word Support.",
+    },
+    review_book_words: {
+        title: "Study book flashcards",
+        instructions: "Review the selected words from this book.",
+    },
+    kanji_reading_practice: {
+        title: "Do Kanji Reading practice",
+        instructions: "Practice a short set of global Kanji Reading cards.",
+    },
+    listening: {
+        title: "Listen to today’s section",
+        instructions: "Listen to the book or audiobook and log the session.",
+    },
+};
 
 function getBook(bookRow: UserBookRow["books"]) {
     if (Array.isArray(bookRow)) return bookRow[0] ?? null;
@@ -180,7 +221,13 @@ function relationshipClasses(status: StudentRelationshipStatus) {
     return "border-emerald-200 bg-emerald-50 text-emerald-800";
 }
 
-function StudentCardArticle({ student }: { student: StudentCard }) {
+function StudentCardArticle({
+    student,
+    onCreateTask,
+}: {
+    student: StudentCard;
+    onCreateTask: (student: StudentCard) => void;
+}) {
     const displayName = student.display_name || student.username || "Unnamed student";
 
     return (
@@ -312,10 +359,10 @@ function StudentCardArticle({ student }: { student: StudentCard }) {
 
                     <button
                         type="button"
-                        disabled
-                        className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
+                        onClick={() => onCreateTask(student)}
+                        className="rounded-2xl border border-sky-700 bg-sky-700 px-4 py-3 text-base font-semibold text-white hover:bg-sky-800"
                     >
-                        Notes later
+                        Assign Task
                     </button>
 
                     <button
@@ -342,16 +389,24 @@ export default function TeacherStudentsPage() {
     const [error, setError] = useState<string | null>(null);
     const [taskLearnerId, setTaskLearnerId] = useState("");
     const [taskUserBookId, setTaskUserBookId] = useState("");
-    const [taskTitle, setTaskTitle] = useState("Reread today’s lesson pages");
+    const [taskType, setTaskType] = useState<LearningTaskType>("reread_pages");
+    const [taskTitle, setTaskTitle] = useState(DEFAULT_TASK_COPY.reread_pages.title);
     const [taskInstructions, setTaskInstructions] = useState(
-        "Reread using Fluid Reading with Saved Word Support."
+        DEFAULT_TASK_COPY.reread_pages.instructions
     );
     const [taskPageStart, setTaskPageStart] = useState("");
     const [taskPageEnd, setTaskPageEnd] = useState("");
     const [taskReadingMode, setTaskReadingMode] =
         useState<RereadTaskMode>("fluid_reading_saved_words");
+    const [taskFlashcardFilter, setTaskFlashcardFilter] =
+        useState<BookFlashcardFilter>("whole_book");
+    const [taskChapterNumber, setTaskChapterNumber] = useState("");
+    const [taskSavedFrom, setTaskSavedFrom] = useState("");
+    const [taskSavedTo, setTaskSavedTo] = useState("");
+    const [taskKanjiCardCount, setTaskKanjiCardCount] = useState("10");
     const [taskSaving, setTaskSaving] = useState(false);
     const [taskMessage, setTaskMessage] = useState<string | null>(null);
+    const [taskModalStudent, setTaskModalStudent] = useState<StudentCard | null>(null);
 
     async function loadStudents() {
         setLoading(true);
@@ -421,30 +476,16 @@ export default function TeacherStudentsPage() {
                     if (status) relationshipStatusByStudentId.set(studentId, status);
                 }
 
-                if (studentIds.length > 0) {
-                    const { data: linkedProfiles, error: linkedProfilesError } = await supabase
-                        .from("profiles")
-                        .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
-                        .in("id", studentIds)
-                        .order("display_name", { ascending: true });
+                const { data: allProfiles, error: allProfilesError } = await supabase
+                    .from("profiles")
+                    .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
+                    .order("display_name", { ascending: true });
 
-                    if (linkedProfilesError) throw linkedProfilesError;
+                if (allProfilesError) throw allProfilesError;
 
-                    studentProfiles = ((linkedProfiles ?? []) as StudentProfile[]).filter(
-                        (profile) => profile.id !== user.id && isStudentProfile(profile)
-                    );
-                } else {
-                    const { data: allProfiles, error: allProfilesError } = await supabase
-                        .from("profiles")
-                        .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
-                        .order("display_name", { ascending: true });
-
-                    if (allProfilesError) throw allProfilesError;
-
-                    studentProfiles = ((allProfiles ?? []) as StudentProfile[]).filter(
-                        (profile) => profile.id !== user.id && isStudentProfile(profile)
-                    );
-                }
+                studentProfiles = ((allProfiles ?? []) as StudentProfile[]).filter(
+                    (profile) => profile.id !== user.id && isStudentProfile(profile)
+                );
             } else {
                 const { data: links, error: linksError } = await supabase
                     .from("teacher_students")
@@ -636,7 +677,32 @@ export default function TeacherStudentsPage() {
         }
     }, [taskBooksByStudentId, taskLearnerId, taskUserBookId]);
 
-    async function createRereadTask() {
+    function updateTaskType(nextType: LearningTaskType) {
+        setTaskType(nextType);
+        setTaskTitle(DEFAULT_TASK_COPY[nextType].title);
+        setTaskInstructions(DEFAULT_TASK_COPY[nextType].instructions);
+        setTaskPageStart("");
+        setTaskPageEnd("");
+        setTaskChapterNumber("");
+        setTaskSavedFrom("");
+        setTaskSavedTo("");
+        setTaskMessage(null);
+    }
+
+    function openTaskModal(student: StudentCard) {
+        setTaskModalStudent(student);
+        setTaskLearnerId(student.id);
+        setTaskUserBookId(student.currentBookId ?? taskBooksByStudentId[student.id]?.[0]?.id ?? "");
+        setTaskMessage(null);
+    }
+
+    function closeTaskModal() {
+        if (taskSaving) return;
+        setTaskModalStudent(null);
+        setTaskMessage(null);
+    }
+
+    async function createLearningTask() {
         setTaskMessage(null);
 
         if (!currentUserId) {
@@ -659,6 +725,20 @@ export default function TeacherStudentsPage() {
         const pageStart =
             taskPageStart.trim() === "" ? null : Number(taskPageStart.trim());
         const pageEnd = taskPageEnd.trim() === "" ? null : Number(taskPageEnd.trim());
+        const chapterNumber =
+            taskChapterNumber.trim() === "" ? null : Number(taskChapterNumber.trim());
+        const kanjiCardCount =
+            taskKanjiCardCount.trim() === "" ? null : Number(taskKanjiCardCount.trim());
+
+        const needsBook =
+            taskType === "reread_pages" ||
+            taskType === "review_book_words" ||
+            taskType === "listening";
+
+        if (needsBook && !taskUserBookId) {
+            setTaskMessage("Choose a linked book for this task.");
+            return;
+        }
 
         if (
             (pageStart != null && (!Number.isFinite(pageStart) || pageStart <= 0)) ||
@@ -678,11 +758,68 @@ export default function TeacherStudentsPage() {
             return;
         }
 
-        const taskPayload: Record<string, unknown> = {
-            mode: taskReadingMode,
-        };
+        if (
+            taskType === "review_book_words" &&
+            taskFlashcardFilter === "chapter" &&
+            (chapterNumber == null || !Number.isFinite(chapterNumber) || chapterNumber <= 0)
+        ) {
+            setTaskMessage("Add a positive chapter number.");
+            return;
+        }
 
-        if (pageStart != null && pageEnd != null) {
+        if (
+            taskType === "kanji_reading_practice" &&
+            (kanjiCardCount == null || !Number.isFinite(kanjiCardCount) || kanjiCardCount <= 0)
+        ) {
+            setTaskMessage("Add a positive number of Kanji Reading cards.");
+            return;
+        }
+
+        if (
+            taskType === "review_book_words" &&
+            taskFlashcardFilter === "saved_date_range" &&
+            ((taskSavedFrom && taskSavedTo && taskSavedTo < taskSavedFrom) ||
+                (!taskSavedFrom && !taskSavedTo))
+        ) {
+            setTaskMessage("Add a saved date range, or choose a different flashcard filter.");
+            return;
+        }
+
+        const taskPayload: Record<string, unknown> = {};
+
+        if (taskType === "reread_pages") {
+            taskPayload.mode = taskReadingMode;
+        }
+
+        if (taskType === "review_book_words") {
+            taskPayload.mode = "book_flashcards";
+            taskPayload.filter_type = taskFlashcardFilter;
+
+            if (taskFlashcardFilter === "chapter" && chapterNumber != null) {
+                taskPayload.chapter_number = chapterNumber;
+            }
+
+            if (taskFlashcardFilter === "saved_date_range") {
+                if (taskSavedFrom) taskPayload.saved_from = taskSavedFrom;
+                if (taskSavedTo) taskPayload.saved_to = taskSavedTo;
+            }
+        }
+
+        if (taskType === "kanji_reading_practice") {
+            taskPayload.mode = "kanji_reading_practice";
+            taskPayload.card_count = kanjiCardCount ?? 10;
+        }
+
+        if (taskType === "listening") {
+            taskPayload.mode = "listening";
+        }
+
+        const shouldIncludePageRange =
+            taskType === "reread_pages" ||
+            taskType === "listening" ||
+            (taskType === "review_book_words" && taskFlashcardFilter === "page_range");
+
+        if (shouldIncludePageRange && pageStart != null && pageEnd != null) {
             taskPayload.page_start = pageStart;
             taskPayload.page_end = pageEnd;
         }
@@ -694,7 +831,7 @@ export default function TeacherStudentsPage() {
                 created_by: currentUserId,
                 learner_id: taskLearnerId,
                 user_book_id: taskUserBookId || null,
-                task_type: "reread_pages",
+                task_type: taskType,
                 title: cleanTitle,
                 instructions: cleanInstructions || null,
                 task_payload: taskPayload,
@@ -706,6 +843,9 @@ export default function TeacherStudentsPage() {
             setTaskMessage("Learning task created.");
             setTaskPageStart("");
             setTaskPageEnd("");
+            setTaskChapterNumber("");
+            setTaskSavedFrom("");
+            setTaskSavedTo("");
         } catch (err: any) {
             console.error("Error creating learning task:", err);
             setTaskMessage(err?.message ?? "Could not create learning task.");
@@ -761,7 +901,7 @@ export default function TeacherStudentsPage() {
                             href="/teacher/assign"
                             className="rounded-2xl border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black"
                         >
-                            Assign Book
+                            Assigned prep books
                         </Link>
 
                         <Link
@@ -807,6 +947,14 @@ export default function TeacherStudentsPage() {
                             <p className="mt-1 text-xs text-sky-700">Trials, prep, and upcoming learners.</p>
                         </div>
 
+                        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                            <p className="text-xs text-stone-500">Past students</p>
+                            <p className="mt-1 text-2xl font-black text-stone-900">
+                                {summary.pastStudents}
+                            </p>
+                            <p className="mt-1 text-xs text-stone-500">Archived or expired access.</p>
+                        </div>
+
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
                             <p className="text-xs text-amber-700">Assigned prep books</p>
                             <p className="mt-1 text-2xl font-black text-amber-900">
@@ -815,78 +963,166 @@ export default function TeacherStudentsPage() {
                             <p className="mt-1 text-xs text-amber-700">Books assigned from prep.</p>
                         </div>
 
-                        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-                            <p className="text-xs text-stone-500">Past students</p>
-                            <p className="mt-1 text-2xl font-black text-stone-900">
-                                {summary.pastStudents}
-                            </p>
-                            <p className="mt-1 text-xs text-stone-500">Archived or expired access.</p>
-                        </div>
+
                     </section>
 
-                    <section className="mt-8 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    {taskModalStudent ? (
+                        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-stone-950/40 px-4 py-8">
+                            <section className="w-full max-w-3xl rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-2xl">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                                     Learning Tasks
                                 </p>
                                 <h2 className="mt-1 text-lg font-black text-stone-900">
-                                    Create a reread task
+                                    Create a task for{" "}
+                                    {taskModalStudent.display_name ||
+                                        taskModalStudent.username ||
+                                        "this learner"}
                                 </h2>
                                 <p className="mt-1 text-sm leading-6 text-stone-600">
-                                    A small manual task for a learner. For now, tasks appear on the learner’s Library page.
+                                    A small manual task for a learner. Tasks appear on the learner’s Library page.
                                 </p>
                             </div>
+                                    <button
+                                        type="button"
+                                        onClick={closeTaskModal}
+                                        disabled={taskSaving}
+                                        className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-emerald-50 disabled:opacity-50"
+                                    >
+                                        Close
+                                    </button>
                         </div>
 
                         <div className="mt-4 grid gap-3 lg:grid-cols-2">
                             <label className="grid gap-1 text-sm font-semibold text-stone-700">
-                                Learner
+                                Task type
                                 <select
-                                    value={taskLearnerId}
-                                    onChange={(event) => setTaskLearnerId(event.target.value)}
-                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
-                                >
-                                    {students.map((student) => (
-                                        <option key={student.id} value={student.id}>
-                                            {student.display_name || student.username || "Unnamed learner"}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
-                                Linked book
-                                <select
-                                    value={taskUserBookId}
-                                    onChange={(event) => setTaskUserBookId(event.target.value)}
-                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
-                                >
-                                    <option value="">No linked book</option>
-                                    {(taskBooksByStudentId[taskLearnerId] ?? []).map((book) => (
-                                        <option key={book.id} value={book.id}>
-                                            {book.title}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            <label className="grid gap-1 text-sm font-semibold text-stone-700 lg:col-span-2">
-                                Reading type
-                                <select
-                                    value={taskReadingMode}
+                                    value={taskType}
                                     onChange={(event) =>
-                                        setTaskReadingMode(event.target.value as RereadTaskMode)
+                                        updateTaskType(event.target.value as LearningTaskType)
                                     }
                                     className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
                                 >
-                                    {REREAD_TASK_MODE_OPTIONS.map((option) => (
+                                    {LEARNING_TASK_TYPE_OPTIONS.map((option) => (
                                         <option key={option.value} value={option.value}>
                                             {option.label}
                                         </option>
                                     ))}
                                 </select>
                             </label>
+
+                            {taskType === "kanji_reading_practice" ? (
+                                <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm text-stone-600">
+                                    Kanji Reading tasks are global, so they do not need a linked book.
+                                </div>
+                            ) : (
+                                <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                    Linked book
+                                    <select
+                                        value={taskUserBookId}
+                                        onChange={(event) => setTaskUserBookId(event.target.value)}
+                                        className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                    >
+                                        <option value="">No linked book</option>
+                                        {(taskBooksByStudentId[taskLearnerId] ?? []).map((book) => (
+                                            <option key={book.id} value={book.id}>
+                                                {book.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            )}
+
+                            {taskType === "reread_pages" ? (
+                                <label className="grid gap-1 text-sm font-semibold text-stone-700 lg:col-span-2">
+                                    Reading type
+                                    <select
+                                        value={taskReadingMode}
+                                        onChange={(event) =>
+                                            setTaskReadingMode(event.target.value as RereadTaskMode)
+                                        }
+                                        className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                    >
+                                        {REREAD_TASK_MODE_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            ) : null}
+
+                            {taskType === "review_book_words" ? (
+                                <>
+                                    <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                        Flashcard set
+                                        <select
+                                            value={taskFlashcardFilter}
+                                            onChange={(event) =>
+                                                setTaskFlashcardFilter(event.target.value as BookFlashcardFilter)
+                                            }
+                                            className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                        >
+                                            {BOOK_FLASHCARD_FILTER_OPTIONS.map((option) => (
+                                                <option key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    {taskFlashcardFilter === "chapter" ? (
+                                        <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                            Chapter number
+                                            <input
+                                                value={taskChapterNumber}
+                                                onChange={(event) => setTaskChapterNumber(event.target.value)}
+                                                inputMode="numeric"
+                                                className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                                placeholder="Example: 2"
+                                            />
+                                        </label>
+                                    ) : null}
+
+                                    {taskFlashcardFilter === "saved_date_range" ? (
+                                        <>
+                                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                                Saved from
+                                                <input
+                                                    type="date"
+                                                    value={taskSavedFrom}
+                                                    onChange={(event) => setTaskSavedFrom(event.target.value)}
+                                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                                />
+                                            </label>
+
+                                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                                Saved to
+                                                <input
+                                                    type="date"
+                                                    value={taskSavedTo}
+                                                    onChange={(event) => setTaskSavedTo(event.target.value)}
+                                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                                />
+                                            </label>
+                                        </>
+                                    ) : null}
+                                </>
+                            ) : null}
+
+                            {taskType === "kanji_reading_practice" ? (
+                                <label className="grid gap-1 text-sm font-semibold text-stone-700 lg:col-span-2">
+                                    Kanji cards
+                                    <input
+                                        value={taskKanjiCardCount}
+                                        onChange={(event) => setTaskKanjiCardCount(event.target.value)}
+                                        inputMode="numeric"
+                                        className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                        placeholder="10"
+                                    />
+                                </label>
+                            ) : null}
 
                             <label className="grid gap-1 text-sm font-semibold text-stone-700 lg:col-span-2">
                                 Title
@@ -907,33 +1143,38 @@ export default function TeacherStudentsPage() {
                                 />
                             </label>
 
-                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
-                                Start page
-                                <input
-                                    value={taskPageStart}
-                                    onChange={(event) => setTaskPageStart(event.target.value)}
-                                    inputMode="numeric"
-                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
-                                    placeholder="Optional"
-                                />
-                            </label>
+                            {taskType !== "kanji_reading_practice" &&
+                                (taskType !== "review_book_words" || taskFlashcardFilter === "page_range") ? (
+                                <>
+                                    <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                        Start page
+                                        <input
+                                            value={taskPageStart}
+                                            onChange={(event) => setTaskPageStart(event.target.value)}
+                                            inputMode="numeric"
+                                            className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                            placeholder="Optional"
+                                        />
+                                    </label>
 
-                            <label className="grid gap-1 text-sm font-semibold text-stone-700">
-                                End page
-                                <input
-                                    value={taskPageEnd}
-                                    onChange={(event) => setTaskPageEnd(event.target.value)}
-                                    inputMode="numeric"
-                                    className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
-                                    placeholder="Optional"
-                                />
-                            </label>
+                                    <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                                        End page
+                                        <input
+                                            value={taskPageEnd}
+                                            onChange={(event) => setTaskPageEnd(event.target.value)}
+                                            inputMode="numeric"
+                                            className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
+                                            placeholder="Optional"
+                                        />
+                                    </label>
+                                </>
+                            ) : null}
                         </div>
 
                         <div className="mt-4 flex flex-wrap items-center gap-3">
                             <button
                                 type="button"
-                                onClick={createRereadTask}
+                                onClick={createLearningTask}
                                 disabled={taskSaving || students.length === 0}
                                 className="rounded-2xl bg-emerald-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:opacity-50"
                             >
@@ -944,7 +1185,9 @@ export default function TeacherStudentsPage() {
                                 <p className="text-sm font-medium text-emerald-900">{taskMessage}</p>
                             ) : null}
                         </div>
-                    </section>
+                            </section>
+                        </div>
+                    ) : null}
 
                     <section className="mt-8">
                         <div className="mb-3">
@@ -1003,7 +1246,11 @@ export default function TeacherStudentsPage() {
                                         ) : (
                                             <div className="grid gap-4 md:grid-cols-2">
                                                 {group.items.map((student) => (
-                                                    <StudentCardArticle key={student.id} student={student} />
+                                                    <StudentCardArticle
+                                                        key={student.id}
+                                                        student={student}
+                                                        onCreateTask={openTaskModal}
+                                                    />
                                                 ))}
                                             </div>
                                         )}

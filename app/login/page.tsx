@@ -6,6 +6,10 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter } from "next/navigation";
 
+const POST_LOGIN_PARAM = "after_login";
+const POST_LOGIN_VALUE = "library";
+const POST_LOGIN_DASHBOARD_TARGET = `/dashboard?${POST_LOGIN_PARAM}=${POST_LOGIN_VALUE}`;
+
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
   const router = useRouter();
@@ -32,10 +36,12 @@ export default function LoginPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!alive) return;
 
-      if (session?.user?.id) {
+      if (event === "SIGNED_IN" && session?.user?.id) {
+        router.replace(POST_LOGIN_DASHBOARD_TARGET);
+      } else if (session?.user?.id) {
         router.replace("/dashboard");
       } else {
         setChecking(false);
@@ -72,7 +78,7 @@ export default function LoginPage() {
             showLinks={false}
             redirectTo={
               typeof window !== "undefined"
-                ? `${window.location.origin}/dashboard`
+                ? `${window.location.origin}/dashboard?${POST_LOGIN_PARAM}=${POST_LOGIN_VALUE}`
                 : undefined
             }
           />
