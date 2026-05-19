@@ -4,7 +4,6 @@
 "use client";
 
 import { useState, type ComponentType } from "react";
-import Link from "next/link";
 import CommunityTab from "./CommunityTab";
 
 type Option = {
@@ -43,6 +42,7 @@ type RatingTabProps = {
   setRatingOverall: (value: string) => void;
 
   readerLevel: string;
+  setReaderLevel: (value: string) => void;
   profileLevel: string;
   ratingDifficulty: string;
   setRatingDifficulty: (value: string) => void;
@@ -89,6 +89,21 @@ const READER_LEVEL_OPTIONS = [
   { value: "Level 8", label: "Upper Intermediate", cefr: "B2-ish", jlpt: "N2 entry" },
   { value: "Level 9", label: "Advanced", cefr: "B2+", jlpt: "Solid N2 / N1 entry" },
   { value: "Level 10", label: "Upper Advanced", cefr: "C1-ish", jlpt: "Solid N1+" },
+] as const;
+
+const READER_LEVEL_GROUPS = [
+  {
+    title: "Beginner Readers",
+    values: ["Level 1", "Level 2", "Level 3", "Level 4", "Level 5"] as readonly string[],
+  },
+  {
+    title: "Intermediate Readers",
+    values: ["Level 6", "Level 7", "Level 8"] as readonly string[],
+  },
+  {
+    title: "Advanced Readers",
+    values: ["Level 9", "Level 10"] as readonly string[],
+  },
 ] as const;
 
 function CardHeader({
@@ -159,6 +174,7 @@ export default function RatingTab({
   ratingOverall,
   setRatingOverall,
   readerLevel,
+  setReaderLevel,
   profileLevel,
   ratingDifficulty,
   setRatingDifficulty,
@@ -219,7 +235,9 @@ export default function RatingTab({
   const currentLevelInfo =
     READER_LEVEL_OPTIONS.find((option) => option.value === (row.reader_level ?? readerLevel)) ??
     null;
-  const effectiveProfileLevel = profileLevel || readerLevel;
+  const profileLevelLabel = profileLevel
+    ? `${profileLevel.replace(/_/g, " ")} reader`
+    : "your profile level";
 
   return (
     <div className="space-y-6">
@@ -249,7 +267,7 @@ export default function RatingTab({
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <CardHeader
-          title="Ratings"
+          title="Entertainment Rating"
           editing={editingRatings}
           onEdit={() => setEditingRatings(true)}
           onCancel={cancelRatings}
@@ -307,21 +325,76 @@ export default function RatingTab({
             )}
             {isEditingReaderFit ? (
               <div className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
-                This uses your Japanese Reading Level from your profile for this book.
+                Your main profile can stay broad, like {profileLevelLabel}. This book rating saves
+                the detailed Mekuru level below so future filters can compare similar readers.
               </div>
             ) : null}
             <div className="mt-3 text-xs leading-5 text-stone-500">
-              Has your level changed?{" "}
-              <Link href="/community/profile/setup" className="font-medium underline underline-offset-4">
-                Change it in Profile Details
-              </Link>
-              .
+              Public profiles stay broad. Reading Reflection uses the detailed level for this book.
             </div>
-            {isEditingReaderFit && effectiveProfileLevel ? (
-              <div className="mt-2 text-xs text-stone-500">
-                Saving will use {effectiveProfileLevel}.
+          </div>
+
+          <div className="rounded border bg-white p-3 text-sm">
+            <div className="text-stone-600">Detailed Reader Level for This Book</div>
+            {isEditingReaderFit ? (
+              <div className="mt-3 space-y-4">
+                {READER_LEVEL_GROUPS.map((group) => {
+                  const options = READER_LEVEL_OPTIONS.filter((option) =>
+                    group.values.includes(option.value)
+                  );
+
+                  return (
+                    <div key={group.title}>
+                      <div className="flex items-center gap-3">
+                        <div className="h-px flex-1 bg-stone-200" />
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-stone-500">
+                          {group.title}
+                        </div>
+                        <div className="h-px flex-1 bg-stone-200" />
+                      </div>
+
+                      <div className="mt-2 grid gap-2">
+                        {options.map((option) => {
+                          const selected = readerLevel === option.value;
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setReaderLevel(option.value)}
+                              className={[
+                                "rounded-xl border px-3 py-2 text-left transition",
+                                selected
+                                  ? "border-stone-900 bg-stone-900 text-white"
+                                  : "border-stone-200 bg-stone-50 text-stone-800 hover:bg-white",
+                              ].join(" ")}
+                            >
+                              <div className="text-sm font-black">
+                                {option.value} · {option.label}
+                              </div>
+                              <div
+                                className={[
+                                  "mt-0.5 text-xs",
+                                  selected ? "text-white/75" : "text-stone-500",
+                                ].join(" ")}
+                              >
+                                {option.cefr} · {option.jlpt}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ) : null}
+            ) : (
+              <div className="mt-2 text-stone-700">
+                {currentLevelInfo
+                  ? `${currentLevelInfo.value} · ${currentLevelInfo.label}`
+                  : "Add your detailed level when you edit Reading Fit."}
+              </div>
+            )}
           </div>
 
           <DifficultyField

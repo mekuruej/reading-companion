@@ -5343,6 +5343,7 @@ export default function BookHubPage() {
                     ratingOverall={ratingOverall}
                     setRatingOverall={setRatingOverall}
                     readerLevel={readerLevel}
+                    setReaderLevel={setReaderLevel}
                     profileLevel={profileLevel}
                     ratingDifficulty={ratingDifficulty}
                     setRatingDifficulty={setRatingDifficulty}

@@ -35,16 +35,24 @@ type LibraryWordSummaryRow = {
   first_seen_at: string | null;
 };
 
-type RatedBookSignal = {
+type BookRatingSignal = {
   id: string;
-  title: string;
-  author: string | null;
-  coverUrl: string | null;
-  bookType: string | null;
   readerLevel: string | null;
   entertainmentRating: number | null;
   difficultyRating: number | null;
   finishedAt: string | null;
+};
+
+type RatedBookGroup = {
+  bookId: string;
+  title: string;
+  author: string | null;
+  coverUrl: string | null;
+  bookType: string | null;
+  signals: BookRatingSignal[];
+  latestFinishedAt: string | null;
+  averageEntertainmentRating: number | null;
+  averageDifficultyRating: number | null;
 };
 
 type SortMode = "recent" | "rating" | "ease" | "difficulty";
@@ -146,16 +154,16 @@ function formatReaderLevel(value: string | null | undefined) {
   return `A ${cleaned} reader`;
 }
 
-function bookSignalSentence(book: RatedBookSignal) {
-  const bookType = bookTypeLabel(book.bookType).toLowerCase();
-  const reader = formatReaderLevel(book.readerLevel);
+function bookSignalSentence(signal: BookRatingSignal, bookTypeValue: string | null) {
+  const bookType = bookTypeLabel(bookTypeValue).toLowerCase();
+  const reader = formatReaderLevel(signal.readerLevel);
   const difficulty =
-    book.difficultyRating != null
-      ? ` thought this ${bookType} was ${formatAverage(book.difficultyRating)} difficulty`
+    signal.difficultyRating != null
+      ? ` thought this ${bookType} was ${formatAverage(signal.difficultyRating)} difficulty`
       : ` rated this ${bookType}`;
   const entertainment =
-    book.entertainmentRating != null
-      ? ` and gave it an entertainment rating of ${formatAverage(book.entertainmentRating)}/5`
+    signal.entertainmentRating != null
+      ? ` and gave it an Entertainment Rating of ${formatAverage(signal.entertainmentRating)}/5`
       : "";
 
   return `${reader}${difficulty}${entertainment}.`;
@@ -204,15 +212,15 @@ function RatingStars({
   );
 }
 
-function RatingStack({ book }: { book: RatedBookSignal }) {
-  if (book.difficultyRating == null && book.entertainmentRating == null) {
+function RatingStack({ signal }: { signal: BookRatingSignal }) {
+  if (signal.difficultyRating == null && signal.entertainmentRating == null) {
     return null;
   }
 
   return (
     <div className="grid min-w-[170px] gap-2 sm:ml-auto sm:w-[190px]">
-      <RatingStars label="Difficulty" value={book.difficultyRating} tone="sky" />
-      <RatingStars label="Fun" value={book.entertainmentRating} tone="amber" />
+      <RatingStars label="Difficulty" value={signal.difficultyRating} tone="sky" />
+      <RatingStars label="Entertainment" value={signal.entertainmentRating} tone="amber" />
     </div>
   );
 }
@@ -360,38 +368,73 @@ export default function CommunityHubPage() {
     );
   }, [ratingRows]);
 
-  const ratedBookSignals = useMemo(() => {
-    const rows: RatedBookSignal[] = ratingRows.flatMap((row) => {
-      const book = firstBook(row);
-      if (!book?.id) return [];
-      if (bookTypeFilter !== "all" && book.book_type !== bookTypeFilter) return [];
+  const ratedBookGroups = useMemo(() => {
+    const map = new Map<string, RatedBookGroup>();
 
-      return [
+    for (const row of ratingRows) {
+      const book = firstBook(row);
+      if (!book?.id) continue;
+      if (bookTypeFilter !== "all" && book.book_type !== bookTypeFilter) continue;
+
+      const existing =
+        map.get(book.id) ??
         {
-          id: row.id,
+          bookId: book.id,
           title: book.title ?? "Untitled book",
           author: book.author ?? null,
           coverUrl: book.cover_url ?? null,
           bookType: book.book_type ?? null,
-          readerLevel: row.reader_level ?? null,
-          entertainmentRating: row.rating_overall,
-          difficultyRating: row.rating_difficulty,
-          finishedAt: row.finished_at,
-        },
-      ];
+          signals: [],
+          latestFinishedAt: null,
+          averageEntertainmentRating: null,
+          averageDifficultyRating: null,
+        };
+
+      existing.signals.push({
+        id: row.id,
+        readerLevel: row.reader_level ?? null,
+        entertainmentRating: row.rating_overall,
+        difficultyRating: row.rating_difficulty,
+        finishedAt: row.finished_at,
+      });
+
+      map.set(book.id, existing);
+    }
+
+    const groups = Array.from(map.values()).map((group) => {
+      const sortedSignals = [...group.signals].sort((a, b) =>
+        (b.finishedAt ?? "").localeCompare(a.finishedAt ?? "")
+      );
+      const latestFinishedAt = sortedSignals[0]?.finishedAt ?? null;
+
+      return {
+        ...group,
+        signals: sortedSignals,
+        latestFinishedAt,
+        averageEntertainmentRating: average(
+          sortedSignals
+            .map((signal) => signal.entertainmentRating)
+            .filter((value): value is number => value != null)
+        ),
+        averageDifficultyRating: average(
+          sortedSignals
+            .map((signal) => signal.difficultyRating)
+            .filter((value): value is number => value != null)
+        ),
+      };
     });
 
-    return rows.sort((a, b) => {
+    return groups.sort((a, b) => {
       if (sortMode === "ease") {
-        return (a.difficultyRating ?? 999) - (b.difficultyRating ?? 999);
+        return (a.averageDifficultyRating ?? 999) - (b.averageDifficultyRating ?? 999);
       }
       if (sortMode === "difficulty") {
-        return (b.difficultyRating ?? -1) - (a.difficultyRating ?? -1);
+        return (b.averageDifficultyRating ?? -1) - (a.averageDifficultyRating ?? -1);
       }
       if (sortMode === "rating") {
-        return (b.entertainmentRating ?? -1) - (a.entertainmentRating ?? -1);
+        return (b.averageEntertainmentRating ?? -1) - (a.averageEntertainmentRating ?? -1);
       }
-      return (b.finishedAt ?? "").localeCompare(a.finishedAt ?? "");
+      return (b.latestFinishedAt ?? "").localeCompare(a.latestFinishedAt ?? "");
     });
   }, [ratingRows, sortMode, bookTypeFilter]);
 
@@ -520,7 +563,7 @@ export default function CommunityHubPage() {
               tone="border-rose-200 bg-rose-50 text-rose-950"
             />
             <StatPill
-              label="Avg Rating"
+              label="Avg Entertainment"
               value={loading ? "…" : formatAverage(communityStats.averageRating)}
               tone="border-amber-200 bg-amber-50 text-amber-950"
             />
@@ -554,7 +597,7 @@ export default function CommunityHubPage() {
                   Recently rated books
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Each row is one anonymous reader signal.
+                  Books are grouped together so different reader levels can be compared.
                 </p>
               </div>
 
@@ -578,7 +621,7 @@ export default function CommunityHubPage() {
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                 >
                   <option value="recent">Recently Finished</option>
-                  <option value="rating">High to Low Rating</option>
+                  <option value="rating">High to Low Entertainment</option>
                   <option value="difficulty">High to Low Difficulty</option>
                   <option value="ease">Low to High Difficulty</option>
                 </select>
@@ -588,17 +631,17 @@ export default function CommunityHubPage() {
             <div className="mt-4 space-y-3">
               {loading ? (
                 <p className="text-sm text-slate-500">Loading rated books...</p>
-              ) : ratedBookSignals.length === 0 ? (
+              ) : ratedBookGroups.length === 0 ? (
                 <p className="text-sm leading-6 text-slate-500">
                   No shared book ratings yet. The first ratings will show up here.
                 </p>
               ) : (
-                ratedBookSignals.slice(0, 8).map((book) => (
+                ratedBookGroups.slice(0, 8).map((book) => (
                   <div
-                    key={book.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center"
+                    key={book.bookId}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
                   >
-                    <div className="flex min-w-0 flex-1 gap-3">
+                    <div className="flex min-w-0 gap-3">
                       {book.coverUrl ? (
                         <img
                           src={book.coverUrl}
@@ -616,13 +659,23 @@ export default function CommunityHubPage() {
                         <div className="mt-0.5 truncate text-xs text-slate-500">
                           {book.author || bookTypeLabel(book.bookType)}
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">
-                          {bookSignalSentence(book)}
-                        </p>
                       </div>
                     </div>
 
-                    <RatingStack book={book} />
+                    <div className="mt-3 space-y-2">
+                      {book.signals.map((signal) => (
+                        <div
+                          key={signal.id}
+                          className="flex flex-col gap-3 rounded-xl border border-white bg-white/80 p-3 sm:flex-row sm:items-center"
+                        >
+                          <p className="min-w-0 flex-1 text-sm leading-6 text-slate-700">
+                            {bookSignalSentence(signal, book.bookType)}
+                          </p>
+
+                          <RatingStack signal={signal} />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))
               )}

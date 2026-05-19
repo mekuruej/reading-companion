@@ -137,6 +137,23 @@ export default function CreditsPage() {
           </p>
         </section>
       </div>
+      <br />
+      <div className="text-center">
+        <p className="mb-3">
+          Support Mekuru
+          <br />
+          Help this small reading project grow.
+        </p>
+
+        <a
+          href="https://ko-fi.com/japanesemekuru"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
+        >
+          Support app development
+        </a>
+      </div>
     </main>
   );
 }

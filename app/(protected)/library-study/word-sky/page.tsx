@@ -615,7 +615,7 @@ export default function WordSkyPage() {
           <div>
             <h1 className="text-2xl font-semibold">Word Sky</h1>
             <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
-              Pick words you are fairly comfortable with. These words can move into Ability Check and Library Practice,
+              Pick words you think you can read. These words can automatically move into Ability Check and Library Practice,
               but encountering words through your reading is still the ideal path.
             </p>
           </div>
