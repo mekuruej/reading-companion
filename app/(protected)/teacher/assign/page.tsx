@@ -331,7 +331,6 @@ export default function AssignBookPage() {
             learner_id: isProspectiveLearner ? null : studentId,
             book_id: bookId,
             status: "prepping",
-            intended_user_book_status: "reading",
             notes: prepNotes,
           });
 
