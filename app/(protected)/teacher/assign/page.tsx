@@ -47,11 +47,13 @@ type PrepItemRow = {
   learner_id: string | null;
   book_id: string;
   status: string;
+  notes: string | null;
   created_at: string;
   books: BookRow | BookRow[] | null;
 };
 
 type ActionMode = "add_to_library" | "prep_book";
+type PrepLearnerMode = "existing" | "prospective";
 
 function labelProfile(p: ProfileRow) {
   const name = (p.display_name ?? "").trim();
@@ -86,6 +88,21 @@ function bookSearchText(book: BookRow) {
     .toLowerCase();
 }
 
+function prospectiveLearnerLabel(notes: string | null | undefined) {
+  const clean = (notes ?? "").trim();
+  if (!clean) return "Prospective learner";
+
+  const nameMatch = clean.match(/Prospective learner:\s*([^\n]+)/i);
+  const contactMatch = clean.match(/Contact:\s*([^\n]+)/i);
+  const name = nameMatch?.[1]?.trim();
+  const contact = contactMatch?.[1]?.trim();
+
+  if (name && contact) return `${name} (${contact})`;
+  if (name) return name;
+  if (contact) return contact;
+  return "Prospective learner";
+}
+
 export default function AssignBookPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -104,6 +121,9 @@ export default function AssignBookPage() {
   const [bookId, setBookId] = useState<string>("");
   const [bookSearch, setBookSearch] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>("add_to_library");
+  const [prepLearnerMode, setPrepLearnerMode] = useState<PrepLearnerMode>("existing");
+  const [prospectiveLearnerName, setProspectiveLearnerName] = useState("");
+  const [prospectiveLearnerContact, setProspectiveLearnerContact] = useState("");
 
   const selectableProfiles = useMemo(() => {
     return profiles.filter((p) => p.id !== meId);
@@ -241,6 +261,7 @@ export default function AssignBookPage() {
             learner_id,
             book_id,
             status,
+            notes,
             created_at,
             books:book_id (
               id,
@@ -278,19 +299,40 @@ export default function AssignBookPage() {
     setSuccessMsg(null);
 
     if (!meId) return setErrorMsg("Please sign in again.");
-    if (!studentId) return setErrorMsg("Pick a learner.");
     if (!bookId) return setErrorMsg("Pick a book.");
 
     try {
       if (actionMode === "prep_book") {
+        const isProspectiveLearner = prepLearnerMode === "prospective";
+        const cleanProspectiveName = prospectiveLearnerName.trim();
+        const cleanProspectiveContact = prospectiveLearnerContact.trim();
+
+        if (!isProspectiveLearner && !studentId) {
+          return setErrorMsg("Pick a learner, or choose not signed up yet.");
+        }
+
+        if (isProspectiveLearner && !cleanProspectiveName && !cleanProspectiveContact) {
+          return setErrorMsg("Add a name or email/note for the future learner.");
+        }
+
+        const prepNotes = isProspectiveLearner
+          ? [
+              cleanProspectiveName ? `Prospective learner: ${cleanProspectiveName}` : null,
+              cleanProspectiveContact ? `Contact: ${cleanProspectiveContact}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n")
+          : null;
+
         const { error: prepError } = await supabase
           .from("teacher_book_prep_items")
           .insert({
             teacher_id: meId,
-            learner_id: studentId,
+            learner_id: isProspectiveLearner ? null : studentId,
             book_id: bookId,
             status: "prepping",
             intended_user_book_status: "reading",
+            notes: prepNotes,
           });
 
         if (prepError) {
@@ -307,9 +349,10 @@ export default function AssignBookPage() {
         setPrepItems((prev) => [
           {
             id: crypto.randomUUID(),
-            learner_id: studentId,
+            learner_id: isProspectiveLearner ? null : studentId,
             book_id: bookId,
             status: "prepping",
+            notes: prepNotes,
             created_at: new Date().toISOString(),
             books: chosenBook ?? null,
           },
@@ -318,11 +361,17 @@ export default function AssignBookPage() {
 
         setSuccessMsg(
           `Added "${chosenBook?.title ?? "Untitled"}" to your prep shelf for ${
-            chosenStudent ? labelProfile(chosenStudent) : "learner"
+            isProspectiveLearner
+              ? prospectiveLearnerLabel(prepNotes)
+              : chosenStudent
+                ? labelProfile(chosenStudent)
+                : "learner"
           }.`
         );
         return;
       }
+
+      if (!studentId) return setErrorMsg("Pick a learner.");
 
       const { data, error } = await supabase
         .from("user_books")
@@ -494,15 +543,88 @@ export default function AssignBookPage() {
 
         <label style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 800 }}>Learner</div>
-          <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-            {selectableProfiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {labelProfile(p)}
-              </option>
-            ))}
-          </select>
+          {actionMode === "prep_book" ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => setPrepLearnerMode("existing")}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 12,
+                  border:
+                    prepLearnerMode === "existing"
+                      ? "1px solid rgba(146,64,14,0.75)"
+                      : "1px solid rgba(0,0,0,0.16)",
+                  background:
+                    prepLearnerMode === "existing"
+                      ? "rgba(254,243,199,0.9)"
+                      : "rgba(255,255,255,0.85)",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Existing learner
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrepLearnerMode("prospective")}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 12,
+                  border:
+                    prepLearnerMode === "prospective"
+                      ? "1px solid rgba(146,64,14,0.75)"
+                      : "1px solid rgba(0,0,0,0.16)",
+                  background:
+                    prepLearnerMode === "prospective"
+                      ? "rgba(254,243,199,0.9)"
+                      : "rgba(255,255,255,0.85)",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Not signed up yet
+              </button>
+            </div>
+          ) : null}
+
+          {actionMode !== "prep_book" || prepLearnerMode === "existing" ? (
+            <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+              {selectableProfiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {labelProfile(p)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              <input
+                value={prospectiveLearnerName}
+                onChange={(e) => setProspectiveLearnerName(e.target.value)}
+                placeholder="Future learner name"
+                style={{
+                  border: "1px solid rgba(0,0,0,0.18)",
+                  borderRadius: 12,
+                  padding: "10px 12px",
+                }}
+              />
+              <input
+                value={prospectiveLearnerContact}
+                onChange={(e) => setProspectiveLearnerContact(e.target.value)}
+                placeholder="Email or note, optional"
+                style={{
+                  border: "1px solid rgba(0,0,0,0.18)",
+                  borderRadius: 12,
+                  padding: "10px 12px",
+                }}
+              />
+            </div>
+          )}
+
           <div style={{ opacity: 0.65, fontSize: 12 }}>
-            This chooses who the visible library row or prep shelf item is for.
+            {actionMode === "prep_book" && prepLearnerMode === "prospective"
+              ? "This keeps the prep item on your shelf only. You can connect it to a real learner later."
+              : "This chooses who the visible library row or prep shelf item is for."}
           </div>
         </label>
 
@@ -659,7 +781,7 @@ export default function AssignBookPage() {
                     <div style={{ marginTop: 4, color: "#78716c", fontSize: 13 }}>
                       {item.learner_id
                         ? profileNameById.get(item.learner_id) ?? item.learner_id
-                        : "No learner selected"}{" "}
+                        : prospectiveLearnerLabel(item.notes)}{" "}
                       · {item.status}
                     </div>
                   </div>

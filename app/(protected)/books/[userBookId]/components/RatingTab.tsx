@@ -291,6 +291,11 @@ export default function RatingTab({
             }}
           />
         </div>
+
+        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          Entertainment Rating can appear in Community Ratings as an anonymous reader signal.
+          Your written review stays private unless we add sharing later.
+        </p>
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -303,9 +308,9 @@ export default function RatingTab({
           saving={saving}
         />
 
-        <div className="mb-4 rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm leading-6 text-stone-700">
-          No one sees your answer here. This helps Mekuru understand how the book felt for
-          readers at different Japanese levels.
+        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm leading-6 text-sky-950">
+          This can appear in Community Ratings as anonymous reader-fit data, like “A Level 9
+          reader rated this difficulty 5/5.” It will not link back to your profile.
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

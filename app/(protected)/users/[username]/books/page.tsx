@@ -633,6 +633,7 @@ export default function BooksPage() {
   const [learningTasks, setLearningTasks] = useState<LearningTaskRow[]>([]);
   const [learningTasksLoading, setLearningTasksLoading] = useState(false);
   const [learningTasksError, setLearningTasksError] = useState<string | null>(null);
+  const [completingLearningTaskId, setCompletingLearningTaskId] = useState<string | null>(null);
 
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
@@ -1097,6 +1098,36 @@ export default function BooksPage() {
       setLearningTasks([]);
     } finally {
       setLearningTasksLoading(false);
+    }
+  }
+
+  async function completeLearningTask(taskId: string) {
+    if (!meId || viewingUserId !== meId) return;
+
+    setCompletingLearningTaskId(taskId);
+    setLearningTasksError(null);
+
+    try {
+      const { error } = await supabase
+        .from("learning_tasks")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", taskId)
+        .eq("learner_id", meId)
+        .eq("status", "assigned");
+
+      if (error) throw error;
+
+      setLearningTasks((prev) => prev.filter((task) => task.id !== taskId));
+    } catch (error) {
+      console.error("Error completing learning task:", error);
+      setLearningTasksError(
+        error instanceof Error ? error.message : "Could not mark the learning task done."
+      );
+    } finally {
+      setCompletingLearningTaskId(null);
     }
   }
 
@@ -2391,9 +2422,14 @@ export default function BooksPage() {
     if (task.task_type !== "reread_pages") return null;
 
     const mode = String(task.task_payload?.mode ?? "reader_choice");
+    const pageStart = task.task_payload?.page_start;
+    const pageParam =
+      pageStart != null && Number.isFinite(Number(pageStart))
+        ? `?page=${encodeURIComponent(String(pageStart))}`
+        : "";
 
     if (mode === "fluid_reading_saved_words") {
-      return { href: `/books/${task.user_book_id}/readalong`, label: "Open Reading" };
+      return { href: `/books/${task.user_book_id}/readalong${pageParam}`, label: "Open Reading" };
     }
 
     if (mode === "curiosity_reading") {
@@ -2587,14 +2623,29 @@ export default function BooksPage() {
                       </div>
                     </div>
 
-                    {taskAction ? (
-                      <button
-                        type="button"
-                        onClick={() => router.push(taskAction.href)}
-                        className="mt-3 rounded-xl bg-emerald-800 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-900"
-                      >
-                        {taskAction.label}
-                      </button>
+                    {taskAction || viewingUserId === meId ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {taskAction ? (
+                          <button
+                            type="button"
+                            onClick={() => router.push(taskAction.href)}
+                            className="rounded-xl bg-emerald-800 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-900"
+                          >
+                            {taskAction.label}
+                          </button>
+                        ) : null}
+
+                        {viewingUserId === meId ? (
+                          <button
+                            type="button"
+                            onClick={() => completeLearningTask(task.id)}
+                            disabled={completingLearningTaskId === task.id}
+                            className="rounded-xl border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-50 disabled:opacity-50"
+                          >
+                            {completingLearningTaskId === task.id ? "Marking..." : "Mark done"}
+                          </button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 );
