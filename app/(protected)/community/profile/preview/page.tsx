@@ -214,7 +214,7 @@ export default function PublicProfilePreviewPage() {
   return (
     <ProfileShell
       title="Public Profile Preview"
-      description="This preview shows the reader-facing information other people can see. Private account details like email and native language are not shown here."
+      description="This preview shows the reader-facing information other people can see. Private account details are not shown here."
     >
       <div className="mx-auto max-w-4xl space-y-4">
         {errorMsg ? (

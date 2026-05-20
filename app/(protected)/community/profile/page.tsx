@@ -25,15 +25,6 @@ type PublicProfileRow = {
 
 const profileActions = [
   {
-    title: "Account Settings",
-    href: "/community/profile/account",
-    description: "See your private login email and account-level details.",
-    className: "border-sky-200 bg-sky-50 hover:bg-sky-100/70",
-    textClassName: "text-sky-950",
-    descriptionClassName: "text-sky-900/75",
-    arrowClassName: "bg-white/80 text-sky-900",
-  },
-  {
     title: "Edit Profile",
     href: "/community/profile/setup",
     description: "Update your display details, level, bio, and public-facing profile basics.",
@@ -53,7 +44,6 @@ export default function ProfileHubPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [publicProfile, setPublicProfile] = useState<PublicProfileRow | null>(null);
-  const [accountEmail, setAccountEmail] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +85,6 @@ export default function ProfileHubPage() {
         if (publicProfileResult.error) throw publicProfileResult.error;
 
         if (!cancelled) {
-          setAccountEmail(user.email ?? "");
           setProfile(profileResult.data ?? null);
           setPublicProfile(publicProfileResult.data ?? null);
         }
@@ -166,15 +155,6 @@ export default function ProfileHubPage() {
             </h2>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {accountEmail ? (
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700 md:col-span-2">
-                  <div className="text-xs font-black uppercase tracking-[0.16em] opacity-60">
-                    Signed in as
-                  </div>
-                  <div className="mt-1 break-all font-semibold">{accountEmail}</div>
-                </div>
-              ) : null}
-
               {username ? (
                 <Link
                   href="/community/profile/preview"
@@ -186,8 +166,7 @@ export default function ProfileHubPage() {
                         Preview Public Profile
                       </div>
                       <p className="mt-1 text-sm leading-6 text-emerald-900/80">
-                        See the page other readers can see. Private account details like email
-                        stay here.
+                        See the page other readers can see. Private account details are not shown.
                       </p>
                     </div>
 

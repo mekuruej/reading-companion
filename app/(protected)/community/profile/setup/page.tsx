@@ -5,10 +5,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileShell from "@/components/profile/ProfileShell";
 import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
 import { supabase } from "@/lib/supabaseClient";
+import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 
 type ProfileRole = "teacher" | "member" | "student";
 
@@ -89,163 +89,131 @@ export default function ProfileSetupPage() {
   const [level, setLevel] = useState("");
   const [existingRole, setExistingRole] = useState<ProfileRole | null>(null);
 
-  const [publicNameChoice, setPublicNameChoice] = useState<
-    "display_name" | "username"
-  >("display_name");
+  const [publicNameChoice, setPublicNameChoice] = useState<"display_name" | "username">(
+    "display_name"
+  );
   const [publicLevel, setPublicLevel] = useState("None");
   const [favoriteGenres, setFavoriteGenres] = useState<string[]>([]);
   const [favoriteGenreInput, setFavoriteGenreInput] = useState("");
   const [bio, setBio] = useState("");
 
   useEffect(() => {
-    let mounted = true;
+    let active = true;
 
-    const load = async () => {
+    async function loadProfile() {
+      setLoading(true);
+      setErrorMsg("");
+
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (!mounted) return;
-
       if (userError || !user) {
-        router.replace("/login");
+        if (active) {
+          setErrorMsg("Please log in before setting up your profile.");
+          setLoading(false);
+        }
         return;
       }
 
-      const [{ data: profile, error: profileError }, { data: publicProfile, error: publicError }] =
-        await Promise.all([
-          supabase
-            .from("profiles")
-            .select("display_name, username, native_language, target_language, role, level")
-            .eq("id", user.id)
-            .maybeSingle(),
-          supabase
-            .from("user_public_profile")
-            .select("*")
-            .eq("user_id", user.id)
-            .maybeSingle(),
-        ]);
+      const [profileResult, publicResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("display_name, username, native_language, target_language, role, level")
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("user_public_profile")
+          .select("user_id, jlpt_level_public, favorite_genres, bio, public_name_choice")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
 
-      if (!mounted) return;
+      if (!active) return;
 
-      if (profileError) {
-        setErrorMsg(profileError.message);
+      if (profileResult.error) {
+        setErrorMsg(profileResult.error.message);
         setLoading(false);
         return;
       }
 
-      if (publicError) {
-        console.error("Error loading public profile:", publicError);
+      if (publicResult.error) {
+        setErrorMsg(publicResult.error.message);
+        setLoading(false);
+        return;
       }
+
+      const profile = profileResult.data;
+      const publicRow = publicResult.data as PublicProfileRow | null;
 
       setDisplayName(profile?.display_name ?? "");
       setUsername(profile?.username ?? "");
-      const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
+
+      const savedNativeLanguage = profile?.native_language ?? "";
       if (
-        loadedNativeLanguage &&
-        NATIVE_LANGUAGE_OPTIONS.includes(
-          loadedNativeLanguage as (typeof NATIVE_LANGUAGE_OPTIONS)[number]
-        )
+        savedNativeLanguage &&
+        !NATIVE_LANGUAGE_OPTIONS.includes(savedNativeLanguage as (typeof NATIVE_LANGUAGE_OPTIONS)[number])
       ) {
-        setNativeLanguageChoice(loadedNativeLanguage);
-        setCustomNativeLanguage("");
-      } else if (loadedNativeLanguage) {
         setNativeLanguageChoice(NATIVE_LANGUAGE_OTHER);
-        setCustomNativeLanguage(loadedNativeLanguage);
+        setCustomNativeLanguage(savedNativeLanguage);
       } else {
-        setNativeLanguageChoice("");
+        setNativeLanguageChoice(savedNativeLanguage);
         setCustomNativeLanguage("");
       }
+
       setTargetLanguage(profile?.target_language ?? "Japanese");
       setLevel(profile?.level ?? "");
       setExistingRole((profile?.role as ProfileRole | null) ?? null);
 
-      const publicRow = (publicProfile as PublicProfileRow | null) ?? null;
       setPublicNameChoice(publicRow?.public_name_choice ?? "display_name");
       setPublicLevel(publicRow?.jlpt_level_public ?? "None");
-      setFavoriteGenres((publicRow?.favorite_genres ?? []).filter(Boolean));
-      setFavoriteGenreInput("");
+      setFavoriteGenres(publicRow?.favorite_genres ?? []);
       setBio(publicRow?.bio ?? "");
-      setLoading(false);
-    };
 
-    void load();
+      setLoading(false);
+    }
+
+    loadProfile();
 
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, [router]);
+  }, []);
 
   function addFavoriteGenresFromInput() {
     const nextGenres = favoriteGenreInput
       .split(",")
-      .map((item) => item.trim())
+      .map((genre) => genre.trim())
       .filter(Boolean);
 
     if (nextGenres.length === 0) return;
 
     setFavoriteGenres((current) => {
+      const normalized = new Set(current.map((genre) => genre.toLowerCase()));
       const merged = [...current];
 
       nextGenres.forEach((genre) => {
-        if (!merged.some((existing) => existing.toLowerCase() === genre.toLowerCase())) {
+        if (!normalized.has(genre.toLowerCase())) {
           merged.push(genre);
+          normalized.add(genre.toLowerCase());
         }
       });
 
       return merged;
     });
+
     setFavoriteGenreInput("");
   }
 
   function removeFavoriteGenre(genreToRemove: string) {
-    setFavoriteGenres((current) =>
-      current.filter((genre) => genre !== genreToRemove)
-    );
+    setFavoriteGenres((current) => current.filter((genre) => genre !== genreToRemove));
   }
 
-  const handleSave = async () => {
+  async function handleSave() {
+    setSaving(true);
     setErrorMsg("");
     setSuccessMsg("");
-    const selectedNativeLanguage =
-      nativeLanguageChoice === NATIVE_LANGUAGE_OTHER
-        ? customNativeLanguage.trim()
-        : nativeLanguageChoice.trim();
-
-    if (!displayName.trim()) {
-      setErrorMsg("Please enter a display name.");
-      return;
-    }
-
-    if (!username.trim()) {
-      setErrorMsg("Please enter a username.");
-      return;
-    }
-
-    if (!selectedNativeLanguage) {
-      setErrorMsg("Please choose your native language.");
-      return;
-    }
-
-    if (!targetLanguage.trim()) {
-      setErrorMsg("Please choose a target language.");
-      return;
-    }
-
-    if (!level.trim()) {
-      setErrorMsg("Please choose the reading level that feels closest right now.");
-      return;
-    }
-
-    const cleanUsername = username.trim().toLowerCase();
-
-    if (!/^[a-z0-9_]+$/.test(cleanUsername)) {
-      setErrorMsg("Username can only use lowercase letters, numbers, and underscores.");
-      return;
-    }
-
-    setSaving(true);
 
     const {
       data: { user },
@@ -254,19 +222,58 @@ export default function ProfileSetupPage() {
 
     if (userError || !user) {
       setSaving(false);
-      router.replace("/login");
+      setErrorMsg("Please log in before saving your profile.");
       return;
     }
 
-    const draftGenres = favoriteGenreInput
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    const cleanedGenres = [...favoriteGenres];
+    const cleanUsername = username.trim().toLowerCase();
 
-    draftGenres.forEach((genre) => {
-      if (!cleanedGenres.some((existing) => existing.toLowerCase() === genre.toLowerCase())) {
-        cleanedGenres.push(genre);
+    if (!displayName.trim()) {
+      setSaving(false);
+      setErrorMsg("Please add a display name.");
+      return;
+    }
+
+    if (!cleanUsername) {
+      setSaving(false);
+      setErrorMsg("Please choose a username.");
+      return;
+    }
+
+    if (!/^[a-z0-9_]+$/.test(cleanUsername)) {
+      setSaving(false);
+      setErrorMsg("Usernames can only use lowercase letters, numbers, and underscores.");
+      return;
+    }
+
+    const selectedNativeLanguage =
+      nativeLanguageChoice === NATIVE_LANGUAGE_OTHER
+        ? customNativeLanguage.trim()
+        : nativeLanguageChoice.trim();
+
+    if (!selectedNativeLanguage) {
+      setSaving(false);
+      setErrorMsg("Please choose your native language.");
+      return;
+    }
+
+    if (!targetLanguage.trim()) {
+      setSaving(false);
+      setErrorMsg("Please choose your target language.");
+      return;
+    }
+
+    if (!level.trim()) {
+      setSaving(false);
+      setErrorMsg("Please choose the reading level that feels closest right now.");
+      return;
+    }
+
+    const cleanedGenres: string[] = [];
+    favoriteGenres.forEach((genre) => {
+      const cleanGenre = genre.trim();
+      if (cleanGenre && !cleanedGenres.some((existing) => existing.toLowerCase() === cleanGenre.toLowerCase())) {
+        cleanedGenres.push(cleanGenre);
       }
     });
 
@@ -310,7 +317,7 @@ export default function ProfileSetupPage() {
     setSuccessMsg("Profile saved.");
     router.replace("/community/profile");
     router.refresh();
-  };
+  }
 
   if (loading) {
     return (
@@ -431,39 +438,7 @@ export default function ProfileSetupPage() {
           </div>
         </div>
 
-        <MekuruReadingLevelGuide />
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <SectionLabel
-            eyebrow="Reading fit"
-            title="Japanese reading level"
-            detail="This is the default starting point for reading-fit questions. Your Reading Profile controls color support separately."
-          />
-
-          <div className="mt-4 space-y-2">
-            {PROFILE_LEVEL_OPTIONS.map((option) => {
-              const isSelected = level === option.value;
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setLevel(option.value)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                    isSelected
-                      ? "border-stone-900 bg-stone-100"
-                      : "border-stone-200 bg-white hover:bg-stone-50"
-                  }`}
-                >
-                  <div className="text-sm font-semibold text-stone-900">
-                    {option.title} · {option.plain} ({option.cefr} · {option.jlpt})
-                  </div>
-                  <div className="mt-1 text-xs leading-5 text-stone-600">{option.feel}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
 
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <SectionLabel
@@ -541,22 +516,20 @@ export default function ProfileSetupPage() {
                 </button>
               </div>
 
-              {favoriteGenres.length > 0 ? (
+              {favoriteGenres.length ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {favoriteGenres.map((genre) => (
                     <button
                       key={genre}
                       type="button"
                       onClick={() => removeFavoriteGenre(genre)}
-                      className="rounded-full border border-stone-300 bg-stone-100 px-3 py-1 text-sm text-stone-700 transition hover:bg-stone-200"
+                      className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100"
                     >
                       {genre} ×
                     </button>
                   ))}
                 </div>
-              ) : (
-                <p className="mt-3 text-sm text-stone-500">No genres added yet.</p>
-              )}
+              ) : null}
             </div>
 
             <div>

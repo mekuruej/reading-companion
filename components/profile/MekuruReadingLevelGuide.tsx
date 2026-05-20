@@ -92,6 +92,9 @@ const MEKURU_READING_LEVEL_GROUPS = [
   },
 ] as const;
 
+export type MekuruReadingLevel =
+  (typeof MEKURU_READING_LEVEL_GROUPS)[number]["levels"][number]["value"];
+
 function GroupLabel({
   title,
   detail,
@@ -115,24 +118,55 @@ function GroupLabel({
 
 function MekuruLevelCard({
   level,
+  selected,
+  onSelect,
 }: {
   level: (typeof MEKURU_READING_LEVEL_GROUPS)[number]["levels"][number];
+  selected: boolean;
+  onSelect?: (level: MekuruReadingLevel) => void;
 }) {
   return (
-    <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+    <button
+      type="button"
+      onClick={() => onSelect?.(level.value)}
+      aria-pressed={selected}
+      className={`rounded-xl border p-3 text-left transition ${
+        selected
+          ? "border-stone-900 bg-stone-900 text-white shadow-sm"
+          : "border-stone-200 bg-stone-50/70 text-stone-900 hover:border-stone-400 hover:bg-white"
+      }`}
+    >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <div className="text-sm font-black text-stone-900">{level.value}</div>
-        <div className="text-sm font-semibold text-stone-700">{level.plain}</div>
+        <div className={`text-sm font-black ${selected ? "text-white" : "text-stone-900"}`}>
+          {level.value}
+        </div>
+        <div className={`text-sm font-semibold ${selected ? "text-stone-100" : "text-stone-700"}`}>
+          {level.plain}
+        </div>
       </div>
-      <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+
+      <div
+        className={`mt-1 text-[11px] font-semibold uppercase tracking-wide ${
+          selected ? "text-stone-200" : "text-stone-500"
+        }`}
+      >
         {level.cefr} · {level.jlpt}
       </div>
-      <p className="mt-2 text-xs leading-5 text-stone-600">{level.feel}</p>
-    </div>
+
+      <p className={`mt-2 text-xs leading-5 ${selected ? "text-stone-100" : "text-stone-600"}`}>
+        {level.feel}
+      </p>
+    </button>
   );
 }
 
-export default function MekuruReadingLevelGuide() {
+export default function MekuruReadingLevelGuide({
+  selectedLevel = "",
+  onSelect,
+}: {
+  selectedLevel?: string;
+  onSelect?: (level: MekuruReadingLevel) => void;
+}) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-stone-900">Mekuru reading levels</h2>
@@ -145,9 +179,15 @@ export default function MekuruReadingLevelGuide() {
         {MEKURU_READING_LEVEL_GROUPS.map((group) => (
           <div key={group.title}>
             <GroupLabel title={group.title} detail={group.detail} />
+
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {group.levels.map((level) => (
-                <MekuruLevelCard key={level.value} level={level} />
+                <MekuruLevelCard
+                  key={level.value}
+                  level={level}
+                  selected={selectedLevel === level.value}
+                  onSelect={onSelect}
+                />
               ))}
             </div>
           </div>

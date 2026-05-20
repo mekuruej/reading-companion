@@ -5,9 +5,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileShell from "@/components/profile/ProfileShell";
-import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
+import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher";
@@ -277,38 +276,7 @@ export default function ProfileSettingsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-stone-900">Japanese reading level</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-600">
-            Pick the closest fit. This can change later.
-          </p>
-
-          <div className="mt-4 space-y-2">
-            {PROFILE_LEVEL_OPTIONS.map((option) => {
-              const isSelected = level === option.value;
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setLevel(option.value)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                    isSelected
-                      ? "border-stone-900 bg-stone-100"
-                      : "border-stone-200 bg-white hover:bg-stone-50"
-                  }`}
-                >
-                  <div className="text-sm font-semibold text-stone-900">
-                    {option.title} · {option.plain} ({option.cefr} · {option.jlpt})
-                  </div>
-                  <div className="mt-1 text-xs leading-5 text-stone-600">{option.feel}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <MekuruReadingLevelGuide />
+        <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
 
         {message ? <p className="text-sm text-red-600">{message}</p> : null}
 
