@@ -378,7 +378,7 @@ export default function PublicProfilePreviewPage() {
             shown in this preview.
           </p>
           <Link
-            href="/community/profile/setup"
+            href="/community/profile/settings"
             className="mt-4 inline-flex rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-100"
           >
             Edit public details

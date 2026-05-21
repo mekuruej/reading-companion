@@ -71,9 +71,9 @@ export default function AppAccessGate({ children }: Props) {
               return;
             }
 
-            setRedirectingTo("/community/profile/settings");
+            setRedirectingTo("/community/profile/setup");
             setChecking(false);
-            router.replace("/community/profile/settings");
+            router.replace("/community/profile/setup");
           }
           return;
         }

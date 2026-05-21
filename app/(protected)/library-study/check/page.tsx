@@ -2030,6 +2030,7 @@ export default function LibraryStudyPage() {
     if (endedEarly) return;
     if (deck.length === 0) return;
     if (index < deck.length) return;
+    if (deck.length < ABILITY_CHECK_MIN_DUE_CARDS) return;
 
     markAbilityCheckCompletedToday();
   }, [libraryMode, endedEarly, deck.length, index]);

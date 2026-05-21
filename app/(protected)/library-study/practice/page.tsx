@@ -1395,6 +1395,7 @@ export default function LibraryStudyPage() {
   const [practiceDeck, setPracticeDeck] = useState<StudyCard[]>([]);
   const [practiceIndex, setPracticeIndex] = useState(0);
   const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
+  const [practiceFinished, setPracticeFinished] = useState(false);
   const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
   const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
@@ -2044,6 +2045,7 @@ export default function LibraryStudyPage() {
     setPracticeDeck(shuffleArray(practiceFilteredCards));
     setPracticeIndex(0);
     setPracticeRevealStep("word");
+    setPracticeFinished(false);
   }, [practiceFilteredCards]);
 
   useEffect(() => {
@@ -2234,8 +2236,10 @@ export default function LibraryStudyPage() {
     if (practiceDeck.length === 0) return;
 
     setPracticeIndex((prev) => {
-      if (practiceDeck.length <= 1) return prev;
-      if (prev + 1 >= practiceDeck.length) return 0;
+      if (prev + 1 >= practiceDeck.length) {
+        setPracticeFinished(true);
+        return prev;
+      }
       return prev + 1;
     });
 
@@ -2253,13 +2257,11 @@ export default function LibraryStudyPage() {
       return;
     }
 
-    if (practiceDeck.length <= 1) {
-      resetPracticeReveal();
-      return;
-    }
-
     setPracticeIndex((prev) => {
-      if (prev + 1 >= practiceDeck.length) return 0;
+      if (prev + 1 >= practiceDeck.length) {
+        setPracticeFinished(true);
+        return prev;
+      }
       return prev + 1;
     });
 
@@ -2279,6 +2281,7 @@ export default function LibraryStudyPage() {
   function shufflePracticeDeck() {
     setPracticeDeck(shuffleArray(practiceFilteredCards));
     setPracticeIndex(0);
+    setPracticeFinished(false);
     resetPracticeReveal();
   }
 
@@ -3076,7 +3079,7 @@ export default function LibraryStudyPage() {
               <option value="yellow">Yellow</option>
               <option value="green">Green</option>
               <option value="blue">Blue</option>
-              <option value="purple">Purple</option>
+              <option value="purple">Purple (Mastered Words)</option>
               <option value="grey">Limbo</option>
               <option value="katakana">Katakana</option>
             </select>
@@ -3109,20 +3112,50 @@ export default function LibraryStudyPage() {
         </div>
       </div>
 
-      <LibraryPracticePanel
-        card={practiceCard}
-        total={practiceDeck.length}
-        revealStep={practiceRevealStep}
-        practiceMode={practiceStudyMode}
-        onAdvance={advancePracticeCard}
-        onNext={goToNextPracticeCard}
-        onPrevious={goToPreviousPracticeCard}
-        onShuffle={shufflePracticeDeck}
-        onMeaningAnswered={queuePracticeMeaningReview}
-        onTypingMissed={handlePracticeTypingMiss}
-        meaningReviewCount={meaningReviewItems.length}
-        onReviewMeanings={() => setShowPracticeMeaningReview(true)}
-      />
+      {practiceFinished ? (
+        <div className="mt-3 w-full max-w-2xl rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-sm">
+          <div className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">
+            Review complete
+          </div>
+          <h2 className="mt-2 text-3xl font-black text-slate-950">Done!</h2>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
+            You finished this filtered Library Review set. Choose another filter, shuffle this set,
+            or open Word Sky if you want more words.
+          </p>
+
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={shufflePracticeDeck}
+              className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
+            >
+              Review Again
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/library-study/word-sky")}
+              className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+            >
+              Open Word Sky
+            </button>
+          </div>
+        </div>
+      ) : (
+        <LibraryPracticePanel
+          card={practiceCard}
+          total={practiceDeck.length}
+          revealStep={practiceRevealStep}
+          practiceMode={practiceStudyMode}
+          onAdvance={advancePracticeCard}
+          onNext={goToNextPracticeCard}
+          onPrevious={goToPreviousPracticeCard}
+          onShuffle={shufflePracticeDeck}
+          onMeaningAnswered={queuePracticeMeaningReview}
+          onTypingMissed={handlePracticeTypingMiss}
+          meaningReviewCount={meaningReviewItems.length}
+          onReviewMeanings={() => setShowPracticeMeaningReview(true)}
+        />
+      )}
     </main>
   );
 }

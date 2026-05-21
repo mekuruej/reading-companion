@@ -183,6 +183,10 @@ function shuffleArray<T>(arr: T[]) {
   return copy;
 }
 
+function shuffledCandidatePool(card: Flashcard, pool: Flashcard[]) {
+  return shuffleArray(pool.filter((c) => c.id !== card.id));
+}
+
 const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1", "NON-JLPT"] as const;
 
 export default function BookFlashcardsPage() {
@@ -726,8 +730,8 @@ export default function BookFlashcardsPage() {
     if (!correct) return [];
 
     const pools = [
-      cardsPool.filter((c) => c.id !== card.id),
-      libraryPool.filter((c) => c.id !== card.id),
+      shuffledCandidatePool(card, cardsPool),
+      shuffledCandidatePool(card, libraryPool),
     ];
 
     const seen = new Set<string>();
@@ -775,8 +779,8 @@ export default function BookFlashcardsPage() {
     if (!correct) return [];
 
     const pools = [
-      cardsPool.filter((c) => c.id !== card.id),
-      libraryPool.filter((c) => c.id !== card.id),
+      shuffledCandidatePool(card, cardsPool),
+      shuffledCandidatePool(card, libraryPool),
     ];
 
     const seen = new Set<string>([correct.toLowerCase()]);
@@ -848,8 +852,8 @@ export default function BookFlashcardsPage() {
         : "";
 
     const pools = [
-      cardsPool.filter((c) => c.id !== card.id),
-      libraryPool.filter((c) => c.id !== card.id),
+      shuffledCandidatePool(card, cardsPool),
+      shuffledCandidatePool(card, libraryPool),
     ];
 
     const seen = new Set<string>([correctWord]);
@@ -924,7 +928,7 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "READING_MC") {
-      const options = buildReadingMcOptions(card, cards, libraryCards);
+      const options = buildReadingMcOptions(card, filteredCards, libraryCards);
       setMcOptions(options);
       setMcCorrectAnswer(normalizeReading(card.reading || ""));
       setMcSelected(null);
@@ -934,7 +938,7 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "MEANING_MC") {
-      const options = buildMeaningMcOptions(card, cards, libraryCards);
+      const options = buildMeaningMcOptions(card, filteredCards, libraryCards);
       setMcOptions(options);
       setMcCorrectAnswer((card.meaning || "").trim().toLowerCase());
       setMcSelected(null);
@@ -944,7 +948,7 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "FROM_READING_MC") {
-      const options = buildWordMcOptions(card, cards, libraryCards);
+      const options = buildWordMcOptions(card, filteredCards, libraryCards);
       setMcOptions(options);
       setMcCorrectAnswer((card.word || "").trim());
       setMcSelected(null);
@@ -954,7 +958,7 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "FROM_READING_MEANING_MC") {
-      const options = buildMeaningMcOptions(card, cards, libraryCards);
+      const options = buildMeaningMcOptions(card, filteredCards, libraryCards);
       setMcOptions(options);
       setMcCorrectAnswer((card.meaning || "").trim().toLowerCase());
       setMcSelected(null);
@@ -964,7 +968,7 @@ export default function BookFlashcardsPage() {
     }
 
     resetMcState();
-  }, [card, isMultipleChoiceMode, studySet, cards, libraryCards]);
+  }, [card, isMultipleChoiceMode, studySet, filteredCards, libraryCards]);
 
   useEffect(() => {
     if (!isMultipleChoiceMode) return;
@@ -1633,32 +1637,6 @@ export default function BookFlashcardsPage() {
       </div>
 
       <div className="mb-2 w-full max-w-2xl space-y-2">
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                Session Progress
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                Card {Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}/
-                {studyOnceMode ? sessionOrder.length : filteredCards.length}
-              </p>
-            </div>
-
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                Cards Left
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                {Math.max(
-                  (studyOnceMode ? sessionOrder.length : filteredCards.length) - sessionIndex,
-                  0
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-
         <div className="mb-2 w-full max-w-2xl space-y-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="flex flex-wrap gap-2">
@@ -1731,6 +1709,32 @@ export default function BookFlashcardsPage() {
             </div>
           </div>
         </div>
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500">
+                Session Progress
+              </p>
+              <p className="text-base font-semibold text-slate-800">
+                Card {Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}/
+                {studyOnceMode ? sessionOrder.length : filteredCards.length}
+              </p>
+            </div>
+
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wide text-gray-500">
+                Cards Left
+              </p>
+              <p className="text-base font-semibold text-slate-800">
+                {Math.max(
+                  (studyOnceMode ? sessionOrder.length : filteredCards.length) - sessionIndex,
+                  0
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div
@@ -1867,7 +1871,7 @@ export default function BookFlashcardsPage() {
                     {!mcWasCorrect ? (
                       <div className="mt-3 space-y-2">
                         <p className="text-xs text-slate-500">
-                          Type the correct answer once to continue.
+                          Type one word from the answer to continue.
                         </p>
                         <div className="flex gap-2">
                           <input

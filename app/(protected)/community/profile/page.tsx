@@ -26,8 +26,9 @@ type PublicProfileRow = {
 const profileActions = [
   {
     title: "Edit Profile",
-    href: "/community/profile/setup",
-    description: "Update your display details, level, bio, and public-facing profile basics.",
+    href: "/community/profile/settings",
+    description:
+      "Update your reader details, reading level, favorite genres, bio, and public-facing profile choices.",
     className: "border-amber-200 bg-amber-50 hover:bg-amber-100/70",
     textClassName: "text-amber-950",
     descriptionClassName: "text-amber-900/75",

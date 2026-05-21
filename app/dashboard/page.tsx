@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabaseClient";
 const POST_LOGIN_TARGET = "/books";
 const POST_LOGIN_PARAM = "after_login";
 const POST_LOGIN_VALUE = "library";
-const PROFILE_SETUP_TARGET = "/community/profile/settings";
+const PROFILE_SETUP_TARGET = "/community/profile/setup";
 const WARMUP_WORD_COUNT = 4;
 
 type WarmupWord = {

@@ -604,14 +604,22 @@ export default function TeacherKanjiPage() {
         });
       }
 
+      function createdAtTime(item: QueueItem) {
+        if (!item.createdAt) return Number.POSITIVE_INFINITY;
+        const time = new Date(item.createdAt).getTime();
+        return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+      }
+
       nextItems.sort((a, b) => {
         const aDone = a.status === "complete" || a.status === "excluded";
         const bDone = b.status === "complete" || b.status === "excluded";
         const aFlagged = a.status === "flagged_review";
         const bFlagged = b.status === "flagged_review";
+        const createdAtDifference = createdAtTime(a) - createdAtTime(b);
 
         if (aFlagged !== bFlagged) return aFlagged ? -1 : 1;
         if (aDone !== bDone) return aDone ? 1 : -1;
+        if (createdAtDifference !== 0) return createdAtDifference;
         if (a.studentName !== b.studentName) return a.studentName.localeCompare(b.studentName);
         if (a.bookTitle !== b.bookTitle) return a.bookTitle.localeCompare(b.bookTitle);
         return a.surface.localeCompare(b.surface);

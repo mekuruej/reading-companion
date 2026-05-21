@@ -14,7 +14,22 @@ DAOs / Repositories
 Database
 ```
 
-The goal is not to make the app more complicated. The goal is to make each part of the app responsible for one clear job.
+The goal is not to make the app more complicated. The goal is to give each part of the app one clear job.
+
+---
+
+## Simple Summary
+
+```txt
+Views show.
+Controllers receive.
+Services decide.
+DAOs fetch and save.
+The database stores and protects.
+Test pages let developers safely experiment.
+```
+
+---
 
 ## Website Pages / Views
 
@@ -30,9 +45,15 @@ Examples:
 - Stats
 - Teacher Portal
 
-Pages should mostly be responsible for layout, visible UI, and connecting components together.
+Pages should mostly handle:
 
-Pages should not contain all database queries, permission rules, validation rules, and business logic.
+- layout
+- visible UI
+- connecting components together
+
+Pages should not contain every database query, permission rule, validation rule, and business rule.
+
+---
 
 ## Controllers
 
@@ -47,13 +68,25 @@ Examples:
 - Load a teacher page
 - Submit a reflection
 
-Controllers should receive the request, check the required information, call the correct service, and return a clear success or error result.
+Controllers should:
 
-In Next.js, controllers may appear as API routes, route handlers, server actions, or action functions used by pages.
+1. Receive the request/action.
+2. Check the required information.
+3. Call the correct service.
+4. Return a clear success or error result.
+
+In Next.js, controllers may appear as:
+
+- API routes
+- route handlers
+- server actions
+- action functions used by pages
+
+---
 
 ## Services
 
-Services contain Mekuru's app rules and learning logic.
+Services contain Mekuru’s app rules and learning logic.
 
 Examples:
 
@@ -64,11 +97,13 @@ Examples:
 - Handling trial/member access rules
 - Connecting saved words to shared vocabulary data
 
-Services should answer:
+Services answer:
 
 > What should happen?
 
-This is where Mekuru's pedagogy, reading flow, and business rules should live.
+This is where Mekuru’s pedagogy, reading flow, and business rules should live.
+
+---
 
 ## DAOs / Repositories
 
@@ -83,11 +118,13 @@ Examples:
 - `getTeacherStudents()`
 - `getVocabularyCacheEntry()`
 
-DAOs should answer:
+DAOs answer:
 
 > How do we get or save this data?
 
-They should contain the Supabase queries so that pages and services do not have database details scattered everywhere.
+They should contain the Supabase queries so database details are not scattered through pages and services.
+
+---
 
 ## Database
 
@@ -103,17 +140,17 @@ Examples:
 - `profiles`
 - teacher/student relationship tables
 
-The database should use RLS policies, constraints, foreign keys, indexes, and required fields to protect data integrity and privacy.
+The database should use:
 
-## Simple Summary
+- RLS policies
+- constraints
+- foreign keys
+- indexes
+- required fields
 
-```txt
-Views show.
-Controllers receive.
-Services decide.
-DAOs fetch and save.
-The database stores and protects.
-```
+The database should help protect data integrity and privacy, not just hold information.
+
+---
 
 ## Test Pages / Sandbox Pages
 
@@ -121,20 +158,25 @@ Test pages are developer-only pages used to safely test pieces of Mekuru before 
 
 They can be useful for checking:
 
-- New UI components
-- Mobile layouts
-- Form behavior
-- Save/update flows
+- new UI components
+- mobile layouts
+- form behavior
+- save/update flows
 - Supabase query results
-- Controller behavior
-- Service logic
-- Teacher/student access rules
-- Vocabulary cache behavior
-- Reading session behavior
+- controller behavior
+- service logic
+- teacher/student access rules
+- vocabulary cache behavior
+- reading session behavior
 
 Test pages should not be treated as normal app pages.
 
-They should be clearly named and kept separate from real user routes.
+They should be:
+
+- clearly named
+- kept separate from real user routes
+- local-only, admin-only, or super-teacher-only
+- removed before production if no longer needed
 
 Examples:
 
@@ -144,8 +186,6 @@ Examples:
 - `test-teacher-access`
 - `test-mobile-layout`
 
-Test pages should be local-only, admin-only, super-teacher-only, or removed before production if they are no longer needed.
-
-A good rule:
+Good rule:
 
 > Test pages are for building and checking Mekuru safely. They are not part of the learner or teacher experience.
