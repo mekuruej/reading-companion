@@ -62,19 +62,6 @@ function SectionLabel({
   );
 }
 
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-stone-100 bg-white px-4 py-3">
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
-        {label}
-      </div>
-      <div className="mt-1 truncate text-sm font-semibold text-stone-900">
-        {value || "—"}
-      </div>
-    </div>
-  );
-}
-
 export default function ProfileSettingsPage() {
   const router = useRouter();
 
@@ -352,26 +339,6 @@ export default function ProfileSettingsPage() {
       description="Update your Mekuru profile, reading level, and public reader details."
     >
       <div className="mx-auto max-w-4xl space-y-4">
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-            Profile Preview
-          </div>
-          <h2 className="mt-2 text-lg font-semibold text-sky-950">{chosenPublicName}</h2>
-          <p className="mt-1 text-sm leading-6 text-sky-950/75">
-            Account basics help Mekuru work correctly. Public details shape how you appear around
-            the community.
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <PreviewRow label="Username" value={username.trim() ? `@${username.trim()}` : ""} />
-            <PreviewRow label="Reading level" value={level || "Not set"} />
-            <PreviewRow
-              label="Public level"
-              value={publicLevel === "None" ? "Hidden" : publicLevel}
-            />
-          </div>
-        </div>
-
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <SectionLabel
             eyebrow="Account basics"

@@ -1,7 +1,7 @@
 // Mekuru Reading Level Guide
 //
 
-const MEKURU_READING_LEVEL_GROUPS = [
+export const MEKURU_READING_LEVEL_GROUPS = [
   {
     title: "Beginner",
     detail: "Levels 1-5 describe the path from kana and survival words into simple stories.",
@@ -94,6 +94,18 @@ const MEKURU_READING_LEVEL_GROUPS = [
 
 export type MekuruReadingLevel =
   (typeof MEKURU_READING_LEVEL_GROUPS)[number]["levels"][number]["value"];
+
+export function findMekuruReadingLevel(levelValue: string | null | undefined) {
+  const value = (levelValue ?? "").trim();
+  if (!value) return null;
+
+  for (const group of MEKURU_READING_LEVEL_GROUPS) {
+    const level = group.levels.find((item) => item.value === value);
+    if (level) return { ...level, groupTitle: group.title };
+  }
+
+  return null;
+}
 
 function GroupLabel({
   title,

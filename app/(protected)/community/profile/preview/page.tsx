@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { findMekuruReadingLevel } from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileShell from "@/components/profile/ProfileShell";
 import {
   emptyLibraryStudyColorTotals,
@@ -207,9 +208,9 @@ export default function PublicProfilePreviewPage() {
       label: "Library Words",
       value: libraryWordCount == null ? "—" : libraryWordCount.toLocaleString(),
     },
-    { label: "Level", value: displayValue(profile?.level, "Not set") },
     { label: "Target Language", value: displayValue(profile?.target_language, "Japanese") },
   ];
+  const readingLevel = findMekuruReadingLevel(profile?.level);
 
   return (
     <ProfileShell
@@ -260,6 +261,33 @@ export default function PublicProfilePreviewPage() {
                   </div>
                 </div>
               ))}
+
+              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3">
+                <div className="text-xs font-black uppercase tracking-[0.16em] text-stone-400">
+                  Japanese Level
+                </div>
+                {loading ? (
+                  <div className="mt-1 text-lg font-black text-stone-900">—</div>
+                ) : readingLevel ? (
+                  <>
+                    <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <span className="text-xl font-black text-stone-950">
+                        {readingLevel.value}
+                      </span>
+                      <span className="text-sm font-black text-stone-800">
+                        {readingLevel.plain}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-stone-500">
+                      {readingLevel.cefr} · {readingLevel.jlpt}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-1 text-lg font-black text-stone-900">
+                    {displayValue(profile?.level, "Not set")}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">

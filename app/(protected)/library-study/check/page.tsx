@@ -2871,6 +2871,11 @@ export default function LibraryStudyPage() {
             </p>
           </div>
 
+          <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+            Don’t worry about checking this on your own. Mekuru will alert you from your Library
+            when enough Ability Check cards are ready.
+          </div>
+
           <div className="mt-5">
             <AbilityCheckFaq />
           </div>
@@ -3371,6 +3376,10 @@ export default function LibraryStudyPage() {
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
                 A daily gate check for Yellow, Green, and Blue words.
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Don’t worry about checking this on your own. Mekuru will alert you from your
+                Library when enough cards are ready.
               </p>
               {deck.length > 0 ? (
                 <p className="mt-1 text-xs text-slate-500">

@@ -360,11 +360,6 @@ export default function BulkVocabPage() {
     setBulkChapterNameList("");
   }
 
-  function goToVocabList() {
-    if (!userBookId) return;
-    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
-  }
-
   // -------------------------------------------------------------
   // Step 1: Preview
   // -------------------------------------------------------------
@@ -650,6 +645,16 @@ export default function BulkVocabPage() {
             </button>
 
             <div className="flex flex-wrap gap-2 sm:justify-end">
+              {step === "done" ? (
+                <button
+                  type="button"
+                  onClick={resetForMore}
+                  className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+                >
+                  Add More Words
+                </button>
+              ) : null}
+
               <button
                 type="button"
                 onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
@@ -1018,27 +1023,9 @@ export default function BulkVocabPage() {
         {step === "done" && (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-3 text-xl font-medium">Done</div>
-            <p className="mb-6 text-sm text-gray-600">
-              Your words have been saved. Add more words or go to the vocab list.
+            <p className="text-sm text-gray-600">
+              Your words have been saved.
             </p>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={resetForMore}
-                className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-              >
-                ➕ Add More Words
-              </button>
-
-              <button
-                type="button"
-                onClick={goToVocabList}
-                className="rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-800"
-              >
-                📄 Go to Vocab List
-              </button>
-            </div>
           </div>
         )}
       </div>

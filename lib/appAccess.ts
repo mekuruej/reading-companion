@@ -12,7 +12,7 @@ export function getAppAccessStatus(profile: AppAccessProfile) {
   const accessType = profile.app_access_type ?? "";
   const expiresAt = profile.app_access_expires_at;
 
-  if (role === "teacher" || role === "admin") {
+  if (role === "teacher" || role === "super_teacher" || role === "admin") {
     return { hasAccess: true, reason: "staff" };
   }
 
