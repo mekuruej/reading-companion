@@ -107,7 +107,7 @@ type EditingPanel =
   | "communityContentNotes"
   | "reflectionReaderFit";
 type VocabTab = "readAlong" | "bulk";
-type ProfileRole = "teacher" | "member" | "student";
+type ProfileRole = "teacher" | "member" | "student" | "super_teacher";
 
 type Character = {
   id: string;
@@ -3165,8 +3165,12 @@ export default function BookHubPage() {
       console.error("Error loading profile role:", meProfileErr);
     }
 
-    setMyRole((meProfile?.role as ProfileRole | null) ?? "member");
-    setIsSuperTeacher(!!meProfile?.is_super_teacher);
+    const currentProfileRole = (meProfile?.role as ProfileRole | null) ?? "member";
+    const currentProfileIsSuperTeacher =
+      currentProfileRole === "super_teacher" || !!meProfile?.is_super_teacher;
+
+    setMyRole(currentProfileRole);
+    setIsSuperTeacher(currentProfileIsSuperTeacher);
     setProfileLevel(meProfile?.level ?? "");
 
     const { data, error } = await supabase
@@ -3239,6 +3243,33 @@ export default function BookHubPage() {
     }
 
     const r = data as unknown as UserBook;
+    let canAccessBook =
+      r.user_id === user.id ||
+      currentProfileIsSuperTeacher;
+
+    if (!canAccessBook && currentProfileRole === "teacher") {
+      const { data: teacherStudentLink, error: teacherStudentAccessError } = await supabase
+        .from("teacher_students")
+        .select("id")
+        .eq("teacher_id", user.id)
+        .eq("student_id", r.user_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (teacherStudentAccessError) {
+        console.error("Error checking Book Hub teacher access:", teacherStudentAccessError);
+      }
+
+      canAccessBook = !!teacherStudentLink;
+    }
+
+    if (!canAccessBook) {
+      setRow(null);
+      setError("You do not have access to this book.");
+      setLoading(false);
+      return;
+    }
+
     setRow(r);
 
     setBookHubOwnerName("");

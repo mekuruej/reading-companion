@@ -461,7 +461,7 @@ export default function ReadAlongPage() {
 
         const desiredTop = Math.max(0, targetTopWithinScroll - 104);
 
-        animateScrollTo(container, desiredTop, 1000);
+        animateScrollTo(container, desiredTop, 800);
     }
 
     async function openTimedSessionFormWithDefaults() {

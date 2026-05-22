@@ -69,6 +69,17 @@ type TaskBookOption = {
     title: string;
 };
 
+type ActiveLearningTask = {
+    id: string;
+    learner_id: string;
+    user_book_id: string | null;
+    task_type: string;
+    title: string;
+    instructions: string | null;
+    due_on: string | null;
+    created_at: string;
+};
+
 type LearningTaskType =
     | "reread_pages"
     | "review_book_words"
@@ -219,6 +230,14 @@ function relationshipClasses(status: StudentRelationshipStatus) {
     if (status === "future") return "border-sky-200 bg-sky-50 text-sky-800";
     if (status === "past") return "border-stone-200 bg-stone-100 text-stone-500";
     return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function learningTaskTypeLabel(taskType: string) {
+    if (taskType === "reread_pages") return "Reread pages";
+    if (taskType === "review_book_words") return "Book flashcards";
+    if (taskType === "kanji_reading_practice") return "Kanji Reading";
+    if (taskType === "listening") return "Listening";
+    return "Learning task";
 }
 
 function StudentCardArticle({
@@ -407,6 +426,32 @@ export default function TeacherStudentsPage() {
     const [taskSaving, setTaskSaving] = useState(false);
     const [taskMessage, setTaskMessage] = useState<string | null>(null);
     const [taskModalStudent, setTaskModalStudent] = useState<StudentCard | null>(null);
+    const [activeLearningTasks, setActiveLearningTasks] = useState<ActiveLearningTask[]>([]);
+    const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
+
+    async function loadActiveLearningTasks(teacherId: string, learnerIds: string[]) {
+        if (learnerIds.length === 0) {
+            setActiveLearningTasks([]);
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from("learning_tasks")
+            .select("id, learner_id, user_book_id, task_type, title, instructions, due_on, created_at")
+            .eq("created_by", teacherId)
+            .eq("status", "assigned")
+            .is("cancelled_at", null)
+            .in("learner_id", learnerIds)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Error loading active learning tasks:", error);
+            setActiveLearningTasks([]);
+            return;
+        }
+
+        setActiveLearningTasks((data ?? []) as ActiveLearningTask[]);
+    }
 
     async function loadStudents() {
         setLoading(true);
@@ -527,6 +572,7 @@ export default function TeacherStudentsPage() {
 
             if (studentProfiles.length === 0) {
                 setStudents([]);
+                setActiveLearningTasks([]);
                 return;
             }
 
@@ -640,11 +686,13 @@ export default function TeacherStudentsPage() {
             });
 
             setStudents(nextCards);
+            await loadActiveLearningTasks(user.id, studentIds);
         } catch (err: any) {
             console.error("Error loading teacher students:", err);
             setError(err?.message ?? "Could not load students.");
             setStudents([]);
             setTaskBooksByStudentId({});
+            setActiveLearningTasks([]);
         } finally {
             setLoading(false);
         }
@@ -700,6 +748,41 @@ export default function TeacherStudentsPage() {
         if (taskSaving) return;
         setTaskModalStudent(null);
         setTaskMessage(null);
+    }
+
+    async function cancelLearningTask(taskId: string) {
+        if (!currentUserId) {
+            setTaskMessage("Please sign in again.");
+            return;
+        }
+
+        const ok = window.confirm("Cancel this task for the learner?");
+        if (!ok) return;
+
+        setCancellingTaskId(taskId);
+        setTaskMessage(null);
+
+        try {
+            const { error: updateError } = await supabase
+                .from("learning_tasks")
+                .update({
+                    status: "cancelled",
+                    cancelled_at: new Date().toISOString(),
+                })
+                .eq("id", taskId)
+                .eq("created_by", currentUserId)
+                .eq("status", "assigned");
+
+            if (updateError) throw updateError;
+
+            setActiveLearningTasks((prev) => prev.filter((task) => task.id !== taskId));
+            setTaskMessage("Task cancelled.");
+        } catch (err: any) {
+            console.error("Error cancelling learning task:", err);
+            setTaskMessage(err?.message ?? "Could not cancel this task.");
+        } finally {
+            setCancellingTaskId(null);
+        }
     }
 
     async function createLearningTask() {
@@ -827,7 +910,9 @@ export default function TeacherStudentsPage() {
         setTaskSaving(true);
 
         try {
-            const { error: insertError } = await supabase.from("learning_tasks").insert({
+            const { data: insertedTask, error: insertError } = await supabase
+                .from("learning_tasks")
+                .insert({
                 created_by: currentUserId,
                 learner_id: taskLearnerId,
                 user_book_id: taskUserBookId || null,
@@ -836,10 +921,15 @@ export default function TeacherStudentsPage() {
                 instructions: cleanInstructions || null,
                 task_payload: taskPayload,
                 status: "assigned",
-            });
+                })
+                .select("id, learner_id, user_book_id, task_type, title, instructions, due_on, created_at")
+                .single();
 
             if (insertError) throw insertError;
 
+            if (insertedTask) {
+                setActiveLearningTasks((prev) => [insertedTask as ActiveLearningTask, ...prev]);
+            }
             setTaskMessage("Learning task created.");
             setTaskPageStart("");
             setTaskPageEnd("");
@@ -876,6 +966,11 @@ export default function TeacherStudentsPage() {
             past: students.filter((student) => student.relationshipStatus === "past"),
         };
     }, [students]);
+
+    const activeTasksForModalStudent = useMemo(() => {
+        if (!taskModalStudent) return [];
+        return activeLearningTasks.filter((task) => task.learner_id === taskModalStudent.id);
+    }, [activeLearningTasks, taskModalStudent]);
 
     return (
         <main className="mx-auto max-w-6xl px-4 py-8">
@@ -1184,6 +1279,64 @@ export default function TeacherStudentsPage() {
                             {taskMessage ? (
                                 <p className="text-sm font-medium text-emerald-900">{taskMessage}</p>
                             ) : null}
+                        </div>
+
+                        <div className="mt-5 rounded-2xl border border-emerald-200 bg-white p-4">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <h3 className="text-sm font-black text-stone-900">
+                                        Active tasks for this learner
+                                    </h3>
+                                    <p className="text-xs leading-5 text-stone-500">
+                                        Cancel a task here if it should disappear from their Library page.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {activeTasksForModalStudent.length > 0 ? (
+                                <div className="mt-3 space-y-2">
+                                    {activeTasksForModalStudent.map((task) => {
+                                        const linkedBook = (taskBooksByStudentId[task.learner_id] ?? []).find(
+                                            (book) => book.id === task.user_book_id
+                                        );
+
+                                        return (
+                                            <div
+                                                key={task.id}
+                                                className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                                            >
+                                                <div className="min-w-0">
+                                                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
+                                                        {learningTaskTypeLabel(task.task_type)}
+                                                        {linkedBook ? ` · ${linkedBook.title}` : ""}
+                                                    </div>
+                                                    <div className="mt-1 text-sm font-black text-stone-900">
+                                                        {task.title}
+                                                    </div>
+                                                    {task.instructions ? (
+                                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">
+                                                            {task.instructions}
+                                                        </p>
+                                                    ) : null}
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void cancelLearningTask(task.id)}
+                                                    disabled={cancellingTaskId === task.id}
+                                                    className="shrink-0 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 disabled:opacity-50"
+                                                >
+                                                    {cancellingTaskId === task.id ? "Cancelling..." : "Cancel task"}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="mt-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-3 py-3 text-sm text-stone-500">
+                                    No active tasks from you right now.
+                                </p>
+                            )}
                         </div>
                             </section>
                         </div>

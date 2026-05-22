@@ -304,11 +304,12 @@ export default function WordDetailPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [myRole, setMyRole] = useState<"teacher" | "member" | "student">("member");
+  const [myRole, setMyRole] = useState<"teacher" | "member" | "student" | "super_teacher">("member");
   const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
 
   const [word, setWord] = useState<WordRow | null>(null);
   const [meaningChoices, setMeaningChoices] = useState<string[]>([]);
@@ -338,13 +339,17 @@ export default function WordDetailPage() {
         return;
       }
 
-      const { data: meProfile } = await supabase
+      const { data: meProfile, error: meProfileErr } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, is_super_teacher")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
-      setMyRole((meProfile?.role as "teacher" | "member" | "student") ?? "member");
+      if (meProfileErr) {
+        console.error("Error loading profile role:", meProfileErr);
+      }
+
+      setMyRole((meProfile?.role as "teacher" | "member" | "student" | "super_teacher") ?? "member");
 
       const { data: ub, error: ubErr } = await supabase
         .from("user_books")
@@ -359,13 +364,46 @@ export default function WordDetailPage() {
         `
         )
         .eq("id", userBookId)
-        .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (ubErr) throw ubErr;
 
+      if (!ub) {
+        setErrorMsg("You do not have access to this word.");
+        setWord(null);
+        return;
+      }
+
+      const bookOwnerUserId = (ub as any)?.user_id ?? "";
+      const isOwner = bookOwnerUserId === user.id;
+      const isSuperTeacher =
+        meProfile?.role === "super_teacher" || Boolean((meProfile as any)?.is_super_teacher);
+      let isLinkedTeacher = false;
+
+      if (!isOwner && !isSuperTeacher && meProfile?.role === "teacher") {
+        const { data: teacherStudentRow, error: teacherStudentErr } = await supabase
+          .from("teacher_students")
+          .select("teacher_id")
+          .eq("teacher_id", user.id)
+          .eq("student_id", bookOwnerUserId)
+          .maybeSingle();
+
+        if (teacherStudentErr) {
+          console.error("Error checking teacher/student access:", teacherStudentErr);
+        }
+
+        isLinkedTeacher = Boolean(teacherStudentRow);
+      }
+
+      if (!isOwner && !isSuperTeacher && !isLinkedTeacher) {
+        setErrorMsg("You do not have access to this word.");
+        setWord(null);
+        return;
+      }
+
       setBookTitle((ub as any)?.books?.title ?? "");
       setBookCover((ub as any)?.books?.cover_url ?? null);
+      setOwnerUserId(bookOwnerUserId);
 
       const { data: w, error: wErr } = await supabase
         .from("user_book_words")
@@ -388,10 +426,16 @@ export default function WordDetailPage() {
         )
         .eq("id", wordId)
         .eq("user_book_id", userBookId)
-        .single()
+        .maybeSingle()
         .returns<WordRow>();
 
       if (wErr) throw wErr;
+
+      if (!w) {
+        setErrorMsg("Word not found.");
+        setWord(null);
+        return;
+      }
 
       setWord(w);
       setMeaningChoices(asStringArray((w as any).meaning_choices));
@@ -554,13 +598,13 @@ export default function WordDetailPage() {
       const user = userData?.user;
       if (!user) return;
 
-      await loadBookAwareInfo(word.surface, user.id);
+      await loadBookAwareInfo(word.surface, ownerUserId ?? user.id);
       await loadDictionaryExtras(word.surface);
     }
 
     refreshDerivedData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [word]);
+  }, [word, ownerUserId]);
 
   if (loading) {
     return (

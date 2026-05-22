@@ -2004,10 +2004,23 @@ export default function LibraryStudyPage() {
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, checked.ok ? 5000 : 5000);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [checked]);
+
+  useEffect(() => {
+    if (!checked || libraryMode !== "check") return;
+
+    function stopEnterAdvance(event: KeyboardEvent) {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    window.addEventListener("keydown", stopEnterAdvance, true);
+    return () => window.removeEventListener("keydown", stopEnterAdvance, true);
+  }, [checked, libraryMode]);
 
   useEffect(() => {
     const needsTypingFocus =
@@ -3743,7 +3756,9 @@ export default function LibraryStudyPage() {
                     <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
                   </div>
 
-                  <p className="mt-3 text-xs text-slate-400">Next card in a moment...</p>
+                  <p className="mt-3 text-xs leading-5 text-slate-400">
+                    The next card comes automatically. Enter will not move you forward.
+                  </p>
                 </div>
               ) : null}
             </div>

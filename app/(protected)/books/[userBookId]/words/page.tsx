@@ -50,7 +50,7 @@ type WordRow = {
   cache_surface?: string | null;
 };
 
-type ProfileRole = "teacher" | "student";
+type ProfileRole = "teacher" | "student" | "super_teacher";
 
 type LearningSettingsRow = {
   red_stages: number;
@@ -590,7 +590,7 @@ export default function BookWordsPage() {
 
         const { data: meProfile, error: meProfileErr } = await supabase
           .from("profiles")
-          .select("role")
+          .select("role, is_super_teacher")
           .eq("id", authedUser.id)
           .single();
 
@@ -613,13 +613,45 @@ export default function BookWordsPage() {
             `
           )
           .eq("id", userBookId)
-          .single();
+          .maybeSingle();
 
         if (ubErr) throw ubErr;
+
+        if (!ub) {
+          setErrorMsg("You do not have access to this vocabulary list.");
+          setLoading(false);
+          return;
+        }
 
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
         const ownerUserId = (ub as any)?.user_id ?? authedUser.id;
+
+        const isOwner = ownerUserId === authedUser.id;
+        const isSuperTeacher =
+          meProfile?.role === "super_teacher" || Boolean((meProfile as any)?.is_super_teacher);
+        let isLinkedTeacher = false;
+
+        if (!isOwner && !isSuperTeacher && meProfile?.role === "teacher") {
+          const { data: teacherStudentRow, error: teacherStudentErr } = await supabase
+            .from("teacher_students")
+            .select("teacher_id")
+            .eq("teacher_id", authedUser.id)
+            .eq("student_id", ownerUserId)
+            .maybeSingle();
+
+          if (teacherStudentErr) {
+            console.error("Error checking teacher/student access:", teacherStudentErr);
+          }
+
+          isLinkedTeacher = Boolean(teacherStudentRow);
+        }
+
+        if (!isOwner && !isSuperTeacher && !isLinkedTeacher) {
+          setErrorMsg("You do not have access to this vocabulary list.");
+          setLoading(false);
+          return;
+        }
 
         const { data: learningSettingsRow, error: learningSettingsErr } = await supabase
           .from("user_learning_settings")

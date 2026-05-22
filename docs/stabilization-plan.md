@@ -64,11 +64,18 @@ Goal: Make sure protected pages are actually protected, not just hidden from the
 Still need to:
 
 - Audit protected learner/member routes.
-- Audit teacher-only routes.
-- Confirm `/teacher/*` routes require teacher or super_teacher access.
 - Confirm users cannot access another user’s private book/study data by typing URLs manually.
-- Confirm AppAccessGate behavior is correct after profile route cleanup.
-- Confirm dashboard/profile setup redirects still work for new users.
+- Review API routes and database writes connected to private book/study data.
+- Continue RLS review for private user/book/study tables.
+
+Finished from this section:
+
+- ✅ Confirmed AppAccessGate behavior after profile route cleanup.
+- ✅ Confirmed dashboard/profile setup redirects still work for new/incomplete profiles.
+- ✅ Audited teacher-only routes.
+- ✅ Added centralized `/teacher/*` route protection.
+- ✅ Confirmed `/teacher/*` routes require teacher or super_teacher access.
+- ✅ Confirmed test student is blocked from teacher routes on `app.mekurureads.com`.
 
 ## RLS Review
 
@@ -101,25 +108,6 @@ Still need to review input handling for:
 - teacher prep forms
 - book add/edit forms
 - search fields
-
-## Profile Cleanup Follow-up
-
-Current intended profile structure:
-
-```txt
-/community/profile          = profile hub
-/community/profile/setup    = mini first-time setup
-/community/profile/settings = full editable profile
-/community/profile/preview  = visual public profile preview
-```
-
-Still need to:
-
-- Test all four remaining profile routes in the browser.
-- Confirm new users are sent to `/community/profile/setup`.
-- Confirm normal profile editing links go to `/community/profile/settings`.
-- Confirm `/community/profile/preview` still works after deleted route cleanup.
-- Confirm no deleted profile routes are linked anywhere.
 
 ## Architecture Cleanup
 
@@ -159,11 +147,109 @@ Later idea:
 
 # Completed Work
 
+## ✅ 2026-05-22 — Vocabulary List Ownership Guard
+
+Goal:
+
+Prevent regular users from opening another user’s private vocabulary list by manually typing a `/books/[userBookId]/words` URL.
+
+Finished:
+
+- ✅ Added ownership/access guard to `/books/[userBookId]/words`.
+- ✅ Confirmed regular student cannot access another user’s vocabulary list.
+- ✅ Confirmed blocked users see a friendly access message instead of a raw Supabase error.
+- ✅ Confirmed private word/progress/settings queries are blocked before loading for unauthorized users.
+- ⏳ Teacher linked-student access still needs testing later with a linked teacher/student pair.
+
+Notes:
+
+The vocabulary list now follows the same access pattern as the Book Hub: owner access, super_teacher access, and intended teacher-linked access. This protects the vocab list side route from manual URL access by unrelated users.
+
+## ✅ 2026-05-22 — Book Hub Ownership Guard
+
+Goal:
+
+Prevent regular users from opening another user’s private Book Hub by manually typing a `/books/[userBookId]` URL.
+
+Finished:
+
+- ✅ Added ownership/access guard to `/books/[userBookId]`.
+- ✅ Confirmed regular student cannot access another user’s Book Hub.
+- ✅ Confirmed owner can still access their own Book Hub.
+- ✅ Confirmed super_teacher access still works.
+- ⏳ Teacher linked-student access still needs testing later with a linked teacher/student pair.
+
+Notes:
+
+The Book Hub now checks ownership before loading private related data. Access is allowed for the book owner, super_teacher, and intended teacher-linked student access. The linked-teacher case still needs a real linked account test, but the student-blocking and super_teacher cases are working.
+
+## ✅ 2026-05-22 — Profile Route Safety Check and Teacher Route Guard
+
+Goal: Confirm the profile cleanup did not break core flows, then lock down teacher-only routes before continuing wider access work.
+
+Finished:
+
+- ✅ Browser-tested remaining profile routes:
+  - `/community/profile`
+  - `/community/profile/setup`
+  - `/community/profile/settings`
+  - `/community/profile/preview`
+- ✅ Confirmed intended profile route meanings:
+  - `/community/profile` = profile hub
+  - `/community/profile/setup` = mini first-time setup
+  - `/community/profile/settings` = full editable profile
+  - `/community/profile/preview` = visual public profile preview
+- ✅ Confirmed `/dashboard` and `/books` work after incomplete-profile redirect changes.
+- ✅ Ran build/deploy path successfully.
+- ✅ Confirmed deleted profile route leftovers are gone.
+- ✅ Confirmed no remaining links to:
+  - `/community/profile/account`
+  - `/community/profile/reading`
+  - `/community/profile/social`
+  - `/community/profile/public`
+- ✅ Audited route/access structure.
+- ✅ Confirmed `(protected)` routes are wrapped by `AppAccessGate`.
+- ✅ Confirmed `AppAccessGate` is a general app-access gate, not a teacher-role or ownership gate.
+- ✅ Added centralized teacher route protection with:
+  - `components/TeacherAccessGate.tsx`
+  - `app/(protected)/teacher/layout.tsx`
+- ✅ Confirmed `/teacher/*` routes are blocked for regular student/member accounts.
+- ✅ Confirmed teacher routes still work for teacher/super_teacher accounts.
+- ✅ Updated `lib/appAccess.ts` so `super_teacher` is treated as staff access.
+
+Notes:
+
+The app now has a clearer two-layer route protection model:
+
+```txt
+app/(protected)/layout.tsx
+    = general logged-in/app-access protection
+
+app/(protected)/teacher/layout.tsx
+    = teacher/super_teacher-only protection
+
+- ✅ Clarified intended route meanings:
+
+```txt
+/community/profile          = profile hub
+/community/profile/setup    = mini first-time setup
+/community/profile/settings = full editable profile
+/community/profile/preview  = visual public profile preview
+```
+
+- ✅ Swapped setup/settings content so the route meanings now match:
+  - `/setup` is the mini required onboarding page.
+  - `/settings` is the full editable profile page.
+- ✅ Added mini setup copy telling users they can complete their full profile later from the Community tab.
+- ✅ Updated incomplete-profile redirects to `/community/profile/setup`.
+- ✅ Updated normal profile editing links to `/community/profile/settings`.
+- ✅ Updated preview page edit link to `/community/profile/settings`.
+
 ## ✅ 2026-05-21 — Email Privacy Cleanup
 
 Goal: Email should be treated as private account infrastructure, not profile identity.
 
-Completed:
+Finished:
 
 - ✅ Removed full email display from the main profile/manage page.
 - ✅ Removed the misleading Account Settings card from the profile hub.
@@ -197,7 +283,7 @@ not email.
 
 ## ✅ 2026-05-21 — Mekuru Reading Level Guide Restored
 
-Completed:
+Finished:
 
 - ✅ Restored the detailed Mekuru Reading Level Guide.
 - ✅ Connected the guide to `level` / `setLevel`.
@@ -212,7 +298,7 @@ The detailed reading level guide is important because book difficulty/reflection
 
 ## ✅ 2026-05-21 — Removed Old Stats Page
 
-Completed:
+Finished:
 
 - ✅ Confirmed no links pointed to `/community/stats/old`.
 - ✅ Removed old Stats page route: `/community/stats/old`.
@@ -222,28 +308,11 @@ Completed:
 
 ## ✅ 2026-05-21 — Clarified Profile Route Structure
 
-Completed:
-
-- ✅ Clarified intended route meanings:
-
-```txt
-/community/profile          = profile hub
-/community/profile/setup    = mini first-time setup
-/community/profile/settings = full editable profile
-/community/profile/preview  = visual public profile preview
-```
-
-- ✅ Swapped setup/settings content so the route meanings now match:
-  - `/setup` is the mini required onboarding page.
-  - `/settings` is the full editable profile page.
-- ✅ Added mini setup copy telling users they can complete their full profile later from the Community tab.
-- ✅ Updated incomplete-profile redirects to `/community/profile/setup`.
-- ✅ Updated normal profile editing links to `/community/profile/settings`.
-- ✅ Updated preview page edit link to `/community/profile/settings`.
+Finished:
 
 ## ✅ 2026-05-21 — Removed Unused Profile Routes
 
-Completed:
+Finished:
 
 - ✅ Checked for links to unused profile routes.
 - ✅ Confirmed no links existed for:
@@ -267,3 +336,19 @@ app/(protected)/community/profile/setup/page.tsx
 Notes:
 
 The profile area is now much simpler and easier to understand.
+
+## ✅ Profile Cleanup Follow-up Finished
+
+Current profile structure:
+
+```txt
+/community/profile          = profile hub
+/community/profile/setup    = mini first-time setup
+/community/profile/settings = full editable profile
+/community/profile/preview  = visual public profile preview
+```
+- ✅ Test all four remaining profile routes in the browser.
+- ✅ Confirm new users are sent to `/community/profile/setup`.
+- ✅ Confirm normal profile editing links go to `/community/profile/settings`.
+- ✅ Confirm `/community/profile/preview` still works after deleted route cleanup.
+- ✅ Confirm no deleted profile routes are linked anywhere.
