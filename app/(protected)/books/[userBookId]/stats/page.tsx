@@ -194,6 +194,9 @@ export default function BookStatsPage() {
     const [sessions, setSessions] = useState<ReadingSession[]>([]);
     const [wordCount, setWordCount] = useState<number | null>(null);
     const [comparisonBooks, setComparisonBooks] = useState<ComparisonBook[]>([]);
+    const [accessChecked, setAccessChecked] = useState(false);
+    const [canAccessBook, setCanAccessBook] = useState(false);
+    const [accessMessage, setAccessMessage] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -203,6 +206,9 @@ export default function BookStatsPage() {
 
             setLoading(true);
             setErrorMessage("");
+            setAccessChecked(false);
+            setCanAccessBook(false);
+            setAccessMessage("");
 
             const {
                 data: { user },
@@ -213,9 +219,20 @@ export default function BookStatsPage() {
 
             if (userError || !user) {
                 setErrorMessage("Please sign in.");
+                setAccessMessage("Please sign in.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
                 setLoading(false);
                 return;
             }
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("role, is_super_teacher")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (cancelled) return;
 
             const { data: userBookData, error: userBookError } = await supabase
                 .from("user_books")
@@ -236,18 +253,52 @@ export default function BookStatsPage() {
           )
         `)
                 .eq("id", userBookId)
-                .single();
+                .maybeSingle();
 
             if (cancelled) return;
 
-            if (userBookError) {
-                console.error("Error loading book stats:", userBookError);
-                setErrorMessage("Could not load book stats.");
+            if (userBookError || !userBookData) {
+                if (userBookError) console.error("Error loading book stats:", userBookError);
+                setAccessMessage("You do not have access to these book stats.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
                 setLoading(false);
                 return;
             }
 
             const loadedRow = userBookData as unknown as UserBook;
+            const ownerUserId = loadedRow.user_id;
+            const isSuperTeacher =
+                profile?.role === "super_teacher" || Boolean((profile as any)?.is_super_teacher);
+            let canAccess =
+                ownerUserId === user.id ||
+                isSuperTeacher;
+
+            if (!canAccess && profile?.role === "teacher" && ownerUserId) {
+                const { data: teacherStudent, error: teacherStudentError } = await supabase
+                    .from("teacher_students")
+                    .select("teacher_id")
+                    .eq("teacher_id", user.id)
+                    .eq("student_id", ownerUserId)
+                    .maybeSingle();
+
+                if (cancelled) return;
+
+                if (!teacherStudentError && teacherStudent) {
+                    canAccess = true;
+                }
+            }
+
+            if (!canAccess) {
+                setAccessMessage("You do not have access to these book stats.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
+                setLoading(false);
+                return;
+            }
+
+            setCanAccessBook(true);
+            setAccessChecked(true);
             setRow(loadedRow);
 
             const [{ data: sessionData, error: sessionError }, wordCountResult] =
@@ -467,6 +518,35 @@ export default function BookStatsPage() {
             <main className="min-h-screen bg-stone-50 p-6">
                 <div className="mx-auto max-w-5xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
                     Loading book stats...
+                </div>
+            </main>
+        );
+    }
+
+    if (!accessChecked) {
+        return (
+            <main className="min-h-screen bg-stone-50 p-6">
+                <div className="mx-auto max-w-5xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
+                    Loading book stats...
+                </div>
+            </main>
+        );
+    }
+
+    if (!canAccessBook) {
+        return (
+            <main className="min-h-screen bg-stone-50 p-6">
+                <div className="mx-auto max-w-5xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+                    <p className="text-sm text-stone-700">
+                        {accessMessage || "You do not have access to these book stats."}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => router.push("/books")}
+                        className="mt-4 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                    >
+                        Back to Books
+                    </button>
                 </div>
             </main>
         );

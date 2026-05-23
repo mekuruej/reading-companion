@@ -57,6 +57,9 @@ export default function SimpleTimedSessionPage({
     const [bookCover, setBookCover] = useState("");
     const [showFinishedNav, setShowFinishedNav] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+    const [accessChecked, setAccessChecked] = useState(false);
+    const [canAccessBook, setCanAccessBook] = useState(false);
+    const [accessMessage, setAccessMessage] = useState("");
 
     const [sessionDate, setSessionDate] = useState("");
     const [sessionStartPage, setSessionStartPage] = useState("");
@@ -79,6 +82,9 @@ export default function SimpleTimedSessionPage({
 
             setLoading(true);
             setErrorMessage("");
+            setAccessChecked(false);
+            setCanAccessBook(false);
+            setAccessMessage("");
 
             const {
                 data: { user },
@@ -89,27 +95,71 @@ export default function SimpleTimedSessionPage({
 
             if (userError || !user) {
                 setErrorMessage("Please sign in.");
+                setAccessMessage("Please sign in.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
                 setLoading(false);
                 return;
             }
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("role, is_super_teacher")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (cancelled) return;
 
             const { data, error } = await supabase
                 .from("user_books")
                 .select(`
           id,
+          user_id,
           books (
             title,
             cover_url
           )
         `)
                 .eq("id", userBookId)
-                .single();
+                .maybeSingle();
 
             if (cancelled) return;
 
-            if (error) {
+            if (error || !data) {
                 console.error("Error loading timed session book:", error);
-                setErrorMessage("Could not load this book.");
+                setAccessMessage("You do not have access to this book.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
+                setLoading(false);
+                return;
+            }
+
+            const ownerUserId = (data as any).user_id;
+            const isSuperTeacher =
+                profile?.role === "super_teacher" || Boolean((profile as any)?.is_super_teacher);
+            let canAccess =
+                ownerUserId === user.id ||
+                isSuperTeacher;
+
+            if (!canAccess && profile?.role === "teacher" && ownerUserId) {
+                const { data: teacherStudent, error: teacherStudentError } = await supabase
+                    .from("teacher_students")
+                    .select("id")
+                    .eq("teacher_id", user.id)
+                    .eq("student_id", ownerUserId)
+                    .maybeSingle();
+
+                if (cancelled) return;
+
+                if (!teacherStudentError && teacherStudent) {
+                    canAccess = true;
+                }
+            }
+
+            if (!canAccess) {
+                setAccessMessage("You do not have access to this book.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
                 setLoading(false);
                 return;
             }
@@ -118,6 +168,8 @@ export default function SimpleTimedSessionPage({
                 ? (data as any).books[0]
                 : (data as any)?.books;
 
+            setCanAccessBook(true);
+            setAccessChecked(true);
             setBookTitle(book?.title ?? "Untitled book");
             setBookCover(book?.cover_url ?? "");
             setLoading(false);
@@ -145,6 +197,8 @@ export default function SimpleTimedSessionPage({
     }, [isRunning, startTime]);
 
     async function openTimedSessionFormWithDefaults() {
+        if (!canAccessBook) return;
+
         if (!userBookId) {
             setShowTimedSessionForm(true);
             return;
@@ -177,6 +231,11 @@ export default function SimpleTimedSessionPage({
 
     async function saveTimedSession() {
         if (!userBookId) return;
+
+        if (!canAccessBook) {
+            setTimerSaveMessage("❌ You do not have access to save sessions to this book.");
+            return;
+        }
 
         const trimmedStartPage = sessionStartPage.trim();
         const trimmedEndPage = sessionEndPage.trim();
@@ -284,6 +343,35 @@ export default function SimpleTimedSessionPage({
             <main className="min-h-screen bg-stone-50 p-6">
                 <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
                     Loading...
+                </div>
+            </main>
+        );
+    }
+
+    if (!accessChecked) {
+        return (
+            <main className="min-h-screen bg-stone-50 p-6">
+                <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
+                    Loading...
+                </div>
+            </main>
+        );
+    }
+
+    if (!canAccessBook) {
+        return (
+            <main className="min-h-screen bg-stone-50 p-6">
+                <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+                    <p className="text-sm text-stone-700">
+                        {accessMessage || "You do not have access to this book."}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => router.push("/books")}
+                        className="mt-4 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                    >
+                        Back to Books
+                    </button>
                 </div>
             </main>
         );

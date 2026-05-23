@@ -130,10 +130,16 @@ Database
 Still need to:
 
 - Use the architecture pattern when touching large pages.
+  - Refactoring into layers should not change what the user sees.
+  - It changes where the logic lives.
 - Extract repeated UI into components.
 - Move shared app rules into service/helper files.
 - Move repeated Supabase queries into DAO/repository-style files.
 - Avoid large rewrites.
+
+## Personal Notes
+
+Pages pull from components/helpers/services/repositories.
 
 ## Future Cleanup: Centralize User Book Access
 
@@ -164,6 +170,24 @@ Later idea:
 ---
 
 # Completed Work
+
+## ✅ 2026-05-23 — Private Study Flashcards Ownership Guard
+
+Goal:
+
+Keep `/books/[userBookId]/study` as a private book-study flashcard route, not a shared/community deck route.
+
+Finished:
+
+- ✅ Added ownership/access guard to `/books/[userBookId]/study`.
+- ✅ Confirmed regular students cannot access another user’s private study flashcards.
+- ✅ Confirmed unauthorized users do not see the flashcard UI.
+- ✅ Confirmed unauthorized users cannot load private `user_book_words` through this route.
+- ✅ Confirmed write actions are guarded, including study logs and flashcard updates.
+
+Notes:
+
+Private study flashcards remain tied to the user’s own book data. Future shared flashcards should use separate shared deck structures rather than exposing another user’s private `user_book_words`.
 
 ## ✅ 2026-05-23 — Removed Legacy Weekly Readings Routes
 

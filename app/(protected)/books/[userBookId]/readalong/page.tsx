@@ -117,6 +117,9 @@ export default function ReadAlongPage() {
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
     const [username, setUsername] = useState("");
+    const [accessChecked, setAccessChecked] = useState(false);
+    const [canAccessBook, setCanAccessBook] = useState(false);
+    const [accessMessage, setAccessMessage] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -151,6 +154,86 @@ export default function ReadAlongPage() {
             if (!userBookId) return;
 
             setLoading(true);
+            setAccessChecked(false);
+            setCanAccessBook(false);
+            setAccessMessage("");
+
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user) {
+                setAccessMessage("Please sign in.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
+                setLoading(false);
+                return;
+            }
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("role, is_super_teacher")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            const { data: userBook, error: userBookError } = await supabase
+                .from("user_books")
+                .select(`
+                    id,
+                    user_id,
+                    books:book_id (
+                        title,
+                        cover_url
+                    )
+                `)
+                .eq("id", userBookId)
+                .maybeSingle();
+
+            if (userBookError || !userBook) {
+                if (userBookError) console.error("Error loading read along book:", userBookError);
+                setAccessMessage("You do not have access to this book.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
+                setLoading(false);
+                return;
+            }
+
+            const ownerUserId = (userBook as any).user_id;
+            const isSuperTeacher =
+                profile?.role === "super_teacher" || Boolean((profile as any)?.is_super_teacher);
+            let canAccess =
+                ownerUserId === user.id ||
+                isSuperTeacher;
+
+            if (!canAccess && profile?.role === "teacher" && ownerUserId) {
+                const { data: teacherStudent, error: teacherStudentError } = await supabase
+                    .from("teacher_students")
+                    .select("teacher_id")
+                    .eq("teacher_id", user.id)
+                    .eq("student_id", ownerUserId)
+                    .maybeSingle();
+
+                if (!teacherStudentError && teacherStudent) {
+                    canAccess = true;
+                }
+            }
+
+            if (!canAccess) {
+                setAccessMessage("You do not have access to this book.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
+                setLoading(false);
+                return;
+            }
+
+            const book = Array.isArray((userBook as any)?.books)
+                ? (userBook as any).books[0]
+                : (userBook as any)?.books;
+
+            setCanAccessBook(true);
+            setAccessChecked(true);
+            setBookTitle(book?.title ?? "");
+            setBookCover(book?.cover_url ?? "");
 
             const { data, error } = await supabase
                 .from("user_book_words")
@@ -189,6 +272,8 @@ export default function ReadAlongPage() {
         let cancelled = false;
 
         async function loadLibraryColors() {
+            if (!canAccessBook) return;
+
             const wordsToCheck = words.map((word) => ({
                 surface: word.surface,
                 reading: word.reading,
@@ -225,12 +310,14 @@ export default function ReadAlongPage() {
         return () => {
             cancelled = true;
         };
-    }, [words]);
+    }, [words, canAccessBook]);
 
     useEffect(() => {
         let cancelled = false;
 
         async function loadLibraryColors() {
+            if (!canAccessBook) return;
+
             const wordsToCheck = words.map((word) => ({
                 surface: word.surface,
                 reading: word.reading,
@@ -267,7 +354,7 @@ export default function ReadAlongPage() {
         return () => {
             cancelled = true;
         };
-    }, [words]);
+    }, [words, canAccessBook]);
 
     const chapterOptions = useMemo(() => {
         const map = new Map<
@@ -465,6 +552,8 @@ export default function ReadAlongPage() {
     }
 
     async function openTimedSessionFormWithDefaults() {
+        if (!canAccessBook) return;
+
         if (!userBookId) {
             setShowTimedSessionForm(true);
             return;
@@ -498,6 +587,11 @@ export default function ReadAlongPage() {
 
     async function saveReadingSession() {
         if (!userBookId) return;
+
+        if (!canAccessBook) {
+            setTimerSaveMessage("❌ You do not have access to save sessions to this book.");
+            return;
+        }
 
         const startPageNum = Number(sessionStartPage);
         const endPageNum = Number(sessionEndPage);
@@ -619,6 +713,7 @@ export default function ReadAlongPage() {
     useEffect(() => {
         async function loadBookInfo() {
             if (!userBookId) return;
+            if (!canAccessBook) return;
 
             const { data: userBook, error: userBookError } = await supabase
                 .from("user_books")
@@ -657,7 +752,7 @@ export default function ReadAlongPage() {
         }
 
         loadBookInfo();
-    }, [userBookId]);
+    }, [userBookId, canAccessBook]);
 
     useEffect(() => {
         function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -675,6 +770,35 @@ export default function ReadAlongPage() {
             <main className="min-h-screen bg-stone-50 p-6">
                 <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
                     Loading Read Along…
+                </div>
+            </main>
+        );
+    }
+
+    if (!accessChecked) {
+        return (
+            <main className="min-h-screen bg-stone-50 p-6">
+                <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
+                    Loading Read Along…
+                </div>
+            </main>
+        );
+    }
+
+    if (!canAccessBook) {
+        return (
+            <main className="min-h-screen bg-stone-50 p-6">
+                <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm">
+                    <p className="text-sm text-stone-700">
+                        {accessMessage || "You do not have access to this book."}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => router.push("/books")}
+                        className="mt-4 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                    >
+                        Back to Books
+                    </button>
                 </div>
             </main>
         );
