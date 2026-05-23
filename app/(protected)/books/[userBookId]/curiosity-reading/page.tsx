@@ -208,6 +208,9 @@ export default function CuriosityReadingPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
   const [message, setMessage] = useState("");
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [canAccessBook, setCanAccessBook] = useState(false);
+  const [accessMessage, setAccessMessage] = useState("");
 
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
@@ -237,6 +240,29 @@ export default function CuriosityReadingPage() {
   const [sessionEndPage, setSessionEndPage] = useState("");
 
   const quickMetaStorageKey = `single-add-meta:${userBookId}`;
+
+  async function canAccessUserBook(
+    authedUserId: string,
+    ownerUserId: string,
+    profile: { role?: string | null; is_super_teacher?: boolean | null } | null
+  ) {
+    if (ownerUserId === authedUserId) return true;
+    if (profile?.role === "super_teacher" || profile?.is_super_teacher) return true;
+    if (profile?.role !== "teacher") return false;
+
+    const { data: teacherStudentRow, error: teacherStudentErr } = await supabase
+      .from("teacher_students")
+      .select("teacher_id")
+      .eq("teacher_id", authedUserId)
+      .eq("student_id", ownerUserId)
+      .maybeSingle();
+
+    if (teacherStudentErr) {
+      console.error("Error checking teacher/student access:", teacherStudentErr);
+    }
+
+    return Boolean(teacherStudentRow);
+  }
 
   useEffect(() => {
     setUserBookId(routeUserBookId);
@@ -274,23 +300,68 @@ export default function CuriosityReadingPage() {
     if (!userBookId) return;
 
     (async () => {
+      setAccessChecked(false);
+      setCanAccessBook(false);
+      setAccessMessage("");
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user?.id) {
+        setAccessMessage("Please sign in.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
+        return;
+      }
+
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("role, is_super_teacher")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileErr) {
+        console.error("Error loading profile role:", profileErr);
+      }
+
       const { data: userBook, error: userBookError } = await supabase
         .from("user_books")
-        .select("id, book_id")
+        .select("id, user_id, book_id")
         .eq("id", userBookId)
         .maybeSingle();
 
       if (userBookError) {
         setMessage(`❌ Could not load book info: ${userBookError.message}`);
+        setAccessMessage("You do not have access to this book.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
         return;
       }
 
       if (!userBook) {
-        setMessage("❌ No user_book found for this userBookId.");
+        setAccessMessage("You do not have access to this book.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
         setBookTitle("");
         setBookCover("");
         return;
       }
+
+      const ownerUserId = (userBook as any)?.user_id ?? "";
+      const allowed = await canAccessUserBook(user.id, ownerUserId, profile ?? null);
+
+      if (!allowed) {
+        setAccessMessage("You do not have access to this book.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
+        setBookTitle("");
+        setBookCover("");
+        return;
+      }
+
+      setCanAccessBook(true);
+      setAccessChecked(true);
 
       const { data: book, error: bookError } = await supabase
         .from("books")
@@ -651,6 +722,11 @@ export default function CuriosityReadingPage() {
   async function saveQuickWord() {
     if (!userBookId || !quickPreview.surface.trim()) return;
 
+    if (!canAccessBook) {
+      setMessage("❌ You do not have access to save words to this book.");
+      return;
+    }
+
     const selectedMeaning = quickPreview.meaning ?? "";
     const normalizedSurface = (
       quickPreview.useAlternateSurface ? quickPreview.alternateSurface : quickPreview.surface
@@ -944,6 +1020,37 @@ export default function CuriosityReadingPage() {
     libraryColorByWordKey[
     makeLibraryStudyColorKey(quickPreview.surface, quickPreview.reading)
     ] ?? null;
+
+  if (!accessChecked) {
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-sm text-gray-500">Loading book info…</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!canAccessBook) {
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <p className="text-base font-medium text-red-700">
+              {accessMessage || "You do not have access to this book."}
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/books")}
+              className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+            >
+              Back to Books
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">

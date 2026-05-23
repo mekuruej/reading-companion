@@ -147,6 +147,26 @@ Later idea:
 
 # Completed Work
 
+## ✅ 2026-05-23 — Add Word Ownership Guard
+
+Goal:
+
+Prevent regular users from opening another user’s Add Word page and saving words into a book they do not own.
+
+Finished:
+
+- ✅ Added ownership/access guard to `/books/[userBookId]/add-word`.
+- ✅ Confirmed regular student cannot access another user’s Add Word page.
+- ✅ Confirmed unauthorized users no longer see the Add Word form.
+- ✅ Confirmed unauthorized users cannot use the dictionary/search UI from that page.
+- ✅ Confirmed blocked users see a friendly message:
+  - “You do not have access to this book.”
+- ✅ Confirmed RLS also blocks unauthorized inserts into `user_book_words`.
+
+Notes:
+
+This route matters because it is a write route. The page now blocks unauthorized users before rendering the form, instead of relying only on Supabase RLS to reject the save.
+
 ## ✅ 2026-05-22 — Individual Word Page Ownership Guard
 
 Goal:
