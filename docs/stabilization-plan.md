@@ -135,6 +135,24 @@ Still need to:
 - Move repeated Supabase queries into DAO/repository-style files.
 - Avoid large rewrites.
 
+## Future Cleanup: Centralize User Book Access
+
+During the ownership audit, several routes received local ownership guards using the same rule:
+
+- owner access
+- linked teacher access
+- super_teacher access
+
+These guards are intentionally local/minimal for the stabilization phase.
+
+Later, this logic should be centralized into a shared helper/service, such as:
+
+- `lib/access/userBookAccess.ts`
+- `canAccessUserBook()`
+- `loadAccessibleUserBook()`
+
+This will reduce duplicated access logic across Book Hub, Vocab List, Add Word, Curiosity Reading, and Study Flashcards.
+
 ## Possible Future Profile Feature
 
 Later idea:
@@ -146,6 +164,43 @@ Later idea:
 ---
 
 # Completed Work
+
+## ✅ 2026-05-23 — Removed Legacy Weekly Readings Routes
+
+Goal:
+
+Remove old weekly-reading routes that are no longer linked from the active Book Hub or study flow.
+
+Finished:
+
+- ✅ Confirmed `/books/[userBookId]/weekly-readings` existed as a route.
+- ✅ Confirmed `/books/[userBookId]/weekly-readings/prepare` existed as a route.
+- ✅ Confirmed active app navigation does not link to these routes.
+- ✅ Confirmed references were limited to the weekly-reading files themselves and vague teacher-page copy.
+- ✅ Removed the legacy weekly-readings route folder.
+
+Notes:
+
+These routes were not part of the current active study flow. Since they could expose private book/vocab study data if manually opened, removing them is cleaner than spending time adding guards to unused pages.
+
+## ✅ 2026-05-23 — Curiosity Reading Ownership Guard
+
+Goal:
+
+Prevent regular users from opening another user’s Curiosity Reading page and saving words into a book they do not own.
+
+Finished:
+
+- ✅ Added ownership/access guard to `/books/[userBookId]/curiosity-reading`.
+- ✅ Confirmed regular student cannot access another user’s Curiosity Reading page.
+- ✅ Confirmed unauthorized users no longer see the Curiosity Reading tools.
+- ✅ Confirmed unauthorized users cannot use the search/save UI from that page.
+- ✅ Confirmed blocked users see a friendly message:
+  - “You do not have access to this book.”
+
+Notes:
+
+This route matters because Curiosity Reading can save words into `user_book_words`. The page now blocks unauthorized users before rendering the tools, instead of relying only on Supabase RLS.
 
 ## ✅ 2026-05-23 — Add Word Ownership Guard
 

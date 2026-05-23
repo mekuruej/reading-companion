@@ -266,6 +266,9 @@ export default function BookFlashcardsPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [canAccessBook, setCanAccessBook] = useState(false);
+  const [accessMessage, setAccessMessage] = useState("");
 
   const [jlptSelected, setJlptSelected] = useState<string[]>([]);
   const [chapterFilter, setChapterFilter] = useState("all");
@@ -280,6 +283,29 @@ export default function BookFlashcardsPage() {
   const [defSaving, setDefSaving] = useState(false);
   const [defError, setDefError] = useState<string | null>(null);
   const [showDefPicker, setShowDefPicker] = useState(false);
+
+  async function canAccessUserBook(
+    authedUserId: string,
+    ownerUserId: string,
+    profile: { role?: string | null; is_super_teacher?: boolean | null } | null
+  ) {
+    if (ownerUserId === authedUserId) return true;
+    if (profile?.role === "super_teacher" || profile?.is_super_teacher) return true;
+    if (profile?.role !== "teacher") return false;
+
+    const { data: teacherStudentRow, error: teacherStudentErr } = await supabase
+      .from("teacher_students")
+      .select("teacher_id")
+      .eq("teacher_id", authedUserId)
+      .eq("student_id", ownerUserId)
+      .maybeSingle();
+
+    if (teacherStudentErr) {
+      console.error("Error checking teacher/student access:", teacherStudentErr);
+    }
+
+    return Boolean(teacherStudentRow);
+  }
 
   function clearTypedInput() {
     setTypedInput("");
@@ -335,6 +361,9 @@ export default function BookFlashcardsPage() {
       setLoading(true);
       setErrorMsg(null);
       setNeedsSignIn(false);
+      setAccessChecked(false);
+      setCanAccessBook(false);
+      setAccessMessage("");
 
       try {
         const { data: userData } = await supabase.auth.getUser();
@@ -350,7 +379,19 @@ export default function BookFlashcardsPage() {
           setBookTitle("");
           setBookCover("");
           setChapterOptions([]);
+          setAccessChecked(true);
+          setCanAccessBook(false);
           return;
+        }
+
+        const { data: profile, error: profileErr } = await supabase
+          .from("profiles")
+          .select("role, is_super_teacher")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileErr) {
+          console.error("Error loading profile role:", profileErr);
         }
 
         const { data: ub, error: ubErr } = await supabase
@@ -366,14 +407,42 @@ export default function BookFlashcardsPage() {
           `
           )
           .eq("id", userBookId)
-          .single();
+          .maybeSingle();
 
         if (ubErr) throw ubErr;
 
+        if (!ub) {
+          setAccessMessage("You do not have access to this flashcard set.");
+          setAccessChecked(true);
+          setCanAccessBook(false);
+          setCards([]);
+          setFilteredCards([]);
+          setLibraryCards([]);
+          setChapterOptions([]);
+          setLoading(false);
+          return;
+        }
+
+        const ownerUserId = (ub as any)?.user_id ?? "";
+        const allowed = await canAccessUserBook(user.id, ownerUserId, profile ?? null);
+
+        if (!allowed) {
+          setAccessMessage("You do not have access to this flashcard set.");
+          setAccessChecked(true);
+          setCanAccessBook(false);
+          setCards([]);
+          setFilteredCards([]);
+          setLibraryCards([]);
+          setChapterOptions([]);
+          setLoading(false);
+          return;
+        }
+
+        setCanAccessBook(true);
+        setAccessChecked(true);
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
 
-        const ownerUserId = (ub as any)?.user_id ?? "";
         const totalCounts = new Map<string, number>();
 
         if (ownerUserId) {
@@ -988,6 +1057,11 @@ export default function BookFlashcardsPage() {
   }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect]);
 
   async function logStudyEvent(result: "revealed" | "correct" | "wrong") {
+    if (!canAccessBook) {
+      console.warn("Cannot write study log without access to this flashcard set.");
+      return;
+    }
+
     if (!card || !meId) return;
 
     const unifiedResult =
@@ -1098,6 +1172,11 @@ export default function BookFlashcardsPage() {
   }
 
   async function skipCardForToday(cardId: string) {
+    if (!canAccessBook) {
+      console.warn("Cannot skip card without access to this flashcard set.");
+      return;
+    }
+
     const today = new Date().toISOString().slice(0, 10);
 
     const { error } = await supabase
@@ -1115,6 +1194,11 @@ export default function BookFlashcardsPage() {
   }
 
   async function flagCardForReview(cardId: string) {
+    if (!canAccessBook) {
+      console.warn("Cannot flag card without access to this flashcard set.");
+      return;
+    }
+
     const { error } = await supabase
       .from("user_book_words")
       .update({
@@ -1136,6 +1220,11 @@ export default function BookFlashcardsPage() {
   }
 
   async function hideCardPermanently(cardId: string) {
+    if (!canAccessBook) {
+      console.warn("Cannot hide card without access to this flashcard set.");
+      return;
+    }
+
     const { error } = await supabase
       .from("user_book_words")
       .update({ hidden: true })
@@ -1364,6 +1453,11 @@ export default function BookFlashcardsPage() {
   }
 
   async function setDefinitionForCurrent(newIndex: number) {
+    if (!canAccessBook) {
+      setDefError("You do not have access to this flashcard set.");
+      return;
+    }
+
     if (!card) return;
     if (!card.meaningChoices?.length) return;
 
@@ -1506,6 +1600,31 @@ export default function BookFlashcardsPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-gray-700">You need to sign in to see your book flashcards.</p>
+      </main>
+    );
+  }
+
+  if (!accessChecked) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-lg text-gray-500">Loading flashcards…</p>
+      </main>
+    );
+  }
+
+  if (!canAccessBook) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
+        <p className="text-red-700">
+          {accessMessage || "You do not have access to this flashcard set."}
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/books")}
+          className="rounded bg-gray-200 px-4 py-2"
+        >
+          Back to Books
+        </button>
       </main>
     );
   }
