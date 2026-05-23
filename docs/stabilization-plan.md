@@ -147,6 +147,25 @@ Later idea:
 
 # Completed Work
 
+## ✅ 2026-05-22 — Individual Word Page Ownership Guard
+
+Goal:
+
+Prevent regular users from opening another user’s individual saved-word page by manually typing a `/books/[userBookId]/words/[wordId]` URL.
+
+Finished:
+
+- ✅ Confirmed individual word page uses friendly blocked access handling.
+- ✅ Confirmed regular student cannot access another user’s saved-word detail page.
+- ✅ Replaced raw Supabase blocked-result behavior with a friendly message:
+  - “You do not have access to this word.”
+- ✅ Confirmed local test works correctly.
+- ⏳ Teacher linked-student access still needs testing later with a linked teacher/student pair.
+
+Notes:
+
+The individual word page is now aligned with the Book Hub and Vocabulary List ownership pattern. The main private book/vocab side doors checked so far are now blocked for unrelated students.
+
 ## ✅ 2026-05-22 — Vocabulary List Ownership Guard
 
 Goal:

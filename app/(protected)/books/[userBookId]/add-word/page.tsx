@@ -150,6 +150,9 @@ export default function AddWordPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [canAccessBook, setCanAccessBook] = useState(false);
+  const [accessMessage, setAccessMessage] = useState("");
 
   const [word, setWord] = useState("");
   const [scratchWord, setScratchWord] = useState("");
@@ -189,6 +192,29 @@ export default function AddWordPage() {
   const wordFieldsRef = useRef<HTMLDivElement | null>(null);
   const isSuperTeacher = superTeacherRole === "super_teacher" || profileIsSuperTeacher;
 
+  async function canAccessUserBook(
+    authedUserId: string,
+    ownerUserId: string,
+    profile: { role?: string | null; is_super_teacher?: boolean | null } | null
+  ) {
+    if (ownerUserId === authedUserId) return true;
+    if (profile?.role === "super_teacher" || profile?.is_super_teacher) return true;
+    if (profile?.role !== "teacher") return false;
+
+    const { data: teacherStudentRow, error: teacherStudentErr } = await supabase
+      .from("teacher_students")
+      .select("teacher_id")
+      .eq("teacher_id", authedUserId)
+      .eq("student_id", ownerUserId)
+      .maybeSingle();
+
+    if (teacherStudentErr) {
+      console.error("Error checking teacher/student access:", teacherStudentErr);
+    }
+
+    return Boolean(teacherStudentRow);
+  }
+
   useEffect(() => {
     if (!userBookId) return;
 
@@ -202,29 +228,42 @@ export default function AddWordPage() {
     }
 
     async function loadBookInfo() {
+      setAccessChecked(false);
+      setCanAccessBook(false);
+      setAccessMessage("");
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user?.id) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, is_super_teacher")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        setSuperTeacherRole(profile?.role ?? null);
-        setProfileIsSuperTeacher(!!profile?.is_super_teacher);
-      } else {
+      if (!user?.id) {
         setSuperTeacherRole(null);
         setProfileIsSuperTeacher(false);
+        setAccessMessage("Please sign in.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
+        return;
       }
+
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("role, is_super_teacher")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileErr) {
+        console.error("Error loading profile role:", profileErr);
+      }
+
+      setSuperTeacherRole(profile?.role ?? null);
+      setProfileIsSuperTeacher(!!profile?.is_super_teacher);
 
       const { data, error } = await supabase
         .from("user_books")
         .select(
           `
             id,
+            user_id,
             books:book_id (
               title,
               cover_url
@@ -232,13 +271,35 @@ export default function AddWordPage() {
           `
         )
         .eq("id", userBookId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         setMessage(`❌ Could not load book info: ${error.message}`);
+        setAccessMessage("You do not have access to this book.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
         return;
       }
 
+      if (!data) {
+        setAccessMessage("You do not have access to this book.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
+        return;
+      }
+
+      const ownerUserId = (data as any)?.user_id ?? "";
+      const allowed = await canAccessUserBook(user.id, ownerUserId, profile ?? null);
+
+      if (!allowed) {
+        setAccessMessage("You do not have access to this book.");
+        setAccessChecked(true);
+        setCanAccessBook(false);
+        return;
+      }
+
+      setCanAccessBook(true);
+      setAccessChecked(true);
       const b = (data as any)?.books;
       setBookTitle(b?.title ?? "");
       setBookCover(b?.cover_url ?? "");
@@ -637,6 +698,12 @@ export default function AddWordPage() {
         return;
       }
 
+      if (!canAccessBook) {
+        setMessage("❌ You do not have access to save words to this book.");
+        setSaving(false);
+        return;
+      }
+
       const finalSurface = useAlternateSurface ? cleanAlternateSurface : cleanWord;
 
       const chapterNum = toNullableInt(chapterNumber);
@@ -813,6 +880,37 @@ export default function AddWordPage() {
     libraryColorByWordKey[
     makeLibraryStudyColorKey(currentColorSurface, reading)
     ] ?? null;
+
+  if (!accessChecked) {
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-sm text-gray-500">Loading book info…</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!canAccessBook) {
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <p className="text-base font-medium text-red-700">
+              {accessMessage || "You do not have access to this book."}
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/books")}
+              className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+            >
+              Back to Books
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
