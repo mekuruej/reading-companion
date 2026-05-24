@@ -14,6 +14,7 @@ import VocabTab from "./components/VocabTab";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 
 type Book = {
   id: string;
@@ -3233,11 +3234,19 @@ export default function BookHubPage() {
       `
       )
       .eq("id", userBookId)
-      .single();
+      .maybeSingle();
 
     if (error) {
+      console.error("Error loading Book Hub row:", error);
       setRow(null);
-      setError(error.message);
+      setError("This book could not be found.");
+      setLoading(false);
+      return;
+    }
+
+    if (!data) {
+      setRow(null);
+      setError("You do not have access to this book.");
       setLoading(false);
       return;
     }
@@ -4640,12 +4649,11 @@ export default function BookHubPage() {
   }
 
   if (!row || !book) {
-    return (
-      <main className="p-6">
-        <div className="text-2xl font-semibold">Book not found</div>
-        {error && <div className="mt-2 text-sm text-red-600">{error}</div>}
-      </main>
-    );
+    if (error === "You do not have access to this book.") {
+      return <AccessDeniedMessage message={error} />;
+    }
+
+    return <AccessDeniedMessage message="This book could not be found." />;
   }
 
   const currentlyReadingBooks = [...bookOptions]

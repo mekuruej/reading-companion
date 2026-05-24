@@ -402,6 +402,7 @@ export default function TeacherStudentsPage() {
     const [canAccess, setCanAccess] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [students, setStudents] = useState<StudentCard[]>([]);
+    const [studentSearch, setStudentSearch] = useState("");
     const [taskBooksByStudentId, setTaskBooksByStudentId] = useState<
         Record<string, TaskBookOption[]>
     >({});
@@ -959,13 +960,34 @@ export default function TeacherStudentsPage() {
         };
     }, [students]);
 
+    const filteredStudents = useMemo(() => {
+        const q = studentSearch.trim().toLowerCase();
+        if (!q) return students;
+
+        return students.filter((student) => {
+            const searchable = [
+                student.display_name,
+                student.username,
+                student.level,
+                student.lesson_day,
+                relationshipLabel(student.relationshipStatus),
+                student.currentBookTitle,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+            return searchable.includes(q);
+        });
+    }, [studentSearch, students]);
+
     const groupedStudents = useMemo(() => {
         return {
-            future: students.filter((student) => student.relationshipStatus === "future"),
-            current: students.filter((student) => student.relationshipStatus === "current"),
-            past: students.filter((student) => student.relationshipStatus === "past"),
+            future: filteredStudents.filter((student) => student.relationshipStatus === "future"),
+            current: filteredStudents.filter((student) => student.relationshipStatus === "current"),
+            past: filteredStudents.filter((student) => student.relationshipStatus === "past"),
         };
-    }, [students]);
+    }, [filteredStudents]);
 
     const activeTasksForModalStudent = useMemo(() => {
         if (!taskModalStudent) return [];
@@ -1359,7 +1381,39 @@ export default function TeacherStudentsPage() {
                             </div>
                         ) : (
                             <div className="space-y-8">
-                                {([
+                                <div className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
+                                    <label className="grid gap-2 text-sm font-semibold text-stone-700">
+                                        Search students
+                                        <input
+                                            value={studentSearch}
+                                            onChange={(event) => setStudentSearch(event.target.value)}
+                                            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base font-normal text-stone-900 outline-none transition focus:border-stone-400"
+                                            placeholder="Search name, username, level, lesson day, or current book"
+                                        />
+                                    </label>
+                                    {studentSearch.trim() ? (
+                                        <p className="mt-2 text-xs font-medium text-stone-500">
+                                            Showing {filteredStudents.length} of {students.length} students.
+                                        </p>
+                                    ) : null}
+                                </div>
+
+                                {filteredStudents.length === 0 ? (
+                                    <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center">
+                                        <p className="text-lg font-black text-stone-900">
+                                            No students match that search.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setStudentSearch("")}
+                                            className="mt-4 rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+                                        >
+                                            Clear search
+                                        </button>
+                                    </div>
+                                ) : null}
+
+                                {filteredStudents.length > 0 ? ([
                                     {
                                         key: "future",
                                         title: "Future Students",
@@ -1408,7 +1462,7 @@ export default function TeacherStudentsPage() {
                                             </div>
                                         )}
                                     </div>
-                                ))}
+                                )) : null}
                             </div>
                         )}
                     </section>

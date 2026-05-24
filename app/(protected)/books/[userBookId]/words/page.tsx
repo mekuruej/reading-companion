@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -945,6 +946,12 @@ export default function BookWordsPage() {
   }
 
   if (errorMsg) {
+    if (errorMsg === "You do not have access to this vocabulary list.") {
+      return (
+        <AccessDeniedMessage message={errorMsg} />
+      );
+    }
+
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-red-700">{errorMsg}</p>

@@ -1049,12 +1049,14 @@ function LibraryPracticePanel({
     answer: string;
     label: string;
   }>(null);
+  const [typingMissedStep, setTypingMissedStep] = useState<PracticeTypingStep | null>(null);
   const typingPracticeInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setTypingStep("reading");
     setTypingInput("");
     setTypingFeedback(null);
+    setTypingMissedStep(null);
   }, [card?.id, practiceMode]);
 
   if (!card) {
@@ -1085,29 +1087,51 @@ function LibraryPracticePanel({
         ? normalizeKana(userAnswer) === normalizeKana(correctAnswer)
         : matchesAnyMeaning(userAnswer, correctAnswer);
 
-    setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
-
     if (typingStep === "reading") {
-      if (!ok) onTypingMissed(card, "reading");
+      if (!ok) {
+        if (typingMissedStep !== "reading") onTypingMissed(card, "reading");
+        setTypingMissedStep("reading");
+        setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
+        setTypingInput("");
+        window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
+        return;
+      }
+
+      setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
 
       window.setTimeout(() => {
         setTypingStep("meaning");
         setTypingInput("");
         setTypingFeedback(null);
+        setTypingMissedStep(null);
         window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
-      }, ok ? 900 : 1700);
+      }, 4000);
       return;
     }
 
-    onMeaningAnswered(card, userAnswer, correctAnswer, ok);
-    if (!ok) onTypingMissed(card, "meaning");
+    if (!ok) {
+      if (typingMissedStep !== "meaning") {
+        onMeaningAnswered(card, userAnswer, correctAnswer, false);
+        onTypingMissed(card, "meaning");
+      }
+      setTypingMissedStep("meaning");
+      setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
+      setTypingInput("");
+      window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
+      return;
+    }
+
+    if (typingMissedStep !== "meaning") {
+      onMeaningAnswered(card, userAnswer, correctAnswer, true);
+    }
+    setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
 
     window.setTimeout(() => {
       onNext();
       window.setTimeout(() => {
         window.requestAnimationFrame(() => typingPracticeInputRef.current?.focus());
       }, 0);
-    }, ok ? 1800 : 2600);
+    }, 4000);
   }
 
   return (
@@ -1231,7 +1255,7 @@ function LibraryPracticePanel({
                 if (e.key !== "Enter") return;
                 e.preventDefault();
                 e.stopPropagation();
-                if (!typingFeedback) submitTypingPractice();
+                if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
               }}
               placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
               inputMode="text"
@@ -1239,7 +1263,7 @@ function LibraryPracticePanel({
               autoCapitalize="none"
               autoComplete="off"
               spellCheck={false}
-              disabled={typingFeedback != null}
+              disabled={typingFeedback?.ok === true}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
             />
 
@@ -1258,7 +1282,11 @@ function LibraryPracticePanel({
                   {typingFeedback.label}: {typingFeedback.answer}
                 </div>
                 <p className="mt-2 text-xs font-medium text-slate-500">
-                  Next card comes automatically.
+                  {typingFeedback.ok
+                    ? "Next card comes automatically."
+                    : typingStep === "reading"
+                      ? "Retype the reading once to continue."
+                      : "Type one meaning word once to continue."}
                 </p>
               </div>
             ) : (
@@ -1378,6 +1406,18 @@ function matchesAnyMeaning(input: string, fullMeaning: string) {
   return false;
 }
 
+function shortMeaningRetypeHint(fullMeaning: string) {
+  const words = fullMeaning
+    .replace(/[;,:()"]/g, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+
+  if (words.length === 0) return "part of the meaning";
+  return words.join(" ");
+}
+
 function getTodayKey() {
   return todayYmdAppTimeZone();
 }
@@ -1449,6 +1489,7 @@ export default function LibraryStudyPage() {
 
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
   const [typingInput, setTypingInput] = useState("");
+  const [typingCorrectionComplete, setTypingCorrectionComplete] = useState(false);
 
   const [endedEarly, setEndedEarly] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1460,6 +1501,13 @@ export default function LibraryStudyPage() {
   const currentCard = deck[index];
   const practiceCard = practiceDeck[practiceIndex];
   const activeStudyMode = studyModeForActiveGate(currentCard);
+  const currentInstructionText = checked
+    ? checked.ok || typingCorrectionComplete
+      ? "Great! Next word comes automatically."
+      : activeStudyMode === "reading_typing"
+        ? "Not quite. Retype the reading."
+        : `Not quite. Retype "${shortMeaningRetypeHint(checked.correct)}" from the meaning.`
+    : null;
 
   const filteredCards = useMemo(() => {
     if (!dailyCheckPlan) return [];
@@ -2001,16 +2049,18 @@ export default function LibraryStudyPage() {
 
   useEffect(() => {
     if (!checked) return;
+    if (!checked.ok && !typingCorrectionComplete) return;
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
     }, 4000);
 
     return () => window.clearTimeout(timer);
-  }, [checked]);
+  }, [checked, typingCorrectionComplete]);
 
   useEffect(() => {
     if (!checked || libraryMode !== "check") return;
+    if (!checked.ok && !typingCorrectionComplete) return;
 
     function stopEnterAdvance(event: KeyboardEvent) {
       if (event.key !== "Enter") return;
@@ -2020,7 +2070,7 @@ export default function LibraryStudyPage() {
 
     window.addEventListener("keydown", stopEnterAdvance, true);
     return () => window.removeEventListener("keydown", stopEnterAdvance, true);
-  }, [checked, libraryMode]);
+  }, [checked, typingCorrectionComplete, libraryMode]);
 
   useEffect(() => {
     const needsTypingFocus =
@@ -2051,6 +2101,7 @@ export default function LibraryStudyPage() {
   function resetCardState() {
     setChecked(null);
     setTypingInput("");
+    setTypingCorrectionComplete(false);
   }
 
   function markStudyCardSeen(card: StudyCard) {
@@ -2660,7 +2711,31 @@ export default function LibraryStudyPage() {
   }
 
   function checkTypingSingle() {
-    if (!currentCard || checked) return;
+    if (!currentCard) return;
+
+    if (checked && !checked.ok) {
+      const correctionOk =
+        activeStudyMode === "reading_typing"
+          ? normalizeKana(typingInput) === normalizeKana(checked.correct)
+          : matchesAnyMeaning(typingInput, checked.correct);
+
+      if (!correctionOk) {
+        setTypingInput("");
+        setNotice(
+          activeStudyMode === "reading_typing"
+            ? "Retype the reading once to continue."
+            : "Type one meaning word once to continue."
+        );
+        return;
+      }
+
+      setTypingInput("");
+      setTypingCorrectionComplete(true);
+      setNotice(null);
+      return;
+    }
+
+    if (checked) return;
 
     const currentStudyMode = activeStudyMode;
     let correct = currentCard.reading;
@@ -2679,6 +2754,10 @@ export default function LibraryStudyPage() {
     }
 
     setChecked({ ok, correct });
+    if (!ok) {
+      setTypingInput("");
+      window.requestAnimationFrame(() => typingInputRef.current?.focus());
+    }
     markStudyCardSeen(currentCard);
 
     recordCurrentStudyEvent(
@@ -3657,7 +3736,7 @@ export default function LibraryStudyPage() {
                         e.preventDefault();
                         e.stopPropagation();
 
-                        if (!checked) {
+                        if (!checked || !checked.ok) {
                           checkTypingSingle();
                         }
                       }}
@@ -3672,14 +3751,8 @@ export default function LibraryStudyPage() {
                       autoComplete="off"
                       spellCheck={false}
                       className="w-full rounded border px-4 py-3 text-base"
-                      disabled={!!checked}
+                      disabled={!!checked && checked.ok}
                     />
-
-                    <div className="mt-2 text-center text-xs uppercase tracking-wide text-slate-500">
-                      {activeStudyMode === "reading_typing"
-                        ? "Kana is best; romaji can bypass predictive text"
-                        : "Type one meaning word"}
-                    </div>
 
                     {!checked ? (
                       <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
@@ -3755,14 +3828,16 @@ export default function LibraryStudyPage() {
                     <div className="mt-1 text-sm text-slate-700">{currentCard?.meaning}</div>
                     <div className="mt-2 text-xs text-slate-500">From: {currentCard?.bookTitle}</div>
                   </div>
-
-                  <p className="mt-3 text-xs leading-5 text-slate-400">
-                    The next card comes automatically. Enter will not move you forward.
-                  </p>
                 </div>
               ) : null}
             </div>
           </div>
+
+          {currentInstructionText ? (
+            <div className="mx-auto mt-3 w-full max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-950 shadow-sm">
+              {currentInstructionText}
+            </div>
+          ) : null}
 
           <div className="mt-2 w-full max-w-2xl space-y-2">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">

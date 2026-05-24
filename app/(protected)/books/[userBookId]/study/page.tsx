@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { normalizeKanaReading } from "@/lib/kanaInput";
@@ -1051,7 +1052,7 @@ export default function BookFlashcardsPage() {
 
     const timer = window.setTimeout(() => {
       goToNextWord("correct");
-    }, 900);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect]);
@@ -1277,7 +1278,7 @@ export default function BookFlashcardsPage() {
 
         window.setTimeout(() => {
           goToNextWord(firstAnswerResult);
-        }, 500);
+        }, 4000);
 
         return;
       }
@@ -1307,7 +1308,7 @@ export default function BookFlashcardsPage() {
 
         window.setTimeout(() => {
           goToNextWord(firstAnswerResult);
-        }, 1800);
+        }, 4000);
 
         return;
       }
@@ -1338,7 +1339,7 @@ export default function BookFlashcardsPage() {
 
         window.setTimeout(() => {
           goToNextWord(firstAnswerResult);
-        }, 1200);
+        }, 4000);
 
         return;
       }
@@ -1443,7 +1444,10 @@ export default function BookFlashcardsPage() {
     }
 
     setCorrectionFeedback(null);
-    void goToNextWord("wrong");
+    setCorrectionFeedback("Good. Moving to the next card...");
+    window.setTimeout(() => {
+      void goToNextWord("wrong");
+    }, 4000);
   }
 
   function flip() {
@@ -1614,18 +1618,9 @@ export default function BookFlashcardsPage() {
 
   if (!canAccessBook) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-red-700">
-          {accessMessage || "You do not have access to this flashcard set."}
-        </p>
-        <button
-          type="button"
-          onClick={() => router.push("/books")}
-          className="rounded bg-gray-200 px-4 py-2"
-        >
-          Back to Books
-        </button>
-      </main>
+      <AccessDeniedMessage
+        message={accessMessage || "You do not have access to this flashcard set."}
+      />
     );
   }
 
@@ -2277,7 +2272,7 @@ export default function BookFlashcardsPage() {
               ? mcAnswered
                 ? mcWasCorrect
                   ? "Moving to next card..."
-                  : "Choose Next below to continue"
+                  : "Type the correct answer once. Then the next card comes automatically."
                 : studySet === "READING_MC"
                   ? "Choose the correct reading"
                   : studySet === "MEANING_MC"
@@ -2291,6 +2286,14 @@ export default function BookFlashcardsPage() {
                   ? "Tap once to reveal"
                   : "Tap again for the next word"}
           </p>
+          <button
+            type="button"
+            onClick={prevCardReveal}
+            disabled={filteredCards.length <= 1}
+            className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2">

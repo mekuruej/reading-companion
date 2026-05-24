@@ -182,7 +182,7 @@ export default function ProfileSetupPage() {
         return;
       }
 
-      router.replace("/community/profile");
+      router.replace("/books");
       router.refresh();
     } finally {
       setSaving(false);

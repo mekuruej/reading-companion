@@ -203,6 +203,27 @@ function getTrailingReadingHint(sourceWord: string, kanji: string) {
   return chars.filter((_, i) => i !== index).join("");
 }
 
+function splitKunyomiPromptReading(sourceReading: string | null, realizedReading: string) {
+  const reading = kataToHira(sourceReading ?? "").trim();
+  const target = kataToHira(realizedReading ?? "").trim();
+  if (!reading) return { strong: "", ghost: "" };
+
+  if (target && normalizeReading(reading).startsWith(normalizeReading(target))) {
+    const targetLength = Array.from(target).length;
+    const chars = Array.from(reading);
+    return {
+      strong: chars.slice(0, targetLength).join(""),
+      ghost: chars.slice(targetLength).join(""),
+    };
+  }
+
+  const chars = Array.from(reading);
+  return {
+    strong: chars.slice(0, 1).join(""),
+    ghost: chars.slice(1).join(""),
+  };
+}
+
 function selectOneCardPerKanji(cards: QuizCard[]) {
   const byKanji = new Map<string, QuizCard>();
 
@@ -254,62 +275,13 @@ export default function KanjiReadingStudyPage() {
 
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [studyOnyomi, setStudyOnyomi] = useState(false);
-  const [studyKunyomi, setStudyKunyomi] = useState(false);
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("beginner");
 
   const canAccessKanjiPractice = true;
 
-  const wordReadingKinds = useMemo(() => {
-    const byWord = new Map<string, Set<"onyomi" | "kunyomi">>();
-
-    for (const card of baseCards) {
-      const word = (card.sourceWord ?? "").trim();
-      if (!word) continue;
-      if (card.readingType !== "onyomi" && card.readingType !== "kunyomi") continue;
-
-      const bucket = byWord.get(word) ?? new Set<"onyomi" | "kunyomi">();
-      bucket.add(card.readingType);
-      byWord.set(word, bucket);
-    }
-
-    return byWord;
-  }, [baseCards]);
-
   const filteredBaseCards = useMemo(() => {
-    return baseCards.filter((card) => {
-      if (!matchesLevelFilter(card.jlpt, levelFilter)) {
-        return false;
-      }
-
-      if (!studyOnyomi && !studyKunyomi) {
-        return true;
-      }
-
-      const word = (card.sourceWord ?? "").trim();
-      const kinds = word ? wordReadingKinds.get(word) : null;
-      const isMixed =
-        !!kinds && kinds.has("onyomi") && kinds.has("kunyomi");
-
-      if (isMixed) {
-        return false;
-      }
-
-      if (studyOnyomi && studyKunyomi) {
-        return card.readingType === "onyomi" || card.readingType === "kunyomi";
-      }
-
-      if (studyOnyomi) {
-        return card.readingType === "onyomi";
-      }
-
-      if (studyKunyomi) {
-        return card.readingType === "kunyomi";
-      }
-
-      return true;
-    });
-  }, [baseCards, levelFilter, studyOnyomi, studyKunyomi, wordReadingKinds]);
+    return baseCards.filter((card) => matchesLevelFilter(card.jlpt, levelFilter));
+  }, [baseCards, levelFilter]);
 
   useEffect(() => {
     buildDeckFromCards(filteredBaseCards);
@@ -516,13 +488,15 @@ export default function KanjiReadingStudyPage() {
   }, [card]);
 
   const cardQuestionMode: CardQuestionMode = useMemo(() => {
-    if (!card || !hasExactlyOneKanji(card.sourceWord) || !card.sourceReading) {
-      return "readingChoice";
+    if (
+      card?.readingType === "kunyomi" &&
+      hasExactlyOneKanji(card.sourceWord) &&
+      !!card.sourceReading
+    ) {
+      return "kanjiChoice";
     }
 
-    return stableNumberFromString(`${card.key}-question`) % 2 === 0
-      ? "kanjiChoice"
-      : "readingChoice";
+    return "readingChoice";
   }, [card]);
 
   const options = useMemo(() => {
@@ -548,7 +522,7 @@ export default function KanjiReadingStudyPage() {
 
       for (const kanji of shuffleArray(kanjiPool)) {
         if (!distractors.includes(kanji)) distractors.push(kanji);
-        if (distractors.length >= 2) break;
+        if (distractors.length >= 3) break;
       }
 
       return shuffleArray([correct, ...distractors]).filter(Boolean);
@@ -612,7 +586,7 @@ export default function KanjiReadingStudyPage() {
 
     const timer = window.setTimeout(() => {
       nextCard();
-    }, 5000);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [checked, inRecallFlow]);
@@ -622,7 +596,7 @@ export default function KanjiReadingStudyPage() {
 
     const timer = window.setTimeout(() => {
       nextCard();
-    }, 5000);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [recallRevealed, recallResult, recallMatchedWord]);
@@ -722,9 +696,30 @@ export default function KanjiReadingStudyPage() {
       return;
     }
 
-    const dailyKanjiCards = selectOneCardPerKanji(cards);
+    const onyomiCards = cards.filter((card) => card.readingType === "onyomi");
+    const kunyomiCards = cards.filter(
+      (card) => card.readingType === "kunyomi" && hasExactlyOneKanji(card.sourceWord)
+    );
 
-    const onePassDeck = shuffleArray(dailyKanjiCards).map((c, i) => ({
+    const dailyOnyomiCards = shuffleArray(selectOneCardPerKanji(onyomiCards));
+    const dailyKunyomiCards = shuffleArray(selectOneCardPerKanji(kunyomiCards));
+    const dailyKanjiCards: QuizCard[] = [];
+    let kunyomiIndex = 0;
+
+    for (let i = 0; i < dailyOnyomiCards.length; i += 1) {
+      dailyKanjiCards.push(dailyOnyomiCards[i]);
+
+      if ((i + 1) % 10 === 0 && dailyKunyomiCards[kunyomiIndex]) {
+        dailyKanjiCards.push(dailyKunyomiCards[kunyomiIndex]);
+        kunyomiIndex += 1;
+      }
+    }
+
+    if (dailyKanjiCards.length === 0) {
+      dailyKanjiCards.push(...dailyKunyomiCards);
+    }
+
+    const onePassDeck = dailyKanjiCards.map((c, i) => ({
       ...c,
       key: `${c.key}-deck-once-${i}`,
     }));
@@ -889,6 +884,12 @@ export default function KanjiReadingStudyPage() {
     }
   }
 
+  function previousCard() {
+    setIndex((prev) => Math.max(prev - 1, 0));
+    resetCardState();
+    setEndedEarly(false);
+  }
+
   function finishForToday() {
     router.push("/library");
   }
@@ -952,7 +953,7 @@ export default function KanjiReadingStudyPage() {
           <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-semibold text-stone-900">
-                Kanji Readings Practice
+                Kanji Reading Practice
               </h1>
               <span className="rounded-full border border-stone-300 bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-700">
                 Preview
@@ -1097,13 +1098,18 @@ export default function KanjiReadingStudyPage() {
 
           <div className="mt-3 border-t border-emerald-100 pt-3">
             <p>
-              Practice onyomi and kunyomi of saved vocabulary across the app. Kanji can have
-              multiple onyomi or kunyomi, so each question is for one specific word shown after
-              your answer. Non-JLPT words are common in books, so they have their own filter.
+              Onyomi is the main study path here: choose the reading that a kanji carries inside
+              compound words. Kunyomi uses a different kind of question: choose which kanji usually
+              writes a kana word.
             </p>
             <p className="mt-2">
-              If kanji is not your forte, we recommend studying only onyomi at first,
-              because it can help you read multiple words in the future.
+              The deck is onyomi-focused by default. Mekuru occasionally adds a kunyomi check,
+              about once every ten onyomi cards, so you can notice common stand-alone word patterns
+              without losing the compound-reading rhythm.
+            </p>
+            <p className="mt-2">
+              If kanji is not your forte, this onyomi focus is intentional: it can help you read
+              many new compound words in the future.
             </p>
           </div>
         </details>
@@ -1128,25 +1134,9 @@ export default function KanjiReadingStudyPage() {
           <option value="all">All levels</option>
         </select>
 
-        <span className="font-medium text-stone-700">Study:</span>
-
-        <label className="inline-flex items-center gap-2 text-stone-700">
-          <input
-            type="checkbox"
-            checked={studyOnyomi}
-            onChange={(e) => setStudyOnyomi(e.target.checked)}
-          />
-          <span>Onyomi</span>
-        </label>
-
-        <label className="inline-flex items-center gap-2 text-stone-700">
-          <input
-            type="checkbox"
-            checked={studyKunyomi}
-            onChange={(e) => setStudyKunyomi(e.target.checked)}
-          />
-          <span>Kunyomi</span>
-        </label>
+        <div className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-semibold text-emerald-900">
+          Onyomi focus · occasional kunyomi check
+        </div>
       </div>
 
       {notice ? (
@@ -1325,13 +1315,13 @@ export default function KanjiReadingStudyPage() {
                       <p className="text-center text-sm font-medium text-slate-800">
                         {recallMode === "kanjiForReading"
                           ? "What kanji character does this word use?"
-                          : "Can you think of a word that uses this kanji?"}
+                          : "Can you come up with the word Mekuru is thinking of?"}
                       </p>
 
                       <p className="mt-1 text-center text-xs text-slate-500">
                         {recallMode === "kanjiForReading"
                           ? card.sourceReading
-                          : "If Mekuru knows the word, we will show whether it is in the shared bank or your saved reading."}
+                          : "Think of the level filter during your guess!"}
                       </p>
 
                       <input
@@ -1380,17 +1370,52 @@ export default function KanjiReadingStudyPage() {
                     </>
                   ) : (
                     <>
-                      <p className="text-center text-sm font-medium text-slate-800">
-                        {recallMode === "wordForKanji" && recallResult === "correct"
-                          ? "Yes, you found one in our vocabulary bank!"
-                          : recallMode === "wordForKanji" && recallResult === "unverified"
-                            ? "Possibly! I can't find it in our shared vocabulary bank yet, though!"
-                            : recallResult === "correct"
-                              ? "✅ That works!"
-                              : recallResult === "wrong"
-                                ? "❌ Not quite."
-                                : "Shown"}
-                      </p>
+                      {recallMode === "wordForKanji" && recallResult === "correct" ? (
+                        <div className="relative overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-center text-amber-950 shadow-sm">
+                          <span className="pointer-events-none absolute left-5 top-4 h-2 w-2 animate-[kanjiRecallBurst_900ms_ease-out_forwards] rounded-full bg-amber-400" />
+                          <span className="pointer-events-none absolute right-8 top-5 h-1.5 w-1.5 animate-[kanjiRecallBurst_1000ms_ease-out_120ms_forwards] rounded-full bg-rose-300" />
+                          <span className="pointer-events-none absolute bottom-5 left-1/2 h-1.5 w-1.5 animate-[kanjiRecallBurst_950ms_ease-out_220ms_forwards] rounded-full bg-sky-300" />
+                          <div className="text-2xl font-black">Amazing!</div>
+                          <div className="mt-1 text-sm font-semibold">
+                            You found the word Mekuru was thinking of.
+                          </div>
+                          <style jsx>{`
+                            @keyframes kanjiRecallBurst {
+                              0% {
+                                opacity: 0;
+                                transform: scale(0.2);
+                                box-shadow:
+                                  0 0 0 0 currentColor,
+                                  0 0 0 0 currentColor,
+                                  0 0 0 0 currentColor;
+                              }
+                              35% {
+                                opacity: 1;
+                              }
+                              100% {
+                                opacity: 0;
+                                transform: scale(1.25);
+                                box-shadow:
+                                  20px -12px 0 -1px currentColor,
+                                  -18px -8px 0 -1px currentColor,
+                                  3px 20px 0 -1px currentColor;
+                              }
+                            }
+                          `}</style>
+                        </div>
+                      ) : (
+                        <p className="text-center text-sm font-medium text-slate-800">
+                          {recallMode === "wordForKanji" && recallResult === "unverified"
+                            ? `Sorry! It was ${card.sourceWord}.`
+                            : recallMode === "wordForKanji" && recallResult === "wrong"
+                              ? `Sorry! It was ${card.sourceWord}.`
+                              : recallResult === "correct"
+                                ? "✅ That works!"
+                                : recallResult === "wrong"
+                                  ? `Sorry! It was ${card.sourceWord}.`
+                                  : `It was ${card.sourceWord}.`}
+                        </p>
+                      )}
 
                       {recallMatchedWord && recallMode !== "wordForKanji" ? (
                         <p
@@ -1454,6 +1479,15 @@ export default function KanjiReadingStudyPage() {
       </div>
 
       <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <button
+          type="button"
+          onClick={previousCard}
+          disabled={index <= 0}
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Previous
+        </button>
+
         <button
           type="button"
           onClick={finishForToday}

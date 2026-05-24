@@ -306,7 +306,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Kanji Reading Study
+                    Kanji Study
                   </Link>
                   <Link
                     href="/library-study/word-sky"

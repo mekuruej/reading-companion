@@ -954,6 +954,7 @@ function LibraryPracticePanel({
     answer: string;
     label: string;
   }>(null);
+  const [typingMissedStep, setTypingMissedStep] = useState<PracticeTypingStep | null>(null);
   const typingPracticeInputRef = useRef<HTMLInputElement | null>(null);
 
   function focusTypingPracticeInput() {
@@ -969,6 +970,7 @@ function LibraryPracticePanel({
     setTypingStep("reading");
     setTypingInput("");
     setTypingFeedback(null);
+    setTypingMissedStep(null);
   }, [card?.id, practiceMode]);
 
   useEffect(() => {
@@ -1008,30 +1010,53 @@ function LibraryPracticePanel({
         ? normalizeKana(userAnswer) === normalizeKana(correctAnswer)
         : matchesAnyMeaning(userAnswer, correctAnswer);
 
-    setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
-
     if (typingStep === "reading") {
-      if (!ok) onTypingMissed(card, "reading");
+      if (!ok) {
+        if (typingMissedStep !== "reading") onTypingMissed(card, "reading");
+        setTypingMissedStep("reading");
+        setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
+        setTypingInput("");
+        focusTypingPracticeInput();
+        return;
+      }
+
+      setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
 
       window.setTimeout(() => {
         setTypingStep("meaning");
         setTypingInput("");
         setTypingFeedback(null);
+        setTypingMissedStep(null);
         focusTypingPracticeInput();
-      }, ok ? 900 : 1700);
+      }, 4000);
       return;
     }
 
-    onMeaningAnswered(card, userAnswer, correctAnswer, ok);
-    if (!ok) onTypingMissed(card, "meaning");
+    if (!ok) {
+      if (typingMissedStep !== "meaning") {
+        onMeaningAnswered(card, userAnswer, correctAnswer, false);
+        onTypingMissed(card, "meaning");
+      }
+      setTypingMissedStep("meaning");
+      setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
+      setTypingInput("");
+      focusTypingPracticeInput();
+      return;
+    }
+
+    if (typingMissedStep !== "meaning") {
+      onMeaningAnswered(card, userAnswer, correctAnswer, true);
+    }
+    setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
 
     window.setTimeout(() => {
       setTypingStep("reading");
       setTypingInput("");
       setTypingFeedback(null);
+      setTypingMissedStep(null);
       onNext();
       focusTypingPracticeInput();
-    }, ok ? 1800 : 2600);
+    }, 4000);
   }
 
   return (
@@ -1155,7 +1180,7 @@ function LibraryPracticePanel({
                 if (e.key !== "Enter") return;
                 e.preventDefault();
                 e.stopPropagation();
-                if (!typingFeedback) submitTypingPractice();
+                if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
               }}
               placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
               inputMode="text"
@@ -1163,7 +1188,7 @@ function LibraryPracticePanel({
               autoCapitalize="none"
               autoComplete="off"
               spellCheck={false}
-              disabled={typingFeedback != null}
+              disabled={typingFeedback?.ok === true}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
             />
 
@@ -1182,7 +1207,11 @@ function LibraryPracticePanel({
                   {typingFeedback.label}: {typingFeedback.answer}
                 </div>
                 <p className="mt-2 text-xs font-medium text-slate-500">
-                  Next card comes automatically.
+                  {typingFeedback.ok
+                    ? "Next card comes automatically."
+                    : typingStep === "reading"
+                      ? "Retype the reading once to continue."
+                      : "Type one meaning word once to continue."}
                 </p>
               </div>
             ) : (
@@ -2069,7 +2098,7 @@ export default function LibraryStudyPage() {
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, checked.ok ? 5000 : 5000);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [checked]);
@@ -2079,7 +2108,7 @@ export default function LibraryStudyPage() {
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, 5000);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [firstStepChecked]);
@@ -2089,7 +2118,7 @@ export default function LibraryStudyPage() {
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, secondStepChecked.ok ? 5000 : 5000);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [secondStepChecked]);

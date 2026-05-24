@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { supabase } from "@/lib/supabaseClient";
 
 // -------------------------------------------------------------
@@ -626,6 +627,12 @@ export default function WordDetailPage() {
   }
 
   if (errorMsg || !word) {
+    if (errorMsg === "You do not have access to this word.") {
+      return (
+        <AccessDeniedMessage message={errorMsg} />
+      );
+    }
+
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 p-6">
         <p className="text-red-700">{errorMsg ?? "Word not found."}</p>

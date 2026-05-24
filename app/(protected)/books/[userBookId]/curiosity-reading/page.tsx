@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import KanjiComponentLookup from "@/components/KanjiComponentLookup";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
+import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1033,22 +1034,7 @@ export default function CuriosityReadingPage() {
 
   if (!canAccessBook) {
     return (
-      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
-        <div className="mx-auto max-w-5xl">
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <p className="text-base font-medium text-red-700">
-              {accessMessage || "You do not have access to this book."}
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push("/books")}
-              className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-            >
-              Back to Books
-            </button>
-          </div>
-        </div>
-      </main>
+      <AccessDeniedMessage message={accessMessage || "You do not have access to this book."} />
     );
   }
 
