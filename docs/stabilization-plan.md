@@ -197,6 +197,39 @@ Later idea:
 
 # Completed Work
 
+## ✅ RLS Review — study_logs and user_study_events
+
+Finished:
+
+- Confirmed there is no broad authenticated-user read-all policy.
+- Confirmed `study_logs` lets users insert/select only their own rows.
+- Confirmed linked teachers can select linked student `study_logs` through `teacher_students`.
+- Confirmed `teacher_students` has already been locked down, so linked-teacher access is safer.
+- Confirmed `study_logs` does not currently expose update/delete access to normal users.
+- Confirmed `user_study_events` lets users select/insert/update/delete only their own rows.
+- Confirmed study table columns contain study progress/event data such as study mode, result, correctness, surface, reading, meaning, and timestamps.
+
+Decision:
+
+No RLS change needed for `study_logs` or `user_study_events` right now.
+
+
+## ✅ RLS Review — user_book_reading_sessions
+
+Finished:
+
+- Confirmed there is no broad authenticated-user read-all policy.
+- Confirmed owner access is scoped through the owning `user_books` row.
+- Confirmed linked teacher access depends on `teacher_students`.
+- Confirmed `teacher_students` has already been locked down, so linked-teacher access is safer.
+- Confirmed session columns are limited to reading date, pages, minutes, filler flag, and session mode.
+- Left linked-teacher SELECT/INSERT/DELETE access in place for now because teacher workflows may need to help manage student reading logs.
+- Noted duplicate super_teacher policies as cleanup-later, not urgent-dangerous.
+
+Decision:
+
+No RLS change needed for `user_book_reading_sessions` right now.
+
 ## ✅ 2026-05-23 / 2026-05-24 — Private Book Route Ownership Guard Pass
 
 Goal:

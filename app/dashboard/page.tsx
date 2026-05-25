@@ -413,7 +413,7 @@ export default function DashboardPage() {
                   </div>
 
                   <p className="mt-3 text-xs leading-5 text-slate-500">
-                    Known words move into your Ability Check. Find more words in Word Sky later.
+                    Tapped words move to your Reading Gate in Ability Check. Find more words in Word Sky later.
                   </p>
                 </div>
 

@@ -161,6 +161,7 @@ type PracticeColorFilter =
 
 const STORAGE_KEY = "library-study-seen-by-date";
 const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
+const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
 const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
 const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
@@ -1460,6 +1461,11 @@ function markAbilityCheckCompletedToday() {
   window.localStorage.setItem(ABILITY_CHECK_COMPLETED_KEY, getTodayKey());
 }
 
+function hideAbilityCheckReminderForToday() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
+}
+
 export default function LibraryStudyPage() {
   const router = useRouter();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
@@ -1541,6 +1547,33 @@ export default function LibraryStudyPage() {
 
     return counts;
   }, [allCards, seenTodayIds]);
+
+  const allLevelsDueCount = useMemo(
+    () =>
+      DAILY_CHECK_LEVELS.reduce(
+        (sum, level) => sum + availableCountBySetupLevel[level],
+        0
+      ),
+    [availableCountBySetupLevel]
+  );
+
+  useEffect(() => {
+    if (libraryMode !== "check") return;
+    if (dailyCheckPlan) return;
+    if (loading || needsSignIn || errorMsg) return;
+    if (allCards.length === 0) return;
+    if (allLevelsDueCount >= ABILITY_CHECK_MIN_DUE_CARDS) return;
+
+    hideAbilityCheckReminderForToday();
+  }, [
+    allCards.length,
+    allLevelsDueCount,
+    dailyCheckPlan,
+    errorMsg,
+    libraryMode,
+    loading,
+    needsSignIn,
+  ]);
 
   useEffect(() => {
     setDebugInfo((prev) => (prev ? { ...prev, filteredCards: filteredCards.length } : prev));
@@ -2877,11 +2910,6 @@ export default function LibraryStudyPage() {
   if (libraryMode === "check" && !dailyCheckPlan) {
     const allLevelsSelected = DAILY_CHECK_LEVELS.every((level) =>
       setupLevels.includes(level)
-    );
-
-    const allLevelsDueCount = DAILY_CHECK_LEVELS.reduce(
-      (sum, level) => sum + availableCountBySetupLevel[level],
-      0
     );
 
     const selectedDueCount = setupLevels.reduce(

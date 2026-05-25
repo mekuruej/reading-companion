@@ -52,13 +52,13 @@ function formatCount(value: number | null | undefined) {
 const publicAbilityColors = [
   {
     label: "Green",
-    description: "Reading passed",
+    description: "Reading Gate",
     key: "green",
     dotClass: "bg-emerald-500",
   },
   {
     label: "Blue",
-    description: "Meaning passed",
+    description: "Meaning Gate",
     key: "blue",
     dotClass: "bg-sky-500",
   },

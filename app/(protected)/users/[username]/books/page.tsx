@@ -1990,7 +1990,7 @@ export default function BooksPage() {
   }, [viewingUserId, meId, abilityCheckReminderDayKey]);
 
   useEffect(() => {
-    function refreshAbilityCheckReminderDay() {
+    function refreshAbilityCheckReminderDay(options: { refreshCount?: boolean } = {}) {
       const todayKey = getTodayKey();
       setAbilityCheckReminderDayKey((previous) =>
         previous === todayKey ? previous : todayKey
@@ -1998,21 +1998,30 @@ export default function BooksPage() {
       setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
       setAbilityCheckReminderCompleted(abilityCheckCompletedToday());
       setSuperTeacherKanjiReminderHidden(superTeacherKanjiReminderHiddenToday());
+
+      if (options.refreshCount && viewingUserId && meId && viewingUserId === meId) {
+        void loadAbilityCheckReminder(viewingUserId);
+      }
     }
 
-    refreshAbilityCheckReminderDay();
+    function refreshAfterReturn() {
+      if (document.visibilityState === "hidden") return;
+      refreshAbilityCheckReminderDay({ refreshCount: true });
+    }
 
-    const interval = window.setInterval(refreshAbilityCheckReminderDay, 60_000);
+    refreshAbilityCheckReminderDay({ refreshCount: true });
 
-    window.addEventListener("focus", refreshAbilityCheckReminderDay);
-    document.addEventListener("visibilitychange", refreshAbilityCheckReminderDay);
+    const interval = window.setInterval(() => refreshAbilityCheckReminderDay(), 60_000);
+
+    window.addEventListener("focus", refreshAfterReturn);
+    document.addEventListener("visibilitychange", refreshAfterReturn);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", refreshAbilityCheckReminderDay);
-      document.removeEventListener("visibilitychange", refreshAbilityCheckReminderDay);
+      window.removeEventListener("focus", refreshAfterReturn);
+      document.removeEventListener("visibilitychange", refreshAfterReturn);
     };
-  }, []);
+  }, [viewingUserId, meId]);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -2535,7 +2544,11 @@ export default function BooksPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => router.push("/teacher/kanji")}
+                  onClick={() => {
+                    hideSuperTeacherKanjiReminderForToday();
+                    setSuperTeacherKanjiReminderHidden(true);
+                    router.push("/teacher/kanji");
+                  }}
                   className="rounded-xl bg-violet-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800"
                 >
                   Open Kanji Queue
