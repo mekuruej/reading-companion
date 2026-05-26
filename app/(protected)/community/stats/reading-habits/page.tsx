@@ -170,55 +170,6 @@ function readingHabitsTheme(value: HabitTimeRange) {
   };
 }
 
-function DailyActivityChart({
-  items,
-}: {
-  items: { label: string; minutes: number; pages: number; sessions: number }[];
-}) {
-  const maxMinutes = Math.max(1, ...items.map((item) => item.minutes));
-  const hasAnyActivity = items.some((item) => item.sessions > 0);
-
-  if (!hasAnyActivity) {
-    return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl bg-slate-50 text-sm text-slate-500">
-        No reading sessions logged this month yet.
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto rounded-2xl bg-slate-50 px-4 py-5">
-      <div className="flex h-48 min-w-[680px] items-end gap-2">
-        {items.map((item) => {
-          const height =
-            item.sessions === 0
-              ? 4
-              : item.minutes > 0
-                ? Math.max(10, (item.minutes / maxMinutes) * 150)
-                : 12;
-
-          return (
-            <div
-              key={item.label}
-              className="flex flex-1 flex-col items-center justify-end gap-2"
-              title={`Day ${item.label}: ${item.sessions} session(s), ${item.pages} page(s), ${item.minutes} minute(s)`}
-            >
-              <div
-                className={`w-full max-w-5 rounded-full ${item.sessions > 0 ? "bg-sky-500" : "bg-slate-200"
-                  }`}
-                style={{ height }}
-              />
-              <span className="text-[10px] font-medium text-slate-500">
-                {item.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function readingPersonality({
   fluidMinutes,
   curiosityMinutes,
