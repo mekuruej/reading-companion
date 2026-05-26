@@ -200,6 +200,32 @@ function isSmallViewport() {
   return window.matchMedia("(max-width: 640px)").matches;
 }
 
+function hasKanji(text: string) {
+  return /[\p{Script=Han}]/u.test(text);
+}
+
+async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const response = await fetch("/api/vocabulary-kanji-map/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : {}),
+    },
+    body: JSON.stringify({ vocabulary_cache_id: vocabularyCacheId }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
+  }
+}
+
 export default function CuriosityReadingPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -741,7 +767,6 @@ export default function CuriosityReadingPage() {
     const chapterNameTrimmed = quickPreview.chapterName?.trim() || null;
 
     let vocabularyCacheId: number | null = null;
-    let createdVocabularyCacheId: number | null = null;
 
     if (normalizedCacheSurface && !isManualEntry) {
       const { data: existingCache, error: cacheLookupError } = await supabase
@@ -776,7 +801,6 @@ export default function CuriosityReadingPage() {
         }
 
         vocabularyCacheId = createdCache.id;
-        createdVocabularyCacheId = createdCache.id;
       }
     }
 
@@ -890,26 +914,8 @@ export default function CuriosityReadingPage() {
       setMessage("");
     }
 
-    if (createdVocabularyCacheId) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const response = await fetch("/api/vocabulary-kanji-map/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {}),
-        },
-        body: JSON.stringify({ vocabulary_cache_id: createdVocabularyCacheId }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
-      }
+    if (vocabularyCacheId && hasKanji(normalizedCacheSurface)) {
+      await generateVocabularyKanjiMap(vocabularyCacheId);
     }
 
     clearQuickWordFields({ preserveSavedNotice: true });

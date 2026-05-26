@@ -6,14 +6,18 @@ For the next few weeks, avoid major new features. Focus on making Mekuru safer, 
 
 ## Current Focus
 
-- Finish blocked/no-access message cleanup
-- RLS review
+- Page thinning / gentle architecture cleanup
+- Documentation updates
+- Keeping current user-facing behavior stable
+
+## Paused but Not Finished
+
+- Deeper RLS review
 - API route review
 - Non-book route access audit
 - Input validation review
 - Public/private profile boundary check
-- Documentation updates
-- Keeping current user-facing behavior stable
+- Teacher assign/prep workflow cleanup
 
 ## Allowed Work
 

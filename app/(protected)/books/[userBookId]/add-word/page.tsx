@@ -144,6 +144,32 @@ function isSmallViewport() {
   return window.matchMedia("(max-width: 640px)").matches;
 }
 
+function hasKanji(text: string) {
+  return /[\p{Script=Han}]/u.test(text);
+}
+
+async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const response = await fetch("/api/vocabulary-kanji-map/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : {}),
+    },
+    body: JSON.stringify({ vocabulary_cache_id: vocabularyCacheId }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
+  }
+}
+
 export default function AddWordPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -706,6 +732,49 @@ export default function AddWordPage() {
       }
 
       const finalSurface = useAlternateSurface ? cleanAlternateSurface : cleanWord;
+      const hasVerifiedDictionaryMatch = lookupCandidates.some(
+        (candidate) =>
+          candidate.surface === finalSurface &&
+          candidate.reading === cleanReading &&
+          candidate.meaningChoices.length > 0
+      );
+      let vocabularyCacheId: number | null = null;
+
+      if (hasKanji(finalSurface) && hasVerifiedDictionaryMatch) {
+        const { data: existingCache, error: cacheLookupError } = await supabase
+          .from("vocabulary_cache")
+          .select("id")
+          .eq("surface", finalSurface)
+          .eq("reading", cleanReading)
+          .maybeSingle();
+
+        if (cacheLookupError) {
+          console.error("Error looking up vocabulary cache:", cacheLookupError);
+          setMessage("❌ Could not save word: vocabulary cache lookup failed.");
+          return;
+        }
+
+        if (existingCache?.id) {
+          vocabularyCacheId = existingCache.id;
+        } else {
+          const { data: createdCache, error: cacheInsertError } = await supabase
+            .from("vocabulary_cache")
+            .insert({
+              surface: finalSurface,
+              reading: cleanReading,
+            })
+            .select("id")
+            .single();
+
+          if (cacheInsertError) {
+            console.error("Error creating vocabulary cache row:", cacheInsertError);
+            setMessage("❌ Could not save word: vocabulary cache creation failed.");
+            return;
+          }
+
+          vocabularyCacheId = createdCache.id;
+        }
+      }
 
       const chapterNum = toNullableInt(chapterNumber);
       const pageNum = toNullableInt(pageNumber);
@@ -729,6 +798,7 @@ export default function AddWordPage() {
 
       const payload = {
         user_book_id: userBookId,
+        vocabulary_cache_id: vocabularyCacheId,
         surface: finalSurface,
         reading: cleanReading,
         meaning: cleanMeaning,
@@ -763,7 +833,8 @@ export default function AddWordPage() {
             chapter_number,
             chapter_name,
             hide_kanji_in_reading_support,
-            page_order
+            page_order,
+            vocabulary_cache_id
           `
           )
           .single();
@@ -812,7 +883,8 @@ export default function AddWordPage() {
             chapter_number,
             chapter_name,
             hide_kanji_in_reading_support,
-            page_order
+            page_order,
+            vocabulary_cache_id
           `
           )
           .single();
@@ -841,6 +913,10 @@ export default function AddWordPage() {
         ]);
         setSavedNotice(`Saved: ${finalSurface}`);
         setMessage("");
+      }
+
+      if (vocabularyCacheId && hasKanji(finalSurface)) {
+        await generateVocabularyKanjiMap(vocabularyCacheId);
       }
 
       clearForm(true, { preserveSavedNotice: true });

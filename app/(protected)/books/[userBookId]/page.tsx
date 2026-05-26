@@ -199,6 +199,32 @@ type SessionKanjiReading = {
   realized: string | null;
 };
 
+function hasKanji(text: string) {
+  return /[\p{Script=Han}]/u.test(text);
+}
+
+async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const response = await fetch("/api/vocabulary-kanji-map/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : {}),
+    },
+    body: JSON.stringify({ vocabulary_cache_id: vocabularyCacheId }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
+  }
+}
+
 const BOOK_TYPE_OPTIONS = [
   { value: "picture_book", label: "Picture Book" },
   { value: "early_reader", label: "Early Reader" },
@@ -4394,7 +4420,6 @@ export default function BookHubPage() {
     const selectedMeaning = quickPreview.meaning ?? "";
 
     let vocabularyCacheId: number | null = null;
-    let createdVocabularyCacheId: number | null = null;
 
     const normalizedSurface = (
       quickPreview.useAlternateSurface
@@ -4440,7 +4465,6 @@ export default function BookHubPage() {
         }
 
         vocabularyCacheId = createdCache.id;
-        createdVocabularyCacheId = createdCache.id;
       }
     }
 
@@ -4474,26 +4498,8 @@ export default function BookHubPage() {
       return;
     }
 
-    if (createdVocabularyCacheId) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const response = await fetch("/api/vocabulary-kanji-map/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {}),
-        },
-        body: JSON.stringify({ vocabulary_cache_id: createdVocabularyCacheId }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
-      }
+    if (vocabularyCacheId && hasKanji(normalizedCacheSurface)) {
+      await generateVocabularyKanjiMap(vocabularyCacheId);
     }
 
     setQuickSessionWords((prev) => [
