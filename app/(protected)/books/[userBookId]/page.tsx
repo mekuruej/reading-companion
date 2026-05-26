@@ -4394,6 +4394,7 @@ export default function BookHubPage() {
     const selectedMeaning = quickPreview.meaning ?? "";
 
     let vocabularyCacheId: number | null = null;
+    let createdVocabularyCacheId: number | null = null;
 
     const normalizedSurface = (
       quickPreview.useAlternateSurface
@@ -4439,14 +4440,7 @@ export default function BookHubPage() {
         }
 
         vocabularyCacheId = createdCache.id;
-
-        await fetch("/api/vocabulary-kanji-map/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ vocabulary_cache_id: createdCache.id }),
-        });
+        createdVocabularyCacheId = createdCache.id;
       }
     }
 
@@ -4478,6 +4472,28 @@ export default function BookHubPage() {
       console.error("Error saving quick word:", error);
       alert(`Could not save word.\n${error.message}`);
       return;
+    }
+
+    if (createdVocabularyCacheId) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/vocabulary-kanji-map/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
+        body: JSON.stringify({ vocabulary_cache_id: createdVocabularyCacheId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
+      }
     }
 
     setQuickSessionWords((prev) => [

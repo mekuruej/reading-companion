@@ -741,6 +741,7 @@ export default function CuriosityReadingPage() {
     const chapterNameTrimmed = quickPreview.chapterName?.trim() || null;
 
     let vocabularyCacheId: number | null = null;
+    let createdVocabularyCacheId: number | null = null;
 
     if (normalizedCacheSurface && !isManualEntry) {
       const { data: existingCache, error: cacheLookupError } = await supabase
@@ -775,12 +776,7 @@ export default function CuriosityReadingPage() {
         }
 
         vocabularyCacheId = createdCache.id;
-
-        await fetch("/api/vocabulary-kanji-map/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ vocabulary_cache_id: createdCache.id }),
-        });
+        createdVocabularyCacheId = createdCache.id;
       }
     }
 
@@ -892,6 +888,28 @@ export default function CuriosityReadingPage() {
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, updatedItem));
       setSavedQuickNotice(`Saved: ${updatedItem.surface}`);
       setMessage("");
+    }
+
+    if (createdVocabularyCacheId) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/vocabulary-kanji-map/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
+        body: JSON.stringify({ vocabulary_cache_id: createdVocabularyCacheId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
+      }
     }
 
     clearQuickWordFields({ preserveSavedNotice: true });
