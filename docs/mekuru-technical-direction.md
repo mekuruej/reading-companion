@@ -21,6 +21,7 @@ Mekuru is not just a flashcard app. The main goal is to help readers build memor
 1. Keep the app working for current users.
 2. Prepare the app for safer student/member access.
 3. Clean up large pages gradually.
+    For page thinning, start with low-risk presentational components before extracting services, DAOs, or controllers.
 4. Make the codebase easier for future-me, Codex, ChatGPT, and future developers to understand.
 5. Build toward a more independent dictionary/vocabulary system over time.
 

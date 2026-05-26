@@ -201,6 +201,41 @@ Later idea:
 
 # Completed Work
 
+## Page Thinning / Architecture Cleanup
+
+### Reading Habits Stats Page
+
+Finished:
+
+- Started thinning `app/(protected)/community/stats/reading-habits/page.tsx`.
+- Extracted presentational UI components into `app/(protected)/community/stats/reading-habits/components/`:
+  - `StatCard.tsx`
+  - `SectionBand.tsx`
+  - `BarStrip.tsx`
+  - `ModeStrip.tsx`
+  - `PieChart.tsx`
+- Kept stats calculations, state, data loading, and page orchestration in `page.tsx`.
+- For `ModeStrip`, kept `formatMinutesAsReadableTime()` in `page.tsx` and passed it into the component as `formatValue`.
+- For `PieChart`, kept `formatDecimal()` in `page.tsx` and passed it into the component as `formatPercent`.
+- Removed unused `DailyActivityChart`.
+- Removed unused `isThisMonth` helper.
+- `npm run build` passed after the component extractions.
+- Current `reading-habits/page.tsx` line count after cleanup: about 1006 lines.
+
+Next:
+
+- Continue thinning `reading-habits/page.tsx`.
+- Next recommended target: extract the time range selector UI.
+- Keep the actual state and behavior in `page.tsx` for now:
+  - `timeRange`
+  - `setTimeRange`
+  - `setShowFullReadingRhythm`
+  - `HABIT_TIME_FILTERS`
+  - `selectedTheme`
+  - `selectedTimeLabel`
+- The new component should only draw the time filter buttons and call an `onSelect` callback.
+- Do not move stats calculations, data loading, or shared time filter constants yet.
+
 ## ✅ RLS Review — study_logs and user_study_events
 
 Finished:
