@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import StatCard from "./components/StatCard";
 import SectionBand from "./components/SectionBand";
 import BarStrip from "./components/BarStrip";
+import ModeStrip from "./components/ModeStrip";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 type HabitTimeRange =
@@ -297,45 +298,6 @@ function PieChart({
               <span className="text-slate-500">
                 ({formatDecimal(item.percent)}%)
               </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ModeStrip({ items }: { items: ModeStripItem[] }) {
-  const hasValue = items.some((item) => item.value > 0);
-
-  return (
-    <div>
-      <div className="flex h-5 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
-        {hasValue ? (
-          items.map((item) => (
-            <div
-              key={item.label}
-              className={`h-full ${item.color}`}
-              style={{ width: item.width }}
-              title={`${item.label}: ${formatMinutesAsReadableTime(item.value)}`}
-            />
-          ))
-        ) : (
-          <div className="h-full w-full bg-slate-200" />
-        )}
-      </div>
-
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        {items.map((item) => (
-          <div key={item.label} className="rounded-xl bg-slate-50 px-3 py-2">
-            <div className="flex items-center gap-2">
-              <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-              <span className="text-xs font-medium text-slate-600">
-                {item.label}
-              </span>
-            </div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">
-              {formatMinutesAsReadableTime(item.value)}
             </div>
           </div>
         ))}
@@ -976,7 +938,10 @@ export default function ReadingHabitsPage() {
             description="A quick view of what kind of reading window this is. Longer sections mean more logged time in that mode."
             tone={selectedTheme.section}
           >
-            <ModeStrip items={modeStripItems} />
+            <ModeStrip
+              items={modeStripItems}
+              formatValue={formatMinutesAsReadableTime}
+            />
 
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="text-xs font-medium uppercase text-slate-500">
