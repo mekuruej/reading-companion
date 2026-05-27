@@ -798,7 +798,7 @@ export default function MonthlyDetailsPage() {
           </p>
 
           <div className="mt-5 grid gap-3">
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <p className="text-sm font-bold text-stone-700">
                 Total reading time
               </p>
@@ -807,7 +807,7 @@ export default function MonthlyDetailsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <p className="text-sm font-bold text-stone-700">
                 Total engagement time
               </p>
@@ -816,7 +816,7 @@ export default function MonthlyDetailsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <p className="text-sm font-bold text-stone-700">
                 Average pages per engaged day
               </p>
@@ -841,7 +841,7 @@ export default function MonthlyDetailsPage() {
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-stone-500">
                 Reading
               </p>
@@ -850,7 +850,7 @@ export default function MonthlyDetailsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-stone-500">
                 Listening
               </p>
@@ -859,7 +859,7 @@ export default function MonthlyDetailsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-stone-500">
                 Saved words
               </p>

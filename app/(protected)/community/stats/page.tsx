@@ -404,7 +404,7 @@ export default function CommunityStatsHomePage() {
         label: "Red",
         value: colorTotals.red,
         previousValue: previousColorTotals?.red ?? null,
-        cardClasses: "border-red-200 bg-red-50 text-red-700",
+        cardClasses: "border-red-200 bg-white text-red-700",
         dotClass: "bg-red-500",
         valueClass: "text-red-900",
       },
@@ -412,7 +412,7 @@ export default function CommunityStatsHomePage() {
         label: "Orange",
         value: colorTotals.orange,
         previousValue: previousColorTotals?.orange ?? null,
-        cardClasses: "border-orange-200 bg-orange-50 text-orange-700",
+        cardClasses: "border-orange-200 bg-white text-orange-700",
         dotClass: "bg-orange-500",
         valueClass: "text-orange-900",
       },
@@ -420,7 +420,7 @@ export default function CommunityStatsHomePage() {
         label: "Yellow",
         value: colorTotals.yellow,
         previousValue: previousColorTotals?.yellow ?? null,
-        cardClasses: "border-yellow-200 bg-yellow-50 text-yellow-700",
+        cardClasses: "border-yellow-200 bg-white text-yellow-700",
         dotClass: "bg-yellow-400",
         valueClass: "text-yellow-900",
       },
@@ -428,7 +428,7 @@ export default function CommunityStatsHomePage() {
         label: "Green",
         value: colorTotals.green,
         previousValue: previousColorTotals?.green ?? null,
-        cardClasses: "border-green-200 bg-green-50 text-green-700",
+        cardClasses: "border-green-200 bg-white text-green-700",
         dotClass: "bg-green-500",
         valueClass: "text-green-900",
       },
@@ -436,7 +436,7 @@ export default function CommunityStatsHomePage() {
         label: "Blue",
         value: colorTotals.blue,
         previousValue: previousColorTotals?.blue ?? null,
-        cardClasses: "border-blue-200 bg-blue-50 text-blue-700",
+        cardClasses: "border-blue-200 bg-white text-blue-700",
         dotClass: "bg-blue-500",
         valueClass: "text-blue-900",
       },
@@ -444,7 +444,7 @@ export default function CommunityStatsHomePage() {
         label: "Purple",
         value: colorTotals.purple,
         previousValue: previousColorTotals?.purple ?? null,
-        cardClasses: "border-purple-200 bg-purple-50 text-purple-700",
+        cardClasses: "border-purple-200 bg-white text-purple-700",
         dotClass: "bg-purple-500",
         valueClass: "text-purple-900",
       },
@@ -506,7 +506,7 @@ export default function CommunityStatsHomePage() {
             {monthlyStats.map(([label, value]) => (
               <div
                 key={label}
-                className="rounded-2xl border border-stone-200 bg-stone-50 p-3"
+                className="rounded-2xl border border-stone-200 bg-white p-3"
               >
                 <p className="text-[11px] font-semibold text-stone-500">
                   {label}

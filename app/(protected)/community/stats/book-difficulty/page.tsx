@@ -101,10 +101,10 @@ function difficultyTheme(value: DifficultyTimeRange) {
     return {
       pageHeader: "border-sky-300 bg-white",
       section: "border-sky-300 bg-white",
-      softSection: "border-sky-300 bg-sky-50/30",
-      statOne: "border-sky-300 bg-sky-50/35",
+      softSection: "border-sky-300 bg-white",
+      statOne: "border-sky-300 bg-white",
       statTwo: "border-sky-300 bg-white",
-      statThree: "border-sky-300 bg-sky-50/25",
+      statThree: "border-sky-300 bg-white",
       statFour: "border-sky-300 bg-white",
       activeButton: "border-sky-600 bg-sky-600 text-white shadow-md",
       inactiveButton: "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100",
@@ -115,10 +115,10 @@ function difficultyTheme(value: DifficultyTimeRange) {
     return {
       pageHeader: "border-emerald-300 bg-white",
       section: "border-emerald-300 bg-white",
-      softSection: "border-emerald-300 bg-emerald-50/30",
-      statOne: "border-emerald-300 bg-emerald-50/35",
+      softSection: "border-emerald-300 bg-white",
+      statOne: "border-emerald-300 bg-white",
       statTwo: "border-emerald-300 bg-white",
-      statThree: "border-emerald-300 bg-emerald-50/25",
+      statThree: "border-emerald-300 bg-white",
       statFour: "border-emerald-300 bg-white",
       activeButton: "border-emerald-600 bg-emerald-600 text-white shadow-md",
       inactiveButton:
@@ -130,10 +130,10 @@ function difficultyTheme(value: DifficultyTimeRange) {
     return {
       pageHeader: "border-violet-300 bg-white",
       section: "border-violet-300 bg-white",
-      softSection: "border-violet-300 bg-violet-50/30",
-      statOne: "border-violet-300 bg-violet-50/35",
+      softSection: "border-violet-300 bg-white",
+      statOne: "border-violet-300 bg-white",
       statTwo: "border-violet-300 bg-white",
-      statThree: "border-violet-300 bg-violet-50/25",
+      statThree: "border-violet-300 bg-white",
       statFour: "border-violet-300 bg-white",
       activeButton: "border-violet-600 bg-violet-600 text-white shadow-md",
       inactiveButton:
@@ -145,10 +145,10 @@ function difficultyTheme(value: DifficultyTimeRange) {
     return {
       pageHeader: "border-amber-300 bg-white",
       section: "border-amber-300 bg-white",
-      softSection: "border-amber-300 bg-amber-50/30",
-      statOne: "border-amber-300 bg-amber-50/35",
+      softSection: "border-amber-300 bg-white",
+      statOne: "border-amber-300 bg-white",
       statTwo: "border-amber-300 bg-white",
-      statThree: "border-amber-300 bg-amber-50/25",
+      statThree: "border-amber-300 bg-white",
       statFour: "border-amber-300 bg-white",
       activeButton: "border-amber-600 bg-amber-500 text-white shadow-md",
       inactiveButton:
@@ -159,10 +159,10 @@ function difficultyTheme(value: DifficultyTimeRange) {
   return {
     pageHeader: "border-fuchsia-300 bg-white",
     section: "border-fuchsia-300 bg-white",
-    softSection: "border-fuchsia-300 bg-fuchsia-50/30",
-    statOne: "border-fuchsia-300 bg-fuchsia-50/35",
+    softSection: "border-fuchsia-300 bg-white",
+    statOne: "border-fuchsia-300 bg-white",
     statTwo: "border-fuchsia-300 bg-white",
-    statThree: "border-fuchsia-300 bg-fuchsia-50/25",
+    statThree: "border-fuchsia-300 bg-white",
     statFour: "border-fuchsia-300 bg-white",
     activeButton: "border-fuchsia-600 bg-fuchsia-600 text-white shadow-md",
     inactiveButton:

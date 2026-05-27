@@ -108,10 +108,10 @@ function readingHabitsTheme(value: HabitTimeRange) {
     return {
       pageHeader: "border-sky-300 bg-white",
       section: "border-sky-300 bg-white",
-      softSection: "border-sky-300 bg-sky-50/30",
-      statOne: "border-sky-300 bg-sky-50/35",
+      softSection: "border-sky-300 bg-white",
+      statOne: "border-sky-300 bg-white",
       statTwo: "border-sky-300 bg-white",
-      statThree: "border-sky-300 bg-sky-50/25",
+      statThree: "border-sky-300 bg-white",
       statFour: "border-sky-300 bg-white",
       plainCard: "border-sky-300 bg-white",
       activeButton: "border-sky-600 bg-sky-600 text-white shadow-md",
@@ -123,10 +123,10 @@ function readingHabitsTheme(value: HabitTimeRange) {
     return {
       pageHeader: "border-emerald-300 bg-white",
       section: "border-emerald-300 bg-white",
-      softSection: "border-emerald-300 bg-emerald-50/30",
-      statOne: "border-emerald-300 bg-emerald-50/35",
+      softSection: "border-emerald-300 bg-white",
+      statOne: "border-emerald-300 bg-white",
       statTwo: "border-emerald-300 bg-white",
-      statThree: "border-emerald-300 bg-emerald-50/25",
+      statThree: "border-emerald-300 bg-white",
       statFour: "border-emerald-300 bg-white",
       plainCard: "border-emerald-300 bg-white",
       activeButton: "border-emerald-600 bg-emerald-600 text-white shadow-md",
@@ -139,10 +139,10 @@ function readingHabitsTheme(value: HabitTimeRange) {
     return {
       pageHeader: "border-violet-300 bg-white",
       section: "border-violet-300 bg-white",
-      softSection: "border-violet-300 bg-violet-50/30",
-      statOne: "border-violet-300 bg-violet-50/35",
+      softSection: "border-violet-300 bg-white",
+      statOne: "border-violet-300 bg-white",
       statTwo: "border-violet-300 bg-white",
-      statThree: "border-violet-300 bg-violet-50/25",
+      statThree: "border-violet-300 bg-white",
       statFour: "border-violet-300 bg-white",
       plainCard: "border-violet-300 bg-white",
       activeButton: "border-violet-600 bg-violet-600 text-white shadow-md",
@@ -154,10 +154,10 @@ function readingHabitsTheme(value: HabitTimeRange) {
   return {
     pageHeader: "border-amber-300 bg-white",
     section: "border-amber-300 bg-white",
-    softSection: "border-amber-300 bg-amber-50/30",
-    statOne: "border-amber-300 bg-amber-50/35",
+    softSection: "border-amber-300 bg-white",
+    statOne: "border-amber-300 bg-white",
     statTwo: "border-amber-300 bg-white",
-    statThree: "border-amber-300 bg-amber-50/25",
+    statThree: "border-amber-300 bg-white",
     statFour: "border-amber-300 bg-white",
     plainCard: "border-amber-300 bg-white",
     activeButton: "border-amber-600 bg-amber-500 text-white shadow-md",
@@ -735,7 +735,7 @@ export default function ReadingHabitsPage() {
               formatValue={formatMinutesAsReadableTime}
             />
 
-            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="mt-5 rounded-xl border border-slate-200 bg-white p-3">
               <div className="text-xs font-medium uppercase text-slate-500">
                 Reading personality
               </div>
@@ -870,35 +870,35 @@ export default function ReadingHabitsPage() {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
               <div className="text-xs text-slate-500">Active days</div>
               <div className="mt-1 text-lg font-semibold text-slate-900">
                 {readingRhythmSummary.activeDays}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
               <div className="text-xs text-slate-500">Fluid days</div>
               <div className="mt-1 text-lg font-semibold text-slate-900">
                 {readingRhythmSummary.fluidDays}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
               <div className="text-xs text-slate-500">Curiosity days</div>
               <div className="mt-1 text-lg font-semibold text-slate-900">
                 {readingRhythmSummary.curiosityDays}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
               <div className="text-xs text-slate-500">Listening days</div>
               <div className="mt-1 text-lg font-semibold text-slate-900">
                 {readingRhythmSummary.listeningDays}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-900/10 bg-white/90 px-4 py-3">
+            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
               <div className="text-xs text-slate-500">Mixed-mode days</div>
               <div className="mt-1 text-lg font-semibold text-slate-900">
                 {readingRhythmSummary.mixedDays}
@@ -906,7 +906,7 @@ export default function ReadingHabitsPage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white/70 p-4">
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
             <div className="text-sm font-semibold text-slate-900">
               Reading rhythm
             </div>

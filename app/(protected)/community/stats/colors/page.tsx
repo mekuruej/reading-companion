@@ -153,7 +153,7 @@ function ColorStepCard({
   note: string;
 }) {
   return (
-    <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3">
+    <div className="rounded-xl border border-stone-200 bg-white p-3">
       <span className={stagePill(stage)}>{colorLabel(stage)}</span>
       <div className="mt-2 text-sm font-semibold leading-5 text-stone-900">
         {title}
@@ -263,7 +263,7 @@ export default function ReadingColorsPage() {
         key: "red" as const,
         label: "Red",
         shortMeaning: "New / needs support",
-        cardClasses: "border-red-200 bg-red-50 text-red-700",
+        cardClasses: "border-red-200 bg-white text-red-700",
         dotClass: "bg-red-500",
         valueClass: "text-red-900",
       },
@@ -271,7 +271,7 @@ export default function ReadingColorsPage() {
         key: "orange" as const,
         label: "Orange",
         shortMeaning: "Starting to repeat",
-        cardClasses: "border-orange-200 bg-orange-50 text-orange-700",
+        cardClasses: "border-orange-200 bg-white text-orange-700",
         dotClass: "bg-orange-500",
         valueClass: "text-orange-900",
       },
@@ -279,7 +279,7 @@ export default function ReadingColorsPage() {
         key: "yellow" as const,
         label: "Yellow",
         shortMeaning: "Readiness checkpoint",
-        cardClasses: "border-yellow-200 bg-yellow-50 text-yellow-700",
+        cardClasses: "border-yellow-200 bg-white text-yellow-700",
         dotClass: "bg-yellow-400",
         valueClass: "text-yellow-900",
       },
@@ -287,7 +287,7 @@ export default function ReadingColorsPage() {
         key: "green" as const,
         label: "Green",
         shortMeaning: "Reading Gate",
-        cardClasses: "border-green-200 bg-green-50 text-green-700",
+        cardClasses: "border-green-200 bg-white text-green-700",
         dotClass: "bg-green-500",
         valueClass: "text-green-900",
       },
@@ -295,7 +295,7 @@ export default function ReadingColorsPage() {
         key: "blue" as const,
         label: "Blue",
         shortMeaning: "Meaning Gate",
-        cardClasses: "border-blue-200 bg-blue-50 text-blue-700",
+        cardClasses: "border-blue-200 bg-white text-blue-700",
         dotClass: "bg-blue-500",
         valueClass: "text-blue-900",
       },
@@ -303,7 +303,7 @@ export default function ReadingColorsPage() {
         key: "purple" as const,
         label: "Purple",
         shortMeaning: "Mastered",
-        cardClasses: "border-purple-200 bg-purple-50 text-purple-700",
+        cardClasses: "border-purple-200 bg-white text-purple-700",
         dotClass: "bg-purple-500",
         valueClass: "text-purple-900",
       },
@@ -319,7 +319,7 @@ export default function ReadingColorsPage() {
         shortMeaning: "Reading needs support",
         detail:
           "Words that struggled at the reading check. These are not failures — they are words that need more reading support before moving forward.",
-        cardClasses: "border-slate-300 bg-slate-100 text-slate-800",
+        cardClasses: "border-slate-300 bg-white text-slate-800",
         dotClass: "bg-slate-500",
         valueClass: "text-slate-900",
       },
@@ -329,7 +329,7 @@ export default function ReadingColorsPage() {
         shortMeaning: "Meaning needs support",
         detail:
           "Words that struggled at the meaning check. These need more meaning support before they can move toward mastery.",
-        cardClasses: "border-slate-400 bg-slate-200 text-slate-900",
+        cardClasses: "border-slate-400 bg-white text-slate-900",
         dotClass: "bg-slate-700",
         valueClass: "text-slate-950",
       },
@@ -489,7 +489,7 @@ export default function ReadingColorsPage() {
         </p>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+          <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
               This month so far
             </p>
@@ -498,7 +498,7 @@ export default function ReadingColorsPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+          <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
               Compared with
             </p>
@@ -574,7 +574,7 @@ export default function ReadingColorsPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
+          <div className="rounded-3xl border border-amber-200 bg-white p-5 text-amber-900 shadow-sm">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-black text-white">
                 Red 2
@@ -660,7 +660,7 @@ export default function ReadingColorsPage() {
         </h2>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4">
             <p className="text-sm font-black text-stone-900">
               Reading encounters
             </p>
@@ -671,7 +671,7 @@ export default function ReadingColorsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4">
             <p className="text-sm font-black text-stone-900">
               Ability Check gates
             </p>
@@ -681,7 +681,7 @@ export default function ReadingColorsPage() {
               you review, but they do not directly move Reading Colors.
             </p>
           </div>
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4">
             <p className="text-sm font-black text-stone-900">
               Limbo / support
             </p>

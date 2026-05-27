@@ -248,10 +248,10 @@ function vocabularyGrowthTheme(value: BookCategoryFilter) {
     return {
       pageHeader: "border-emerald-300 bg-white",
       section: "border-emerald-300 bg-white",
-      softSection: "border-emerald-300 bg-emerald-50/25",
-      statOne: "border-emerald-300 bg-emerald-50/35",
+      softSection: "border-emerald-300 bg-white",
+      statOne: "border-emerald-300 bg-white",
       statTwo: "border-emerald-300 bg-white",
-      statThree: "border-emerald-300 bg-emerald-50/25",
+      statThree: "border-emerald-300 bg-white",
       statFour: "border-emerald-300 bg-white",
       plainCard: "border-emerald-300 bg-white",
     };
@@ -261,10 +261,10 @@ function vocabularyGrowthTheme(value: BookCategoryFilter) {
     return {
       pageHeader: "border-violet-300 bg-white",
       section: "border-violet-300 bg-white",
-      softSection: "border-violet-300 bg-violet-50/25",
-      statOne: "border-violet-300 bg-violet-50/35",
+      softSection: "border-violet-300 bg-white",
+      statOne: "border-violet-300 bg-white",
       statTwo: "border-violet-300 bg-white",
-      statThree: "border-violet-300 bg-violet-50/25",
+      statThree: "border-violet-300 bg-white",
       statFour: "border-violet-300 bg-white",
       plainCard: "border-violet-300 bg-white",
     };
@@ -274,10 +274,10 @@ function vocabularyGrowthTheme(value: BookCategoryFilter) {
     return {
       pageHeader: "border-amber-300 bg-white",
       section: "border-amber-300 bg-white",
-      softSection: "border-amber-300 bg-amber-50/25",
-      statOne: "border-amber-300 bg-amber-50/35",
+      softSection: "border-amber-300 bg-white",
+      statOne: "border-amber-300 bg-white",
       statTwo: "border-amber-300 bg-white",
-      statThree: "border-amber-300 bg-amber-50/25",
+      statThree: "border-amber-300 bg-white",
       statFour: "border-amber-300 bg-white",
       plainCard: "border-amber-300 bg-white",
     };
@@ -286,10 +286,10 @@ function vocabularyGrowthTheme(value: BookCategoryFilter) {
   return {
     pageHeader: "border-sky-300 bg-white",
     section: "border-sky-300 bg-white",
-    softSection: "border-sky-300 bg-sky-50/25",
-    statOne: "border-sky-300 bg-sky-50/35",
+    softSection: "border-sky-300 bg-white",
+    statOne: "border-sky-300 bg-white",
     statTwo: "border-sky-300 bg-white",
-    statThree: "border-sky-300 bg-sky-50/25",
+    statThree: "border-sky-300 bg-white",
     statFour: "border-sky-300 bg-white",
     plainCard: "border-sky-300 bg-white",
   };
@@ -1742,7 +1742,7 @@ export default function VocabularyGrowthPage() {
               {recentWords.map((word) => (
                 <div
                   key={word.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                  className="rounded-xl border border-slate-200 bg-white p-3"
                 >
                   <div className="text-base font-semibold text-slate-950">
                     {word.surface || "—"}
