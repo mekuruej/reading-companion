@@ -11,6 +11,7 @@ import PieChart from "./components/PieChart";
 import ReadingAbilityFilterSelector from "./components/ReadingAbilityFilterSelector";
 import ReadingAbilityHeader from "./components/ReadingAbilityHeader";
 import PaceLegendCards from "./components/PaceLegendCards";
+import ReadingRangeCard from "./components/ReadingRangeCard";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -844,81 +845,57 @@ export default function ReadingAbilityPage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                    <div className={`rounded-2xl border-2 p-4 shadow-sm ${selectedTheme.plainCard}`}>
-                        <div className="text-xs font-medium uppercase text-slate-600">
-                            Fluid Reading Range — {selectedFilterLabel}
-                        </div>
+                    <ReadingRangeCard
+                        title={`Fluid Reading Range — ${selectedFilterLabel}`}
+                        fastest={
+                            abilityStandouts.fastestFluid?.fluidMinPerPage != null
+                                ? {
+                                    value: `${formatDecimal(
+                                        abilityStandouts.fastestFluid.fluidMinPerPage
+                                    )} min/page`,
+                                    title: abilityStandouts.fastestFluid.title,
+                                }
+                                : null
+                        }
+                        slowest={
+                            abilityStandouts.slowestFluid?.fluidMinPerPage != null
+                                ? {
+                                    value: `${formatDecimal(
+                                        abilityStandouts.slowestFluid.fluidMinPerPage
+                                    )} min/page`,
+                                    title: abilityStandouts.slowestFluid.title,
+                                }
+                                : null
+                        }
+                        emptyText="No timed fluid reading yet"
+                        tone={selectedTheme.plainCard}
+                    />
 
-                        <div className="mt-3 space-y-3">
-                            <div>
-                                <div className="text-xs text-slate-500">Fastest</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {abilityStandouts.fastestFluid?.fluidMinPerPage != null
-                                        ? `${formatDecimal(
-                                            abilityStandouts.fastestFluid.fluidMinPerPage
-                                        )} min/page`
-                                        : "—"}
-                                </div>
-                                <div className="truncate text-sm text-slate-700">
-                                    {abilityStandouts.fastestFluid?.title ??
-                                        "No timed fluid reading yet"}
-                                </div>
-                            </div>
-
-                            <div className="border-t border-slate-100 pt-3">
-                                <div className="text-xs text-slate-500">Slowest</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {abilityStandouts.slowestFluid?.fluidMinPerPage != null
-                                        ? `${formatDecimal(
-                                            abilityStandouts.slowestFluid.fluidMinPerPage
-                                        )} min/page`
-                                        : "—"}
-                                </div>
-                                <div className="truncate text-sm text-slate-700">
-                                    {abilityStandouts.slowestFluid?.title ??
-                                        "No timed fluid reading yet"}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className={`rounded-2xl border-2 p-4 shadow-sm ${selectedTheme.plainCard}`}>
-                        <div className="text-xs font-medium uppercase text-slate-600">
-                            Curiosity Reading Range — {selectedFilterLabel}
-                        </div>
-
-                        <div className="mt-3 space-y-3">
-                            <div>
-                                <div className="text-xs text-slate-500">Fastest</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {abilityStandouts.fastestCuriosity?.curiosityMinPerPage != null
-                                        ? `${formatDecimal(
-                                            abilityStandouts.fastestCuriosity.curiosityMinPerPage
-                                        )} min/page`
-                                        : "—"}
-                                </div>
-                                <div className="truncate text-sm text-slate-700">
-                                    {abilityStandouts.fastestCuriosity?.title ??
-                                        "No timed curiosity reading yet"}
-                                </div>
-                            </div>
-
-                            <div className="border-t border-slate-100 pt-3">
-                                <div className="text-xs text-slate-500">Slowest</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {abilityStandouts.slowestCuriosity?.curiosityMinPerPage != null
-                                        ? `${formatDecimal(
-                                            abilityStandouts.slowestCuriosity.curiosityMinPerPage
-                                        )} min/page`
-                                        : "—"}
-                                </div>
-                                <div className="truncate text-sm text-slate-700">
-                                    {abilityStandouts.slowestCuriosity?.title ??
-                                        "No timed curiosity reading yet"}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <ReadingRangeCard
+                        title={`Curiosity Reading Range — ${selectedFilterLabel}`}
+                        fastest={
+                            abilityStandouts.fastestCuriosity?.curiosityMinPerPage != null
+                                ? {
+                                    value: `${formatDecimal(
+                                        abilityStandouts.fastestCuriosity.curiosityMinPerPage
+                                    )} min/page`,
+                                    title: abilityStandouts.fastestCuriosity.title,
+                                }
+                                : null
+                        }
+                        slowest={
+                            abilityStandouts.slowestCuriosity?.curiosityMinPerPage != null
+                                ? {
+                                    value: `${formatDecimal(
+                                        abilityStandouts.slowestCuriosity.curiosityMinPerPage
+                                    )} min/page`,
+                                    title: abilityStandouts.slowestCuriosity.title,
+                                }
+                                : null
+                        }
+                        emptyText="No timed curiosity reading yet"
+                        tone={selectedTheme.plainCard}
+                    />
                 </div>
 
                 <SectionBand
