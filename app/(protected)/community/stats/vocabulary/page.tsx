@@ -12,6 +12,7 @@ import BarStrip from "./components/BarStrip";
 import PieChart from "./components/PieChart";
 import BookCategoryFilterSelector from "./components/BookCategoryFilterSelector";
 import VocabularyHeader from "./components/VocabularyHeader";
+import RecentWordsGrid from "./components/RecentWordsGrid";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -1455,32 +1456,7 @@ export default function VocabularyGrowthPage() {
           description="A quick reminder of the newest words entering your reading life."
           tone={selectedTheme.section}
         >
-          {recentWords.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-              No saved words yet.
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {recentWords.map((word) => (
-                <div
-                  key={word.id}
-                  className="rounded-xl border border-slate-200 bg-white p-3"
-                >
-                  <div className="text-base font-semibold text-slate-950">
-                    {word.surface || "—"}
-                  </div>
-                  {word.reading ? (
-                    <div className="mt-0.5 text-xs text-slate-500">
-                      {word.reading}
-                    </div>
-                  ) : null}
-                  <div className="mt-2 line-clamp-2 text-sm leading-5 text-slate-600">
-                    {word.meaning || "No meaning saved"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <RecentWordsGrid words={recentWords} />
         </SectionBand>
       </div>
     </main>
