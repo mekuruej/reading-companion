@@ -4,31 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] A. Stat cards
-1. Move: `StatCard`.
-2. Stay in `page.tsx`: `abilityTotals`, formatted stat values, selected theme.
-3. Props needed:
-    * label
-    * value
-    * hint
-    * tone
-4. Type: presentational UI.
-5. Risk: low.
-Good first extraction.
-
-- [ ] B. Section wrapper
-1. Move: `SectionBand`.
-2. Stay in `page.tsx`: section order, selected theme, children.
-3. Props needed:
-    * eyebrow
-    * title
-    * description
-    * children
-    * tone
-4. Type: presentational UI.
-5. Risk: low.
-Good first extraction.
-
 - [ ] C. Bar strip
 1. Move: `BarStrip`.
 2. Stay in `page.tsx`: `abilityTypeMetrics.map(...)`, color choice, suffix.
@@ -298,4 +273,5 @@ Future home:
 
 ## Finished
 
-- [ ] Nothing extracted yet.
+- [✔️] Extracted `StatCard`.
+- [✔️] Extracted `SectionBand`.
