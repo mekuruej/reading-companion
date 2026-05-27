@@ -203,6 +203,10 @@ Later idea:
 
 ## Page Thinning / Architecture Cleanup
 
+Finished:
+
+- Standardized stats card and section backgrounds so card interiors are white while theme colors remain in borders and accents.
+
 ### Reading Habits Stats Page
 
 Finished:
