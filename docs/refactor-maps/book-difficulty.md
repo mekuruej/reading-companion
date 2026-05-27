@@ -4,18 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] A. Presentational stat cards
-1. Move: `StatCard`.
-2. Stay in `page.tsx`: totals calculation and stat card values.
-3. Props needed:
-    * label
-    * value
-    * hint
-    * tone
-4. Type: presentational UI.
-5. Risk: low.
-Good first extraction because it is small and does not know about book difficulty rules.
-
 - [ ] B. Section wrapper
 1. Move: `SectionBand`.
 2. Stay in `page.tsx`: section ordering, selected theme, and all children.
@@ -291,4 +279,5 @@ Future home:
 
 ## Finished
 
-- [ ] Nothing extracted yet.
+- [✔️] Extracted `StatCard`.
+- [✔️] Fixed `Header Text`.

@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import StatCard from "./components/StatCard";
 
 type DifficultyTimeRange =
   | "all_time"
@@ -293,30 +294,6 @@ function pageCountBucket(pageCount: number | null | undefined) {
 function average(values: number[]) {
   if (values.length === 0) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  tone = "border-slate-200 bg-white",
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  tone?: string;
-}) {
-  return (
-    <div className={`rounded-2xl border-2 p-4 shadow-sm ${tone}`}>
-      <div className="text-xs font-medium uppercase text-slate-600">
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold text-slate-950">
-        {value}
-      </div>
-      {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
-    </div>
-  );
 }
 
 function SectionBand({
@@ -896,9 +873,9 @@ export default function BookDifficultyPage() {
               Book Difficulty
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-              description="A reader-fit view of your books for {selectedTimeLabel.toLowerCase()}:
+              A reader-fit view of your books for {selectedTimeLabel.toLowerCase()}:
               what felt comfortable, what pushed back, what you enjoyed, and how
-              those signals compare across different book types."
+              those signals compare across different book types.
             </p>
           </div>
         </div>
