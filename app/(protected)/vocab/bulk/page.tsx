@@ -5,6 +5,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import BulkMessageBanner from "./components/BulkMessageBanner";
+import SaveBar from "./components/SaveBar";
+import BulkDonePanel from "./components/BulkDonePanel";
 
 // -------------------------------------------------------------
 // Helpers
@@ -587,32 +590,6 @@ export default function BulkVocabPage() {
   }
 
   // -------------------------------------------------------------
-  // UI helpers
-  // -------------------------------------------------------------
-  function SaveBar({
-    label,
-    onClick,
-    disabled = false,
-  }: {
-    label: string;
-    onClick: () => void;
-    disabled?: boolean;
-  }) {
-    return (
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-60"
-        >
-          {label}
-        </button>
-      </div>
-    );
-  }
-
-  // -------------------------------------------------------------
   // UI
   // -------------------------------------------------------------
   return (
@@ -678,15 +655,7 @@ export default function BulkVocabPage() {
           </p>
         )}
 
-        {message ? (
-          <div className="mb-4">
-            {message.startsWith("❌") ? (
-              <p className="text-base font-medium text-red-700">{message}</p>
-            ) : (
-              <p className="text-lg font-semibold text-green-700">{message}</p>
-            )}
-          </div>
-        ) : null}
+        <BulkMessageBanner message={message} />
 
         {step === "paste" && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1019,15 +988,7 @@ export default function BulkVocabPage() {
             </div>
           </>
         )}
-
-        {step === "done" && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-3 text-xl font-medium">Done</div>
-            <p className="text-sm text-gray-600">
-              Your words have been saved.
-            </p>
-          </div>
-        )}
+        {step === "done" && <BulkDonePanel />}
       </div>
     </main>
   );
