@@ -4,28 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] G. Reading range cards
-1. Move: Fluid Reading Range and Curiosity Reading Range card UI.
-2. Stay in `page.tsx`: `abilityStandouts`, selected theme, formatting.
-3. Props needed:
-    * title
-    * fastestValue
-    * fastestTitle
-    * slowestValue
-    * slowestTitle
-    * emptyText
-    * tone
-4. Type: presentational UI.
-5. Risk: medium.
-
-- [ ] H. Pace explanation cards
-1. Move: the four static pace explanation cards.
-2. Stay in `page.tsx`: `pacePie`, `SectionBand`, chart placement.
-3. Props needed:
-    * items, or none if static inside component.
-4. Type: presentational UI.
-5. Risk: low.
-
 - [ ] I. Types
 1. Move:
     * `SessionMode`
@@ -239,3 +217,5 @@ Future home:
 - [✔️] Extracted `PieChart`.
 - [✔️] Extracted `ReadingAbilityFilterSelector`.
 - [✔️] Extracted `Page header`.
+- [✔️] Extracted `ReadingRangeCards`.
+- [✔️] Extracted `PaceExplanationCards`.
