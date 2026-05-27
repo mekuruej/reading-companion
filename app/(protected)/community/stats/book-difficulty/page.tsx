@@ -10,6 +10,7 @@ import BarStrip from "./components/BarStrip";
 import PieChart from "./components/PieChart";
 import DifficultyTimeRangeSelector from "./components/DifficultyTimeRangeSelector";
 import BookDifficultyHeader from "./components/BookDifficultyHeader";
+import ReaderFitTable from "./components/ReaderFitTable";
 
 type DifficultyTimeRange =
   | "all_time"
@@ -792,51 +793,15 @@ export default function BookDifficultyPage() {
 
         <SectionBand
           eyebrow={`Reader-fit table — ${selectedTimeLabel}`}
-          title="Reader-fit details"
-          description="A compact table of finished books with ease and entertainment ratings. Keep in mind these ratings are most useful relative to each book’s type."
+          title="Difficulty and enjoyment by book"
+          description="A compact table of finished books with difficulty and entertainment ratings. Keep in mind these ratings are most useful relative to each book’s type."
           tone={selectedTheme.section}
         >
-          <div className="overflow-hidden rounded-2xl border border-slate-200">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">Book</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Ease rating</th>
-                  <th className="px-3 py-2">Entertainment</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {readerFitRows.length === 0 ? (
-                  <tr>
-                    <td
-                      className="px-3 py-4 text-sm text-slate-500"
-                      colSpan={4}
-                    >
-                      No difficulty or reader-fit data in this window yet.
-                    </td>
-                  </tr>
-                ) : (
-                  readerFitRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-3 py-2 font-medium text-slate-900">
-                        {row.books?.title ?? "Untitled book"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {bookTypeLabel(row.books?.book_type)}
-                      </td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {formatRating(row.rating_difficulty)}
-                      </td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {formatRating(row.rating_overall)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <ReaderFitTable
+            rows={readerFitRows}
+            bookTypeLabel={bookTypeLabel}
+            formatRating={formatRating}
+          />
         </SectionBand>
       </div>
     </main>
