@@ -10,6 +10,7 @@ import SaveBar from "./components/SaveBar";
 import BulkDonePanel from "./components/BulkDonePanel";
 import BulkStepIntroCard from "./components/BulkStepIntroCard";
 import BulkPasteWordsPanel from "./components/BulkPasteWordsPanel";
+import BulkColumnPastePanel from "./components/BulkColumnPastePanel";
 
 // -------------------------------------------------------------
 // Helpers
@@ -824,74 +825,16 @@ export default function BulkVocabPage() {
               </div>
             </div>
 
-            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-1 text-lg font-medium">Paste Row-by-Row Columns</div>
-              <p className="mb-3 text-sm text-gray-500">
-                Paste one value per line. Line 1 matches word 1, line 2 matches word 2, and so on.
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Page numbers</div>
-                  <textarea
-                    value={bulkPageList}
-                    onChange={(e) => setBulkPageList(e.target.value)}
-                    rows={5}
-                    placeholder={`45\n46\n46\n47`}
-                    className="w-full rounded border p-3 font-mono text-sm"
-                  />
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => applyBulkColumnList("page", bulkPageList, "page-list")}
-                      className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
-                    >
-                      {recentAction === "page-list" ? "Added!" : "Apply page list"}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Chapter numbers</div>
-                  <textarea
-                    value={bulkChapterNumberList}
-                    onChange={(e) => setBulkChapterNumberList(e.target.value)}
-                    rows={5}
-                    placeholder={`3\n3\n3\n4`}
-                    className="w-full rounded border p-3 font-mono text-sm"
-                  />
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => applyBulkColumnList("chapterNumber", bulkChapterNumberList, "chapter-number-list")}
-                      className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
-                    >
-                      {recentAction === "chapter-number-list" ? "Added!" : "Apply chapter # list"}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Chapter names</div>
-                  <textarea
-                    value={bulkChapterNameList}
-                    onChange={(e) => setBulkChapterNameList(e.target.value)}
-                    rows={5}
-                    placeholder={`Festival\nFestival\nFestival\nAftermath`}
-                    className="w-full rounded border p-3 font-mono text-sm"
-                  />
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => applyBulkColumnList("chapterName", bulkChapterNameList, "chapter-name-list")}
-                      className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
-                    >
-                      {recentAction === "chapter-name-list" ? "Added!" : "Apply chapter name list"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <BulkColumnPastePanel
+              bulkPageList={bulkPageList}
+              bulkChapterNumberList={bulkChapterNumberList}
+              bulkChapterNameList={bulkChapterNameList}
+              recentAction={recentAction}
+              onBulkPageListChange={setBulkPageList}
+              onBulkChapterNumberListChange={setBulkChapterNumberList}
+              onBulkChapterNameListChange={setBulkChapterNameList}
+              onApplyBulkColumnList={applyBulkColumnList}
+            />
 
             <ul className="space-y-3">
               {items.map((i, idx) => (

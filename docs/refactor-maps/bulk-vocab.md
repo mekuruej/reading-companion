@@ -99,21 +99,6 @@ Use after smaller extractions. It touches controlled inputs and definition-choic
 5. Risk: medium.
 Keep `applyBulkField` in `page.tsx`; this component should only render inputs/buttons.
 
-- [ ] H. Bulk column paste panel
-1. Move: the Step 3 row-by-row paste card.
-2. Stay in `page.tsx`: column list state, setters, `applyBulkColumnList`, `recentAction`.
-3. Props needed:
-    * bulkPageList
-    * bulkChapterNumberList
-    * bulkChapterNameList
-    * recentAction
-    * onBulkPageListChange
-    * onBulkChapterNumberListChange
-    * onBulkChapterNameListChange
-    * onApplyBulkColumnList
-4. Type: presentational UI with callbacks.
-5. Risk: medium.
-Do after `BulkApplyFieldsPanel`; the pattern is similar but has more textarea state.
 
 - [ ] I. Detail edit item
 1. Move: one Step 3 `<li>` row for per-word page/chapter edits and reading support checkbox.
@@ -314,3 +299,4 @@ Future home:
 - [✔️] Extracted `BulkDonePanel`.
 - [✔️] Extracted `StepIntroCard`.
 - [✔️] Extracted `PasteWordsPanel`.
+- [✔️] Extracted `BulkColumnPastePanel`.
