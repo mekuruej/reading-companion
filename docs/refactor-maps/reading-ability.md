@@ -4,46 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] C. Bar strip
-1. Move: `BarStrip`.
-2. Stay in `page.tsx`: `abilityTypeMetrics.map(...)`, color choice, suffix.
-3. Props needed:
-    * items
-    * colorClass
-    * valueSuffix
-4. Type: presentational UI.
-5. Risk: low.
-
-- [ ] D. Pie chart
-1. Move: `PieChart`.
-2. Stay in `page.tsx`: `pacePie`.
-3. Props needed:
-    * items
-    * size
-    * formatPercent
-4. Type: presentational UI.
-5. Risk: low-medium.
-It currently uses `formatDecimal`; pass that in rather than moving helper logic first.
-
-- [ ] E. Reading ability filter selector
-1. Move: the filter button grid and included-book count.
-2. Stay in `page.tsx`: `bookTypeFilter`, `setBookTypeFilter`, `READING_ABILITY_FILTERS`, selected filter lookup, filtered metrics.
-3. Props needed:
-    * filters
-    * value
-    * onChange
-    * bookCount
-4. Type: presentational UI with callback.
-5. Risk: low-medium.
-
-- [ ] F. Page header
-1. Move: back link plus hero/header block.
-2. Stay in `page.tsx`: selected theme.
-3. Props needed:
-    * tone
-4. Type: presentational UI.
-5. Risk: low.
-
 - [ ] G. Reading range cards
 1. Move: Fluid Reading Range and Curiosity Reading Range card UI.
 2. Stay in `page.tsx`: `abilityStandouts`, selected theme, formatting.
@@ -275,3 +235,7 @@ Future home:
 
 - [✔️] Extracted `StatCard`.
 - [✔️] Extracted `SectionBand`.
+- [✔️] Extracted `BarStrip`.
+- [✔️] Extracted `PieChart`.
+- [✔️] Extracted `ReadingAbilityFilterSelector`.
+- [✔️] Extracted `Page header`.
