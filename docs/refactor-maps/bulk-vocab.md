@@ -83,23 +83,6 @@ This removes repeated visual markup without touching step logic.
 5. Risk: medium.
 Use after smaller extractions. It touches controlled inputs and definition-choice behavior, so the callback wiring must be careful.
 
-- [ ] G. Bulk apply fields panel
-1. Move: the Step 3 bulk single-value page/chapter form card.
-2. Stay in `page.tsx`: bulk field state, setters, `applyBulkField`, `recentAction`.
-3. Props needed:
-    * bulkPageNumber
-    * bulkChapterNumber
-    * bulkChapterName
-    * recentAction
-    * onBulkPageNumberChange
-    * onBulkChapterNumberChange
-    * onBulkChapterNameChange
-    * onApplyBulkField
-4. Type: presentational UI with callbacks.
-5. Risk: medium.
-Keep `applyBulkField` in `page.tsx`; this component should only render inputs/buttons.
-
-
 - [ ] I. Detail edit item
 1. Move: one Step 3 `<li>` row for per-word page/chapter edits and reading support checkbox.
 2. Stay in `page.tsx`: `items.map`, `updateItem`, `BulkItem` state.
@@ -300,3 +283,4 @@ Future home:
 - [✔️] Extracted `StepIntroCard`.
 - [✔️] Extracted `PasteWordsPanel`.
 - [✔️] Extracted `BulkColumnPastePanel`.
+- [✔️] Extracted `BulkApplyFieldsPanel`.
