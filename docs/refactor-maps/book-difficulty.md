@@ -4,19 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] B. Section wrapper
-1. Move: `SectionBand`.
-2. Stay in `page.tsx`: section ordering, selected theme, and all children.
-3. Props needed:
-    * eyebrow
-    * title
-    * description
-    * children
-    * tone
-4. Type: presentational UI.
-5. Risk: low.
-This mirrors the Reading Habits cleanup and removes repeated section framing.
-
 - [ ] C. Bar strip component
 1. Move: `BarStrip`.
 2. Stay in `page.tsx`: page bucket counts, overall rating counts, hardest/easiest book mapping.
@@ -281,3 +268,4 @@ Future home:
 
 - [✔️] Extracted `StatCard`.
 - [✔️] Fixed `Header Text`.
+- [✔️] Extracted `SectionBand`.

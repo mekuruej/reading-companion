@@ -214,6 +214,81 @@ Finished:
   - `BarStrip.tsx`
   - `ModeStrip.tsx`
   - `PieChart.tsx`
+  - `TimeRangeSelector.tsx`
+- Kept stats calculations, state, data loading, and page orchestration in `page.tsx`.
+- For `ModeStrip`, kept `formatMinutesAsReadableTime()` in `page.tsx` and passed it into the component as `formatValue`.
+- For `PieChart`, kept `formatDecimal()` in `page.tsx` and passed it into the component as `formatPercent`.
+- Removed unused `DailyActivityChart`.
+- Removed unused `isThisMonth` helper.
+- Reduced `reading-habits/page.tsx` to about 984 lines.
+- Added a detailed refactor map at `docs/refactor-maps/reading-habits.md`.
+- `npm run build` passed after the component extractions.
+
+Next:
+
+- Park Reading Habits for now.
+- Remaining Reading Habits cleanup is more advanced:
+  - Reading rhythm calendar section extraction
+  - data loading cleanup
+  - stats calculation/view-model cleanup
+  - types/helpers cleanup
+- Do not move Reading Habits data loading, stats calculations, services, DAOs, or controllers yet unless doing a focused later pass.
+
+### Book Difficulty Stats Page
+
+Finished:
+
+- Started thinning `app/(protected)/community/stats/book-difficulty/page.tsx`.
+- Added a detailed refactor map at `docs/refactor-maps/book-difficulty.md`.
+- Extracted `StatCard` into:
+  - `app/(protected)/community/stats/book-difficulty/components/StatCard.tsx`
+- Extracted `SectionBand` into:
+  - `app/(protected)/community/stats/book-difficulty/components/SectionBand.tsx`
+- Added TODO notes to local `StatCard` / `SectionBand` components where useful, because they may eventually become shared stats components.
+- Fixed the Book Difficulty header text bug where the hero paragraph visibly rendered `description="..."`.
+- Kept totals, calculations, data loading, state, and page orchestration in `page.tsx`.
+- `npm run build` passed after these changes.
+- Working tree was clean after clearing the recurring `next-env.d.ts` generated-change noise.
+
+Next:
+
+- Continue Book Difficulty visual component thinning.
+- Next recommended target: `BarStrip`.
+- After that, likely continue with:
+  - `PieChart`
+  - `DifficultyTimeRangeSelector`
+  - `BookDifficultyHeader`
+- Pause before `ReaderFitTable`, because that is medium risk and includes a user-facing label change from `Ease rating` to `Difficulty`.
+- Do not move Book Difficulty data loading, stats calculations, helpers, services, DAOs, or controllers yet.
+
+### Shared Stats Component Note
+
+Finished:
+
+- Noticed that some stats components are duplicated across stats pages, especially:
+  - `StatCard`
+  - `SectionBand`
+
+Next:
+
+- Keep components local for now while page thinning is still in progress.
+- Later, consider a separate shared stats component pass if multiple stats pages continue using the same component patterns.
+- Possible future shared location:
+  - `app/(protected)/community/stats/components/`
+  - or `components/stats/`
+- Do not combine shared components during small page-specific extraction commits unless that is the explicit task.
+
+### Reading Habits Stats Page
+
+Finished:
+
+- Started thinning `app/(protected)/community/stats/reading-habits/page.tsx`.
+- Extracted presentational UI components into `app/(protected)/community/stats/reading-habits/components/`:
+  - `StatCard.tsx`
+  - `SectionBand.tsx`
+  - `BarStrip.tsx`
+  - `ModeStrip.tsx`
+  - `PieChart.tsx`
 - Kept stats calculations, state, data loading, and page orchestration in `page.tsx`.
 - For `ModeStrip`, kept `formatMinutesAsReadableTime()` in `page.tsx` and passed it into the component as `formatValue`.
 - For `PieChart`, kept `formatDecimal()` in `page.tsx` and passed it into the component as `formatPercent`.
