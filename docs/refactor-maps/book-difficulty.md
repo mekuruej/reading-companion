@@ -4,17 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] D. Pie chart component
-1. Move: `PieChart`.
-2. Stay in `page.tsx`: `bookTypePie`, `difficultyPie`, and palette assignment.
-3. Props needed:
-    * items
-    * size
-    * formatPercent
-4. Type: presentational chart UI.
-5. Risk: medium.
-Pass `formatDecimal` in as `formatPercent` at first, similar to Reading Habits, so the chart does not need to import page-level formatting rules.
-
 - [ ] E. Time range selector
 1. Move: the `DIFFICULTY_TIME_FILTERS.map(...)` button group into `DifficultyTimeRangeSelector`.
 2. Stay in `page.tsx`: `timeRange`, `setTimeRange`, `DIFFICULTY_TIME_FILTERS`, `difficultyTheme`, `selectedTheme`, and `selectedTimeLabel`.
@@ -259,3 +248,5 @@ Future home:
 - [✔️] Fixed `Header Text`.
 - [✔️] Extracted `SectionBand`.
 - [✔️] Extracted `BarStrip`.
+- [✔️] Extracted `PieChart`.
+- [✔️] Extracted `Time range selector`.
