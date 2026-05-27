@@ -2,7 +2,6 @@
 
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import StatCard from "./components/StatCard";
@@ -10,6 +9,7 @@ import SectionBand from "./components/SectionBand";
 import BarStrip from "./components/BarStrip";
 import PieChart from "./components/PieChart";
 import ReadingAbilityFilterSelector from "./components/ReadingAbilityFilterSelector";
+import ReadingAbilityHeader from "./components/ReadingAbilityHeader";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -783,27 +783,7 @@ export default function ReadingAbilityPage() {
     return (
         <main className="min-h-screen bg-slate-100 px-6 py-8">
             <div className="mx-auto max-w-7xl space-y-5">
-                <div>
-                    <Link
-                        href="/community/stats"
-                        className="text-sm font-semibold text-slate-500 hover:text-slate-900"
-                    >
-                        ← Back to Stats Home
-                    </Link>
-
-                    <div className={`mt-5 rounded-3xl border-2 p-5 shadow-sm ${selectedTheme.pageHeader}`}>
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
-                            Reading Ability
-                        </p>
-                        <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-                            Reading Ability
-                        </h1>
-                        <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-                            Pace, support, difficulty, and reader-fit patterns from your
-                            reading life.
-                        </p>
-                    </div>
-                </div>
+                <ReadingAbilityHeader pageHeaderTone={selectedTheme.pageHeader} />
 
                 {errorMsg ? (
                     <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
