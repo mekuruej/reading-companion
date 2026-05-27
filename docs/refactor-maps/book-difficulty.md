@@ -4,17 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] C. Bar strip component
-1. Move: `BarStrip`.
-2. Stay in `page.tsx`: page bucket counts, overall rating counts, hardest/easiest book mapping.
-3. Props needed:
-    * items
-    * colorClass
-    * valueSuffix
-4. Type: presentational chart UI.
-5. Risk: low-medium.
-Watch empty states and the minimum-width bar behavior.
-
 - [ ] D. Pie chart component
 1. Move: `PieChart`.
 2. Stay in `page.tsx`: `bookTypePie`, `difficultyPie`, and palette assignment.
@@ -269,3 +258,4 @@ Future home:
 - [✔️] Extracted `StatCard`.
 - [✔️] Fixed `Header Text`.
 - [✔️] Extracted `SectionBand`.
+- [✔️] Extracted `BarStrip`.
