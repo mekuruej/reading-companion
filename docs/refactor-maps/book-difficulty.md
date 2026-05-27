@@ -238,3 +238,4 @@ Future home:
 - [✔️] Extracted `BarStrip`.
 - [✔️] Extracted `PieChart`.
 - [✔️] Extracted `Time range selector`.
+- [✔️] Extracted `Page header`.
