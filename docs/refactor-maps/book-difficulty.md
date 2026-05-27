@@ -4,18 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] E. Time range selector
-1. Move: the `DIFFICULTY_TIME_FILTERS.map(...)` button group into `DifficultyTimeRangeSelector`.
-2. Stay in `page.tsx`: `timeRange`, `setTimeRange`, `DIFFICULTY_TIME_FILTERS`, `difficultyTheme`, `selectedTheme`, and `selectedTimeLabel`.
-3. Props needed:
-    * filters
-    * value
-    * onChange
-    * getOptionTheme
-4. Type: presentational UI with callback.
-5. Risk: low-medium.
-The component should only render buttons and call `onChange(option.value)`.
-
 - [ ] F. Page header
 1. Move: back link plus hero/header block into `BookDifficultyHeader`.
 2. Stay in `page.tsx`: selected time label and selected theme.
