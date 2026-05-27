@@ -1,3 +1,5 @@
+// TODO: Consider moving this to a shared stats component if more stats pages use the same pie chart pattern.
+
 type PieChartItem = {
   label: string;
   value: number;
