@@ -61,19 +61,6 @@ The first code changes should only move visual JSX into components and keep all 
 5. Risk: low-medium.
 Good early extraction, but keep navigation functions in `page.tsx` so the component only calls callbacks.
 
-- [ ] D. Paste words panel
-1. Move: the Step 1 card, instructions, textarea, and preview button.
-2. Stay in `page.tsx`: `rawInput`, `setRawInput`, `wordCount`, `isPreviewing`, and `handlePreview`.
-3. Props needed:
-    * rawInput
-    * wordCount
-    * isPreviewing
-    * onRawInputChange
-    * onPreview
-4. Type: presentational UI with callback.
-5. Risk: low-medium.
-The form submit behavior must stay exactly the same; pass `handlePreview` in unchanged.
-
 - [ ] E. Step intro card
 1. Move: repeated step heading/instruction cards for Step 2 and Step 3 into a small `BulkStepIntroCard`.
 2. Stay in `page.tsx`: conditional step rendering and step labels/copy.
@@ -326,3 +313,4 @@ Future home:
 - [✔️] Extracted `SaveBar`.
 - [✔️] Extracted `BulkDonePanel`.
 - [✔️] Extracted `StepIntroCard`.
+- [✔️] Extracted `PasteWordsPanel`.

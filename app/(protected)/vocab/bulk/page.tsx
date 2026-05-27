@@ -9,6 +9,7 @@ import BulkMessageBanner from "./components/BulkMessageBanner";
 import SaveBar from "./components/SaveBar";
 import BulkDonePanel from "./components/BulkDonePanel";
 import BulkStepIntroCard from "./components/BulkStepIntroCard";
+import BulkPasteWordsPanel from "./components/BulkPasteWordsPanel";
 
 // -------------------------------------------------------------
 // Helpers
@@ -659,31 +660,13 @@ export default function BulkVocabPage() {
         <BulkMessageBanner message={message} />
 
         {step === "paste" && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-1 text-lg font-medium">Step 1 — Paste Words</div>
-            <p className="mb-3 text-sm text-gray-500">
-              Paste one word per line or comma-separated, then preview them.
-            </p>
-
-            <form onSubmit={handlePreview} className="flex flex-col gap-3">
-              <textarea
-                value={rawInput}
-                onChange={(e) => setRawInput(e.target.value)}
-                rows={8}
-                className="rounded border bg-white p-3 font-mono text-sm"
-                placeholder={`Paste one per line (or comma-separated)\n\n生意気\nメンヘラ\n都市伝説`}
-              />
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  disabled={isPreviewing}
-                  className="rounded bg-amber-500 px-4 py-2 text-white hover:bg-amber-600 disabled:opacity-60"
-                >
-                  {isPreviewing ? "Loading…" : `Preview Words${wordCount ? ` (${wordCount})` : ""}`}
-                </button>
-              </div>
-            </form>
-          </div>
+          <BulkPasteWordsPanel
+            rawInput={rawInput}
+            wordCount={wordCount}
+            isPreviewing={isPreviewing}
+            onRawInputChange={setRawInput}
+            onPreview={handlePreview}
+          />
         )}
 
         {step === "definitions" && (
