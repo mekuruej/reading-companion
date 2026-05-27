@@ -4,29 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] E. Pie chart
-1. Move: `PieChart`.
-2. Stay in `page.tsx`: `wordsByBookTypePie`.
-3. Props needed:
-    * items
-    * size
-    * formatPercent
-4. Type: presentational UI.
-5. Risk: low-medium.
-It currently calls `formatDecimal`; pass that in later rather than moving helper logic first.
-
-- [ ] F. Book category filter selector
-1. Move: the `BOOK_CATEGORY_FILTERS.map(...)` button grid and included-book count.
-2. Stay in `page.tsx`: `bookCategoryFilter`, `setBookCategoryFilter`, `BOOK_CATEGORY_FILTERS`, selected filter lookup, filtered metrics.
-3. Props needed:
-    * filters
-    * value
-    * onChange
-    * bookCount
-4. Type: presentational UI with callback.
-5. Risk: low-medium.
-Keep the filter state and behavior in `page.tsx`.
-
 - [ ] G. Page header
 1. Move: back link plus hero/header block.
 2. Stay in `page.tsx`: selected theme.
@@ -321,6 +298,6 @@ Future home:
 - [✔️] Extracted `MetricCards`.
 - [✔️] Extracted `SectionBand`.
 - [✔️] Extracted `BarStrip`.
-- [✔️] 
-- [✔️] 
+- [✔️] Extracted `PieChart`.
+- [✔️] Extracted `BookCategoryFilterSelector`.
 - [✔️] 
