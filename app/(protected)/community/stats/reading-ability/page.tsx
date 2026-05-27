@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import StatCard from "./components/StatCard";
+import SectionBand from "./components/SectionBand";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -283,38 +284,6 @@ function readingAbilityTheme(value: ReadingAbilityFilter) {
         statThree: "border-sky-300 bg-white",
         plainCard: "border-sky-300 bg-white",
     };
-}
-
-function SectionBand({
-    eyebrow,
-    title,
-    description,
-    children,
-    tone = "border-slate-200 bg-white",
-}: {
-    eyebrow: string;
-    title: string;
-    description?: string;
-    children: React.ReactNode;
-    tone?: string;
-}) {
-    return (
-        <section className={`rounded-2xl border-2 p-4 shadow-sm ${tone}`}>
-            <div className="mb-4">
-                <div className="text-xs font-medium uppercase text-slate-600">
-                    {eyebrow}
-                </div>
-                <h2 className="mt-1 text-xl font-semibold text-slate-950">{title}</h2>
-                {description ? (
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                        {description}
-                    </p>
-                ) : null}
-            </div>
-
-            {children}
-        </section>
-    );
 }
 
 function BarStrip({
