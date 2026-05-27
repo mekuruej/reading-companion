@@ -11,6 +11,7 @@ import SmallMetricCard from "./components/SmallMetricCard";
 import SectionBand from "./components/SectionBand";
 import BarStrip from "./components/BarStrip";
 import PieChart from "./components/PieChart";
+import BookCategoryFilterSelector from "./components/BookCategoryFilterSelector";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -1045,29 +1046,11 @@ export default function VocabularyGrowthPage() {
           description="Choose a broad kind of reading material. This changes the vocabulary totals, charts, study rhythm, and book examples below."
           tone={selectedTheme.section}
         >
-          <div className="grid gap-3 md:grid-cols-4">
-            {BOOK_CATEGORY_FILTERS.map((option) => {
-              const selected = bookCategoryFilter === option.value;
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setBookCategoryFilter(option.value)}
-                  className={`rounded-2xl border-2 px-4 py-3 text-left transition ${selected ? option.activeClass : option.inactiveClass
-                    }`}
-                >
-                  <div className="text-base font-black">{option.title}</div>
-                  <div
-                    className={`mt-1 text-sm leading-5 ${selected ? "text-white/85" : ""
-                      }`}
-                  >
-                    {option.description}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          <BookCategoryFilterSelector
+            filters={BOOK_CATEGORY_FILTERS}
+            value={bookCategoryFilter}
+            onChange={(value) => setBookCategoryFilter(value as BookCategoryFilter)}
+          />
 
           <p className="mt-3 text-xs text-slate-500">
             <span className="font-semibold text-slate-700">
