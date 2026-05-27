@@ -3,9 +3,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import StatCard from "./components/StatCard";
+import SectionBand from "./components/SectionBand";
 
 type DifficultyTimeRange =
   | "all_time"
@@ -294,38 +295,6 @@ function pageCountBucket(pageCount: number | null | undefined) {
 function average(values: number[]) {
   if (values.length === 0) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function SectionBand({
-  eyebrow,
-  title,
-  description,
-  children,
-  tone = "border-slate-200 bg-white",
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  children: ReactNode;
-  tone?: string;
-}) {
-  return (
-    <section className={`rounded-2xl border-2 p-4 shadow-sm ${tone}`}>
-      <div className="mb-4">
-        <div className="text-xs font-medium uppercase text-slate-600">
-          {eyebrow}
-        </div>
-        <h2 className="mt-1 text-xl font-semibold text-slate-950">{title}</h2>
-        {description ? (
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {description}
-          </p>
-        ) : null}
-      </div>
-
-      {children}
-    </section>
-  );
 }
 
 function BarStrip({
