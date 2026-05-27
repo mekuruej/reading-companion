@@ -325,3 +325,4 @@ Future home:
 - [✔️] Extracted `BulkMessageBanner`.
 - [✔️] Extracted `SaveBar`.
 - [✔️] Extracted `BulkDonePanel`.
+- [✔️] Extracted `StepIntroCard`.
