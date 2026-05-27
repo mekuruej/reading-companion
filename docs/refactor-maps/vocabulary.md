@@ -4,14 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] G. Page header
-1. Move: back link plus hero/header block.
-2. Stay in `page.tsx`: selected theme.
-3. Props needed:
-    * tone
-4. Type: presentational UI.
-5. Risk: low.
-
 - [ ] H. Recent words grid
 1. Move: the recent saved words empty state and word card grid.
 2. Stay in `page.tsx`: `recentWords`, selected label, `SectionBand`.
@@ -300,4 +292,4 @@ Future home:
 - [✔️] Extracted `BarStrip`.
 - [✔️] Extracted `PieChart`.
 - [✔️] Extracted `BookCategoryFilterSelector`.
-- [✔️] 
+- [✔️] Extracted `PageHeader`. 
