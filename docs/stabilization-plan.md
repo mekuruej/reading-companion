@@ -2,120 +2,85 @@
 
 ## Goal
 
-For the next few weeks, avoid major new features. Focus on making Mekuru safer, easier to understand, and less fragile before wider student access.
+For now, avoid major new features. Focus on making Mekuru safer, easier to understand, and less fragile before wider student access.
 
-## Current Focus
+Mekuru stabilization has two main tracks:
 
-- Page thinning / gentle architecture cleanup
-- Documentation updates
-- Keeping current user-facing behavior stable
+1. **Security / Privacy / Access Safety**
+2. **Page Thinning / Maintainability / Refactor Work**
 
-## Paused but Not Finished
+Detailed page-specific refactor plans live in:
 
-- Deeper RLS review
-- API route review
-- Non-book route access audit
-- Input validation review
-- Public/private profile boundary check
-- Teacher assign/prep workflow cleanup
-
-## Allowed Work
-
-- Documentation updates
-- Security/privacy review
-- RLS review
-- API route review
-- Route/access review for remaining non-book user-data routes
-- Input validation review
-- Bug fixes
-- Small UI fixes that do not change the core flow
-- Small component extraction when it reduces duplication
-- Small helper/service/DAO organization when it makes code safer or clearer
-- Removing unused pages/routes after confirming they are not linked or active
-- Build fixes and TypeScript fixes
-
-## Paused Work
-
-- Major new features
-- Major database redesigns
-- Payment/access changes
-- Full dictionary import
-- Big stats redesigns
-- Large page rewrites
-- Large visual redesigns unless they are part of cleanup
-
-## Stabilization Rules
-
-- Refactor one page or feature at a time.
-- Do not change behavior unless the change is intentional and documented.
-- For UI pages, take before/after screenshots when possible.
-- After each cleanup task, run the app and confirm the original flow still works.
-- Prefer small safety patches before larger architecture cleanup.
+- `docs/refactor-maps/reading-habits.md`
+- `docs/refactor-maps/book-difficulty.md`
 
 ---
 
-# Active / Remaining Tasks
+# Current Focus
 
-## Blocked / No-Access Message Cleanup
+## 1. Security / Privacy / Access Safety
 
-Goal: Make blocked private-book pages look consistent and avoid exposing technical database/API errors.
+Goal:
 
-Current status:
+Make sure users can only see and change data they should have access to.
 
-- Regular-user private book access tests passed both ways.
-- `trialmekuru` can access their own book and is blocked from `trialmekuru2`’s private book routes.
-- `trialmekuru2` can access their own book and is blocked from `trialmekuru`’s private book routes.
-- `/words/[wordId]` and `/add-word` were included in testing.
-- Codex is currently standardizing the blocked/no-access UI.
+This includes:
 
-Still need to confirm:
+- route guards
+- private book access
+- teacher/student access boundaries
+- Supabase RLS policies
+- API route authorization
+- input validation
+- public/private profile boundaries
+- private saved-word data
+- future shared flashcard/deck separation
 
-- Blocked messages are centered and visually consistent.
-- The message style matches the Add Word blocked message style.
-- No blocked page reveals private book data.
-- No blocked page shows raw technical errors.
+## 2. Page Thinning / Maintainability
 
-Known issue being fixed:
+Goal:
 
-- The main Book Hub route showed a raw technical message:
-  - `Cannot coerce the result to a single JSON object`
+Make large files easier to understand and safer to edit without changing behavior.
 
-This should be replaced with a friendly message such as:
+General order:
 
-- `You do not have access to this book.`
-- `This book could not be found.`
+1. Extract low-risk presentational components.
+2. Remove unused code.
+3. Extract pure helper functions.
+4. Move shared types/constants when useful.
+5. Move services, DAOs, and controllers later.
+6. Avoid behavior changes during refactor commits.
 
-## RLS Review
+---
 
-Goal: Confirm Supabase RLS protects private user data even if a UI guard fails.
+# Current / Remaining Tasks
 
-Priority tables:
+## Security / Privacy / Access Safety
+
+### Continue RLS Review
+
+Remaining / revisit areas:
 
 - `profiles`
 - `user_public_profile`
 - `user_books`
 - `user_book_words`
 - `user_book_reading_sessions`
-- `teacher_students`
 - study log / study event tables
 - user alerts
 - teacher prep / club tables
 - future shared flashcard/deck tables, when created
 
-## API Route Review
+### Continue API Route Review
 
-Goal: Make sure API routes do not expose or modify private data incorrectly.
-
-Routes to review:
+Routes to review or revisit:
 
 - `app/api/book-lookup/route.ts`
 - `app/api/jisho/route.ts`
 - `app/api/vocabulary-kanji-map/generate/route.ts`
 - `app/api/word-sky/approve/route.ts`
 
-## Input Validation Review
-
-Goal: Make sure user input is validated before saving.
+### Continue Input Validation Review
 
 Areas to review:
 
@@ -130,33 +95,7 @@ Areas to review:
 - teacher prep forms
 - search fields
 
-## Architecture Cleanup
-
-Goal: Gradually move toward clearer top-down architecture.
-
-Reminder pattern:
-
-```txt
-Website Pages / Views
-    ↓
-Controllers
-    ↓
-Services
-    ↓
-DAOs / Repositories
-    ↓
-Database
-```
-
-Still need to:
-
-- Extract repeated UI into components.
-- Move shared app rules into service/helper files.
-- Move repeated Supabase queries into DAO/repository-style files.
-- Keep pages visually and behaviorally the same while moving logic.
-- Avoid large rewrites.
-
-## Future Cleanup: Centralize User Book Access
+### Future Cleanup: Centralize User Book Access
 
 During the ownership audit, several routes received local ownership guards using the same rule:
 
@@ -164,7 +103,7 @@ During the ownership audit, several routes received local ownership guards using
 - linked teacher access
 - super_teacher access
 
-These guards were intentionally local/minimal for stabilization.
+These guards are intentionally local/minimal for stabilization.
 
 Later, centralize this logic into something like:
 
@@ -172,9 +111,18 @@ Later, centralize this logic into something like:
 - `canAccessUserBook()`
 - `loadAccessibleUserBook()`
 
-This will reduce duplicated access logic across Book Hub, Vocab List, Add Word, Curiosity Reading, Study Flashcards, reading timers, Readalong, and Stats.
+This should eventually reduce duplicated access logic across:
 
-## Future Feature Note: Shared Flashcards
+- Book Hub
+- Vocab List
+- Add Word
+- Curiosity Reading
+- Study Flashcards
+- reading timers
+- Readalong
+- Stats
+
+### Future Feature Note: Shared Flashcards
 
 Future shared flashcards should use separate shared deck structures.
 
@@ -189,7 +137,7 @@ Possible future structures:
 
 Private book flashcards and future shared flashcards should remain separate concepts.
 
-## Possible Future Profile Feature
+### Possible Future Profile Feature
 
 Later idea:
 
@@ -199,173 +147,127 @@ Later idea:
 
 ---
 
-# Completed Work
+# Page Thinning / Refactor Work
 
-## Page Thinning / Architecture Cleanup
+## Reading Habits Stats Page
 
-Finished:
+Detailed map:
 
-- Standardized stats card and section backgrounds so card interiors are white while theme colors remain in borders and accents.
-
-### Reading Habits Stats Page
+- `docs/refactor-maps/reading-habits.md`
 
 Finished:
 
-- Started thinning `app/(protected)/community/stats/reading-habits/page.tsx`.
-- Extracted presentational UI components into `app/(protected)/community/stats/reading-habits/components/`:
-  - `StatCard.tsx`
-  - `SectionBand.tsx`
-  - `BarStrip.tsx`
-  - `ModeStrip.tsx`
-  - `PieChart.tsx`
-  - `TimeRangeSelector.tsx`
-- Kept stats calculations, state, data loading, and page orchestration in `page.tsx`.
-- For `ModeStrip`, kept `formatMinutesAsReadableTime()` in `page.tsx` and passed it into the component as `formatValue`.
-- For `PieChart`, kept `formatDecimal()` in `page.tsx` and passed it into the component as `formatPercent`.
+- Completed first visual component thinning pass.
+- Extracted:
+  - `StatCard`
+  - `SectionBand`
+  - `BarStrip`
+  - `ModeStrip`
+  - `PieChart`
+  - `TimeRangeSelector`
 - Removed unused `DailyActivityChart`.
-- Removed unused `isThisMonth` helper.
-- Reduced `reading-habits/page.tsx` to about 984 lines.
-- Added a detailed refactor map at `docs/refactor-maps/reading-habits.md`.
-- `npm run build` passed after the component extractions.
+- Removed unused `isThisMonth`.
+- Reduced `reading-habits/page.tsx` to under 1000 lines.
+- Kept stats calculations, state, data loading, and page orchestration in `page.tsx`.
 
 Next:
 
-- Park Reading Habits for now.
-- Remaining Reading Habits cleanup is more advanced:
-  - Reading rhythm calendar section extraction
-  - data loading cleanup
+- Park for now.
+- Remaining work is medium/higher-risk:
+  - reading rhythm calendar section extraction
+  - types/helpers
+  - data loading
   - stats calculation/view-model cleanup
-  - types/helpers cleanup
-- Do not move Reading Habits data loading, stats calculations, services, DAOs, or controllers yet unless doing a focused later pass.
 
-### Book Difficulty Stats Page
+## Book Difficulty Stats Page
+
+Detailed map:
+
+- `docs/refactor-maps/book-difficulty.md`
 
 Finished:
 
-- Started thinning `app/(protected)/community/stats/book-difficulty/page.tsx`.
-- Added a detailed refactor map at `docs/refactor-maps/book-difficulty.md`.
-- Extracted `StatCard` into:
-  - `app/(protected)/community/stats/book-difficulty/components/StatCard.tsx`
-- Extracted `SectionBand` into:
-  - `app/(protected)/community/stats/book-difficulty/components/SectionBand.tsx`
-- Added TODO notes to local `StatCard` / `SectionBand` components where useful, because they may eventually become shared stats components.
-- Fixed the Book Difficulty header text bug where the hero paragraph visibly rendered `description="..."`.
-- Kept totals, calculations, data loading, state, and page orchestration in `page.tsx`.
-- `npm run build` passed after these changes.
-- Working tree was clean after clearing the recurring `next-env.d.ts` generated-change noise.
-
-Next:
-
-- Continue Book Difficulty visual component thinning.
-- Next recommended target: `BarStrip`.
-- After that, likely continue with:
+- Completed basic visual component thinning pass.
+- Extracted:
+  - `StatCard`
+  - `SectionBand`
+  - `BarStrip`
   - `PieChart`
   - `DifficultyTimeRangeSelector`
   - `BookDifficultyHeader`
-- Pause before `ReaderFitTable`, because that is medium risk and includes a user-facing label change from `Ease rating` to `Difficulty`.
-- Do not move Book Difficulty data loading, stats calculations, helpers, services, DAOs, or controllers yet.
+  - `ReaderFitTable`
+- Fixed visible header `description="..."` issue.
+- Updated reader-fit table wording:
+  - `Ease rating` → `Difficulty`
+  - `Reader fit — [range]`
+  - `Difficulty and enjoyment by book`
+- Kept totals, calculations, data loading, state, and page orchestration in `page.tsx`.
 
-### Shared Stats Component Note
+Next:
+
+- Park visual pass for now.
+- Remaining work is architecture cleanup:
+  - types
+  - helpers
+  - data loading
+  - stats calculations
+  - time range logic
+
+## Stats Visual Consistency
 
 Finished:
 
-- Noticed that some stats components are duplicated across stats pages, especially:
+- Standardized stats card and section backgrounds.
+- Card and section interiors now use white backgrounds more consistently.
+- Theme colors remain mostly in borders, page accents, active controls, charts, badges, and legends.
+
+Next:
+
+- Keep future stats cards and major section panels consistent:
+  - white interiors
+  - themed borders
+  - meaningful colors preserved for charts, buttons, badges, and legends
+
+## Shared Stats Component Note
+
+Finished:
+
+- Noticed repeated stats component patterns across stats pages, especially:
   - `StatCard`
   - `SectionBand`
+  - `BarStrip`
+  - `PieChart`
+  - time range selectors
 
 Next:
 
 - Keep components local for now while page thinning is still in progress.
-- Later, consider a separate shared stats component pass if multiple stats pages continue using the same component patterns.
+- Later, consider a separate shared stats component pass.
 - Possible future shared location:
   - `app/(protected)/community/stats/components/`
   - or `components/stats/`
 - Do not combine shared components during small page-specific extraction commits unless that is the explicit task.
 
-### Reading Habits Stats Page
+---
+
+# Completed Security / Stabilization Work
+
+## Private Book Route Ownership Guard Pass
 
 Finished:
 
-- Started thinning `app/(protected)/community/stats/reading-habits/page.tsx`.
-- Extracted presentational UI components into `app/(protected)/community/stats/reading-habits/components/`:
-  - `StatCard.tsx`
-  - `SectionBand.tsx`
-  - `BarStrip.tsx`
-  - `ModeStrip.tsx`
-  - `PieChart.tsx`
-- Kept stats calculations, state, data loading, and page orchestration in `page.tsx`.
-- For `ModeStrip`, kept `formatMinutesAsReadableTime()` in `page.tsx` and passed it into the component as `formatValue`.
-- For `PieChart`, kept `formatDecimal()` in `page.tsx` and passed it into the component as `formatPercent`.
-- Removed unused `DailyActivityChart`.
-- Removed unused `isThisMonth` helper.
-- `npm run build` passed after the component extractions.
-- Current `reading-habits/page.tsx` line count after cleanup: about 1006 lines.
-
-Next:
-
-- Continue thinning `reading-habits/page.tsx`.
-- Next recommended target: extract the time range selector UI.
-- Keep the actual state and behavior in `page.tsx` for now:
-  - `timeRange`
-  - `setTimeRange`
-  - `setShowFullReadingRhythm`
-  - `HABIT_TIME_FILTERS`
-  - `selectedTheme`
-  - `selectedTimeLabel`
-- The new component should only draw the time filter buttons and call an `onSelect` callback.
-- Do not move stats calculations, data loading, or shared time filter constants yet.
-
-## ✅ RLS Review — study_logs and user_study_events
-
-Finished:
-
-- Confirmed there is no broad authenticated-user read-all policy.
-- Confirmed `study_logs` lets users insert/select only their own rows.
-- Confirmed linked teachers can select linked student `study_logs` through `teacher_students`.
-- Confirmed `teacher_students` has already been locked down, so linked-teacher access is safer.
-- Confirmed `study_logs` does not currently expose update/delete access to normal users.
-- Confirmed `user_study_events` lets users select/insert/update/delete only their own rows.
-- Confirmed study table columns contain study progress/event data such as study mode, result, correctness, surface, reading, meaning, and timestamps.
-
-Decision:
-
-No RLS change needed for `study_logs` or `user_study_events` right now.
-
-
-## ✅ RLS Review — user_book_reading_sessions
-
-Finished:
-
-- Confirmed there is no broad authenticated-user read-all policy.
-- Confirmed owner access is scoped through the owning `user_books` row.
-- Confirmed linked teacher access depends on `teacher_students`.
-- Confirmed `teacher_students` has already been locked down, so linked-teacher access is safer.
-- Confirmed session columns are limited to reading date, pages, minutes, filler flag, and session mode.
-- Left linked-teacher SELECT/INSERT/DELETE access in place for now because teacher workflows may need to help manage student reading logs.
-- Noted duplicate super_teacher policies as cleanup-later, not urgent-dangerous.
-
-Decision:
-
-No RLS change needed for `user_book_reading_sessions` right now.
-
-## ✅ 2026-05-23 / 2026-05-24 — Private Book Route Ownership Guard Pass
-
-Goal:
-
-Prevent regular users from manually opening another user’s private book, vocabulary, study, reading, timer, or stats routes.
-
-Finished:
-
-- ✅ Added ownership/access guards to private book routes.
-- ✅ Confirmed regular users are blocked from another regular user’s private book data.
-- ✅ Confirmed `trialmekuru` can access their own book.
-- ✅ Confirmed `trialmekuru` is blocked from `trialmekuru2`’s private book routes.
-- ✅ Confirmed `trialmekuru2` can access their own book.
-- ✅ Confirmed `trialmekuru2` is blocked from `trialmekuru`’s private book routes.
-- ✅ Confirmed `/words/[wordId]` was included in testing.
-- ✅ Confirmed `/add-word` was included in testing.
-- ✅ Confirmed write routes are guarded before saving.
-- ✅ Confirmed super_teacher access still works where intended.
+- Added ownership/access guards to private book routes.
+- Confirmed regular users are blocked from another regular user’s private book data.
+- Confirmed `trialmekuru` can access their own book.
+- Confirmed `trialmekuru` is blocked from `trialmekuru2`’s private book routes.
+- Confirmed `trialmekuru2` can access their own book.
+- Confirmed `trialmekuru2` is blocked from `trialmekuru`’s private book routes.
+- Confirmed `/words/[wordId]` was included in testing.
+- Confirmed `/add-word` was included in testing.
+- Confirmed write routes are guarded before saving.
+- Confirmed super_teacher access still works where intended.
+- Standardized blocked/no-access messages enough for now.
+- Removed raw technical no-access errors from blocked private book pages.
 
 Guarded routes:
 
@@ -380,123 +282,122 @@ Guarded routes:
 - `/books/[userBookId]/readalong`
 - `/books/[userBookId]/stats`
 
-Still being cleaned up:
-
-- Blocked/no-access message formatting should be standardized.
-- Blocked messages should be centered and visually consistent.
-- Raw technical errors should never appear to users.
-- The main Book Hub route needs cleanup because it showed:
-  - `Cannot coerce the result to a single JSON object`
-
-Notes:
-
-The repeated local access rule is temporary. Later, it should be centralized into a shared access helper/service.
-
-## ✅ 2026-05-23 — Removed Legacy Weekly Readings Routes
-
-Goal:
-
-Remove old book-specific weekly kanji/weekly-reading routes that are no longer part of the active study flow.
+## Teacher Route Guard
 
 Finished:
 
-- ✅ Confirmed the active global kanji study page is `/library-study/kanji`.
-- ✅ Confirmed `/books/[userBookId]/weekly-readings` is legacy.
-- ✅ Confirmed `/books/[userBookId]/weekly-readings/prepare` is legacy.
-- ✅ Removed the unused weekly-readings route folder.
-
-Notes:
-
-Removing these old routes was cleaner than adding ownership guards to unused pages.
-
-## ✅ 2026-05-22 — Profile Route Safety Check and Teacher Route Guard
-
-Goal:
-
-Confirm the profile cleanup did not break core flows, then lock down teacher-only routes.
-
-Finished:
-
-- ✅ Browser-tested remaining profile routes:
-  - `/community/profile`
-  - `/community/profile/setup`
-  - `/community/profile/settings`
-  - `/community/profile/preview`
-- ✅ Confirmed intended profile route meanings:
-  - `/community/profile` = profile hub
-  - `/community/profile/setup` = mini first-time setup
-  - `/community/profile/settings` = full editable profile
-  - `/community/profile/preview` = visual public profile preview
-- ✅ Confirmed `/dashboard` and `/books` work after incomplete-profile redirect changes.
-- ✅ Confirmed deleted profile route leftovers are gone.
-- ✅ Added centralized teacher route protection with:
+- Added centralized teacher route protection with:
   - `components/TeacherAccessGate.tsx`
   - `app/(protected)/teacher/layout.tsx`
-- ✅ Confirmed `/teacher/*` routes are blocked for regular student/member accounts.
-- ✅ Confirmed teacher routes still work for teacher/super_teacher accounts.
-- ✅ Updated `lib/appAccess.ts` so `super_teacher` is treated as staff access.
+- Confirmed `/teacher/*` routes are blocked for regular student/member accounts.
+- Confirmed teacher routes still work for teacher/super_teacher accounts.
+- Updated `lib/appAccess.ts` so `super_teacher` is treated as staff access.
 
-Notes:
-
-The app now has a clearer two-layer route protection model:
-
-```txt
-app/(protected)/layout.tsx
-    = general logged-in/app-access protection
-
-app/(protected)/teacher/layout.tsx
-    = teacher/super_teacher-only protection
-```
-
-## ✅ 2026-05-21 — Profile and Email Privacy Cleanup
-
-Goal:
-
-Simplify profile routes and keep email private.
+## Profile and Email Privacy Cleanup
 
 Finished:
 
-- ✅ Removed full email display from visible profile/account pages.
-- ✅ Confirmed profile pages use username/display name instead of email.
-- ✅ Confirmed `profiles.email` does not exist in Supabase.
-- ✅ Confirmed no app-code usage of `profiles.email`.
-- ✅ Clarified profile route structure:
+- Removed full email display from visible profile/account pages.
+- Confirmed profile pages use username/display name instead of email.
+- Confirmed `profiles.email` does not exist in Supabase.
+- Confirmed no app-code usage of `profiles.email`.
+- Clarified profile route structure:
   - `/community/profile`
   - `/community/profile/setup`
   - `/community/profile/settings`
   - `/community/profile/preview`
-- ✅ Removed unused profile routes:
+- Removed unused profile routes:
   - `/community/profile/account`
   - `/community/profile/reading`
   - `/community/profile/social`
   - `/community/profile/public`
-- ✅ Confirmed remaining profile files are only the intended four profile routes.
 
 Notes:
 
 Mekuru should treat email as private login/account infrastructure handled by Supabase Auth, not as profile identity.
 
-## ✅ 2026-05-21 — Mekuru Reading Level Guide Restored
+## Removed Legacy Weekly Readings Routes
 
 Finished:
 
-- ✅ Restored the detailed Mekuru Reading Level Guide.
-- ✅ Connected the guide to `level` / `setLevel`.
-- ✅ Confirmed setup page uses the detailed level guide.
-- ✅ Confirmed settings page uses the detailed level guide.
-- ✅ Removed broken `<MekuruReadingLevelGuide />` usage.
-- ✅ Confirmed detailed reading level selection works again.
+- Confirmed the active global kanji study page is `/library-study/kanji`.
+- Confirmed `/books/[userBookId]/weekly-readings` is legacy.
+- Confirmed `/books/[userBookId]/weekly-readings/prepare` is legacy.
+- Removed the unused weekly-readings route folder.
+
+## Removed Old Stats Page
+
+Finished:
+
+- Confirmed no links pointed to `/community/stats/old`.
+- Removed old Stats page route: `/community/stats/old`.
+- Deleted `app/(protected)/community/stats/old/page.tsx`.
+- Removed the empty `old` folder.
+
+## Mekuru Reading Level Guide Restored
+
+Finished:
+
+- Restored the detailed Mekuru Reading Level Guide.
+- Connected the guide to `level` / `setLevel`.
+- Confirmed setup page uses the detailed level guide.
+- Confirmed settings page uses the detailed level guide.
+- Removed broken `<MekuruReadingLevelGuide />` usage.
 
 Notes:
 
 The detailed reading level guide is important because book difficulty/reflection ratings depend on the user’s current reading level.
 
-## ✅ 2026-05-21 — Removed Old Stats Page
+## RLS Review: `study_logs` and `user_study_events`
 
 Finished:
 
-- ✅ Confirmed no links pointed to `/community/stats/old`.
-- ✅ Removed old Stats page route: `/community/stats/old`.
-- ✅ Deleted `app/(protected)/community/stats/old/page.tsx`.
-- ✅ Removed the empty `old` folder.
-- ✅ Confirmed the route no longer appears in the page list.
+- Confirmed there is no broad authenticated-user read-all policy.
+- Confirmed `study_logs` lets users insert/select only their own rows.
+- Confirmed linked teachers can select linked student `study_logs` through `teacher_students`.
+- Confirmed `user_study_events` lets users select/insert/update/delete only their own rows.
+
+Decision:
+
+No RLS change needed for `study_logs` or `user_study_events` right now.
+
+## RLS Review: `user_book_reading_sessions`
+
+Finished:
+
+- Confirmed there is no broad authenticated-user read-all policy.
+- Confirmed owner access is scoped through the owning `user_books` row.
+- Confirmed linked teacher access depends on `teacher_students`.
+- Confirmed session columns are limited to reading date, pages, minutes, filler flag, and session mode.
+- Left linked-teacher SELECT/INSERT/DELETE access in place for now.
+
+Decision:
+
+No RLS change needed for `user_book_reading_sessions` right now.
+
+## Earlier RLS Tightening
+
+Finished:
+
+- Tightened `teacher_students` so normal teachers cannot self-create arbitrary teacher/student links.
+- Removed broad authenticated profile read policy.
+- Removed broad teacher insert policy on `user_books`.
+- Reviewed `user_book_words`.
+- Reviewed alert/settings tables.
+- Added learner completion policy for `learning_tasks`.
+- Tightened `teacher_book_prep_items`.
+- Tightened `/api/vocabulary-kanji-map/generate` and fixed related save-flow issues.
+
+---
+
+# Working Rules
+
+- Keep `docs/stabilization-plan.md` concise.
+- Keep detailed page-specific cleanup notes in `docs/refactor-maps/*.md`.
+- Refactor one page or feature at a time.
+- Prefer visual component extraction before service/DAO/controller work.
+- Do not change behavior unless the change is intentional and documented.
+- For UI pages, take before/after screenshots when possible.
+- After each cleanup task, run the app and confirm the original flow still works.
+- Run `npm run build` after meaningful code changes.
+- Treat recurring `next-env.d.ts` changes as generated noise unless intentionally investigating typed routes.

@@ -189,3 +189,26 @@ Examples:
 Good rule:
 
 > Test pages are for building and checking Mekuru safely. They are not part of the learner or teacher experience.
+
+# Page Name Refactor Map
+
+Extraction Tasks
+
+## Remaining
+
+- [ ] A. Task name
+1. Move:
+2. Stay in `page.tsx`:
+3. Props needed:
+4. Type:
+5. Risk:
+Notes.
+
+Target Architecture Placement
+...
+
+Old Map
+...
+
+## Finished
+...

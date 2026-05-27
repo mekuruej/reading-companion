@@ -4,27 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] F. Page header
-1. Move: back link plus hero/header block into `BookDifficultyHeader`.
-2. Stay in `page.tsx`: selected time label and selected theme.
-3. Props needed:
-    * selectedTimeLabel
-    * selectedTheme
-4. Type: presentational UI.
-5. Risk: low.
-Fix the current hero paragraph while extracting it; it currently renders a literal `description="..."` string.
-
-- [ ] G. Reader-fit table
-1. Move: the table section body into `ReaderFitTable`.
-2. Stay in `page.tsx`: `readerFitRows`, selected section wrapper, and derived sorting logic.
-3. Props needed:
-    * rows
-    * bookTypeLabel
-    * formatRating
-4. Type: presentational UI.
-5. Risk: medium.
-Rename the `Ease rating` column to `Difficulty` during this pass.
-
 - [ ] H. Types
 1. Move:
     * `DifficultyTimeRange`
@@ -239,3 +218,4 @@ Future home:
 - [✔️] Extracted `PieChart`.
 - [✔️] Extracted `Time range selector`.
 - [✔️] Extracted `Page header`.
+- [✔️] Extracted `Reader-fit table`.
