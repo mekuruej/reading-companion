@@ -216,6 +216,6 @@ Future home:
 - [✔️] Extracted `BarStrip`.
 - [✔️] Extracted `PieChart`.
 - [✔️] Extracted `ReadingAbilityFilterSelector`.
-- [✔️] Extracted `Page header`.
+- [✔️] Extracted `PageHeader`.
 - [✔️] Extracted `ReadingRangeCards`.
 - [✔️] Extracted `PaceExplanationCards`.

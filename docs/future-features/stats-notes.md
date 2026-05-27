@@ -48,3 +48,46 @@ Possible approach:
   - `Most Looked Up All Time`
 
 This would make Word History feel more alive and prevent old lookup habits from permanently dominating the page.
+
+## Future Performance / UX Note: Vocabulary Stats Data Scope
+
+The Vocabulary Stats page currently appears to work from broad/all-time saved-word, reading-session, and study-event data for the selected book category.
+
+This is acceptable for now, but may become slow for advanced readers or long-term users with thousands of saved words and many study events.
+
+Future direction:
+
+- Consider making Vocabulary Stats default to a recent time window such as this month, past 90 days, or past year.
+- Keep “All time” available, but avoid making it the only/default view if performance or usefulness becomes an issue.
+- Consider moving full saved-word browsing/searching to a dedicated Word History page.
+- Consider adding cached summary tables for monthly vocabulary stats, book-level vocabulary totals, and study signals.
+
+Related Word History decision:
+
+- “Most Looked Up” should probably be time-filtered by default.
+- If it is all-time only, the same common/high-frequency words may dominate forever.
+- Possible labels:
+  - Most Looked Up This Month
+  - Most Looked Up Recently
+  - Most Looked Up All Time
+
+  ## Future UX Note: Vocabulary Rhythm Color Intensity
+
+The Vocabulary rhythm calendar appears to use stronger/darker colors for higher activity days.
+
+Example:
+
+- Blue = studied
+- Darker blue = studied more / higher study volume
+
+The current legend explains the activity type, but not the color intensity.
+
+Future improvement:
+
+- Add a small note near the legend:
+  - “Darker colors mean more activity that day.”
+- Or add a tiny intensity legend:
+  - light = some activity
+  - dark = more activity
+
+This would make the dark blue / dark orange / dark purple days easier to understand.

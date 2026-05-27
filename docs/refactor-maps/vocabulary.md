@@ -4,15 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] H. Recent words grid
-1. Move: the recent saved words empty state and word card grid.
-2. Stay in `page.tsx`: `recentWords`, selected label, `SectionBand`.
-3. Props needed:
-    * words
-4. Type: presentational UI.
-5. Risk: low-medium.
-Simple UI, but make sure optional reading/meaning rendering remains identical.
-
 - [ ] I. Types
 1. Move:
     * `SessionMode`
@@ -293,3 +284,4 @@ Future home:
 - [✔️] Extracted `PieChart`.
 - [✔️] Extracted `BookCategoryFilterSelector`.
 - [✔️] Extracted `PageHeader`. 
+- [✔️] Extracted `RecentWordsGrid`.
