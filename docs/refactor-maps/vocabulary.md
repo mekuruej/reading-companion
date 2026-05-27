@@ -352,3 +352,9 @@ Future home:
 ## Finished
 
 - [✔️] Extracted `StatCard`.
+- [✔️] Extracted `MetricCards`.
+- [✔️] 
+- [✔️] 
+- [✔️] 
+- [✔️] 
+- [✔️] 
