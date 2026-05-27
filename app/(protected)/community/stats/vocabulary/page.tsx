@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import StatCard from "./components/StatCard";
 import SmallMetricCard from "./components/SmallMetricCard";
 import SectionBand from "./components/SectionBand";
+import BarStrip from "./components/BarStrip";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -323,46 +324,6 @@ function isSkippedStudyEvent(event: StudyEventRow) {
 function isKanjiStudyEvent(event: StudyEventRow) {
   const mode = event.study_mode ?? "";
   return mode === "kanji_reading_flashcards" || mode.includes("kanji");
-}
-
-function BarStrip({
-  items,
-  colorClass,
-  valueSuffix = "",
-}: {
-  items: { label: string; value: number }[];
-  colorClass: string;
-  valueSuffix?: string;
-}) {
-  const max = Math.max(1, ...items.map((item) => item.value));
-
-  return (
-    <div className="space-y-3">
-      {items.length === 0 ? (
-        <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-          No data yet.
-        </div>
-      ) : (
-        items.map((item) => (
-          <div key={item.label}>
-            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-              <span className="truncate text-slate-700">{item.label}</span>
-              <span className="shrink-0 font-medium text-slate-900">
-                {item.value}
-                {valueSuffix}
-              </span>
-            </div>
-            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className={`h-full rounded-full ${colorClass}`}
-                style={{ width: `${Math.max(6, (item.value / max) * 100)}%` }}
-              />
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
 }
 
 function PieChart({
