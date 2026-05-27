@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import BulkMessageBanner from "./components/BulkMessageBanner";
 import SaveBar from "./components/SaveBar";
 import BulkDonePanel from "./components/BulkDonePanel";
+import BulkStepIntroCard from "./components/BulkStepIntroCard";
 
 // -------------------------------------------------------------
 // Helpers
@@ -687,12 +688,10 @@ export default function BulkVocabPage() {
 
         {step === "definitions" && (
           <>
-            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-1 text-lg font-medium">Step 2 — Check Definitions</div>
-              <p className="text-sm text-gray-500">
-                Choose the best definition number for each word. Use Other if needed.
-              </p>
-            </div>
+            <BulkStepIntroCard
+              title="Step 2 — Check Definitions"
+              description="Choose the best definition number for each word. Use Other if needed."
+            />
 
             <div className="mb-4">
               <SaveBar label="Save Definitions" onClick={handleSaveDefinitions} />
@@ -771,12 +770,10 @@ export default function BulkVocabPage() {
 
         {step === "details" && (
           <>
-            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-1 text-lg font-medium">Step 3 — Add Page and Chapter Info</div>
-              <p className="text-sm text-gray-500">
-                Use the bulk tools or edit row by row, then save everything.
-              </p>
-            </div>
+            <BulkStepIntroCard
+              title="Step 3 — Add Page and Chapter Info"
+              description="Use the bulk tools or edit row by row, then save everything."
+            />
 
             <div className="mb-4">
               <SaveBar
