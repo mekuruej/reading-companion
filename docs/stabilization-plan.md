@@ -252,6 +252,50 @@ Next:
 
 # Completed Security / Stabilization Work
 
+## ✅ API Route Review — word-sky/approve
+
+Goal:
+
+Confirm the Word Sky approval route does not allow normal users to create or approve global vocabulary data.
+
+Reviewed route:
+
+- `app/api/word-sky/approve/route.ts`
+
+Finished:
+
+- ✅ Confirmed the route uses `SUPABASE_SERVICE_ROLE_KEY`, but protects writes with an explicit auth check.
+- ✅ Confirmed the route requires a Bearer token from the logged-in Supabase session.
+- ✅ Confirmed the route checks the caller’s profile and only allows:
+  - `role = "super_teacher"`
+  - or `is_super_teacher = true`
+- ✅ Confirmed normal users should receive `403`.
+- ✅ Confirmed logged-out requests should receive `401`.
+- ✅ Confirmed the only current caller is:
+  - `app/(protected)/books/[userBookId]/add-word/page.tsx`
+- ✅ Confirmed the Add Word page sends the Supabase access token in the request header:
+  - `Authorization: Bearer <session.access_token>`
+- ✅ Confirmed required fields are checked:
+  - `surface`
+  - `reading`
+  - `meaning`
+- ✅ Confirmed JLPT input is normalized to expected values.
+- ✅ Confirmed the route can create/update:
+  - `vocabulary_cache`
+  - `word_sky_starter_words`
+  - `vocabulary_kanji_map` rows for newly created cache rows
+
+Decision:
+
+No urgent security change needed for `word-sky/approve` right now.
+
+Cleanup-later notes:
+
+- Return more generic client-facing errors instead of raw-ish `err.message`.
+- Add length limits for `surface`, `reading`, `meaning`, and `meanings`.
+- Consider generating missing kanji-map rows even when the `vocabulary_cache` row already exists.
+- Optionally test as a regular user later to confirm the Word Sky super tool is hidden or blocked.
+
 ## Private Book Route Ownership Guard Pass
 
 Finished:
