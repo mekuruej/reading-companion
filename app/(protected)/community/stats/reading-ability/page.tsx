@@ -9,6 +9,7 @@ import StatCard from "./components/StatCard";
 import SectionBand from "./components/SectionBand";
 import BarStrip from "./components/BarStrip";
 import PieChart from "./components/PieChart";
+import ReadingAbilityFilterSelector from "./components/ReadingAbilityFilterSelector";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -816,37 +817,12 @@ export default function ReadingAbilityPage() {
                     description="Choose a broad kind of reading material. This changes the stats and book examples below."
                     tone={selectedTheme.section}
                 >
-                    <div className="grid gap-3 md:grid-cols-4">
-                        {READING_ABILITY_FILTERS.map((option) => {
-                            const selected = bookTypeFilter === option.value;
-
-                            return (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => setBookTypeFilter(option.value)}
-                                    className={`rounded-2xl border-2 px-4 py-3 text-left transition ${selected ? option.activeClass : option.inactiveClass
-                                        }`}
-                                >
-                                    <div className="text-base font-black">{option.title}</div>
-                                    <div
-                                        className={`mt-1 text-sm leading-5 ${selected ? "text-white/85" : ""
-                                            }`}
-                                    >
-                                        {option.description}
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <p className="mt-3 text-xs text-slate-500">
-                        <span className="font-semibold text-slate-700">
-                            {filteredBookMetrics.length}
-                        </span>{" "}
-                        book{filteredBookMetrics.length === 1 ? "" : "s"} with reading data included
-                        in this category.
-                    </p>
+                    <ReadingAbilityFilterSelector
+                        filters={READING_ABILITY_FILTERS}
+                        value={bookTypeFilter}
+                        onChange={(value) => setBookTypeFilter(value as ReadingAbilityFilter)}
+                        bookCount={filteredBookMetrics.length}
+                    />
                 </SectionBand>
 
                 <div className="grid gap-4 md:grid-cols-3">
