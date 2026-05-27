@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import StatCard from "./components/StatCard";
 import SectionBand from "./components/SectionBand";
+import BarStrip from "./components/BarStrip";
 
 type DifficultyTimeRange =
   | "all_time"
@@ -295,48 +296,6 @@ function pageCountBucket(pageCount: number | null | undefined) {
 function average(values: number[]) {
   if (values.length === 0) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function BarStrip({
-  items,
-  colorClass,
-  valueSuffix = "",
-}: {
-  items: { label: string; value: number }[];
-  colorClass: string;
-  valueSuffix?: string;
-}) {
-  const max = Math.max(1, ...items.map((item) => item.value));
-
-  if (items.length === 0) {
-    return (
-      <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-        No data yet.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {items.map((item) => (
-        <div key={item.label}>
-          <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-            <span className="truncate text-slate-700">{item.label}</span>
-            <span className="shrink-0 font-medium text-slate-900">
-              {item.value}
-              {valueSuffix}
-            </span>
-          </div>
-          <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className={`h-full rounded-full ${colorClass}`}
-              style={{ width: `${Math.max(6, (item.value / max) * 100)}%` }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 function PieChart({ items, size = 220 }: { items: PieItem[]; size?: number }) {
