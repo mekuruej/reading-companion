@@ -61,26 +61,6 @@ The first code changes should only move visual JSX into components and keep all 
 5. Risk: low-medium.
 Good early extraction, but keep navigation functions in `page.tsx` so the component only calls callbacks.
 
-- [ ] B. Message banner
-1. Move: the `message ? (...) : null` block that renders success/error text.
-2. Stay in `page.tsx`: all message setting and message text creation.
-3. Props needed:
-    * message
-4. Type: presentational UI.
-5. Risk: low.
-Good first extraction because it is small and behavior-free.
-
-- [ ] C. Save button bar
-1. Move: `SaveBar`.
-2. Stay in `page.tsx`: `handleSaveDefinitions`, `handleSaveAll`, `isSaving`.
-3. Props needed:
-    * label
-    * onClick
-    * disabled
-4. Type: presentational UI with callback.
-5. Risk: low.
-This is already a local UI helper and is one of the safest first moves.
-
 - [ ] D. Paste words panel
 1. Move: the Step 1 card, instructions, textarea, and preview button.
 2. Stay in `page.tsx`: `rawInput`, `setRawInput`, `wordCount`, `isPreviewing`, and `handlePreview`.
@@ -158,14 +138,6 @@ Do after `BulkApplyFieldsPanel`; the pattern is similar but has more textarea st
 4. Type: presentational UI with callback.
 5. Risk: medium.
 This is controlled-input-heavy, so it should not be the first extraction.
-
-- [ ] J. Done panel
-1. Move: the final Step Done card.
-2. Stay in `page.tsx`: `step === "done"` conditional.
-3. Props: none.
-4. Type: presentational UI.
-5. Risk: low.
-Very safe, but small. Good companion to another first-pass extraction.
 
 ## Recommended First Extraction
 
@@ -350,4 +322,6 @@ Future home:
 
 ## Finished
 
-- [ ] Nothing extracted yet.
+- [✔️] Extracted `BulkMessageBanner`.
+- [✔️] Extracted `SaveBar`.
+- [✔️] Extracted `BulkDonePanel`.
