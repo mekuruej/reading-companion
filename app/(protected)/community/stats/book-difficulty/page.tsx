@@ -9,6 +9,7 @@ import StatCard from "./components/StatCard";
 import SectionBand from "./components/SectionBand";
 import BarStrip from "./components/BarStrip";
 import PieChart from "./components/PieChart";
+import DifficultyTimeRangeSelector from "./components/DifficultyTimeRangeSelector";
 
 type DifficultyTimeRange =
   | "all_time"
@@ -680,39 +681,14 @@ export default function BookDifficultyPage() {
           </div>
         ) : null}
 
-        <SectionBand
-          eyebrow={`Time range — ${selectedTimeLabel}`}
-          title={selectedTimeLabel}
-          description="Choose the reader-fit window. Time ranges use a book’s finished date when available, then DNF, started, or added date."
+        <DifficultyTimeRangeSelector
+          filters={DIFFICULTY_TIME_FILTERS}
+          timeRange={timeRange}
+          selectedTimeLabel={selectedTimeLabel}
           tone={selectedTheme.section}
-        >
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            {DIFFICULTY_TIME_FILTERS.map((option) => {
-              const selected = timeRange === option.value;
-              const optionTheme = difficultyTheme(option.value);
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setTimeRange(option.value)}
-                  className={`rounded-xl border-2 px-3 py-2 text-left transition ${selected
-                    ? optionTheme.activeButton
-                    : optionTheme.inactiveButton
-                    }`}
-                >
-                  <div className="text-sm font-black">{option.title}</div>
-                  <div
-                    className={`mt-0.5 text-xs leading-4 ${selected ? "text-white/85" : ""
-                      }`}
-                  >
-                    {option.description}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </SectionBand>
+          getOptionTheme={difficultyTheme}
+          onSelectTimeRange={setTimeRange}
+        />
 
         <div className="grid gap-4 md:grid-cols-4">
           <StatCard
