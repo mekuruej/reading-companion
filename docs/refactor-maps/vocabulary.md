@@ -4,40 +4,6 @@ Extraction Tasks
 
 ## Remaining
 
-- [ ] B. Small metric cards
-1. Move: `SmallMetricCard`.
-2. Stay in `page.tsx`: rhythm/study calculations and values.
-3. Props needed:
-    * label
-    * value
-    * hint
-4. Type: presentational UI.
-5. Risk: low.
-Good first extraction because it is reused inside the rhythm and sticky-book sections.
-
-- [ ] C. Section wrapper
-1. Move: `SectionBand`.
-2. Stay in `page.tsx`: section order, selected theme, children.
-3. Props needed:
-    * eyebrow
-    * title
-    * description
-    * children
-    * tone
-4. Type: presentational UI.
-5. Risk: low.
-Good first extraction.
-
-- [ ] D. Bar strip
-1. Move: `BarStrip`.
-2. Stay in `page.tsx`: `wordiestBooks.map(...)`, color choice, suffix.
-3. Props needed:
-    * items
-    * colorClass
-    * valueSuffix
-4. Type: presentational UI.
-5. Risk: low.
-
 - [ ] E. Pie chart
 1. Move: `PieChart`.
 2. Stay in `page.tsx`: `wordsByBookTypePie`.
@@ -353,8 +319,8 @@ Future home:
 
 - [✔️] Extracted `StatCard`.
 - [✔️] Extracted `MetricCards`.
-- [✔️] 
-- [✔️] 
+- [✔️] Extracted `SectionBand`.
+- [✔️] Extracted `BarStrip`.
 - [✔️] 
 - [✔️] 
 - [✔️] 
