@@ -11,6 +11,7 @@ import BookVocabIntroCopy from "./components/BookVocabIntroCopy";
 import BookVocabReorderHint from "./components/BookVocabReorderHint";
 import BookVocabTableHeader from "./components/BookVocabTableHeader";
 import BookVocabEmptyRow from "./components/BookVocabEmptyRow";
+import BookVocabContextCard from "./components/BookVocabContextCard";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -965,6 +966,10 @@ export default function BookWordsPage() {
     );
   }
 
+  function openBookHub() {
+    router.push(`/books/${encodeURIComponent(userBookId)}`);
+  }
+
   return (
     <main className="max-w-6xl mx-auto p-6 pb-24">
       {editing && isTeacher ? (
@@ -1133,36 +1138,13 @@ export default function BookWordsPage() {
 
       <div className="border-b border-stone-200">
         <div className="space-y-3 py-4">
-          <button
-            type="button"
-            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="flex w-full flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 text-left shadow-sm transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400 sm:flex-row sm:items-center sm:justify-between sm:p-4"
-            title={`Go to ${bookTitle || "this book"} Book Hub`}
-          >
-            <div className="flex min-w-0 items-center gap-4">
-              {bookCover ? (
-                <img
-                  src={bookCover}
-                  alt={`Go to ${bookTitle || "this book"} Book Hub`}
-                  className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
-                />
-              ) : null}
-
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
-                <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
-                  {bookTitle || "Words"}
-                </div>
-                <p className="mt-1 text-sm text-stone-500">
-                  Total: {words.length} • Showing: {filteredSorted.length}
-                </p>
-              </div>
-            </div>
-
-            <span className="inline-flex w-fit rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800">
-              Book Hub
-            </span>
-          </button>
+          <BookVocabContextCard
+            bookTitle={bookTitle}
+            bookCover={bookCover}
+            totalCount={words.length}
+            visibleCount={filteredSorted.length}
+            onOpenBookHub={openBookHub}
+          />
 
           <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-3 shadow-sm">
             <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_220px]">
