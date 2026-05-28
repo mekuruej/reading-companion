@@ -1,14 +1,24 @@
+// Shows labeled values as relative horizontal bars.
+// Tiny non-zero bars keep a minimum visible width so low values are still noticeable.
 // TODO: Consider moving this to a shared stats component if more stats pages use the same bar strip pattern.
+
+type BarStripItem = {
+  label: string;
+  value: number;
+};
+
+type BarStripProps = {
+  items: BarStripItem[];
+  colorClass: string;
+  valueSuffix?: string;
+};
 
 export default function BarStrip({
   items,
   colorClass,
   valueSuffix = "",
-}: {
-  items: { label: string; value: number }[];
-  colorClass: string;
-  valueSuffix?: string;
-}) {
+}: BarStripProps) {
+  // Use at least 1 so empty or all-zero data does not create divide-by-zero widths.
   const max = Math.max(1, ...items.map((item) => item.value));
 
   return (
@@ -22,9 +32,11 @@ export default function BarStrip({
               {valueSuffix}
             </span>
           </div>
+
           <div className="h-3 overflow-hidden rounded-full bg-slate-100">
             <div
               className={`h-full rounded-full ${colorClass}`}
+              // Keep very small positive values visible instead of letting the bar disappear.
               style={{ width: `${Math.max(6, (item.value / max) * 100)}%` }}
             />
           </div>
