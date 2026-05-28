@@ -1,9 +1,8 @@
 // Rating Tab
-// 
 
 "use client";
 
-import { useState, type ComponentType } from "react";
+import type { ComponentType } from "react";
 import CommunityTab from "./CommunityTab";
 
 type Option = {
@@ -23,16 +22,10 @@ type UserBook = {
 type RatingTabProps = {
   row: UserBook;
 
-  onSave: () => void | Promise<void>;
-  onSaveReaderFit: () => void | Promise<void>;
-  onSaveCommunity: () => void | Promise<void>;
+  onSaveReflection: () => void | Promise<void>;
   saving?: boolean;
-  isEditingReaderFit: boolean;
-  isEditingGenres: boolean;
-  isEditingContentNotes: boolean;
-  onEditReaderFit: () => void;
-  onEditGenres: () => void;
-  onEditContentNotes: () => void;
+  isEditingReflection: boolean;
+  onEditReflection: () => void;
   onCancel: () => void;
 
   myReview: string;
@@ -41,8 +34,6 @@ type RatingTabProps = {
   ratingOverall: string;
   setRatingOverall: (value: string) => void;
 
-  readerLevel: string;
-  setReaderLevel: (value: string) => void;
   profileLevel: string;
   ratingDifficulty: string;
   setRatingDifficulty: (value: string) => void;
@@ -91,90 +82,63 @@ const READER_LEVEL_OPTIONS = [
   { value: "Level 10", label: "Upper Advanced", cefr: "C1-ish", jlpt: "Solid N1+" },
 ] as const;
 
-const READER_LEVEL_GROUPS = [
-  {
-    title: "Beginner Readers",
-    values: ["Level 1", "Level 2", "Level 3", "Level 4", "Level 5"] as readonly string[],
-  },
-  {
-    title: "Intermediate Readers",
-    values: ["Level 6", "Level 7", "Level 8"] as readonly string[],
-  },
-  {
-    title: "Advanced Readers",
-    values: ["Level 9", "Level 10"] as readonly string[],
-  },
-] as const;
-
-function CardHeader({
-  title,
+function ReflectionControls({
   editing,
+  saving,
   onEdit,
   onCancel,
   onSave,
-  saving = false,
 }: {
-  title: string;
   editing: boolean;
+  saving: boolean;
   onEdit: () => void;
   onCancel: () => void;
   onSave: () => void | Promise<void>;
-  saving?: boolean;
 }) {
-  return (
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <div className="text-sm font-semibold text-stone-900">{title}</div>
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={onEdit}
+        className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+      >
+        Edit Reflection
+      </button>
+    );
+  }
 
-      {!editing ? (
-        <button
-          type="button"
-          onClick={onEdit}
-          className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
-        >
-          Edit
-        </button>
-      ) : (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
-      )}
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="rounded-lg bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-900 transition hover:bg-stone-300"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={saving}
+        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+      >
+        {saving ? "Saving..." : "Save Reflection"}
+      </button>
     </div>
   );
 }
 
 export default function RatingTab({
   row,
-  onSave,
-  onSaveReaderFit,
-  onSaveCommunity,
+  onSaveReflection,
   saving = false,
-  isEditingReaderFit,
-  isEditingGenres,
-  isEditingContentNotes,
-  onEditReaderFit,
-  onEditGenres,
-  onEditContentNotes,
+  isEditingReflection,
+  onEditReflection,
   onCancel,
   myReview,
   setMyReview,
   ratingOverall,
   setRatingOverall,
-  readerLevel,
-  setReaderLevel,
   profileLevel,
   ratingDifficulty,
   setRatingDifficulty,
@@ -193,65 +157,109 @@ export default function RatingTab({
   StarRatingField,
   DifficultyField,
 }: RatingTabProps) {
-  const [editingReview, setEditingReview] = useState(false);
-  const [editingRatings, setEditingRatings] = useState(false);
-  const [editingMemory, setEditingMemory] = useState(false);
-
-  function cancelReview() {
-    setMyReview(row.my_review ?? "");
-    setEditingReview(false);
-  }
-
-  function cancelRatings() {
-    setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
-    setEditingRatings(false);
-  }
-
-  function cancelMemory() {
-    setFavoriteQuotes(row.favorite_quotes ?? "");
-    setMemorableWords(row.memorable_words ?? "");
-    setEditingMemory(false);
-  }
-
-  async function saveReview() {
-    await onSave();
-    setEditingReview(false);
-  }
-
-  async function saveRatings() {
-    await onSave();
-    setEditingRatings(false);
-  }
-
-  async function saveReaderFit() {
-    await onSaveReaderFit();
-  }
-
-  async function saveMemory() {
-    await onSave();
-    setEditingMemory(false);
-  }
-
   const currentLevelInfo =
-    READER_LEVEL_OPTIONS.find((option) => option.value === (row.reader_level ?? readerLevel)) ??
-    null;
-  const profileLevelLabel = profileLevel
-    ? `${profileLevel.replace(/_/g, " ")} reader`
-    : "your profile level";
+    READER_LEVEL_OPTIONS.find((option) => option.value === profileLevel) ?? null;
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <CardHeader
-          title="My Review"
-          editing={editingReview}
-          onEdit={() => setEditingReview(true)}
-          onCancel={cancelReview}
-          onSave={saveReview}
+      <div className="flex items-center justify-end">
+        <ReflectionControls
+          editing={isEditingReflection}
           saving={saving}
+          onEdit={onEditReflection}
+          onCancel={onCancel}
+          onSave={onSaveReflection}
         />
+      </div>
 
-        {!editingReview ? (
+      <div
+        id="reader-difficulty-section"
+        className="rounded-2xl border border-stone-200 bg-stone-50 p-4 scroll-mt-6"
+      >
+        <div className="mb-3 text-sm font-semibold text-stone-900">
+          Reader Difficulty
+        </div>
+
+        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm leading-6 text-sky-950">
+          Ratings, including entertainment and difficulty, will appear anonymously in Find
+          Your Next Book to help readers filter for books that fit them. Your profile remains
+          anonymous.
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded border bg-white p-3 text-sm">
+            <div className="text-stone-600">Reader level from profile</div>
+            {currentLevelInfo ? (
+              <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
+                <div className="font-medium text-stone-900">
+                  {currentLevelInfo.value} · {currentLevelInfo.label}
+                </div>
+                <div className="mt-1 text-xs text-stone-500">
+                  {currentLevelInfo.cefr} · {currentLevelInfo.jlpt}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 font-medium text-stone-900">
+                {profileLevel ? profileLevel.replace(/_/g, " ") : "—"}
+              </div>
+            )}
+            <div className="mt-3 text-xs leading-5 text-stone-500">
+              Reader level comes from your profile. Change it in Profile Settings if needed.
+            </div>
+          </div>
+
+          <DifficultyField
+            value={row.rating_difficulty}
+            editing={isEditingReflection}
+            inputValue={ratingDifficulty}
+            setInputValue={setRatingDifficulty}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+        <div className="mb-3 text-sm font-semibold text-stone-900">
+          Entertainment Rating
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          <StarRatingField
+            label="Entertainment Rating"
+            value={row.rating_overall}
+            editing={isEditingReflection}
+            inputValue={ratingOverall}
+            setInputValue={setRatingOverall}
+            descriptions={{
+              1: "Not for me / did not enjoy much.",
+              2: "Some parts worked, but I would not rush to recommend it.",
+              3: "Good solid book.",
+              4: "Very good! Definitely will recommend it.",
+              5: "Loved it / highly recommend.",
+            }}
+          />
+        </div>
+
+        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          Ratings, including entertainment and difficulty, will appear anonymously in Find
+          Your Next Book to help readers filter for books that fit them. Your profile remains
+          anonymous.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-center">
+        <ReflectionControls
+          editing={isEditingReflection}
+          saving={saving}
+          onEdit={onEditReflection}
+          onCancel={onCancel}
+          onSave={onSaveReflection}
+        />
+      </div>
+
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+        <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+
+        {!isEditingReflection ? (
           <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
             {row.my_review?.trim() ? row.my_review : "—"}
           </div>
@@ -263,152 +271,6 @@ export default function RatingTab({
             className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
           />
         )}
-      </div>
-
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <CardHeader
-          title="Entertainment Rating"
-          editing={editingRatings}
-          onEdit={() => setEditingRatings(true)}
-          onCancel={cancelRatings}
-          onSave={saveRatings}
-          saving={saving}
-        />
-
-        <div className="grid grid-cols-1 gap-3">
-          <StarRatingField
-            label="Entertainment Rating"
-            value={row.rating_overall}
-            editing={editingRatings}
-            inputValue={ratingOverall}
-            setInputValue={setRatingOverall}
-            descriptions={{
-              5: "Exceptional! Already want to read it again!",
-              4: "Very good! Definitely will recommend it.",
-              3: "Good solid book.",
-              2: "Not bad, but I would have liked to read something else.",
-              1: "Didn’t like it.",
-            }}
-          />
-        </div>
-
-        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-          Entertainment Rating can appear in Community Ratings as an anonymous reader signal.
-          Your written review stays private unless we add sharing later.
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <CardHeader
-          title="Reading Fit"
-          editing={isEditingReaderFit}
-          onEdit={onEditReaderFit}
-          onCancel={onCancel}
-          onSave={saveReaderFit}
-          saving={saving}
-        />
-
-        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm leading-6 text-sky-950">
-          This can appear in Community Ratings as anonymous reader-fit data, like “A Level 9
-          reader rated this difficulty 5/5.” It will not link back to your profile.
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">My Level at Time of Reading</div>
-            {currentLevelInfo ? (
-              <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
-                <div className="font-medium text-stone-900">
-                  {currentLevelInfo.value} · {currentLevelInfo.label}
-                </div>
-                <div className="mt-1 text-xs text-stone-500">
-                  {currentLevelInfo.cefr} · {currentLevelInfo.jlpt}
-                </div>
-              </div>
-            ) : (
-              <div className="mt-2 font-medium text-stone-900">—</div>
-            )}
-            {isEditingReaderFit ? (
-              <div className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
-                Your main profile can stay broad, like {profileLevelLabel}. This book rating saves
-                the detailed Mekuru level below so future filters can compare similar readers.
-              </div>
-            ) : null}
-            <div className="mt-3 text-xs leading-5 text-stone-500">
-              Public profiles stay broad. Reading Reflection uses the detailed level for this book.
-            </div>
-          </div>
-
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Detailed Reader Level for This Book</div>
-            {isEditingReaderFit ? (
-              <div className="mt-3 space-y-4">
-                {READER_LEVEL_GROUPS.map((group) => {
-                  const options = READER_LEVEL_OPTIONS.filter((option) =>
-                    group.values.includes(option.value)
-                  );
-
-                  return (
-                    <div key={group.title}>
-                      <div className="flex items-center gap-3">
-                        <div className="h-px flex-1 bg-stone-200" />
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-stone-500">
-                          {group.title}
-                        </div>
-                        <div className="h-px flex-1 bg-stone-200" />
-                      </div>
-
-                      <div className="mt-2 grid gap-2">
-                        {options.map((option) => {
-                          const selected = readerLevel === option.value;
-
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => setReaderLevel(option.value)}
-                              className={[
-                                "rounded-xl border px-3 py-2 text-left transition",
-                                selected
-                                  ? "border-stone-900 bg-stone-900 text-white"
-                                  : "border-stone-200 bg-stone-50 text-stone-800 hover:bg-white",
-                              ].join(" ")}
-                            >
-                              <div className="text-sm font-black">
-                                {option.value} · {option.label}
-                              </div>
-                              <div
-                                className={[
-                                  "mt-0.5 text-xs",
-                                  selected ? "text-white/75" : "text-stone-500",
-                                ].join(" ")}
-                              >
-                                {option.cefr} · {option.jlpt}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mt-2 text-stone-700">
-                {currentLevelInfo
-                  ? `${currentLevelInfo.value} · ${currentLevelInfo.label}`
-                  : "Add your detailed level when you edit Reading Fit."}
-              </div>
-            )}
-          </div>
-
-          <DifficultyField
-            value={row.rating_difficulty}
-            editing={isEditingReaderFit}
-            inputValue={ratingDifficulty}
-            setInputValue={setRatingDifficulty}
-          />
-        </div>
       </div>
 
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
@@ -423,13 +285,15 @@ export default function RatingTab({
         </div>
 
         <CommunityTab
-          isEditingGenres={isEditingGenres}
-          isEditingContentNotes={isEditingContentNotes}
+          singleEditMode
+          editing={isEditingReflection}
+          isEditingGenres={false}
+          isEditingContentNotes={false}
           saving={saving}
-          onEditGenres={onEditGenres}
-          onEditContentNotes={onEditContentNotes}
+          onEditGenres={onEditReflection}
+          onEditContentNotes={onEditReflection}
           onCancel={onCancel}
-          onSave={onSaveCommunity}
+          onSave={onSaveReflection}
           genre={genre}
           setGenre={setGenre}
           triggerWarnings={triggerWarnings}
@@ -442,16 +306,11 @@ export default function RatingTab({
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <CardHeader
-          title="Reading Memory"
-          editing={editingMemory}
-          onEdit={() => setEditingMemory(true)}
-          onCancel={cancelMemory}
-          onSave={saveMemory}
-          saving={saving}
-        />
+        <div className="mb-3 text-sm font-semibold text-stone-900">
+          Reading Memory
+        </div>
 
-        {!editingMemory ? (
+        {!isEditingReflection ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded border bg-white p-3 text-sm">
               <div className="text-stone-600">Favorite Quotes</div>
@@ -496,6 +355,16 @@ export default function RatingTab({
             </div>
           </div>
         )}
+      </div>
+
+      <div className="flex items-center justify-center">
+        <ReflectionControls
+          editing={isEditingReflection}
+          saving={saving}
+          onEdit={onEditReflection}
+          onCancel={onCancel}
+          onSave={onSaveReflection}
+        />
       </div>
     </div>
   );

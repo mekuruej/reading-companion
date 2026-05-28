@@ -105,8 +105,7 @@ type EditingPanel =
   | "bookInfoLinks"
   | "bookInfoCopy"
   | "communityGenres"
-  | "communityContentNotes"
-  | "reflectionReaderFit";
+  | "communityContentNotes";
 type VocabTab = "readAlong" | "bulk";
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher";
 
@@ -518,7 +517,11 @@ function percentToPage(percent: number | null, pageCount: number | null) {
 }
 
 function genreLabel(value: string | null | undefined) {
-  return GENRE_OPTIONS.find((opt) => opt.value === value)?.label ?? "—";
+  if (!value) return "—";
+  return (
+    GENRE_OPTIONS.find((opt) => opt.value === value)?.label ??
+    value.replaceAll("_", " ")
+  );
 }
 
 function parseCommunityTags(value: string) {
@@ -582,7 +585,7 @@ export default function BookHubPage() {
   const [editingTab, setEditingTab] = useState<EditingPanel | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<HubTab>("study");
+  const [activeTab, setActiveTab] = useState<HubTab>("reflection");
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
 
@@ -887,7 +890,7 @@ export default function BookHubPage() {
   const isEditingBookInfoCopy = editingTab === "bookInfoCopy";
   const isEditingCommunityGenres = editingTab === "communityGenres";
   const isEditingCommunityContentNotes = editingTab === "communityContentNotes";
-  const isEditingReflectionReaderFit = editingTab === "reflectionReaderFit";
+  const isEditingReflection = editingTab === "reflection";
 
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
@@ -2931,7 +2934,7 @@ export default function BookHubPage() {
     setActiveTab("reflection");
     window.requestAnimationFrame(() => {
       document
-        .getElementById("reading-reflection-panel")
+        .getElementById("reader-difficulty-section")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
@@ -3426,6 +3429,27 @@ export default function BookHubPage() {
   }, [userBookId]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get("tab") ?? window.location.hash.replace(/^#/, "");
+    const normalizedTab =
+      requestedTab === "vocab" || requestedTab === "vocabulary"
+        ? "study"
+        : requestedTab;
+
+    if (
+      normalizedTab === "bookInfo" ||
+      normalizedTab === "study" ||
+      normalizedTab === "reading" ||
+      normalizedTab === "story" ||
+      normalizedTab === "reflection"
+    ) {
+      setActiveTab(normalizedTab);
+    }
+  }, []);
+
+  useEffect(() => {
     async function loadBookOptions() {
       if (!userId) return;
 
@@ -3906,7 +3930,7 @@ export default function BookHubPage() {
     };
   }
 
-  async function saveRatingTabFields() {
+  async function saveReadingReflectionFields() {
     if (!row?.id) {
       setError("Book record is not loaded yet.");
       return;
@@ -3920,48 +3944,6 @@ export default function BookHubPage() {
       const ro = ratingOverall.trim()
         ? clampRating5(Number(ratingOverall.trim()))
         : null;
-
-      const { error: userBookError } = await supabase
-        .from("user_books")
-        .update({
-          my_review: myReview.trim() || null,
-          rating_overall: ro,
-          favorite_quotes: favoriteQuotes.trim() || null,
-          memorable_words: memorableWords.trim() || null,
-        })
-        .eq("id", row.id);
-
-      if (userBookError) throw userBookError;
-
-      setSaveNoticeTone("success");
-      setSaveNotice("Saved.");
-      await load();
-    } catch (saveError: any) {
-      console.error("Error saving rating tab fields:", {
-        message: saveError?.message,
-        details: saveError?.details,
-        hint: saveError?.hint,
-        code: saveError?.code,
-        raw: saveError,
-      });
-
-      setError(saveError?.message ?? "Could not save rating tab fields.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveReflectionReaderFitFields() {
-    if (!row?.id) {
-      setError("Book record is not loaded yet.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setSaveNotice("");
-
-    try {
       const rd = ratingDifficulty.trim()
         ? clampRating5(Number(ratingDifficulty.trim()))
         : null;
@@ -3969,18 +3951,33 @@ export default function BookHubPage() {
       const { error: userBookError } = await supabase
         .from("user_books")
         .update({
-          reader_level: readerLevel || null,
+          my_review: myReview.trim() || null,
+          rating_overall: ro,
           rating_difficulty: rd,
+          favorite_quotes: favoriteQuotes.trim() || null,
+          memorable_words: memorableWords.trim() || null,
         })
         .eq("id", row.id);
 
       if (userBookError) throw userBookError;
 
+      if (row.books?.id) {
+        await saveCommunityContributions(row.books.id, userId);
+      }
+
       setSaveNoticeTone("success");
       setSaveNotice("Saved.");
+      setEditingTab(null);
       await load();
     } catch (saveError: any) {
-      console.error("Error saving reading reflection fit fields:", saveError);
+      console.error("Error saving reading reflection fields:", {
+        message: saveError?.message,
+        details: saveError?.details,
+        hint: saveError?.hint,
+        code: saveError?.code,
+        raw: saveError,
+      });
+
       setError(saveError?.message ?? "Could not save reading reflection fields.");
     } finally {
       setSaving(false);
@@ -5102,6 +5099,13 @@ export default function BookHubPage() {
                 <div className="mb-4 w-full border-b border-stone-400 px-2">
                   <div className="flex flex-wrap items-end gap-3">
                     <FilingTab
+                      active={activeTab === "reflection"}
+                      onClick={() => setActiveTab("reflection")}
+                    >
+                      Reading Reflection
+                    </FilingTab>
+
+                    <FilingTab
                       active={activeTab === "study"}
                       onClick={() => setActiveTab("study")}
                     >
@@ -5120,13 +5124,6 @@ export default function BookHubPage() {
                       onClick={() => setActiveTab("story")}
                     >
                       Story Details
-                    </FilingTab>
-
-                    <FilingTab
-                      active={activeTab === "reflection"}
-                      onClick={() => setActiveTab("reflection")}
-                    >
-                      Reading Reflection
                     </FilingTab>
 
                     <FilingTab
@@ -5388,23 +5385,15 @@ export default function BookHubPage() {
 
                   <RatingTab
                     row={row}
-                    onSave={saveRatingTabFields}
-                    onSaveReaderFit={saveReflectionReaderFitFields}
-                    onSaveCommunity={saveAll}
+                    onSaveReflection={saveReadingReflectionFields}
                     saving={saving}
-                    isEditingReaderFit={isEditingReflectionReaderFit}
-                    isEditingGenres={isEditingCommunityGenres}
-                    isEditingContentNotes={isEditingCommunityContentNotes}
-                    onEditReaderFit={() => setEditingTab("reflectionReaderFit")}
-                    onEditGenres={() => setEditingTab("communityGenres")}
-                    onEditContentNotes={() => setEditingTab("communityContentNotes")}
+                    isEditingReflection={isEditingReflection}
+                    onEditReflection={() => setEditingTab("reflection")}
                     onCancel={cancelEdits}
                     myReview={myReview}
                     setMyReview={setMyReview}
                     ratingOverall={ratingOverall}
                     setRatingOverall={setRatingOverall}
-                    readerLevel={readerLevel}
-                    setReaderLevel={setReaderLevel}
                     profileLevel={profileLevel}
                     ratingDifficulty={ratingDifficulty}
                     setRatingDifficulty={setRatingDifficulty}
@@ -5692,20 +5681,9 @@ function StarRatingField({
             <span>5</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-2">
-            {[5, 4, 3, 2, 1].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setInputValue(String(n))}
-                className={`rounded-lg border px-2 py-1.5 text-xs font-semibold transition ${selected === n
-                  ? "border-amber-500 bg-amber-50 text-amber-700"
-                  : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-                  }`}
-              >
-                {n}
-              </button>
-            ))}
+          <div className="flex items-center justify-between gap-3 text-[11px] text-stone-500">
+            <span>Not for me</span>
+            <span>Loved it</span>
           </div>
         </div>
       )}

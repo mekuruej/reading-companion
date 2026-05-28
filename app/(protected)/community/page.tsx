@@ -6,56 +6,23 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-type PublicProfileRow = {
-  user_id: string;
-  jlpt_level_public: string | null;
-};
-
-type BookMeta = {
-  id: string;
-  title: string | null;
-  author: string | null;
-  cover_url: string | null;
-  book_type: string | null;
-};
-
-type UserBookRatingRow = {
-  id: string;
-  user_id: string;
-  rating_overall: number | null;
-  rating_difficulty: number | null;
-  reader_level: string | null;
-  finished_at: string | null;
-  books: BookMeta | BookMeta[] | null;
-};
-
 type LibraryWordSummaryRow = {
   user_id: string;
   study_identity_key: string;
   first_seen_at: string | null;
 };
 
-type BookRatingSignal = {
-  id: string;
-  readerLevel: string | null;
-  entertainmentRating: number | null;
-  difficultyRating: number | null;
-  finishedAt: string | null;
+type LibraryWordProgressRow = {
+  user_id: string;
+  study_identity_key: string;
+  reading_gate_status: "not_started" | "passed" | "failed" | null;
+  meaning_gate_status: "not_started" | "passed" | "failed" | null;
+  mastered: boolean | null;
+  mastered_at: string | null;
+  reading_gate_failed_at: string | null;
+  meaning_gate_failed_at: string | null;
+  last_studied_at: string | null;
 };
-
-type RatedBookGroup = {
-  bookId: string;
-  title: string;
-  author: string | null;
-  coverUrl: string | null;
-  bookType: string | null;
-  signals: BookRatingSignal[];
-  latestFinishedAt: string | null;
-  averageEntertainmentRating: number | null;
-  averageDifficultyRating: number | null;
-};
-
-type SortMode = "recent" | "rating" | "ease" | "difficulty";
 
 const mySpaceCards = [
   {
@@ -85,144 +52,48 @@ const communityCards = [
       "Future shared reading spaces for groups, guided reading, and book-based community events.",
     className: "border-amber-200 bg-amber-50 text-amber-950",
   },
-  {
-    title: "Reader Insights",
-    href: "/discovery/reader-insights",
-    eyebrow: "Coming soon",
-    description:
-      "A future space for anonymous comfort ratings, difficulty patterns, and reader-level insights.",
-    className: "border-violet-200 bg-violet-50 text-violet-950",
-  },
 ];
-
-function average(values: number[]) {
-  if (values.length === 0) return null;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
 
 function formatAverage(value: number | null) {
   if (value == null || !Number.isFinite(value)) return "—";
   return value.toFixed(1);
 }
 
-function daysBetweenInclusive(start: string, end: string) {
-  const startTime = new Date(start).getTime();
-  const endTime = new Date(end).getTime();
-  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return 1;
-  return Math.max(1, Math.floor((endTime - startTime) / 86400000) + 1);
+function ymdLocal(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-function firstBook(row: UserBookRatingRow) {
-  if (Array.isArray(row.books)) return row.books[0] ?? null;
-  return row.books ?? null;
+function yesterdayRange() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(today.getDate() - 1);
+  const end = new Date(today);
+
+  return {
+    start,
+    end,
+    label: ymdLocal(start),
+  };
 }
 
-function bookTypeLabel(value: string | null | undefined) {
-  if (!value) return "book";
-  return value
-    .split(/[_-]/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+function isInRange(value: string | null | undefined, start: Date, end: Date) {
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) && time >= start.getTime() && time < end.getTime();
 }
 
-function formatReaderLevel(value: string | null | undefined) {
-  const cleaned = (value ?? "").trim();
-  if (!cleaned) return "A reader";
-  const levelMatch = cleaned.match(/^Level\s+(\d+)$/i) ?? cleaned.match(/^(\d+)$/);
-  const levelNumber = levelMatch?.[1];
-
-  if (levelNumber) {
-    const levelDescriptions: Record<string, string> = {
-      "1": "pre-N5",
-      "2": "early N5",
-      "3": "solid N5",
-      "4": "lower N4",
-      "5": "upper N4",
-      "6": "lower N3",
-      "7": "upper N3",
-      "8": "lower N2",
-      "9": "lower N1",
-      "10": "upper N1",
-    };
-
-    const description = levelDescriptions[levelNumber];
-    return description
-      ? `A Level ${levelNumber} reader (${description})`
-      : `A Level ${levelNumber} reader`;
-  }
-
-  return `A ${cleaned} reader`;
+function incrementCount(map: Map<string, number>, key: string, amount = 1) {
+  map.set(key, (map.get(key) ?? 0) + amount);
 }
 
-function bookSignalSentence(signal: BookRatingSignal, bookTypeValue: string | null) {
-  const bookType = bookTypeLabel(bookTypeValue).toLowerCase();
-  const reader = formatReaderLevel(signal.readerLevel);
-  const difficulty =
-    signal.difficultyRating != null
-      ? ` thought this ${bookType} was ${formatAverage(signal.difficultyRating)} difficulty`
-      : ` rated this ${bookType}`;
-  const entertainment =
-    signal.entertainmentRating != null
-      ? ` and gave it an Entertainment Rating of ${formatAverage(signal.entertainmentRating)}/5`
-      : "";
-
-  return `${reader}${difficulty}${entertainment}.`;
-}
-
-function RatingStars({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | null;
-  tone: "amber" | "sky";
-}) {
-  const safeValue =
-    value == null || !Number.isFinite(value)
-      ? null
-      : Math.max(0, Math.min(5, value));
-  const fillWidth = safeValue == null ? 0 : (safeValue / 5) * 100;
-  const colorClass = tone === "amber" ? "text-amber-500" : "text-sky-500";
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-          {label}
-        </span>
-        <span className="text-xs font-black text-slate-700">
-          {safeValue == null ? "—" : `${formatAverage(safeValue)}/5`}
-        </span>
-      </div>
-
-      <div
-        className="relative mt-1 inline-block whitespace-nowrap text-lg leading-none tracking-[0.08em]"
-        aria-hidden="true"
-      >
-        <span className="text-slate-200">★★★★★</span>
-        <span
-          className={`absolute inset-y-0 left-0 overflow-hidden ${colorClass}`}
-          style={{ width: `${fillWidth}%` }}
-        >
-          ★★★★★
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function RatingStack({ signal }: { signal: BookRatingSignal }) {
-  if (signal.difficultyRating == null && signal.entertainmentRating == null) {
-    return null;
-  }
-
-  return (
-    <div className="grid min-w-[170px] gap-2 sm:ml-auto sm:w-[190px]">
-      <RatingStars label="Difficulty" value={signal.difficultyRating} tone="sky" />
-      <RatingStars label="Entertainment" value={signal.entertainmentRating} tone="amber" />
-    </div>
-  );
+function averageCount(map: Map<string, number>, userCount: number) {
+  if (userCount <= 0) return null;
+  const total = Array.from(map.values()).reduce((sum, value) => sum + value, 0);
+  return total / userCount;
 }
 
 function HubCard({
@@ -265,10 +136,12 @@ function StatPill({
   label,
   value,
   tone,
+  detail,
 }: {
   label: string;
   value: string;
   tone: string;
+  detail?: string;
 }) {
   return (
     <div className={`rounded-3xl border px-4 py-4 shadow-sm ${tone}`}>
@@ -276,6 +149,9 @@ function StatPill({
         {label}
       </div>
       <div className="mt-2 text-3xl font-black">{value}</div>
+      {detail ? (
+        <div className="mt-1 text-xs font-semibold opacity-65">{detail}</div>
+      ) : null}
     </div>
   );
 }
@@ -283,11 +159,8 @@ function StatPill({
 export default function CommunityHubPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<PublicProfileRow[]>([]);
-  const [ratingRows, setRatingRows] = useState<UserBookRatingRow[]>([]);
   const [wordSummaries, setWordSummaries] = useState<LibraryWordSummaryRow[]>([]);
-  const [sortMode, setSortMode] = useState<SortMode>("recent");
-  const [bookTypeFilter, setBookTypeFilter] = useState("all");
+  const [wordProgressRows, setWordProgressRows] = useState<LibraryWordProgressRow[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -297,48 +170,26 @@ export default function CommunityHubPage() {
       setErrorMsg(null);
 
       try {
-        const [profileResult, ratingResult, wordResult] = await Promise.all([
-          supabase
-            .from("user_public_profile")
-            .select("user_id, jlpt_level_public")
-            .limit(500),
-          supabase
-            .from("user_books")
-            .select(
-              `
-              id,
-              user_id,
-              rating_overall,
-              rating_difficulty,
-              reader_level,
-              finished_at,
-              books:book_id (
-                id,
-                title,
-                author,
-                cover_url,
-                book_type
-              )
-            `
-            )
-            .or("rating_overall.not.is.null,rating_difficulty.not.is.null")
-            .order("finished_at", { ascending: false, nullsFirst: false })
-            .limit(1000),
+        const [wordResult, progressResult] = await Promise.all([
           supabase
             .from("user_library_word_summaries")
             .select("user_id, study_identity_key, first_seen_at")
             .limit(10000),
+          supabase
+            .from("user_library_word_progress")
+            .select(
+              "user_id, study_identity_key, reading_gate_status, meaning_gate_status, mastered, mastered_at, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
+            )
+            .limit(10000),
         ]);
 
-        if (profileResult.error) throw profileResult.error;
-        if (ratingResult.error) throw ratingResult.error;
         if (wordResult.error) throw wordResult.error;
+        if (progressResult.error) throw progressResult.error;
 
         if (!alive) return;
 
-        setProfiles((profileResult.data ?? []) as PublicProfileRow[]);
-        setRatingRows((ratingResult.data ?? []) as UserBookRatingRow[]);
         setWordSummaries((wordResult.data ?? []) as LibraryWordSummaryRow[]);
+        setWordProgressRows((progressResult.data ?? []) as LibraryWordProgressRow[]);
       } catch (error: any) {
         console.error("Error loading community snapshot:", error);
         if (!alive) return;
@@ -355,147 +206,69 @@ export default function CommunityHubPage() {
     };
   }, []);
 
-  const bookTypeOptions = useMemo(() => {
-    const types = new Set<string>();
+  const yesterday = useMemo(() => yesterdayRange(), []);
 
-    for (const row of ratingRows) {
-      const book = firstBook(row);
-      if (book?.book_type) types.add(book.book_type);
-    }
-
-    return Array.from(types).sort((a, b) =>
-      bookTypeLabel(a).localeCompare(bookTypeLabel(b))
-    );
-  }, [ratingRows]);
-
-  const ratedBookGroups = useMemo(() => {
-    const map = new Map<string, RatedBookGroup>();
-
-    for (const row of ratingRows) {
-      const book = firstBook(row);
-      if (!book?.id) continue;
-      if (bookTypeFilter !== "all" && book.book_type !== bookTypeFilter) continue;
-
-      const existing =
-        map.get(book.id) ??
-        {
-          bookId: book.id,
-          title: book.title ?? "Untitled book",
-          author: book.author ?? null,
-          coverUrl: book.cover_url ?? null,
-          bookType: book.book_type ?? null,
-          signals: [],
-          latestFinishedAt: null,
-          averageEntertainmentRating: null,
-          averageDifficultyRating: null,
-        };
-
-      existing.signals.push({
-        id: row.id,
-        readerLevel: row.reader_level ?? null,
-        entertainmentRating: row.rating_overall,
-        difficultyRating: row.rating_difficulty,
-        finishedAt: row.finished_at,
-      });
-
-      map.set(book.id, existing);
-    }
-
-    const groups = Array.from(map.values()).map((group) => {
-      const sortedSignals = [...group.signals].sort((a, b) =>
-        (b.finishedAt ?? "").localeCompare(a.finishedAt ?? "")
-      );
-      const latestFinishedAt = sortedSignals[0]?.finishedAt ?? null;
-
-      return {
-        ...group,
-        signals: sortedSignals,
-        latestFinishedAt,
-        averageEntertainmentRating: average(
-          sortedSignals
-            .map((signal) => signal.entertainmentRating)
-            .filter((value): value is number => value != null)
-        ),
-        averageDifficultyRating: average(
-          sortedSignals
-            .map((signal) => signal.difficultyRating)
-            .filter((value): value is number => value != null)
-        ),
-      };
-    });
-
-    return groups.sort((a, b) => {
-      if (sortMode === "ease") {
-        return (a.averageDifficultyRating ?? 999) - (b.averageDifficultyRating ?? 999);
-      }
-      if (sortMode === "difficulty") {
-        return (b.averageDifficultyRating ?? -1) - (a.averageDifficultyRating ?? -1);
-      }
-      if (sortMode === "rating") {
-        return (b.averageEntertainmentRating ?? -1) - (a.averageEntertainmentRating ?? -1);
-      }
-      return (b.latestFinishedAt ?? "").localeCompare(a.latestFinishedAt ?? "");
-    });
-  }, [ratingRows, sortMode, bookTypeFilter]);
-
-  const ratedBookCount = useMemo(() => {
-    const bookIds = new Set<string>();
-
-    for (const row of ratingRows) {
-      const book = firstBook(row);
-      if (book?.id) bookIds.add(book.id);
-    }
-
-    return bookIds.size;
-  }, [ratingRows]);
-
-  const publicReaderCount = useMemo(() => {
-    const ids = new Set<string>();
-
-    for (const profile of profiles) {
-      if (profile.user_id) ids.add(profile.user_id);
-    }
-
-    for (const row of ratingRows) {
-      if (row.user_id) ids.add(row.user_id);
-    }
-
-    for (const row of wordSummaries) {
-      if (row.user_id) ids.add(row.user_id);
-    }
-
-    return ids.size;
-  }, [profiles, ratingRows, wordSummaries]);
-
-  const communityStats = useMemo(() => {
-    const ratings = ratingRows
-      .map((row) => row.rating_overall)
-      .filter((value): value is number => value != null);
-    const easeRatings = ratingRows
-      .map((row) => row.rating_difficulty)
-      .filter((value): value is number => value != null);
-    const wordKeys = new Set<string>();
-    const seenDates = wordSummaries
-      .map((row) => row.first_seen_at)
-      .filter((value): value is string => Boolean(value))
-      .sort();
+  const dailyStudyStats = useMemo(() => {
+    const activeUsers = new Set<string>();
+    const newWordsByUser = new Map<string, number>();
+    const passedReadingByUser = new Map<string, number>();
+    const passedMeaningByUser = new Map<string, number>();
+    const masteredByUser = new Map<string, number>();
+    const forgottenByUser = new Map<string, number>();
+    const seenNewWords = new Set<string>();
 
     for (const row of wordSummaries) {
       if (!row.user_id || !row.study_identity_key) continue;
-      wordKeys.add(`${row.user_id}::${row.study_identity_key}`);
+      if (!isInRange(row.first_seen_at, yesterday.start, yesterday.end)) continue;
+
+      const key = `${row.user_id}::${row.study_identity_key}`;
+      if (seenNewWords.has(key)) continue;
+
+      seenNewWords.add(key);
+      activeUsers.add(row.user_id);
+      incrementCount(newWordsByUser, row.user_id);
     }
 
-    const activeDays =
-      seenDates.length > 0
-        ? daysBetweenInclusive(seenDates[0], seenDates[seenDates.length - 1])
-        : 0;
+    for (const row of wordProgressRows) {
+      if (!row.user_id || !row.study_identity_key) continue;
 
+      const hadDailyStudy = isInRange(
+        row.last_studied_at,
+        yesterday.start,
+        yesterday.end
+      );
+      if (!hadDailyStudy) continue;
+
+      const masteredYesterday =
+        isInRange(row.mastered_at, yesterday.start, yesterday.end) ||
+        (row.mastered && !row.mastered_at);
+      const forgottenCount =
+        (isInRange(row.reading_gate_failed_at, yesterday.start, yesterday.end) ? 1 : 0) +
+        (isInRange(row.meaning_gate_failed_at, yesterday.start, yesterday.end) ? 1 : 0);
+
+      activeUsers.add(row.user_id);
+
+      if (forgottenCount > 0) {
+        incrementCount(forgottenByUser, row.user_id, forgottenCount);
+      } else if (masteredYesterday) {
+        incrementCount(masteredByUser, row.user_id);
+      } else if (row.meaning_gate_status === "passed") {
+        incrementCount(passedMeaningByUser, row.user_id);
+      } else if (row.reading_gate_status === "passed") {
+        incrementCount(passedReadingByUser, row.user_id);
+      }
+    }
+
+    const activeUserCount = activeUsers.size;
     return {
-      averageRating: average(ratings),
-      averageEase: average(easeRatings),
-      savedWordsPerDay: activeDays > 0 ? wordKeys.size / activeDays : null,
+      activeUserCount,
+      averageNewWords: averageCount(newWordsByUser, activeUserCount),
+      averagePassedReading: averageCount(passedReadingByUser, activeUserCount),
+      averagePassedMeaning: averageCount(passedMeaningByUser, activeUserCount),
+      averageMastered: averageCount(masteredByUser, activeUserCount),
+      averageForgotten: averageCount(forgottenByUser, activeUserCount),
     };
-  }, [ratingRows, wordSummaries]);
+  }, [wordSummaries, wordProgressRows, yesterday]);
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -510,8 +283,8 @@ export default function CommunityHubPage() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            A small community snapshot: shared book ratings, reader-fit signals, and a quiet pulse
-            of how the reading library is growing.
+            A small community snapshot: reading color movement, shared spaces, and a quiet pulse
+            of how the study library is growing.
           </p>
         </div>
 
@@ -543,144 +316,55 @@ export default function CommunityHubPage() {
                 Community Snapshot
               </p>
               <h2 className="mt-1 text-2xl font-black text-slate-950">
-                Readers are starting to leave footprints.
+                Yesterday's color movement.
               </h2>
             </div>
             <p className="text-xs text-slate-500">
-              {loading ? "Loading..." : "Anonymous counts only. Private review text stays private."}
+              {loading
+                ? "Loading..."
+                : `Anonymous daily averages from ${dailyStudyStats.activeUserCount} active reader${dailyStudyStats.activeUserCount === 1 ? "" : "s"} on ${yesterday.label}.`}
             </p>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatPill
-              label="Readers"
-              value={loading ? "…" : String(publicReaderCount)}
-              tone="border-slate-200 bg-white text-slate-950"
+              label="Avg New Words"
+              value={loading ? "…" : formatAverage(dailyStudyStats.averageNewWords)}
+              detail="New"
+              tone="border-red-200 bg-white text-red-950"
             />
             <StatPill
-              label="Rated Books"
-              value={loading ? "…" : String(ratedBookCount)}
-              tone="border-rose-200 bg-rose-50 text-rose-950"
+              label="Avg Green"
+              value={loading ? "…" : formatAverage(dailyStudyStats.averagePassedReading)}
+              detail="Passed reading"
+              tone="border-emerald-200 bg-white text-emerald-950"
             />
             <StatPill
-              label="Avg Entertainment"
-              value={loading ? "…" : formatAverage(communityStats.averageRating)}
-              tone="border-amber-200 bg-amber-50 text-amber-950"
+              label="Avg Blue"
+              value={loading ? "…" : formatAverage(dailyStudyStats.averagePassedMeaning)}
+              detail="Passed meaning"
+              tone="border-sky-200 bg-white text-sky-950"
             />
             <StatPill
-              label="Avg Difficulty"
-              value={loading ? "…" : formatAverage(communityStats.averageEase)}
-              tone="border-emerald-200 bg-emerald-50 text-emerald-950"
+              label="Avg Purple"
+              value={loading ? "…" : formatAverage(dailyStudyStats.averageMastered)}
+              detail="Mastered"
+              tone="border-purple-200 bg-white text-purple-950"
             />
             <StatPill
-              label="Saved Words/Day"
-              value={loading ? "…" : formatAverage(communityStats.savedWordsPerDay)}
-              tone="border-violet-200 bg-violet-50 text-violet-950"
+              label="Avg Forgotten"
+              value={loading ? "…" : formatAverage(dailyStudyStats.averageForgotten)}
+              detail="Back to support"
+              tone="border-slate-300 bg-white text-slate-950"
             />
           </div>
 
           <p className="mt-4 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm leading-6 text-slate-600">
-            No private notes, reviews, quotes, or personal vocabulary lists are shown here.
-            This snapshot is tiny right now, but it will become more useful and more community-shaped
-            as more readers join Mekuru.
+            No private notes, reviews, quotes, or vocabulary lists are shown here.
+            These are anonymous averages from yesterday's Library Study activity. A studied
+            word is counted once in its strongest color bucket, with forgotten words counted
+            separately.
           </p>
-        </section>
-
-        <section className="mb-8">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                  Community Ratings
-                </p>
-                <h2 className="mt-1 text-xl font-black text-slate-950">
-                  Recently rated books
-                </h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Books are grouped together so different reader levels can be compared.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <select
-                  value={bookTypeFilter}
-                  onChange={(event) => setBookTypeFilter(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                >
-                  <option value="all">All Book Types</option>
-                  {bookTypeOptions.map((type) => (
-                    <option key={type} value={type}>
-                      {bookTypeLabel(type)}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={sortMode}
-                  onChange={(event) => setSortMode(event.target.value as SortMode)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                >
-                  <option value="recent">Recently Finished</option>
-                  <option value="rating">High to Low Entertainment</option>
-                  <option value="difficulty">High to Low Difficulty</option>
-                  <option value="ease">Low to High Difficulty</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {loading ? (
-                <p className="text-sm text-slate-500">Loading rated books...</p>
-              ) : ratedBookGroups.length === 0 ? (
-                <p className="text-sm leading-6 text-slate-500">
-                  No shared book ratings yet. The first ratings will show up here.
-                </p>
-              ) : (
-                ratedBookGroups.slice(0, 8).map((book) => (
-                  <div
-                    key={book.bookId}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-                  >
-                    <div className="flex min-w-0 gap-3">
-                      {book.coverUrl ? (
-                        <img
-                          src={book.coverUrl}
-                          alt=""
-                          className="h-20 w-14 shrink-0 rounded-lg object-cover shadow-sm"
-                        />
-                      ) : (
-                        <div className="h-20 w-14 shrink-0 rounded-lg bg-slate-200" />
-                      )}
-
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black text-slate-950">
-                          {book.title}
-                        </div>
-                        <div className="mt-0.5 truncate text-xs text-slate-500">
-                          {book.author || bookTypeLabel(book.bookType)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      {book.signals.map((signal) => (
-                        <div
-                          key={signal.id}
-                          className="flex flex-col gap-3 rounded-xl border border-white bg-white/80 p-3 sm:flex-row sm:items-center"
-                        >
-                          <p className="min-w-0 flex-1 text-sm leading-6 text-slate-700">
-                            {bookSignalSentence(signal, book.bookType)}
-                          </p>
-
-                          <RatingStack signal={signal} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
         </section>
 
         <section>

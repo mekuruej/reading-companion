@@ -11,6 +11,8 @@ type Option = {
 type CommunityTabProps = {
   isEditingGenres: boolean;
   isEditingContentNotes: boolean;
+  singleEditMode?: boolean;
+  editing?: boolean;
   saving: boolean;
   onEditGenres: () => void;
   onEditContentNotes: () => void;
@@ -51,6 +53,10 @@ function joinTags(tags: string[]) {
   return dedupeTags(tags).join(", ");
 }
 
+function isKnownGenre(value: string, options: readonly Option[]) {
+  return options.some((option) => option.value === value);
+}
+
 function TagChip({
   label,
   selected,
@@ -85,6 +91,8 @@ function TagChip({
 export default function CommunityTab({
   isEditingGenres,
   isEditingContentNotes,
+  singleEditMode = false,
+  editing,
   saving,
   onEditGenres,
   onEditContentNotes,
@@ -101,13 +109,39 @@ export default function CommunityTab({
 }: CommunityTabProps) {
   const selectedGenres = dedupeTags(parseTagList(genre));
   const contentNotes = dedupeTags(parseTagList(triggerWarnings));
+  const editingGenres = singleEditMode ? !!editing : isEditingGenres;
+  const editingContentNotes = singleEditMode ? !!editing : isEditingContentNotes;
+  const customGenres = selectedGenres.filter(
+    (value) => !isKnownGenre(value, GENRE_OPTIONS)
+  );
+  const isOtherSelected = selectedGenres.includes("other") || customGenres.length > 0;
 
   const toggleGenre = (value: string) => {
+    if (value === "other") {
+      const next = isOtherSelected
+        ? selectedGenres.filter(
+          (item) => item !== "other" && isKnownGenre(item, GENRE_OPTIONS)
+        )
+        : [...selectedGenres, "other"];
+
+      setGenre(joinTags(next));
+      return;
+    }
+
     const next = selectedGenres.includes(value)
       ? selectedGenres.filter((item) => item !== value)
       : [...selectedGenres, value];
 
     setGenre(joinTags(next));
+  };
+
+  const setCustomGenreText = (value: string) => {
+    const standardGenres = selectedGenres.filter(
+      (item) => item !== "other" && isKnownGenre(item, GENRE_OPTIONS)
+    );
+    const customValues = parseTagList(value);
+
+    setGenre(joinTags([...standardGenres, ...(customValues.length ? customValues : ["other"])]));
   };
 
   return (
@@ -123,36 +157,38 @@ export default function CommunityTab({
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-stone-900">Genres</div>
-          {!isEditingGenres ? (
-            <button
-              type="button"
-              onClick={onEditGenres}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-            >
-              Edit
-            </button>
-          ) : (
-            <div className="flex gap-2">
+          {!singleEditMode ? (
+            !editingGenres ? (
               <button
                 type="button"
-                onClick={onCancel}
-                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                onClick={onEditGenres}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
               >
-                Cancel
+                Edit
               </button>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={saving}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={onSave}
+                  disabled={saving}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            )
+          ) : null}
         </div>
 
-        {!isEditingGenres ? (
+        {!editingGenres ? (
           sharedGenres.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {sharedGenres.map((tag) => (
@@ -175,11 +211,31 @@ export default function CommunityTab({
                 <TagChip
                   key={option.value}
                   label={option.label}
-                  selected={selectedGenres.includes(option.value)}
+                  selected={
+                    option.value === "other"
+                      ? isOtherSelected
+                      : selectedGenres.includes(option.value)
+                  }
                   onClick={() => toggleGenre(option.value)}
                 />
               ))}
             </div>
+            {isOtherSelected ? (
+              <div className="rounded-xl border border-stone-200 bg-white p-3">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Custom genre
+                </label>
+                <input
+                  value={customGenres.join(", ")}
+                  onChange={(event) => setCustomGenreText(event.target.value)}
+                  placeholder="Type a genre, or comma-separate a few"
+                  className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                />
+                <div className="mt-2 text-xs text-stone-500">
+                  This saves as your own shared genre tag for this book.
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -187,36 +243,38 @@ export default function CommunityTab({
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-stone-900">Content Notes</div>
-          {!isEditingContentNotes ? (
-            <button
-              type="button"
-              onClick={onEditContentNotes}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-            >
-              Edit
-            </button>
-          ) : (
-            <div className="flex gap-2">
+          {!singleEditMode ? (
+            !editingContentNotes ? (
               <button
                 type="button"
-                onClick={onCancel}
-                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                onClick={onEditContentNotes}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
               >
-                Cancel
+                Edit
               </button>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={saving}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={onSave}
+                  disabled={saving}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            )
+          ) : null}
         </div>
 
-        {!isEditingContentNotes ? (
+        {!editingContentNotes ? (
           sharedContentNotes.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {sharedContentNotes.map((note) => (
