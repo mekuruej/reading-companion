@@ -125,15 +125,6 @@ It looks visual, but it reflects non-obvious Library Study rules. Extract only a
 5. Risk: medium.
 It is visually isolated, but the callbacks mutate database rows and must remain in `page.tsx`.
 
-- [ ] I. Word table header
-1. Move: the `<thead>` with sticky column labels and tooltips.
-2. Stay in `page.tsx`: `headerStickyStyle` or a prop for `stickyTop`.
-3. Props needed:
-    * stickyStyle or stickyTop
-4. Type: presentational UI.
-5. Risk: low.
-The header is static. This is a good extraction before moving row rendering.
-
 - [ ] J. Word table empty state
 1. Move: the zero-results `<tr>`.
 2. Stay in `page.tsx`: `filteredSorted.length` decision if preferred.
@@ -305,8 +296,8 @@ types.ts
 ## Finished
 
 - [✔️] Extracted `BookVocabIntroCopy`.
-- [✔️] Extracted `Reorder status hint`.
-- [✔️] Extracted 
+- [✔️] Extracted `ReorderStatusHint`.
+- [✔️] Extracted `WordTableHeader`.
 - [✔️] Extracted 
 - [✔️] Extracted 
 - [✔️] Extracted 
