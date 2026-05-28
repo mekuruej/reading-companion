@@ -24,16 +24,6 @@ function ymdLocal(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function monthStartDate() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-}
-
-function previousMonthStartDate() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth() - 1, 1);
-}
-
 function previousMonthComparisonEndDate() {
   const now = new Date();
   const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -52,39 +42,30 @@ function previousMonthComparisonEndDate() {
   );
 }
 
-function monthRangeLabel() {
-  const now = new Date();
-  const start = monthStartDate();
-
-  return `${ymdLocal(start)} → ${ymdLocal(now)}`;
-}
-
-function previousMonthRangeLabel() {
-  const start = previousMonthStartDate();
+function previousMonthComparisonDateLabel() {
   const before = previousMonthComparisonEndDate();
   const end = new Date(before);
   end.setDate(before.getDate() - 1);
 
-  return `${ymdLocal(start)} → ${ymdLocal(end)}`;
+  return ymdLocal(end);
 }
 
-function ColorDeltaPill({ value }: { value: number | null }) {
+function ColorDeltaPill({
+  value,
+  className,
+}: {
+  value: number | null;
+  className: string;
+}) {
   if (value == null) return null;
 
-  if (value === 0) {
-    return (
-      <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-stone-500">
-        → 0
-      </span>
-    );
-  }
-
-  const isUp = value > 0;
+  const icon = value > 0 ? "↑" : value < 0 ? "↓" : "→";
+  const label = value > 0 ? `+${value}` : String(value);
 
   return (
-    <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-stone-700">
-      {isUp ? "↗" : "↘"} {isUp ? "+" : ""}
-      {value}
+    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-black shadow-sm ${className}`}>
+      <span className="text-lg leading-none">{icon}</span>
+      {label}
     </span>
   );
 }
@@ -167,17 +148,12 @@ function ColorStepCard({
 export default function ReadingColorsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-  const [monthTotals, setMonthTotals] = useState<LibraryStudyColorTotals>(
-    emptyLibraryStudyColorTotals()
-  );
   const [previousTotals, setPreviousTotals] =
     useState<LibraryStudyColorTotals | null>(null);
   const [allTimeTotals, setAllTimeTotals] = useState<LibraryStudyColorTotals>(
     emptyLibraryStudyColorTotals()
   );
 
-  const [monthLimboTotals, setMonthLimboTotals] =
-    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
   const [previousLimboTotals, setPreviousLimboTotals] =
     useState<LibraryStudyLimboTotals | null>(null);
   const [allTimeLimboTotals, setAllTimeLimboTotals] =
@@ -199,25 +175,19 @@ export default function ReadingColorsPage() {
 
         if (!user) {
           if (!isMounted) return;
-          setMonthTotals(emptyLibraryStudyColorTotals());
           setPreviousTotals(null);
           setAllTimeTotals(emptyLibraryStudyColorTotals());
 
-          setMonthLimboTotals(emptyLibraryStudyLimboTotals());
           setPreviousLimboTotals(null);
           setAllTimeLimboTotals(emptyLibraryStudyLimboTotals());
           return;
         }
 
-        const since = monthStartDate();
-        const previousSince = previousMonthStartDate();
         const previousBefore = previousMonthComparisonEndDate();
 
-        const [monthBreakdown, previousBreakdown, allTimeBreakdown] =
+        const [previousBreakdown, allTimeBreakdown] =
           await Promise.all([
-            fetchLibraryStudyColorBreakdown(user.id, null, { since }),
             fetchLibraryStudyColorBreakdown(user.id, null, {
-              since: previousSince,
               before: previousBefore,
             }),
             fetchLibraryStudyColorBreakdown(user.id, null, {}),
@@ -225,11 +195,9 @@ export default function ReadingColorsPage() {
 
         if (!isMounted) return;
 
-        setMonthTotals(monthBreakdown.colorTotals);
         setPreviousTotals(previousBreakdown.colorTotals);
         setAllTimeTotals(allTimeBreakdown.colorTotals);
 
-        setMonthLimboTotals(monthBreakdown.limboTotals);
         setPreviousLimboTotals(previousBreakdown.limboTotals);
         setAllTimeLimboTotals(allTimeBreakdown.limboTotals);
       } catch (error: any) {
@@ -238,11 +206,9 @@ export default function ReadingColorsPage() {
         if (!isMounted) return;
 
         setErrorMsg(error?.message ?? "Could not load reading colors.");
-        setMonthTotals(emptyLibraryStudyColorTotals());
         setPreviousTotals(null);
         setAllTimeTotals(emptyLibraryStudyColorTotals());
 
-        setMonthLimboTotals(emptyLibraryStudyLimboTotals());
         setPreviousLimboTotals(null);
         setAllTimeLimboTotals(emptyLibraryStudyLimboTotals());
       } finally {
@@ -264,6 +230,7 @@ export default function ReadingColorsPage() {
         label: "Red",
         shortMeaning: "New / needs support",
         cardClasses: "border-red-200 bg-white text-red-700",
+        deltaClass: "bg-red-50 text-red-800 ring-1 ring-red-200",
         dotClass: "bg-red-500",
         valueClass: "text-red-900",
       },
@@ -272,6 +239,7 @@ export default function ReadingColorsPage() {
         label: "Orange",
         shortMeaning: "Starting to repeat",
         cardClasses: "border-orange-200 bg-white text-orange-700",
+        deltaClass: "bg-orange-50 text-orange-800 ring-1 ring-orange-200",
         dotClass: "bg-orange-500",
         valueClass: "text-orange-900",
       },
@@ -280,6 +248,7 @@ export default function ReadingColorsPage() {
         label: "Yellow",
         shortMeaning: "Readiness checkpoint",
         cardClasses: "border-yellow-200 bg-white text-yellow-700",
+        deltaClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-200",
         dotClass: "bg-yellow-400",
         valueClass: "text-yellow-900",
       },
@@ -288,6 +257,7 @@ export default function ReadingColorsPage() {
         label: "Green",
         shortMeaning: "Reading Gate",
         cardClasses: "border-green-200 bg-white text-green-700",
+        deltaClass: "bg-green-50 text-green-800 ring-1 ring-green-200",
         dotClass: "bg-green-500",
         valueClass: "text-green-900",
       },
@@ -296,6 +266,7 @@ export default function ReadingColorsPage() {
         label: "Blue",
         shortMeaning: "Meaning Gate",
         cardClasses: "border-blue-200 bg-white text-blue-700",
+        deltaClass: "bg-blue-50 text-blue-800 ring-1 ring-blue-200",
         dotClass: "bg-blue-500",
         valueClass: "text-blue-900",
       },
@@ -304,6 +275,7 @@ export default function ReadingColorsPage() {
         label: "Purple",
         shortMeaning: "Mastered",
         cardClasses: "border-purple-200 bg-white text-purple-700",
+        deltaClass: "bg-purple-50 text-purple-800 ring-1 ring-purple-200",
         dotClass: "bg-purple-500",
         valueClass: "text-purple-900",
       },
@@ -318,8 +290,9 @@ export default function ReadingColorsPage() {
         label: "Reading Gate Missed",
         shortMeaning: "Reading needs support",
         detail:
-          "Words that struggled at the reading check. These are not failures — they are words that need more reading support before moving forward.",
+          "Words that reached the Reading Gate from Green, missed the reading check, and need support before moving toward Blue.",
         cardClasses: "border-slate-300 bg-white text-slate-800",
+        deltaClass: "bg-slate-100 text-slate-800 ring-1 ring-slate-300",
         dotClass: "bg-slate-500",
         valueClass: "text-slate-900",
       },
@@ -328,8 +301,9 @@ export default function ReadingColorsPage() {
         label: "Meaning Gate Missed",
         shortMeaning: "Meaning needs support",
         detail:
-          "Words that struggled at the meaning check. These need more meaning support before they can move toward mastery.",
+          "Words that reached the Meaning Gate from Blue, missed the meaning check, and need support before moving toward Purple.",
         cardClasses: "border-slate-400 bg-white text-slate-900",
+        deltaClass: "bg-slate-200 text-slate-950 ring-1 ring-slate-400",
         dotClass: "bg-slate-700",
         valueClass: "text-slate-950",
       },
@@ -411,7 +385,7 @@ export default function ReadingColorsPage() {
               <div>
                 <GroupLabel
                   title="Based on encounters"
-                  detail="Red, orange, and yellow come from real reading encounters, not quiz answers."
+                  detail="Red, orange, and yellow come from real reading encounters, not quiz answers. After yellow, you can decide to repeat these three levels if you are not ready for the Reading Gate."
                 />
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   <ColorStepCard
@@ -462,8 +436,8 @@ export default function ReadingColorsPage() {
                   <ColorStepCard
                     stage="grey"
                     title="Limbo: between gates"
-                    detail="The word is being held before the next gate, either because it is not ready yet or because a gate was missed."
-                    note="Limbo is support, not punishment."
+                    detail="Limbo only appears after a word has entered the gate path: between Green and Blue, or between Blue and Purple."
+                    note="Choosing Not yet after Yellow repeats Red, Orange, and Yellow instead."
                   />
                 </div>
               </div>
@@ -478,45 +452,13 @@ export default function ReadingColorsPage() {
         </div>
       ) : null}
 
-      <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-purple-500">
-          How to read the movement
-        </p>
-        <p className="mt-2 text-xs leading-5 text-stone-600 sm:text-sm">
-          The arrows compare <strong>this month so far</strong> with{" "}
-          <strong>the same stretch last month</strong>, so the comparison stays
-          fair on both the 1st and the 30th.
-        </p>
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
-              This month so far
-            </p>
-            <p className="mt-1 text-xs font-semibold text-stone-800 sm:text-sm">
-              {monthRangeLabel()}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
-              Compared with
-            </p>
-            <p className="mt-1 text-xs font-semibold text-stone-800 sm:text-sm">
-              {previousMonthRangeLabel()}
-            </p>
-          </div>
-        </div>
-      </section>
-
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {colorItems.map((item) => {
-          const monthValue = colorValue(monthTotals, item.key);
           const previousValue =
             previousTotals == null ? null : colorValue(previousTotals, item.key);
-          const delta =
-            previousValue == null ? null : monthValue - previousValue;
           const allTimeValue = colorValue(allTimeTotals, item.key);
+          const delta =
+            previousValue == null ? null : allTimeValue - previousValue;
 
           return (
             <div
@@ -531,7 +473,9 @@ export default function ReadingColorsPage() {
                   <h2 className="text-xl font-black">{item.label}</h2>
                 </div>
 
-                {!loading ? <ColorDeltaPill value={delta} /> : null}
+                {!loading ? (
+                  <ColorDeltaPill value={delta} className={item.deltaClass} />
+                ) : null}
               </div>
 
               <p className="mt-1 text-sm font-bold">{item.shortMeaning}</p>
@@ -539,10 +483,10 @@ export default function ReadingColorsPage() {
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded-2xl bg-white/70 p-3">
                   <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-                    This month
+                    On {previousMonthComparisonDateLabel()}
                   </p>
                   <p className={`mt-1 text-2xl font-black ${item.valueClass}`}>
-                    {loading ? "—" : monthValue}
+                    {loading || previousValue == null ? "—" : previousValue}
                   </p>
                 </div>
 
@@ -557,7 +501,7 @@ export default function ReadingColorsPage() {
               </div>
             </div>
           );
-        })}
+          })}
       </section>
       <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="mb-4">
@@ -568,8 +512,8 @@ export default function ReadingColorsPage() {
             Words waiting for support
           </h2>
           <p className="mt-2 text-sm leading-6 text-stone-600">
-            Limbo words are not failed words. They are words sent back for more
-            support after a gate check.
+            Limbo words are not failed words. They sit between Green and Blue after
+            a missed Reading Gate, or between Blue and Purple after a missed Meaning Gate.
           </p>
         </div>
 
@@ -587,7 +531,7 @@ export default function ReadingColorsPage() {
               </span>
             </div>
             <h3 className="mt-4 text-lg font-black">Extra encounter support</h3>
-            <p className="mt-1 text-sm font-bold">Chosen before a gate</p>
+            <p className="mt-1 text-sm font-bold">Chosen before the reading gate</p>
             <p className="mt-4 text-sm leading-6 text-stone-700">
               If a word reaches Yellow but still feels too far above your level,
               you can send it into another encounter loop. Red 2, Orange 2, and
@@ -598,14 +542,13 @@ export default function ReadingColorsPage() {
           </div>
 
           {limboItems.map((item) => {
-            const monthValue = limboValue(monthLimboTotals, item.key);
             const previousValue =
               previousLimboTotals == null
                 ? null
                 : limboValue(previousLimboTotals, item.key);
-            const delta =
-              previousValue == null ? null : monthValue - previousValue;
             const allTimeValue = limboValue(allTimeLimboTotals, item.key);
+            const delta =
+              previousValue == null ? null : allTimeValue - previousValue;
 
             return (
               <div
@@ -620,7 +563,9 @@ export default function ReadingColorsPage() {
                     <h3 className="text-lg font-black">{item.label}</h3>
                   </div>
 
-                  {!loading ? <ColorDeltaPill value={delta} /> : null}
+                  {!loading ? (
+                    <ColorDeltaPill value={delta} className={item.deltaClass} />
+                  ) : null}
                 </div>
 
                 <p className="mt-1 text-sm font-bold">{item.shortMeaning}</p>
@@ -628,10 +573,10 @@ export default function ReadingColorsPage() {
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <div className="rounded-2xl bg-white/70 p-3">
                     <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-                      This month
+                      On {previousMonthComparisonDateLabel()}
                     </p>
                     <p className={`mt-1 text-2xl font-black ${item.valueClass}`}>
-                      {loading ? "—" : monthValue}
+                      {loading || previousValue == null ? "—" : previousValue}
                     </p>
                   </div>
 
@@ -686,18 +631,11 @@ export default function ReadingColorsPage() {
               Limbo / support
             </p>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              Limbo means a word is being held between gates or sent back for more
-              support. It is not failure — it usually means the word needs more
-              encounters, more time, or a lighter review path.
+              Limbo means a word has already entered the gate path and needs support
+              between Green and Blue, or between Blue and Purple.
             </p>
           </div>
         </div>
-        <p className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-xs leading-5 text-stone-600">
-          In the yellow stage, you can decide if a word is ready for
-          Ability Check. If not, you may move it back to Red. This does not mean your
-          encounter history is erased. It just means the word gets more time to become
-          familiar before Mekuru asks you to check it.
-        </p>
       </section>
     </main>
   );

@@ -90,29 +90,6 @@ function monthStartDate() {
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
-function previousMonthStartDate() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth() - 1, 1);
-}
-
-function previousMonthComparisonEndDate() {
-  const now = new Date();
-  const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const previousMonthDays = new Date(
-    previousStart.getFullYear(),
-    previousStart.getMonth() + 1,
-    0
-  ).getDate();
-
-  const comparisonDays = Math.min(now.getDate(), previousMonthDays);
-
-  return new Date(
-    previousStart.getFullYear(),
-    previousStart.getMonth(),
-    comparisonDays + 1
-  );
-}
-
 function isThisMonth(dateString: string | null | undefined) {
   if (!dateString) return false;
   return dateString >= monthStartYmd();
@@ -169,27 +146,6 @@ function buildStreakStats(activeDays: Set<string>) {
   return { currentStreak, bestStreak };
 }
 
-function ColorDeltaPill({ value }: { value: number | null }) {
-  if (value == null) return null;
-
-  if (value === 0) {
-    return (
-      <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold text-stone-500">
-        → 0
-      </span>
-    );
-  }
-
-  const isUp = value > 0;
-
-  return (
-    <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold text-stone-700">
-      {isUp ? "↗" : "↘"} {isUp ? "+" : ""}
-      {value}
-    </span>
-  );
-}
-
 export default function CommunityStatsHomePage() {
   const [loadingSnapshot, setLoadingSnapshot] = useState(true);
   const [snapshotError, setSnapshotError] = useState("");
@@ -205,8 +161,6 @@ export default function CommunityStatsHomePage() {
   const [colorTotals, setColorTotals] = useState<LibraryStudyColorTotals>(
     emptyLibraryStudyColorTotals()
   );
-  const [previousColorTotals, setPreviousColorTotals] =
-    useState<LibraryStudyColorTotals | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -348,26 +302,16 @@ export default function CommunityStatsHomePage() {
         if (!user) {
           if (!isMounted) return;
           setColorTotals(emptyLibraryStudyColorTotals());
-          setPreviousColorTotals(null);
           return;
         }
 
         const since = monthStartDate();
-        const previousSince = previousMonthStartDate();
-        const previousBefore = previousMonthComparisonEndDate();
 
-        const [breakdown, previousBreakdown] = await Promise.all([
-          fetchLibraryStudyColorBreakdown(user.id, null, { since }),
-          fetchLibraryStudyColorBreakdown(user.id, null, {
-            since: previousSince,
-            before: previousBefore,
-          }),
-        ]);
+        const breakdown = await fetchLibraryStudyColorBreakdown(user.id, null, { since });
 
         if (!isMounted) return;
 
         setColorTotals(breakdown.colorTotals);
-        setPreviousColorTotals(previousBreakdown.colorTotals);
       } catch (error: any) {
         console.error("Error loading color snapshot:", error);
 
@@ -375,7 +319,6 @@ export default function CommunityStatsHomePage() {
 
         setColorError(error?.message ?? "Could not load color snapshot.");
         setColorTotals(emptyLibraryStudyColorTotals());
-        setPreviousColorTotals(null);
       } finally {
         if (isMounted) setLoadingColors(false);
       }
@@ -403,7 +346,6 @@ export default function CommunityStatsHomePage() {
       {
         label: "Red",
         value: colorTotals.red,
-        previousValue: previousColorTotals?.red ?? null,
         cardClasses: "border-red-200 bg-white text-red-700",
         dotClass: "bg-red-500",
         valueClass: "text-red-900",
@@ -411,7 +353,6 @@ export default function CommunityStatsHomePage() {
       {
         label: "Orange",
         value: colorTotals.orange,
-        previousValue: previousColorTotals?.orange ?? null,
         cardClasses: "border-orange-200 bg-white text-orange-700",
         dotClass: "bg-orange-500",
         valueClass: "text-orange-900",
@@ -419,7 +360,6 @@ export default function CommunityStatsHomePage() {
       {
         label: "Yellow",
         value: colorTotals.yellow,
-        previousValue: previousColorTotals?.yellow ?? null,
         cardClasses: "border-yellow-200 bg-white text-yellow-700",
         dotClass: "bg-yellow-400",
         valueClass: "text-yellow-900",
@@ -427,7 +367,6 @@ export default function CommunityStatsHomePage() {
       {
         label: "Green",
         value: colorTotals.green,
-        previousValue: previousColorTotals?.green ?? null,
         cardClasses: "border-green-200 bg-white text-green-700",
         dotClass: "bg-green-500",
         valueClass: "text-green-900",
@@ -435,7 +374,6 @@ export default function CommunityStatsHomePage() {
       {
         label: "Blue",
         value: colorTotals.blue,
-        previousValue: previousColorTotals?.blue ?? null,
         cardClasses: "border-blue-200 bg-white text-blue-700",
         dotClass: "bg-blue-500",
         valueClass: "text-blue-900",
@@ -443,13 +381,12 @@ export default function CommunityStatsHomePage() {
       {
         label: "Purple",
         value: colorTotals.purple,
-        previousValue: previousColorTotals?.purple ?? null,
         cardClasses: "border-purple-200 bg-white text-purple-700",
         dotClass: "bg-purple-500",
         valueClass: "text-purple-900",
       },
     ],
-    [colorTotals, previousColorTotals]
+    [colorTotals]
   );
 
   return (
@@ -538,42 +475,37 @@ export default function CommunityStatsHomePage() {
           </div>
 
           <p className="mt-2 text-sm leading-6 text-stone-600">
-            A quick look at this month’s color movement compared with the same stretch last month.
+            A quick count of color movement this month.
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {colorSnapshotItems.map((item) => {
-              const delta =
-                item.previousValue == null
-                  ? null
-                  : item.value - item.previousValue;
-
-              return (
-                <div
-                  key={item.label}
-                  className={`rounded-2xl border p-3 ${item.cardClasses}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${item.dotClass}`}
-                    />
-                    <p className="text-[11px] font-bold">{item.label}</p>
-                  </div>
-
-                  <div className="mt-1 flex items-end justify-between gap-2">
-                    <p className={`text-xl font-black ${item.valueClass}`}>
-                      {loadingColors ? "—" : item.value}
-                    </p>
-
-                    {!loadingColors ? <ColorDeltaPill value={delta} /> : null}
-                  </div>
+            {colorSnapshotItems.map((item) => (
+              <div
+                key={item.label}
+                className={`rounded-2xl border p-3 ${item.cardClasses}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${item.dotClass}`}
+                  />
+                  <p className="text-[11px] font-bold">{item.label}</p>
                 </div>
-              );
-            })}
+
+                <div className="mt-1 flex items-end justify-between gap-2">
+                  <p className={`text-xl font-black ${item.valueClass}`}>
+                    {loadingColors ? "—" : item.value}
+                  </p>
+                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-stone-500">
+                    This month
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
 
           <p className="mt-3 text-[11px] font-medium leading-5 text-stone-500">
-            Counts update when you save words, log reading, or study in Ability Check. Arrows compare this month so far with the same stretch last month.
+            Counts update when you save words, log reading, or study in Ability Check.
+            This snapshot shows this month only.
           </p>
         </div>
       </section>
