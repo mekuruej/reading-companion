@@ -76,15 +76,6 @@ Safe if navigation stays as a callback. Do not move router usage yet.
 5. Risk: medium.
 The JSX is isolated, but it owns controlled inputs that affect data reloading and filtering. Do after simpler display components.
 
-- [ ] D. Reorder status hint
-1. Move: the `Saving new order...` / drag instruction text.
-2. Stay in `page.tsx`: `reordering`.
-3. Props needed:
-    * reordering
-4. Type: presentational UI.
-5. Risk: low.
-This is a tiny visual status component with no behavior.
-
 - [ ] E. Loading / sign-in / error states
 1. Move: simple loading, sign-in, and non-access-error return UIs.
 2. Stay in `page.tsx`: branching decisions, `router.push`, `needsSignIn`, `errorMsg`, and `AccessDeniedMessage` usage at first.
@@ -314,7 +305,7 @@ types.ts
 ## Finished
 
 - [✔️] Extracted `BookVocabIntroCopy`.
-- [✔️] Extracted 
+- [✔️] Extracted `Reorder status hint`.
 - [✔️] Extracted 
 - [✔️] Extracted 
 - [✔️] Extracted 
