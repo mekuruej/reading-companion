@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { supabase } from "@/lib/supabaseClient";
+import BookVocabIntroCopy from "./components/BookVocabIntroCopy";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1126,14 +1127,7 @@ export default function BookWordsPage() {
         </div>
       ) : null}
 
-      <div className="mt-2 mb-4 w-full border-b border-gray-300 pb-4">
-        <p className="text-sm text-gray-500 text-center">
-          The words you’ve added from this book, organized in reading order to support your reading.
-        </p>
-        <p className="mt-1 text-sm text-stone-500 text-center">
-          Use search, chapter filters, and hidden-word mode to focus the list.
-        </p>
-      </div>
+      <BookVocabIntroCopy />
 
       <div className="border-b border-stone-200">
         <div className="space-y-3 py-4">

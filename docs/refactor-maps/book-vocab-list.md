@@ -48,14 +48,6 @@ The first code changes should only move visual JSX into components and keep stat
 
 ## Remaining
 
-- [ ] A. Book vocab intro copy
-1. Move: the top explanatory copy above the book context card.
-2. Stay in `page.tsx`: loading/error/no-access returns and all page state.
-3. Props needed: none, unless the copy later needs book-specific text.
-4. Type: presentational UI.
-5. Risk: low.
-Smallest extraction. It has no handlers, no controlled inputs, no data loading, and no permissions logic.
-
 - [ ] B. Book context header card
 1. Move: the clickable book cover/title/count card and `Book Hub` visual button.
 2. Stay in `page.tsx`: `router.push`, `userBookId`, `bookTitle`, `bookCover`, `words.length`, `filteredSorted.length`.
@@ -319,3 +311,12 @@ types.ts
 * LibraryWordProgressRow
 * future component/view-model prop types if useful.
 
+## Finished
+
+- [✔️] Extracted `BookVocabIntroCopy`.
+- [✔️] Extracted 
+- [✔️] Extracted 
+- [✔️] Extracted 
+- [✔️] Extracted 
+- [✔️] Extracted 
+- [✔️] Extracted 
