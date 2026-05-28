@@ -125,14 +125,6 @@ It looks visual, but it reflects non-obvious Library Study rules. Extract only a
 5. Risk: medium.
 It is visually isolated, but the callbacks mutate database rows and must remain in `page.tsx`.
 
-- [ ] J. Word table empty state
-1. Move: the zero-results `<tr>`.
-2. Stay in `page.tsx`: `filteredSorted.length` decision if preferred.
-3. Props needed: none, or `colSpan`.
-4. Type: presentational UI.
-5. Risk: low.
-Static table empty state.
-
 - [ ] K. Word table row
 1. Move: one `<tr>` for a word.
 2. Stay in `page.tsx`: `filteredSorted.map`, drag state, drag/drop handlers, row view-model preparation, color status calculation, router navigation, edit/hide/delete handlers.
@@ -298,7 +290,7 @@ types.ts
 - [✔️] Extracted `BookVocabIntroCopy`.
 - [✔️] Extracted `ReorderStatusHint`.
 - [✔️] Extracted `WordTableHeader`.
-- [✔️] Extracted 
+- [✔️] Extracted `WordTableEmptyState`.
 - [✔️] Extracted 
 - [✔️] Extracted 
 - [✔️] Extracted 
