@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import BookVocabIntroCopy from "./components/BookVocabIntroCopy";
 import BookVocabReorderHint from "./components/BookVocabReorderHint";
 import BookVocabTableHeader from "./components/BookVocabTableHeader";
+import BookVocabEmptyRow from "./components/BookVocabEmptyRow";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1377,13 +1378,7 @@ export default function BookWordsPage() {
               );
             })}
 
-            {filteredSorted.length === 0 ? (
-              <tr>
-                <td className="p-4 text-gray-500" colSpan={10}>
-                  No words match your filters.
-                </td>
-              </tr>
-            ) : null}
+            {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
           </tbody>
         </table>
       </div>
