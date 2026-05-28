@@ -8,6 +8,7 @@ import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { supabase } from "@/lib/supabaseClient";
 import BookVocabIntroCopy from "./components/BookVocabIntroCopy";
+import BookVocabReorderHint from "./components/BookVocabReorderHint";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1198,13 +1199,7 @@ export default function BookWordsPage() {
         </div>
       </div>
 
-      {reordering ? (
-        <p className="mb-2 text-sm text-stone-500">Saving new order…</p>
-      ) : (
-        <p className="mb-2 text-sm text-stone-500">
-          Drag words by ☰ to adjust their reading order.
-        </p>
-      )}
+      <BookVocabReorderHint reordering={reordering} />
 
       <div className="relative overflow-x-auto overflow-y-visible rounded border bg-white">
         <table className="w-full border-separate border-spacing-0 text-sm">
