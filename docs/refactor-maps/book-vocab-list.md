@@ -48,19 +48,6 @@ The first code changes should only move visual JSX into components and keep stat
 
 ## Remaining
 
-- [ ] B. Book context header card
-1. Move: the clickable book cover/title/count card and `Book Hub` visual button.
-2. Stay in `page.tsx`: `router.push`, `userBookId`, `bookTitle`, `bookCover`, `words.length`, `filteredSorted.length`.
-3. Props needed:
-    * bookTitle
-    * bookCover
-    * totalCount
-    * visibleCount
-    * onOpenBookHub
-4. Type: presentational UI with one navigation callback.
-5. Risk: low-medium.
-Safe if navigation stays as a callback. Do not move router usage yet.
-
 - [ ] C. Search and filter panel
 1. Move: the rounded search/filter container with search input, hidden toggle, and chapter select.
 2. Stay in `page.tsx`: `query`, `setQuery`, `showHidden`, `setShowHidden`, `chapterFilter`, `setChapterFilter`, `chapterOptions`, and all filter calculations.
@@ -291,6 +278,6 @@ types.ts
 - [✔️] Extracted `ReorderStatusHint`.
 - [✔️] Extracted `WordTableHeader`.
 - [✔️] Extracted `WordTableEmptyState`.
-- [✔️] Extracted 
+- [✔️] Extracted `Book context header card`.
 - [✔️] Extracted 
 - [✔️] Extracted 
