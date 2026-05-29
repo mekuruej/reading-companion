@@ -23,6 +23,7 @@ import BookVocabChapterCell from "./components/BookVocabChapterCell";
 import BookVocabPageCell from "./components/BookVocabPageCell";
 import BookVocabLoadingState from "./components/BookVocabLoadingState";
 import BookVocabSignInState from "./components/BookVocabSignInState";
+import BookVocabEditFormBody from "./components/BookVocabEditFormBody";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -916,127 +917,30 @@ export default function BookWordsPage() {
           onClose={closeEdit}
           onSave={saveEdit}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-600">Word (book form)</span>
-              <input
-                value={editSurface}
-                onChange={(e) => setEditSurface(e.target.value)}
-                className="border p-2 rounded"
-              />
-
-              {editing?.cache_surface && editing.cache_surface !== editSurface ? (
-                <span className="text-[11px] text-gray-500">
-                  Dictionary form: {editing.cache_surface}
-                </span>
-              ) : null}
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-600">Reading</span>
-              <input
-                value={editReading}
-                onChange={(e) => setEditReading(e.target.value)}
-                className="border p-2 rounded"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-600">JLPT</span>
-              <select
-                value={editJlpt}
-                onChange={(e) => setEditJlpt(e.target.value)}
-                className="border p-2 rounded bg-white"
-              >
-                <option value="">NON-JLPT</option>
-                <option value="N5">N5</option>
-                <option value="N4">N4</option>
-                <option value="N3">N3</option>
-                <option value="N2">N2</option>
-                <option value="N1">N1</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-600">Definition #</span>
-              {editMeaningChoices.length > 0 ? (
-                <select
-                  value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
-                  onChange={(e) => changeDefinition(e.target.value)}
-                  className="border p-2 rounded bg-white"
-                >
-                  {editMeaningChoices.map((_, i) => (
-                    <option key={i} value={i}>
-                      {i + 1}
-                    </option>
-                  ))}
-                  <option value="other">Other</option>
-                </select>
-              ) : (
-                <select
-                  value={editMeaningChoiceIndex == null ? "other" : "0"}
-                  onChange={(e) => changeDefinition(e.target.value)}
-                  className="border p-2 rounded bg-white"
-                >
-                  <option value="other">Other</option>
-                </select>
-              )}
-            </label>
-
-            <label className="flex flex-col gap-1 sm:col-span-2">
-              <span className="text-xs text-gray-600">Meaning</span>
-              <textarea
-                value={editMeaning}
-                onChange={(e) => setEditMeaning(e.target.value)}
-                className="border p-2 rounded min-h-[90px]"
-              />
-              {editMeaningChoices.length > 1 ? (
-                <p className="text-[11px] text-gray-500">
-                  Tip: changing “Definition #” will overwrite Meaning to match that definition.
-                </p>
-              ) : null}
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-600">Chapter #</span>
-              <input
-                value={editChapterNum}
-                onChange={(e) => setEditChapterNum(e.target.value)}
-                className="border p-2 rounded"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-600">Chapter title</span>
-              <input
-                value={editChapterName}
-                onChange={(e) => setEditChapterName(e.target.value)}
-                className="border p-2 rounded"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-600">Page</span>
-              <input
-                value={editPage}
-                onChange={(e) => setEditPage(e.target.value)}
-                className="border p-2 rounded"
-              />
-            </label>
-
-            <label className="flex items-start gap-2 text-sm text-stone-700 sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={editHideKanjiInReadingSupport}
-                onChange={(e) => setEditHideKanjiInReadingSupport(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="font-medium">Hide kanji in Reading Support</span>
-                <span className="block text-xs text-stone-500">Use kana to match the book.</span>
-              </span>
-            </label>
-          </div>
+          <BookVocabEditFormBody
+            cacheSurface={editing.cache_surface}
+            editSurface={editSurface}
+            editReading={editReading}
+            editJlpt={editJlpt}
+            editMeaning={editMeaning}
+            editChapterNum={editChapterNum}
+            editChapterName={editChapterName}
+            editPage={editPage}
+            editMeaningChoices={editMeaningChoices}
+            editMeaningChoiceIndex={editMeaningChoiceIndex}
+            editHideKanjiInReadingSupport={editHideKanjiInReadingSupport}
+            onEditSurfaceChange={setEditSurface}
+            onEditReadingChange={setEditReading}
+            onEditJlptChange={setEditJlpt}
+            onDefinitionChange={changeDefinition}
+            onEditMeaningChange={setEditMeaning}
+            onEditChapterNumChange={setEditChapterNum}
+            onEditChapterNameChange={setEditChapterName}
+            onEditPageChange={setEditPage}
+            onEditHideKanjiInReadingSupportChange={
+              setEditHideKanjiInReadingSupport
+            }
+          />
 
         </BookVocabEditModalShell>
       ) : null}
