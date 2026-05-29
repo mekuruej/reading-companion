@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import ReadAlongLoadingState from "./components/ReadAlongLoadingState";
+import ReadAlongPageHeader from "./components/ReadAlongPageHeader";
 import {
     fetchLibraryStudyColorInfoByWord,
     makeLibraryStudyColorKey,
@@ -784,22 +785,7 @@ export default function ReadAlongPage() {
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
             <div className="mx-auto max-w-4xl space-y-4">
-                <div>
-                    <h1 className="text-2xl font-semibold text-stone-900">Fluid Reading</h1>
-                    <p className="mt-1 text-sm text-stone-600">
-                        Use this for a quicker, smoother reading experience while you read along with your saved words. New lookups can wait — this page is for keeping your reading momentum.
-                    </p>
-                </div>
-
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5 text-center">
-                    <div className="text-base font-semibold text-stone-900">
-                        Fluid Reading with Saved Word Support
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-stone-700">
-                        Read forward without stopping for new lookups. Use your saved words only as light support.
-                    </p>
-                </div>
-
+                <ReadAlongPageHeader />
                 {bookTitle ? (
                     <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
                         <button
