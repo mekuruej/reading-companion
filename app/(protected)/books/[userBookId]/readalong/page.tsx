@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
-import LibraryColorBadge from "@/components/LibraryColorBadge";
 import ReadAlongLoadingState from "./components/ReadAlongLoadingState";
 import ReadAlongPageHeader from "./components/ReadAlongPageHeader";
 import ReadAlongBookContextCard from "./components/ReadAlongBookContextCard";
@@ -17,6 +16,8 @@ import ReadAlongCurrentPageSummary from "./components/ReadAlongCurrentPageSummar
 import ReadAlongPageNavigator from "./components/ReadAlongPageNavigator";
 import ReadAlongChapterSelector from "./components/ReadAlongChapterSelector";
 import ReadAlongTimerPanel from "./components/ReadAlongTimerPanel";
+import ReadAlongReaderShell from "./components/ReadAlongReaderShell";
+import ReadAlongWordCard from "./components/ReadAlongWordCard";
 import {
     fetchLibraryStudyColorInfoByWord,
     makeLibraryStudyColorKey,
@@ -899,9 +900,10 @@ export default function ReadAlongPage() {
                     onSupportModeChange={setSupportMode}
                 />
 
-                <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
-                    <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-                        <div className="space-y-3">
+                <ReadAlongReaderShell
+                    scrollAreaRef={scrollAreaRef}
+                    header={
+                        <>
                             <ReadAlongPageNavigator
                                 pageIndex={pageIndex}
                                 pageCount={pages.length}
@@ -917,69 +919,35 @@ export default function ReadAlongPage() {
                                 wordCount={currentPage?.words.length ?? 0}
                                 hasCurrentPage={Boolean(currentPage)}
                             />
+                        </>
+                    }
+                >
+                    {!currentPage || currentPage.words.length === 0 ? (
+                        <ReadAlongEmptyState />
+                    ) : (
+                        <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
+                            {currentPage.words.map((w, index) => {
+                                const isFaded = index <= fadedThroughIndex;
+                                const colorInfo =
+                                    libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
+
+                                return (
+                                    <ReadAlongWordCard
+                                        key={w.id}
+                                        word={w}
+                                        supportMode={supportMode}
+                                        isFaded={isFaded}
+                                        colorInfo={colorInfo}
+                                        setWordRef={(wordId, element) => {
+                                            wordRefs.current[wordId] = element;
+                                        }}
+                                        onProgressTap={() => handleProgressTap(index, w.id)}
+                                    />
+                                );
+                            })}
                         </div>
-                    </div>
-
-                    <div
-                        ref={scrollAreaRef}
-                        className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
-                    >
-                        {!currentPage || currentPage.words.length === 0 ? (
-                            <ReadAlongEmptyState />
-                        ) : (
-                            <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
-                                {currentPage.words.map((w, index) => {
-                                    const isFaded = index <= fadedThroughIndex;
-                                    const colorInfo =
-                                        libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
-
-                                    return (
-                                        <div
-                                            key={w.id}
-                                            ref={(el) => {
-                                                wordRefs.current[w.id] = el;
-                                            }}
-                                            onClick={() => handleProgressTap(index, w.id)}
-                                            className={`relative cursor-pointer rounded-2xl border px-4 py-3 pr-28 transition ${isFaded
-                                                ? "border-stone-200 bg-stone-50 opacity-35"
-                                                : "border-stone-200 bg-white hover:bg-stone-50"
-                                                }`}
-                                        >
-                                            {colorInfo ? (
-                                                <div className="absolute right-4 top-3">
-                                                    <LibraryColorBadge
-                                                        colorStatus={colorInfo.colorStatus}
-                                                        stageLabel={colorInfo.stageLabel}
-                                                    />
-                                                </div>
-                                            ) : null}
-
-                                            <div className="min-w-0">
-                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                                    <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
-                                                        {(w.hide_kanji_in_reading_support ? (w.reading || w.surface) : w.surface) || "—"}
-                                                    </div>
-
-                                                    {(supportMode === "full" || supportMode === "reading") && (
-                                                        <div className="text-sm text-stone-500 sm:text-base">
-                                                            {w.reading || "—"}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {(supportMode === "full" || supportMode === "meaning") && (
-                                                    <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
-                                                        {w.meaning || "—"}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                    )}
+                </ReadAlongReaderShell>
             </div>
         </main>
     );
