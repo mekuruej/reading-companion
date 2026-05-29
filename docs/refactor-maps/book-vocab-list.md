@@ -211,9 +211,9 @@ types.ts
 - [✔️] Extracted `BookVocabPageCell`.
 - [✔️] Extracted `BookVocabLibraryStageCell`.
 - [✔️] Extracted `BookVocabLibraryStudyStatusBadge`.
+- [✔️] Extracted `LoadingSigninStates`.
 
 ## Remaining
 
-- [ ] E. Loading / sign-in / error states
 - [ ] K. Word table row
 - [ ] N. Edit word form body
