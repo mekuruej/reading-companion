@@ -48,16 +48,7 @@ The first code changes should only move visual JSX into components. Keep state, 
 
 ## First Pass: Visual / Page-Thinning Components
 
-### B. `ReadAlongPageHeader`
 
-* What JSX it owns: the top title "Fluid Reading" and intro copy.
-* Expected props: none, unless the copy becomes configurable later.
-* What stays in `page.tsx`:
-  * all page state and handlers
-* Risk level: low.
-* Why it is safe or risky: static copy only.
-* Recommended order: 2.
-* Helpful comment notes: no comment needed unless the copy is intentionally tied to product language.
 
 ### C. `ReadAlongSupportIntroCard`
 
@@ -439,8 +430,8 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 ## Finished
 
 - [✔️] Extracted `ReadAlongLoadingState`.
-- [✔️] Extracted 
-- [✔️] Extracted 
+- [✔️] Extracted `ReadAlongPageHeader`.
+- [✔️] Removed due to Redundancy `ReadAlongSupportIntroCard`.
 - [✔️] Extracted 
 - [✔️] Extracted 
 - [✔️] Extracted 
