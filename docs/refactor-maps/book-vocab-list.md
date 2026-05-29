@@ -58,18 +58,6 @@ The first code changes should only move visual JSX into components and keep stat
 5. Risk: low-medium.
 The UI is simple, but access-denied handling is security-sensitive. Keep the branching in `page.tsx`.
 
-- [ ] F. Word metadata badges
-1. Move: small repeated display pieces such as `KatakanaBadge`, repeat count cell content, chapter display snippet, and maybe definition-number display.
-2. Stay in `page.tsx`: `chapterDisplayParts`, `repeatCounts`, `repeatKey`, and row mapping at first.
-3. Props needed:
-    * surface for katakana badge
-    * repeat count
-    * chapter display parts or word row
-    * meaning choice index / meaning presence
-4. Type: presentational UI.
-5. Risk: low-medium.
-Good once the table row is being prepared. Keep normalization and chapter helpers in `page.tsx` initially.
-
 - [ ] G. Library stage cell
 1. Move: the Library Study stage table cell, including `LibraryColorBadge` / `LibraryStudyStatusBadge` selection.
 2. Stay in `page.tsx`: `computeLibraryStudyColorStatus`, `globalEncounterCounts`, `libraryProgressByKey`, `libraryColorByWordKey`, `learningSettings`, identity-key calculations, and fallback logic.
@@ -106,20 +94,6 @@ It looks visual, but it reflects non-obvious Library Study rules. Extract only a
 4. Type: presentational UI with many callbacks.
 5. Risk: medium-high.
 Do not extract first. The row combines display, drag/drop, mutation actions, color logic, and repeated helper output.
-
-- [ ] M. 
-1. Move: modal frame, title area, close button, error placement, action footer.
-2. Stay in `page.tsx`: `editing`, all edit state, `changeDefinition`, `saveEdit`, `closeEdit`, and all controlled inputs at first.
-3. Props needed:
-    * editing word
-    * editErr
-    * editSaving
-    * onClose
-    * onSave
-    * children for form body
-4. Type: presentational UI with callbacks.
-5. Risk: medium.
-The modal shell is safe, but the form body is controlled-input-heavy.
 
 - [ ] N. Edit word form body
 1. Move: all edit form labels/inputs/selects/checkboxes.
@@ -243,6 +217,6 @@ types.ts
 - [✔️] Extracted `WordTableShell`.
 - [✔️] Extracted `WordRowActionButtons`.
 - [✔️] Extracted `EditWordModalShell`.
-- [✔️] Extracted
+- [✔️] Extracted `WordMetadataBadges`.
 - [✔️] Extracted
 - [✔️] Extracted
