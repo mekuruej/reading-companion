@@ -1,11 +1,8 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
-// Use the same import paths that page.tsx currently uses for these two components.
-import LibraryColorBadge from "PASTE_EXISTING_LIBRARY_COLOR_BADGE_IMPORT_PATH";
-import LibraryStudyStatusBadge from "PASTE_EXISTING_LIBRARY_STUDY_STATUS_BADGE_IMPORT_PATH";
+import LibraryColorBadge from "@/components/LibraryColorBadge";
 
 type LibraryColorBadgeProps = ComponentProps<typeof LibraryColorBadge>;
-type LibraryStudyStatusBadgeProps = ComponentProps<typeof LibraryStudyStatusBadge>;
 
 type SharedColorInfo = {
   colorStatus: LibraryColorBadgeProps["colorStatus"];
@@ -14,19 +11,16 @@ type SharedColorInfo = {
 
 type BookVocabLibraryStageCellProps = {
   sharedColorInfo: SharedColorInfo | null;
-  status: LibraryStudyStatusBadgeProps["status"];
-  showBadgeNumbers: boolean;
-  encounterCount: number;
+  fallbackBadge: ReactNode;
 };
 
 // Visual Library Study stage cell for one vocabulary row.
-// page.tsx still owns the encounter/progress lookups and status calculation;
-// this component only chooses which badge display to show.
+// page.tsx still owns the encounter/progress lookups, fallback status calculation,
+// and the local fallback badge helper. This component only renders the table cell
+// and chooses between the shared LibraryColorBadge display or the provided fallback badge.
 export default function BookVocabLibraryStageCell({
   sharedColorInfo,
-  status,
-  showBadgeNumbers,
-  encounterCount,
+  fallbackBadge,
 }: BookVocabLibraryStageCellProps) {
   return (
     <td className="p-2 text-center text-xs text-gray-600 align-middle">
@@ -39,11 +33,7 @@ export default function BookVocabLibraryStageCell({
             dotOnly
           />
         ) : (
-          <LibraryStudyStatusBadge
-            status={status}
-            showNumbers={showBadgeNumbers}
-            encounterCount={encounterCount}
-          />
+          fallbackBadge
         )}
       </span>
     </td>
