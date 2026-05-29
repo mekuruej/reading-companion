@@ -48,38 +48,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 
 ## First Pass: Visual / Page-Thinning Components
 
-### M. `ReadAlongWordList`
-
-* What JSX it owns: the list wrapper around all word cards.
-* Expected props:
-  * `words`
-  * `supportMode`
-  * `fadedThroughIndex`
-  * `libraryColorByWordKey`
-  * `setWordRef`
-  * `onProgressTap`
-* What stays in `page.tsx`:
-  * page/word derivation
-  * color lookup map creation
-  * tap/scroll logic
-* Risk level: high for first pass, medium later.
-* Why it is safe or risky: this would reduce line count, but it starts to move mapping plus display conditions. It should wait until `ReadAlongWordCard` is stable.
-* Recommended order: 12.
-* Helpful comment notes: if extracted, comment that it remains presentational and receives already-derived words and color info.
-
-### N. `ReadAlongAccessDeniedState`
-
-* What JSX it owns: possibly a thin wrapper around `AccessDeniedMessage`.
-* Expected props:
-  * `message`
-* What stays in `page.tsx`:
-  * all access decisions
-  * `canAccessBook`, `accessChecked`, and `accessMessage` state
-* Risk level: low-medium.
-* Why it is safe or risky: the visual wrapper is easy, but access-denied semantics are security-sensitive. It may not be worth extracting unless loading/error states are grouped later.
-* Recommended order: optional, after the first few static pieces.
-* Helpful comment notes: access/security checks must remain in `page.tsx`.
-
 ## Recommended First Extraction
 
 Start with `ReadAlongLoadingState`.
@@ -256,8 +224,8 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `ReadAlongTimerPanel`.
 - [✔️] Extracted `ReadAlongReaderShell`.
 - [✔️] Extracted `ReadAlongWordCard`.
-- [✔️] Extracted
-- [✔️] Extracted
+- [✔️] Extracted `ReadAlongWordList`.
+- [✔️] Extracted `ReadAlongAccessDeniedState`.
 
 
 
