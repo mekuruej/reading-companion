@@ -48,19 +48,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 
 ## First Pass: Visual / Page-Thinning Components
 
-### A. `ReadAlongLoadingState`
-
-* What JSX it owns: the repeated loading `<main>` with the centered "Loading Read Along..." card.
-* Expected props:
-  * `message?: string`
-* What stays in `page.tsx`:
-  * `loading` and `accessChecked` branching
-  * access-denied branching
-* Risk level: low.
-* Why it is safe or risky: this is static presentational UI and does not touch access decisions.
-* Recommended order: 1.
-* Helpful comment notes: optional comment near the return branches saying access decisions stay in `page.tsx`; this component only renders the visual loading shell.
-
 ### B. `ReadAlongPageHeader`
 
 * What JSX it owns: the top title "Fluid Reading" and intro copy.
@@ -448,3 +435,13 @@ Use these labels for this page:
 Recommended current status: `Not started`.
 
 When all safe presentational extractions are complete, use `Visual pass done / architecture deferred`. That should mean the page-thinning layer is complete and the deeper controller/service/DAO/helper cleanup is intentionally saved for later, not that the visual work is unfinished.
+
+## Finished
+
+- [✔️] Extracted `ReadAlongLoadingState`.
+- [✔️] Extracted 
+- [✔️] Extracted 
+- [✔️] Extracted 
+- [✔️] Extracted 
+- [✔️] Extracted 
+

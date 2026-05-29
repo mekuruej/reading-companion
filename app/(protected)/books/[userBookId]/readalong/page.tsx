@@ -8,6 +8,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
+import ReadAlongLoadingState from "./components/ReadAlongLoadingState";
 import {
     fetchLibraryStudyColorInfoByWord,
     makeLibraryStudyColorKey,
@@ -767,23 +768,11 @@ export default function ReadAlongPage() {
     }, [isRunning, isPaused]);
 
     if (loading) {
-        return (
-            <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
-                    Loading Read Along…
-                </div>
-            </main>
-        );
+        return <ReadAlongLoadingState />;
     }
 
     if (!accessChecked) {
-        return (
-            <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-center text-stone-500">
-                    Loading Read Along…
-                </div>
-            </main>
-        );
+        return <ReadAlongLoadingState />;
     }
 
     if (!canAccessBook) {

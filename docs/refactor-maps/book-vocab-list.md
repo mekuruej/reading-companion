@@ -48,61 +48,6 @@ The first code changes should only move visual JSX into components and keep stat
 
 ## Remaining
 
-- [ ] E. Loading / sign-in / error states
-1. Move: simple loading, sign-in, and non-access-error return UIs.
-2. Stay in `page.tsx`: branching decisions, `router.push`, `needsSignIn`, `errorMsg`, and `AccessDeniedMessage` usage at first.
-3. Props needed:
-    * message
-    * onPrimaryAction for login/books navigation
-4. Type: presentational UI with callbacks.
-5. Risk: low-medium.
-The UI is simple, but access-denied handling is security-sensitive. Keep the branching in `page.tsx`.
-
-- [ ] K. Word table row
-1. Move: one `<tr>` for a word.
-2. Stay in `page.tsx`: `filteredSorted.map`, drag state, drag/drop handlers, row view-model preparation, color status calculation, router navigation, edit/hide/delete handlers.
-3. Props needed:
-    * word
-    * repeatCount
-    * globalEncounterCount
-    * sharedColorInfo
-    * fallbackStatus
-    * showBadgeNumbers
-    * isDragging
-    * isDropTarget
-    * onDragStart
-    * onDragOver
-    * onDrop
-    * onDragEnd
-    * onOpen
-    * onEdit
-    * onHide
-    * onUnhide
-    * onDelete
-4. Type: presentational UI with many callbacks.
-5. Risk: medium-high.
-Do not extract first. The row combines display, drag/drop, mutation actions, color logic, and repeated helper output.
-
-- [ ] N. Edit word form body
-1. Move: all edit form labels/inputs/selects/checkboxes.
-2. Stay in `page.tsx`: all state values and setters, `changeDefinition`, `parseNullableInt`, `saveEdit`, and patch construction.
-3. Props needed:
-    * editing
-    * editSurface / setEditSurface
-    * editReading / setEditReading
-    * editMeaning / setEditMeaning
-    * editJlpt / setEditJlpt
-    * editPage / setEditPage
-    * editChapterNum / setEditChapterNum
-    * editChapterName / setEditChapterName
-    * editMeaningChoices
-    * editMeaningChoiceIndex
-    * onDefinitionChange
-    * editHideKanjiInReadingSupport / setEditHideKanjiInReadingSupport
-4. Type: presentational UI with controlled inputs.
-5. Risk: high.
-Not an early extraction. Definition selection can overwrite meaning, and save payload behavior must stay exactly the same.
-
 ## Recommended First Extraction
 
 Start with `BookVocabIntroCopy`.
