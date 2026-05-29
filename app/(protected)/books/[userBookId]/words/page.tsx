@@ -20,6 +20,7 @@ import BookVocabLibraryStageCell from "./components/BookVocabLibraryStageCell";
 import BookVocabLibraryStudyStatusBadge from "./components/BookVocabLibraryStudyStatusBadge";
 import BookVocabRepeatCountCell from "./components/BookVocabRepeatCountCell";
 import BookVocabChapterCell from "./components/BookVocabChapterCell";
+import BookVocabPageCell from "./components/BookVocabPageCell";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1171,9 +1172,7 @@ export default function BookWordsPage() {
               </td>
 
               <BookVocabChapterCell chapter={chapterDisplayParts(w)} />
-
-              <td className="p-2">{w.page_number ?? "—"}</td>
-
+              <BookVocabPageCell pageNumber={w.page_number} />
               <BookVocabActionsCell
                 hidden={w.hidden}
                 onOpen={() =>
