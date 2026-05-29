@@ -19,6 +19,7 @@ import BookVocabKatakanaBadge from "./components/BookVocabKatakanaBadge";
 import BookVocabLibraryStageCell from "./components/BookVocabLibraryStageCell";
 import BookVocabLibraryStudyStatusBadge from "./components/BookVocabLibraryStudyStatusBadge";
 import BookVocabRepeatCountCell from "./components/BookVocabRepeatCountCell";
+import BookVocabChapterCell from "./components/BookVocabChapterCell";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1138,7 +1139,6 @@ export default function BookWordsPage() {
               </td>
 
               <BookVocabRepeatCountCell repeatCount={rep} />
-
               <BookVocabLibraryStageCell
                 sharedColorInfo={sharedColorInfo}
                 fallbackBadge={
@@ -1170,20 +1170,7 @@ export default function BookWordsPage() {
                     : "—"}
               </td>
 
-              <td className="p-2">
-                {(() => {
-                  const ch = chapterDisplayParts(w);
-                  if (ch.num && ch.name) {
-                    return (
-                      <span className="leading-tight">
-                        <span className="block">{ch.num}</span>
-                        <span className="block text-gray-600">{ch.name}</span>
-                      </span>
-                    );
-                  }
-                  return ch.fallback;
-                })()}
-              </td>
+              <BookVocabChapterCell chapter={chapterDisplayParts(w)} />
 
               <td className="p-2">{w.page_number ?? "—"}</td>
 
