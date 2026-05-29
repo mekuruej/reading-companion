@@ -24,6 +24,7 @@ import BookVocabPageCell from "./components/BookVocabPageCell";
 import BookVocabLoadingState from "./components/BookVocabLoadingState";
 import BookVocabSignInState from "./components/BookVocabSignInState";
 import BookVocabEditFormBody from "./components/BookVocabEditFormBody";
+import BookVocabRow from "./components/BookVocabRow";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -991,9 +992,22 @@ export default function BookWordsPage() {
           });
 
           return (
-            <tr
+            <BookVocabRow
               key={w.id}
-              draggable
+              hidden={w.hidden}
+              surface={w.surface}
+              reading={w.reading}
+              meaning={w.meaning}
+              meaningChoiceIndex={w.meaning_choice_index}
+              pageNumber={w.page_number}
+              repeatCount={rep}
+              chapter={chapterDisplayParts(w)}
+              sharedColorInfo={sharedColorInfo}
+              status={status}
+              showBadgeNumbers={learningSettings.show_badge_numbers}
+              encounterCount={globalEncounterCount}
+              isDragging={draggingId === w.id}
+              isDropTarget={dropTargetId === w.id}
               onDragStart={() => {
                 setDraggingId(w.id);
                 setDropTargetId(null);
@@ -1024,61 +1038,14 @@ export default function BookWordsPage() {
                 setDraggingId(null);
                 setDropTargetId(null);
               }}
-              className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""} ${dropTargetId === w.id ? "bg-blue-50" : ""
-                } ${draggingId === w.id ? "opacity-50" : ""}`}
-            >
-              <td
-                className="cursor-grab select-none p-2 text-center text-gray-400"
-                title="Drag to reorder within this page"
-              >
-                ☰
-              </td>
-
-              <BookVocabRepeatCountCell repeatCount={rep} />
-              <BookVocabLibraryStageCell
-                sharedColorInfo={sharedColorInfo}
-                fallbackBadge={
-                  <BookVocabLibraryStudyStatusBadge
-                    status={status}
-                    showNumbers={learningSettings.show_badge_numbers}
-                    encounterCount={globalEncounterCount}
-                  />
-                }
-              />
-
-              <td className="p-2 font-medium">
-                <span className="inline-flex items-center gap-2">
-                  {w.surface}
-                  <BookVocabKatakanaBadge surface={w.surface} />
-                </span>
-              </td>
-              <td className="p-2">{w.reading ?? "—"}</td>
-
-              <td className="p-2">
-                <div>{w.meaning ?? "—"}</div>
-              </td>
-
-              <td className="p-2 text-center">
-                {w.meaning_choice_index != null
-                  ? w.meaning_choice_index + 1
-                  : w.meaning
-                    ? "O"
-                    : "—"}
-              </td>
-
-              <BookVocabChapterCell chapter={chapterDisplayParts(w)} />
-              <BookVocabPageCell pageNumber={w.page_number} />
-              <BookVocabActionsCell
-                hidden={w.hidden}
-                onOpen={() =>
-                  router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
-                }
-                onEdit={() => openEdit(w)}
-                onHide={() => hideWord(w)}
-                onUnhide={() => unhideWord(w)}
-                onDelete={() => deleteWord(w)}
-              />
-            </tr>
+              onOpen={() =>
+                router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
+              }
+              onEdit={() => openEdit(w)}
+              onHide={() => hideWord(w)}
+              onUnhide={() => unhideWord(w)}
+              onDelete={() => deleteWord(w)}
+            />
           );
         })}
 
