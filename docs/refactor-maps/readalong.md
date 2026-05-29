@@ -99,21 +99,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 * Recommended order: 9.
 * Helpful comment notes: strongly recommended. Explain that timer/session orchestration remains page-owned and this component only displays controls and calls callbacks.
 
-### G. `ReadAlongSupportModeTabs`
-
-* What JSX it owns: the three support mode buttons.
-* Expected props:
-  * `supportMode`
-  * `onSupportModeChange`
-* What stays in `page.tsx`:
-  * `SupportMode` type for now, or pass it from page-local type
-  * state and setter
-  * word display decisions based on support mode
-* Risk level: low.
-* Why it is safe or risky: small visual control with a single state callback. It does not own the rendering behavior that support mode affects.
-* Recommended order: 6.
-* Helpful comment notes: note that support mode is interpreted by the word-card rendering in `page.tsx` until a later row/card extraction.
-
 ### H. `ReadAlongReaderShell`
 
 * What JSX it owns: the outer rounded reader container, sticky header area, and scroll body wrapper.
@@ -171,15 +156,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 * Helpful comment notes: no comment needed.
 
 ### K. `ReadAlongEmptyState`
-
-* What JSX it owns: "No saved words here." and "Enjoy the story!" empty state.
-* Expected props: none, unless copy becomes configurable.
-* What stays in `page.tsx`:
-  * empty-state condition
-* Risk level: low.
-* Why it is safe or risky: static visual state.
-* Recommended order: 3 or 4, after the header/intro static components.
-* Helpful comment notes: no comment needed.
 
 ### L. `ReadAlongWordCard`
 
@@ -403,6 +379,10 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `ReadAlongPageHeader`.
 - [✔️] Removed due to Redundancy `ReadAlongSupportIntroCard`.
 - [✔️] Extracted `ReadAlongBookContextCard`.
+- [✔️] Extracted `ReadAlongEmptyState`.
+- [✔️] Extracted `ReadAlongSupportModeTabs`.
+- [✔️] Extracted 
+- [✔️] Extracted 
 - [✔️] Extracted 
 - [✔️] Extracted 
 
