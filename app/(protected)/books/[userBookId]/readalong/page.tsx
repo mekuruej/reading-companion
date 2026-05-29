@@ -16,6 +16,7 @@ import ReadAlongSupportModeTabs from "./components/ReadAlongSupportModeTabs";
 import ReadAlongCurrentPageSummary from "./components/ReadAlongCurrentPageSummary";
 import ReadAlongPageNavigator from "./components/ReadAlongPageNavigator";
 import ReadAlongChapterSelector from "./components/ReadAlongChapterSelector";
+import ReadAlongTimerPanel from "./components/ReadAlongTimerPanel";
 import {
     fetchLibraryStudyColorInfoByWord,
     makeLibraryStudyColorKey,
@@ -788,6 +789,66 @@ export default function ReadAlongPage() {
         );
     }
 
+    function handleStartTimer() {
+        const today = todayYmdAppTimeZone();
+
+        setSessionDate(today);
+        setStartTime(Date.now());
+        setElapsed(0);
+        setIsRunning(true);
+        setIsPaused(false);
+        setHasFinishedTimer(false);
+        setShowTimedSessionForm(false);
+        setTimerSaveMessage("");
+        setSessionMinutesRead("");
+    }
+
+    function handlePauseTimer() {
+        if (startTime) {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+        }
+
+        setIsRunning(false);
+        setIsPaused(true);
+    }
+
+    async function handleFinishRunningTimer() {
+        if (startTime) {
+            setElapsed(Math.floor((Date.now() - startTime) / 1000));
+        }
+
+        setIsRunning(false);
+        setIsPaused(false);
+        setHasFinishedTimer(true);
+        await openTimedSessionFormWithDefaults();
+    }
+
+    function handleResumeTimer() {
+        setStartTime(Date.now() - elapsed * 1000);
+        setIsRunning(true);
+        setIsPaused(false);
+    }
+
+    async function handleFinishPausedTimer() {
+        setIsPaused(false);
+        setIsRunning(false);
+        setHasFinishedTimer(true);
+        await openTimedSessionFormWithDefaults();
+    }
+
+    async function handleSaveTimedSessionFromTimer() {
+        setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
+        await saveReadingSession();
+    }
+
+    function handleCancelTimedSession() {
+        setShowTimedSessionForm(false);
+        setElapsed(0);
+        setStartTime(null);
+        setIsPaused(false);
+        setIsRunning(false);
+    }
+
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
             <div className="mx-auto max-w-4xl space-y-4">
@@ -814,177 +875,24 @@ export default function ReadAlongPage() {
                     />
                 ) : null}
 
-                <div className="rounded-xl border border-stone-200 bg-white px-3 py-3">
-                    <div className="mb-2 text-center text-sm text-stone-600">
-                        Use the timer to track your fluid reading session, whether you read quietly or with saved word support.
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                        {!isRunning && !isPaused ? (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const today = todayYmdAppTimeZone();
-
-                                    setSessionDate(today);
-                                    setStartTime(Date.now());
-                                    setElapsed(0);
-                                    setIsRunning(true);
-                                    setIsPaused(false);
-                                    setHasFinishedTimer(false);
-                                    setShowTimedSessionForm(false);
-                                    setTimerSaveMessage("");
-                                    setSessionMinutesRead("");
-                                }}
-                                className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
-                            >
-                                Start Timer
-                            </button>
-                        ) : null}
-
-                        {isRunning ? (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (startTime) {
-                                            setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                                        }
-                                        setIsRunning(false);
-                                        setIsPaused(true);
-                                    }}
-                                    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
-                                >
-                                    Pause
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (startTime) {
-                                            setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                                        }
-                                        setIsRunning(false);
-                                        setIsPaused(false);
-                                        setHasFinishedTimer(true);
-                                        void openTimedSessionFormWithDefaults();
-                                    }}
-                                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-                                >
-                                    Finish
-                                </button>
-                            </>
-                        ) : null}
-
-                        {isPaused ? (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setStartTime(Date.now() - elapsed * 1000);
-                                        setIsRunning(true);
-                                        setIsPaused(false);
-                                    }}
-                                    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
-                                >
-                                    Resume
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsPaused(false);
-                                        setIsRunning(false);
-                                        setHasFinishedTimer(true);
-                                        void openTimedSessionFormWithDefaults();
-                                    }}
-                                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-                                >
-                                    Finish
-                                </button>
-                            </>
-                        ) : null}
-
-                        <div className="flex items-center rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700">
-                            ⏱ {formatTimer(elapsed)}
-                        </div>
-                    </div>
-
-                    {showTimedSessionForm && !isRunning ? (
-                        <div className="mt-3 rounded-2xl border border-stone-300 bg-white p-4">
-                            <div className="mb-3 text-sm font-medium text-stone-700">
-                                Save this reading session
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div>
-                                    <div className="mb-1 text-sm text-stone-600">Start page</div>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        value={sessionStartPage}
-                                        onChange={(e) => setSessionStartPage(e.target.value)}
-                                        placeholder="e.g. 45"
-                                        className="w-full rounded border px-3 py-2 text-sm"
-                                    />
-                                </div>
-
-                                <div>
-                                    <div className="mb-1 text-sm text-stone-600">End page</div>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        value={sessionEndPage}
-                                        onChange={(e) => setSessionEndPage(e.target.value)}
-                                        placeholder="e.g. 52"
-                                        className="w-full rounded border px-3 py-2 text-sm"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mt-3 text-sm text-stone-500">
-                                Time: {formatTimer(elapsed)}
-                            </div>
-
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
-                                        await saveReadingSession();
-                                    }}
-                                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                                >
-                                    Save Timed Session
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowTimedSessionForm(false);
-                                        setElapsed(0);
-                                        setStartTime(null);
-                                        setIsPaused(false);
-                                        setIsRunning(false);
-                                    }}
-                                    className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {(isRunning || isPaused) ? (
-                        <p className="mt-2 text-xs text-amber-600">
-                            Timer is active. If you leave Read Along or refresh the page, you may lose your session.
-                        </p>
-                    ) : null}
-
-                    {timerSaveMessage ? (
-                        <p className="mt-2 text-xs text-emerald-600">{timerSaveMessage}</p>
-                    ) : null}
-                </div>
+                <ReadAlongTimerPanel
+                    isRunning={isRunning}
+                    isPaused={isPaused}
+                    elapsedLabel={formatTimer(elapsed)}
+                    showTimedSessionForm={showTimedSessionForm}
+                    sessionStartPage={sessionStartPage}
+                    sessionEndPage={sessionEndPage}
+                    timerSaveMessage={timerSaveMessage}
+                    onStartTimer={handleStartTimer}
+                    onPauseTimer={handlePauseTimer}
+                    onFinishRunningTimer={handleFinishRunningTimer}
+                    onResumeTimer={handleResumeTimer}
+                    onFinishPausedTimer={handleFinishPausedTimer}
+                    onSessionStartPageChange={setSessionStartPage}
+                    onSessionEndPageChange={setSessionEndPage}
+                    onSaveTimedSession={handleSaveTimedSessionFromTimer}
+                    onCancelTimedSession={handleCancelTimedSession}
+                />
 
                 <ReadAlongSupportModeTabs
                     supportMode={supportMode}
