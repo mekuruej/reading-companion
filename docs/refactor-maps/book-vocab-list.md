@@ -122,16 +122,6 @@ It is visually isolated, but the callbacks mutate database rows and must remain 
 5. Risk: medium-high.
 Do not extract first. The row combines display, drag/drop, mutation actions, color logic, and repeated helper output.
 
-- [ ] L. Word table shell
-1. Move: table wrapper, table element, header, body slots, and maybe empty-state composition.
-2. Stay in `page.tsx`: row mapping and all row calculations at first.
-3. Props needed:
-    * children or rendered rows
-    * headerStickyStyle
-4. Type: presentational layout.
-5. Risk: medium.
-Useful after header/empty-state/row pieces are clearer.
-
 - [ ] M. Edit word modal shell
 1. Move: modal frame, title area, close button, error placement, action footer.
 2. Stay in `page.tsx`: `editing`, all edit state, `changeDefinition`, `saveEdit`, `closeEdit`, and all controlled inputs at first.
@@ -265,4 +255,9 @@ types.ts
 - [✔️] Extracted `WordTableEmptyState`.
 - [✔️] Extracted `BookContextHeaderCard`.
 - [✔️] Extracted `SearchAndFilterPanel`.
-- [✔️] Extracted 
+- [✔️] Extracted `WordTableShell`.
+- [✔️] Extracted
+- [✔️] Extracted
+- [✔️] Extracted
+- [✔️] Extracted
+- [✔️] Extracted
