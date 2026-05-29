@@ -197,14 +197,23 @@ types.ts
 ## Finished
 
 - [✔️] Extracted `BookVocabIntroCopy`.
-- [✔️] Extracted `ReorderStatusHint`.
-- [✔️] Extracted `WordTableHeader`.
-- [✔️] Extracted `WordTableEmptyState`.
-- [✔️] Extracted `BookContextHeaderCard`.
-- [✔️] Extracted `SearchAndFilterPanel`.
-- [✔️] Extracted `WordTableShell`.
-- [✔️] Extracted `WordRowActionButtons`.
-- [✔️] Extracted `EditWordModalShell`.
-- [✔️] Extracted `WordMetadataBadges`.
-- [✔️] Extracted `LibraryStageCell`.
-- [✔️] Extracted
+- [✔️] Extracted `BookVocabContextCard`.
+- [✔️] Extracted `BookVocabFilterPanel`.
+- [✔️] Extracted `BookVocabReorderHint`.
+- [✔️] Extracted `BookVocabTableHeader`.
+- [✔️] Extracted `BookVocabEmptyRow`.
+- [✔️] Extracted `BookVocabTableShell`.
+- [✔️] Extracted `BookVocabActionsCell`.
+- [✔️] Extracted `BookVocabEditModalShell`.
+- [✔️] Extracted `BookVocabKatakanaBadge`.
+- [✔️] Extracted `BookVocabRepeatCountCell`.
+- [✔️] Extracted `BookVocabChapterCell`.
+- [✔️] Extracted `BookVocabPageCell`.
+- [✔️] Extracted `BookVocabLibraryStageCell`.
+- [✔️] Extracted `BookVocabLibraryStudyStatusBadge`.
+
+## Remaining
+
+- [ ] E. Loading / sign-in / error states
+- [ ] K. Word table row
+- [ ] N. Edit word form body
