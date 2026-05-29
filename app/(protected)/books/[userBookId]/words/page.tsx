@@ -16,6 +16,7 @@ import BookVocabTableShell from "./components/BookVocabTableShell";
 import BookVocabActionsCell from "./components/BookVocabActionsCell";
 import BookVocabEditModalShell from "./components/BookVocabEditModalShell";
 import BookVocabKatakanaBadge from "./components/BookVocabKatakanaBadge";
+import BookVocabLibraryStageCell from "./components/BookVocabLibraryStageCell";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1188,24 +1189,16 @@ export default function BookWordsPage() {
                 {rep > 1 ? rep : ""}
               </td>
 
-              <td className="p-2 text-center text-xs text-gray-600 align-middle">
-                <span className="mx-auto flex justify-center">
-                  {sharedColorInfo ? (
-                    <LibraryColorBadge
-                      colorStatus={sharedColorInfo.colorStatus}
-                      stageLabel={sharedColorInfo.stageLabel}
-                      size="md"
-                      dotOnly
-                    />
-                  ) : (
-                    <LibraryStudyStatusBadge
-                      status={status}
-                      showNumbers={learningSettings.show_badge_numbers}
-                      encounterCount={globalEncounterCount}
-                    />
-                  )}
-                </span>
-              </td>
+              <BookVocabLibraryStageCell
+                sharedColorInfo={sharedColorInfo}
+                fallbackBadge={
+                  <LibraryStudyStatusBadge
+                    status={status}
+                    showNumbers={learningSettings.show_badge_numbers}
+                    encounterCount={globalEncounterCount}
+                  />
+                }
+              />
 
               <td className="p-2 font-medium">
                 <span className="inline-flex items-center gap-2">
