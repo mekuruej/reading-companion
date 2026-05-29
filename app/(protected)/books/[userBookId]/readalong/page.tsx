@@ -6,7 +6,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import ReadAlongLoadingState from "./components/ReadAlongLoadingState";
 import ReadAlongPageHeader from "./components/ReadAlongPageHeader";
 import ReadAlongBookContextCard from "./components/ReadAlongBookContextCard";
@@ -17,7 +16,8 @@ import ReadAlongPageNavigator from "./components/ReadAlongPageNavigator";
 import ReadAlongChapterSelector from "./components/ReadAlongChapterSelector";
 import ReadAlongTimerPanel from "./components/ReadAlongTimerPanel";
 import ReadAlongReaderShell from "./components/ReadAlongReaderShell";
-import ReadAlongWordCard from "./components/ReadAlongWordCard";
+import ReadAlongWordList from "./components/ReadAlongWordList";
+import ReadAlongAccessDeniedState from "./components/ReadAlongAccessDeniedState";
 import {
     fetchLibraryStudyColorInfoByWord,
     makeLibraryStudyColorKey,
@@ -785,9 +785,7 @@ export default function ReadAlongPage() {
     }
 
     if (!canAccessBook) {
-        return (
-            <AccessDeniedMessage message={accessMessage || "You do not have access to this book."} />
-        );
+        return <ReadAlongAccessDeniedState message={accessMessage} />;
     }
 
     function handleStartTimer() {
@@ -925,27 +923,20 @@ export default function ReadAlongPage() {
                     {!currentPage || currentPage.words.length === 0 ? (
                         <ReadAlongEmptyState />
                     ) : (
-                        <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
-                            {currentPage.words.map((w, index) => {
-                                const isFaded = index <= fadedThroughIndex;
-                                const colorInfo =
-                                    libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
-
-                                return (
-                                    <ReadAlongWordCard
-                                        key={w.id}
-                                        word={w}
-                                        supportMode={supportMode}
-                                        isFaded={isFaded}
-                                        colorInfo={colorInfo}
-                                        setWordRef={(wordId, element) => {
-                                            wordRefs.current[wordId] = element;
-                                        }}
-                                        onProgressTap={() => handleProgressTap(index, w.id)}
-                                    />
-                                );
-                            })}
-                        </div>
+                        <ReadAlongWordList
+                            words={currentPage.words}
+                            supportMode={supportMode}
+                            fadedThroughIndex={fadedThroughIndex}
+                            getColorInfo={(word) =>
+                                libraryColorByWordKey[
+                                makeLibraryStudyColorKey(word.surface, word.reading)
+                                ] ?? null
+                            }
+                            setWordRef={(wordId, element) => {
+                                wordRefs.current[wordId] = element;
+                            }}
+                            onProgressTap={handleProgressTap}
+                        />
                     )}
                 </ReadAlongReaderShell>
             </div>
