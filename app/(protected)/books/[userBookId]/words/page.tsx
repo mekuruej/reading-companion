@@ -18,6 +18,7 @@ import BookVocabEditModalShell from "./components/BookVocabEditModalShell";
 import BookVocabKatakanaBadge from "./components/BookVocabKatakanaBadge";
 import BookVocabLibraryStageCell from "./components/BookVocabLibraryStageCell";
 import BookVocabLibraryStudyStatusBadge from "./components/BookVocabLibraryStudyStatusBadge";
+import BookVocabRepeatCountCell from "./components/BookVocabRepeatCountCell";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1136,9 +1137,7 @@ export default function BookWordsPage() {
                 ☰
               </td>
 
-              <td className="p-2 text-center text-xs text-gray-600">
-                {rep > 1 ? rep : ""}
-              </td>
+              <BookVocabRepeatCountCell repeatCount={rep} />
 
               <BookVocabLibraryStageCell
                 sharedColorInfo={sharedColorInfo}
