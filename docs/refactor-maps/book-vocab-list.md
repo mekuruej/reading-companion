@@ -58,18 +58,6 @@ The first code changes should only move visual JSX into components and keep stat
 5. Risk: low-medium.
 The UI is simple, but access-denied handling is security-sensitive. Keep the branching in `page.tsx`.
 
-- [ ] G. Library stage cell
-1. Move: the Library Study stage table cell, including `LibraryColorBadge` / `LibraryStudyStatusBadge` selection.
-2. Stay in `page.tsx`: `computeLibraryStudyColorStatus`, `globalEncounterCounts`, `libraryProgressByKey`, `libraryColorByWordKey`, `learningSettings`, identity-key calculations, and fallback logic.
-3. Props needed:
-    * sharedColorInfo
-    * fallbackStatus
-    * showBadgeNumbers
-    * encounterCount
-4. Type: presentational UI.
-5. Risk: medium.
-It looks visual, but it reflects non-obvious Library Study rules. Extract only after row view-model values are computed in `page.tsx`.
-
 - [ ] K. Word table row
 1. Move: one `<tr>` for a word.
 2. Stay in `page.tsx`: `filteredSorted.map`, drag state, drag/drop handlers, row view-model preparation, color status calculation, router navigation, edit/hide/delete handlers.
@@ -218,5 +206,5 @@ types.ts
 - [✔️] Extracted `WordRowActionButtons`.
 - [✔️] Extracted `EditWordModalShell`.
 - [✔️] Extracted `WordMetadataBadges`.
-- [✔️] Extracted
+- [✔️] Extracted `LibraryStageCell`.
 - [✔️] Extracted
