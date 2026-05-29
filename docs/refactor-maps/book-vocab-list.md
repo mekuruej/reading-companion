@@ -107,7 +107,7 @@ It looks visual, but it reflects non-obvious Library Study rules. Extract only a
 5. Risk: medium-high.
 Do not extract first. The row combines display, drag/drop, mutation actions, color logic, and repeated helper output.
 
-- [ ] M. Edit word modal shell
+- [ ] M. 
 1. Move: modal frame, title area, close button, error placement, action footer.
 2. Stay in `page.tsx`: `editing`, all edit state, `changeDefinition`, `saveEdit`, `closeEdit`, and all controlled inputs at first.
 3. Props needed:
@@ -241,8 +241,8 @@ types.ts
 - [✔️] Extracted `BookContextHeaderCard`.
 - [✔️] Extracted `SearchAndFilterPanel`.
 - [✔️] Extracted `WordTableShell`.
-- [✔️] Extracted `Word row action buttons`.
-- [✔️] Extracted
+- [✔️] Extracted `WordRowActionButtons`.
+- [✔️] Extracted `EditWordModalShell`.
 - [✔️] Extracted
 - [✔️] Extracted
 - [✔️] Extracted
