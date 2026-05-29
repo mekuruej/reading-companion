@@ -21,6 +21,8 @@ import BookVocabLibraryStudyStatusBadge from "./components/BookVocabLibraryStudy
 import BookVocabRepeatCountCell from "./components/BookVocabRepeatCountCell";
 import BookVocabChapterCell from "./components/BookVocabChapterCell";
 import BookVocabPageCell from "./components/BookVocabPageCell";
+import BookVocabLoadingState from "./components/BookVocabLoadingState";
+import BookVocabSignInState from "./components/BookVocabSignInState";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -874,22 +876,11 @@ export default function BookWordsPage() {
   const headerStickyStyle = { top: "0px" };
 
   if (loading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Loading words…</p>
-      </main>
-    );
+    return <BookVocabLoadingState />;
   }
 
   if (needsSignIn) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-gray-700">You need to sign in.</p>
-        <button onClick={() => router.push("/login")} className="px-4 py-2 bg-gray-200 rounded">
-          Go to Login
-        </button>
-      </main>
-    );
+    return <BookVocabSignInState onGoToLogin={() => router.push("/login")} />;
   }
 
   if (errorMsg) {
