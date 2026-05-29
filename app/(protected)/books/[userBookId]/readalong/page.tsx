@@ -11,6 +11,8 @@ import LibraryColorBadge from "@/components/LibraryColorBadge";
 import ReadAlongLoadingState from "./components/ReadAlongLoadingState";
 import ReadAlongPageHeader from "./components/ReadAlongPageHeader";
 import ReadAlongBookContextCard from "./components/ReadAlongBookContextCard";
+import ReadAlongEmptyState from "./components/ReadAlongEmptyState";
+import ReadAlongSupportModeTabs from "./components/ReadAlongSupportModeTabs";
 import {
     fetchLibraryStudyColorInfoByWord,
     makeLibraryStudyColorKey,
@@ -1002,43 +1004,10 @@ export default function ReadAlongPage() {
                     ) : null}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setSupportMode("full")}
-                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "full"
-                            ? "bg-stone-900 text-white"
-                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                            }`}
-                    >
-                        <span className="sm:hidden">Full</span>
-                        <span className="hidden sm:inline">Full Support</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setSupportMode("reading")}
-                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "reading"
-                            ? "bg-stone-900 text-white"
-                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                            }`}
-                    >
-                        <span className="sm:hidden">Reading</span>
-                        <span className="hidden sm:inline">Reading Support</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setSupportMode("meaning")}
-                        className={`rounded-xl px-2 py-2 text-xs whitespace-nowrap sm:text-sm ${supportMode === "meaning"
-                            ? "bg-stone-900 text-white"
-                            : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                            }`}
-                    >
-                        <span className="sm:hidden">Meaning</span>
-                        <span className="hidden sm:inline">Meaning Support</span>
-                    </button>
-                </div>
+                <ReadAlongSupportModeTabs
+                    supportMode={supportMode}
+                    onSupportModeChange={setSupportMode}
+                />
 
                 <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
                     <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
@@ -1112,15 +1081,7 @@ export default function ReadAlongPage() {
                         className="max-h-[72vh] overflow-y-auto px-4 py-4 sm:px-6"
                     >
                         {!currentPage || currentPage.words.length === 0 ? (
-                            <div className="mx-auto max-w-2xl py-16 text-center">
-                                <div className="text-2xl font-semibold text-stone-700">
-                                    No saved words here.
-                                </div>
-
-                                <p className="mt-3 text-sm text-stone-500">
-                                    Enjoy the story!
-                                </p>
-                            </div>
+                            <ReadAlongEmptyState />
                         ) : (
                             <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
                                 {currentPage.words.map((w, index) => {
