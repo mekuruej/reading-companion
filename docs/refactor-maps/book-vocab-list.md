@@ -48,21 +48,6 @@ The first code changes should only move visual JSX into components and keep stat
 
 ## Remaining
 
-- [ ] C. Search and filter panel
-1. Move: the rounded search/filter container with search input, hidden toggle, and chapter select.
-2. Stay in `page.tsx`: `query`, `setQuery`, `showHidden`, `setShowHidden`, `chapterFilter`, `setChapterFilter`, `chapterOptions`, and all filter calculations.
-3. Props needed:
-    * query
-    * onQueryChange
-    * showHidden
-    * onShowHiddenChange
-    * chapterFilter
-    * onChapterFilterChange
-    * chapterOptions
-4. Type: presentational UI with controlled inputs.
-5. Risk: medium.
-The JSX is isolated, but it owns controlled inputs that affect data reloading and filtering. Do after simpler display components.
-
 - [ ] E. Loading / sign-in / error states
 1. Move: simple loading, sign-in, and non-access-error return UIs.
 2. Stay in `page.tsx`: branching decisions, `router.push`, `needsSignIn`, `errorMsg`, and `AccessDeniedMessage` usage at first.
@@ -278,6 +263,6 @@ types.ts
 - [✔️] Extracted `ReorderStatusHint`.
 - [✔️] Extracted `WordTableHeader`.
 - [✔️] Extracted `WordTableEmptyState`.
-- [✔️] Extracted `Book context header card`.
-- [✔️] Extracted 
+- [✔️] Extracted `BookContextHeaderCard`.
+- [✔️] Extracted `SearchAndFilterPanel`.
 - [✔️] Extracted 
