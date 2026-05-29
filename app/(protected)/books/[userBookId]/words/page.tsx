@@ -13,6 +13,7 @@ import BookVocabEmptyRow from "./components/BookVocabEmptyRow";
 import BookVocabContextCard from "./components/BookVocabContextCard";
 import BookVocabFilterPanel from "./components/BookVocabFilterPanel";
 import BookVocabTableShell from "./components/BookVocabTableShell";
+import BookVocabActionsCell from "./components/BookVocabActionsCell";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1284,51 +1285,16 @@ export default function BookWordsPage() {
 
               <td className="p-2">{w.page_number ?? "—"}</td>
 
-              <td className="p-2">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() =>
-                      router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
-                    }
-                    className="rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
-                    title="Open word card"
-                  >
-                    Open
-                  </button>
-
-                  <>
-                    <button
-                      onClick={() => openEdit(w)}
-                      className="rounded bg-blue-400 px-2 py-1 text-xs hover:bg-green-500"
-                    >
-                      Edit
-                    </button>
-
-                    {w.hidden ? (
-                      <button
-                        onClick={() => unhideWord(w)}
-                        className="rounded bg-green-700 px-2 py-1 text-xs text-white hover:bg-green-800"
-                      >
-                        Unhide
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => hideWord(w)}
-                        className="rounded bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
-                      >
-                        Hide
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => deleteWord(w)}
-                      className="rounded bg-gray-700 px-2 py-1 text-xs text-white hover:bg-red-700"
-                    >
-                      Delete
-                    </button>
-                  </>
-                </div>
-              </td>
+              <BookVocabActionsCell
+                hidden={w.hidden}
+                onOpen={() =>
+                  router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
+                }
+                onEdit={() => openEdit(w)}
+                onHide={() => hideWord(w)}
+                onUnhide={() => unhideWord(w)}
+                onDelete={() => deleteWord(w)}
+              />
             </tr>
           );
         })}
