@@ -9,10 +9,10 @@ import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { supabase } from "@/lib/supabaseClient";
 import BookVocabIntroCopy from "./components/BookVocabIntroCopy";
 import BookVocabReorderHint from "./components/BookVocabReorderHint";
-import BookVocabTableHeader from "./components/BookVocabTableHeader";
 import BookVocabEmptyRow from "./components/BookVocabEmptyRow";
 import BookVocabContextCard from "./components/BookVocabContextCard";
 import BookVocabFilterPanel from "./components/BookVocabFilterPanel";
+import BookVocabTableShell from "./components/BookVocabTableShell";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1161,186 +1161,180 @@ export default function BookWordsPage() {
 
       <BookVocabReorderHint reordering={reordering} />
 
-      <div className="relative overflow-x-auto overflow-y-visible rounded border bg-white">
-        <table className="w-full border-separate border-spacing-0 text-sm">
-          <BookVocabTableHeader headerStickyStyle={headerStickyStyle} />
+      <BookVocabTableShell headerStickyStyle={headerStickyStyle}>
+        {filteredSorted.map((w) => {
+          const rep = repeatCounts.get(repeatKey(w)) ?? 0;
+          const identityKey = studyIdentityKey(w.surface, w.reading);
+          const globalEncounterCount = globalEncounterCounts[identityKey] ?? rep;
+          const progress = libraryProgressByKey[identityKey];
+          const sharedColorInfo =
+            libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
 
-          <tbody>
-            {filteredSorted.map((w) => {
-              const rep = repeatCounts.get(repeatKey(w)) ?? 0;
-              const identityKey = studyIdentityKey(w.surface, w.reading);
-              const globalEncounterCount = globalEncounterCounts[identityKey] ?? rep;
-              const progress = libraryProgressByKey[identityKey];
-              const sharedColorInfo =
-                libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
+          const status = computeLibraryStudyColorStatus({
+            encounterCount: globalEncounterCount,
+            settings: learningSettings,
+            readingGate: progress?.reading_gate_status ?? "not_started",
+            meaningGate: progress?.meaning_gate_status ?? "not_started",
+            heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+            heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+            mastered: progress?.mastered ?? false,
+          });
 
-              const status = computeLibraryStudyColorStatus({
-                encounterCount: globalEncounterCount,
-                settings: learningSettings,
-                readingGate: progress?.reading_gate_status ?? "not_started",
-                meaningGate: progress?.meaning_gate_status ?? "not_started",
-                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-                mastered: progress?.mastered ?? false,
-              });
+          return (
+            <tr
+              key={w.id}
+              draggable
+              onDragStart={() => {
+                setDraggingId(w.id);
+                setDropTargetId(null);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (draggingId && draggingId !== w.id) {
+                  setDropTargetId(w.id);
+                }
+              }}
+              onDrop={async (e) => {
+                e.preventDefault();
 
-              return (
-                <tr
-                  key={w.id}
-                  draggable
-                  onDragStart={() => {
-                    setDraggingId(w.id);
-                    setDropTargetId(null);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (draggingId && draggingId !== w.id) {
-                      setDropTargetId(w.id);
+                const scrollY = window.scrollY;
+
+                if (draggingId && draggingId !== w.id) {
+                  await moveWordInGroup(draggingId, w.id);
+                }
+
+                setDraggingId(null);
+                setDropTargetId(null);
+
+                requestAnimationFrame(() => {
+                  window.scrollTo({ top: scrollY });
+                });
+              }}
+              onDragEnd={() => {
+                setDraggingId(null);
+                setDropTargetId(null);
+              }}
+              className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""} ${dropTargetId === w.id ? "bg-blue-50" : ""
+                } ${draggingId === w.id ? "opacity-50" : ""}`}
+            >
+              <td
+                className="cursor-grab select-none p-2 text-center text-gray-400"
+                title="Drag to reorder within this page"
+              >
+                ☰
+              </td>
+
+              <td className="p-2 text-center text-xs text-gray-600">
+                {rep > 1 ? rep : ""}
+              </td>
+
+              <td className="p-2 text-center text-xs text-gray-600 align-middle">
+                <span className="mx-auto flex justify-center">
+                  {sharedColorInfo ? (
+                    <LibraryColorBadge
+                      colorStatus={sharedColorInfo.colorStatus}
+                      stageLabel={sharedColorInfo.stageLabel}
+                      size="md"
+                      dotOnly
+                    />
+                  ) : (
+                    <LibraryStudyStatusBadge
+                      status={status}
+                      showNumbers={learningSettings.show_badge_numbers}
+                      encounterCount={globalEncounterCount}
+                    />
+                  )}
+                </span>
+              </td>
+
+              <td className="p-2 font-medium">
+                <span className="inline-flex items-center gap-2">
+                  {w.surface}
+                  {isKatakanaOnly(w.surface) ? <KatakanaBadge /> : null}
+                </span>
+              </td>
+              <td className="p-2">{w.reading ?? "—"}</td>
+
+              <td className="p-2">
+                <div>{w.meaning ?? "—"}</div>
+              </td>
+
+              <td className="p-2 text-center">
+                {w.meaning_choice_index != null
+                  ? w.meaning_choice_index + 1
+                  : w.meaning
+                    ? "O"
+                    : "—"}
+              </td>
+
+              <td className="p-2">
+                {(() => {
+                  const ch = chapterDisplayParts(w);
+                  if (ch.num && ch.name) {
+                    return (
+                      <span className="leading-tight">
+                        <span className="block">{ch.num}</span>
+                        <span className="block text-gray-600">{ch.name}</span>
+                      </span>
+                    );
+                  }
+                  return ch.fallback;
+                })()}
+              </td>
+
+              <td className="p-2">{w.page_number ?? "—"}</td>
+
+              <td className="p-2">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() =>
+                      router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
                     }
-                  }}
-                  onDrop={async (e) => {
-                    e.preventDefault();
-
-                    const scrollY = window.scrollY;
-
-                    if (draggingId && draggingId !== w.id) {
-                      await moveWordInGroup(draggingId, w.id);
-                    }
-
-                    setDraggingId(null);
-                    setDropTargetId(null);
-
-                    requestAnimationFrame(() => {
-                      window.scrollTo({ top: scrollY });
-                    });
-                  }}
-                  onDragEnd={() => {
-                    setDraggingId(null);
-                    setDropTargetId(null);
-                  }}
-                  className={`border-t ${w.hidden ? "bg-gray-50 text-gray-400" : ""} ${dropTargetId === w.id ? "bg-blue-50" : ""
-                    } ${draggingId === w.id ? "opacity-50" : ""}`}
-                >
-                  <td
-                    className="cursor-grab select-none p-2 text-center text-gray-400"
-                    title="Drag to reorder within this page"
+                    className="rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
+                    title="Open word card"
                   >
-                    ☰
-                  </td>
+                    Open
+                  </button>
 
-                  <td className="p-2 text-center text-xs text-gray-600">
-                    {rep > 1 ? rep : ""}
-                  </td>
+                  <>
+                    <button
+                      onClick={() => openEdit(w)}
+                      className="rounded bg-blue-400 px-2 py-1 text-xs hover:bg-green-500"
+                    >
+                      Edit
+                    </button>
 
-                  <td className="p-2 text-center text-xs text-gray-600 align-middle">
-                    <span className="mx-auto flex justify-center">
-                      {sharedColorInfo ? (
-                        <LibraryColorBadge
-                          colorStatus={sharedColorInfo.colorStatus}
-                          stageLabel={sharedColorInfo.stageLabel}
-                          size="md"
-                          dotOnly
-                        />
-                      ) : (
-                        <LibraryStudyStatusBadge
-                          status={status}
-                          showNumbers={learningSettings.show_badge_numbers}
-                          encounterCount={globalEncounterCount}
-                        />
-                      )}
-                    </span>
-                  </td>
-
-                  <td className="p-2 font-medium">
-                    <span className="inline-flex items-center gap-2">
-                      {w.surface}
-                      {isKatakanaOnly(w.surface) ? <KatakanaBadge /> : null}
-                    </span>
-                  </td>
-                  <td className="p-2">{w.reading ?? "—"}</td>
-
-                  <td className="p-2">
-                    <div>{w.meaning ?? "—"}</div>
-                  </td>
-
-                  <td className="p-2 text-center">
-                    {w.meaning_choice_index != null
-                      ? w.meaning_choice_index + 1
-                      : w.meaning
-                        ? "O"
-                        : "—"}
-                  </td>
-
-                  <td className="p-2">
-                    {(() => {
-                      const ch = chapterDisplayParts(w);
-                      if (ch.num && ch.name) {
-                        return (
-                          <span className="leading-tight">
-                            <span className="block">{ch.num}</span>
-                            <span className="block text-gray-600">{ch.name}</span>
-                          </span>
-                        );
-                      }
-                      return ch.fallback;
-                    })()}
-                  </td>
-
-                  <td className="p-2">{w.page_number ?? "—"}</td>
-
-                  <td className="p-2">
-                    <div className="flex flex-wrap gap-2">
+                    {w.hidden ? (
                       <button
-                        onClick={() =>
-                          router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
-                        }
-                        className="rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
-                        title="Open word card"
+                        onClick={() => unhideWord(w)}
+                        className="rounded bg-green-700 px-2 py-1 text-xs text-white hover:bg-green-800"
                       >
-                        Open
+                        Unhide
                       </button>
+                    ) : (
+                      <button
+                        onClick={() => hideWord(w)}
+                        className="rounded bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
+                      >
+                        Hide
+                      </button>
+                    )}
 
-                      <>
-                        <button
-                          onClick={() => openEdit(w)}
-                          className="rounded bg-blue-400 px-2 py-1 text-xs hover:bg-green-500"
-                        >
-                          Edit
-                        </button>
+                    <button
+                      onClick={() => deleteWord(w)}
+                      className="rounded bg-gray-700 px-2 py-1 text-xs text-white hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </>
+                </div>
+              </td>
+            </tr>
+          );
+        })}
 
-                        {w.hidden ? (
-                          <button
-                            onClick={() => unhideWord(w)}
-                            className="rounded bg-green-700 px-2 py-1 text-xs text-white hover:bg-green-800"
-                          >
-                            Unhide
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => hideWord(w)}
-                            className="rounded bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
-                          >
-                            Hide
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => deleteWord(w)}
-                          className="rounded bg-gray-700 px-2 py-1 text-xs text-white hover:bg-red-700"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-
-            {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
-          </tbody>
-        </table>
-      </div>
+        {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
+      </BookVocabTableShell>
     </main>
   );
 }
