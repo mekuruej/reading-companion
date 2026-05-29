@@ -48,36 +48,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 
 ## First Pass: Visual / Page-Thinning Components
 
-
-
-### C. `ReadAlongSupportIntroCard`
-
-* What JSX it owns: the "Fluid Reading with Saved Word Support" intro card.
-* Expected props: none.
-* What stays in `page.tsx`:
-  * all support mode state and behavior
-* Risk level: low.
-* Why it is safe or risky: static visual card; no callbacks or controlled inputs.
-* Recommended order: 3.
-* Helpful comment notes: no comment needed.
-
-### D. `ReadAlongBookContextCard`
-
-* What JSX it owns: the book cover/title card and Book Hub / Vocab List navigation buttons.
-* Expected props:
-  * `bookTitle`
-  * `bookCover`
-  * `onOpenBookHub`
-  * `onOpenVocabList`
-* What stays in `page.tsx`:
-  * `router.push`
-  * `userBookId`
-  * conditional rendering when `bookTitle` is present
-* Risk level: low-medium.
-* Why it is safe or risky: visually simple, but navigation should stay as callbacks from `page.tsx` so route construction remains page-owned.
-* Recommended order: 4.
-* Helpful comment notes: mention that the component receives navigation callbacks and does not know route structure.
-
 ### E. `ReadAlongChapterSelector`
 
 * What JSX it owns: the chapter filter section with selected chapter heading, helper copy, and `<select>`.
@@ -432,7 +402,7 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `ReadAlongLoadingState`.
 - [✔️] Extracted `ReadAlongPageHeader`.
 - [✔️] Removed due to Redundancy `ReadAlongSupportIntroCard`.
-- [✔️] Extracted 
+- [✔️] Extracted `ReadAlongBookContextCard`.
 - [✔️] Extracted 
 - [✔️] Extracted 
 
