@@ -48,24 +48,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 
 ## First Pass: Visual / Page-Thinning Components
 
-### E. `ReadAlongChapterSelector`
-
-* What JSX it owns: the chapter filter section with selected chapter heading, helper copy, and `<select>`.
-* Expected props:
-  * `selectedChapterLabel`
-  * `selectedChapterKey`
-  * `chapterOptions`
-  * `onSelectedChapterKeyChange`
-* What stays in `page.tsx`:
-  * `chapterOptions` calculation
-  * `selectedChapterLabel` calculation
-  * selected-chapter reset effect
-  * state setter wrapper if needed
-* Risk level: low-medium.
-* Why it is safe or risky: the component can be visual with one callback, but chapter filtering and reset behavior must stay in `page.tsx`.
-* Recommended order: 5.
-* Helpful comment notes: add a boundary comment that chapter derivation/filtering stays in `page.tsx`; the component only renders the selector.
-
 ### F. `ReadAlongTimerPanel`
 
 * What JSX it owns: timer copy, Start/Pause/Resume/Finish buttons, formatted timer display, timed session form, active warning, and save message.
@@ -117,30 +99,7 @@ The first code changes should only move visual JSX into components. Keep state, 
 * Recommended order: 10.
 * Helpful comment notes: mention that the scroll ref belongs to `page.tsx` because tap-to-scroll behavior is still page-owned.
 
-### I. `ReadAlongPageNavigator`
-
-* What JSX it owns: Previous / page jump input / Go / Next controls in the sticky reader header.
-* Expected props:
-  * `hasPages`
-  * `pageIndex`
-  * `pageCount`
-  * `jumpPageInput`
-  * `setJumpPageInput`
-  * `onJumpToPage`
-  * `onPrevious`
-  * `onNext`
-* What stays in `page.tsx`:
-  * `goPrev`
-  * `goNext`
-  * `jumpToPage`
-  * URL page handling
-  * keyboard navigation
-* Risk level: medium.
-* Why it is safe or risky: controlled input and navigation callbacks require careful prop wiring, but no data loading or save logic moves.
-* Recommended order: 8.
-* Helpful comment notes: explain that keyboard navigation remains in `page.tsx`; this component only handles button/input UI.
-
-### J. `ReadAlongCurrentPageSummary`
+### J. 
 
 * What JSX it owns: the saved-word count, current page/section label, and "Tap the words..." helper text in the sticky reader header.
 * Expected props:
@@ -381,8 +340,10 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `ReadAlongBookContextCard`.
 - [✔️] Extracted `ReadAlongEmptyState`.
 - [✔️] Extracted `ReadAlongSupportModeTabs`.
-- [✔️] Extracted 
-- [✔️] Extracted 
-- [✔️] Extracted 
+- [✔️] Extracted `ReadAlongCurrentPageSummary`
+- [✔️] Extracted `ReadAlongPageNavigator`.
+- [✔️] Extracted `ReadAlongChapterSelector`.
+
+
 - [✔️] Extracted 
 
