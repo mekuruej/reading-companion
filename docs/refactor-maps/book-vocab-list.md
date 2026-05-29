@@ -82,21 +82,6 @@ Good once the table row is being prepared. Keep normalization and chapter helper
 5. Risk: medium.
 It looks visual, but it reflects non-obvious Library Study rules. Extract only after row view-model values are computed in `page.tsx`.
 
-- [ ] H. Word row action buttons
-1. Move: `Open`, `Edit`, `Hide`/`Unhide`, and `Delete` buttons inside the actions cell.
-2. Stay in `page.tsx`: router URL construction, `openEdit`, `hideWord`, `unhideWord`, `deleteWord`, and permission/role decisions if any are added later.
-3. Props needed:
-    * word
-    * userBookId or prebuilt callbacks
-    * onOpen
-    * onEdit
-    * onHide
-    * onUnhide
-    * onDelete
-4. Type: presentational UI with action callbacks.
-5. Risk: medium.
-It is visually isolated, but the callbacks mutate database rows and must remain in `page.tsx`.
-
 - [ ] K. Word table row
 1. Move: one `<tr>` for a word.
 2. Stay in `page.tsx`: `filteredSorted.map`, drag state, drag/drop handlers, row view-model preparation, color status calculation, router navigation, edit/hide/delete handlers.
@@ -256,7 +241,7 @@ types.ts
 - [✔️] Extracted `BookContextHeaderCard`.
 - [✔️] Extracted `SearchAndFilterPanel`.
 - [✔️] Extracted `WordTableShell`.
-- [✔️] Extracted
+- [✔️] Extracted `Word row action buttons`.
 - [✔️] Extracted
 - [✔️] Extracted
 - [✔️] Extracted
