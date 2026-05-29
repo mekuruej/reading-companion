@@ -48,39 +48,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 
 ## First Pass: Visual / Page-Thinning Components
 
-### F. `ReadAlongTimerPanel`
-
-* What JSX it owns: timer copy, Start/Pause/Resume/Finish buttons, formatted timer display, timed session form, active warning, and save message.
-* Expected props:
-  * `isRunning`
-  * `isPaused`
-  * `elapsedLabel`
-  * `showTimedSessionForm`
-  * `sessionStartPage`
-  * `setSessionStartPage`
-  * `sessionEndPage`
-  * `setSessionEndPage`
-  * `timerSaveMessage`
-  * `onStart`
-  * `onPause`
-  * `onResume`
-  * `onFinish`
-  * `onSaveTimedSession`
-  * `onCancelTimedSession`
-* What stays in `page.tsx`:
-  * timer state
-  * `formatTimer`
-  * `todayYmdAppTimeZone`
-  * default session lookup
-  * validation
-  * Supabase insert
-  * before-unload warning
-  * all start/pause/resume/finish orchestration
-* Risk level: medium.
-* Why it is safe or risky: visually contained, but it touches many state transitions and controlled inputs. Extract only after smaller components, and keep every behavior as callbacks from `page.tsx`.
-* Recommended order: 9.
-* Helpful comment notes: strongly recommended. Explain that timer/session orchestration remains page-owned and this component only displays controls and calls callbacks.
-
 ### H. `ReadAlongReaderShell`
 
 * What JSX it owns: the outer rounded reader container, sticky header area, and scroll body wrapper.
@@ -98,23 +65,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 * Why it is safe or risky: mostly layout, but it wraps ref-driven scroll behavior. Use only after smaller pieces are extracted and keep the actual ref in `page.tsx`.
 * Recommended order: 10.
 * Helpful comment notes: mention that the scroll ref belongs to `page.tsx` because tap-to-scroll behavior is still page-owned.
-
-### J. 
-
-* What JSX it owns: the saved-word count, current page/section label, and "Tap the words..." helper text in the sticky reader header.
-* Expected props:
-  * `currentPageLabel`
-  * `wordCount`
-  * `hasCurrentPage`
-* What stays in `page.tsx`:
-  * `currentPage`
-  * pluralization can either stay in `page.tsx` as an already-computed label or move if kept purely visual
-* Risk level: low.
-* Why it is safe or risky: display-only summary.
-* Recommended order: 7.
-* Helpful comment notes: no comment needed.
-
-### K. `ReadAlongEmptyState`
 
 ### L. `ReadAlongWordCard`
 
@@ -343,7 +293,11 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `ReadAlongCurrentPageSummary`
 - [✔️] Extracted `ReadAlongPageNavigator`.
 - [✔️] Extracted `ReadAlongChapterSelector`.
+- [✔️] Extracted `ReadAlongTimerPanel`
+- [✔️] Extracted
+- [✔️] Extracted
+- [✔️] Extracted
+- [✔️] Extracted
 
 
-- [✔️] Extracted 
 
