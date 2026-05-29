@@ -48,46 +48,6 @@ The first code changes should only move visual JSX into components. Keep state, 
 
 ## First Pass: Visual / Page-Thinning Components
 
-### H. `ReadAlongReaderShell`
-
-* What JSX it owns: the outer rounded reader container, sticky header area, and scroll body wrapper.
-* Expected props:
-  * `children`
-  * `header`
-  * `scrollAreaRef`
-* What stays in `page.tsx`:
-  * current page calculation
-  * refs
-  * navigation handlers
-  * empty state decision
-  * word mapping
-* Risk level: medium.
-* Why it is safe or risky: mostly layout, but it wraps ref-driven scroll behavior. Use only after smaller pieces are extracted and keep the actual ref in `page.tsx`.
-* Recommended order: 10.
-* Helpful comment notes: mention that the scroll ref belongs to `page.tsx` because tap-to-scroll behavior is still page-owned.
-
-### L. `ReadAlongWordCard`
-
-* What JSX it owns: one saved-word card, including faded styling, Library Study badge position, surface/reading/meaning display, and click area.
-* Expected props:
-  * `word`
-  * `supportMode`
-  * `isFaded`
-  * `colorInfo`
-  * `setWordRef`
-  * `onProgressTap`
-* What stays in `page.tsx`:
-  * `currentPage.words.map`
-  * `fadedThroughIndex`
-  * `wordRefs`
-  * `handleProgressTap`
-  * `makeLibraryStudyColorKey`
-  * `libraryColorByWordKey`
-* Risk level: medium-high.
-* Why it is safe or risky: visually obvious but connected to refs, tap-to-scroll behavior, support mode, and color lookup display. Do not extract first.
-* Recommended order: 11.
-* Helpful comment notes: explain that the ref callback is passed in because scroll orchestration remains in `page.tsx`.
-
 ### M. `ReadAlongWordList`
 
 * What JSX it owns: the list wrapper around all word cards.
@@ -293,9 +253,9 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `ReadAlongCurrentPageSummary`
 - [✔️] Extracted `ReadAlongPageNavigator`.
 - [✔️] Extracted `ReadAlongChapterSelector`.
-- [✔️] Extracted `ReadAlongTimerPanel`
-- [✔️] Extracted
-- [✔️] Extracted
+- [✔️] Extracted `ReadAlongTimerPanel`.
+- [✔️] Extracted `ReadAlongReaderShell`.
+- [✔️] Extracted `ReadAlongWordCard`.
 - [✔️] Extracted
 - [✔️] Extracted
 
