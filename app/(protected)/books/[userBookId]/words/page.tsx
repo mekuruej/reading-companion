@@ -14,6 +14,7 @@ import BookVocabContextCard from "./components/BookVocabContextCard";
 import BookVocabFilterPanel from "./components/BookVocabFilterPanel";
 import BookVocabTableShell from "./components/BookVocabTableShell";
 import BookVocabActionsCell from "./components/BookVocabActionsCell";
+import BookVocabEditModalShell from "./components/BookVocabEditModalShell";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -975,165 +976,138 @@ export default function BookWordsPage() {
   return (
     <main className="max-w-6xl mx-auto p-6 pb-24">
       {editing && isTeacher ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl border p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Edit word</h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  {editing.surface} • {editing.id}
-                </p>
-              </div>
-              <button
-                onClick={closeEdit}
-                className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+        <BookVocabEditModalShell
+          surface={editing.surface}
+          wordId={editing.id}
+          editErr={editErr}
+          editSaving={editSaving}
+          saveDisabled={editSaving || !editSurface.trim()}
+          onClose={closeEdit}
+          onSave={saveEdit}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-600">Word (book form)</span>
+              <input
+                value={editSurface}
+                onChange={(e) => setEditSurface(e.target.value)}
+                className="border p-2 rounded"
+              />
+
+              {editing?.cache_surface && editing.cache_surface !== editSurface ? (
+                <span className="text-[11px] text-gray-500">
+                  Dictionary form: {editing.cache_surface}
+                </span>
+              ) : null}
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-600">Reading</span>
+              <input
+                value={editReading}
+                onChange={(e) => setEditReading(e.target.value)}
+                className="border p-2 rounded"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-600">JLPT</span>
+              <select
+                value={editJlpt}
+                onChange={(e) => setEditJlpt(e.target.value)}
+                className="border p-2 rounded bg-white"
               >
-                ✕ Close
-              </button>
-            </div>
+                <option value="">NON-JLPT</option>
+                <option value="N5">N5</option>
+                <option value="N4">N4</option>
+                <option value="N3">N3</option>
+                <option value="N2">N2</option>
+                <option value="N1">N1</option>
+              </select>
+            </label>
 
-            {editErr ? <p className="mt-3 text-sm text-red-700">{editErr}</p> : null}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Word (book form)</span>
-                <input
-                  value={editSurface}
-                  onChange={(e) => setEditSurface(e.target.value)}
-                  className="border p-2 rounded"
-                />
-
-                {editing?.cache_surface && editing.cache_surface !== editSurface ? (
-                  <span className="text-[11px] text-gray-500">
-                    Dictionary form: {editing.cache_surface}
-                  </span>
-                ) : null}
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Reading</span>
-                <input
-                  value={editReading}
-                  onChange={(e) => setEditReading(e.target.value)}
-                  className="border p-2 rounded"
-                />
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">JLPT</span>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-600">Definition #</span>
+              {editMeaningChoices.length > 0 ? (
                 <select
-                  value={editJlpt}
-                  onChange={(e) => setEditJlpt(e.target.value)}
+                  value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
+                  onChange={(e) => changeDefinition(e.target.value)}
                   className="border p-2 rounded bg-white"
                 >
-                  <option value="">NON-JLPT</option>
-                  <option value="N5">N5</option>
-                  <option value="N4">N4</option>
-                  <option value="N3">N3</option>
-                  <option value="N2">N2</option>
-                  <option value="N1">N1</option>
+                  {editMeaningChoices.map((_, i) => (
+                    <option key={i} value={i}>
+                      {i + 1}
+                    </option>
+                  ))}
+                  <option value="other">Other</option>
                 </select>
-              </label>
+              ) : (
+                <select
+                  value={editMeaningChoiceIndex == null ? "other" : "0"}
+                  onChange={(e) => changeDefinition(e.target.value)}
+                  className="border p-2 rounded bg-white"
+                >
+                  <option value="other">Other</option>
+                </select>
+              )}
+            </label>
 
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Definition #</span>
-                {editMeaningChoices.length > 0 ? (
-                  <select
-                    value={editMeaningChoiceIndex == null ? "other" : String(editMeaningChoiceIndex)}
-                    onChange={(e) => changeDefinition(e.target.value)}
-                    className="border p-2 rounded bg-white"
-                  >
-                    {editMeaningChoices.map((_, i) => (
-                      <option key={i} value={i}>
-                        {i + 1}
-                      </option>
-                    ))}
-                    <option value="other">Other</option>
-                  </select>
-                ) : (
-                  <select
-                    value={editMeaningChoiceIndex == null ? "other" : "0"}
-                    onChange={(e) => changeDefinition(e.target.value)}
-                    className="border p-2 rounded bg-white"
-                  >
-                    <option value="other">Other</option>
-                  </select>
-                )}
-              </label>
+            <label className="flex flex-col gap-1 sm:col-span-2">
+              <span className="text-xs text-gray-600">Meaning</span>
+              <textarea
+                value={editMeaning}
+                onChange={(e) => setEditMeaning(e.target.value)}
+                className="border p-2 rounded min-h-[90px]"
+              />
+              {editMeaningChoices.length > 1 ? (
+                <p className="text-[11px] text-gray-500">
+                  Tip: changing “Definition #” will overwrite Meaning to match that definition.
+                </p>
+              ) : null}
+            </label>
 
-              <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-xs text-gray-600">Meaning</span>
-                <textarea
-                  value={editMeaning}
-                  onChange={(e) => setEditMeaning(e.target.value)}
-                  className="border p-2 rounded min-h-[90px]"
-                />
-                {editMeaningChoices.length > 1 ? (
-                  <p className="text-[11px] text-gray-500">
-                    Tip: changing “Definition #” will overwrite Meaning to match that definition.
-                  </p>
-                ) : null}
-              </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-600">Chapter #</span>
+              <input
+                value={editChapterNum}
+                onChange={(e) => setEditChapterNum(e.target.value)}
+                className="border p-2 rounded"
+              />
+            </label>
 
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Chapter #</span>
-                <input
-                  value={editChapterNum}
-                  onChange={(e) => setEditChapterNum(e.target.value)}
-                  className="border p-2 rounded"
-                />
-              </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-600">Chapter title</span>
+              <input
+                value={editChapterName}
+                onChange={(e) => setEditChapterName(e.target.value)}
+                className="border p-2 rounded"
+              />
+            </label>
 
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Chapter title</span>
-                <input
-                  value={editChapterName}
-                  onChange={(e) => setEditChapterName(e.target.value)}
-                  className="border p-2 rounded"
-                />
-              </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-600">Page</span>
+              <input
+                value={editPage}
+                onChange={(e) => setEditPage(e.target.value)}
+                className="border p-2 rounded"
+              />
+            </label>
 
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Page</span>
-                <input
-                  value={editPage}
-                  onChange={(e) => setEditPage(e.target.value)}
-                  className="border p-2 rounded"
-                />
-              </label>
-
-              <label className="flex items-start gap-2 text-sm text-stone-700 sm:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={editHideKanjiInReadingSupport}
-                  onChange={(e) => setEditHideKanjiInReadingSupport(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  <span className="font-medium">Hide kanji in Reading Support</span>
-                  <span className="block text-xs text-stone-500">Use kana to match the book.</span>
-                </span>
-              </label>
-            </div>
-
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                onClick={closeEdit}
-                disabled={editSaving}
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                disabled={editSaving || !editSurface.trim()}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50"
-              >
-                {editSaving ? "Saving…" : "Save"}
-              </button>
-            </div>
+            <label className="flex items-start gap-2 text-sm text-stone-700 sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={editHideKanjiInReadingSupport}
+                onChange={(e) => setEditHideKanjiInReadingSupport(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Hide kanji in Reading Support</span>
+                <span className="block text-xs text-stone-500">Use kana to match the book.</span>
+              </span>
+            </label>
           </div>
-        </div>
+
+        </BookVocabEditModalShell>
       ) : null}
 
       <BookVocabIntroCopy />
@@ -1301,6 +1275,6 @@ export default function BookWordsPage() {
 
         {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
       </BookVocabTableShell>
-    </main>
+    </main >
   );
 }

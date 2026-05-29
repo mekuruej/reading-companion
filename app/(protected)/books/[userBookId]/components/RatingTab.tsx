@@ -35,6 +35,7 @@ type RatingTabProps = {
   setRatingOverall: (value: string) => void;
 
   profileLevel: string;
+  bookType: string | null;
   ratingDifficulty: string;
   setRatingDifficulty: (value: string) => void;
 
@@ -64,6 +65,7 @@ type RatingTabProps = {
   DifficultyField: ComponentType<{
     value: number | null;
     editing: boolean;
+    bookType: string | null;
     inputValue: string;
     setInputValue: (v: string) => void;
   }>;
@@ -140,6 +142,7 @@ export default function RatingTab({
   ratingOverall,
   setRatingOverall,
   profileLevel,
+  bookType,
   ratingDifficulty,
   setRatingDifficulty,
   favoriteQuotes,
@@ -211,6 +214,7 @@ export default function RatingTab({
           <DifficultyField
             value={row.rating_difficulty}
             editing={isEditingReflection}
+            bookType={bookType}
             inputValue={ratingDifficulty}
             setInputValue={setRatingDifficulty}
           />

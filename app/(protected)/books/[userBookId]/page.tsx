@@ -5395,6 +5395,7 @@ export default function BookHubPage() {
                     ratingOverall={ratingOverall}
                     setRatingOverall={setRatingOverall}
                     profileLevel={profileLevel}
+                    bookType={book?.book_type ?? null}
                     ratingDifficulty={ratingDifficulty}
                     setRatingDifficulty={setRatingDifficulty}
                     favoriteQuotes={favoriteQuotes}
@@ -5694,16 +5695,21 @@ function StarRatingField({
 function DifficultyField({
   value,
   editing,
+  bookType,
   inputValue,
   setInputValue,
 }: {
   value: number | null;
   editing: boolean;
+  bookType: string | null;
   inputValue: string;
   setInputValue: (v: string) => void;
 }) {
   const selected = inputValue ? Number(inputValue) : null;
   const label = DIFFICULTY_OPTIONS.find((o) => o.value === value)?.label ?? "";
+  const typeLabel = bookTypeLabel(bookType);
+  const promptLabel =
+    typeLabel === "—" ? "this kind of book" : `this book type (${typeLabel})`;
 
   return (
       <div className="rounded border bg-white p-3 text-sm">
@@ -5720,6 +5726,10 @@ function DifficultyField({
         </>
       ) : (
         <div className="mt-3 space-y-2">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-stone-700">
+            Within {promptLabel}, how difficult did this feel for you?
+          </div>
+
           {DIFFICULTY_OPTIONS.map((opt) => {
             const isSelected = selected === opt.value;
             return (
