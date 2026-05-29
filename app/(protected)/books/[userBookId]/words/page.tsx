@@ -15,6 +15,7 @@ import BookVocabFilterPanel from "./components/BookVocabFilterPanel";
 import BookVocabTableShell from "./components/BookVocabTableShell";
 import BookVocabActionsCell from "./components/BookVocabActionsCell";
 import BookVocabEditModalShell from "./components/BookVocabEditModalShell";
+import BookVocabKatakanaBadge from "./components/BookVocabKatakanaBadge";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -176,22 +177,6 @@ function normalizeKana(val: string | null | undefined) {
     .replace(/\s+/g, "")
     .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
     .toLowerCase();
-}
-
-function isKatakanaOnly(value: string | null | undefined) {
-  const compact = (value ?? "").trim().replace(/\s+/g, "");
-  return compact.length > 0 && /^[ァ-ヶー・･]+$/.test(compact);
-}
-
-function KatakanaBadge() {
-  return (
-    <span
-      title="Katakana-only word"
-      className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white"
-    >
-      カ
-    </span>
-  );
 }
 
 function repeatKey(w: WordRow) {
@@ -1225,7 +1210,7 @@ export default function BookWordsPage() {
               <td className="p-2 font-medium">
                 <span className="inline-flex items-center gap-2">
                   {w.surface}
-                  {isKatakanaOnly(w.surface) ? <KatakanaBadge /> : null}
+                  <BookVocabKatakanaBadge surface={w.surface} />
                 </span>
               </td>
               <td className="p-2">{w.reading ?? "—"}</td>
