@@ -14,7 +14,7 @@ import {
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
-import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import { todayYmdAppTimeZone, ymdInTimeZone } from "@/lib/timeZone";
 
 type UserBookJoinRow = {
   id: string;
@@ -162,8 +162,8 @@ type PracticeColorFilter =
 const STORAGE_KEY = "library-study-seen-by-date";
 const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
 const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
-const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
-const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
+const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
+const REGULAR_GATE_RECHECK_WINDOW_DAYS = 5;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
@@ -631,6 +631,20 @@ function regularGateRecheckDays(card: StudyCard) {
   );
 }
 
+function appDayNumber(now = new Date()) {
+  const [year, month, day] = ymdInTimeZone(now).split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / (24 * 60 * 60 * 1000));
+}
+
+function isInitialGateSlotDue(card: StudyCard, now = new Date()) {
+  const recheckDays = regularGateRecheckDays(card);
+  const dayNumber = appDayNumber(now);
+  const releaseOffset =
+    hashString(`${card.studyIdentityKey}::initial-gate-slot`) % recheckDays;
+
+  return dayNumber % recheckDays === releaseOffset;
+}
+
 function lastStudiedTime(card: StudyCard) {
   const value = card.progress?.last_studied_at;
   if (!value) return 0;
@@ -704,7 +718,7 @@ function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
   }
 
   if (card.colorStatus.color === "purple" || card.colorStatus.color === "grey") return true;
-  if (!card.progress?.last_studied_at) return true;
+  if (!card.progress?.last_studied_at) return isInitialGateSlotDue(card, now);
 
   return daysSinceIso(card.progress.last_studied_at, now) >= regularGateRecheckDays(card);
 }
@@ -2637,6 +2651,7 @@ export default function LibraryStudyPage() {
     if (!currentUserId || !currentCard || currentCard.activeGate !== "readiness") return;
 
     const existing = currentCard.progress;
+    const now = new Date().toISOString();
 
     const { data, error } = await supabase
       .from("user_library_word_progress")
@@ -2659,7 +2674,7 @@ export default function LibraryStudyPage() {
           meaning_gate_passed_at: null,
           meaning_gate_failed_at: null,
           mastered_at: null,
-          last_studied_at: existing?.last_studied_at ?? null,
+          last_studied_at: now,
         },
         { onConflict: "user_id,study_identity_key,definition_key" }
       )
@@ -3270,7 +3285,6 @@ export default function LibraryStudyPage() {
   if (
     libraryMode === "check" &&
     index >= deck.length &&
-    !endedEarly &&
     meaningReviewItems.length > 0
   ) {
     return (
@@ -3887,6 +3901,19 @@ export default function LibraryStudyPage() {
                 </div>
 
                 <div className="grid gap-2 md:w-[180px]">
+                  <button
+                    type="button"
+                    onClick={finishForToday}
+                    className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <div className="leading-tight">Finish early</div>
+                    <div className="text-[10px] font-normal text-slate-500">
+                      {meaningReviewItems.length > 0
+                        ? "Review meaning answers"
+                        : "Save your place"}
+                    </div>
+                  </button>
+
                   {canComeBackLater(currentCard) ? (
                     <button
                       type="button"

@@ -242,6 +242,8 @@ export default function CuriosityReadingPage() {
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
+  const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
+  const [pickedKanji, setPickedKanji] = useState("");
   const [scratchWord, setScratchWord] = useState("");
 
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
@@ -1382,68 +1384,96 @@ export default function CuriosityReadingPage() {
               ) : null}
             </div>
 
-            <div className="lg:hidden">
-              <KanjiComponentLookup
-                onPickKanji={(kanji) => {
-                  setQuickPreview((prev) => ({
-                    ...prev,
-                    surface: `${prev.surface}${kanji}`,
-                  }));
-                  setSavedQuickNotice("");
-                  if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-                  window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
-                }}
-              />
-            </div>
+            <details
+              open={isWordHelpOpen}
+              onToggle={(event) =>
+                setIsWordHelpOpen((event.currentTarget as HTMLDetailsElement).open)
+              }
+              className="rounded-xl border border-stone-200 bg-white/75 p-3"
+            >
+              <summary className="cursor-pointer text-sm font-semibold text-stone-800">
+                Having trouble? Look up a kanji. Build a word.
+              </summary>
 
-            <div className="hidden rounded-xl border border-stone-200 bg-white/75 p-3 lg:block">
-              <label className="block text-sm font-medium text-stone-700">
-                Build your word
-              </label>
-              <p className="mt-1 text-xs text-stone-500">
-                Still figuring out the kanji? Try it here first. Nothing will search until you’re ready.
-              </p>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-stone-700">
+                    Build a word
+                  </label>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Try pieces here first. Nothing will search until you use it.
+                  </p>
 
-              <div className="mt-2 flex gap-2">
-                <input
-                  value={scratchWord}
-                  onChange={(event) => setScratchWord(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={scratchWord}
+                      onChange={(event) => setScratchWord(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }
+                      }}
+                      placeholder="Try building the word here..."
+                      className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+                    />
+                    <button
+                      type="button"
+                      disabled={!scratchWord.trim()}
+                      onClick={() => {
+                        const nextWord = scratchWord.trim();
+                        setQuickPreview((prev) => ({
+                          ...prev,
+                          surface: nextWord,
+                          cacheSurface: nextWord ? prev.cacheSurface : "",
+                        }));
+                        setScratchWord("");
+                        setSavedQuickNotice("");
+                        if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+                        window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
+                      }}
+                      className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+                    >
+                      Use this word
+                    </button>
+                  </div>
+                </div>
+
+                {pickedKanji ? (
+                  <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-stone-600">
+                      Selected kanji:{" "}
+                      <span className="text-2xl font-semibold text-stone-900">
+                        {pickedKanji}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickPreview((prev) => ({
+                          ...prev,
+                          surface: pickedKanji,
+                          cacheSurface: pickedKanji ? prev.cacheSurface : "",
+                        }));
+                        setSavedQuickNotice("");
+                        if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+                        window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
+                      }}
+                      className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                    >
+                      Use this kanji
+                    </button>
+                  </div>
+                ) : null}
+
+                <KanjiComponentLookup
+                  onPickKanji={(kanji) => {
+                    setPickedKanji(kanji);
+                    setScratchWord((prev) => `${prev}${kanji}`);
                   }}
-                  placeholder="Try building the word here..."
-                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
                 />
-                <button
-                  type="button"
-                  disabled={!scratchWord.trim()}
-                  onClick={() => {
-                    const nextWord = scratchWord.trim();
-	                    setQuickPreview((prev) => ({
-	                      ...prev,
-	                      surface: nextWord,
-	                      cacheSurface: nextWord ? prev.cacheSurface : "",
-	                    }));
-	                    setScratchWord("");
-	                    setSavedQuickNotice("");
-	                    if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-	                    window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
-	                  }}
-                  className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
-                >
-                  Use this word
-                </button>
               </div>
-
-              <KanjiComponentLookup
-                onPickKanji={(kanji) => {
-                  setScratchWord((prev) => `${prev}${kanji}`);
-                }}
-              />
-            </div>
+            </details>
 
             {quickError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
