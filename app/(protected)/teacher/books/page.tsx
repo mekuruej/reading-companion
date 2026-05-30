@@ -9,12 +9,41 @@ import { supabase } from "@/lib/supabaseClient";
 
 type BookFlag = {
   id: string;
+  type: "manual_flag" | "missing_book_info";
   user_book_id: string | null;
+  book_id: string | null;
   message: string | null;
   created_at: string | null;
   bookTitle: string;
   coverUrl: string | null;
+  href: string | null;
+  actionLabel: string;
 };
+
+type GlobalBookRow = {
+  id: string;
+  title: string | null;
+  isbn13: string | null;
+  cover_url: string | null;
+  book_type: string | null;
+  author: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  page_count: number | null;
+};
+
+function missingGlobalBookFields(book: GlobalBookRow) {
+  const missing: string[] = [];
+  if (!String(book.title ?? "").trim()) missing.push("title");
+  if (!String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!String(book.cover_url ?? "").trim()) missing.push("cover");
+  if (!String(book.book_type ?? "").trim()) missing.push("book type");
+  if (!String(book.author ?? "").trim()) missing.push("author");
+  if (!String(book.publisher ?? "").trim()) missing.push("publisher");
+  if (!String(book.published_date ?? "").trim()) missing.push("published date");
+  if (book.page_count == null) missing.push("page count");
+  return missing;
+}
 
 export default function TeacherBooksQueuePage() {
   const [loading, setLoading] = useState(true);
@@ -65,6 +94,7 @@ export default function TeacherBooksQueuePage() {
 
       if (alertsError) throw alertsError;
 
+      const nextFlags: BookFlag[] = [];
       const userBookIds = Array.from(
         new Set((alerts ?? []).map((alert: any) => alert.user_book_id).filter(Boolean))
       );
@@ -90,22 +120,51 @@ export default function TeacherBooksQueuePage() {
         }
       }
 
-      setFlags(
-        ((alerts ?? []) as any[]).map((alert) => {
-          const book = alert.user_book_id
-            ? bookByUserBookId.get(alert.user_book_id)
-            : null;
+      for (const alert of (alerts ?? []) as any[]) {
+        const book = alert.user_book_id
+          ? bookByUserBookId.get(alert.user_book_id)
+          : null;
 
-          return {
-            id: alert.id,
-            user_book_id: alert.user_book_id,
-            message: alert.message,
-            created_at: alert.created_at,
-            bookTitle: book?.title ?? "Book needing attention",
-            coverUrl: book?.coverUrl ?? null,
-          };
-        })
-      );
+        nextFlags.push({
+          id: `manual:${alert.id}`,
+          type: "manual_flag",
+          user_book_id: alert.user_book_id,
+          book_id: null,
+          message: alert.message,
+          created_at: alert.created_at,
+          bookTitle: book?.title ?? "Book needing attention",
+          coverUrl: book?.coverUrl ?? null,
+          href: alert.user_book_id ? `/books/${alert.user_book_id}` : null,
+          actionLabel: "Open Book Hub",
+        });
+      }
+
+      const { data: globalBooks, error: globalBooksError } = await supabase
+        .from("books")
+        .select("id, title, isbn13, cover_url, book_type, author, publisher, published_date, page_count")
+        .order("title", { ascending: true });
+
+      if (globalBooksError) throw globalBooksError;
+
+      for (const book of (globalBooks ?? []) as GlobalBookRow[]) {
+        const missing = missingGlobalBookFields(book);
+        if (missing.length === 0) continue;
+
+        nextFlags.push({
+          id: `missing-book-info:${book.id}`,
+          type: "missing_book_info",
+          user_book_id: null,
+          book_id: book.id,
+          message: `Missing book info: ${missing.join(", ")}.`,
+          created_at: null,
+          bookTitle: book.title ?? "Untitled global book",
+          coverUrl: book.cover_url ?? null,
+          href: `/teacher/books/add?bookId=${book.id}`,
+          actionLabel: "Open Global Book Entry",
+        });
+      }
+
+      setFlags(nextFlags);
     } catch (error: any) {
       setMessage(error?.message ?? "Could not load book flags.");
       setFlags([]);
@@ -128,7 +187,7 @@ export default function TeacherBooksQueuePage() {
           Books Needing My Attention
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Books marked for teacher review from the Book Hub.
+          Books marked for review and global books missing core info.
         </p>
       </section>
 
@@ -154,17 +213,22 @@ export default function TeacherBooksQueuePage() {
 
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-black text-stone-900">{flag.bookTitle}</h2>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
+                  {flag.type === "manual_flag"
+                    ? "Manual flag"
+                    : "Missing book info"}
+                </p>
                 <p className="mt-1 text-sm text-stone-600">{flag.message ?? "Needs review."}</p>
                 <p className="mt-2 text-xs text-stone-400">
                   {flag.created_at ? new Date(flag.created_at).toLocaleString() : ""}
                 </p>
 
-                {flag.user_book_id ? (
+                {flag.href ? (
                   <Link
-                    href={`/books/${flag.user_book_id}`}
+                    href={flag.href}
                     className="mt-3 inline-flex rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
                   >
-                    Open Book Hub
+                    {flag.actionLabel}
                   </Link>
                 ) : null}
               </div>

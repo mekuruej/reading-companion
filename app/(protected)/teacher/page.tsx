@@ -182,7 +182,24 @@ export default function TeacherHubPage() {
         .eq("user_id", user.id)
         .eq("type", "book_flag");
 
-      bookCount = count ?? 0;
+      const { data: globalBooksNeedingInfo } = await supabase
+        .from("books")
+        .select("id, title, isbn13, cover_url, book_type, author, publisher, published_date, page_count");
+
+      const missingGlobalBookInfoCount = (globalBooksNeedingInfo ?? []).filter((book: any) => {
+        return (
+          !String(book.title ?? "").trim() ||
+          !String(book.isbn13 ?? "").trim() ||
+          !String(book.cover_url ?? "").trim() ||
+          !String(book.book_type ?? "").trim() ||
+          !String(book.author ?? "").trim() ||
+          !String(book.publisher ?? "").trim() ||
+          !String(book.published_date ?? "").trim() ||
+          book.page_count == null
+        );
+      }).length;
+
+      bookCount = (count ?? 0) + missingGlobalBookInfoCount;
     }
 
     const { count: kanjiCount } = await supabase
@@ -264,7 +281,7 @@ export default function TeacherHubPage() {
           href: "/teacher/books",
           eyebrow: "Book flags",
           description:
-            "Books marked for super-teacher review. Use this for missing info, odd metadata, or prep decisions.",
+            "Books marked for super-teacher review and global books missing core info.",
           status: "Active" as const,
           count: counts.books,
           countLabel: "book flags",

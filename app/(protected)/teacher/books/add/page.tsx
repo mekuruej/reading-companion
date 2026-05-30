@@ -29,6 +29,9 @@ type BookRow = {
     author: string | null;
     author_reading: string | null;
     author_image_url: string | null;
+    translator: string | null;
+    translator_reading: string | null;
+    translator_image_url: string | null;
     illustrator: string | null;
     illustrator_reading: string | null;
     illustrator_image_url: string | null;
@@ -39,8 +42,39 @@ type BookRow = {
     page_count: number | null;
 };
 
+type IsbnLookupPreview = {
+    isbn13: string;
+    title: string | null;
+    author_display: string | null;
+    authors: string[];
+    cover_url: string | null;
+    publisher: string | null;
+    published_date: string | null;
+    page_count: number | null;
+    metadata_source: "mekuru" | "openbd" | "google_books" | "open_library" | "none";
+    found_existing_book: boolean;
+    existing_book_id: string | null;
+    needs_review: boolean;
+};
+
 function cleanText(value: string) {
     return value.trim() || null;
+}
+
+function metadataSourceLabel(value: IsbnLookupPreview["metadata_source"]) {
+    switch (value) {
+        case "mekuru":
+            return "Mekuru";
+        case "openbd":
+            return "openBD";
+        case "google_books":
+            return "Google Books";
+        case "open_library":
+            return "Open Library";
+        case "none":
+        default:
+            return "None";
+    }
 }
 
 export default function TeacherAddBookPage() {
@@ -64,6 +98,11 @@ export default function TeacherAddBookPage() {
     const [authorEnglishName, setAuthorEnglishName] = useState("");
     const [authorImageUrl, setAuthorImageUrl] = useState("");
 
+    const [translator, setTranslator] = useState("");
+    const [translatorReading, setTranslatorReading] = useState("");
+    const [translatorEnglishName, setTranslatorEnglishName] = useState("");
+    const [translatorImageUrl, setTranslatorImageUrl] = useState("");
+
     const [illustrator, setIllustrator] = useState("");
     const [illustratorReading, setIllustratorReading] = useState("");
     const [illustratorEnglishName, setIllustratorEnglishName] = useState("");
@@ -79,6 +118,9 @@ export default function TeacherAddBookPage() {
 
     const [message, setMessage] = useState("");
     const [saving, setSaving] = useState(false);
+    const [isbnLookupLoading, setIsbnLookupLoading] = useState(false);
+    const [isbnLookupError, setIsbnLookupError] = useState("");
+    const [isbnLookupPreview, setIsbnLookupPreview] = useState<IsbnLookupPreview | null>(null);
 
     const missingFields = useMemo(() => {
         const missing: string[] = [];
@@ -150,6 +192,9 @@ export default function TeacherAddBookPage() {
         author,
         author_reading,
         author_image_url,
+        translator,
+        translator_reading,
+        translator_image_url,
         illustrator,
         illustrator_reading,
         illustrator_image_url,
@@ -178,6 +223,10 @@ export default function TeacherAddBookPage() {
         setAuthorReading(data.author_reading ?? "");
         setAuthorImageUrl(data.author_image_url ?? "");
 
+        setTranslator(data.translator ?? "");
+        setTranslatorReading(data.translator_reading ?? "");
+        setTranslatorImageUrl(data.translator_image_url ?? "");
+
         setIllustrator(data.illustrator ?? "");
         setIllustratorReading(data.illustrator_reading ?? "");
         setIllustratorImageUrl(data.illustrator_image_url ?? "");
@@ -202,6 +251,11 @@ export default function TeacherAddBookPage() {
         setAuthorEnglishName("");
         setAuthorImageUrl("");
 
+        setTranslator("");
+        setTranslatorReading("");
+        setTranslatorEnglishName("");
+        setTranslatorImageUrl("");
+
         setIllustrator("");
         setIllustratorReading("");
         setIllustratorEnglishName("");
@@ -214,6 +268,41 @@ export default function TeacherAddBookPage() {
 
         setPublishedDate("");
         setPageCount("");
+        setIsbnLookupError("");
+        setIsbnLookupPreview(null);
+    }
+
+    async function lookupIsbnPreview() {
+        setMessage("");
+        setIsbnLookupError("");
+        setIsbnLookupPreview(null);
+
+        const cleanIsbn13 = isbn13.replace(/[\s-]/g, "").trim();
+
+        if (!/^\d{13}$/.test(cleanIsbn13)) {
+            setIsbnLookupError("Please enter a valid ISBN-13. Hyphens are okay.");
+            return;
+        }
+
+        setIsbnLookupLoading(true);
+
+        try {
+            const response = await fetch(
+                `/api/books/lookup-isbn?isbn=${encodeURIComponent(cleanIsbn13)}`,
+                { cache: "no-store" }
+            );
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(payload?.error ?? "ISBN lookup failed.");
+            }
+
+            setIsbnLookupPreview(payload as IsbnLookupPreview);
+        } catch (error: any) {
+            setIsbnLookupError(error?.message ?? "ISBN lookup failed.");
+        } finally {
+            setIsbnLookupLoading(false);
+        }
     }
 
     async function createOrLoadByIsbn() {
@@ -272,6 +361,92 @@ export default function TeacherAddBookPage() {
         setSaving(false);
     }
 
+    async function createOrLoadFromIsbnPreview() {
+        setMessage("");
+        setIsbnLookupError("");
+
+        if (!isbnLookupPreview) {
+            setIsbnLookupError("Look up an ISBN before creating a global book from metadata.");
+            return;
+        }
+
+        if (!isbnLookupPreview.isbn13 || !/^\d{13}$/.test(isbnLookupPreview.isbn13)) {
+            setIsbnLookupError("The preview is missing a valid ISBN-13.");
+            return;
+        }
+
+        if (isbnLookupPreview.found_existing_book && isbnLookupPreview.existing_book_id) {
+            setSaving(true);
+            try {
+                await loadBook(isbnLookupPreview.existing_book_id);
+                setMessage("This ISBN already exists in Mekuru. Loaded the existing global book.");
+                router.replace(`/teacher/books/add?bookId=${isbnLookupPreview.existing_book_id}`);
+            } catch (error: any) {
+                setIsbnLookupError(error?.message ?? "Could not load the existing global book.");
+            } finally {
+                setSaving(false);
+            }
+            return;
+        }
+
+        if (!isbnLookupPreview.title?.trim()) {
+            setIsbnLookupError(
+                "This lookup did not return a title. Please review and create the book manually."
+            );
+            return;
+        }
+
+        setSaving(true);
+
+        try {
+            const { data: existingBook, error: existingError } = await supabase
+                .from("books")
+                .select("id, title")
+                .eq("isbn13", isbnLookupPreview.isbn13)
+                .maybeSingle();
+
+            if (existingError) throw existingError;
+
+            if (existingBook) {
+                await loadBook(existingBook.id);
+                setMessage("This ISBN already exists in Mekuru. Loaded the existing global book.");
+                router.replace(`/teacher/books/add?bookId=${existingBook.id}`);
+                setSaving(false);
+                return;
+            }
+
+            const cleanPageCount =
+                isbnLookupPreview.page_count != null && Number.isFinite(isbnLookupPreview.page_count)
+                    ? isbnLookupPreview.page_count
+                    : null;
+
+            const { data, error } = await supabase
+                .from("books")
+                .insert({
+                    title: isbnLookupPreview.title.trim(),
+                    isbn13: isbnLookupPreview.isbn13,
+                    author: cleanText(isbnLookupPreview.author_display ?? ""),
+                    cover_url: cleanText(isbnLookupPreview.cover_url ?? ""),
+                    publisher: cleanText(isbnLookupPreview.publisher ?? ""),
+                    published_date: cleanText(isbnLookupPreview.published_date ?? ""),
+                    page_count: cleanPageCount,
+                })
+                .select("id")
+                .single();
+
+            if (error) throw error;
+
+            await loadBook(data.id);
+            setMessage("Global book created from ISBN metadata. Review and edit details below.");
+            router.replace(`/teacher/books/add?bookId=${data.id}`);
+        } catch (error: any) {
+            console.error("Create global book from ISBN metadata error:", JSON.stringify(error, null, 2));
+            setIsbnLookupError(error?.message ?? "Failed to create global book from metadata.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
     async function saveBookInfo() {
         setMessage("");
 
@@ -310,6 +485,10 @@ export default function TeacherAddBookPage() {
                     author: cleanText(author),
                     author_reading: cleanText(authorReading),
                     author_image_url: cleanText(authorImageUrl),
+
+                    translator: cleanText(translator),
+                    translator_reading: cleanText(translatorReading),
+                    translator_image_url: cleanText(translatorImageUrl),
 
                     illustrator: cleanText(illustrator),
                     illustrator_reading: cleanText(illustratorReading),
@@ -390,13 +569,26 @@ export default function TeacherAddBookPage() {
                         </label>
                         <input
                             value={isbn13}
-                            onChange={(e) => setIsbn13(e.target.value)}
+                            onChange={(e) => {
+                                setIsbn13(e.target.value);
+                                setIsbnLookupError("");
+                                setIsbnLookupPreview(null);
+                            }}
                             className="w-full rounded-xl border border-slate-500 px-4 py-3"
                         />
                     </div>
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                        onClick={lookupIsbnPreview}
+                        disabled={isbnLookupLoading || !isbn13.trim()}
+                        type="button"
+                        className="rounded-2xl border border-sky-300 bg-white px-5 py-3 font-semibold text-sky-900 hover:bg-sky-50 disabled:opacity-50"
+                    >
+                        {isbnLookupLoading ? "Looking up..." : "Look up ISBN"}
+                    </button>
+
                     <button
                         onClick={createOrLoadByIsbn}
                         disabled={saving}
@@ -413,6 +605,112 @@ export default function TeacherAddBookPage() {
                         Clear
                     </button>
                 </div>
+
+                {isbnLookupError ? (
+                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {isbnLookupError}
+                    </div>
+                ) : null}
+
+                {isbnLookupPreview ? (
+                    <div className="mt-5 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
+                        {isbnLookupPreview.found_existing_book ? (
+                            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                                This ISBN already exists in the global library. Do not create a duplicate.
+                            </div>
+                        ) : (
+                            <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                                Metadata preview only. Nothing has been saved to Mekuru yet.
+                            </div>
+                        )}
+
+                        <div className="grid gap-4 md:grid-cols-[120px_minmax(0,1fr)]">
+                            {isbnLookupPreview.cover_url ? (
+                                <img
+                                    src={isbnLookupPreview.cover_url}
+                                    alt=""
+                                    className="h-40 w-28 rounded-xl object-cover shadow-sm"
+                                />
+                            ) : (
+                                <div className="flex h-40 w-28 items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-xs text-stone-500">
+                                    No cover
+                                </div>
+                            )}
+
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
+                                    ISBN Lookup Preview
+                                </div>
+                                <h3 className="mt-1 text-xl font-black text-stone-950">
+                                    {isbnLookupPreview.title ?? "Untitled book"}
+                                </h3>
+                                <p className="mt-1 text-sm text-stone-600">
+                                    {isbnLookupPreview.author_display ?? "Author unknown"}
+                                </p>
+
+                                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                                    <div>
+                                        <dt className="font-semibold text-stone-500">Publisher</dt>
+                                        <dd className="text-stone-900">
+                                            {isbnLookupPreview.publisher ?? "—"}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="font-semibold text-stone-500">Published date</dt>
+                                        <dd className="text-stone-900">
+                                            {isbnLookupPreview.published_date ?? "—"}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="font-semibold text-stone-500">ISBN-13</dt>
+                                        <dd className="text-stone-900">{isbnLookupPreview.isbn13}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="font-semibold text-stone-500">Metadata source</dt>
+                                        <dd className="text-stone-900">
+                                            {metadataSourceLabel(isbnLookupPreview.metadata_source)}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="font-semibold text-stone-500">Existing book</dt>
+                                        <dd className="text-stone-900">
+                                            {isbnLookupPreview.found_existing_book
+                                                ? `Yes (${isbnLookupPreview.existing_book_id ?? "ID unavailable"})`
+                                                : "No"}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="font-semibold text-stone-500">Needs review</dt>
+                                        <dd className="text-stone-900">
+                                            {isbnLookupPreview.needs_review ? "Yes" : "No"}
+                                        </dd>
+                                    </div>
+                                </dl>
+
+                                <div className="mt-5 flex flex-wrap gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={createOrLoadFromIsbnPreview}
+                                        disabled={saving}
+                                        className="rounded-2xl bg-sky-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:opacity-50"
+                                    >
+                                        {saving
+                                            ? "Working..."
+                                            : isbnLookupPreview.found_existing_book
+                                                ? "Load existing global book"
+                                                : "Create global book from this metadata"}
+                                    </button>
+
+                                    {!isbnLookupPreview.title ? (
+                                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                            This preview has no title, so it needs manual/admin review before creating.
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </section>
 
             {currentBookId ? (
@@ -503,6 +801,16 @@ export default function TeacherAddBookPage() {
                                 <input value={authorReading} onChange={(e) => setAuthorReading(e.target.value)} placeholder="Author reading" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
                                 <input value={authorEnglishName} onChange={(e) => setAuthorEnglishName(e.target.value)} placeholder="Author English name" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
                                 <input value={authorImageUrl} onChange={(e) => setAuthorImageUrl(e.target.value)} placeholder="Author image URL" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-stone-200 p-4">
+                            <h3 className="font-black text-stone-900">Translator</h3>
+                            <div className="mt-4 grid gap-4">
+                                <input value={translator} onChange={(e) => setTranslator(e.target.value)} placeholder="Translator" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
+                                <input value={translatorReading} onChange={(e) => setTranslatorReading(e.target.value)} placeholder="Translator reading" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
+                                <input value={translatorEnglishName} onChange={(e) => setTranslatorEnglishName(e.target.value)} placeholder="Translator English name" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
+                                <input value={translatorImageUrl} onChange={(e) => setTranslatorImageUrl(e.target.value)} placeholder="Translator image URL" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
                             </div>
                         </div>
 
