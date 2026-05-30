@@ -12,6 +12,7 @@ type Option = {
 
 type UserBook = {
   my_review: string | null;
+  reader_advice: string | null;
   rating_overall: number | null;
   rating_difficulty: number | null;
   reader_level: string | null;
@@ -30,6 +31,9 @@ type RatingTabProps = {
 
   myReview: string;
   setMyReview: (value: string) => void;
+
+  readerAdvice: string;
+  setReaderAdvice: (value: string) => void;
 
   ratingOverall: string;
   setRatingOverall: (value: string) => void;
@@ -83,6 +87,8 @@ const READER_LEVEL_OPTIONS = [
   { value: "Level 9", label: "Advanced", cefr: "B2+", jlpt: "Solid N2 / N1 entry" },
   { value: "Level 10", label: "Upper Advanced", cefr: "C1-ish", jlpt: "Solid N1+" },
 ] as const;
+
+const READER_ADVICE_MAX_LENGTH = 160;
 
 function ReflectionControls({
   editing,
@@ -139,6 +145,8 @@ export default function RatingTab({
   onCancel,
   myReview,
   setMyReview,
+  readerAdvice,
+  setReaderAdvice,
   ratingOverall,
   setRatingOverall,
   profileLevel,
@@ -248,6 +256,36 @@ export default function RatingTab({
           Your Next Book to help readers filter for books that fit them. Your profile remains
           anonymous.
         </p>
+      </div>
+
+      <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
+        <div className="mb-3 text-sm font-semibold text-sky-950">
+          Advice to a Reader
+        </div>
+
+        {!isEditingReflection ? (
+          <div className="min-h-[64px] whitespace-pre-wrap rounded border border-sky-100 bg-white p-3 text-sm leading-6 text-stone-700">
+            {row.reader_advice?.trim() ? row.reader_advice : "—"}
+          </div>
+        ) : (
+          <>
+            <textarea
+              value={readerAdvice}
+              maxLength={READER_ADVICE_MAX_LENGTH}
+              onChange={(e) =>
+                setReaderAdvice(e.target.value.slice(0, READER_ADVICE_MAX_LENGTH))
+              }
+              placeholder="A tiny note for the next reader…"
+              className="min-h-[90px] w-full rounded border bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
+            />
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-sky-900/75">
+              <span>Short and practical works best.</span>
+              <span>
+                {readerAdvice.length}/{READER_ADVICE_MAX_LENGTH}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex items-center justify-center">

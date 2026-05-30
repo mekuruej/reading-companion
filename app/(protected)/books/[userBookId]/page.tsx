@@ -57,6 +57,7 @@ type UserBook = {
   dnf_at: string | null;
   notes: string | null;
   my_review: string | null;
+  reader_advice: string | null;
 
   rating_overall: number | null;
   rating_recommend: number | null;
@@ -594,6 +595,7 @@ export default function BookHubPage() {
   const [dnfAt, setDnfAt] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [myReview, setMyReview] = useState<string>("");
+  const [readerAdvice, setReaderAdvice] = useState<string>("");
 
   const [ratingOverall, setRatingOverall] = useState<string>("");
   const [ratingRecommend, setRatingRecommend] = useState<string>("");
@@ -1566,7 +1568,7 @@ export default function BookHubPage() {
       const { error } = await supabase
         .from("vocabulary_kanji_map")
         .update({
-          reading_type: row.reading_type,
+          reading_type: row.reading_type ?? "on",
           base_reading: row.base_reading,
           realized_reading: row.realized_reading,
         })
@@ -1793,7 +1795,9 @@ export default function BookHubPage() {
       if (!row.kanji) continue;
 
       const nextValue: SessionKanjiReading = {
-        reading_type: row.reading_type,
+        reading_type:
+          row.reading_type ??
+          (row.base_reading?.trim() && row.realized_reading?.trim() ? "on" : null),
         base: row.base_reading,
         realized: row.realized_reading,
       };
@@ -1824,15 +1828,19 @@ export default function BookHubPage() {
     return rows.map((r) => {
       const sessionMemory = kanjiReadingMemoryRef.current[r.kanji];
       const savedDefault = savedKanjiDefaults[r.kanji];
+      const readingType =
+        r.reading_type ??
+        (r.base_reading?.trim() && r.realized_reading?.trim() ? "on" : null);
 
       const rememberedForType =
-        r.reading_type && sessionMemory
-          ? sessionMemory[r.reading_type]
+        readingType && sessionMemory
+          ? sessionMemory[readingType]
           : null;
 
       if (rememberedForType) {
         return {
           ...r,
+          reading_type: readingType,
           base_reading: r.base_reading || rememberedForType.base,
           realized_reading: r.realized_reading || rememberedForType.realized,
         };
@@ -2057,9 +2065,13 @@ export default function BookHubPage() {
       if (kanjiCount === 0) return false;
       if (mapRows.length !== kanjiCount) return false;
 
-      return mapRows.every(
-        (row) => !!row.reading_type && !!row.base_reading && !!row.realized_reading
-      );
+      return mapRows.every((row) => {
+        const readingType =
+          row.reading_type ??
+          (row.base_reading?.trim() && row.realized_reading?.trim() ? "on" : null);
+
+        return !!readingType && !!row.base_reading && !!row.realized_reading;
+      });
     }
 
     for (const word of cacheRows) {
@@ -2211,7 +2223,10 @@ export default function BookHubPage() {
           .filter(
             (r) =>
               typeof r.kanji_position === "number" &&
-              !!r.reading_type &&
+              !!(
+                r.reading_type ??
+                (r.base_reading?.trim() && r.realized_reading?.trim() ? "on" : null)
+              ) &&
               !!r.base_reading &&
               !!r.realized_reading
           )
@@ -2730,9 +2745,13 @@ export default function BookHubPage() {
       vocabularyCacheId:
         workingWord.vocabularyCacheId ?? (workingWord.id > 0 ? workingWord.id : null),
       vocabulary_kanji_map: rows,
-      enrichmentStatus: rows.some(
-        (r) => !r.reading_type || !r.base_reading || !r.realized_reading
-      )
+      enrichmentStatus: rows.some((r) => {
+        const readingType =
+          r.reading_type ??
+          (r.base_reading?.trim() && r.realized_reading?.trim() ? "on" : null);
+
+        return !readingType || !r.base_reading || !r.realized_reading;
+      })
         ? "partial"
         : "ready",
     });
@@ -3215,6 +3234,7 @@ export default function BookHubPage() {
         dnf_at,
         notes,
         my_review,
+        reader_advice,
         rating_overall,
         rating_recommend,
         rating_difficulty,
@@ -3356,6 +3376,7 @@ export default function BookHubPage() {
     setDnfAt(r.dnf_at ? formatYmd(new Date(r.dnf_at)) : "");
     setNotes(r.notes ?? "");
     setMyReview(r.my_review ?? "");
+    setReaderAdvice(r.reader_advice ?? "");
 
     setRatingOverall(r.rating_overall != null ? String(r.rating_overall) : "");
     setRatingRecommend(r.rating_recommend != null ? String(r.rating_recommend) : "");
@@ -3533,6 +3554,7 @@ export default function BookHubPage() {
     setDnfAt(row.dnf_at ? formatYmd(new Date(row.dnf_at)) : "");
     setNotes(row.notes ?? "");
     setMyReview(row.my_review ?? "");
+    setReaderAdvice(row.reader_advice ?? "");
 
     setRatingOverall(row.rating_overall != null ? String(row.rating_overall) : "");
     setRatingRecommend(row.rating_recommend != null ? String(row.rating_recommend) : "");
@@ -3952,8 +3974,10 @@ export default function BookHubPage() {
         .from("user_books")
         .update({
           my_review: myReview.trim() || null,
+          reader_advice: readerAdvice.trim().slice(0, 160) || null,
           rating_overall: ro,
           rating_difficulty: rd,
+          reader_level: profileLevel || null,
           favorite_quotes: favoriteQuotes.trim() || null,
           memorable_words: memorableWords.trim() || null,
         })
@@ -4096,6 +4120,7 @@ export default function BookHubPage() {
         dnf_at,
         notes: notes || null,
         my_review: myReview || null,
+        reader_advice: readerAdvice.trim().slice(0, 160) || null,
         rating_overall: ro,
         rating_recommend: rr,
         rating_difficulty: rd,
@@ -5392,6 +5417,8 @@ export default function BookHubPage() {
                     onCancel={cancelEdits}
                     myReview={myReview}
                     setMyReview={setMyReview}
+                    readerAdvice={readerAdvice}
+                    setReaderAdvice={setReaderAdvice}
                     ratingOverall={ratingOverall}
                     setRatingOverall={setRatingOverall}
                     profileLevel={profileLevel}
@@ -5708,12 +5735,14 @@ function DifficultyField({
   const selected = inputValue ? Number(inputValue) : null;
   const label = DIFFICULTY_OPTIONS.find((o) => o.value === value)?.label ?? "";
   const typeLabel = bookTypeLabel(bookType);
+  const difficultyLabel =
+    typeLabel === "—" ? "Reader Difficulty" : `${typeLabel} Difficulty`;
   const promptLabel =
-    typeLabel === "—" ? "this kind of book" : `this book type (${typeLabel})`;
+    typeLabel === "—" ? "this kind of book" : `a ${typeLabel.toLowerCase()}`;
 
   return (
       <div className="rounded border bg-white p-3 text-sm">
-      <div className="text-stone-600">Difficulty for Me</div>
+      <div className="text-stone-600">{difficultyLabel}</div>
       <div className="mt-1 text-xs text-stone-500">1 = easiest · 5 = hardest</div>
 
       {!editing ? (
@@ -5727,7 +5756,7 @@ function DifficultyField({
       ) : (
         <div className="mt-3 space-y-2">
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-stone-700">
-            Within {promptLabel}, how difficult did this feel for you?
+            Thinking of this as {promptLabel}, how difficult was it for you?
           </div>
 
           {DIFFICULTY_OPTIONS.map((opt) => {

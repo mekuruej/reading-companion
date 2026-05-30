@@ -198,6 +198,11 @@ function isActiveStatus(status: QueueStatus) {
   return status !== "complete" && status !== "excluded";
 }
 
+function effectiveReadingType(row: Pick<KanjiMapRow, "reading_type" | "base_reading" | "realized_reading">) {
+  if (row.reading_type) return row.reading_type;
+  return row.base_reading?.trim() && row.realized_reading?.trim() ? "on" : null;
+}
+
 function getQueueStatus(params: {
   vocabularyCacheId: number | null;
   surface: string;
@@ -243,7 +248,7 @@ function getQueueStatus(params: {
       .filter(
         (row) =>
           typeof row.kanji_position === "number" &&
-          !!row.reading_type &&
+          !!effectiveReadingType(row) &&
           !!row.base_reading &&
           !!row.realized_reading
       )
@@ -251,7 +256,7 @@ function getQueueStatus(params: {
   );
 
   const incompleteRowCount = mapRows.filter(
-    (row) => !row.reading_type || !row.base_reading || !row.realized_reading
+    (row) => !effectiveReadingType(row) || !row.base_reading || !row.realized_reading
   ).length;
 
   if (mapRows.length === 0) {
@@ -944,7 +949,7 @@ export default function TeacherKanjiPage() {
       const { error: saveError } = await supabase
         .from("vocabulary_kanji_map")
         .update({
-          reading_type: row.reading_type,
+          reading_type: row.reading_type ?? "on",
           base_reading: row.base_reading,
           realized_reading: row.realized_reading,
         })
@@ -1617,10 +1622,10 @@ export default function TeacherKanjiPage() {
 
                               {item.userBookId ? (
                                 <Link
-                                  href={`/books/${item.userBookId}?tab=teacher`}
+                                  href={`/teacher/books/${item.userBookId}`}
                                   className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
                                 >
-                                  Open Book Hub
+                                  Teacher Review
                                 </Link>
                               ) : null}
 
