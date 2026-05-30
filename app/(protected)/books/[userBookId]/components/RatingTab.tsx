@@ -88,7 +88,7 @@ const READER_LEVEL_OPTIONS = [
   { value: "Level 10", label: "Upper Advanced", cefr: "C1-ish", jlpt: "Solid N1+" },
 ] as const;
 
-const READER_ADVICE_MAX_LENGTH = 160;
+const READER_ADVICE_MAX_LENGTH = 120;
 
 function ReflectionControls({
   editing,

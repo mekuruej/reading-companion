@@ -550,7 +550,15 @@ export default function WordDetailPage() {
         }
 
         try {
-          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(ch)}`);
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(ch)}`, {
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
+          });
           if (!res.ok) {
             groupResults.push({ kanji: ch, relatedWords: [] });
             continue;

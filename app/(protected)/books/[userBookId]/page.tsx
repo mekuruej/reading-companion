@@ -4358,7 +4358,15 @@ export default function BookHubPage() {
     setQuickError(null);
 
     try {
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      });
       const json = await res.json();
 
       const first = json?.data?.[0];
@@ -4418,7 +4426,15 @@ export default function BookHubPage() {
     setWordExplorerError(null);
 
     try {
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(query)}`);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(query)}`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      });
       const json = await res.json();
 
       const results = (json?.data ?? []).slice(0, 8);
@@ -4886,11 +4902,10 @@ export default function BookHubPage() {
                     <button
                       type="button"
                       onClick={() => void markStartedToday()}
-                      className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${
-                        shouldNudgeStartBook
-                          ? "animate-pulse border-emerald-300 bg-emerald-100 shadow-sm shadow-emerald-100"
-                          : "border-stone-400 bg-stone-100"
-                      }`}
+                      className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${shouldNudgeStartBook
+                        ? "animate-pulse border-emerald-300 bg-emerald-100 shadow-sm shadow-emerald-100"
+                        : "border-stone-400 bg-stone-100"
+                        }`}
                     >
                       Start Today
                     </button>
@@ -4900,11 +4915,10 @@ export default function BookHubPage() {
                     <button
                       type="button"
                       onClick={() => void markFinishedToday()}
-                      className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${
-                        shouldNudgeFinishBook
-                          ? "animate-pulse border-amber-300 bg-amber-100 shadow-sm shadow-amber-100"
-                          : "border-stone-400 bg-stone-100"
-                      }`}
+                      className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${shouldNudgeFinishBook
+                        ? "animate-pulse border-amber-300 bg-amber-100 shadow-sm shadow-amber-100"
+                        : "border-stone-400 bg-stone-100"
+                        }`}
                     >
                       Mark Finished
                     </button>
@@ -5741,7 +5755,7 @@ function DifficultyField({
     typeLabel === "—" ? "this kind of book" : `a ${typeLabel.toLowerCase()}`;
 
   return (
-      <div className="rounded border bg-white p-3 text-sm">
+    <div className="rounded border bg-white p-3 text-sm">
       <div className="text-stone-600">{difficultyLabel}</div>
       <div className="mt-1 text-xs text-stone-500">1 = easiest · 5 = hardest</div>
 

@@ -679,7 +679,15 @@ export default function CuriosityReadingPage() {
     setSavedQuickNotice("");
 
     try {
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      });
       const json = await res.json();
 
       const candidates = buildQuickLookupCandidates(json?.data ?? [], word);
