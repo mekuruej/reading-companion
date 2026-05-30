@@ -11,6 +11,7 @@ import MonthlyChartPanel from "./components/MonthlyChartPanel";
 import PieChart, { type PieItem } from "./components/PieChart";
 import MonthlyRhythmSection from "./components/MonthlyRhythmSection";
 import MonthlyMoodSection from "./components/MonthlyMoodSection";
+import MonthlySmallMetricCard from "./MonthlySmallMetricCard";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
