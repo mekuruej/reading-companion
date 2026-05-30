@@ -6,12 +6,43 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+async function requireAuthenticatedUser(req: Request) {
+  const authHeader = req.headers.get("authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+  if (!token) {
+    return { error: "Missing session.", status: 401 as const };
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser(token);
+  const user = userData?.user;
+
+  if (userError || !user) {
+    return { error: "Invalid session.", status: 401 as const };
+  }
+
+  return { user };
+}
+
 export async function GET(req: Request) {
+  const auth = await requireAuthenticatedUser(req);
+
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { searchParams } = new URL(req.url);
   const keyword = (searchParams.get("keyword") ?? "").trim();
 
   if (!keyword) {
     return NextResponse.json({ data: [] }, { status: 200 });
+  }
+
+  if (keyword.length > 100) {
+    return NextResponse.json(
+      { error: "Keyword is too long." },
+      { status: 400 }
+    );
   }
 
   const { data: cached, error: cacheError } = await supabase
