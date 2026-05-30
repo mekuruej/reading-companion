@@ -2,9 +2,14 @@
 
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import MonthlyStatsPageHeader from "./components/MonthlyStatsPageHeader";
+import MonthlyStatsErrorBanner from "./components/MonthlyStatsErrorBanner";
+import MonthlyTopStatsGrid from "./components/MonthlyTopStatsGrid";
+import MonthlyChartPanel from "./components/MonthlyChartPanel";
+import PieChart, { type PieItem } from "./components/PieChart";
+import MonthlyRhythmSection from "./components/MonthlyRhythmSection";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -30,13 +35,13 @@ type RawUserBookRow = {
   id: string;
   finished_at: string | null;
   books:
-    | {
-        book_type: string | null;
-      }
-    | {
-        book_type: string | null;
-      }[]
-    | null;
+  | {
+    book_type: string | null;
+  }
+  | {
+    book_type: string | null;
+  }[]
+  | null;
 };
 
 type UserBookRow = {
@@ -66,12 +71,6 @@ type MonthlyStats = {
   readingSessions: number;
   listeningSessions: number;
   bookTypeMetrics: BookTypeMetric[];
-};
-
-type PieItem = {
-  label: string;
-  value: number;
-  color: string;
 };
 
 const STATS_QUERY_PAGE_SIZE = 1000;
@@ -285,138 +284,6 @@ async function fetchMonthlyWordsForBooks(
   return allRows;
 }
 
-function PieChart({
-  items,
-  size = 220,
-  centerLabel = "Total",
-  totalLabel,
-  valueLabel = (value) => String(value),
-}: {
-  items: PieItem[];
-  size?: number;
-  centerLabel?: string;
-  totalLabel?: string;
-  valueLabel?: (value: number) => string;
-}) {
-  const filtered = items.filter((item) => item.value > 0);
-  const total = filtered.reduce((sum, item) => sum + item.value, 0);
-  const radius = size / 2 - 12;
-  const cx = size / 2;
-  const cy = size / 2;
-
-  if (total <= 0) {
-    return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl bg-stone-50 text-sm text-stone-500">
-        No chart data yet
-      </div>
-    );
-  }
-
-  let running = -Math.PI / 2;
-
-  const paths = filtered.map((item) => {
-    const angle = (item.value / total) * Math.PI * 2;
-    const startAngle = running;
-    const endAngle = running + angle;
-    running = endAngle;
-
-    const x1 = cx + radius * Math.cos(startAngle);
-    const y1 = cy + radius * Math.sin(startAngle);
-    const x2 = cx + radius * Math.cos(endAngle);
-    const y2 = cy + radius * Math.sin(endAngle);
-    const largeArc = angle > Math.PI ? 1 : 0;
-
-    const d = [
-      `M ${cx} ${cy}`,
-      `L ${x1} ${y1}`,
-      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-      "Z",
-    ].join(" ");
-
-    return {
-      ...item,
-      d,
-      percent: Math.round((item.value / total) * 100),
-    };
-  });
-
-  return (
-    <div className="grid gap-5 lg:grid-cols-[220px_1fr] lg:items-center">
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="mx-auto"
-      >
-        {paths.length === 1 ? (
-          <circle
-            cx={cx}
-            cy={cy}
-            r={radius}
-            fill={paths[0].color}
-            stroke="white"
-            strokeWidth="3"
-          />
-        ) : (
-          paths.map((item) => (
-            <path
-              key={item.label}
-              d={item.d}
-              fill={item.color}
-              stroke="white"
-              strokeWidth="3"
-            />
-          ))
-        )}
-
-        <circle cx={cx} cy={cy} r={radius * 0.48} fill="white" />
-
-        <text
-          x={cx}
-          y={cy - 6}
-          textAnchor="middle"
-          className="fill-stone-500 text-[11px] font-bold uppercase"
-        >
-          {centerLabel}
-        </text>
-
-        <text
-          x={cx}
-          y={cy + 18}
-          textAnchor="middle"
-          className="fill-stone-900 text-[14px] font-black"
-        >
-          {totalLabel ?? String(total)}
-        </text>
-      </svg>
-
-      <div className="space-y-3">
-        {paths.map((item) => (
-          <div
-            key={item.label}
-            className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <span
-                className="h-3 w-3 shrink-0 rounded-full"
-                style={{ backgroundColor: item.color }}
-              />
-              <span className="min-w-0 truncate text-sm font-semibold text-stone-700">
-                {item.label}
-              </span>
-            </div>
-
-            <div className="shrink-0 text-sm font-bold text-stone-900">
-              {valueLabel(item.value)}{" "}
-              <span className="text-stone-500">({item.percent}%)</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function MonthlyDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -625,6 +492,11 @@ export default function MonthlyDetailsPage() {
   const totalReadingMinutes = stats.curiosityMinutes + stats.fluidMinutes;
   const totalEngagementMinutes = totalReadingMinutes + stats.listeningMinutes;
 
+  const averagePagesPerEngagedDayLabel =
+    stats.daysEngaged === 0
+      ? "—"
+      : (stats.pagesRead / stats.daysEngaged).toFixed(1);
+
   const timeByModePie = useMemo<PieItem[]>(
     () => [
       {
@@ -670,165 +542,70 @@ export default function MonthlyDetailsPage() {
   const monthlyMood =
     stats.daysEngaged === 0
       ? {
-          title: "Waiting to wake up",
-          description:
-            "No monthly rhythm yet. One tiny reading or listening session is enough to start the page.",
-        }
+        title: "Waiting to wake up",
+        description:
+          "No monthly rhythm yet. One tiny reading or listening session is enough to start the page.",
+      }
       : stats.listeningMinutes > totalReadingMinutes
         ? {
-            title: "Ear-training month",
-            description:
-              "Listening took the lead this month. That still counts as engagement with Japanese, just through your ears.",
-          }
+          title: "Ear-training month",
+          description:
+            "Listening took the lead this month. That still counts as engagement with Japanese, just through your ears.",
+        }
         : stats.curiosityMinutes > stats.fluidMinutes
           ? {
-              title: "Curiosity-led month",
-              description:
-                "You spent more time reading slowly, noticing words, and letting the text teach you.",
-            }
+            title: "Curiosity-led month",
+            description:
+              "You spent more time reading slowly, noticing words, and letting the text teach you.",
+          }
           : {
-              title: "Flow-forward month",
-              description:
-                "Fluid reading took the lead this month, which means you spent more time moving with the story.",
-            };
+            title: "Flow-forward month",
+            description:
+              "Fluid reading took the lead this month, which means you spent more time moving with the story.",
+          };
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-8">
-        <Link
-          href="/community/stats"
-          className="text-sm font-bold text-stone-500 hover:text-stone-900"
-        >
-          ← Back to Stats Home
-        </Link>
-
-        <p className="mt-6 text-sm font-semibold uppercase tracking-[0.25em] text-stone-500">
-          Monthly stats
-        </p>
-
-        <h1 className="mt-2 text-3xl font-black text-stone-900 sm:text-4xl">
-          Monthly Details
-        </h1>
-
-        <p className="mt-3 text-sm leading-6 text-stone-600 sm:text-base">
-          A colorful snapshot of this month’s reading rhythm: pages, time,
-          listening, saved words, and the kinds of books you spent time with.
-        </p>
-      </div>
-
-      {errorMsg ? (
-        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {errorMsg}
-        </div>
-      ) : null}
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {topStats.map(([label, value]) => (
-          <div
-            key={label}
-            className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm"
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-              {label}
-            </p>
-            <p className="mt-3 text-3xl font-black text-stone-900">
-              {loading ? "—" : value}
-            </p>
-          </div>
-        ))}
-      </section>
-
+      <MonthlyStatsPageHeader />
+      <MonthlyStatsErrorBanner errorMsg={errorMsg} />
+      <MonthlyTopStatsGrid items={topStats} loading={loading} />
       <section className="mt-8 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-3xl border border-sky-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-600">
-            Reading time
-          </p>
-          <h2 className="mt-2 text-2xl font-black text-stone-900">
-            Time by mode
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            Reading time counts Curiosity and Fluid sessions. Listening is shown
-            separately so it does not blur your reading pace.
-          </p>
+        <MonthlyChartPanel
+          tone="sky"
+          eyebrow="Reading time"
+          title="Time by mode"
+          description="Reading time counts Curiosity and Fluid sessions. Listening is shown separately so it does not blur your reading pace."
+        >
+          <PieChart
+            items={timeByModePie}
+            centerLabel="Time"
+            totalLabel={formatMinutes(totalEngagementMinutes)}
+            valueLabel={formatMinutes}
+          />
+        </MonthlyChartPanel>
 
-          <div className="mt-5">
-            <PieChart
-              items={timeByModePie}
-              centerLabel="Time"
-              totalLabel={formatMinutes(totalEngagementMinutes)}
-              valueLabel={formatMinutes}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-violet-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">
-            Book mix
-          </p>
-          <h2 className="mt-2 text-2xl font-black text-stone-900">
-            Book types read this month
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            This chart uses page movement from Fluid and Curiosity sessions, so
-            listening is not included here.
-          </p>
-
-          <div className="mt-5">
-            <PieChart
-              items={bookTypePie}
-              centerLabel="Pages"
-              totalLabel={formatPageCount(stats.pagesRead)}
-              valueLabel={formatPageCount}
-            />
-          </div>
-        </div>
+        <MonthlyChartPanel
+          tone="violet"
+          eyebrow="Book mix"
+          title="Book types read this month"
+          description="This chart uses page movement from Fluid and Curiosity sessions, so listening is not included here."
+        >
+          <PieChart
+            items={bookTypePie}
+            centerLabel="Pages"
+            totalLabel={formatPageCount(stats.pagesRead)}
+            valueLabel={formatPageCount}
+          />
+        </MonthlyChartPanel>
       </section>
 
       <section className="mt-8 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
-        <div className="rounded-3xl border border-amber-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">
-            Monthly rhythm
-          </p>
-          <h2 className="mt-2 text-2xl font-black text-stone-900">
-            What this month looks like
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            This combines reading sessions, listening, and saved words because
-            looking up and saving vocabulary is also part of your reading life.
-          </p>
-
-          <div className="mt-5 grid gap-3">
-            <div className="rounded-2xl border border-stone-200 bg-white p-4">
-              <p className="text-sm font-bold text-stone-700">
-                Total reading time
-              </p>
-              <p className="mt-1 text-2xl font-black text-stone-900">
-                {loading ? "—" : formatMinutes(totalReadingMinutes)}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-stone-200 bg-white p-4">
-              <p className="text-sm font-bold text-stone-700">
-                Total engagement time
-              </p>
-              <p className="mt-1 text-2xl font-black text-stone-900">
-                {loading ? "—" : formatMinutes(totalEngagementMinutes)}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-stone-200 bg-white p-4">
-              <p className="text-sm font-bold text-stone-700">
-                Average pages per engaged day
-              </p>
-              <p className="mt-1 text-2xl font-black text-stone-900">
-                {loading || stats.daysEngaged === 0
-                  ? "—"
-                  : (stats.pagesRead / stats.daysEngaged).toFixed(1)}
-              </p>
-            </div>
-          </div>
-        </div>
-
+        <MonthlyRhythmSection
+          loading={loading}
+          totalReadingTimeLabel={formatMinutes(totalReadingMinutes)}
+          totalEngagementTimeLabel={formatMinutes(totalEngagementMinutes)}
+          averagePagesPerEngagedDayLabel={averagePagesPerEngagedDayLabel}
+        />
         <div className="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">
             Monthly mood
