@@ -163,72 +163,6 @@ This first pass should be presentational only. Components should receive already
 
 The suggested components below are ordered from easiest / lowest-risk to more complex: A, B, C, and onward.
 
-### H. `MonthlyMoodSection`
-
-* What JSX it owns:
-  * Monthly Mood outer panel
-  * mood title and description display
-  * Reading / Listening / Saved words cards
-* Expected props:
-  * `loading: boolean`
-  * `title: string`
-  * `description: string`
-  * `readingTimeLabel: string`
-  * `listeningTimeLabel: string`
-  * `savedWordsLabel: string | number`
-* What must stay in `page.tsx`:
-  * `monthlyMood` selection logic
-  * total reading/listening/saved-word calculations
-  * formatting
-* Risk level: low-medium
-* Why safe/risky:
-  * Safe if the component only displays the mood selected by `page.tsx`.
-* Recommended order:
-  * 8
-* Helpful comment notes:
-  * Note that mood rules stay in `page.tsx` until the architecture pass.
-
-### I. `MonthlySmallMetricCard`
-
-* What JSX it owns:
-  * repeated small cards inside Monthly Rhythm and Monthly Mood
-* Expected props:
-  * `label: string`
-  * `value: string | number`
-  * optional label styling/tone prop if needed
-* What must stay in `page.tsx`:
-  * values and formatting
-* Risk level: low
-* Why safe/risky:
-  * Safe because it is a repeated display card.
-* Recommended order:
-  * 9, or earlier if used while extracting Rhythm/Mood
-
-### J. `MonthlyChartsSection`
-
-* What JSX it owns:
-  * grid wrapper around the two chart panels
-* Expected props:
-  * `timeByModePie: PieItem[]`
-  * `bookTypePie: PieItem[]`
-  * `totalEngagementMinutesLabel: string`
-  * `pagesReadLabel: string`
-* What must stay in `page.tsx`:
-  * pie item calculation
-  * labels/formatting at first
-* Risk level: medium
-* Why safe/risky:
-  * It is still presentational, but it coordinates multiple child components and chart props. Extract after the smaller chart shell/pie pieces are stable.
-* Recommended order:
-  * 10
-
-## Recommended First Extraction
-
-Start with `MonthlyStatsPageHeader`.
-
-It is the smallest and clearest low-risk visual extraction because it only owns static navigation and intro copy. It does not touch Supabase reads, user scoping, monthly date logic, streaks, session calculations, saved-word calculations, chart data, loading/error state, or monthly mood rules.
-
-After that, extract `MonthlyStatsErrorBanner`, then `MonthlyTopStatsGrid` / `MonthlyStatCard`.
 
 ## Later Architecture Refactor
 
@@ -382,8 +316,8 @@ A future status of `Visual pass done / architecture deferred` should mean the sa
 - [✔️] Extracted `MonthlyChartPanel`.
 - [✔️] Extracted `PieChart`.
 - [✔️] Extracted `MonthlyRhythmSection`.
-- [✔️] Extracted
-- [✔️] Extracted
-- [✔️] Extracted
+- [✔️] Extracted `MonthlyMoodSection`.
+- [✔️] Extracted `MonthlySmallMetricCard`.
+- [✔️] Extracted `MonthlyChartsSection`.
 - [✔️] Extracted
 
