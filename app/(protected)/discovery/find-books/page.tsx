@@ -14,19 +14,15 @@ type BookMeta = {
   book_type: string | null;
 };
 
-type ProfileMeta = {
-  level: string | null;
-};
-
 type UserBookRatingRow = {
   id: string;
+  user_id: string | null;
   rating_overall: number | null;
   rating_difficulty: number | null;
   reader_level: string | null;
   reader_advice: string | null;
   finished_at: string | null;
   books: BookMeta | BookMeta[] | null;
-  profiles: ProfileMeta | ProfileMeta[] | null;
 };
 
 type BookRatingSignal = {
@@ -67,13 +63,15 @@ function firstBook(row: UserBookRatingRow) {
   return row.books ?? null;
 }
 
-function firstProfile(row: UserBookRatingRow) {
-  if (Array.isArray(row.profiles)) return row.profiles[0] ?? null;
-  return row.profiles ?? null;
-}
-
-function effectiveReaderLevel(row: UserBookRatingRow) {
-  return row.reader_level ?? firstProfile(row)?.level ?? null;
+function effectiveReaderLevel(
+  row: UserBookRatingRow,
+  currentUserId: string | null,
+  currentProfileLevel: string | null
+) {
+  return (
+    row.reader_level ??
+    (row.user_id && row.user_id === currentUserId ? currentProfileLevel : null)
+  );
 }
 
 function cleanReaderAdvice(value: string | null | undefined) {
@@ -166,6 +164,8 @@ export default function FindBooksPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [bookTypeFilter, setBookTypeFilter] = useState("all");
   const [readerLevelFilter, setReaderLevelFilter] = useState("all");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentProfileLevel, setCurrentProfileLevel] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -175,11 +175,32 @@ export default function FindBooksPage() {
       setErrorMsg(null);
 
       try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (alive) {
+          setCurrentUserId(user?.id ?? null);
+        }
+
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("level")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (alive) {
+            setCurrentProfileLevel(profile?.level ?? null);
+          }
+        }
+
         const { data, error } = await supabase
           .from("user_books")
           .select(
             `
             id,
+            user_id,
             rating_overall,
             rating_difficulty,
             reader_level,
@@ -232,13 +253,13 @@ export default function FindBooksPage() {
   const readerLevelOptions = useMemo(() => {
     const levels = new Set<string>();
     for (const row of ratingRows) {
-      const level = effectiveReaderLevel(row);
+      const level = effectiveReaderLevel(row, currentUserId, currentProfileLevel);
       if (level) levels.add(level);
     }
     return Array.from(levels).sort((a, b) =>
       formatReaderLevel(a).localeCompare(formatReaderLevel(b))
     );
-  }, [ratingRows]);
+  }, [ratingRows, currentUserId, currentProfileLevel]);
 
   const ratedBookGroups = useMemo(() => {
     const map = new Map<string, RatedBookGroup>();
@@ -247,7 +268,8 @@ export default function FindBooksPage() {
       const book = firstBook(row);
       if (!book?.id) continue;
       if (bookTypeFilter !== "all" && book.book_type !== bookTypeFilter) continue;
-      if (readerLevelFilter !== "all" && effectiveReaderLevel(row) !== readerLevelFilter) {
+      const readerLevel = effectiveReaderLevel(row, currentUserId, currentProfileLevel);
+      if (readerLevelFilter !== "all" && readerLevel !== readerLevelFilter) {
         continue;
       }
 
@@ -267,7 +289,7 @@ export default function FindBooksPage() {
 
       existing.signals.push({
         id: row.id,
-        readerLevel: effectiveReaderLevel(row),
+        readerLevel,
         entertainmentRating: row.rating_overall,
         difficultyRating: row.rating_difficulty,
         readerAdvice: cleanReaderAdvice(row.reader_advice),
@@ -314,7 +336,7 @@ export default function FindBooksPage() {
       }
       return (b.latestFinishedAt ?? "").localeCompare(a.latestFinishedAt ?? "");
     });
-  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter]);
+  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter, currentUserId, currentProfileLevel]);
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">

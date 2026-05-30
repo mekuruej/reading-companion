@@ -3969,6 +3969,7 @@ export default function BookHubPage() {
       const rd = ratingDifficulty.trim()
         ? clampRating5(Number(ratingDifficulty.trim()))
         : null;
+      const reflectionReaderLevel = profileLevel || readerLevel || null;
 
       const { error: userBookError } = await supabase
         .from("user_books")
@@ -3977,7 +3978,7 @@ export default function BookHubPage() {
           reader_advice: readerAdvice.trim().slice(0, 160) || null,
           rating_overall: ro,
           rating_difficulty: rd,
-          reader_level: profileLevel || null,
+          reader_level: reflectionReaderLevel,
           favorite_quotes: favoriteQuotes.trim() || null,
           memorable_words: memorableWords.trim() || null,
         })
@@ -4127,7 +4128,7 @@ export default function BookHubPage() {
         teacher_student_use_rating: tsur,
         favorite_quotes: favoriteQuotes.trim() || null,
         memorable_words: memorableWords.trim() || null,
-        reader_level: readerLevel || null,
+        reader_level: readerLevel || profileLevel || null,
         recommended_level: recommendedLevel || null,
         format_type: formatType || null,
         progress_mode: progressMode || null,
@@ -5162,7 +5163,7 @@ export default function BookHubPage() {
                       active={activeTab === "story"}
                       onClick={() => setActiveTab("story")}
                     >
-                      Story Details
+                      Story Notes
                     </FilingTab>
 
                     <FilingTab
