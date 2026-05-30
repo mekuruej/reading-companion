@@ -65,13 +65,9 @@ function firstBook(row: UserBookRatingRow) {
 
 function effectiveReaderLevel(
   row: UserBookRatingRow,
-  currentUserId: string | null,
-  currentProfileLevel: string | null
+  profileLevelsByUserId: Record<string, string | null>
 ) {
-  return (
-    row.reader_level ??
-    (row.user_id && row.user_id === currentUserId ? currentProfileLevel : null)
-  );
+  return row.reader_level ?? (row.user_id ? profileLevelsByUserId[row.user_id] ?? null : null);
 }
 
 function cleanReaderAdvice(value: string | null | undefined) {
@@ -164,8 +160,7 @@ export default function FindBooksPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [bookTypeFilter, setBookTypeFilter] = useState("all");
   const [readerLevelFilter, setReaderLevelFilter] = useState("all");
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentProfileLevel, setCurrentProfileLevel] = useState<string | null>(null);
+  const [profileLevelsByUserId, setProfileLevelsByUserId] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     let alive = true;
@@ -175,26 +170,6 @@ export default function FindBooksPage() {
       setErrorMsg(null);
 
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (alive) {
-          setCurrentUserId(user?.id ?? null);
-        }
-
-        if (user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("level")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          if (alive) {
-            setCurrentProfileLevel(profile?.level ?? null);
-          }
-        }
-
         const { data, error } = await supabase
           .from("user_books")
           .select(
@@ -222,7 +197,43 @@ export default function FindBooksPage() {
         if (error) throw error;
         if (!alive) return;
 
-        setRatingRows((data ?? []) as UserBookRatingRow[]);
+        const rows = (data ?? []) as UserBookRatingRow[];
+        setRatingRows(rows);
+
+        const userIds = Array.from(
+          new Set(
+            rows
+              .map((row) => row.user_id)
+              .filter((userId): userId is string => !!userId)
+          )
+        );
+
+        if (userIds.length === 0) {
+          setProfileLevelsByUserId({});
+          return;
+        }
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, level")
+          .in("id", userIds);
+
+        if (profilesError) {
+          console.error("Error loading find-books profile levels:", profilesError);
+          if (alive) setProfileLevelsByUserId({});
+          return;
+        }
+
+        if (!alive) return;
+
+        setProfileLevelsByUserId(
+          Object.fromEntries(
+            (profiles ?? []).map((profile) => [
+              profile.id as string,
+              (profile.level as string | null) ?? null,
+            ])
+          )
+        );
       } catch (error: any) {
         console.error("Error loading find-books ratings:", error);
         if (!alive) return;
@@ -253,13 +264,13 @@ export default function FindBooksPage() {
   const readerLevelOptions = useMemo(() => {
     const levels = new Set<string>();
     for (const row of ratingRows) {
-      const level = effectiveReaderLevel(row, currentUserId, currentProfileLevel);
+      const level = effectiveReaderLevel(row, profileLevelsByUserId);
       if (level) levels.add(level);
     }
     return Array.from(levels).sort((a, b) =>
       formatReaderLevel(a).localeCompare(formatReaderLevel(b))
     );
-  }, [ratingRows, currentUserId, currentProfileLevel]);
+  }, [ratingRows, profileLevelsByUserId]);
 
   const ratedBookGroups = useMemo(() => {
     const map = new Map<string, RatedBookGroup>();
@@ -268,7 +279,7 @@ export default function FindBooksPage() {
       const book = firstBook(row);
       if (!book?.id) continue;
       if (bookTypeFilter !== "all" && book.book_type !== bookTypeFilter) continue;
-      const readerLevel = effectiveReaderLevel(row, currentUserId, currentProfileLevel);
+      const readerLevel = effectiveReaderLevel(row, profileLevelsByUserId);
       if (readerLevelFilter !== "all" && readerLevel !== readerLevelFilter) {
         continue;
       }
@@ -336,7 +347,7 @@ export default function FindBooksPage() {
       }
       return (b.latestFinishedAt ?? "").localeCompare(a.latestFinishedAt ?? "");
     });
-  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter, currentUserId, currentProfileLevel]);
+  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter, profileLevelsByUserId]);
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
