@@ -77,6 +77,42 @@ export default function CreditsPage() {
 
         <section className="mt-8 space-y-3">
           <h2 className="text-xl font-bold text-stone-950">
+            Book Metadata
+          </h2>
+          <p className="leading-relaxed">
+            Book lookup metadata and cover images may be provided by openBD,
+            Google Books, and Open Library.
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <a
+                href="https://openbd.jp/"
+                className="font-medium text-amber-800 underline"
+              >
+                openBD
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://books.google.com/"
+                className="font-medium text-amber-800 underline"
+              >
+                Google Books
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://openlibrary.org/"
+                className="font-medium text-amber-800 underline"
+              >
+                Open Library
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        <section className="mt-8 space-y-3">
+          <h2 className="text-xl font-bold text-stone-950">
             Icons & Illustrations
           </h2>
           <p className="leading-relaxed">
