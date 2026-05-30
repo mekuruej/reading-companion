@@ -3670,12 +3670,6 @@ export default function LibraryStudyPage() {
         />
       ) : (
         <>
-          {notice ? (
-            <div className="mb-3 w-full max-w-2xl rounded-xl border border-amber-100 bg-[#fffaf0] px-4 py-2 text-sm text-amber-900">
-              {notice}
-            </div>
-          ) : null}
-
           <div className={libraryStudyCardClass(currentCard?.colorStatus)}>
             {currentCard ? (
               <div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-2 sm:left-4 sm:right-4 sm:top-4 sm:gap-3">
@@ -3796,6 +3790,12 @@ export default function LibraryStudyPage() {
                       disabled={!!checked && checked.ok}
                     />
 
+                    {currentInstructionText ? (
+                      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-center text-sm font-semibold text-stone-700">
+                        {currentInstructionText}
+                      </div>
+                    ) : null}
+
                     {!checked ? (
                       <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
                         <button
@@ -3874,12 +3874,6 @@ export default function LibraryStudyPage() {
               ) : null}
             </div>
           </div>
-
-          {currentInstructionText ? (
-            <div className="mx-auto mt-3 w-full max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-950 shadow-sm">
-              {currentInstructionText}
-            </div>
-          ) : null}
 
           <div className="mt-2 w-full max-w-2xl space-y-2">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
