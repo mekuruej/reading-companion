@@ -1,4 +1,4 @@
-// Discovery Hub
+// Find Your Next Book
 //
 "use client";
 
@@ -23,6 +23,7 @@ type UserBookRatingRow = {
   rating_overall: number | null;
   rating_difficulty: number | null;
   reader_level: string | null;
+  reader_advice: string | null;
   finished_at: string | null;
   books: BookMeta | BookMeta[] | null;
   profiles: ProfileMeta | ProfileMeta[] | null;
@@ -33,6 +34,7 @@ type BookRatingSignal = {
   readerLevel: string | null;
   entertainmentRating: number | null;
   difficultyRating: number | null;
+  readerAdvice: string | null;
   finishedAt: string | null;
 };
 
@@ -49,33 +51,6 @@ type RatedBookGroup = {
 };
 
 type SortMode = "recent" | "rating" | "rating_low" | "ease" | "difficulty";
-
-const discoveryCards = [
-  {
-    title: "Find Your Next Book",
-    href: "/discovery/find-books",
-    eyebrow: "Reader-fit search",
-    description:
-      "Filter anonymous book ratings by learner level, book type, entertainment, and difficulty.",
-    className: "border-violet-200 bg-violet-50 text-violet-950",
-  },
-  {
-    title: "Dictionary",
-    href: "/discovery/dictionary",
-    eyebrow: "Look up words",
-    description:
-      "Search Japanese words, readings, meanings, kanji, and related vocabulary.",
-    className: "border-sky-200 bg-sky-50 text-sky-950",
-  },
-  {
-    title: "Word History",
-    href: "/discovery/word-history",
-    eyebrow: "Words you have met",
-    description:
-      "Search across words you have saved from books and see where you met them.",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-950",
-  },
-];
 
 function average(values: number[]) {
   if (values.length === 0) return null;
@@ -101,8 +76,13 @@ function effectiveReaderLevel(row: UserBookRatingRow) {
   return row.reader_level ?? firstProfile(row)?.level ?? null;
 }
 
+function cleanReaderAdvice(value: string | null | undefined) {
+  const cleaned = (value ?? "").trim();
+  return cleaned ? cleaned.slice(0, 160) : null;
+}
+
 function bookTypeLabel(value: string | null | undefined) {
-  if (!value) return "book";
+  if (!value) return "Book";
   return value
     .split(/[_-]/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -111,7 +91,7 @@ function bookTypeLabel(value: string | null | undefined) {
 
 function formatReaderLevel(value: string | null | undefined) {
   const cleaned = (value ?? "").trim();
-  if (!cleaned) return "A reader";
+  if (!cleaned) return "Reader level not shared";
   const levelMatch = cleaned.match(/^Level\s+(\d+)$/i) ?? cleaned.match(/^(\d+)$/);
   const levelNumber = levelMatch?.[1];
 
@@ -130,27 +110,10 @@ function formatReaderLevel(value: string | null | undefined) {
     };
 
     const description = levelDescriptions[levelNumber];
-    return description
-      ? `A Level ${levelNumber} reader (${description})`
-      : `A Level ${levelNumber} reader`;
+    return description ? `Level ${levelNumber} (${description})` : `Level ${levelNumber}`;
   }
 
-  return `A ${cleaned} reader`;
-}
-
-function bookSignalSentence(signal: BookRatingSignal, bookTypeValue: string | null) {
-  const bookType = bookTypeLabel(bookTypeValue).toLowerCase();
-  const reader = formatReaderLevel(signal.readerLevel);
-  const difficulty =
-    signal.difficultyRating != null
-      ? ` thought this ${bookType} was ${formatAverage(signal.difficultyRating)} difficulty`
-      : ` rated this ${bookType}`;
-  const entertainment =
-    signal.entertainmentRating != null
-      ? ` and gave it an Entertainment Rating of ${formatAverage(signal.entertainmentRating)}/5`
-      : "";
-
-  return `${reader}${difficulty}${entertainment}.`;
+  return cleaned;
 }
 
 function RatingStars({
@@ -196,27 +159,7 @@ function RatingStars({
   );
 }
 
-function HubDifficultyRating({
-  signal,
-  bookType,
-}: {
-  signal: BookRatingSignal;
-  bookType: string | null;
-}) {
-  if (signal.difficultyRating == null) {
-    return null;
-  }
-
-  const label = `${bookTypeLabel(bookType)} Difficulty`;
-
-  return (
-    <div className="mt-2 w-full">
-      <RatingStars label={label} value={signal.difficultyRating} tone="sky" />
-    </div>
-  );
-}
-
-export default function DiscoveryHubPage() {
+export default function FindBooksPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ratingRows, setRatingRows] = useState<UserBookRatingRow[]>([]);
@@ -240,6 +183,7 @@ export default function DiscoveryHubPage() {
             rating_overall,
             rating_difficulty,
             reader_level,
+            reader_advice,
             finished_at,
             profiles:user_id (
               level
@@ -262,7 +206,7 @@ export default function DiscoveryHubPage() {
 
         setRatingRows((data ?? []) as UserBookRatingRow[]);
       } catch (error: any) {
-        console.error("Error loading discovery ratings:", error);
+        console.error("Error loading find-books ratings:", error);
         if (!alive) return;
         setErrorMsg(error?.message ?? "Could not load rated books yet.");
       } finally {
@@ -279,12 +223,10 @@ export default function DiscoveryHubPage() {
 
   const bookTypeOptions = useMemo(() => {
     const types = new Set<string>();
-
     for (const row of ratingRows) {
       const book = firstBook(row);
       if (book?.book_type) types.add(book.book_type);
     }
-
     return Array.from(types).sort((a, b) =>
       bookTypeLabel(a).localeCompare(bookTypeLabel(b))
     );
@@ -292,12 +234,10 @@ export default function DiscoveryHubPage() {
 
   const readerLevelOptions = useMemo(() => {
     const levels = new Set<string>();
-
     for (const row of ratingRows) {
       const level = effectiveReaderLevel(row);
       if (level) levels.add(level);
     }
-
     return Array.from(levels).sort((a, b) =>
       formatReaderLevel(a).localeCompare(formatReaderLevel(b))
     );
@@ -333,6 +273,7 @@ export default function DiscoveryHubPage() {
         readerLevel: effectiveReaderLevel(row),
         entertainmentRating: row.rating_overall,
         difficultyRating: row.rating_difficulty,
+        readerAdvice: cleanReaderAdvice(row.reader_advice),
         finishedAt: row.finished_at,
       });
 
@@ -343,12 +284,11 @@ export default function DiscoveryHubPage() {
       const sortedSignals = [...group.signals].sort((a, b) =>
         (b.finishedAt ?? "").localeCompare(a.finishedAt ?? "")
       );
-      const latestFinishedAt = sortedSignals[0]?.finishedAt ?? null;
 
       return {
         ...group,
         signals: sortedSignals,
-        latestFinishedAt,
+        latestFinishedAt: sortedSignals[0]?.finishedAt ?? null,
         averageEntertainmentRating: average(
           sortedSignals
             .map((signal) => signal.entertainmentRating)
@@ -382,18 +322,19 @@ export default function DiscoveryHubPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-            Mekuru Discovery
+        <div className="mb-6">
+          <Link href="/discovery" className="text-sm font-semibold text-slate-500 hover:text-slate-900">
+            &larr; Discovery Hub
+          </Link>
+          <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-slate-400">
+            Discovery
           </p>
-
           <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-            Discovery Hub
+            Find Your Next Book
           </h1>
-
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Look up words, revisit your word history, and find books through
-            anonymous community ratings.
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+            Search anonymous reader-fit ratings by book type, reader level, and rating direction.
+            Ratings stay anonymous and are meant to help you find a better match.
           </p>
         </div>
 
@@ -403,108 +344,156 @@ export default function DiscoveryHubPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {discoveryCards.map((card) => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className={`group rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.className}`}
-            >
-              <div className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                {card.eyebrow}
-              </div>
-
-              <div className="mt-3 flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-black">{card.title}</h2>
-                  <p className="mt-2 text-sm leading-6 opacity-80">
-                    {card.description}
-                  </p>
-                </div>
-
-                <span className="rounded-full bg-white/80 px-3 py-1 text-sm font-black shadow-sm transition group-hover:bg-white">
-                  &rarr;
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        <section className="mt-8">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                  Find Your Next Book
-                </p>
-                <h2 className="mt-1 text-xl font-black text-slate-950">
-                  Recently rated books
-                </h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  A quick peek at reader-fit signals. Open the full page to filter and compare.
-                </p>
-              </div>
-
-              <Link
-                href="/discovery/find-books"
-                className="inline-flex rounded-2xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-black"
-              >
-                Open Find Your Next Book
-              </Link>
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Reader-fit filters</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Filters work together. Narrow by level and type, then sort the remaining books.
+              </p>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              {loading ? (
-                <p className="text-sm text-slate-500">Loading rated books...</p>
-              ) : ratedBookGroups.length === 0 ? (
-                <p className="text-sm leading-6 text-slate-500">
-                  No shared book ratings match these filters yet.
-                </p>
-              ) : (
-                ratedBookGroups.slice(0, 4).map((book) => {
-                  const latestSignal = book.signals[0] ?? null;
+            <div className="grid gap-2 sm:grid-cols-3">
+              <select
+                value={readerLevelFilter}
+                onChange={(event) => setReaderLevelFilter(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="all">All Reader Levels</option>
+                {readerLevelOptions.map((level) => (
+                  <option key={level} value={level}>
+                    {formatReaderLevel(level)}
+                  </option>
+                ))}
+              </select>
 
-                  return (
-                  <div
-                    key={book.bookId}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5"
-                  >
-                    <div className="flex min-w-0 gap-2.5">
-                      {book.coverUrl ? (
-                        <img
-                          src={book.coverUrl}
-                          alt=""
-                          className="h-16 w-11 shrink-0 rounded-lg object-cover shadow-sm"
-                        />
-                      ) : (
-                        <div className="h-16 w-11 shrink-0 rounded-lg bg-slate-200" />
-                      )}
+              <select
+                value={bookTypeFilter}
+                onChange={(event) => setBookTypeFilter(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="all">All Book Types</option>
+                {bookTypeOptions.map((type) => (
+                  <option key={type} value={type}>
+                    {bookTypeLabel(type)}
+                  </option>
+                ))}
+              </select>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="line-clamp-2 text-sm font-black leading-tight text-slate-950">
+              <select
+                value={sortMode}
+                onChange={(event) => setSortMode(event.target.value as SortMode)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="recent">Recently Finished</option>
+                <option value="rating">High to Low Entertainment</option>
+                <option value="rating_low">Low to High Entertainment</option>
+                <option value="difficulty">High to Low Difficulty</option>
+                <option value="ease">Low to High Difficulty</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-5 grid gap-4">
+          {loading ? (
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
+              Loading rated books...
+            </div>
+          ) : ratedBookGroups.length === 0 ? (
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 text-sm leading-6 text-slate-500 shadow-sm">
+              No shared book ratings match these filters yet.
+            </div>
+          ) : (
+            ratedBookGroups.map((book) => (
+              <article
+                key={book.bookId}
+                className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="grid gap-4 md:grid-cols-[104px_minmax(0,1fr)]">
+                  {book.coverUrl ? (
+                    <img
+                      src={book.coverUrl}
+                      alt=""
+                      className="h-36 w-24 rounded-xl object-cover shadow-sm"
+                    />
+                  ) : (
+                    <div className="h-36 w-24 rounded-xl bg-slate-200" />
+                  )}
+
+                  <div className="min-w-0">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                          {bookTypeLabel(book.bookType)}
+                        </p>
+                        <h2 className="mt-1 text-2xl font-black text-slate-950">
                           {book.title}
-                        </div>
-                        <div className="mt-0.5 truncate text-xs text-slate-500">
-                          {book.author || bookTypeLabel(book.bookType)}
-                        </div>
-                        <div className="mt-2 text-xs font-semibold text-slate-600">
-                          {formatReaderLevel(latestSignal?.readerLevel)}
-                        </div>
+                        </h2>
+                        {book.author ? (
+                          <p className="mt-1 text-sm text-slate-500">{book.author}</p>
+                        ) : null}
+                      </div>
+
+                      <div className="grid min-w-[180px] gap-2 sm:grid-cols-2 lg:w-[390px]">
+                        <RatingStars
+                          label={`Avg ${bookTypeLabel(book.bookType)} Difficulty`}
+                          value={book.averageDifficultyRating}
+                          tone="sky"
+                        />
+                        <RatingStars
+                          label="Avg Entertainment"
+                          value={book.averageEntertainmentRating}
+                          tone="amber"
+                        />
                       </div>
                     </div>
 
-                    {latestSignal ? (
-                      <HubDifficultyRating
-                        signal={latestSignal}
-                        bookType={book.bookType}
-                      />
-                    ) : null}
+                    <div className="mt-4 grid gap-3">
+                      {book.signals.map((signal) => (
+                        <div
+                          key={signal.id}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Anonymous reader signal
+                              </div>
+                              <div className="mt-1 text-sm font-semibold text-slate-900">
+                                {formatReaderLevel(signal.readerLevel)}
+                              </div>
+                              {signal.readerAdvice ? (
+                                <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-600">
+                                  <span className="font-semibold text-slate-900">
+                                    Advice to the reader:
+                                  </span>{" "}
+                                  {signal.readerAdvice}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <RatingStars
+                                label={`${bookTypeLabel(book.bookType)} Difficulty`}
+                                value={signal.difficultyRating}
+                                tone="sky"
+                              />
+                              <RatingStars
+                                label="Entertainment"
+                                value={signal.entertainmentRating}
+                                tone="amber"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+                </div>
+              </article>
+            ))
+          )}
         </section>
       </div>
     </main>

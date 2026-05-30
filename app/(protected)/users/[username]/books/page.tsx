@@ -1511,13 +1511,16 @@ export default function BooksPage() {
 
       for (const row of mapRows ?? []) {
         const cacheId = (row as any).vocabulary_cache_id as number;
+        const hasReadingType =
+          !!(row as any).reading_type ||
+          (!!(row as any).base_reading && !!(row as any).realized_reading);
         const existing = mapStatusByCacheId.get(cacheId) ?? {
           completePositions: new Set<number>(),
           hasIncomplete: false,
         };
 
         if (
-          !(row as any).reading_type ||
+          !hasReadingType ||
           !(row as any).base_reading ||
           !(row as any).realized_reading
         ) {
@@ -2778,7 +2781,7 @@ export default function BooksPage() {
                 <button
                   key={alert.userBookId}
                   type="button"
-                  onClick={() => router.push(`/books/${alert.userBookId}?tab=teacher`)}
+                  onClick={() => router.push(`/teacher/books/${alert.userBookId}`)}
                   className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-white px-3 py-3 text-left hover:bg-amber-100"
                 >
                   <div>

@@ -369,6 +369,17 @@ export default function Header() {
                   </Link>
 
                   <Link
+                    href="/discovery/find-books"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/find-books"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowDiscoveryMenu(false)}
+                  >
+                    Find Your Next Book
+                  </Link>
+
+                  <Link
                     href="/discovery/dictionary"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/dictionary"
                       ? "bg-stone-100 font-medium text-stone-900"
