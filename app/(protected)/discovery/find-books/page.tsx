@@ -183,11 +183,7 @@ export default function FindBooksPage() {
             rating_overall,
             rating_difficulty,
             reader_level,
-            reader_advice,
             finished_at,
-            profiles:user_id (
-              level
-            ),
             books:book_id (
               id,
               title,
