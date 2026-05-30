@@ -7,11 +7,10 @@ import { supabase } from "@/lib/supabaseClient";
 import MonthlyStatsPageHeader from "./components/MonthlyStatsPageHeader";
 import MonthlyStatsErrorBanner from "./components/MonthlyStatsErrorBanner";
 import MonthlyTopStatsGrid from "./components/MonthlyTopStatsGrid";
-import MonthlyChartPanel from "./components/MonthlyChartPanel";
-import PieChart, { type PieItem } from "./components/PieChart";
+import type { PieItem } from "./components/PieChart";
 import MonthlyRhythmSection from "./components/MonthlyRhythmSection";
 import MonthlyMoodSection from "./components/MonthlyMoodSection";
-import MonthlySmallMetricCard from "./MonthlySmallMetricCard";
+import MonthlyChartsSection from "./components/MonthlyChartsSection";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -571,35 +570,14 @@ export default function MonthlyDetailsPage() {
       <MonthlyStatsPageHeader />
       <MonthlyStatsErrorBanner errorMsg={errorMsg} />
       <MonthlyTopStatsGrid items={topStats} loading={loading} />
-      <section className="mt-8 grid gap-4 lg:grid-cols-2">
-        <MonthlyChartPanel
-          tone="sky"
-          eyebrow="Reading time"
-          title="Time by mode"
-          description="Reading time counts Curiosity and Fluid sessions. Listening is shown separately so it does not blur your reading pace."
-        >
-          <PieChart
-            items={timeByModePie}
-            centerLabel="Time"
-            totalLabel={formatMinutes(totalEngagementMinutes)}
-            valueLabel={formatMinutes}
-          />
-        </MonthlyChartPanel>
-
-        <MonthlyChartPanel
-          tone="violet"
-          eyebrow="Book mix"
-          title="Book types read this month"
-          description="This chart uses page movement from Fluid and Curiosity sessions, so listening is not included here."
-        >
-          <PieChart
-            items={bookTypePie}
-            centerLabel="Pages"
-            totalLabel={formatPageCount(stats.pagesRead)}
-            valueLabel={formatPageCount}
-          />
-        </MonthlyChartPanel>
-      </section>
+      <MonthlyChartsSection
+        timeByModePie={timeByModePie}
+        bookTypePie={bookTypePie}
+        totalEngagementMinutesLabel={formatMinutes(totalEngagementMinutes)}
+        pagesReadLabel={formatPageCount(stats.pagesRead)}
+        formatTimeValue={formatMinutes}
+        formatPageValue={formatPageCount}
+      />
 
       <section className="mt-8 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
         <MonthlyRhythmSection
