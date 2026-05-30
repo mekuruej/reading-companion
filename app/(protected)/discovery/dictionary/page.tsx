@@ -136,7 +136,15 @@ export default function DictionaryPage() {
         }
 
         try {
-          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(ch)}`);
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(ch)}`, {
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
+          });
           if (!res.ok) {
             groupResults.push({ kanji: ch, relatedWords: [] });
             continue;
@@ -181,7 +189,15 @@ export default function DictionaryPage() {
     setSummaryCountsByKey({});
 
     try {
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      });
 
       if (!res.ok) {
         throw new Error(`Search failed (${res.status})`);

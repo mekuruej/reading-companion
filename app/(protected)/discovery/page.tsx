@@ -491,9 +491,10 @@ export default function DiscoveryHubPage() {
                       </div>
 
                       {latestSignal ? (
-                        <p className="mt-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600 shadow-sm">
-                          {bookSignalSentence(latestSignal, book.bookType)}
-                        </p>
+                        <HubDifficultyRating
+                          signal={latestSignal}
+                          bookType={book.bookType}
+                        />
                       ) : null}
                     </div>
                   );

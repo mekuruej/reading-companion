@@ -78,7 +78,7 @@ function effectiveReaderLevel(row: UserBookRatingRow) {
 
 function cleanReaderAdvice(value: string | null | undefined) {
   const cleaned = (value ?? "").trim();
-  return cleaned ? cleaned.slice(0, 160) : null;
+  return cleaned ? cleaned.slice(0, 120) : null;
 }
 
 function bookTypeLabel(value: string | null | undefined) {
@@ -183,6 +183,7 @@ export default function FindBooksPage() {
             rating_overall,
             rating_difficulty,
             reader_level,
+            reader_advice,
             finished_at,
             books:book_id (
               id,
@@ -401,94 +402,103 @@ export default function FindBooksPage() {
               No shared book ratings match these filters yet.
             </div>
           ) : (
-            ratedBookGroups.map((book) => (
-              <article
-                key={book.bookId}
-                className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <div className="grid gap-4 md:grid-cols-[104px_minmax(0,1fr)]">
-                  {book.coverUrl ? (
-                    <img
-                      src={book.coverUrl}
-                      alt=""
-                      className="h-36 w-24 rounded-xl object-cover shadow-sm"
-                    />
-                  ) : (
-                    <div className="h-36 w-24 rounded-xl bg-slate-200" />
-                  )}
+            ratedBookGroups.map((book) => {
+              const shouldShowAverageRatings = book.signals.length >= 5;
 
-                  <div className="min-w-0">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0">
-                        <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                          {bookTypeLabel(book.bookType)}
-                        </p>
-                        <h2 className="mt-1 text-2xl font-black text-slate-950">
-                          {book.title}
-                        </h2>
-                        {book.author ? (
-                          <p className="mt-1 text-sm text-slate-500">{book.author}</p>
+              return (
+                <article
+                  key={book.bookId}
+                  className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="grid gap-4 md:grid-cols-[104px_minmax(0,1fr)]">
+                    {book.coverUrl ? (
+                      <img
+                        src={book.coverUrl}
+                        alt=""
+                        className="h-36 w-24 rounded-xl object-cover shadow-sm"
+                      />
+                    ) : (
+                      <div className="h-36 w-24 rounded-xl bg-slate-200" />
+                    )}
+
+                    <div className="min-w-0">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                            {bookTypeLabel(book.bookType)}
+                          </p>
+                          <h2 className="mt-1 text-2xl font-black text-slate-950">
+                            {book.title}
+                          </h2>
+                          {book.author ? (
+                            <p className="mt-1 text-sm text-slate-500">
+                              {book.author}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        {shouldShowAverageRatings ? (
+                          <div className="grid min-w-[180px] gap-2 sm:grid-cols-2 lg:w-[390px]">
+                            <RatingStars
+                              label={`Avg ${bookTypeLabel(book.bookType)} Difficulty`}
+                              value={book.averageDifficultyRating}
+                              tone="sky"
+                            />
+                            <RatingStars
+                              label="Avg Entertainment"
+                              value={book.averageEntertainmentRating}
+                              tone="amber"
+                            />
+                          </div>
                         ) : null}
                       </div>
 
-                      <div className="grid min-w-[180px] gap-2 sm:grid-cols-2 lg:w-[390px]">
-                        <RatingStars
-                          label={`Avg ${bookTypeLabel(book.bookType)} Difficulty`}
-                          value={book.averageDifficultyRating}
-                          tone="sky"
-                        />
-                        <RatingStars
-                          label="Avg Entertainment"
-                          value={book.averageEntertainmentRating}
-                          tone="amber"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3">
-                      {book.signals.map((signal) => (
-                        <div
-                          key={signal.id}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-                        >
-                          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">
-                            <div>
-                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                                Anonymous reader signal
-                              </div>
-                              <div className="mt-1 text-sm font-semibold text-slate-900">
-                                {formatReaderLevel(signal.readerLevel)}
-                              </div>
-                              {signal.readerAdvice ? (
-                                <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-600">
-                                  <span className="font-semibold text-slate-900">
-                                    Advice to the reader:
-                                  </span>{" "}
-                                  {signal.readerAdvice}
+                      <div className="mt-4 grid gap-3">
+                        {book.signals.map((signal) => (
+                          <div
+                            key={signal.id}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                          >
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">
+                              <div>
+                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                  Anonymous reader signal
                                 </div>
-                              ) : null}
-                            </div>
+                                <div className="mt-1 text-sm font-semibold text-slate-900">
+                                  {formatReaderLevel(signal.readerLevel)}
+                                </div>
 
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <RatingStars
-                                label={`${bookTypeLabel(book.bookType)} Difficulty`}
-                                value={signal.difficultyRating}
-                                tone="sky"
-                              />
-                              <RatingStars
-                                label="Entertainment"
-                                value={signal.entertainmentRating}
-                                tone="amber"
-                              />
+                                {signal.readerAdvice ? (
+                                  <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-600">
+                                    <span className="font-semibold text-slate-900">
+                                      Advice to the reader:
+                                    </span>{" "}
+                                    {signal.readerAdvice}
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <RatingStars
+                                  label={`${bookTypeLabel(book.bookType)} Difficulty`}
+                                  value={signal.difficultyRating}
+                                  tone="sky"
+                                />
+                                <RatingStars
+                                  label="Entertainment"
+                                  value={signal.entertainmentRating}
+                                  tone="amber"
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
-            ))
+                </article>
+              );
+            })
           )}
         </section>
       </div>

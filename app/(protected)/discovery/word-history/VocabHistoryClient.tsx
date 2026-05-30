@@ -165,9 +165,8 @@ function LibraryStatusBadge({
     status.stageCount != null &&
     status.stageCount > 1;
 
-  const title = `${status.reason} · ${encounterCount} library encounter${
-    encounterCount === 1 ? "" : "s"
-  }`;
+  const title = `${status.reason} · ${encounterCount} library encounter${encounterCount === 1 ? "" : "s"
+    }`;
 
   return (
     <span
@@ -339,8 +338,8 @@ export default function VocabHistoryClient() {
 
             if (!existing) {
               grouped.set(key, {
-              surface,
-              reading: row.reading ?? null,
+                surface,
+                reading: row.reading ?? null,
                 meaning: row.meaning ?? null,
                 count: 1,
                 checkReadyCount: countsForLibraryCheck ? 1 : 0,
@@ -524,7 +523,15 @@ export default function VocabHistoryClient() {
         return;
       }
 
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      });
       if (!res.ok) {
         throw new Error(`Search failed (${res.status})`);
       }
