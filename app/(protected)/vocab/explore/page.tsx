@@ -59,7 +59,7 @@ function asStringArray(val: any): string[] {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch {}
+    } catch { }
   }
 
   return [];
@@ -309,7 +309,15 @@ export default function WordHistorySearchPage() {
         return;
       }
 
-      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(q)}`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      });
       if (!res.ok) {
         throw new Error(`Search failed (${res.status})`);
       }

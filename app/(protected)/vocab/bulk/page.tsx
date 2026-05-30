@@ -400,7 +400,15 @@ export default function BulkVocabPage() {
         let meaning = "";
 
         try {
-          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(w)}`);
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(w)}`, {
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
+          });
           if (res.ok) {
             const data = await res.json();
             const entry = data?.data?.[0];
