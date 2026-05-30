@@ -1,3 +1,5 @@
+import MonthlySmallMetricCard from "./MonthlySmallMetricCard";
+
 type MonthlyRhythmSectionProps = {
   // Monthly rhythm calculations stay in page.tsx during the visual pass.
   loading: boolean;
@@ -28,32 +30,23 @@ export default function MonthlyRhythmSection({
       </p>
 
       <div className="mt-5 grid gap-3">
-        <div className="rounded-2xl border border-stone-200 bg-white p-4">
-          <p className="text-sm font-bold text-stone-700">
-            Total reading time
-          </p>
-          <p className="mt-1 text-2xl font-black text-stone-900">
-            {loading ? "—" : totalReadingTimeLabel}
-          </p>
-        </div>
+        <MonthlySmallMetricCard
+          label="Total reading time"
+          value={totalReadingTimeLabel}
+          loading={loading}
+        />
 
-        <div className="rounded-2xl border border-stone-200 bg-white p-4">
-          <p className="text-sm font-bold text-stone-700">
-            Total engagement time
-          </p>
-          <p className="mt-1 text-2xl font-black text-stone-900">
-            {loading ? "—" : totalEngagementTimeLabel}
-          </p>
-        </div>
+        <MonthlySmallMetricCard
+          label="Total engagement time"
+          value={totalEngagementTimeLabel}
+          loading={loading}
+        />
 
-        <div className="rounded-2xl border border-stone-200 bg-white p-4">
-          <p className="text-sm font-bold text-stone-700">
-            Average pages per engaged day
-          </p>
-          <p className="mt-1 text-2xl font-black text-stone-900">
-            {loading ? "—" : averagePagesPerEngagedDayLabel}
-          </p>
-        </div>
+        <MonthlySmallMetricCard
+          label="Average pages per engaged day"
+          value={averagePagesPerEngagedDayLabel}
+          loading={loading}
+        />
       </div>
     </div>
   );
