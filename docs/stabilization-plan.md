@@ -6,19 +6,17 @@ For now, avoid major new features. Focus on making Mekuru safer, easier to under
 
 Mekuru stabilization has two main tracks:
 
-1. **Security / Privacy / Access Safety**
-2. **Page Thinning / Maintainability / Refactor Work**
+A. **Security / Privacy / Access Safety**
+B. **Page Thinning / Maintainability / Refactor Work**
 
 Detailed page-specific refactor plans live in:
 
-- `docs/refactor-maps/reading-habits.md`
-- `docs/refactor-maps/book-difficulty.md`
-
+- `docs/refactor-maps/**
 ---
 
 # Current Focus
 
-## 1. Security / Privacy / Access Safety
+## A. Security / Privacy / Access Safety
 
 Goal:
 
@@ -36,7 +34,178 @@ This includes:
 - private saved-word data
 - future shared flashcard/deck separation
 
-## 2. Page Thinning / Maintainability
+Still Working On / Not Fully Finished
+
+## 1. Remaining API Route Review
+
+Mostly done, but not completely closed.
+
+Finished/reviewed:
+
+/api/vocabulary-kanji-map/generate
+/api/word-sky/approve
+/api/jisho
+
+Paused:
+
+/api/book-lookup — leave alone for now because the Add Book / ISBN import flow may change.
+
+Still later:
+
+Revisit API routes after Add Book / Global Book Entry redesign is clearer.
+
+## 2. Non-Book Route Access Audit
+
+Started with:
+
+/users/[username]/books
+
+Recent fix:
+
+Regular users now use their own effective user ID for books, monthly stats, and Mekuru color totals.
+Tested regular student manually opening another student’s route.
+Result: both routes fall back to their own books. Good.
+
+Still to audit later:
+
+/library-study/book-flashcards
+/library-study/practice
+/library-study/check
+/library-study/kanji
+/community/stats/*
+other non-book pages that show private user data
+
+## 3. Teacher / Student Access Boundaries
+
+Partly done, partly paused.
+
+Finished enough for now:
+
+/teacher/* has teacher route guard.
+teacher_students RLS was tightened.
+linked-teacher access is safer now.
+
+Paused:
+
+/teacher/assign
+prep shelf
+future learner prep
+teacher tasks
+book assignment/prep workflow
+
+Reason: The teacher-side concepts are mixed together and need design clarification before more cleanup.
+
+## 4. Public / Private Profile Boundary
+
+Still needs a later pass.
+
+Already done:
+
+Removed email display.
+Removed old profile routes.
+Dropped broad profiles_select_authed.
+
+Still later:
+
+Check public profile pages/views.
+Confirm public profile never exposes:
+email
+internal roles/access fields
+teacher/student relationships
+private books
+private vocab
+study history
+
+Important future direction:
+
+Prefer user_public_profile or limited public views instead of exposing full profiles rows.
+
+5. Discovery / Ratings / Find Your Next Book Privacy
+
+Later task, not now.
+
+Concern:
+
+Discovery / Find Your Next Book may be reading from private user_books.
+RLS may block cross-user ratings, causing empty results.
+Do not make user_books broadly readable.
+
+Future direction:
+
+Create a separate anonymous/shared signal source, like:
+book_reader_signals
+public_book_reviews
+book_fit_signals
+
+Goal:
+
+Public discovery reads safe anonymous rating data, not private library rows.
+
+6. Input Validation Review
+
+Still not deeply done.
+
+Areas to review:
+
+username
+display name
+bio
+saved words
+page numbers
+notes
+book add/edit forms
+teacher prep/task forms
+search fields
+long text fields
+weird empty strings
+
+7. RLS Cleanup / Duplicate Policy Cleanup
+
+Big scary RLS pass mostly handled for the most important tables, but cleanup remains.
+
+Reviewed/tightened:
+
+teacher_students
+profiles
+user_books
+user_book_words
+user_book_reading_sessions
+study_logs
+user_study_events
+user_alerts
+user_learning_settings
+user_settings
+learning_tasks
+teacher_book_prep_items
+
+Still later:
+
+clean duplicate super_teacher policies
+revisit public profile read policy
+revisit linked teacher delete/update permissions if teacher workflows change
+revisit teacher_alert_completions to possibly verify linked student relationship
+
+8. Future Shared Flashcards Boundary
+
+Not building now, but rule is clear.
+
+Private stays private:
+
+user_book_words
+private book flashcards
+private study progress
+reading sessions
+
+Future shared flashcards should use separate tables, not expose private saved words.
+
+Possible future structures:
+
+shared_flashcard_decks
+shared_flashcard_items
+user_saved_flashcard_decks
+user_flashcard_deck_progress
+
+## B. Page Thinning / Maintainability
 
 Goal:
 

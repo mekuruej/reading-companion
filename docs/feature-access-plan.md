@@ -226,3 +226,115 @@ A reading-powered vocabulary and study system.
 The free version should help people keep reading.
 
 The paid version should help people learn deeply from what they read.
+
+
+## Stats Access Direction
+
+Mekuru stats should be divided into two main layers:
+
+```txt
+Book-level stats
+Global reading-life overview
+```
+
+### Book-level stats
+
+Each book should use a small set of book-specific stats snapshots.
+
+These should be useful for free users because they support the reading-life tracker side of Mekuru.
+
+Likely book-level snapshots:
+
+* Reading activity for this book
+* Progress / pages / time
+* Reflection or reader-fit information
+* Book-specific rhythm or completion summary
+
+Saved-word and vocabulary-based data should only appear for users with full access. For free users, those parts should be hidden, locked, or replaced with a gentle note.
+
+The Book Hub should remain useful for free users because they can still track and reflect on books.
+
+### Global stats area
+
+The global stats area should probably be simpler for free users.
+
+Instead of many detailed stats pages, free users may only need one global page that connects their books together.
+
+This page could act as a reading-life overview, showing things like:
+
+* Books read
+* Currently reading
+* Finished books
+* Reading days
+* Pages or time tracked
+* Recent reflections
+* Book types read
+* Books that felt easy or difficult
+* Links back to individual Book Hubs
+
+The purpose of the global stats page is not deep analytics at first. It is to help users see their reading life across books.
+
+### Paid / full-access stats
+
+Full-access users can unlock deeper stats connected to saved vocabulary and study progress, such as:
+
+* Vocabulary growth
+* Saved-word history
+* Reading colors
+* Ability Check movement
+* Study rhythm
+* Book vocabulary patterns
+* Deeper vocabulary/study analytics
+
+These stats belong to Mekuru’s paid/full-access learning engine because they depend on saved words and study tools.
+
+### Design principle
+
+Free stats should answer:
+
+```txt
+What have I been reading?
+```
+
+Full-access stats can answer:
+
+```txt
+What am I learning from what I read?
+```
+## Global stats area
+
+The global stats area should be simpler for free users and should not duplicate the main Library page.
+
+The Library page already shows core shelf information such as:
+
+* Currently reading
+* Finished books
+* User’s active book list
+
+The global stats page should instead connect the user’s reading activity across books.
+
+Possible global reading-life overview metrics:
+
+* Total reading days
+* Total pages tracked
+* Total reading/listening time
+* Reading rhythm over time
+* Recent reading activity
+* Book types read
+* Books that felt easy or difficult
+* Reflection patterns
+* Links back to individual Book Hubs
+
+The purpose of the global stats page is not to repeat the library. It should help users understand their reading habits across books.
+
+Free stats should answer:
+
+```txt
+How have I been reading?
+```
+
+Full-access stats can additionally answer:
+
+```txt
+What am I learning from what I read?
+```
