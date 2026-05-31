@@ -101,17 +101,24 @@ export default function AddBookPage() {
                 return;
             }
 
-            if (!data.book) {
-                console.error("Lookup response had no book:", data);
+            console.log("Lookup response data:", data);
+
+            const lookedUpBook =
+                data.book ??
+                data.result ??
+                data.lookupResult ??
+                data.data ??
+                data;
+
+            if (!lookedUpBook || typeof lookedUpBook !== "object") {
+                console.error("Lookup response had no usable book object:", data);
                 setError("The lookup worked, but no book data came back.");
                 return;
             }
 
-            const lookedUpBook = data.book ?? data;
-
-            if (!lookedUpBook?.isbn13 || !lookedUpBook?.title) {
-                console.error("Lookup response had an unexpected shape:", data);
-                setError("The lookup worked, but the book data came back in an unexpected shape.");
+            if (!lookedUpBook.title) {
+                console.error("Lookup response had a book object, but no title:", data);
+                setError("The lookup worked, but the book data was missing a title.");
                 return;
             }
 
@@ -144,7 +151,14 @@ export default function AddBookPage() {
             const data = await response.json();
 
             if (!response.ok) {
+                console.error("Add book route returned an error:", data);
                 setError(data.error ?? "I couldn’t add this book to your library.");
+                return;
+            }
+
+            if (!data.userBookId) {
+                console.error("Add book response had no userBookId:", data);
+                setError("The book was added, but Mekuru could not open the Book Hub.");
                 return;
             }
 
