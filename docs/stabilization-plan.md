@@ -55,6 +55,20 @@ General order:
 
 # Current / Remaining Tasks
 
+### Discovery / Ratings Privacy Boundary
+
+Review how reader-fit ratings, Discovery Hub, and Find Your Next Book expose community signals.
+
+Main rule:
+
+Private `user_books` should stay private. Public/global discovery should read from a deliberately limited anonymous signal table or view, not directly from private library rows.
+
+Potential future shared source:
+
+- `book_reader_signals`
+- `public_book_reviews`
+- `book_fit_signals`
+
 ## Security / Privacy / Access Safety
 
 ### Continue RLS Review
