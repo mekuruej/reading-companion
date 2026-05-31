@@ -560,6 +560,10 @@ function normalizeKanjiQueueKey(surface: string | null | undefined, reading: str
   return `${(surface ?? "").trim()}|||${(reading ?? "").trim()}`;
 }
 
+function isSuperTeacherFlag(value: unknown) {
+  return value === true || value === "true";
+}
+
 export default function BookHubPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -3224,7 +3228,8 @@ export default function BookHubPage() {
 
     const currentProfileRole = (meProfile?.role as ProfileRole | null) ?? "member";
     const currentProfileIsSuperTeacher =
-      currentProfileRole === "super_teacher" || !!meProfile?.is_super_teacher;
+      currentProfileRole === "super_teacher" ||
+      isSuperTeacherFlag(meProfile?.is_super_teacher);
 
     setMyRole(currentProfileRole);
     setIsSuperTeacher(currentProfileIsSuperTeacher);
@@ -4020,7 +4025,10 @@ export default function BookHubPage() {
   const saveAll = async () => {
     if (!row?.id || !row.books?.id) return;
 
-    if (isBookInfoEditingTab && !canEditBookInfo) {
+    const canSaveSharedBookInfo =
+      myRole === "super_teacher" || isSuperTeacherFlag(isSuperTeacher);
+
+    if (isBookInfoEditingTab && !canSaveSharedBookInfo) {
       setEditingTab(null);
       setError("Only super teachers can edit shared book information.");
       return;
