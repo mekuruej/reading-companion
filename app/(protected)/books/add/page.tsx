@@ -65,15 +65,45 @@ export default function AddBookPage() {
         setBook(null);
         setLookupLoading(true);
 
-        try {
-            const response = await fetch(
-                `/api/books/lookup-isbn?isbn=${encodeURIComponent(isbn)}`
-            );
+        const lookupUrl = `/api/books/lookup-isbn?isbn=${encodeURIComponent(
+            isbn.trim()
+        )}`;
 
-            const data = await response.json();
+        try {
+            console.log("Looking up book with URL:", lookupUrl);
+
+            const response = await fetch(lookupUrl, {
+                cache: "no-store",
+            });
+
+            const text = await response.text();
+
+            let data: any = null;
+
+            try {
+                data = JSON.parse(text);
+            } catch {
+                console.error("Lookup did not return JSON:", {
+                    status: response.status,
+                    url: lookupUrl,
+                    text,
+                });
+
+                setError(
+                    `Lookup route returned ${response.status}, but not JSON. Check the API route name.`
+                );
+                return;
+            }
 
             if (!response.ok) {
+                console.error("Lookup route returned an error:", data);
                 setError(data.error ?? "I couldn’t find that book.");
+                return;
+            }
+
+            if (!data.book) {
+                console.error("Lookup response had no book:", data);
+                setError("The lookup worked, but no book data came back.");
                 return;
             }
 
