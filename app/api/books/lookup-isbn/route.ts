@@ -238,7 +238,7 @@ async function handleLookup(request: Request) {
 
   const existing = await lookupMekuruBook(isbn13);
   if (existing) {
-    return NextResponse.json(existing);
+    return NextResponse.json({ book: existing });
   }
 
   const externalErrors: string[] = [];
@@ -272,7 +272,7 @@ async function handleLookup(request: Request) {
     });
 
     if (coverOnly?.cover_url) {
-      return NextResponse.json(responseFromExternal(isbn13, coverOnly));
+      return NextResponse.json({ book: responseFromExternal(isbn13, coverOnly) });
     }
 
     return NextResponse.json(
@@ -286,7 +286,7 @@ async function handleLookup(request: Request) {
     );
   }
 
-  return NextResponse.json(responseFromExternal(isbn13, metadata));
+  return NextResponse.json({ book: responseFromExternal(isbn13, metadata) });
 }
 
 export async function GET(request: Request) {

@@ -70,8 +70,6 @@ export default function AddBookPage() {
         )}`;
 
         try {
-            console.log("Looking up book with URL:", lookupUrl);
-
             const response = await fetch(lookupUrl, {
                 cache: "no-store",
             });
@@ -101,14 +99,7 @@ export default function AddBookPage() {
                 return;
             }
 
-            console.log("Lookup response data:", data);
-
-            const lookedUpBook =
-                data.book ??
-                data.result ??
-                data.lookupResult ??
-                data.data ??
-                data;
+            const lookedUpBook = data.book;
 
             if (!lookedUpBook || typeof lookedUpBook !== "object") {
                 console.error("Lookup response had no usable book object:", data);
