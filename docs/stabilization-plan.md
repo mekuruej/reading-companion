@@ -56,24 +56,26 @@ Revisit API routes after Add Book / Global Book Entry redesign is clearer.
 
 ## 2. Non-Book Route Access Audit
 
-Started with:
+Status: In progress
+
+Finished so far:
 
 /users/[username]/books
+regular users fall back to their own books
+monthly stats/color counts now use the same safe effective user target
+tested with student routes and passed
 
-Recent fix:
+Current task:
 
-Regular users now use their own effective user ID for books, monthly stats, and Mekuru color totals.
-Tested regular student manually opening another student’s route.
-Result: both routes fall back to their own books. Good.
-
-Still to audit later:
-
-/library-study/book-flashcards
-/library-study/practice
 /library-study/check
-/library-study/kanji
-/community/stats/*
-other non-book pages that show private user data
+
+We are working here now.
+
+When this page is reviewed/fixed/tested, I’ll clearly say:
+
+Finished: #2 Non-Book Route Access Audit — /library-study/check
+
+Then we can choose the next page under #2.
 
 ## 3. Teacher / Student Access Boundaries
 
