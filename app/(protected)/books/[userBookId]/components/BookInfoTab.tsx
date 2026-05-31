@@ -79,6 +79,7 @@ type BookInfoTabProps = {
   isEditingMyCopy: boolean;
   saving: boolean;
   errorMessage: string | null;
+  canCreateSharedRecords?: boolean;
   onEditBookInfo: () => void;
   onEditPeople: () => void;
   onEditLinks: () => void;
@@ -200,6 +201,7 @@ export default function BookInfoTab({
   isEditingMyCopy,
   saving,
   errorMessage,
+  canCreateSharedRecords = true,
   onEditBookInfo,
   onEditPeople,
   onEditLinks,
@@ -1025,8 +1027,10 @@ export default function BookInfoTab({
                 />
                 <div className="mt-2 text-xs text-stone-500">
                   Pick an existing author when you can. If no match exists, keep the author typed
-                  in below and save. The app will try to create a shared author record
-                  automatically.
+                  in below and save.
+                  {canCreateSharedRecords
+                    ? " The app will try to create a shared author record automatically."
+                    : ""}
                 </div>
 
                 {authorSearchLoading ? (
@@ -1119,13 +1123,13 @@ export default function BookInfoTab({
                   </div>
                 ) : null}
 
-                {requireSharedAuthorRecord ? (
+                {canCreateSharedRecords && requireSharedAuthorRecord ? (
                   <div className="mt-2 text-xs font-medium text-amber-700">
                     New shared author record will be required on save.
                   </div>
                 ) : null}
 
-                {authorSearch.trim() ? (
+                {canCreateSharedRecords && authorSearch.trim() ? (
                   <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                     <div className="text-xs text-amber-900">
                       Don&apos;t see the right match? Create a new shared author record from this
@@ -1229,13 +1233,13 @@ export default function BookInfoTab({
                     </div>
                   ) : null}
 
-                  {requireSharedTranslatorRecord ? (
+                  {canCreateSharedRecords && requireSharedTranslatorRecord ? (
                     <div className="mt-2 text-xs font-medium text-amber-700">
                       New shared translator record will be required on save.
                     </div>
                   ) : null}
 
-                  {translatorSearch.trim() ? (
+                  {canCreateSharedRecords && translatorSearch.trim() ? (
                     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                       <div className="text-xs text-amber-900">
                         Don&apos;t see the right match? Create a new shared translator record from
@@ -1340,13 +1344,13 @@ export default function BookInfoTab({
                     </div>
                   ) : null}
 
-                  {requireSharedIllustratorRecord ? (
+                  {canCreateSharedRecords && requireSharedIllustratorRecord ? (
                     <div className="mt-2 text-xs font-medium text-amber-700">
                       New shared illustrator record will be required on save.
                     </div>
                   ) : null}
 
-                  {illustratorSearch.trim() ? (
+                  {canCreateSharedRecords && illustratorSearch.trim() ? (
                     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                       <div className="text-xs text-amber-900">
                         Don&apos;t see the right match? Create a new shared illustrator record from
@@ -1451,13 +1455,13 @@ export default function BookInfoTab({
                     </div>
                   ) : null}
 
-                  {requireSharedPublisherRecord ? (
+                  {canCreateSharedRecords && requireSharedPublisherRecord ? (
                     <div className="mt-2 text-xs font-medium text-amber-700">
                       New shared publisher record will be required on save.
                     </div>
                   ) : null}
 
-                  {publisherSearch.trim() ? (
+                  {canCreateSharedRecords && publisherSearch.trim() ? (
                     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                       <div className="text-xs text-amber-900">
                         Don&apos;t see the right match? Create a new shared publisher record from this

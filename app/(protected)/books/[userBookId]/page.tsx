@@ -4848,15 +4848,15 @@ export default function BookHubPage() {
                   setRemoveLibraryError(null);
                 }}
                 disabled={isRemovingFromLibrary}
-                className="rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-60"
+                className="rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400 disabled:opacity-70"
               >
-                Cancel
+                {isRemovingFromLibrary ? "Please wait" : "Cancel"}
               </button>
               <button
                 type="button"
                 onClick={removeFromMyLibrary}
                 disabled={isRemovingFromLibrary}
-                className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:opacity-60"
+                className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-500 disabled:opacity-90"
               >
                 {isRemovingFromLibrary ? "Removing..." : "Remove from My Library"}
               </button>

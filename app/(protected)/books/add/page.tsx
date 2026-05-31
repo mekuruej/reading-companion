@@ -64,11 +64,17 @@ export default function AddBookPage() {
     const [requestLoading, setRequestLoading] = useState(false);
     const [error, setError] = useState("");
     const [canRequestBook, setCanRequestBook] = useState(false);
+    const [libraryNotice, setLibraryNotice] = useState<{
+        message: string;
+        detail?: string;
+        userBookId?: string;
+    } | null>(null);
 
     async function handleLookup() {
         setError("");
         setBook(null);
         setCanRequestBook(false);
+        setLibraryNotice(null);
         setLookupLoading(true);
 
         const lookupUrl = `/api/books/lookup-isbn?isbn=${encodeURIComponent(
@@ -121,7 +127,6 @@ export default function AddBookPage() {
             }
 
             if (!lookedUpBook.title) {
-                console.error("Lookup response had a book object, but no title:", data);
                 setCanRequestBook(true);
                 setError(
                     "We couldn’t find enough information for that ISBN yet. You can request this book for review."
@@ -146,13 +151,14 @@ export default function AddBookPage() {
         if (
             isNewToMekuru &&
             !window.confirm(
-                "This book is new to Mekuru, so some details may need review. Add it to your library?"
+                "This book is new to Mekuru. An admin may need to review it before all book details show up. Add it to your library?"
             )
         ) {
             return;
         }
 
         setError("");
+        setLibraryNotice(null);
         setAddLoading(true);
 
         try {
@@ -184,6 +190,15 @@ export default function AddBookPage() {
             if (!data.userBookId) {
                 console.error("Add book response had no userBookId:", data);
                 setError("The book was added, but Mekuru could not open the Book Hub.");
+                return;
+            }
+
+            if (data.alreadyInLibrary) {
+                setLibraryNotice({
+                    message: "This book is already in your library.",
+                    detail: "We found your existing copy.",
+                    userBookId: data.userBookId,
+                });
                 return;
             }
 
@@ -224,10 +239,10 @@ export default function AddBookPage() {
             if (requestError) throw requestError;
 
             setCanRequestBook(false);
-            setError("Book request sent. Devon or your teacher can review this ISBN.");
+            setError("Book request sent. An admin can review this ISBN and add the book details.");
         } catch (requestError) {
             console.error("Book request failed:", requestError);
-            setError("Could not send this book request. Please ask Devon or your teacher to add it.");
+            setError("Could not send this book request. Please ask an admin or teacher to add it.");
         } finally {
             setRequestLoading(false);
         }
@@ -268,7 +283,10 @@ export default function AddBookPage() {
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                     <input
                         value={isbn}
-                        onChange={(event) => setIsbn(event.target.value)}
+                        onChange={(event) => {
+                            setIsbn(event.target.value);
+                            setLibraryNotice(null);
+                        }}
                         placeholder="9784094071733"
                         className="min-h-12 flex-1 rounded-2xl border border-amber-200 bg-white px-4 text-base text-stone-900 shadow-sm outline-none focus:border-amber-400"
                     />
@@ -294,6 +312,24 @@ export default function AddBookPage() {
                                 className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-xs font-black text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {requestLoading ? "Sending..." : "Request this book for review"}
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
+
+                {libraryNotice ? (
+                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                        <p className="font-bold">{libraryNotice.message}</p>
+                        {libraryNotice.detail ? (
+                            <p className="mt-1">{libraryNotice.detail}</p>
+                        ) : null}
+                        {libraryNotice.userBookId ? (
+                            <button
+                                type="button"
+                                onClick={() => router.push(`/books/${libraryNotice.userBookId}`)}
+                                className="mt-3 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+                            >
+                                Open this book
                             </button>
                         ) : null}
                     </div>
@@ -366,7 +402,7 @@ export default function AddBookPage() {
 
                             {isNewToMekuru ? (
                                 <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                                    This book is not in Mekuru’s database yet. You can still add it to your library now, but some details may need review before the book information is complete.
+                                    This book is not in Mekuru’s database yet. You can still add it to your library now, but an admin may need to review it before all book details show up.
                                 </p>
                             ) : null}
 
