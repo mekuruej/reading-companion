@@ -107,7 +107,15 @@ export default function AddBookPage() {
                 return;
             }
 
-            setBook(data.book);
+            const lookedUpBook = data.book ?? data;
+
+            if (!lookedUpBook?.isbn13 || !lookedUpBook?.title) {
+                console.error("Lookup response had an unexpected shape:", data);
+                setError("The lookup worked, but the book data came back in an unexpected shape.");
+                return;
+            }
+
+            setBook(lookedUpBook);
         } catch (lookupError) {
             console.error("Book lookup failed:", lookupError);
             setError("Something went wrong while looking up this book.");
