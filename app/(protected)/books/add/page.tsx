@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 type LookupBook = {
     isbn13: string;
@@ -129,10 +130,17 @@ export default function AddBookPage() {
         setAddLoading(true);
 
         try {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+
             const response = await fetch("/api/books/add-by-isbn", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    ...(session?.access_token
+                        ? { Authorization: `Bearer ${session.access_token}` }
+                        : {}),
                 },
                 body: JSON.stringify({
                     isbn13: book.isbn13,

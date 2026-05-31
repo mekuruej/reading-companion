@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseClient";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 type MetadataSource = "mekuru" | "openbd" | "google_books" | "open_library" | "none";
 
@@ -56,6 +61,7 @@ function compactAuthors(values: unknown[]) {
   return values
     .flatMap((value) => String(value ?? "").split(/[、,;]/))
     .map((value) => value.trim())
+    .filter((value) => !/^\(?\d{4}\s*-?\s*(?:\d{4})?\)?$/.test(value))
     .filter(Boolean);
 }
 
@@ -91,10 +97,10 @@ async function isbnFromRequest(request: Request) {
 }
 
 async function lookupMekuruBook(isbn13: string): Promise<LookupResponse | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("books")
     .select(
-      "id, title, author, cover_url, publisher, published_date, page_count, isbn13"
+      "id, title, author, cover_url, publisher, published_date, page_count, isbn13, book_type"
     )
     .eq("isbn13", isbn13)
     .maybeSingle();

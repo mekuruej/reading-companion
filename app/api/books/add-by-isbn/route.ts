@@ -1,39 +1,38 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@supabase/supabase-js";
 
 import { lookupBookByIsbn13 } from "@/lib/books/bookLookup";
 import { normalizeIsbn13 } from "@/lib/books/isbn";
 
-export async function POST(request: Request) {
-  const cookieStore = await cookies();
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
+async function getAuthenticatedUser(req: Request) {
+  const authHeader = req.headers.get("authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  if (!token) {
+    return { error: "Missing session.", status: 401 as const };
+  }
+
+  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+  const user = userData?.user;
 
   if (userError || !user) {
+    return { error: "Invalid session.", status: 401 as const };
+  }
+
+  return { user };
+}
+
+export async function POST(request: Request) {
+  const auth = await getAuthenticatedUser(request);
+  if ("error" in auth) {
     return NextResponse.json(
       { error: "You need to be logged in to add a book." },
-      { status: 401 }
+      { status: auth.status }
     );
   }
 
@@ -47,19 +46,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const lookupResult = await lookupBookByIsbn13(isbn13);
-
-  if (!lookupResult) {
-    return NextResponse.json(
-      {
-        error:
-          "I couldn’t find book information for that ISBN. Please request this book for review instead.",
-      },
-      { status: 404 }
-    );
-  }
-
-  const { data: existingBook, error: existingBookError } = await supabase
+  const { data: existingBook, error: existingBookError } = await supabaseAdmin
     .from("books")
     .select("id")
     .eq("isbn13", isbn13)
@@ -77,17 +64,29 @@ export async function POST(request: Request) {
   let bookId = existingBook?.id ?? null;
 
   if (!bookId) {
+    const lookupResult = await lookupBookByIsbn13(isbn13);
+
+    if (!lookupResult) {
+      return NextResponse.json(
+        {
+          error:
+            "I couldn’t find book information for that ISBN. Please request this book for review instead.",
+        },
+        { status: 404 }
+      );
+    }
+
     const authorDisplay =
       lookupResult.authors.length > 0
         ? lookupResult.authors.join("、")
         : null;
 
-    const { data: insertedBook, error: insertBookError } = await supabase
+    let { data: insertedBook, error: insertBookError } = await supabaseAdmin
       .from("books")
       .insert({
         isbn13: lookupResult.isbn13,
         title: lookupResult.title,
-        author_display: authorDisplay,
+        author: authorDisplay,
         cover_url: lookupResult.coverUrl,
         publisher: lookupResult.publisher,
         published_date: lookupResult.publishedDate,
@@ -97,6 +96,25 @@ export async function POST(request: Request) {
       })
       .select("id")
       .single();
+
+    if (insertBookError?.code === "42703" || insertBookError?.code === "PGRST204") {
+      const retry = await supabaseAdmin
+        .from("books")
+        .insert({
+          isbn13: lookupResult.isbn13,
+          title: lookupResult.title,
+          author: authorDisplay,
+          cover_url: lookupResult.coverUrl,
+          publisher: lookupResult.publisher,
+          published_date: lookupResult.publishedDate,
+          page_count: lookupResult.pageCount,
+        })
+        .select("id")
+        .single();
+
+      insertedBook = retry.data;
+      insertBookError = retry.error;
+    }
 
     if (insertBookError) {
       console.error("Error creating imported book:", insertBookError);
@@ -111,10 +129,10 @@ export async function POST(request: Request) {
   }
 
   const { data: existingUserBook, error: existingUserBookError } =
-    await supabase
+    await supabaseAdmin
       .from("user_books")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", auth.user.id)
       .eq("book_id", bookId)
       .maybeSingle();
 
@@ -137,10 +155,10 @@ export async function POST(request: Request) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: insertedUserBook, error: insertUserBookError } = await supabase
+  const { data: insertedUserBook, error: insertUserBookError } = await supabaseAdmin
     .from("user_books")
     .insert({
-      user_id: user.id,
+      user_id: auth.user.id,
       book_id: bookId,
       started_at: today,
     })

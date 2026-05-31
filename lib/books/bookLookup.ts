@@ -72,6 +72,20 @@ function cleanCoverUrl(value: string | null | undefined) {
   return value.replace(/^http:\/\//, "https://");
 }
 
+function cleanAuthorName(value: string | null | undefined) {
+  return (value ?? "")
+    .split(/[、,;]/)
+    .map((part) => part.trim())
+    .filter((part) => part && !/^\(?\d{4}\s*-?\s*(?:\d{4})?\)?$/.test(part))
+    .join(", ");
+}
+
+function cleanAuthors(values: Array<string | null | undefined>) {
+  return values
+    .map((value) => cleanAuthorName(value))
+    .filter(Boolean);
+}
+
 async function fetchJson<T>(url: string | URL) {
   const response = await fetch(url, {
     next: {
@@ -113,7 +127,7 @@ async function lookupGoogleBooksByIsbn13(
     isbn13,
     title: volumeInfo.title,
     subtitle: volumeInfo.subtitle ?? null,
-    authors: volumeInfo.authors ?? [],
+    authors: cleanAuthors(volumeInfo.authors ?? []),
     publisher: volumeInfo.publisher ?? null,
     publishedDate: volumeInfo.publishedDate ?? null,
     pageCount: volumeInfo.pageCount ?? null,
@@ -181,7 +195,7 @@ async function lookupOpenLibraryByIsbn13(
     isbn13,
     title: data.title,
     subtitle: data.subtitle ?? null,
-    authors: authorNames.filter((name): name is string => Boolean(name)),
+    authors: cleanAuthors(authorNames),
     publisher: data.publishers?.[0] ?? null,
     publishedDate: data.publish_date ?? null,
     pageCount: data.number_of_pages ?? null,
