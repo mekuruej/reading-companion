@@ -69,7 +69,7 @@ const statCards = [
     title: "Detailed Reading Colors",
     description: "See color meanings, encounter stages, and Ability Check progress.",
     href: "/community/stats/colors",
-    tag: "Color details",
+    tag: "Snapshot details",
   },
 ];
 
