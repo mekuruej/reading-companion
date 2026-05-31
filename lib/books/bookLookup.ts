@@ -20,7 +20,7 @@ export type BookLookupResult = {
   pageCount: number | null;
   description: string | null;
   coverUrl: string | null;
-  source: "google_books" | "open_library";
+  source: "openbd" | "google_books" | "open_library";
   sourceId: string | null;
 };
 
@@ -42,6 +42,24 @@ type GoogleBooksResponse = {
     };
   }>;
 };
+
+type OpenBdResponse = Array<{
+  summary?: {
+    title?: string;
+    author?: string;
+    publisher?: string;
+    pubdate?: string;
+    cover?: string;
+  };
+  onix?: {
+    PublishingDetail?: {
+      PublishingDate?: Array<{ Date?: string }>;
+    };
+    DescriptiveDetail?: {
+      Extent?: Array<{ ExtentType?: string; ExtentValue?: string | number }>;
+    };
+  };
+} | null>;
 
 type OpenLibraryIsbnResponse = {
   title?: string;
@@ -73,11 +91,16 @@ function cleanCoverUrl(value: string | null | undefined) {
 }
 
 function cleanAuthorName(value: string | null | undefined) {
-  return (value ?? "")
+  const parts = (value ?? "")
     .split(/[、,;]/)
     .map((part) => part.trim())
-    .filter((part) => part && !/^\(?\d{4}\s*-?\s*(?:\d{4})?\)?$/.test(part))
-    .join(", ");
+    .filter(Boolean);
+
+  while (parts.length > 0 && /^\(?\d{4}\s*-?\s*(?:\d{4})?\)?$/.test(parts[parts.length - 1])) {
+    parts.pop();
+  }
+
+  return parts.join(", ");
 }
 
 function cleanAuthors(values: Array<string | null | undefined>) {
@@ -98,6 +121,47 @@ async function fetchJson<T>(url: string | URL) {
   }
 
   return (await response.json()) as T;
+}
+
+function cleanNumber(value: unknown) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+}
+
+async function lookupOpenBdByIsbn13(isbn13: string): Promise<BookLookupResult | null> {
+  const data = await fetchJson<OpenBdResponse>(
+    `https://api.openbd.jp/v1/get?isbn=${encodeURIComponent(isbn13)}`
+  );
+
+  const item = Array.isArray(data) ? data[0] : null;
+  const summary = item?.summary;
+
+  if (!summary?.title) {
+    return null;
+  }
+
+  const pageCount = cleanNumber(
+    item?.onix?.DescriptiveDetail?.Extent?.find?.(
+      (extent) => String(extent?.ExtentType ?? "") === "11"
+    )?.ExtentValue
+  );
+
+  return {
+    isbn13,
+    title: summary.title,
+    subtitle: null,
+    authors: cleanAuthors([summary.author]),
+    publisher: summary.publisher ?? null,
+    publishedDate:
+      summary.pubdate ??
+      item?.onix?.PublishingDetail?.PublishingDate?.[0]?.Date ??
+      null,
+    pageCount,
+    description: null,
+    coverUrl: cleanCoverUrl(summary.cover),
+    source: "openbd",
+    sourceId: isbn13,
+  };
 }
 
 async function lookupGoogleBooksByIsbn13(
@@ -207,6 +271,12 @@ async function lookupOpenLibraryByIsbn13(
 }
 
 export async function lookupBookByIsbn13(isbn13: string) {
+  const openBdResult = await lookupOpenBdByIsbn13(isbn13);
+
+  if (openBdResult) {
+    return openBdResult;
+  }
+
   const googleResult = await lookupGoogleBooksByIsbn13(isbn13);
 
   if (googleResult) {

@@ -572,6 +572,9 @@ export default function BookHubPage() {
   const [showBookFlagModal, setShowBookFlagModal] = useState(false);
   const [bookFlagNote, setBookFlagNote] = useState("");
   const [isSavingBookFlag, setIsSavingBookFlag] = useState(false);
+  const [showRemoveLibraryConfirm, setShowRemoveLibraryConfirm] = useState(false);
+  const [isRemovingFromLibrary, setIsRemovingFromLibrary] = useState(false);
+  const [removeLibraryError, setRemoveLibraryError] = useState<string | null>(null);
 
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
@@ -886,10 +889,15 @@ export default function BookHubPage() {
       ? canEditBookInfo
       : true; // members can edit everything else
 
-  const isEditingBookInfoDetails = editingTab === "bookInfoDetails";
-  const isEditingBookInfoPeople = editingTab === "bookInfoPeople";
-  const isEditingBookInfoLinks = editingTab === "bookInfoLinks";
-  const isEditingBookInfoCopy = editingTab === "bookInfoCopy";
+  const isBookInfoEditingTab =
+    editingTab === "bookInfoDetails" ||
+    editingTab === "bookInfoPeople" ||
+    editingTab === "bookInfoLinks" ||
+    editingTab === "bookInfoCopy";
+  const isEditingBookInfoDetails = canEditBookInfo && editingTab === "bookInfoDetails";
+  const isEditingBookInfoPeople = canEditBookInfo && editingTab === "bookInfoPeople";
+  const isEditingBookInfoLinks = canEditBookInfo && editingTab === "bookInfoLinks";
+  const isEditingBookInfoCopy = canEditBookInfo && editingTab === "bookInfoCopy";
   const isEditingCommunityGenres = editingTab === "communityGenres";
   const isEditingCommunityContentNotes = editingTab === "communityContentNotes";
   const isEditingReflection = editingTab === "reflection";
@@ -4012,6 +4020,12 @@ export default function BookHubPage() {
   const saveAll = async () => {
     if (!row?.id || !row.books?.id) return;
 
+    if (isBookInfoEditingTab && !canEditBookInfo) {
+      setEditingTab(null);
+      setError("Only super teachers can edit shared book information.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSaveNotice(null);
@@ -4349,6 +4363,50 @@ export default function BookHubPage() {
     setShowBookFlagModal(false);
     setSaveNoticeTone("success");
     setSaveNotice("Book flagged for review.");
+  }
+
+  async function removeFromMyLibrary() {
+    if (!row?.id || !userId) return;
+
+    if (row.user_id !== userId) {
+      setRemoveLibraryError("You can only remove books from your own library.");
+      return;
+    }
+
+    setIsRemovingFromLibrary(true);
+    setRemoveLibraryError(null);
+    setError(null);
+    setSaveNotice(null);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(`/api/books/${row.id}/remove-from-library`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Could not remove this book from your library yet.");
+      }
+
+      router.push("/books");
+    } catch (err: any) {
+      setRemoveLibraryError(
+        err?.message ?? "Could not remove this book from your library yet."
+      );
+    } finally {
+      setIsRemovingFromLibrary(false);
+    }
   }
 
   async function pullQuickWord() {
@@ -4729,6 +4787,7 @@ export default function BookHubPage() {
 
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
+  const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
 
   const bookHubContextLabel = isViewingStudentBookHub
     ? `Student Book Hub · ${bookHubOwnerName || "Student"}`
@@ -4749,6 +4808,53 @@ export default function BookHubPage() {
           }}
           onSubmit={flagBookForTeacherReview}
         />
+      ) : null}
+
+      {showRemoveLibraryConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 px-4">
+          <div className="w-full max-w-lg rounded-3xl border border-stone-200 bg-white p-6 shadow-xl">
+            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-rose-700">
+              Library Action
+            </div>
+            <h2 className="mt-2 text-2xl font-bold text-stone-950">
+              Remove from My Library?
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-stone-700">
+              Remove this book from your library? This will remove your saved
+              words, reading sessions, and stats for this book. The shared book
+              record will stay in Mekuru.
+            </p>
+
+            {removeLibraryError ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                {removeLibraryError}
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isRemovingFromLibrary) return;
+                  setShowRemoveLibraryConfirm(false);
+                  setRemoveLibraryError(null);
+                }}
+                disabled={isRemovingFromLibrary}
+                className="rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={removeFromMyLibrary}
+                disabled={isRemovingFromLibrary}
+                className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:opacity-60"
+              >
+                {isRemovingFromLibrary ? "Removing..." : "Remove from My Library"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <div className="mx-auto max-w-6xl">
@@ -4991,6 +5097,22 @@ export default function BookHubPage() {
                     {book.page_count}?
                   </div>
                 ) : null}
+
+                {canRemoveFromMyLibrary ? (
+                  <div className="mt-5 border-t border-violet-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirmLeaveIfTimerActive()) return;
+                        setRemoveLibraryError(null);
+                        setShowRemoveLibraryConfirm(true);
+                      }}
+                      className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
+                    >
+                      Remove from My Library
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -5184,16 +5306,29 @@ export default function BookHubPage() {
 
                   <BookInfoTab
                     book={book}
+                    canEditBookInfo={canEditBookInfo}
                     isEditingBookInfo={isEditingBookInfoDetails}
                     isEditingPeople={isEditingBookInfoPeople}
                     isEditingLinks={isEditingBookInfoLinks}
                     isEditingMyCopy={isEditingBookInfoCopy}
                     saving={saving}
                     errorMessage={isEditingBookInfoPeople ? error : null}
-                    onEditBookInfo={() => setEditingTab("bookInfoDetails")}
-                    onEditPeople={() => setEditingTab("bookInfoPeople")}
-                    onEditLinks={() => setEditingTab("bookInfoLinks")}
-                    onEditMyCopy={() => setEditingTab("bookInfoCopy")}
+                    onEditBookInfo={() => {
+                      if (!canEditBookInfo) return;
+                      setEditingTab("bookInfoDetails");
+                    }}
+                    onEditPeople={() => {
+                      if (!canEditBookInfo) return;
+                      setEditingTab("bookInfoPeople");
+                    }}
+                    onEditLinks={() => {
+                      if (!canEditBookInfo) return;
+                      setEditingTab("bookInfoLinks");
+                    }}
+                    onEditMyCopy={() => {
+                      if (!canEditBookInfo) return;
+                      setEditingTab("bookInfoCopy");
+                    }}
                     onCancel={cancelEdits}
                     onSave={saveAll}
                     bookType={bookType}

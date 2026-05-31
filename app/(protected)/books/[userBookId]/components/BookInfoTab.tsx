@@ -72,6 +72,7 @@ type ContributorAuthorRecord = {
 
 type BookInfoTabProps = {
   book: Book;
+  canEditBookInfo: boolean;
   isEditingBookInfo: boolean;
   isEditingPeople: boolean;
   isEditingLinks: boolean;
@@ -192,6 +193,7 @@ type BookInfoTabProps = {
 
 export default function BookInfoTab({
   book,
+  canEditBookInfo,
   isEditingBookInfo,
   isEditingPeople,
   isEditingLinks,
@@ -854,13 +856,15 @@ export default function BookInfoTab({
             </div>
           </div>
           {!isEditingBookInfo ? (
-            <button
-              type="button"
-              onClick={onEditBookInfo}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-            >
-              Edit
-            </button>
+            canEditBookInfo ? (
+              <button
+                type="button"
+                onClick={onEditBookInfo}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
+              >
+                Edit
+              </button>
+            ) : null
           ) : (
             <div className="flex gap-2">
               <button
@@ -966,13 +970,15 @@ export default function BookInfoTab({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-stone-900">People</div>
           {!isEditingPeople ? (
-            <button
-              type="button"
-              onClick={onEditPeople}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-            >
-              Edit
-            </button>
+            canEditBookInfo ? (
+              <button
+                type="button"
+                onClick={onEditPeople}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
+              >
+                Edit
+              </button>
+            ) : null
           ) : (
             <div className="flex gap-2">
               <button
@@ -1508,13 +1514,15 @@ export default function BookInfoTab({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-stone-900">Where to Find It</div>
           {!isEditingLinks ? (
-            <button
-              type="button"
-              onClick={onEditLinks}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-            >
-              Edit
-            </button>
+            canEditBookInfo ? (
+              <button
+                type="button"
+                onClick={onEditLinks}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
+              >
+                Edit
+              </button>
+            ) : null
           ) : (
             <div className="flex gap-2">
               <button

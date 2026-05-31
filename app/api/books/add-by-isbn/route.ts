@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "I couldn’t find book information for that ISBN. Please request this book for review instead.",
+            "We couldn’t find enough information for that ISBN yet. Please request this book for review.",
         },
         { status: 404 }
       );

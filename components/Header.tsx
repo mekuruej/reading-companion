@@ -106,6 +106,7 @@ export default function Header() {
     pathname.startsWith("/library") ||
     pathname === libraryHref ||
     pathname === "/books" ||
+    pathname === "/books/add" ||
     /^\/users\/[^/]+\/books$/.test(pathname) ||
     pathname === "/vocab";
   const discoverySectionActive = pathname.startsWith("/discovery");
@@ -183,6 +184,17 @@ export default function Header() {
                     onClick={() => setShowLibraryMenu(false)}
                   >
                     My Mekuru Library
+                  </Link>
+
+                  <Link
+                    href="/books/add"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/books/add"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowLibraryMenu(false)}
+                  >
+                    Add a Book
                   </Link>
 
                   <Link

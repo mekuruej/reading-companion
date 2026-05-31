@@ -29,6 +29,8 @@ type LookupBook = {
     metadata_source?: string | null;
 
     needs_review?: boolean;
+    found_existing_book?: boolean;
+    existing_book_id?: string | null;
 };
 
 function getDisplayAuthor(book: LookupBook) {
@@ -59,11 +61,14 @@ export default function AddBookPage() {
     const [book, setBook] = useState<LookupBook | null>(null);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [addLoading, setAddLoading] = useState(false);
+    const [requestLoading, setRequestLoading] = useState(false);
     const [error, setError] = useState("");
+    const [canRequestBook, setCanRequestBook] = useState(false);
 
     async function handleLookup() {
         setError("");
         setBook(null);
+        setCanRequestBook(false);
         setLookupLoading(true);
 
         const lookupUrl = `/api/books/lookup-isbn?isbn=${encodeURIComponent(
@@ -96,7 +101,11 @@ export default function AddBookPage() {
 
             if (!response.ok) {
                 console.error("Lookup route returned an error:", data);
-                setError(data.error ?? "I couldn’t find that book.");
+                setCanRequestBook(true);
+                setError(
+                    data.error ??
+                    "We couldn’t find enough information for that ISBN yet. You can request this book for review."
+                );
                 return;
             }
 
@@ -104,19 +113,27 @@ export default function AddBookPage() {
 
             if (!lookedUpBook || typeof lookedUpBook !== "object") {
                 console.error("Lookup response had no usable book object:", data);
-                setError("The lookup worked, but no book data came back.");
+                setCanRequestBook(true);
+                setError(
+                    "We couldn’t find enough information for that ISBN yet. You can request this book for review."
+                );
                 return;
             }
 
             if (!lookedUpBook.title) {
                 console.error("Lookup response had a book object, but no title:", data);
-                setError("The lookup worked, but the book data was missing a title.");
+                setCanRequestBook(true);
+                setError(
+                    "We couldn’t find enough information for that ISBN yet. You can request this book for review."
+                );
                 return;
             }
 
+            setError("");
             setBook(lookedUpBook);
         } catch (lookupError) {
             console.error("Book lookup failed:", lookupError);
+            setCanRequestBook(true);
             setError("Something went wrong while looking up this book.");
         } finally {
             setLookupLoading(false);
@@ -125,6 +142,15 @@ export default function AddBookPage() {
 
     async function handleAddToLibrary() {
         if (!book?.isbn13) return;
+
+        if (
+            isNewToMekuru &&
+            !window.confirm(
+                "This book is new to Mekuru, so some details may need review. Add it to your library?"
+            )
+        ) {
+            return;
+        }
 
         setError("");
         setAddLoading(true);
@@ -161,7 +187,7 @@ export default function AddBookPage() {
                 return;
             }
 
-            router.push(`/books/${data.userBookId}`);
+            router.push("/books");
         } catch (addError) {
             console.error("Add book failed:", addError);
             setError("Something went wrong while adding this book to your library.");
@@ -170,10 +196,58 @@ export default function AddBookPage() {
         }
     }
 
+    async function handleRequestBook() {
+        const cleanIsbn = isbn.replace(/[\s-]/g, "").trim();
+        if (!cleanIsbn) return;
+
+        setRequestLoading(true);
+        setError("");
+
+        try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user) {
+                setError("You need to be signed in to request a book.");
+                return;
+            }
+
+            const { error: requestError } = await supabase.from("book_requests").insert({
+                user_id: user.id,
+                title: `ISBN ${cleanIsbn}`,
+                author: null,
+                isbn13: cleanIsbn,
+                status: "pending",
+            });
+
+            if (requestError) throw requestError;
+
+            setCanRequestBook(false);
+            setError("Book request sent. Devon or your teacher can review this ISBN.");
+        } catch (requestError) {
+            console.error("Book request failed:", requestError);
+            setError("Could not send this book request. Please ask Devon or your teacher to add it.");
+        } finally {
+            setRequestLoading(false);
+        }
+    }
+
     const coverUrl = book ? getCoverUrl(book) : null;
     const displayAuthor = book ? getDisplayAuthor(book) : "";
     const publishedDate = book ? getPublishedDate(book) : null;
     const pageCount = book ? getPageCount(book) : null;
+    const isNewToMekuru =
+        !!book &&
+        book.found_existing_book !== true &&
+        (book.needs_review === true ||
+            book.existing_book_id == null ||
+            book.metadata_source === "openbd" ||
+            book.metadata_source === "google_books" ||
+            book.metadata_source === "open_library" ||
+            book.source === "openbd" ||
+            book.source === "google_books" ||
+            book.source === "open_library");
 
     return (
         <main className="mx-auto max-w-3xl px-4 py-8">
@@ -210,9 +284,19 @@ export default function AddBookPage() {
                 </div>
 
                 {error ? (
-                    <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                        {error}
-                    </p>
+                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                        <p>{error}</p>
+                        {canRequestBook ? (
+                            <button
+                                type="button"
+                                onClick={handleRequestBook}
+                                disabled={requestLoading}
+                                className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-xs font-black text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {requestLoading ? "Sending..." : "Request this book for review"}
+                            </button>
+                        ) : null}
+                    </div>
                 ) : null}
             </div>
 
@@ -280,10 +364,11 @@ export default function AddBookPage() {
                                 </p>
                             </div>
 
-                            <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                                Some imported book details may need review later, especially
-                                authors, editors, translators, or short story collections.
-                            </p>
+                            {isNewToMekuru ? (
+                                <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                                    This book is not in Mekuru’s database yet. You can still add it to your library now, but some details may need review before the book information is complete.
+                                </p>
+                            ) : null}
 
                             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                                 <button
