@@ -2,7 +2,6 @@
 
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   emptyLibraryStudyColorTotals,
@@ -13,6 +12,7 @@ import {
   type LibraryStudyLimboTotals,
 } from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
+import ReadingColorsHeader from "./components/ReadingColorsHeader";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
@@ -314,13 +314,7 @@ export default function ReadingColorsPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-8">
-        <Link
-          href="/community/stats"
-          className="text-sm font-bold text-stone-500 hover:text-stone-900"
-        >
-          ← Back to Stats Home
-        </Link>
-
+        <ReadingColorsHeader />
         <p className="mt-6 text-sm font-semibold uppercase tracking-[0.25em] text-stone-500">
           Study colors
         </p>

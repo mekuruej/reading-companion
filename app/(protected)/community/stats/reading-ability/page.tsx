@@ -177,6 +177,7 @@ function bookTypeLabel(value: string | null | undefined) {
         nonfiction: "Nonfiction",
         short_story: "Short story",
         "short story": "Short story",
+        textbook: "Textbook",
     };
 
     return labels[value] ?? value.replaceAll("_", " ");
@@ -228,6 +229,7 @@ function bookTypeSortIndex(value: string | null | undefined) {
         "adult",
         "manga",
         "nonfiction",
+        "textbook",
     ];
 
     const index = order.indexOf(value ?? "");

@@ -258,6 +258,7 @@ function bookTypeLabel(value: string | null | undefined) {
     nonfiction: "Nonfiction",
     short_story: "Short story",
     "short story": "Short story",
+    textbook: "Textbook",
   };
 
   return labels[value] ?? value.replaceAll("_", " ");
