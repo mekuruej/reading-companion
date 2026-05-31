@@ -146,6 +146,17 @@ function stableNumberFromString(text: string) {
   return total;
 }
 
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfLocalDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 function meaningPreviewFromSenses(senses: any[] | null | undefined) {
   if (!Array.isArray(senses)) return null;
 
@@ -237,6 +248,26 @@ function selectOneCardPerKanji(cards: QuizCard[]) {
   return Array.from(byKanji.values());
 }
 
+function selectOneCardPerSourceWordForDay(cards: QuizCard[], dateKey: string) {
+  const byWord = new Map<string, QuizCard[]>();
+
+  for (const card of cards) {
+    const wordKey = normalizeWord(card.sourceWord);
+    if (!wordKey) continue;
+
+    const group = byWord.get(wordKey) ?? [];
+    group.push(card);
+    byWord.set(wordKey, group);
+  }
+
+  return Array.from(byWord.entries()).map(([wordKey, group]) => {
+    const flaggedCards = group.filter((card) => card.flaggedForReview);
+    const candidates = flaggedCards.length > 0 ? flaggedCards : group;
+    const index = stableNumberFromString(`${wordKey}|${dateKey}`) % candidates.length;
+    return candidates[index];
+  });
+}
+
 function chunkArray<T>(items: T[], size: number) {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
@@ -272,6 +303,7 @@ export default function KanjiReadingStudyPage() {
   const [endedEarly, setEndedEarly] = useState(false);
   const [usedRecallWords, setUsedRecallWords] = useState<string[]>([]);
   const [cardsSinceLastRecall, setCardsSinceLastRecall] = useState(0);
+  const [studiedTodayWords, setStudiedTodayWords] = useState<Set<string>>(() => new Set());
 
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -319,6 +351,26 @@ export default function KanjiReadingStudyPage() {
           .returns<KanjiMapRow[]>();
 
         if (kanjiMapErr) throw kanjiMapErr;
+
+        const todayStart = startOfLocalDay();
+        const { data: todayStudyEvents, error: todayStudyEventsErr } = await supabase
+          .from("user_study_events")
+          .select("surface")
+          .eq("user_id", user.id)
+          .eq("study_mode", "kanji_reading_flashcards")
+          .gte("created_at", todayStart.toISOString());
+
+        if (todayStudyEventsErr) {
+          console.warn("Error loading today's kanji reading events:", todayStudyEventsErr);
+        }
+
+        const practicedTodayWords = new Set(
+          (todayStudyEvents ?? [])
+            .map((event) => normalizeWord((event as any).surface ?? ""))
+            .filter(Boolean)
+        );
+
+        setStudiedTodayWords(practicedTodayWords);
 
         const activeKanjiMapRows = (kanjiMapRows ?? []).filter((row) => {
           const hasReading = !!(row.realized_reading?.trim() || row.base_reading?.trim());
@@ -462,8 +514,21 @@ export default function KanjiReadingStudyPage() {
 
   const card = deck[index];
 
+  const cardQuestionMode: CardQuestionMode = useMemo(() => {
+    if (
+      card?.readingType === "kunyomi" &&
+      hasExactlyOneKanji(card.sourceWord) &&
+      !!card.sourceReading
+    ) {
+      return "kanjiChoice";
+    }
+
+    return "readingChoice";
+  }, [card]);
+
   const canStartRecall =
     !!card &&
+    cardQuestionMode === "readingChoice" &&
     !!checked &&
     checked.ok &&
     !skipTypingThisSession &&
@@ -473,6 +538,7 @@ export default function KanjiReadingStudyPage() {
 
   const inRecallFlow =
     !!card &&
+    cardQuestionMode === "readingChoice" &&
     !!checked &&
     checked.ok &&
     !skipTypingThisSession &&
@@ -485,18 +551,6 @@ export default function KanjiReadingStudyPage() {
     }
 
     return stableNumberFromString(card.key) % 2 === 0 ? "kanjiForReading" : "wordForKanji";
-  }, [card]);
-
-  const cardQuestionMode: CardQuestionMode = useMemo(() => {
-    if (
-      card?.readingType === "kunyomi" &&
-      hasExactlyOneKanji(card.sourceWord) &&
-      !!card.sourceReading
-    ) {
-      return "kanjiChoice";
-    }
-
-    return "readingChoice";
   }, [card]);
 
   const options = useMemo(() => {
@@ -689,15 +743,22 @@ export default function KanjiReadingStudyPage() {
   }
 
   function buildDeckFromCards(cards: QuizCard[]) {
-    if (cards.length === 0) {
+    const cardsAvailableToday = cards.filter(
+      (card) => !studiedTodayWords.has(normalizeWord(card.sourceWord))
+    );
+
+    if (cardsAvailableToday.length === 0) {
       setDeck([]);
       setIndex(0);
       resetCardState();
       return;
     }
 
-    const onyomiCards = cards.filter((card) => card.readingType === "onyomi");
-    const kunyomiCards = cards.filter(
+    const dateKey = localDateKey();
+    const oneCardPerWord = selectOneCardPerSourceWordForDay(cardsAvailableToday, dateKey);
+
+    const onyomiCards = oneCardPerWord.filter((card) => card.readingType === "onyomi");
+    const kunyomiCards = oneCardPerWord.filter(
       (card) => card.readingType === "kunyomi" && hasExactlyOneKanji(card.sourceWord)
     );
 
@@ -765,6 +826,18 @@ export default function KanjiReadingStudyPage() {
     });
   }
 
+  function markCardStudiedToday(cardToMark: QuizCard) {
+    const wordKey = normalizeWord(cardToMark.sourceWord);
+    if (!wordKey) return;
+
+    setStudiedTodayWords((prev) => {
+      if (prev.has(wordKey)) return prev;
+      const next = new Set(prev);
+      next.add(wordKey);
+      return next;
+    });
+  }
+
   function checkAnswer(choice: string) {
     if (!card || checked) return;
 
@@ -788,6 +861,8 @@ export default function KanjiReadingStudyPage() {
       isCorrect: ok,
       cardType: "kanji_reading_choice",
     });
+
+    markCardStudiedToday(card);
   }
 
   function revealRecallCard(
