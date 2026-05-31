@@ -728,6 +728,9 @@ export default function BooksPage() {
   const isViewingStudentLibrary =
     isTeacher && !!viewingUserId && !!meId && viewingUserId !== meId;
 
+  const isViewingOwnLibrary =
+    !!viewingUserId && !!meId && viewingUserId === meId;
+
   const libraryOwnerLabel = isViewingStudentLibrary ? `${viewingLabel}’s` : "My";
 
   const libraryContextLabel = isViewingStudentLibrary
@@ -1971,14 +1974,23 @@ export default function BooksPage() {
   }, [viewingUserId, meId, isTeacher]);
 
   useEffect(() => {
-    if (!viewingUserId || !selectedMonth) return;
-    loadMonthlyLibraryStats(viewingUserId, selectedMonth, myTimeZone);
-  }, [viewingUserId, selectedMonth, myTimeZone]);
+    if (!viewingUserId || !meId || !selectedMonth) return;
+
+    // Regular members should only load their own private monthly stats.
+    // Teachers can load the viewed learner's stats when RLS allows it.
+    const targetUserId = isTeacher ? viewingUserId : meId;
+
+    loadMonthlyLibraryStats(targetUserId, selectedMonth, myTimeZone);
+  }, [viewingUserId, meId, isTeacher, selectedMonth, myTimeZone]);
 
   useEffect(() => {
-    if (!viewingUserId) return;
-    loadMekuruColorCounts(viewingUserId);
-  }, [viewingUserId]);
+    if (!viewingUserId || !meId) return;
+
+    // Keep color totals aligned with the same effective user as the library query.
+    const targetUserId = isTeacher ? viewingUserId : meId;
+
+    loadMekuruColorCounts(targetUserId);
+  }, [viewingUserId, meId, isTeacher]);
 
   useEffect(() => {
     setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
@@ -3060,85 +3072,14 @@ export default function BooksPage() {
           </>
         ) : (
           <>
-            <button
-              type="button"
-              onClick={() => setShowRequestBook(true)}
-              className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
-            >
-              + Request a Book
-            </button>
-
-            {showRequestBook ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Request a Book</h2>
-                    <button
-                      type="button"
-                      onClick={() => setShowRequestBook(false)}
-                      className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <div className="mt-4 grid gap-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium">Title</label>
-                      <input
-                        type="text"
-                        value={requestBookTitle}
-                        onChange={(e) => setRequestBookTitle(e.target.value)}
-                        placeholder="Enter book title"
-                        className="w-full rounded-xl border px-3 py-2"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-medium">Author</label>
-                      <input
-                        type="text"
-                        value={requestBookAuthor}
-                        onChange={(e) => setRequestBookAuthor(e.target.value)}
-                        placeholder="Enter author name"
-                        className="w-full rounded-xl border px-3 py-2"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-medium">ISBN-13</label>
-                      <input
-                        type="text"
-                        value={requestBookIsbn}
-                        onChange={(e) => setRequestBookIsbn(e.target.value)}
-                        placeholder="978..."
-                        className="w-full rounded-xl border px-3 py-2"
-                      />
-                      <p className="mt-1 text-xs text-stone-500">
-                        Hyphens and spaces are okay. They will be removed automatically.
-                      </p>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowRequestBook(false)}
-                        className="rounded-xl border px-4 py-2 text-sm"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleRequestBook}
-                        disabled={isSavingRequest}
-                        className="rounded-xl bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-                      >
-                        {isSavingRequest ? "Sending..." : "Request Book"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {isViewingOwnLibrary ? (
+              <button
+                type="button"
+                onClick={() => router.push("/books/add")}
+                className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
+              >
+                + Add a Book
+              </button>
             ) : null}
           </>
         )}
