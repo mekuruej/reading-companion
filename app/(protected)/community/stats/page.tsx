@@ -60,13 +60,13 @@ const statCards = [
     tag: "Reading skill",
   },
   {
-    title: "Monthly Details",
+    title: "Detailed Monthly Stats",
     description: "Review this month’s reading, listening, saved words, and engagement.",
     href: "/community/stats/monthly",
     tag: "Snapshot details",
   },
   {
-    title: "Reading Colors",
+    title: "Detailed Reading Colors",
     description: "See color meanings, encounter stages, and Ability Check progress.",
     href: "/community/stats/colors",
     tag: "Color details",
@@ -427,12 +427,6 @@ export default function CommunityStatsHomePage() {
                 Monthly Snapshot
               </h2>
             </div>
-            <Link
-              href="/community/stats/monthly"
-              className="rounded-xl bg-stone-900 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-black"
-            >
-              Details
-            </Link>
           </div>
 
           <p className="mt-2 text-sm leading-6 text-stone-600">
@@ -460,18 +454,12 @@ export default function CommunityStatsHomePage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-purple-500">
-                Study colors
+                Reading colors
               </p>
               <h2 className="mt-1 text-2xl font-black text-stone-900">
                 Colors Snapshot
               </h2>
             </div>
-            <Link
-              href="/community/stats/colors"
-              className="rounded-xl bg-stone-900 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-black"
-            >
-              Details
-            </Link>
           </div>
 
           <p className="mt-2 text-sm leading-6 text-stone-600">
