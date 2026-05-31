@@ -225,21 +225,36 @@ export default function TeacherHubPage() {
     let readingFitCount = 0;
 
     if (studentIds.length > 0) {
-      const { data: userBooks } = await supabase
-        .from("user_books")
-        .select("id, finished_at, reader_level, rating_difficulty, rating_overall")
-        .in("user_id", studentIds);
+      const [{ data: profileLevels }, { data: userBooks }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, level")
+          .in("id", studentIds),
+        supabase
+          .from("user_books")
+          .select("id, user_id, finished_at, reader_level, rating_difficulty, rating_overall, teacher_review_cleared_at")
+          .in("user_id", studentIds),
+      ]);
+
+      const profileLevelById = new Map<string, string | null>();
+      for (const item of profileLevels ?? []) {
+        profileLevelById.set((item as any).id, (item as any).level ?? null);
+      }
 
       const userBookIds = (userBooks ?? []).map((book: any) => book.id).filter(Boolean);
 
       readingFitCount = (userBooks ?? []).filter((book: any) => {
         const isFinished = !!book.finished_at;
-        const missingReaderLevel = !String(book.reader_level ?? "").trim();
+        const isCleared = !!book.teacher_review_cleared_at;
+        const effectiveReaderLevel =
+          book.reader_level || profileLevelById.get(book.user_id) || null;
+        const missingReaderLevel = !String(effectiveReaderLevel ?? "").trim();
         const missingEaseRating = book.rating_difficulty == null;
         const missingEntertainmentRating = book.rating_overall == null;
 
         return (
           isFinished &&
+          !isCleared &&
           (missingReaderLevel || missingEaseRating || missingEntertainmentRating)
         );
       }).length;

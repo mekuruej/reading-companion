@@ -13,6 +13,7 @@ type ProfileRow = {
   id: string;
   display_name: string | null;
   username: string | null;
+  level?: string | null;
   role?: ProfileRole;
   is_super_teacher?: boolean | null;
 };
@@ -152,7 +153,7 @@ export default function TeacherReadingFitPage() {
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("id, display_name, username, role, is_super_teacher")
+        .select("id, display_name, username, level, role, is_super_teacher")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -185,17 +186,11 @@ export default function TeacherReadingFitPage() {
         ])
       );
 
-      if (studentIds.length === 0) {
-        setItems([]);
-        setLoading(false);
-        return;
-      }
-
       const [{ data: profilesData, error: profilesError }, { data: userBooksData, error: userBooksError }] =
         await Promise.all([
           supabase
             .from("profiles")
-            .select("id, display_name, username")
+            .select("id, display_name, username, level")
             .in("id", studentIds),
           supabase
             .from("user_books")
@@ -236,7 +231,8 @@ export default function TeacherReadingFitPage() {
             profile?.username ||
             "Unknown student";
 
-          const missingReaderLevel = !String(row.reader_level ?? "").trim();
+          const effectiveReaderLevel = row.reader_level || profile?.level || null;
+          const missingReaderLevel = !String(effectiveReaderLevel ?? "").trim();
           const missingDifficulty = row.rating_difficulty == null;
           const missingEntertainment = row.rating_overall == null;
 
@@ -248,7 +244,7 @@ export default function TeacherReadingFitPage() {
             coverUrl: book?.cover_url ?? "",
             bookType: bookTypeLabel(book?.book_type),
             finishedAt: row.finished_at,
-            readerLevel: row.reader_level,
+            readerLevel: effectiveReaderLevel,
             ratingDifficulty: row.rating_difficulty,
             ratingEntertainment: row.rating_overall,
             missingReaderLevel,
@@ -409,7 +405,7 @@ export default function TeacherReadingFitPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-800 shadow-sm">
-            All finished books have the learner reflection signals this index is checking. Beautiful. Tiny data goblin appeased.
+            All finished books have the learner reflection signals this index is checking.
           </div>
         ) : (
           <div className="grid gap-4">
