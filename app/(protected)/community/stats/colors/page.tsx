@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import ReadingColorsHeader from "./components/ReadingColorsHeader";
 import ReadingColorsErrorBanner from "./components/ReadingColorsErrorBanner";
+import ColorDeltaPill from "./components/ColorDeltaPill";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
@@ -49,26 +50,6 @@ function previousMonthComparisonDateLabel() {
   end.setDate(before.getDate() - 1);
 
   return ymdLocal(end);
-}
-
-function ColorDeltaPill({
-  value,
-  className,
-}: {
-  value: number | null;
-  className: string;
-}) {
-  if (value == null) return null;
-
-  const icon = value > 0 ? "↑" : value < 0 ? "↓" : "→";
-  const label = value > 0 ? `+${value}` : String(value);
-
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-black shadow-sm ${className}`}>
-      <span className="text-lg leading-none">{icon}</span>
-      {label}
-    </span>
-  );
 }
 
 function colorValue(totals: LibraryStudyColorTotals, key: ColorKey) {
