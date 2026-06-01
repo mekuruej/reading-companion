@@ -87,12 +87,31 @@ Decision:
 
 No code change needed for `/library-study/check` right now.
 
+### `/library-study/practice`
+
+Finished:
+
+* Confirmed the page requires a logged-in user through `supabase.auth.getUser()`.
+* Confirmed the page uses the logged-in user’s `user.id` as `currentUserId`.
+* Confirmed `useSearchParams()` is used for study/filter behavior such as `color`, not for loading another user ID.
+* Confirmed the page loads the logged-in user’s own profile with `.eq("id", user.id)`.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed `user_learning_settings`, `user_library_word_summaries`, Word Sky claims, and progress rows are scoped to the logged-in user.
+* Confirmed saved-word cards are loaded through the current user’s own `user_book_ids`.
+* Confirmed practice progress writes use `currentUserId`.
+* Confirmed Word Sky claim removal is scoped with `user_id = currentUserId`.
+* Confirmed saved-word hide behavior is based on cards loaded from the current user’s own library, with RLS as the backup safety layer.
+
+Decision:
+
+No code change needed for `/library-study/practice` right now.
+
 Next possible pages under this audit:
 
-* `/library-study/practice`
 * `/library-study/book-flashcards`
 * `/library-study/kanji`
 * `/community/stats/*`
+
 
 
 ## 3. Teacher / Student Access Boundaries

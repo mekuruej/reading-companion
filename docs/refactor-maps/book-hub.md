@@ -233,39 +233,6 @@ Do not move or change these in the first pass:
 
 ## First Pass: Visual / Page-Thinning Components
 
-### C. `BookHubHero`
-
-* What JSX it owns: cover display, title/title reading, author/author reading, translator/translator reading, teacher context badge, Teacher Review button, and Switch Book select.
-* Expected props: `book`, `rowId`, `userBookId`, `isEditingCover`, `coverUrl`, `bookHubContextLabel`, `isViewingStudentBookHub`, `isTeacherContext`, `currentlyReadingBooks`, `otherBooks`, `onTeacherReview`, `onSwitchBook`.
-* What stays in `page.tsx`: router calls, `confirmLeaveIfTimerActive`, sorting/calculating book option groups, access context.
-* Layer: presentational UI.
-* Risk level: low-medium.
-* Why it is safe or risky: mostly visual, but includes navigation controls. Pass navigation callbacks instead of moving routing.
-* Recommended order: C.
-* Helpful comment notes: explain that route decisions stay in `page.tsx`.
-
-### D. `BookHubStatusPanel`
-
-* What JSX it owns: Book Status card, status/date display, Start/Finish/DNF buttons, finished-reflection prompt, filler-page buttons/copy, and Remove from My Library button placement.
-* Expected props: `startedAt`, `finishedAt`, `dnfAt`, `started`, `finished`, `realReadingSessions`, `shouldNudgeStartBook`, `shouldNudgeFinishBook`, `canFillBeginningPages`, `canFillEndingPages`, `earliestTrackedStartPage`, `furthestTrackedPage`, `pageCount`, `canRemoveFromMyLibrary`, `onStartToday`, `onMarkFinished`, `onMarkDnf`, `onOpenReflection`, `onFillBeginningPages`, `onFillEndingPages`, `onRemoveFromLibrary`.
-* What stays in `page.tsx`: all status/date saves, filler-page inserts, remove modal state, confirmation/timer guard.
-* Layer: presentational UI.
-* Risk level: medium.
-* Why it is safe or risky: visually self-contained, but it has many action callbacks tied to important state changes.
-* Recommended order: D.
-* Helpful comment notes: note that the component owns only button placement/copy; all status mutations remain in `page.tsx`.
-
-### I. `WordExplorerModal`
-
-* What JSX it owns: Word Explorer modal shell, search input, search button, loading/error/empty states, and result cards.
-* Expected props: `query`, `setQuery`, `loading`, `error`, `results`, `onSearch`, `onClose`.
-* What stays in `page.tsx`: `showWordExplorer`, `/api/jisho` fetch, result shaping, and any future trigger behavior.
-* Layer: presentational UI.
-* Risk level: medium.
-* Why it is safe or risky: JSX is isolated, but this flow may be dormant and should be verified before moving.
-* Recommended order: I.
-* Helpful comment notes: add a comment that this is UI-only while search behavior remains in the page.
-
 ### K. `BookHubTabPanels`
 
 * What JSX it owns: high-level conditional render blocks for `BookInfoTab`, `VocabTab`, `ReadingTab`, `StoryTab`, and `RatingTab`.
@@ -373,6 +340,7 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `BookHubNotices`.
 - [✔️] Extracted `BookHubTabBar`.
 - [✔️] Extracted `BookHubTabSectionHeader`.
-- [✔️] Extracted 
-- [✔️] Extracted 
+- [✔️] Extracted `BookHubHero`.
+- [✔️] Extracted `BookHubStatusPanel`.
+- [✔️] Extracted `WordExplorerModal`.
 - [✔️] Extracted 
