@@ -16,6 +16,7 @@ import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookHubLoadingState from "./components/BookHubLoadingState";
+import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 
 type Book = {
   id: string;
@@ -4769,8 +4770,8 @@ export default function BookHubPage() {
   }, [fluidMinutes, fluidPages]);
 
   if (loading) {
-  return <BookHubLoadingState />;
-}
+    return <BookHubLoadingState />;
+  }
 
   if (!row || !book) {
     if (error === "You do not have access to this book.") {
@@ -4816,50 +4817,16 @@ export default function BookHubPage() {
       ) : null}
 
       {showRemoveLibraryConfirm ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 px-4">
-          <div className="w-full max-w-lg rounded-3xl border border-stone-200 bg-white p-6 shadow-xl">
-            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-rose-700">
-              Library Action
-            </div>
-            <h2 className="mt-2 text-2xl font-bold text-stone-950">
-              Remove from My Library?
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-stone-700">
-              Remove this book from your library? This will remove your saved
-              words, reading sessions, and stats for this book. The shared book
-              record will stay in Mekuru.
-            </p>
-
-            {removeLibraryError ? (
-              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-                {removeLibraryError}
-              </div>
-            ) : null}
-
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  if (isRemovingFromLibrary) return;
-                  setShowRemoveLibraryConfirm(false);
-                  setRemoveLibraryError(null);
-                }}
-                disabled={isRemovingFromLibrary}
-                className="rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400 disabled:opacity-70"
-              >
-                {isRemovingFromLibrary ? "Please wait" : "Cancel"}
-              </button>
-              <button
-                type="button"
-                onClick={removeFromMyLibrary}
-                disabled={isRemovingFromLibrary}
-                className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-500 disabled:opacity-90"
-              >
-                {isRemovingFromLibrary ? "Removing..." : "Remove from My Library"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <RemoveFromLibraryDialog
+          error={removeLibraryError}
+          isRemoving={isRemovingFromLibrary}
+          onCancel={() => {
+            if (isRemovingFromLibrary) return;
+            setShowRemoveLibraryConfirm(false);
+            setRemoveLibraryError(null);
+          }}
+          onConfirm={removeFromMyLibrary}
+        />
       ) : null}
 
       <div className="mx-auto max-w-6xl">
