@@ -25,6 +25,7 @@ import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
 import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
+import Detail from "./components/Detail";
 
 type Book = {
   id: string;
@@ -5278,7 +5279,7 @@ export default function BookHubPage() {
                 </div>
               )}
             </div>
-            
+
             {showWordExplorer ? (
               <WordExplorerModal
                 query={wordExplorerQuery}
@@ -5294,41 +5295,6 @@ export default function BookHubPage() {
         </section>
       </div >
     </main >
-  );
-}
-
-function Detail({
-  label,
-  value,
-  editing,
-  inputValue,
-  setInputValue,
-  placeholder,
-}: {
-  label: string;
-  value: any;
-  editing: boolean;
-  inputValue: string;
-  setInputValue: (v: string) => void;
-  placeholder?: string;
-}) {
-  const display =
-    value === null || value === undefined || value === "" ? "—" : String(value);
-
-  return (
-    <div className="rounded border bg-white p-3">
-      <div className="text-stone-600">{label}</div>
-      {!editing ? (
-        <div className="font-medium">{display}</div>
-      ) : (
-        <input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder={placeholder}
-          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-        />
-      )}
-    </div>
   );
 }
 
