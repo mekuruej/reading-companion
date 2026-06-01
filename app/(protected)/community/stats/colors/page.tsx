@@ -23,6 +23,7 @@ import ReadingColorTotalsGrid, {
 } from "./components/ReadingColorTotalsGrid";
 import SupportLoopCard from "./components/SupportLoopCard";
 import LimboSupportCard from "./components/LimboSupportCard";
+import ReadingColorSupportSection from "./components/ReadingColorSupportSection";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
@@ -292,50 +293,37 @@ export default function ReadingColorsPage() {
         loading={loading}
         comparisonDateLabel={comparisonDateLabel}
       />
-      <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="mb-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-            Between gates
-          </p>
-          <h2 className="mt-2 text-2xl font-black text-stone-900">
-            Words waiting for support
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            Limbo words are not failed words. They sit between Green and Blue after
-            a missed Reading Gate, or between Blue and Purple after a missed Meaning Gate.
-          </p>
-        </div>
+      <ReadingColorSupportSection>
+        <SupportLoopCard />
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <SupportLoopCard />
-          {limboItems.map((item) => {
-            const previousValue =
-              previousLimboTotals == null
-                ? null
-                : limboValue(previousLimboTotals, item.key);
-            const allTimeValue = limboValue(allTimeLimboTotals, item.key);
-            const delta =
-              previousValue == null ? null : allTimeValue - previousValue;
-            return (
-              <LimboSupportCard
-                key={item.key}
-                label={item.label}
-                shortMeaning={item.shortMeaning}
-                detail={item.detail}
-                cardClasses={item.cardClasses}
-                dotClass={item.dotClass}
-                deltaClass={item.deltaClass}
-                valueClass={item.valueClass}
-                loading={loading}
-                previousValue={previousValue}
-                allTimeValue={allTimeValue}
-                delta={delta}
-                comparisonDateLabel={comparisonDateLabel}
-              />
-            );
-          })}
-        </div>
-      </section>
+        {limboItems.map((item) => {
+          const previousValue =
+            previousLimboTotals == null
+              ? null
+              : limboValue(previousLimboTotals, item.key);
+          const allTimeValue = limboValue(allTimeLimboTotals, item.key);
+          const delta =
+            previousValue == null ? null : allTimeValue - previousValue;
+
+          return (
+            <LimboSupportCard
+              key={item.key}
+              label={item.label}
+              shortMeaning={item.shortMeaning}
+              detail={item.detail}
+              cardClasses={item.cardClasses}
+              dotClass={item.dotClass}
+              deltaClass={item.deltaClass}
+              valueClass={item.valueClass}
+              loading={loading}
+              previousValue={previousValue}
+              allTimeValue={allTimeValue}
+              delta={delta}
+              comparisonDateLabel={comparisonDateLabel}
+            />
+          );
+        })}
+      </ReadingColorSupportSection>
 
       <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-black text-stone-900">
