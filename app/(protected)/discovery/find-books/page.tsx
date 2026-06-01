@@ -118,9 +118,13 @@ function RatingStars({
       : Math.max(0, Math.min(5, value));
   const fillWidth = safeValue == null ? 0 : (safeValue / 5) * 100;
   const colorClass = tone === "amber" ? "text-amber-500" : "text-sky-500";
+  const cardClass =
+    tone === "amber"
+      ? "border-amber-200 bg-amber-50/70"
+      : "border-sky-200 bg-sky-50/70";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+    <div className={`rounded-2xl border px-3 py-2 ${cardClass}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
           {label}
@@ -140,6 +144,44 @@ function RatingStars({
           style={{ width: `${fillWidth}%` }}
         >
           *****
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CompactRatingPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | null;
+  tone: "amber" | "sky";
+}) {
+  const colorClass = tone === "amber" ? "text-amber-500" : "text-sky-500";
+  const hasValue = value != null && Number.isFinite(value);
+  const roundedValue = hasValue
+    ? Math.round(Math.max(0, Math.min(5, value)))
+    : 0;
+  const pillClass = hasValue
+    ? "bg-white text-slate-700 ring-slate-200"
+    : "bg-slate-100/80 text-slate-400 ring-slate-200";
+
+  return (
+    <div className={`rounded-lg px-3 py-2 ring-1 ring-inset ${pillClass}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+          {label}
+        </span>
+        <span className="text-xs font-black text-slate-700">
+          {hasValue ? `${formatAverage(value)}/5` : "-"}
+        </span>
+      </div>
+      <div className={`mt-1 text-sm leading-none tracking-[0.08em] ${hasValue ? colorClass : "text-slate-200"}`}>
+        {"*".repeat(roundedValue)}
+        <span className="text-slate-200">
+          {"*".repeat(5 - roundedValue)}
         </span>
       </div>
     </div>
@@ -396,12 +438,13 @@ export default function FindBooksPage() {
             </div>
           ) : (
             ratedBookGroups.map((book) => {
-              const shouldShowAverageRatings = book.signals.length >= 5;
+              const shouldShowAverageRatings = book.signals.length >= 2;
+              const readerCountLabel = `${book.signals.length} reader${book.signals.length === 1 ? "" : "s"}`;
 
               return (
                 <article
                   key={book.bookId}
-                  className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="rounded-3xl border border-slate-300 bg-white p-4 shadow-sm"
                 >
                   <div className="grid gap-4 md:grid-cols-[104px_minmax(0,1fr)]">
                     {book.coverUrl ? (
@@ -431,38 +474,44 @@ export default function FindBooksPage() {
                         </div>
 
                         {shouldShowAverageRatings ? (
-                          <div className="grid min-w-[180px] gap-2 sm:grid-cols-2 lg:w-[390px]">
-                            <RatingStars
-                              label={`Avg ${bookTypeLabel(book.bookType)} Difficulty`}
-                              value={book.averageDifficultyRating}
-                              tone="sky"
-                            />
-                            <RatingStars
-                              label="Avg Entertainment"
-                              value={book.averageEntertainmentRating}
-                              tone="amber"
-                            />
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:w-[430px]">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                Average from {readerCountLabel}
+                              </span>
+                            </div>
+                            <div className="grid min-w-[180px] gap-2 sm:grid-cols-2">
+                              <RatingStars
+                                label={`${bookTypeLabel(book.bookType)} Difficulty`}
+                                value={book.averageDifficultyRating}
+                                tone="sky"
+                              />
+                              <RatingStars
+                                label="Entertainment"
+                                value={book.averageEntertainmentRating}
+                                tone="amber"
+                              />
+                            </div>
                           </div>
                         ) : null}
                       </div>
 
-                      <div className="mt-4 grid gap-3">
+                      <div className="mt-4 grid gap-2">
                         {book.signals.map((signal) => (
                           <div
                             key={signal.id}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                            className="rounded-2xl border border-slate-200 border-l-4 border-l-slate-300 bg-white px-3 py-2"
                           >
-                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">
-                              <div>
-                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                                  Anonymous reader signal
-                                </div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                  {formatReaderLevel(signal.readerLevel)}
+                            <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                  <div className="text-sm font-semibold text-slate-900">
+                                    {formatReaderLevel(signal.readerLevel)} Reader
+                                  </div>
                                 </div>
 
                                 {signal.readerAdvice ? (
-                                  <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-600">
+                                  <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-600">
                                     <span className="font-semibold text-slate-900">
                                       Advice to the reader:
                                     </span>{" "}
@@ -472,12 +521,12 @@ export default function FindBooksPage() {
                               </div>
 
                               <div className="grid gap-2 sm:grid-cols-2">
-                                <RatingStars
+                                <CompactRatingPill
                                   label={`${bookTypeLabel(book.bookType)} Difficulty`}
                                   value={signal.difficultyRating}
                                   tone="sky"
                                 />
-                                <RatingStars
+                                <CompactRatingPill
                                   label="Entertainment"
                                   value={signal.entertainmentRating}
                                   tone="amber"

@@ -1,0 +1,50 @@
+# Curiosity Reading iPad Lookup Flow Notes
+
+## Context
+
+These notes come from first real iPad use of Curiosity Reading. The current lookup tools work, but on a smaller touch screen the helper panels can stay open too long and make it harder to see the actual rapid search results.
+
+## Future UX Improvements
+
+A. Clear Helper Inputs After Use
+- When the user taps `Use this word`, clear the Build a Word input after copying it into Rapid Search.
+- When the user taps `Use this kanji`, clear the Kanji Lookup input after using it.
+- This should make the tool feel like each helper action has completed.
+
+B. Kanji Lookup to Build a Word Flow
+- The current behavior where `Use this kanji` moves the kanji into Build a Word feels useful.
+- Keep this direction as the default candidate flow.
+- Open question: should `Use this kanji` offer two actions?
+  - Move to Build a Word
+  - Send directly to Rapid Search
+- For early cleanup, the simpler version is probably best: `Use this kanji` moves to Build a Word.
+
+C. Build a Word to Rapid Search Flow
+- `Use this word` should copy the built word into Rapid Search.
+- After the word is sent to Rapid Search, collapse the helper/search-building area again.
+- Anything sent into Build a Word from Kanji Lookup should also collapse the Kanji Lookup panel so the user can see the next useful area.
+
+D. Collapse Helper Panels After Use
+- On iPad, keeping Build a Word / Kanji Lookup open can push the real results too far down.
+- After a helper action completes, collapse the helper panels so the search results are easier to see.
+- The user can reopen the helper tools if needed.
+
+E. Kanji Lookup Should Prioritize Stroke Count
+- The Kanji Lookup tool should become a stricter stroke-count lookup.
+- “Common kanji” choices are not reliable enough for this use case.
+- Stroke count should be the main path because the reader is likely looking at an unknown character visually.
+- Use a clear numbered grid for stroke counts so the choices are easy to see and tap on iPad.
+- The numbers should be large enough to scan quickly without crowding the search results.
+
+F. Possible Stroke Lookup Refinements
+- Open design question from iPad use: should the Kanji Lookup have multiple stroke-count support options?
+- Possible future directions:
+  - exact stroke count
+  - nearby stroke counts, such as one fewer / one more
+  - grouped number ranges if the full grid feels too large
+  - simple radical or shape hints later, if needed
+- Keep this lightweight at first. The immediate need is better stroke-count lookup, not a full kanji dictionary redesign.
+
+## Status
+
+Not started. Save this for a future Curiosity Reading / Add Word mobile UX cleanup pass.
