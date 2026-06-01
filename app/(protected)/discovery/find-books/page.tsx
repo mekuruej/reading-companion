@@ -14,14 +14,14 @@ type BookMeta = {
   book_type: string | null;
 };
 
-type UserBookRatingRow = {
+type RecommendationSignalRow = {
   id: string;
-  user_id: string | null;
-  rating_overall: number | null;
-  rating_difficulty: number | null;
   reader_level: string | null;
+  book_type: string | null;
+  difficulty_rating: number | null;
+  entertainment_rating: number | null;
   reader_advice: string | null;
-  finished_at: string | null;
+  updated_at: string | null;
   books: BookMeta | BookMeta[] | null;
 };
 
@@ -31,7 +31,7 @@ type BookRatingSignal = {
   entertainmentRating: number | null;
   difficultyRating: number | null;
   readerAdvice: string | null;
-  finishedAt: string | null;
+  updatedAt: string | null;
 };
 
 type RatedBookGroup = {
@@ -41,7 +41,7 @@ type RatedBookGroup = {
   coverUrl: string | null;
   bookType: string | null;
   signals: BookRatingSignal[];
-  latestFinishedAt: string | null;
+  latestSignalAt: string | null;
   averageEntertainmentRating: number | null;
   averageDifficultyRating: number | null;
 };
@@ -58,16 +58,9 @@ function formatAverage(value: number | null) {
   return value.toFixed(1);
 }
 
-function firstBook(row: UserBookRatingRow) {
+function firstBook(row: RecommendationSignalRow) {
   if (Array.isArray(row.books)) return row.books[0] ?? null;
   return row.books ?? null;
-}
-
-function effectiveReaderLevel(
-  row: UserBookRatingRow,
-  profileLevelsByUserId: Record<string, string | null>
-) {
-  return row.reader_level ?? (row.user_id ? profileLevelsByUserId[row.user_id] ?? null : null);
 }
 
 function cleanReaderAdvice(value: string | null | undefined) {
@@ -156,11 +149,10 @@ function RatingStars({
 export default function FindBooksPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [ratingRows, setRatingRows] = useState<UserBookRatingRow[]>([]);
+  const [ratingRows, setRatingRows] = useState<RecommendationSignalRow[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [bookTypeFilter, setBookTypeFilter] = useState("all");
   const [readerLevelFilter, setReaderLevelFilter] = useState("all");
-  const [profileLevelsByUserId, setProfileLevelsByUserId] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     let alive = true;
@@ -171,16 +163,16 @@ export default function FindBooksPage() {
 
       try {
         const { data, error } = await supabase
-          .from("user_books")
+          .from("book_recommendation_signals")
           .select(
             `
             id,
-            user_id,
-            rating_overall,
-            rating_difficulty,
             reader_level,
+            book_type,
+            difficulty_rating,
+            entertainment_rating,
             reader_advice,
-            finished_at,
+            updated_at,
             books:book_id (
               id,
               title,
@@ -190,54 +182,20 @@ export default function FindBooksPage() {
             )
           `
           )
-          .or("rating_overall.not.is.null,rating_difficulty.not.is.null")
-          .order("finished_at", { ascending: false, nullsFirst: false })
+          .eq("is_active", true)
+          .or("difficulty_rating.not.is.null,entertainment_rating.not.is.null,reader_advice.not.is.null")
+          .order("updated_at", { ascending: false, nullsFirst: false })
           .limit(1000);
 
         if (error) throw error;
         if (!alive) return;
 
-        const rows = (data ?? []) as UserBookRatingRow[];
+        const rows = (data ?? []) as RecommendationSignalRow[];
         setRatingRows(rows);
-
-        const userIds = Array.from(
-          new Set(
-            rows
-              .map((row) => row.user_id)
-              .filter((userId): userId is string => !!userId)
-          )
-        );
-
-        if (userIds.length === 0) {
-          setProfileLevelsByUserId({});
-          return;
-        }
-
-        const { data: profiles, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id, level")
-          .in("id", userIds);
-
-        if (profilesError) {
-          console.error("Error loading find-books profile levels:", profilesError);
-          if (alive) setProfileLevelsByUserId({});
-          return;
-        }
-
-        if (!alive) return;
-
-        setProfileLevelsByUserId(
-          Object.fromEntries(
-            (profiles ?? []).map((profile) => [
-              profile.id as string,
-              (profile.level as string | null) ?? null,
-            ])
-          )
-        );
       } catch (error: any) {
-        console.error("Error loading find-books ratings:", error);
+        console.error("Error loading find-books recommendation signals:", error);
         if (!alive) return;
-        setErrorMsg(error?.message ?? "Could not load rated books yet.");
+        setErrorMsg(error?.message ?? "Could not load book recommendations yet.");
       } finally {
         if (alive) setLoading(false);
       }
@@ -254,7 +212,8 @@ export default function FindBooksPage() {
     const types = new Set<string>();
     for (const row of ratingRows) {
       const book = firstBook(row);
-      if (book?.book_type) types.add(book.book_type);
+      const type = row.book_type ?? book?.book_type ?? null;
+      if (type) types.add(type);
     }
     return Array.from(types).sort((a, b) =>
       bookTypeLabel(a).localeCompare(bookTypeLabel(b))
@@ -264,13 +223,13 @@ export default function FindBooksPage() {
   const readerLevelOptions = useMemo(() => {
     const levels = new Set<string>();
     for (const row of ratingRows) {
-      const level = effectiveReaderLevel(row, profileLevelsByUserId);
+      const level = row.reader_level;
       if (level) levels.add(level);
     }
     return Array.from(levels).sort((a, b) =>
       formatReaderLevel(a).localeCompare(formatReaderLevel(b))
     );
-  }, [ratingRows, profileLevelsByUserId]);
+  }, [ratingRows]);
 
   const ratedBookGroups = useMemo(() => {
     const map = new Map<string, RatedBookGroup>();
@@ -278,8 +237,9 @@ export default function FindBooksPage() {
     for (const row of ratingRows) {
       const book = firstBook(row);
       if (!book?.id) continue;
-      if (bookTypeFilter !== "all" && book.book_type !== bookTypeFilter) continue;
-      const readerLevel = effectiveReaderLevel(row, profileLevelsByUserId);
+      const bookType = row.book_type ?? book.book_type ?? null;
+      if (bookTypeFilter !== "all" && bookType !== bookTypeFilter) continue;
+      const readerLevel = row.reader_level;
       if (readerLevelFilter !== "all" && readerLevel !== readerLevelFilter) {
         continue;
       }
@@ -291,9 +251,9 @@ export default function FindBooksPage() {
           title: book.title ?? "Untitled book",
           author: book.author ?? null,
           coverUrl: book.cover_url ?? null,
-          bookType: book.book_type ?? null,
+          bookType,
           signals: [],
-          latestFinishedAt: null,
+          latestSignalAt: null,
           averageEntertainmentRating: null,
           averageDifficultyRating: null,
         };
@@ -301,10 +261,10 @@ export default function FindBooksPage() {
       existing.signals.push({
         id: row.id,
         readerLevel,
-        entertainmentRating: row.rating_overall,
-        difficultyRating: row.rating_difficulty,
+        entertainmentRating: row.entertainment_rating,
+        difficultyRating: row.difficulty_rating,
         readerAdvice: cleanReaderAdvice(row.reader_advice),
-        finishedAt: row.finished_at,
+        updatedAt: row.updated_at,
       });
 
       map.set(book.id, existing);
@@ -312,13 +272,13 @@ export default function FindBooksPage() {
 
     const groups = Array.from(map.values()).map((group) => {
       const sortedSignals = [...group.signals].sort((a, b) =>
-        (b.finishedAt ?? "").localeCompare(a.finishedAt ?? "")
+        (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "")
       );
 
       return {
         ...group,
         signals: sortedSignals,
-        latestFinishedAt: sortedSignals[0]?.finishedAt ?? null,
+        latestSignalAt: sortedSignals[0]?.updatedAt ?? null,
         averageEntertainmentRating: average(
           sortedSignals
             .map((signal) => signal.entertainmentRating)
@@ -345,9 +305,9 @@ export default function FindBooksPage() {
       if (sortMode === "rating_low") {
         return (a.averageEntertainmentRating ?? 999) - (b.averageEntertainmentRating ?? 999);
       }
-      return (b.latestFinishedAt ?? "").localeCompare(a.latestFinishedAt ?? "");
+      return (b.latestSignalAt ?? "").localeCompare(a.latestSignalAt ?? "");
     });
-  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter, profileLevelsByUserId]);
+  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter]);
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">

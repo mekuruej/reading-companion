@@ -4045,6 +4045,17 @@ export default function BookHubPage() {
 
       if (userBookError) throw userBookError;
 
+      await syncBookRecommendationSignal({
+        userBookId: row.id,
+        bookId: row.books?.id ?? null,
+        ownerUserId: row.user_id,
+        readerLevel: reflectionReaderLevel,
+        bookType: bookType || row.books?.book_type || null,
+        entertainmentRating: ro,
+        difficultyRating: rd,
+        readerAdvice: readerAdvice.trim().slice(0, 160) || null,
+      });
+
       if (row.books?.id) {
         await saveCommunityContributions(row.books.id, userId);
       }
@@ -4259,6 +4270,17 @@ export default function BookHubPage() {
       return;
     }
 
+    await syncBookRecommendationSignal({
+      userBookId: row.id,
+      bookId: row.books.id,
+      ownerUserId: row.user_id,
+      readerLevel: readerLevel || profileLevel || null,
+      bookType: bookType || row.books.book_type || null,
+      entertainmentRating: ro,
+      difficultyRating: rd,
+      readerAdvice: readerAdvice.trim().slice(0, 160) || null,
+    });
+
     const contributorSyncs = [
       {
         role: "author" as const,
@@ -4358,6 +4380,69 @@ export default function BookHubPage() {
     setSaving(false);
     await load();
   };
+
+  async function syncBookRecommendationSignal({
+    userBookId,
+    bookId,
+    ownerUserId,
+    readerLevel,
+    bookType,
+    entertainmentRating,
+    difficultyRating,
+    readerAdvice,
+  }: {
+    userBookId: string;
+    bookId: string | null;
+    ownerUserId: string;
+    readerLevel: string | null;
+    bookType: string | null;
+    entertainmentRating: number | null;
+    difficultyRating: number | null;
+    readerAdvice: string | null;
+  }) {
+    if (!bookId || !ownerUserId) return;
+
+    const hasPublicSignal =
+      entertainmentRating != null ||
+      difficultyRating != null ||
+      !!readerAdvice;
+
+    if (!hasPublicSignal) {
+      const { error: deactivateError } = await supabase
+        .from("book_recommendation_signals")
+        .update({
+          reader_level: readerLevel,
+          book_type: bookType,
+          difficulty_rating: null,
+          entertainment_rating: null,
+          reader_advice: null,
+          is_active: false,
+        })
+        .eq("user_book_id", userBookId);
+
+      if (deactivateError) throw deactivateError;
+      return;
+    }
+
+    const { error: signalError } = await supabase
+      .from("book_recommendation_signals")
+      .upsert(
+        {
+          book_id: bookId,
+          user_book_id: userBookId,
+          user_id: ownerUserId,
+          reader_level: readerLevel,
+          book_type: bookType,
+          difficulty_rating: difficultyRating,
+          entertainment_rating: entertainmentRating,
+          reader_advice: readerAdvice,
+          is_active: true,
+        },
+        { onConflict: "user_book_id" }
+      );
+
+    if (signalError) throw signalError;
+  }
 
   async function flagBookForTeacherReview() {
     if (!row?.id || !userId) return;
