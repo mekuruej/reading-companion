@@ -36,11 +36,11 @@ const lessonPrepCards: TeacherCard[] = [
     status: "Active",
   },
   {
-    title: "Add Global Book",
-    href: "/teacher/books/add",
+    title: "Add a Book",
+    href: "/books/add",
     eyebrow: "Catalog prep",
     description:
-      "Add a shared catalog book without assigning it to a student library.",
+      "Look up a book by ISBN, then add it to your library, a student, or the global catalog if you have access.",
     status: "Active",
   },
   {

@@ -3048,13 +3048,13 @@ export default function BooksPage() {
           <>
             <button
               type="button"
-              onClick={() => setShowAddBook(true)}
+              onClick={() => router.push("/books/add")}
               className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
             >
-              + Add to Library
+              + Add a Book
             </button>
 
-            {showAddBook ? (
+            {false && showAddBook ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                 <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
                   <div className="flex items-start justify-between gap-3">

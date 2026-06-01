@@ -846,12 +846,6 @@ export default function BookInfoTab({
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
               <span>These book details are managed by the site.</span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-1 font-medium text-stone-700">
-                <span>Request a different edition</span>
-                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">
-                  Coming Soon
-                </span>
-              </span>
             </div>
             <div className="mt-2 text-sm font-semibold text-stone-900">
               Book Info

@@ -27,6 +27,51 @@ async function getAuthenticatedUser(req: Request) {
   return { user };
 }
 
+function isSuperTeacherFlag(value: unknown) {
+  return value === true || value === "true";
+}
+
+async function getProfile(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id, role, is_super_teacher")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as { id: string; role?: string | null; is_super_teacher?: boolean | string | null } | null;
+}
+
+async function canAddToTargetUser({
+  actorId,
+  targetUserId,
+  actorProfile,
+}: {
+  actorId: string;
+  targetUserId: string;
+  actorProfile: { role?: string | null; is_super_teacher?: boolean | string | null } | null;
+}) {
+  if (actorId === targetUserId) return true;
+
+  const isSuperTeacher =
+    actorProfile?.role === "super_teacher" ||
+    isSuperTeacherFlag(actorProfile?.is_super_teacher);
+
+  if (isSuperTeacher) return true;
+  if (actorProfile?.role !== "teacher") return false;
+
+  const { data, error } = await supabaseAdmin
+    .from("teacher_students")
+    .select("teacher_id")
+    .eq("teacher_id", actorId)
+    .eq("student_id", targetUserId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
 export async function POST(request: Request) {
   const auth = await getAuthenticatedUser(request);
   if ("error" in auth) {
@@ -38,12 +83,44 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const isbn13 = normalizeIsbn13(body?.isbn13 ?? body?.isbn ?? "");
+  const mode = body?.mode === "global_only" ? "global_only" : "add_to_library";
+  const targetUserId =
+    typeof body?.targetUserId === "string" && body.targetUserId.trim()
+      ? body.targetUserId.trim()
+      : auth.user.id;
 
   if (!isbn13) {
     return NextResponse.json(
       { error: "Please enter a valid ISBN-13." },
       { status: 400 }
     );
+  }
+
+  const actorProfile = await getProfile(auth.user.id);
+  const actorIsSuperTeacher =
+    actorProfile?.role === "super_teacher" ||
+    isSuperTeacherFlag(actorProfile?.is_super_teacher);
+
+  if (mode === "global_only" && !actorIsSuperTeacher) {
+    return NextResponse.json(
+      { error: "Only super teachers can create global catalog books without adding them to a library." },
+      { status: 403 }
+    );
+  }
+
+  if (mode !== "global_only") {
+    const canAdd = await canAddToTargetUser({
+      actorId: auth.user.id,
+      targetUserId,
+      actorProfile,
+    });
+
+    if (!canAdd) {
+      return NextResponse.json(
+        { error: "You do not have permission to add books to that user." },
+        { status: 403 }
+      );
+    }
   }
 
   const { data: existingBook, error: existingBookError } = await supabaseAdmin
@@ -128,11 +205,20 @@ export async function POST(request: Request) {
     bookId = insertedBook.id;
   }
 
+  if (mode === "global_only") {
+    return NextResponse.json({
+      userBookId: null,
+      bookId,
+      alreadyInLibrary: false,
+      globalOnly: true,
+    });
+  }
+
   const { data: existingUserBook, error: existingUserBookError } =
     await supabaseAdmin
       .from("user_books")
       .select("id")
-      .eq("user_id", auth.user.id)
+      .eq("user_id", targetUserId)
       .eq("book_id", bookId)
       .maybeSingle();
 
@@ -158,7 +244,7 @@ export async function POST(request: Request) {
   const { data: insertedUserBook, error: insertUserBookError } = await supabaseAdmin
     .from("user_books")
     .insert({
-      user_id: auth.user.id,
+      user_id: targetUserId,
       book_id: bookId,
       started_at: today,
     })

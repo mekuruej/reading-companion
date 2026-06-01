@@ -762,6 +762,8 @@ export default function TeacherAddBookPage() {
         );
     }
 
+    const showFindOrCreatePanel = !currentBookId || !!bookRequest;
+
     return (
         <main className="mx-auto max-w-4xl p-6">
             <Link
@@ -829,6 +831,7 @@ export default function TeacherAddBookPage() {
                 </section>
             ) : null}
 
+            {showFindOrCreatePanel ? (
             <section className="mt-8 rounded-3xl border border-stone-500 bg-stone-100 p-5">
                 <h2 className="text-lg font-black text-stone-900">
                     {bookRequest ? "Manual Book Entry" : "Find or Create Book"}
@@ -1018,6 +1021,7 @@ export default function TeacherAddBookPage() {
                     </div>
                 ) : null}
             </section>
+            ) : null}
 
             {currentBookId && currentBook ? (
                 <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
