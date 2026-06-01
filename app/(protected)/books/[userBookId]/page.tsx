@@ -4678,15 +4678,6 @@ export default function BookHubPage() {
     quickWordInputRef.current?.focus();
   }
 
-  function StatBox({ label, value }: { label: string; value: string | number }) {
-    return (
-      <div className="rounded-xl border bg-white p-3 text-center">
-        <div className="text-xs text-stone-500">{label}</div>
-        <div className="mt-1 font-medium text-stone-900">{value}</div>
-      </div>
-    );
-  }
-
   function startEditingQuickSessionWord(item: {
     id: string;
     surface: string;
