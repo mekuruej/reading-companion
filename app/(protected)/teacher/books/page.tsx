@@ -32,6 +32,16 @@ type GlobalBookRow = {
   page_count: number | null;
 };
 
+type PendingBookRequest = {
+  id: string;
+  title: string | null;
+  author: string | null;
+  isbn13: string | null;
+  status: string | null;
+  created_at: string | null;
+  requestedBy: string;
+};
+
 function missingGlobalBookFields(book: GlobalBookRow) {
   const missing: string[] = [];
   if (!String(book.title ?? "").trim()) missing.push("title");
@@ -45,10 +55,15 @@ function missingGlobalBookFields(book: GlobalBookRow) {
   return missing;
 }
 
+function isSuperTeacherFlag(value: unknown) {
+  return value === true || value === "true";
+}
+
 export default function TeacherBooksQueuePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [flags, setFlags] = useState<BookFlag[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<PendingBookRequest[]>([]);
 
   useEffect(() => {
     void loadFlags();
@@ -65,6 +80,7 @@ export default function TeacherBooksQueuePage() {
       if (authError || !user) {
         setMessage("Please sign in.");
         setFlags([]);
+        setPendingRequests([]);
         return;
       }
 
@@ -77,11 +93,13 @@ export default function TeacherBooksQueuePage() {
       if (profileError) throw profileError;
 
       const canAccess =
-        profile?.role === "super_teacher" || !!profile?.is_super_teacher;
+        profile?.role === "super_teacher" ||
+        isSuperTeacherFlag(profile?.is_super_teacher);
 
       if (!canAccess) {
         setMessage("Super teacher access is required for book attention flags.");
         setFlags([]);
+        setPendingRequests([]);
         return;
       }
 
@@ -164,10 +182,51 @@ export default function TeacherBooksQueuePage() {
         });
       }
 
+      const { data: requestRows, error: requestRowsError } = await supabase
+        .from("book_requests")
+        .select(`
+          id,
+          title,
+          author,
+          isbn13,
+          status,
+          created_at,
+          profiles:user_id (
+            display_name,
+            username
+          )
+        `)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (requestRowsError) throw requestRowsError;
+
+      const nextRequests = ((requestRows ?? []) as any[]).map((request) => {
+        const profile = Array.isArray(request.profiles)
+          ? request.profiles[0]
+          : request.profiles;
+        const requestedBy =
+          profile?.display_name ||
+          profile?.username ||
+          "Unknown reader";
+
+        return {
+          id: request.id,
+          title: request.title ?? null,
+          author: request.author ?? null,
+          isbn13: request.isbn13 ?? null,
+          status: request.status ?? null,
+          created_at: request.created_at ?? null,
+          requestedBy,
+        };
+      });
+
       setFlags(nextFlags);
+      setPendingRequests(nextRequests);
     } catch (error: any) {
       setMessage(error?.message ?? "Could not load book flags.");
       setFlags([]);
+      setPendingRequests([]);
     } finally {
       setLoading(false);
     }
@@ -187,13 +246,93 @@ export default function TeacherBooksQueuePage() {
           Books Needing My Attention
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Books marked for review and global books missing core info.
+          Pending book requests are separate from global books missing core info.
         </p>
       </section>
 
       {message ? <p className="mt-4 text-sm text-amber-700">{message}</p> : null}
 
       <section className="mt-6 space-y-3">
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                Pending Book Requests
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-stone-900">
+                {pendingRequests.length} pending book request{pendingRequests.length === 1 ? "" : "s"}
+              </h2>
+            </div>
+            <p className="text-sm text-stone-600">
+              Failed ISBN lookups that need an admin to add book details.
+            </p>
+          </div>
+        </div>
+
+        {loading ? <p className="text-sm text-stone-500">Loading pending book requests...</p> : null}
+
+        {!loading && pendingRequests.length === 0 ? (
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
+            No pending book requests right now.
+          </div>
+        ) : null}
+
+        {pendingRequests.map((request) => {
+          const displayTitle =
+            String(request.title ?? "").trim() ||
+            String(request.isbn13 ?? "").trim() ||
+            "Untitled book request";
+
+          return (
+            <div key={request.id} className="rounded-3xl border border-amber-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-stone-900">{displayTitle}</h3>
+                  <div className="mt-2 grid gap-1 text-sm text-stone-600 sm:grid-cols-2">
+                    <p>
+                      <span className="font-semibold text-stone-800">Author:</span>{" "}
+                      {request.author || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-stone-800">ISBN:</span>{" "}
+                      {request.isbn13 || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-stone-800">Requested by:</span>{" "}
+                      {request.requestedBy}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-stone-800">Status:</span>{" "}
+                      {request.status || "pending"}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-xs text-stone-400">
+                    {request.created_at ? new Date(request.created_at).toLocaleString() : ""}
+                  </p>
+                </div>
+
+                <Link
+                  href={`/teacher/books/add?requestId=${request.id}`}
+                  className="inline-flex rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  Open Global Book Entry
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="mt-6 space-y-3">
+        <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+            Books Missing Information
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-stone-900">
+            {flags.length} book attention item{flags.length === 1 ? "" : "s"}
+          </h2>
+        </div>
+
         {loading ? <p className="text-sm text-stone-500">Loading book flags...</p> : null}
 
         {!loading && flags.length === 0 ? (

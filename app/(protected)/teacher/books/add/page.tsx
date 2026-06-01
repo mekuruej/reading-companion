@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import BookInfoTab from "../../../books/[userBookId]/components/BookInfoTab";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -17,15 +18,20 @@ const BOOK_TYPE_OPTIONS = [
     { value: "novel", label: "Novel" },
     { value: "manga", label: "Manga" },
     { value: "graded_reader", label: "Graded reader" },
+    { value: "textbook", label: "Textbook" },
     { value: "other", label: "Other" },
 ];
 
 type BookRow = {
     id: string;
     title: string | null;
+    title_reading: string | null;
+    isbn: string | null;
     isbn13: string | null;
     cover_url: string | null;
+    genre: string | null;
     book_type: string | null;
+    trigger_warnings: string | null;
     author: string | null;
     author_reading: string | null;
     author_image_url: string | null;
@@ -36,11 +42,16 @@ type BookRow = {
     illustrator_reading: string | null;
     illustrator_image_url: string | null;
     publisher: string | null;
+    publisher_id: string | null;
     publisher_reading: string | null;
     publisher_image_url: string | null;
     published_date: string | null;
     page_count: number | null;
+    series_number: number | null;
+    related_links: any | null;
 };
+
+type EditingPanel = "bookInfoDetails" | "bookInfoPeople" | "bookInfoLinks" | null;
 
 type IsbnLookupPreview = {
     isbn13: string;
@@ -55,6 +66,15 @@ type IsbnLookupPreview = {
     found_existing_book: boolean;
     existing_book_id: string | null;
     needs_review: boolean;
+};
+
+type BookRequestRow = {
+    id: string;
+    title: string | null;
+    author: string | null;
+    isbn13: string | null;
+    status: string | null;
+    created_at: string | null;
 };
 
 function cleanText(value: string) {
@@ -77,18 +97,76 @@ function metadataSourceLabel(value: IsbnLookupPreview["metadata_source"]) {
     }
 }
 
+function bookTypeLabel(value: string | null | undefined) {
+    return BOOK_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? "—";
+}
+
+function linksToText(links: any): string {
+    if (!Array.isArray(links)) return "";
+
+    return links
+        .map((item) => {
+            if (typeof item === "string") return item;
+            if (item && typeof item === "object") {
+                const label = (item.label ?? item.url ?? "").toString();
+                const url = (item.url ?? "").toString();
+                return url ? `${label} | ${url}` : label;
+            }
+            return "";
+        })
+        .filter(Boolean)
+        .join("\n");
+}
+
+function parseLinks(text: string) {
+    return text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+            const parts = line.split("|").map((part) => part.trim());
+            if (parts.length === 1) return { label: parts[0], url: parts[0] };
+            return { label: parts[0], url: parts.slice(1).join("|") };
+        });
+}
+
+function displayLinkLabel(link: any) {
+    const rawLabel =
+        typeof link === "object" && link != null ? (link.label ?? "").toString().trim() : "";
+    const rawUrl =
+        typeof link === "string"
+            ? link
+            : typeof link === "object" && link != null
+                ? (link.url ?? "").toString()
+                : "";
+
+    if (rawLabel && rawLabel !== rawUrl) return rawLabel;
+    return rawLabel || rawUrl || "Link";
+}
+
+function displayLinkUrl(link: any) {
+    if (!link) return "";
+    if (typeof link === "string") return link;
+    if (typeof link === "object") return link.url ?? "";
+    return "";
+}
+
 export default function TeacherAddBookPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const bookId = searchParams.get("bookId");
+    const requestId = searchParams.get("requestId");
 
     const isEditMode = !!bookId;
 
     const [loading, setLoading] = useState(true);
     const [canAccess, setCanAccess] = useState(false);
     const [currentBookId, setCurrentBookId] = useState<string | null>(bookId);
+    const [currentBook, setCurrentBook] = useState<BookRow | null>(null);
+    const [editingPanel, setEditingPanel] = useState<EditingPanel>(null);
 
     const [title, setTitle] = useState("");
+    const [isbn, setIsbn] = useState("");
     const [isbn13, setIsbn13] = useState("");
     const [coverUrl, setCoverUrl] = useState("");
     const [bookType, setBookType] = useState("");
@@ -115,8 +193,19 @@ export default function TeacherAddBookPage() {
 
     const [publishedDate, setPublishedDate] = useState("");
     const [pageCount, setPageCount] = useState("");
+    const [seriesNumber, setSeriesNumber] = useState("");
+    const [linksText, setLinksText] = useState("");
+    const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
+    const [selectedTranslatorId, setSelectedTranslatorId] = useState<string | null>(null);
+    const [selectedIllustratorId, setSelectedIllustratorId] = useState<string | null>(null);
+    const [selectedPublisherId, setSelectedPublisherId] = useState<string | null>(null);
+    const [requireSharedAuthorRecord, setRequireSharedAuthorRecord] = useState(false);
+    const [requireSharedTranslatorRecord, setRequireSharedTranslatorRecord] = useState(false);
+    const [requireSharedIllustratorRecord, setRequireSharedIllustratorRecord] = useState(false);
+    const [requireSharedPublisherRecord, setRequireSharedPublisherRecord] = useState(false);
 
     const [message, setMessage] = useState("");
+    const [bookRequest, setBookRequest] = useState<BookRequestRow | null>(null);
     const [saving, setSaving] = useState(false);
     const [isbnLookupLoading, setIsbnLookupLoading] = useState(false);
     const [isbnLookupError, setIsbnLookupError] = useState("");
@@ -171,13 +260,15 @@ export default function TeacherAddBookPage() {
 
             if (bookId) {
                 await loadBook(bookId);
+            } else if (requestId) {
+                await loadBookRequest(requestId);
             }
 
             setLoading(false);
         }
 
         load();
-    }, [bookId, router]);
+    }, [bookId, requestId, router]);
 
     async function loadBook(id: string) {
         const { data, error } = await supabase
@@ -186,9 +277,13 @@ export default function TeacherAddBookPage() {
                 `
         id,
         title,
+        title_reading,
+        isbn,
         isbn13,
         cover_url,
+        genre,
         book_type,
+        trigger_warnings,
         author,
         author_reading,
         author_image_url,
@@ -199,10 +294,13 @@ export default function TeacherAddBookPage() {
         illustrator_reading,
         illustrator_image_url,
         publisher,
+        publisher_id,
         publisher_reading,
         publisher_image_url,
         published_date,
-        page_count
+        page_count,
+        series_number,
+        related_links
       `
             )
             .eq("id", id)
@@ -214,7 +312,9 @@ export default function TeacherAddBookPage() {
         }
 
         setCurrentBookId(data.id);
+        setCurrentBook(data);
         setTitle(data.title ?? "");
+        setIsbn(data.isbn ?? "");
         setIsbn13(data.isbn13 ?? "");
         setCoverUrl(data.cover_url ?? "");
         setBookType(data.book_type ?? "");
@@ -234,14 +334,57 @@ export default function TeacherAddBookPage() {
         setPublisher(data.publisher ?? "");
         setPublisherReading(data.publisher_reading ?? "");
         setPublisherImageUrl(data.publisher_image_url ?? "");
+        setSelectedPublisherId(data.publisher_id ?? null);
 
         setPublishedDate(data.published_date ?? "");
         setPageCount(data.page_count == null ? "" : String(data.page_count));
+        setSeriesNumber(data.series_number == null ? "" : String(data.series_number));
+        setLinksText(linksToText(data.related_links));
+        setSelectedAuthorId(null);
+        setSelectedTranslatorId(null);
+        setSelectedIllustratorId(null);
+        setRequireSharedAuthorRecord(false);
+        setRequireSharedTranslatorRecord(false);
+        setRequireSharedIllustratorRecord(false);
+        setRequireSharedPublisherRecord(false);
+    }
+
+    async function loadBookRequest(id: string) {
+        const { data, error } = await supabase
+            .from("book_requests")
+            .select("id, title, author, isbn13, status, created_at")
+            .eq("id", id)
+            .maybeSingle<BookRequestRow>();
+
+        if (error) {
+            setMessage(error.message ?? "Failed to load book request.");
+            return;
+        }
+
+        if (!data) {
+            setMessage("This book request could not be found.");
+            return;
+        }
+
+        setBookRequest(data);
+
+        const requestTitle = (data.title ?? "").trim();
+        const requestIsbn = (data.isbn13 ?? "").trim();
+
+        if (requestTitle && requestTitle !== `ISBN ${requestIsbn}`) {
+            setTitle(requestTitle);
+        }
+
+        if (requestIsbn) setIsbn13(requestIsbn);
+        if (data.author) setAuthor(data.author);
     }
 
     function clearForm() {
         setCurrentBookId(null);
+        setCurrentBook(null);
+        setEditingPanel(null);
         setTitle("");
+        setIsbn("");
         setIsbn13("");
         setCoverUrl("");
         setBookType("");
@@ -268,6 +411,16 @@ export default function TeacherAddBookPage() {
 
         setPublishedDate("");
         setPageCount("");
+        setSeriesNumber("");
+        setLinksText("");
+        setSelectedAuthorId(null);
+        setSelectedTranslatorId(null);
+        setSelectedIllustratorId(null);
+        setSelectedPublisherId(null);
+        setRequireSharedAuthorRecord(false);
+        setRequireSharedTranslatorRecord(false);
+        setRequireSharedIllustratorRecord(false);
+        setRequireSharedPublisherRecord(false);
         setIsbnLookupError("");
         setIsbnLookupPreview(null);
     }
@@ -297,7 +450,7 @@ export default function TeacherAddBookPage() {
                 throw new Error(payload?.error ?? "ISBN lookup failed.");
             }
 
-            setIsbnLookupPreview(payload as IsbnLookupPreview);
+            setIsbnLookupPreview((payload?.book ?? payload) as IsbnLookupPreview);
         } catch (error: any) {
             setIsbnLookupError(error?.message ?? "ISBN lookup failed.");
         } finally {
@@ -470,6 +623,10 @@ export default function TeacherAddBookPage() {
         const cleanPageCount = pageCount.trim()
             ? Number(pageCount.replace(/[^0-9]/g, ""))
             : null;
+        const cleanSeriesNumber = seriesNumber.trim()
+            ? Number(seriesNumber.replace(/[^0-9]/g, ""))
+            : null;
+        const relatedLinks = linksText.trim() ? parseLinks(linksText) : null;
 
         setSaving(true);
 
@@ -478,6 +635,7 @@ export default function TeacherAddBookPage() {
                 .from("books")
                 .update({
                     title: title.trim(),
+                    isbn: cleanText(isbn),
                     isbn13: cleanIsbn13,
                     cover_url: cleanText(coverUrl),
                     book_type: cleanText(bookType),
@@ -495,23 +653,36 @@ export default function TeacherAddBookPage() {
                     illustrator_image_url: cleanText(illustratorImageUrl),
 
                     publisher: cleanText(publisher),
+                    publisher_id: selectedPublisherId,
                     publisher_reading: cleanText(publisherReading),
                     publisher_image_url: cleanText(publisherImageUrl),
 
                     published_date: cleanText(publishedDate),
                     page_count: cleanPageCount,
+                    series_number: cleanSeriesNumber,
+                    related_links: relatedLinks,
                 })
                 .eq("id", currentBookId);
 
             if (error) throw error;
 
             setMessage("Book info saved.");
+            setEditingPanel(null);
+            await loadBook(currentBookId);
         } catch (error: any) {
             console.error("Save global book info error:", JSON.stringify(error, null, 2));
             setMessage(error?.message ?? "Failed to save book info.");
         }
 
         setSaving(false);
+    }
+
+    async function cancelBookInfoEdits() {
+        setEditingPanel(null);
+        setMessage("");
+        if (currentBookId) {
+            await loadBook(currentBookId);
+        }
     }
 
     if (loading) {
@@ -547,6 +718,41 @@ export default function TeacherAddBookPage() {
                 Create or update a shared catalog book. This does not add the book to a
                 student library.
             </p>
+
+            {bookRequest ? (
+                <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                        Pending Book Request
+                    </p>
+                    <h2 className="mt-2 text-xl font-black text-stone-900">
+                        This request needs manual book entry.
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-stone-700">
+                        Mekuru could not find enough metadata automatically. Use the ISBN or
+                        any title/author clue below to research the book, then enter the
+                        shared catalog details manually.
+                    </p>
+
+                    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                        <div>
+                            <dt className="font-semibold text-stone-600">Requested title</dt>
+                            <dd className="text-stone-900">{bookRequest.title || "—"}</dd>
+                        </div>
+                        <div>
+                            <dt className="font-semibold text-stone-600">Author</dt>
+                            <dd className="text-stone-900">{bookRequest.author || "—"}</dd>
+                        </div>
+                        <div>
+                            <dt className="font-semibold text-stone-600">ISBN</dt>
+                            <dd className="text-stone-900">{bookRequest.isbn13 || "—"}</dd>
+                        </div>
+                        <div>
+                            <dt className="font-semibold text-stone-600">Status</dt>
+                            <dd className="text-stone-900">{bookRequest.status || "pending"}</dd>
+                        </div>
+                    </dl>
+                </section>
+            ) : null}
 
             <section className="mt-8 rounded-3xl border border-stone-500 bg-stone-100 p-5">
                 <h2 className="text-lg font-black text-stone-900">
@@ -713,15 +919,15 @@ export default function TeacherAddBookPage() {
                 ) : null}
             </section>
 
-            {currentBookId ? (
+            {currentBookId && currentBook ? (
                 <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
                             <h2 className="text-lg font-black text-stone-900">
-                                Book Info Editor
+                                Shared Book Info
                             </h2>
                             <p className="mt-1 text-sm text-stone-500">
-                                Fill in the shared catalog details readers will see later.
+                                This uses the same editing surface as the Book Hub Book Info tab.
                             </p>
                         </div>
 
@@ -737,111 +943,94 @@ export default function TeacherAddBookPage() {
                         )}
                     </div>
 
-                    <div className="mt-6 grid gap-8">
-                        <div className="grid gap-5">
-                            <div>
-                                <label className="mb-1 block text-sm font-semibold">
-                                    Book Type
-                                </label>
-                                <select
-                                    value={bookType}
-                                    onChange={(e) => setBookType(e.target.value)}
-                                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3"
-                                >
-                                    {BOOK_TYPE_OPTIONS.map((option) => (
-                                        <option key={option.value || "empty"} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="mb-1 block text-sm font-semibold">
-                                    Cover URL
-                                </label>
-                                <input
-                                    value={coverUrl}
-                                    onChange={(e) => setCoverUrl(e.target.value)}
-                                    className="w-full rounded-xl border border-stone-300 px-4 py-3"
-                                />
-                            </div>
-
-                            <div className="grid gap-5 md:grid-cols-2">
-                                <div>
-                                    <label className="mb-1 block text-sm font-semibold">
-                                        Published Date / Year
-                                    </label>
-                                    <input
-                                        value={publishedDate}
-                                        onChange={(e) => setPublishedDate(e.target.value)}
-                                        placeholder="2024 or 2024-03-15"
-                                        className="w-full rounded-xl border border-stone-300 px-4 py-3"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1 block text-sm font-semibold">
-                                        Page Count
-                                    </label>
-                                    <input
-                                        value={pageCount}
-                                        onChange={(e) => setPageCount(e.target.value)}
-                                        inputMode="numeric"
-                                        className="w-full rounded-xl border border-stone-300 px-4 py-3"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-stone-200 p-4">
-                            <h3 className="font-black text-stone-900">Author</h3>
-                            <div className="mt-4 grid gap-4">
-                                <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Author" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={authorReading} onChange={(e) => setAuthorReading(e.target.value)} placeholder="Author reading" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={authorEnglishName} onChange={(e) => setAuthorEnglishName(e.target.value)} placeholder="Author English name" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={authorImageUrl} onChange={(e) => setAuthorImageUrl(e.target.value)} placeholder="Author image URL" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-stone-200 p-4">
-                            <h3 className="font-black text-stone-900">Translator</h3>
-                            <div className="mt-4 grid gap-4">
-                                <input value={translator} onChange={(e) => setTranslator(e.target.value)} placeholder="Translator" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={translatorReading} onChange={(e) => setTranslatorReading(e.target.value)} placeholder="Translator reading" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={translatorEnglishName} onChange={(e) => setTranslatorEnglishName(e.target.value)} placeholder="Translator English name" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={translatorImageUrl} onChange={(e) => setTranslatorImageUrl(e.target.value)} placeholder="Translator image URL" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-stone-200 p-4">
-                            <h3 className="font-black text-stone-900">Illustrator</h3>
-                            <div className="mt-4 grid gap-4">
-                                <input value={illustrator} onChange={(e) => setIllustrator(e.target.value)} placeholder="Illustrator" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={illustratorReading} onChange={(e) => setIllustratorReading(e.target.value)} placeholder="Illustrator reading" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={illustratorEnglishName} onChange={(e) => setIllustratorEnglishName(e.target.value)} placeholder="Illustrator English name" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={illustratorImageUrl} onChange={(e) => setIllustratorImageUrl(e.target.value)} placeholder="Illustrator image URL" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-stone-200 p-4">
-                            <h3 className="font-black text-stone-900">Publisher</h3>
-                            <div className="mt-4 grid gap-4">
-                                <input value={publisher} onChange={(e) => setPublisher(e.target.value)} placeholder="Publisher" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={publisherReading} onChange={(e) => setPublisherReading(e.target.value)} placeholder="Publisher reading" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={publisherEnglishName} onChange={(e) => setPublisherEnglishName(e.target.value)} placeholder="Publisher English name" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                                <input value={publisherImageUrl} onChange={(e) => setPublisherImageUrl(e.target.value)} placeholder="Publisher image URL" className="w-full rounded-xl border border-stone-300 px-4 py-3" />
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={saveBookInfo}
-                            disabled={saving}
-                            className="rounded-2xl bg-stone-900 px-5 py-3 font-semibold text-white hover:bg-black disabled:opacity-50"
-                        >
-                            {saving ? "Saving..." : "Save Book Info"}
-                        </button>
-                    </div>
+                    <BookInfoTab
+                        book={currentBook as any}
+                        canEditBookInfo={true}
+                        isEditingBookInfo={editingPanel === "bookInfoDetails"}
+                        isEditingPeople={editingPanel === "bookInfoPeople"}
+                        isEditingLinks={editingPanel === "bookInfoLinks"}
+                        isEditingMyCopy={false}
+                        saving={saving}
+                        errorMessage={message || null}
+                        canCreateSharedRecords={false}
+                        onEditBookInfo={() => setEditingPanel("bookInfoDetails")}
+                        onEditPeople={() => setEditingPanel("bookInfoPeople")}
+                        onEditLinks={() => setEditingPanel("bookInfoLinks")}
+                        onEditMyCopy={() => null}
+                        onCancel={cancelBookInfoEdits}
+                        onSave={saveBookInfo}
+                        bookType={bookType}
+                        setBookType={setBookType}
+                        publishedDate={publishedDate}
+                        setPublishedDate={setPublishedDate}
+                        pageCount={pageCount}
+                        setPageCount={setPageCount}
+                        seriesNumber={seriesNumber}
+                        setSeriesNumber={setSeriesNumber}
+                        isbn={isbn}
+                        setIsbn={setIsbn}
+                        isbn13={isbn13}
+                        setIsbn13={setIsbn13}
+                        authorName={author}
+                        authorEnglishName={authorEnglishName}
+                        setAuthorEnglishName={setAuthorEnglishName}
+                        setAuthorName={setAuthor}
+                        translatorName={translator}
+                        translatorEnglishName={translatorEnglishName}
+                        setTranslatorEnglishName={setTranslatorEnglishName}
+                        setTranslatorName={setTranslator}
+                        illustratorName={illustrator}
+                        illustratorEnglishName={illustratorEnglishName}
+                        setIllustratorEnglishName={setIllustratorEnglishName}
+                        setIllustratorName={setIllustrator}
+                        publisherName={publisher}
+                        setPublisherName={setPublisher}
+                        publisherEnglishName={publisherEnglishName}
+                        setPublisherEnglishName={setPublisherEnglishName}
+                        publisherReading={publisherReading}
+                        setPublisherReading={setPublisherReading}
+                        selectedAuthorId={selectedAuthorId}
+                        setSelectedAuthorId={setSelectedAuthorId}
+                        requireSharedAuthorRecord={requireSharedAuthorRecord}
+                        setRequireSharedAuthorRecord={setRequireSharedAuthorRecord}
+                        selectedTranslatorId={selectedTranslatorId}
+                        setSelectedTranslatorId={setSelectedTranslatorId}
+                        requireSharedTranslatorRecord={requireSharedTranslatorRecord}
+                        setRequireSharedTranslatorRecord={setRequireSharedTranslatorRecord}
+                        selectedIllustratorId={selectedIllustratorId}
+                        setSelectedIllustratorId={setSelectedIllustratorId}
+                        requireSharedIllustratorRecord={requireSharedIllustratorRecord}
+                        setRequireSharedIllustratorRecord={setRequireSharedIllustratorRecord}
+                        selectedPublisherId={selectedPublisherId}
+                        setSelectedPublisherId={setSelectedPublisherId}
+                        requireSharedPublisherRecord={requireSharedPublisherRecord}
+                        setRequireSharedPublisherRecord={setRequireSharedPublisherRecord}
+                        coverUrl={coverUrl}
+                        setCoverUrl={setCoverUrl}
+                        authorImg={authorImageUrl}
+                        setAuthorImg={setAuthorImageUrl}
+                        translatorImg={translatorImageUrl}
+                        setTranslatorImg={setTranslatorImageUrl}
+                        illustratorImg={illustratorImageUrl}
+                        setIllustratorImg={setIllustratorImageUrl}
+                        publisherImg={publisherImageUrl}
+                        setPublisherImg={setPublisherImageUrl}
+                        authorReading={authorReading}
+                        setAuthorReading={setAuthorReading}
+                        translatorReading={translatorReading}
+                        setTranslatorReading={setTranslatorReading}
+                        illustratorReading={illustratorReading}
+                        setIllustratorReading={setIllustratorReading}
+                        relatedLinksArr={Array.isArray(currentBook.related_links) ? currentBook.related_links : []}
+                        linksText={linksText}
+                        setLinksText={setLinksText}
+                        bookTypeLabel={bookTypeLabel}
+                        displayLinkLabel={displayLinkLabel}
+                        displayLinkUrl={displayLinkUrl}
+                        BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
+                        Detail={Detail}
+                        PersonRow={PersonRow}
+                    />
                 </section>
             ) : null}
 
@@ -851,5 +1040,125 @@ export default function TeacherAddBookPage() {
                 </p>
             ) : null}
         </main>
+    );
+}
+
+function Detail({
+    label,
+    value,
+    editing,
+    inputValue,
+    setInputValue,
+    placeholder,
+}: {
+    label: string;
+    value: any;
+    editing: boolean;
+    inputValue: string;
+    setInputValue: (value: string) => void;
+    placeholder?: string;
+}) {
+    const display =
+        value === null || value === undefined || value === "" ? "—" : String(value);
+
+    return (
+        <div className="rounded border bg-white p-3">
+            <div className="text-stone-600">{label}</div>
+            {!editing ? (
+                <div className="font-medium">{display}</div>
+            ) : (
+                <input
+                    value={inputValue}
+                    onChange={(event) => setInputValue(event.target.value)}
+                    placeholder={placeholder}
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                />
+            )}
+        </div>
+    );
+}
+
+function PersonRow({
+    label,
+    name,
+    reading,
+    img,
+    editing,
+    nameValue,
+    setNameValue,
+    englishNameValue,
+    setEnglishNameValue,
+    imgValue,
+    setImgValue,
+    readingValue,
+    setReadingValue,
+}: {
+    label: string;
+    name: string | null | undefined;
+    reading: string | null | undefined;
+    img: string | null | undefined;
+    editing: boolean;
+    nameValue: string;
+    setNameValue: (value: string) => void;
+    englishNameValue: string;
+    setEnglishNameValue: (value: string) => void;
+    imgValue: string;
+    setImgValue: (value: string) => void;
+    readingValue: string;
+    setReadingValue: (value: string) => void;
+}) {
+    return (
+        <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-20 w-20 shrink-0 overflow-hidden rounded-full border bg-stone-100">
+                {img ? (
+                    <img src={img} alt={name || label} className="h-full w-full object-cover" />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-stone-400">
+                        No image
+                    </div>
+                )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+                {!editing ? (
+                    <>
+                        <div className="text-xs uppercase tracking-wide text-stone-500">{label}</div>
+                        <div className="mt-1 text-sm font-medium text-stone-900">{name || "—"}</div>
+                        {englishNameValue ? (
+                            <div className="text-sm text-stone-700">{englishNameValue}</div>
+                        ) : null}
+                        <div className="text-sm text-stone-500">{reading || "—"}</div>
+                    </>
+                ) : (
+                    <div className="space-y-2">
+                        <div className="text-xs uppercase tracking-wide text-stone-500">{label}</div>
+                        <input
+                            value={nameValue}
+                            onChange={(event) => setNameValue(event.target.value)}
+                            placeholder={`${label} name`}
+                            className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                        <input
+                            value={englishNameValue}
+                            onChange={(event) => setEnglishNameValue(event.target.value)}
+                            placeholder={`${label} English name`}
+                            className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                        <input
+                            value={readingValue}
+                            onChange={(event) => setReadingValue(event.target.value)}
+                            placeholder={`${label} reading`}
+                            className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                        <input
+                            value={imgValue}
+                            onChange={(event) => setImgValue(event.target.value)}
+                            placeholder={`${label} image URL`}
+                            className="w-full rounded border px-3 py-2 text-sm"
+                        />
+                    </div>
+                )}
+            </div>
+        </div>
     );
 }

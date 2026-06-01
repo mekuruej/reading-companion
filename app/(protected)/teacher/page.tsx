@@ -20,6 +20,7 @@ type TeacherCard = {
 
 type QueueCounts = {
   books: number | null;
+  bookRequests: number | null;
   kanji: number | null;
   words: number | null;
   readingFit: number | null;
@@ -59,6 +60,10 @@ const lessonPrepCards: TeacherCard[] = [
     status: "Planned",
   },
 ];
+
+function isSuperTeacherFlag(value: unknown) {
+  return value === true || value === "true";
+}
 
 function TeacherCardGrid({ cards }: { cards: TeacherCard[] }) {
   return (
@@ -126,6 +131,7 @@ function TeacherCardGrid({ cards }: { cards: TeacherCard[] }) {
 export default function TeacherHubPage() {
   const [counts, setCounts] = useState<QueueCounts>({
     books: null,
+    bookRequests: null,
     kanji: null,
     words: null,
     readingFit: null,
@@ -162,9 +168,10 @@ export default function TeacherHubPage() {
     const isTeacher =
       profile?.role === "teacher" ||
       profile?.role === "super_teacher" ||
-      !!profile?.is_super_teacher;
+      isSuperTeacherFlag(profile?.is_super_teacher);
     const hasSuperTeacherAccess =
-      profile?.role === "super_teacher" || !!profile?.is_super_teacher;
+      profile?.role === "super_teacher" ||
+      isSuperTeacherFlag(profile?.is_super_teacher);
 
     setIsSuperTeacher(hasSuperTeacherAccess);
 
@@ -174,6 +181,7 @@ export default function TeacherHubPage() {
     }
 
     let bookCount: number | null = null;
+    let bookRequestCount: number | null = null;
 
     if (hasSuperTeacherAccess) {
       const { count } = await supabase
@@ -200,6 +208,13 @@ export default function TeacherHubPage() {
       }).length;
 
       bookCount = (count ?? 0) + missingGlobalBookInfoCount;
+
+      const { count: pendingBookRequestCount } = await supabase
+        .from("book_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+
+      bookRequestCount = pendingBookRequestCount ?? 0;
     }
 
     const { count: kanjiCount } = await supabase
@@ -272,6 +287,7 @@ export default function TeacherHubPage() {
 
     setCounts({
       books: bookCount ?? 0,
+      bookRequests: bookRequestCount ?? 0,
       kanji: kanjiCount ?? 0,
       words: wordCount,
       readingFit: readingFitCount,
@@ -291,6 +307,19 @@ export default function TeacherHubPage() {
     },
     ...(isSuperTeacher
       ? [
+        {
+          title: "Pending Book Requests",
+          href: "/teacher/books",
+          eyebrow: "ISBN requests",
+          description:
+            "Books requested after Mekuru could not find enough lookup data. These do not have global book records yet.",
+          status: "Active" as const,
+          count: counts.bookRequests,
+          countLabel:
+            counts.bookRequests === 1
+              ? "pending book request"
+              : "pending book requests",
+        },
         {
           title: "Books Needing My Attention",
           href: "/teacher/books",
