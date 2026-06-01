@@ -22,6 +22,7 @@ import BookHubNotices from "./components/BookHubNotices";
 import BookHubTabBar from "./components/BookHubTabBar";
 import BookHubTabSectionHeader from "./components/BookHubTabSectionHeader";
 import BookHubHero from "./components/BookHubHero";
+import BookHubStatusPanel from "./components/BookHubStatusPanel";
 
 type Book = {
   id: string;
@@ -4835,6 +4836,18 @@ export default function BookHubPage() {
     ? `Student Book Hub · ${bookHubOwnerName || "Student"}`
     : "My Book Hub";
 
+  const bookHubStatusLabel = dnfAt
+    ? "DNF"
+    : finishedAt
+      ? "Finished"
+      : startedAt
+        ? "Reading"
+        : "Not started";
+
+  const showBookHubStartButton = !started && realReadingSessions.length === 0;
+  const showBookHubFinishDnfButtons = !finishedAt && !dnfAt;
+  const showBookHubReflectionPrompt = !!finishedAt;
+
   return (
     <main className="min-h-screen bg-stone-50 p-6">
       {showBookFlagModal ? (
@@ -4893,135 +4906,34 @@ export default function BookHubPage() {
                 }}
               />
 
-              <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
-                <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
-
-                <div className="space-y-2 text-sm text-stone-700">
-                  <div>
-                    <span className="font-medium">Status:</span>{" "}
-                    {dnfAt ? "DNF" : finishedAt ? "Finished" : startedAt ? "Reading" : "Not started"}
-                  </div>
-                  <div>
-                    <span className="font-medium">Started:</span> {startedAt || "—"}
-                  </div>
-                  <div>
-                    <span className="font-medium">Finished:</span> {finishedAt || "—"}
-                  </div>
-                  <div>
-                    <span className="font-medium">DNF:</span> {dnfAt || "—"}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {!started && realReadingSessions.length === 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => void markStartedToday()}
-                      className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${shouldNudgeStartBook
-                        ? "animate-pulse border-emerald-300 bg-emerald-100 shadow-sm shadow-emerald-100"
-                        : "border-stone-400 bg-stone-100"
-                        }`}
-                    >
-                      Start Today
-                    </button>
-                  ) : null}
-
-                  {!finishedAt && !dnfAt ? (
-                    <button
-                      type="button"
-                      onClick={() => void markFinishedToday()}
-                      className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${shouldNudgeFinishBook
-                        ? "animate-pulse border-amber-300 bg-amber-100 shadow-sm shadow-amber-100"
-                        : "border-stone-400 bg-stone-100"
-                        }`}
-                    >
-                      Mark Finished
-                    </button>
-                  ) : null}
-
-                  {!finishedAt && !dnfAt ? (
-                    <button
-                      type="button"
-                      onClick={() => void markDnfToday()}
-                      className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
-                    >
-                      Mark DNF
-                    </button>
-                  ) : null}
-                  <p className="mt-2 text-xs text-stone-500">
-                    You can edit these in the Reading Tab.
-                  </p>
-                </div>
-
-                {finishedAt ? (
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <div className="text-sm font-semibold text-amber-950">
-                      Finished! Add a reflection while the book is fresh.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={openReadingReflection}
-                      className="mt-3 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600"
-                    >
-                      Go to Reading Reflection
-                    </button>
-                  </div>
-                ) : null}
-
-                {canFillBeginningPages || canFillEndingPages ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {canFillBeginningPages ? (
-                      <button
-                        type="button"
-                        onClick={fillBeginningPages}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        Fill beginning pages
-                      </button>
-                    ) : null}
-
-                    {canFillEndingPages ? (
-                      <button
-                        type="button"
-                        onClick={fillEndingPages}
-                        className="rounded-2xl border px-4 py-2 text-sm font-medium text-stone-700 hover:bg-white"
-                      >
-                        Fill ending pages
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {canFillBeginningPages && earliestTrackedStartPage != null ? (
-                  <div className="mt-2 text-xs text-stone-500">
-                    Looks like you started logging on page {earliestTrackedStartPage}. Fill pages 1–
-                    {earliestTrackedStartPage - 1}?
-                  </div>
-                ) : null}
-
-                {canFillEndingPages && furthestTrackedPage != null && book.page_count != null ? (
-                  <div className="mt-2 text-xs text-stone-500">
-                    Looks like your story ended on page {furthestTrackedPage}. Fill pages {furthestTrackedPage + 1}–
-                    {book.page_count}?
-                  </div>
-                ) : null}
-
-                {canRemoveFromMyLibrary ? (
-                  <div className="mt-5 border-t border-violet-100 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!confirmLeaveIfTimerActive()) return;
-                        setRemoveLibraryError(null);
-                        setShowRemoveLibraryConfirm(true);
-                      }}
-                      className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
-                    >
-                      Remove from My Library
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <BookHubStatusPanel
+                statusLabel={bookHubStatusLabel}
+                startedAt={startedAt}
+                finishedAt={finishedAt}
+                dnfAt={dnfAt}
+                showStartButton={showBookHubStartButton}
+                showFinishDnfButtons={showBookHubFinishDnfButtons}
+                showReflectionPrompt={showBookHubReflectionPrompt}
+                shouldNudgeStartBook={shouldNudgeStartBook}
+                shouldNudgeFinishBook={shouldNudgeFinishBook}
+                canFillBeginningPages={canFillBeginningPages}
+                canFillEndingPages={canFillEndingPages}
+                earliestTrackedStartPage={earliestTrackedStartPage}
+                furthestTrackedPage={furthestTrackedPage}
+                pageCount={book.page_count}
+                canRemoveFromMyLibrary={canRemoveFromMyLibrary}
+                onStartToday={() => void markStartedToday()}
+                onMarkFinished={() => void markFinishedToday()}
+                onMarkDnf={() => void markDnfToday()}
+                onOpenReflection={openReadingReflection}
+                onFillBeginningPages={fillBeginningPages}
+                onFillEndingPages={fillEndingPages}
+                onRemoveFromLibrary={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  setRemoveLibraryError(null);
+                  setShowRemoveLibraryConfirm(true);
+                }}
+              />
             </div>
 
             {row.is_teacher_prep && row.teacher_prep_kind === "trial" ? (
