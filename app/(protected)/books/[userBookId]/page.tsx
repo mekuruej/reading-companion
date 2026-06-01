@@ -27,6 +27,7 @@ import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
 import Detail from "./components/Detail";
 import PersonRow from "./components/PersonRow";
+import DateField from "./components/DateField";
 
 type Book = {
   id: string;
@@ -5296,36 +5297,6 @@ export default function BookHubPage() {
         </section>
       </div >
     </main >
-  );
-}
-
-function DateField({
-  label,
-  value,
-  editing,
-  inputValue,
-  setInputValue,
-}: {
-  label: string;
-  value: Date | null;
-  editing: boolean;
-  inputValue: string;
-  setInputValue: (v: string) => void;
-}) {
-  return (
-    <div className="rounded border bg-white p-3 text-sm">
-      <div className="text-stone-600">{label}</div>
-      {!editing ? (
-        <div className="mt-1 font-medium">{value ? formatYmd(value) : "—"}</div>
-      ) : (
-        <input
-          type="date"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          className="mt-1 w-full rounded border px-2 py-1"
-        />
-      )}
-    </div>
   );
 }
 
