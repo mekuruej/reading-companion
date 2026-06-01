@@ -389,7 +389,8 @@ export default function TeacherKanjiPage() {
       const { data: teacherLinks, error: teacherLinksError } = await supabase
         .from("teacher_students")
         .select("student_id")
-        .eq("teacher_id", user.id);
+        .eq("teacher_id", user.id)
+        .is("archived_at", null);
 
       if (teacherLinksError) {
         console.error("Error loading linked students:", teacherLinksError);

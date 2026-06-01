@@ -60,22 +60,40 @@ Status: In progress
 
 Finished so far:
 
-/users/[username]/books
-regular users fall back to their own books
-monthly stats/color counts now use the same safe effective user target
-tested with student routes and passed
+### `/users/[username]/books`
 
-Current task:
+Finished:
 
-/library-study/check
+* Regular users fall back to their own books when manually opening another user’s library route.
+* Monthly stats and Mekuru color counts now use the same safe effective user target as the main library query.
+* Tested with student routes and passed.
+* Confirmed regular students do not see another student’s private library, stats, or color totals.
 
-We are working here now.
+### `/library-study/check`
 
-When this page is reviewed/fixed/tested, I’ll clearly say:
+Finished:
 
-Finished: #2 Non-Book Route Access Audit — /library-study/check
+* Confirmed the page requires a logged-in user through `supabase.auth.getUser()`.
+* Confirmed the page uses the logged-in user’s `user.id` as `currentUserId`.
+* Confirmed there is no route username/user ID parameter used to load another user’s study data.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed learning settings, word summaries, Word Sky claims, and progress rows are scoped to the logged-in user.
+* Confirmed saved-word cards are loaded through the current user’s own `user_book_ids`.
+* Confirmed Ability Check progress writes use `currentUserId`.
+* Confirmed Word Sky claim removal is scoped with `user_id = currentUserId`.
+* Confirmed saved-word hide behavior is based on cards loaded from the current user’s own library, with RLS as the backup safety layer.
 
-Then we can choose the next page under #2.
+Decision:
+
+No code change needed for `/library-study/check` right now.
+
+Next possible pages under this audit:
+
+* `/library-study/practice`
+* `/library-study/book-flashcards`
+* `/library-study/kanji`
+* `/community/stats/*`
+
 
 ## 3. Teacher / Student Access Boundaries
 

@@ -232,6 +232,28 @@ export default function TeacherBooksQueuePage() {
     }
   }
 
+  async function rejectBookRequest(requestId: string) {
+    const confirmed = window.confirm(
+      "Reject this book request? It will leave the pending list, but the request history will stay in Mekuru."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("book_requests")
+        .update({ status: "rejected" })
+        .eq("id", requestId);
+
+      if (error) throw error;
+
+      setMessage("Book request marked as rejected.");
+      await loadFlags();
+    } catch (error: any) {
+      setMessage(error?.message ?? "Could not reject this book request.");
+    }
+  }
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <Link href="/teacher" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
@@ -311,12 +333,21 @@ export default function TeacherBooksQueuePage() {
                   </p>
                 </div>
 
-                <Link
-                  href={`/teacher/books/add?requestId=${request.id}`}
-                  className="inline-flex rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
-                >
-                  Open Global Book Entry
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/teacher/books/add?requestId=${request.id}`}
+                    className="inline-flex rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                  >
+                    Open Global Book Entry
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => rejectBookRequest(request.id)}
+                    className="inline-flex rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                  >
+                    Reject Request
+                  </button>
+                </div>
               </div>
             </div>
           );

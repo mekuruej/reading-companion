@@ -225,7 +225,8 @@ export default function TeacherHubPage() {
     const { data: teacherLinks } = await supabase
       .from("teacher_students")
       .select("student_id")
-      .eq("teacher_id", user.id);
+      .eq("teacher_id", user.id)
+      .is("archived_at", null);
 
     const studentIds = Array.from(
       new Set([

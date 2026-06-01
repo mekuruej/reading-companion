@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
-type StudentRelationshipStatus = "future" | "current" | "past";
+type StudentRelationshipStatus = "future" | "current" | "past" | "archived";
 
 type StudentProfile = {
     id: string;
@@ -27,6 +27,9 @@ type TeacherStudentLink = {
     relationship_status?: string | null;
     student_status?: string | null;
     status?: string | null;
+    archived_at?: string | null;
+    archived_by?: string | null;
+    archive_reason?: string | null;
 };
 
 type UserBookRow = {
@@ -55,6 +58,9 @@ type UserBookRow = {
 
 type StudentCard = StudentProfile & {
     relationshipStatus: StudentRelationshipStatus;
+    teacherStudentTeacherId: string | null;
+    archivedAt: string | null;
+    archiveReason: string | null;
     currentBookTitle: string | null;
     currentBookCoverUrl: string | null;
     currentBookId: string | null;
@@ -221,12 +227,14 @@ function getLinkRelationshipStatus(link: TeacherStudentLink | null | undefined) 
 }
 
 function relationshipLabel(status: StudentRelationshipStatus) {
+    if (status === "archived") return "Archived";
     if (status === "future") return "Future";
     if (status === "past") return "Past";
     return "Current";
 }
 
 function relationshipClasses(status: StudentRelationshipStatus) {
+    if (status === "archived") return "border-rose-200 bg-rose-50 text-rose-800";
     if (status === "future") return "border-sky-200 bg-sky-50 text-sky-800";
     if (status === "past") return "border-stone-200 bg-stone-100 text-stone-500";
     return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -243,11 +251,18 @@ function learningTaskTypeLabel(taskType: string) {
 function StudentCardArticle({
     student,
     onCreateTask,
+    onArchive,
+    onRestore,
+    isUpdatingArchive,
 }: {
     student: StudentCard;
     onCreateTask: (student: StudentCard) => void;
+    onArchive: (student: StudentCard) => void;
+    onRestore: (student: StudentCard) => void;
+    isUpdatingArchive: boolean;
 }) {
     const displayName = student.display_name || student.username || "Unnamed student";
+    const isArchived = student.relationshipStatus === "archived";
 
     return (
         <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -341,6 +356,20 @@ function StudentCardArticle({
                     )}
                 </div>
 
+                {isArchived ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                        <p className="font-semibold">Archived relationship</p>
+                        <p className="mt-1">
+                            {student.archiveReason || "Hidden from active teacher lists and alerts."}
+                        </p>
+                        {student.archivedAt ? (
+                            <p className="mt-1 text-xs text-rose-600">
+                                Archived {new Date(student.archivedAt).toLocaleDateString()}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
+
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {student.username ? (
                         <Link
@@ -379,18 +408,31 @@ function StudentCardArticle({
                     <button
                         type="button"
                         onClick={() => onCreateTask(student)}
+                        disabled={isArchived}
                         className="rounded-2xl border border-sky-700 bg-sky-700 px-4 py-3 text-base font-semibold text-white hover:bg-sky-800"
                     >
                         Assign Task
                     </button>
 
-                    <button
-                        type="button"
-                        disabled
-                        className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
-                    >
-                        Stats later
-                    </button>
+                    {isArchived ? (
+                        <button
+                            type="button"
+                            onClick={() => onRestore(student)}
+                            disabled={isUpdatingArchive || !student.teacherStudentTeacherId}
+                            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                            {isUpdatingArchive ? "Restoring..." : "Restore"}
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => onArchive(student)}
+                            disabled={isUpdatingArchive || !student.teacherStudentTeacherId}
+                            className="rounded-2xl border border-rose-200 bg-white px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                        >
+                            {isUpdatingArchive ? "Archiving..." : "Archive"}
+                        </button>
+                    )}
                 </div>
             </div>
         </article>
@@ -429,6 +471,7 @@ export default function TeacherStudentsPage() {
     const [taskModalStudent, setTaskModalStudent] = useState<StudentCard | null>(null);
     const [activeLearningTasks, setActiveLearningTasks] = useState<ActiveLearningTask[]>([]);
     const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
+    const [updatingArchiveStudentId, setUpdatingArchiveStudentId] = useState<string | null>(null);
 
     async function loadActiveLearningTasks(teacherId: string, learnerIds: string[]) {
         if (learnerIds.length === 0) {
@@ -498,6 +541,10 @@ export default function TeacherStudentsPage() {
 
             let studentProfiles: StudentProfile[] = [];
             const relationshipStatusByStudentId = new Map<string, StudentRelationshipStatus>();
+            const relationshipTeacherIdByStudentId = new Map<string, string>();
+            const archivedAtByStudentId = new Map<string, string>();
+            const archiveReasonByStudentId = new Map<string, string>();
+            const studentsWithActiveTeacherLink = new Set<string>();
 
             if (meProfile?.role === "super_teacher" || meProfile?.is_super_teacher) {
                 const { data: links, error: linksError } = await supabase
@@ -516,10 +563,25 @@ export default function TeacherStudentsPage() {
 
                 for (const link of (links ?? []) as TeacherStudentLink[]) {
                     const studentId = link.student_id;
-                    if (!studentId || relationshipStatusByStudentId.has(studentId)) continue;
+                    if (!studentId) continue;
+                    if (link.teacher_id && !relationshipTeacherIdByStudentId.has(studentId)) {
+                        relationshipTeacherIdByStudentId.set(studentId, link.teacher_id);
+                    }
+
+                    if (link.archived_at) {
+                        if (!archivedAtByStudentId.has(studentId)) {
+                            archivedAtByStudentId.set(studentId, link.archived_at);
+                            archiveReasonByStudentId.set(studentId, link.archive_reason ?? "");
+                        }
+                        continue;
+                    }
+
+                    studentsWithActiveTeacherLink.add(studentId);
 
                     const status = getLinkRelationshipStatus(link);
-                    if (status) relationshipStatusByStudentId.set(studentId, status);
+                    if (status && !relationshipStatusByStudentId.has(studentId)) {
+                        relationshipStatusByStudentId.set(studentId, status);
+                    }
                 }
 
                 const { data: allProfiles, error: allProfilesError } = await supabase
@@ -551,6 +613,17 @@ export default function TeacherStudentsPage() {
                 for (const link of (links ?? []) as TeacherStudentLink[]) {
                     const studentId = link.student_id;
                     if (!studentId) continue;
+                    if (link.teacher_id) {
+                        relationshipTeacherIdByStudentId.set(studentId, link.teacher_id);
+                    }
+
+                    if (link.archived_at) {
+                        archivedAtByStudentId.set(studentId, link.archived_at);
+                        archiveReasonByStudentId.set(studentId, link.archive_reason ?? "");
+                        continue;
+                    }
+
+                    studentsWithActiveTeacherLink.add(studentId);
 
                     const status = getLinkRelationshipStatus(link);
                     if (status) relationshipStatusByStudentId.set(studentId, status);
@@ -665,12 +738,20 @@ export default function TeacherStudentsPage() {
                     .map((row) => lastEngagedByUserBookId.get(row.id) ?? null)
                     .filter(Boolean)
                     .sort((a, b) => String(b).localeCompare(String(a)))[0] ?? null;
+                const archivedAt = studentsWithActiveTeacherLink.has(student.id)
+                    ? null
+                    : archivedAtByStudentId.get(student.id) ?? null;
 
                 return {
                     ...student,
                     relationshipStatus:
-                        relationshipStatusByStudentId.get(student.id) ??
+                        archivedAt
+                            ? "archived"
+                            : relationshipStatusByStudentId.get(student.id) ??
                         getStudentRelationshipStatus(student),
+                    teacherStudentTeacherId: relationshipTeacherIdByStudentId.get(student.id) ?? null,
+                    archivedAt,
+                    archiveReason: archivedAt ? archiveReasonByStudentId.get(student.id) ?? null : null,
                     currentBookTitle: currentBookData?.title ?? null,
                     currentBookCoverUrl: currentBookData?.cover_url ?? null,
                     currentBookId: currentBook?.id ?? null,
@@ -687,7 +768,10 @@ export default function TeacherStudentsPage() {
             });
 
             setStudents(nextCards);
-            await loadActiveLearningTasks(user.id, studentIds);
+            const activeStudentIds = nextCards
+                .filter((student) => student.relationshipStatus !== "archived")
+                .map((student) => student.id);
+            await loadActiveLearningTasks(user.id, activeStudentIds);
         } catch (err: any) {
             console.error("Error loading teacher students:", err);
             setError(err?.message ?? "Could not load students.");
@@ -705,13 +789,20 @@ export default function TeacherStudentsPage() {
 
     useEffect(() => {
         if (students.length === 0) return;
-        if (taskLearnerId && students.some((student) => student.id === taskLearnerId)) return;
+        const activeStudents = students.filter((student) => student.relationshipStatus !== "archived");
+        if (
+            taskLearnerId &&
+            activeStudents.some((student) => student.id === taskLearnerId)
+        ) {
+            return;
+        }
 
         const firstCurrentStudent =
-            students.find((student) => student.relationshipStatus === "current") ?? students[0];
+            activeStudents.find((student) => student.relationshipStatus === "current") ??
+            activeStudents[0];
 
-        setTaskLearnerId(firstCurrentStudent.id);
-        setTaskUserBookId(firstCurrentStudent.currentBookId ?? "");
+        setTaskLearnerId(firstCurrentStudent?.id ?? "");
+        setTaskUserBookId(firstCurrentStudent?.currentBookId ?? "");
     }, [students, taskLearnerId]);
 
     useEffect(() => {
@@ -783,6 +874,81 @@ export default function TeacherStudentsPage() {
             setTaskMessage(err?.message ?? "Could not cancel this task.");
         } finally {
             setCancellingTaskId(null);
+        }
+    }
+
+    async function archiveStudent(student: StudentCard) {
+        if (!currentUserId || !student.teacherStudentTeacherId) {
+            setError("This student relationship could not be archived.");
+            return;
+        }
+
+        const displayName = student.display_name || student.username || "this student";
+        const ok = window.confirm(
+            `Archive ${displayName}? They will be hidden from active teacher lists and alerts, but their data will stay in Mekuru.`
+        );
+        if (!ok) return;
+
+        const reason = window.prompt("Optional archive note", "Student quit");
+
+        setUpdatingArchiveStudentId(student.id);
+        setError(null);
+
+        try {
+            const { error: updateError } = await supabase
+                .from("teacher_students")
+                .update({
+                    archived_at: new Date().toISOString(),
+                    archived_by: currentUserId,
+                    archive_reason: reason?.trim() || null,
+                })
+                .eq("teacher_id", student.teacherStudentTeacherId)
+                .eq("student_id", student.id)
+                .is("archived_at", null);
+
+            if (updateError) throw updateError;
+
+            await loadStudents();
+        } catch (err: any) {
+            console.error("Error archiving student:", err);
+            setError(err?.message ?? "Could not archive this student.");
+        } finally {
+            setUpdatingArchiveStudentId(null);
+        }
+    }
+
+    async function restoreStudent(student: StudentCard) {
+        if (!currentUserId || !student.teacherStudentTeacherId) {
+            setError("This student relationship could not be restored.");
+            return;
+        }
+
+        const displayName = student.display_name || student.username || "this student";
+        const ok = window.confirm(`Restore ${displayName} to active student lists?`);
+        if (!ok) return;
+
+        setUpdatingArchiveStudentId(student.id);
+        setError(null);
+
+        try {
+            const { error: updateError } = await supabase
+                .from("teacher_students")
+                .update({
+                    archived_at: null,
+                    archived_by: null,
+                    archive_reason: null,
+                })
+                .eq("teacher_id", student.teacherStudentTeacherId)
+                .eq("student_id", student.id);
+
+            if (updateError) throw updateError;
+
+            await loadStudents();
+        } catch (err: any) {
+            console.error("Error restoring student:", err);
+            setError(err?.message ?? "Could not restore this student.");
+        } finally {
+            setUpdatingArchiveStudentId(null);
         }
     }
 
@@ -946,17 +1112,20 @@ export default function TeacherStudentsPage() {
     }
 
     const summary = useMemo(() => {
+        const activeStudents = students.filter((student) => student.relationshipStatus !== "archived");
+
         return {
-            totalStudents: students.length,
-            futureStudents: students.filter((student) => student.relationshipStatus === "future").length,
-            currentStudents: students.filter((student) => student.relationshipStatus === "current").length,
-            pastStudents: students.filter((student) => student.relationshipStatus === "past").length,
-            activeReaders: students.filter((student) => !!student.currentBookId).length,
-            assignedPrepBooks: students.reduce(
+            totalStudents: activeStudents.length,
+            futureStudents: activeStudents.filter((student) => student.relationshipStatus === "future").length,
+            currentStudents: activeStudents.filter((student) => student.relationshipStatus === "current").length,
+            pastStudents: activeStudents.filter((student) => student.relationshipStatus === "past").length,
+            archivedStudents: students.filter((student) => student.relationshipStatus === "archived").length,
+            activeReaders: activeStudents.filter((student) => !!student.currentBookId).length,
+            assignedPrepBooks: activeStudents.reduce(
                 (total, student) => total + student.assignedPrepCount,
                 0
             ),
-            withRecentActivity: students.filter((student) => !!student.lastEngagedAt).length,
+            withRecentActivity: activeStudents.filter((student) => !!student.lastEngagedAt).length,
         };
     }, [students]);
 
@@ -986,6 +1155,7 @@ export default function TeacherStudentsPage() {
             future: filteredStudents.filter((student) => student.relationshipStatus === "future"),
             current: filteredStudents.filter((student) => student.relationshipStatus === "current"),
             past: filteredStudents.filter((student) => student.relationshipStatus === "past"),
+            archived: filteredStudents.filter((student) => student.relationshipStatus === "archived"),
         };
     }, [filteredStudents]);
 
@@ -1069,7 +1239,7 @@ export default function TeacherStudentsPage() {
                             <p className="mt-1 text-2xl font-black text-stone-900">
                                 {summary.pastStudents}
                             </p>
-                            <p className="mt-1 text-xs text-stone-500">Archived or expired access.</p>
+                            <p className="mt-1 text-xs text-stone-500">Expired or former active access.</p>
                         </div>
 
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
@@ -1078,6 +1248,14 @@ export default function TeacherStudentsPage() {
                                 {summary.assignedPrepBooks}
                             </p>
                             <p className="mt-1 text-xs text-amber-700">Books assigned from prep.</p>
+                        </div>
+
+                        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm">
+                            <p className="text-xs text-rose-700">Archived students</p>
+                            <p className="mt-1 text-2xl font-black text-stone-900">
+                                {summary.archivedStudents}
+                            </p>
+                            <p className="mt-1 text-xs text-rose-700">Hidden from normal teacher queues.</p>
                         </div>
 
 
@@ -1429,8 +1607,14 @@ export default function TeacherStudentsPage() {
                                     {
                                         key: "past",
                                         title: "Past Students",
-                                        detail: "Expired or archived student relationships.",
+                                        detail: "Expired or former active relationships.",
                                         items: groupedStudents.past,
+                                    },
+                                    {
+                                        key: "archived",
+                                        title: "Archived Students",
+                                        detail: "Hidden from active teacher lists and alerts. Restore when needed.",
+                                        items: groupedStudents.archived,
                                     },
                                 ] as const).map((group) => (
                                     <div key={group.key}>
@@ -1457,6 +1641,9 @@ export default function TeacherStudentsPage() {
                                                         key={student.id}
                                                         student={student}
                                                         onCreateTask={openTaskModal}
+                                                        onArchive={archiveStudent}
+                                                        onRestore={restoreStudent}
+                                                        isUpdatingArchive={updatingArchiveStudentId === student.id}
                                                     />
                                                 ))}
                                             </div>

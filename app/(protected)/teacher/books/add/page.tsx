@@ -151,6 +151,13 @@ function displayLinkUrl(link: any) {
     return "";
 }
 
+function requestTitleNeedsManualResearch(request: BookRequestRow | null) {
+    if (!request) return false;
+    const title = (request.title ?? "").trim();
+    const isbn = (request.isbn13 ?? "").trim();
+    return !title || title === `ISBN ${isbn}`;
+}
+
 export default function TeacherAddBookPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -462,25 +469,34 @@ export default function TeacherAddBookPage() {
         setMessage("");
 
         if (!title.trim()) {
-            setMessage("Please enter a title.");
+            setMessage(
+                bookRequest
+                    ? "Please enter the researched book title before creating the manual global book entry."
+                    : "Please enter a title."
+            );
             return;
         }
 
         const cleanIsbn13 = isbn13.replace(/[^0-9Xx]/g, "");
+        const isManualRequest = Boolean(bookRequest);
 
-        if (cleanIsbn13.length !== 13) {
-            setMessage("Please enter a valid ISBN-13. Hyphens are okay.");
+        if (cleanIsbn13 && cleanIsbn13.length !== 13) {
+            setMessage("Please enter a valid ISBN-13, or leave ISBN blank for a manual entry.");
             return;
         }
 
         setSaving(true);
 
         try {
-            const { data: existingBook, error: existingError } = await supabase
-                .from("books")
-                .select("id, title")
-                .eq("isbn13", cleanIsbn13)
-                .maybeSingle();
+            const existingLookup = cleanIsbn13
+                ? await supabase
+                    .from("books")
+                    .select("id, title")
+                    .eq("isbn13", cleanIsbn13)
+                    .maybeSingle()
+                : { data: null, error: null };
+            const existingBook = existingLookup.data;
+            const existingError = existingLookup.error;
 
             if (existingError) throw existingError;
 
@@ -496,7 +512,8 @@ export default function TeacherAddBookPage() {
                 .from("books")
                 .insert({
                     title: title.trim(),
-                    isbn13: cleanIsbn13,
+                    author: cleanText(author),
+                    isbn13: cleanIsbn13 || null,
                 })
                 .select("id")
                 .single();
@@ -504,7 +521,21 @@ export default function TeacherAddBookPage() {
             if (error) throw error;
 
             setCurrentBookId(data.id);
-            setMessage("Catalog book created. Add details below.");
+            if (bookRequest?.id) {
+                const { error: requestUpdateError } = await supabase
+                    .from("book_requests")
+                    .update({ status: "reviewed" })
+                    .eq("id", bookRequest.id);
+
+                if (requestUpdateError) {
+                    console.warn("Could not mark book request as reviewed:", requestUpdateError);
+                }
+            }
+            setMessage(
+                isManualRequest
+                    ? "Manual catalog book created. Add shared book details below."
+                    : "Catalog book created. Add shared book details below."
+            );
             router.replace(`/teacher/books/add?bookId=${data.id}`);
         } catch (error: any) {
             console.error("Create/load global book error:", JSON.stringify(error, null, 2));
@@ -512,6 +543,36 @@ export default function TeacherAddBookPage() {
         }
 
         setSaving(false);
+    }
+
+    async function rejectBookRequest() {
+        if (!bookRequest?.id) return;
+
+        const confirmed = window.confirm(
+            "Reject this book request? It will leave the pending list, but the request history will stay in Mekuru."
+        );
+
+        if (!confirmed) return;
+
+        setMessage("");
+        setSaving(true);
+
+        try {
+            const { error } = await supabase
+                .from("book_requests")
+                .update({ status: "rejected" })
+                .eq("id", bookRequest.id);
+
+            if (error) throw error;
+
+            setMessage("Book request marked as rejected.");
+            router.replace("/teacher/books");
+        } catch (error: any) {
+            console.error("Reject book request error:", error);
+            setMessage(error?.message ?? "Could not reject this book request.");
+        } finally {
+            setSaving(false);
+        }
     }
 
     async function createOrLoadFromIsbnPreview() {
@@ -728,9 +789,9 @@ export default function TeacherAddBookPage() {
                         This request needs manual book entry.
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-stone-700">
-                        Mekuru could not find enough metadata automatically. Use the ISBN or
-                        any title/author clue below to research the book, then enter the
-                        shared catalog details manually.
+                        Mekuru could not find enough metadata automatically. Research the
+                        book from any clue below. ISBN is helpful when available, but it is
+                        not required for manual entry.
                     </p>
 
                     <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -751,13 +812,35 @@ export default function TeacherAddBookPage() {
                             <dd className="text-stone-900">{bookRequest.status || "pending"}</dd>
                         </div>
                     </dl>
+
+                    <div className="mt-5 border-t border-amber-200 pt-4">
+                        <button
+                            type="button"
+                            onClick={rejectBookRequest}
+                            disabled={saving}
+                            className="rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                        >
+                            {saving ? "Updating..." : "Reject Request"}
+                        </button>
+                        <p className="mt-2 text-xs leading-5 text-amber-800">
+                            Use this if this request should not become a global book. Mekuru will keep the request history.
+                        </p>
+                    </div>
                 </section>
             ) : null}
 
             <section className="mt-8 rounded-3xl border border-stone-500 bg-stone-100 p-5">
                 <h2 className="text-lg font-black text-stone-900">
-                    Find or Create Book
+                    {bookRequest ? "Manual Book Entry" : "Find or Create Book"}
                 </h2>
+
+                {bookRequest ? (
+                    <div className="mt-3 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm leading-6 text-stone-700">
+                        <span className="font-black text-stone-900">Manual entry:</span>{" "}
+                        1. Research the real title. 2. Type the title below. 3. Add ISBN only if you have it.
+                        4. Create the global book. 5. Fill in the shared Book Info details.
+                    </div>
+                ) : null}
 
                 <div className="mt-5 grid gap-5 md:grid-cols-2">
                     <div>
@@ -765,13 +848,26 @@ export default function TeacherAddBookPage() {
                         <input
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
+                            placeholder={
+                                bookRequest
+                                    ? "Enter the researched book title"
+                                    : "Book title"
+                            }
                             className="w-full rounded-xl border border-slate-500 px-4 py-3"
                         />
+                        {bookRequest && requestTitleNeedsManualResearch(bookRequest) ? (
+                            <p className="mt-2 text-xs font-medium text-amber-800">
+                                The request only gave an ISBN, so the real title needs to be entered here.
+                            </p>
+                        ) : null}
                     </div>
 
                     <div>
                         <label className="mb-1 block text-sm font-semibold">
-                            ISBN-13 * <span className="font-normal text-stone-500">(Hyphens are okay.)</span>
+                            ISBN-13{" "}
+                            <span className="font-normal text-stone-500">
+                                {bookRequest ? "(optional for manual entry)" : "*(Hyphens are okay.)"}
+                            </span>
                         </label>
                         <input
                             value={isbn13}
@@ -800,7 +896,11 @@ export default function TeacherAddBookPage() {
                         disabled={saving}
                         className="rounded-2xl bg-stone-900 px-5 py-3 font-semibold text-white hover:bg-black disabled:opacity-50"
                     >
-                        {saving ? "Working..." : "Create / Load by ISBN"}
+                        {saving
+                            ? "Working..."
+                            : bookRequest
+                                ? "Create Manual Book Entry"
+                                : "Create / Load by ISBN"}
                     </button>
 
                     <button

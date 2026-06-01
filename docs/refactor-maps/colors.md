@@ -130,215 +130,6 @@ This first pass should be presentational only. Components should receive already
 The suggested components below are ordered from easiest / lowest-risk to more complex: A, B, C, and onward.
 
 
-
-### B. `ReadingColorsErrorBanner`
-
-* What JSX it owns:
-  * the conditional red error banner
-* Expected props:
-  * `message: string`
-* What stays in `page.tsx`:
-  * `errorMsg` state
-  * error handling inside the load effect
-* Risk level: low
-* Why it is safe or risky:
-  * Safe because it only displays an already-computed error message.
-* Recommended order:
-  * B
-* Helpful comment notes:
-  * No comment needed.
-
-### C. `ColorDeltaPill`
-
-* What JSX it owns:
-  * already exists as a local presentational function
-  * can move into `components/ColorDeltaPill.tsx`
-* Expected props:
-  * `value: number | null`
-  * `className: string`
-* What stays in `page.tsx`:
-  * delta calculation
-  * color-specific class strings for now
-* Risk level: low
-* Why it is safe or risky:
-  * Safe because it already has a clean prop boundary and no app logic beyond display formatting.
-* Recommended order:
-  * C
-* Helpful comment notes:
-  * If extracted, note that `className` carries color meaning from the page config.
-
-### D. `ColorGuideStepCard`
-
-* What JSX it owns:
-  * existing `ColorStepCard`
-  * visual card for each explanatory color step
-* Expected props:
-  * `stage: MainStage`
-  * `title: string`
-  * `detail: string`
-  * `note: string`
-* What stays in `page.tsx`:
-  * guide copy
-  * `MainStage` type for now, or pass it through once types are shared
-* Risk level: low
-* Why it is safe or risky:
-  * Safe because it is already a pure visual helper. Slightly more sensitive than the header because color stage labels carry app meaning.
-* Recommended order:
-  * D
-* Helpful comment notes:
-  * A short component comment could say this card is explanatory only and does not calculate color state.
-
-### E. `ColorGuideGroupLabel`
-
-* What JSX it owns:
-  * existing `GroupLabel`
-  * divider label and detail text inside the guide
-* Expected props:
-  * `title: string`
-  * `detail: string`
-* What stays in `page.tsx`:
-  * group copy
-  * grouping order
-* Risk level: low
-* Why it is safe or risky:
-  * Safe because it is static presentational UI.
-* Recommended order:
-  * E
-* Helpful comment notes:
-  * No comment needed.
-
-### F. `ReadingColorsGuide`
-
-* What JSX it owns:
-  * full `<details>` “Why colors?” panel
-  * parrot image block
-  * introductory explanatory paragraphs
-  * “Based on encounters” group
-  * “Based on ability” group
-  * `ColorGuideGroupLabel` and `ColorGuideStepCard` children
-* Expected props:
-  * likely none at first
-  * optional future props for copy or image path if reused
-* What stays in `page.tsx`:
-  * data loading
-  * color totals
-  * stats card rendering
-  * error/loading state
-* Risk level: low-medium
-* Why it is safe or risky:
-  * Mostly safe because it is static instructional UI. Risk comes from accidentally changing important app-rule wording about Red/Orange/Yellow loops, gates, and Limbo.
-* Recommended order:
-  * F
-* Helpful comment notes:
-  * Add a short boundary comment in the page or component: “Instructional copy only; color movement rules stay in the study logic and totals helpers.”
-
-### G. `ReadingColorTotalsGrid`
-
-* What JSX it owns:
-  * the main grid of six Red/Orange/Yellow/Green/Blue/Purple cards
-  * mapping over `colorItems`
-  * rendering `ColorDeltaPill`
-  * previous snapshot and current total mini-cards
-* Expected props:
-  * `items`
-  * `loading: boolean`
-  * `previousTotals: LibraryStudyColorTotals | null`
-  * `allTimeTotals: LibraryStudyColorTotals`
-  * `comparisonDateLabel: string`
-* What stays in `page.tsx`:
-  * `colorItems` config at first
-  * `colorValue`
-  * previous/current/delta calculation can stay in page for the first extraction, or be passed as already-shaped display rows
-* Risk level: medium
-* Why it is safe or risky:
-  * Visually straightforward, but it touches the most important numbers on the page. Safest version passes already-computed display rows instead of moving calculations.
-* Recommended order:
-  * G
-* Helpful comment notes:
-  * Comment that the component should not decide what counts as current/previous; it only displays already-scoped totals.
-
-### H. `SupportLoopCard`
-
-* What JSX it owns:
-  * the Red 2 / Orange 2 / Yellow 2 extra encounter support card
-* Expected props:
-  * none at first
-* What stays in `page.tsx`:
-  * section layout until `ReadingColorSupportSection` is extracted
-* Risk level: low-medium
-* Why it is safe or risky:
-  * Mostly static UI. Risk is app-rule wording around repeated encounter loops.
-* Recommended order:
-  * H
-* Helpful comment notes:
-  * Note that this describes behavior that should match Ability Check/support-loop implementation.
-
-### I. `LimboSupportCard`
-
-* What JSX it owns:
-  * one Limbo/support card rendered from `limboItems`
-  * dot, label, delta pill, snapshot/current values, detail copy
-* Expected props:
-  * item display config
-  * `loading: boolean`
-  * `previousValue: number | null`
-  * `allTimeValue: number`
-  * `delta: number | null`
-  * `comparisonDateLabel: string`
-* What stays in `page.tsx`:
-  * Limbo totals
-  * `limboItems`
-  * value/delta calculation at first
-* Risk level: medium
-* Why it is safe or risky:
-  * Similar to the color total card. It is display-only, but the Limbo distinction is easy to confuse if logic or labels move too early.
-* Recommended order:
-  * I
-* Helpful comment notes:
-  * Comment that Limbo reason keys are app-rule data and should remain page/service-owned until architecture refactor.
-
-### J. `ReadingColorSupportSection`
-
-* What JSX it owns:
-  * “Between gates” eyebrow
-  * “Words waiting for support” title/copy
-  * `SupportLoopCard`
-  * mapped `LimboSupportCard` cards
-* Expected props:
-  * `limboItems`
-  * `loading`
-  * `previousLimboTotals`
-  * `allTimeLimboTotals`
-  * `comparisonDateLabel`
-* What stays in `page.tsx`:
-  * data loading
-  * totals state
-  * value/delta helpers at first
-* Risk level: medium
-* Why it is safe or risky:
-  * Useful page-thinning extraction, but it combines several app-rule explanations and live private totals.
-* Recommended order:
-  * J
-* Helpful comment notes:
-  * Note that this section only presents support states; it should not decide movement rules.
-
-### K. `ColorMovementInfoSection`
-
-* What JSX it owns:
-  * “When do colors change?” section
-  * three explanatory cards for reading encounters, Ability Check gates, and Limbo/support
-* Expected props:
-  * none at first
-* What stays in `page.tsx`:
-  * nothing from this static copy, aside from page composition
-* Risk level: low-medium
-* Why it is safe or risky:
-  * Static visual section. Risk is wording drift around what activities move colors.
-* Recommended order:
-  * K
-* Helpful comment notes:
-  * No noisy comments needed; a section-level comment can mention this copy must match study behavior.
-
 ### L. Display Row Shaping For Cards
 
 * What JSX it owns:
@@ -356,14 +147,6 @@ The suggested components below are ordered from easiest / lowest-risk to more co
   * L, only if `ReadingColorTotalsGrid` or `ReadingColorSupportSection` props feel too wide.
 * Helpful comment notes:
   * A useful comment could say display rows are intentionally shaped in `page.tsx` so presentational cards do not own stats rules.
-
-## Recommended First Extraction
-
-Start with `ReadingColorsHeader`.
-
-It is the smallest and clearest low-risk extraction because it owns static navigation and heading markup only. It does not depend on Supabase data, loading state, color totals, Limbo totals, comparison dates, or app-rule calculations.
-
-After that, extract `ReadingColorsErrorBanner`, then the already-local `ColorDeltaPill`, `ColorGuideStepCard`, and `ColorGuideGroupLabel`.
 
 ## Later Architecture Refactor
 
@@ -495,25 +278,13 @@ A future status of `Visual pass done / architecture deferred` should mean the sa
 
 
 - [✔️] Extracted `ReadingColorsHeader`.
-
-
-### A. `ReadingColorsHeader`
-
-* What JSX it owns:
-  * Back to Stats Home link
-  * small “Study colors” eyebrow
-  * `Reading Colors` page title
-* Expected props:
-  * none, unless the back href or title needs to be configurable later
-* What stays in `page.tsx`:
-  * page shell
-  * data loading
-  * state
-  * all color totals
-* Risk level: low
-* Why it is safe or risky:
-  * Safe because it is static navigation/header markup with no data dependencies.
-* Recommended order:
-  * A
-* Helpful comment notes:
-  * No comment needed unless the page keeps the header inline for a while.
+- [✔️] Extracted `ReadingColorsErrorBanner`.
+- [✔️] Extracted `ColorDeltaPill`.
+- [✔️] Extracted `ColorGuideStepCard`.
+- [✔️] Extracted `ColorGuideGroupLabel`.
+- [✔️] Extracted `ReadingColorsGuide`.
+- [✔️] Extracted `ReadingColorTotalsGrid`.
+- [✔️] Extracted `SupportLoopCard`.
+- [✔️] Extracted `LimboSupportCard`.
+- [✔️] Extracted `ReadingColorSupportSection`.
+- [✔️] Extracted `ColorMovementInfoSection`.

@@ -182,6 +182,8 @@ const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
 const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
 const SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY =
   "super-teacher-kanji-enrichment-reminder-hidden-date";
+const PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY =
+  "pending-book-requests-alert-hidden-signature";
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
 const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
 const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
@@ -252,6 +254,24 @@ function superTeacherKanjiReminderHiddenToday() {
 function hideSuperTeacherKanjiReminderForToday() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY, getTodayKey());
+}
+
+function pendingBookRequestsSignature(requests: Array<{ id?: string | null }>) {
+  return requests
+    .map((request) => request.id)
+    .filter(Boolean)
+    .sort()
+    .join("|");
+}
+
+function pendingBookRequestsAlertHidden(signature: string) {
+  if (typeof window === "undefined" || !signature) return false;
+  return window.localStorage.getItem(PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY) === signature;
+}
+
+function hidePendingBookRequestsAlert(signature: string) {
+  if (typeof window === "undefined" || !signature) return;
+  window.localStorage.setItem(PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY, signature);
 }
 
 function isKatakanaOnly(value: string | null | undefined) {
@@ -653,6 +673,8 @@ export default function BooksPage() {
   const [showAddBook, setShowAddBook] = useState(false);
 
   const [bookRequests, setBookRequests] = useState<any[]>([]);
+  const [dismissedPendingBookRequestsSignature, setDismissedPendingBookRequestsSignature] =
+    useState("");
   const [requestBookTitle, setRequestBookTitle] = useState("");
   const [requestBookAuthor, setRequestBookAuthor] = useState("");
   const [requestBookIsbn, setRequestBookIsbn] = useState("");
@@ -674,6 +696,15 @@ export default function BooksPage() {
       return matchesBookType && matchesFormat;
     });
   }, [rows, bookTypeFilter, formatFilter]);
+
+  const pendingBookRequestsAlertSignature = useMemo(
+    () => pendingBookRequestsSignature(bookRequests),
+    [bookRequests]
+  );
+  const showPendingBookRequestsAlert =
+    bookRequests.length > 0 &&
+    dismissedPendingBookRequestsSignature !== pendingBookRequestsAlertSignature &&
+    !pendingBookRequestsAlertHidden(pendingBookRequestsAlertSignature);
 
   const allValidRows = filteredRows.filter((r) => !!r.books);
   const validRows = allValidRows.filter((r) => !r.is_teacher_prep);
@@ -1426,6 +1457,33 @@ export default function BooksPage() {
     }
   }
 
+  async function handleRejectBookRequest(requestId: string) {
+    const confirmed = window.confirm(
+      "Reject this book request? It will leave the pending list, but the request history will stay in Mekuru."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("book_requests")
+        .update({ status: "rejected" })
+        .eq("id", requestId);
+
+      if (error) {
+        console.error("Reject request error:", error);
+        alert("Could not reject request.");
+        return;
+      }
+
+      alert("Book request rejected.");
+      await loadPendingBookRequests();
+    } catch (err) {
+      console.error("Reject request error:", err);
+      alert("Something went wrong.");
+    }
+  }
+
   async function loadKanjiEnrichmentAlerts(userIdsToView: string[]) {
     if (userIdsToView.length === 0) {
       setKanjiEnrichmentAlerts([]);
@@ -1886,7 +1944,8 @@ export default function BooksPage() {
       const { data: rels, error: relErr } = await supabase
         .from("teacher_students")
         .select("student_id")
-        .eq("teacher_id", user.id);
+        .eq("teacher_id", user.id)
+        .is("archived_at", null);
 
       if (relErr) {
         logSbError("Error loading teacher_students:", relErr);
@@ -2815,7 +2874,7 @@ export default function BooksPage() {
           </div>
         ) : null}
 
-        {isSuperTeacher && bookRequests.length > 0 ? (
+        {isSuperTeacher && showPendingBookRequestsAlert ? (
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -2825,6 +2884,16 @@ export default function BooksPage() {
                   {bookRequests.length === 1 ? "request" : "requests"}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  hidePendingBookRequestsAlert(pendingBookRequestsAlertSignature);
+                  setDismissedPendingBookRequestsSignature(pendingBookRequestsAlertSignature);
+                }}
+                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
+              >
+                Dismiss
+              </button>
             </div>
 
             <div className="mt-3 space-y-3">
@@ -2851,6 +2920,12 @@ export default function BooksPage() {
                       className="rounded-lg bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700"
                     >
                       Add to Library
+                    </button>
+                    <button
+                      onClick={() => handleRejectBookRequest(req.id)}
+                      className="rounded-lg border border-rose-200 bg-white px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                    >
+                      Reject
                     </button>
                   </div>
 

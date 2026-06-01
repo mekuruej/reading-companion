@@ -209,7 +209,8 @@ export default function AssignBookPage() {
           const { data: links, error: linksError } = await supabase
             .from("teacher_students")
             .select("student_id")
-            .eq("teacher_id", authUser.id);
+            .eq("teacher_id", authUser.id)
+            .is("archived_at", null);
 
           if (linksError) throw linksError;
 

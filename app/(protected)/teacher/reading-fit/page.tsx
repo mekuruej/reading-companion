@@ -173,7 +173,8 @@ export default function TeacherReadingFitPage() {
       const { data: teacherLinks, error: teacherLinksError } = await supabase
         .from("teacher_students")
         .select("student_id")
-        .eq("teacher_id", user.id);
+        .eq("teacher_id", user.id)
+        .is("archived_at", null);
 
       if (teacherLinksError) throw teacherLinksError;
 
