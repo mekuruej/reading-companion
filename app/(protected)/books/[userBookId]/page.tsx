@@ -15,6 +15,7 @@ import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import BookHubLoadingState from "./components/BookHubLoadingState";
 
 type Book = {
   id: string;
@@ -4768,12 +4769,8 @@ export default function BookHubPage() {
   }, [fluidMinutes, fluidPages]);
 
   if (loading) {
-    return (
-      <main className="p-6">
-        <div className="text-sm text-gray-600">Loading book info…</div>
-      </main>
-    );
-  }
+  return <BookHubLoadingState />;
+}
 
   if (!row || !book) {
     if (error === "You do not have access to this book.") {
