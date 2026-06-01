@@ -22,6 +22,7 @@ import ReadingColorTotalsGrid, {
   type ReadingColorTotalRow,
 } from "./components/ReadingColorTotalsGrid";
 import SupportLoopCard from "./components/SupportLoopCard";
+import LimboSupportCard from "./components/LimboSupportCard";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
@@ -306,7 +307,7 @@ export default function ReadingColorsPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-            <SupportLoopCard />
+          <SupportLoopCard />
           {limboItems.map((item) => {
             const previousValue =
               previousLimboTotals == null
@@ -315,51 +316,22 @@ export default function ReadingColorsPage() {
             const allTimeValue = limboValue(allTimeLimboTotals, item.key);
             const delta =
               previousValue == null ? null : allTimeValue - previousValue;
-
             return (
-              <div
+              <LimboSupportCard
                 key={item.key}
-                className={`rounded-3xl border p-5 shadow-sm ${item.cardClasses}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-3 w-3 rounded-full ${item.dotClass}`}
-                    />
-                    <h3 className="text-lg font-black">{item.label}</h3>
-                  </div>
-
-                  {!loading ? (
-                    <ColorDeltaPill value={delta} className={item.deltaClass} />
-                  ) : null}
-                </div>
-
-                <p className="mt-1 text-sm font-bold">{item.shortMeaning}</p>
-
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <div className="rounded-2xl bg-white/70 p-3">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-                      On {previousMonthComparisonDateLabel()}
-                    </p>
-                    <p className={`mt-1 text-2xl font-black ${item.valueClass}`}>
-                      {loading || previousValue == null ? "—" : previousValue}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-white/70 p-3">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-                      Current total
-                    </p>
-                    <p className={`mt-1 text-2xl font-black ${item.valueClass}`}>
-                      {loading ? "—" : allTimeValue}
-                    </p>
-                  </div>
-                </div>
-
-                <p className="mt-4 text-sm leading-6 text-stone-700">
-                  {item.detail}
-                </p>
-              </div>
+                label={item.label}
+                shortMeaning={item.shortMeaning}
+                detail={item.detail}
+                cardClasses={item.cardClasses}
+                dotClass={item.dotClass}
+                deltaClass={item.deltaClass}
+                valueClass={item.valueClass}
+                loading={loading}
+                previousValue={previousValue}
+                allTimeValue={allTimeValue}
+                delta={delta}
+                comparisonDateLabel={comparisonDateLabel}
+              />
             );
           })}
         </div>
