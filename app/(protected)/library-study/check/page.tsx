@@ -1301,7 +1301,7 @@ function LibraryPracticePanel({
                     ? "Next card comes automatically."
                     : typingStep === "reading"
                       ? "Retype the reading once to continue."
-                      : "Type one meaning word once to continue."}
+                      : `Retype "${shortMeaningRetypeHint(typingFeedback.answer)}" from the meaning to continue.`}
                 </p>
               </div>
             ) : (
@@ -1386,13 +1386,48 @@ function errorMessage(error: unknown) {
   );
 }
 
+function normalizeMeaningAnswer(value: string) {
+  return normalizeText(value)
+    .replace(/[“”"]/g, "")
+    .replace(/[()[\]{}]/g, " ")
+    .replace(/[.,;:!?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function meaningAnswerCandidates(fullMeaning: string) {
+  const candidates = new Set<string>();
+  const add = (value: string) => {
+    const normalized = normalizeMeaningAnswer(value);
+    if (normalized) candidates.add(normalized);
+  };
+
+  add(fullMeaning);
+  add(shortMeaningRetypeHint(fullMeaning));
+  add(fullMeaning.replace(/\([^)]*\)/g, " "));
+
+  for (const part of fullMeaning.split(/[;,]/)) {
+    add(part);
+    add(part.replace(/\([^)]*\)/g, " "));
+  }
+
+  const firstNaturalBreak = fullMeaning.split(/[;,()]/)[0] ?? "";
+  add(firstNaturalBreak);
+
+  return candidates;
+}
+
 function matchesAnyMeaning(input: string, fullMeaning: string) {
-  const normalizedInput = normalizeText(input);
+  const normalizedInput = normalizeMeaningAnswer(input);
   if (!normalizedInput) return false;
+
+  if (meaningAnswerCandidates(fullMeaning).has(normalizedInput)) {
+    return true;
+  }
 
   const semicolonParts = fullMeaning
     .split(";")
-    .map((part) => normalizeText(part))
+    .map((part) => normalizeMeaningAnswer(part))
     .filter(Boolean);
 
   for (const part of semicolonParts) {
@@ -1400,7 +1435,7 @@ function matchesAnyMeaning(input: string, fullMeaning: string) {
 
     const commaParts = part
       .split(",")
-      .map((piece) => normalizeText(piece))
+      .map((piece) => normalizeMeaningAnswer(piece))
       .filter(Boolean);
 
     for (const piece of commaParts) {
@@ -1409,7 +1444,7 @@ function matchesAnyMeaning(input: string, fullMeaning: string) {
       const words = piece
         .replace(/[()]/g, " ")
         .split(/\s+/)
-        .map((word) => normalizeText(word))
+        .map((word) => normalizeMeaningAnswer(word))
         .filter(Boolean);
 
       if (words.includes(normalizedInput)) {
@@ -2772,7 +2807,7 @@ export default function LibraryStudyPage() {
         setNotice(
           activeStudyMode === "reading_typing"
             ? "Retype the reading once to continue."
-            : "Type one meaning word once to continue."
+            : `Retype "${shortMeaningRetypeHint(checked.correct)}" from the meaning to continue.`
         );
         return;
       }
