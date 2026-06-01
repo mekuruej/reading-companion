@@ -17,6 +17,7 @@ import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
+import BookHubProgressSummary from "./components/BookHubProgressSummary";
 
 type Book = {
   id: string;
@@ -979,6 +980,37 @@ export default function BookHubPage() {
     if (!book?.page_count || !furthestPage) return null;
     return Math.min(100, Math.round((furthestPage / book.page_count) * 100));
   }, [book?.page_count, furthestPage, finished]);
+
+  const savedWordsProgressCount =
+    uniqueLookupCount != null ? uniqueLookupCount : 0;
+
+  const savedWordsProgressLabel = `${savedWordsProgressCount} word${savedWordsProgressCount === 1 ? "" : "s"
+    } saved`;
+
+  const bookHubProgressLabel = finished
+    ? `${savedWordsProgressLabel} · 100%`
+    : readingSessions.length > 0 && progressPercent != null && furthestPage != null
+      ? `${savedWordsProgressLabel} · ${progressPercent}% · On page ${furthestPage}${lastSavedWord ? ` · Last saved word: ${lastSavedWord}` : ""
+      }`
+      : started
+        ? "In progress"
+        : "Not started";
+
+  const bookHubProgressBarWidth =
+    progressPercent != null
+      ? `${progressPercent}%`
+      : finished
+        ? "100%"
+        : started
+          ? "8%"
+          : "0%";
+
+  const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
+  const bookHubPagesReadLabel = totalPagesRead ? String(totalPagesRead) : "—";
+  const bookHubWordsSavedLabel =
+    uniqueLookupCount != null ? String(uniqueLookupCount) : "—";
+  const bookHubAverageMinutesPerPageLabel =
+    averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
 
   const shouldNudgeStartBook = !started && realReadingSessions.length === 0;
   const shouldNudgeFinishBook =
@@ -5095,80 +5127,15 @@ export default function BookHubPage() {
             ) : null}
 
             <div className="mt-6 space-y-4">
-              <div>
-                <div className="mb-2 text-sm text-stone-700">
-                  <div className="font-medium">Progress</div>
-                  <div className="mt-1 text-stone-500">
-                    {finished
-                      ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · 100%`
-                      : readingSessions.length > 0 && progressPercent != null && furthestPage != null
-                        ? `${uniqueLookupCount != null ? uniqueLookupCount : 0} word${uniqueLookupCount === 1 ? "" : "s"} saved · ${progressPercent}% · On page ${furthestPage}${lastSavedWord ? ` · Last saved word: ${lastSavedWord}` : ""}`
-                        : started
-                          ? "In progress"
-                          : "Not started"}
-                  </div>
-                </div>
-
-                <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
-                  <div
-                    className="h-full rounded-full bg-stone-700 transition-all"
-                    style={{
-                      width:
-                        progressPercent != null
-                          ? `${progressPercent}%`
-                          : finished
-                            ? "100%"
-                            : started
-                              ? "8%"
-                              : "0%",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <p className="mt-2 mb-4 text-xs text-stone-500">
-                Last read: {lastReadDate ?? "—"}
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Days Engaged</div>
-                  <div className="mt-1 font-medium">{daysRead != null ? daysRead : "—"}</div>
-                  <div className="mt-1 text-[10px] text-stone-400">
-                    Reading or listening
-                  </div>
-                </div>
-
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Pages Read</div>
-                  <div className="mt-1 font-medium">{totalPagesRead || "—"}</div>
-                  <div className="mt-1 text-[10px] text-stone-400">
-                    Page-tracked only
-                  </div>
-                </div>
-
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Words Saved</div>
-                  <div className="mt-1 font-medium">
-                    {uniqueLookupCount != null ? uniqueLookupCount : "—"}
-                  </div>
-                  <div className="mt-1 text-[10px] text-stone-400">
-                    Unique saved words
-                  </div>
-                </div>
-
-                <div className="rounded-xl border bg-white p-3 text-center">
-                  <div className="text-xs text-stone-500">Avg Min/Page</div>
-                  <div className="mt-1 font-medium">
-                    {averageMinutesPerPage != null
-                      ? averageMinutesPerPage.toFixed(1)
-                      : "—"}
-                  </div>
-                  <div className="mt-1 text-[10px] text-stone-400">
-                    Timed page-tracked reading
-                  </div>
-                </div>
-              </div>
+              <BookHubProgressSummary
+                progressLabel={bookHubProgressLabel}
+                progressBarWidth={bookHubProgressBarWidth}
+                lastReadDateLabel={lastReadDate ?? "—"}
+                daysEngagedLabel={bookHubDaysEngagedLabel}
+                pagesReadLabel={bookHubPagesReadLabel}
+                wordsSavedLabel={bookHubWordsSavedLabel}
+                averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
+              />
 
               <div className="mb-3 text-center">
                 <h2 className="text-base font-semibold text-stone-900 sm:text-lg">
