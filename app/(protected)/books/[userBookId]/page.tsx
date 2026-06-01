@@ -21,6 +21,7 @@ import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
 import BookHubTabBar from "./components/BookHubTabBar";
 import BookHubTabSectionHeader from "./components/BookHubTabSectionHeader";
+import BookHubHero from "./components/BookHubHero";
 
 type Book = {
   id: string;
@@ -4868,129 +4869,29 @@ export default function BookHubPage() {
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="p-5 md:p-8">
             <div className="grid gap-6 md:grid-cols-[150px_minmax(0,1fr)_380px] md:items-start md:gap-8">
-              <div className="w-[140px] shrink-0 md:w-[150px]">
-                {(isEditingThisTab ? coverUrl : book.cover_url) ? (
-                  <img
-                    src={isEditingThisTab ? coverUrl : (book.cover_url ?? "")}
-                    alt={`${book.title} cover`}
-                    className="w-full rounded-2xl border border-stone-200 object-cover shadow-sm"
-                  />
-                ) : (
-                  <div className="flex aspect-[2/3] w-full items-center justify-center rounded-2xl border border-stone-200 bg-stone-100 text-sm text-stone-400">
-                    No cover
-                  </div>
-                )}
-              </div>
+              <BookHubHero
+                book={book}
+                displayedCoverUrl={isEditingThisTab ? coverUrl : book.cover_url}
+                selectedUserBookId={userBookId ?? ""}
+                bookHubContextLabel={bookHubContextLabel}
+                isViewingStudentBookHub={isViewingStudentBookHub}
+                isTeacherContext={isTeacherContext}
+                currentlyReadingBooks={currentlyReadingBooks}
+                otherBooks={otherBooks}
+                onTeacherReview={() => router.push(`/teacher/books/${row.id}`)}
+                onSwitchBook={(nextValue) => {
+                  if (!nextValue) return;
 
-              <div className="min-w-0">
-                <div className="space-y-3">
-                  <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
-                      {book.title}
-                    </h1>
+                  if (nextValue === "all-book-hubs") {
+                    router.push("/library/book-hubs");
+                    return;
+                  }
 
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <div
-                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${isViewingStudentBookHub
-                          ? "border-amber-200 bg-amber-50 text-amber-800"
-                          : "border-stone-200 bg-stone-50 text-stone-600"
-                          }`}
-                      >
-                        {bookHubContextLabel}
-                      </div>
+                  if (nextValue === userBookId) return;
 
-                      {isTeacherContext ? (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/teacher/books/${row.id}`)}
-                          className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800 transition hover:bg-violet-100"
-                        >
-                          Teacher Review →
-                        </button>
-                      ) : null}
-                    </div>
-
-                    {book.title_reading ? (
-                      <div className="mt-1 text-lg text-stone-500 md:text-xl">
-                        {book.title_reading}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {book.author && (
-                    <div>
-                      <div className="text-xl font-semibold text-stone-900 md:text-2xl">
-                        {book.author}
-                      </div>
-
-                      {book.author_reading ? (
-                        <div className="mt-1 text-base text-stone-500 md:text-lg">
-                          {book.author_reading}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {book.translator && (
-                    <div>
-                      <div className="text-base font-medium text-stone-700 md:text-lg">
-                        Translated by {book.translator}
-                      </div>
-
-                      {book.translator_reading ? (
-                        <div className="mt-1 text-sm text-stone-500 md:text-base">
-                          {book.translator_reading}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 max-w-sm">
-                  <div className="mb-1 text-xs uppercase tracking-wide text-stone-500">
-                    Switch Book
-                  </div>
-
-                  <select
-                    value={userBookId ?? ""}
-                    onChange={(e) => {
-                      const newId = e.target.value;
-                      if (!newId) return;
-
-                      if (newId === "all-book-hubs") {
-                        router.push("/library/book-hubs");
-                        return;
-                      }
-
-                      if (newId === userBookId) return;
-                      router.push(`/books/${newId}`);
-                    }}
-                    className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700"
-                  >
-                    <option value="all-book-hubs">All Book Hubs</option>
-
-                    {currentlyReadingBooks.length > 0 && (
-                      <optgroup label="Currently Reading">
-                        {currentlyReadingBooks.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.title}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-
-                    {otherBooks.length > 0 && (
-                      <optgroup label="All Books">
-                        {otherBooks.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.title}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
-                </div>
-              </div>
+                  router.push(`/books/${nextValue}`);
+                }}
+              />
 
               <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
                 <div className="mb-3 text-sm font-semibold text-stone-900">Book Status</div>
