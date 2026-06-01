@@ -18,6 +18,9 @@ import ColorDeltaPill from "./components/ColorDeltaPill";
 import ColorGuideGroupLabel from "./components/ColorGuideGroupLabel";
 import ColorGuideStepCard from "./components/ColorGuideStepCard";
 import ReadingColorsGuide from "./components/ReadingColorsGuide";
+import ReadingColorTotalsGrid, {
+  type ReadingColorTotalRow,
+} from "./components/ReadingColorTotalsGrid";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
@@ -222,6 +225,31 @@ export default function ReadingColorsPage() {
     []
   );
 
+  const colorTotalRows: ReadingColorTotalRow[] = useMemo(
+    () =>
+      colorItems.map((item) => {
+        const previousValue =
+          previousTotals == null ? null : colorValue(previousTotals, item.key);
+        const allTimeValue = colorValue(allTimeTotals, item.key);
+        const delta =
+          previousValue == null ? null : allTimeValue - previousValue;
+
+        return {
+          key: item.key,
+          label: item.label,
+          shortMeaning: item.shortMeaning,
+          cardClasses: item.cardClasses,
+          dotClass: item.dotClass,
+          deltaClass: item.deltaClass,
+          valueClass: item.valueClass,
+          previousValue,
+          allTimeValue,
+          delta,
+        };
+      }),
+    [allTimeTotals, colorItems, previousTotals]
+  );
+  const comparisonDateLabel = previousMonthComparisonDateLabel();
   const limboItems = useMemo(
     () => [
       {
@@ -256,60 +284,12 @@ export default function ReadingColorsPage() {
         <ReadingColorsHeader />
         <ReadingColorsGuide colorLabel={colorLabel} stagePill={stagePill} />
       </div>
-
       <ReadingColorsErrorBanner message={errorMsg} />
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {colorItems.map((item) => {
-          const previousValue =
-            previousTotals == null ? null : colorValue(previousTotals, item.key);
-          const allTimeValue = colorValue(allTimeTotals, item.key);
-          const delta =
-            previousValue == null ? null : allTimeValue - previousValue;
-
-          return (
-            <div
-              key={item.key}
-              className={`rounded-3xl border p-5 shadow-sm ${item.cardClasses}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`h-3 w-3 rounded-full ${item.dotClass}`}
-                  />
-                  <h2 className="text-xl font-black">{item.label}</h2>
-                </div>
-
-                {!loading ? (
-                  <ColorDeltaPill value={delta} className={item.deltaClass} />
-                ) : null}
-              </div>
-
-              <p className="mt-1 text-sm font-bold">{item.shortMeaning}</p>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <div className="rounded-2xl bg-white/70 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-                    On {previousMonthComparisonDateLabel()}
-                  </p>
-                  <p className={`mt-1 text-2xl font-black ${item.valueClass}`}>
-                    {loading || previousValue == null ? "—" : previousValue}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white/70 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-                    Current total
-                  </p>
-                  <p className={`mt-1 text-2xl font-black ${item.valueClass}`}>
-                    {loading ? "—" : allTimeValue}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </section>
+      <ReadingColorTotalsGrid
+        rows={colorTotalRows}
+        loading={loading}
+        comparisonDateLabel={comparisonDateLabel}
+      />
       <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="mb-4">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
