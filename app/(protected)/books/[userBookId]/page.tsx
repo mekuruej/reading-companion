@@ -19,6 +19,7 @@ import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
+import BookHubTabBar from "./components/BookHubTabBar";
 
 type Book = {
   id: string;
@@ -5188,46 +5189,7 @@ export default function BookHubPage() {
                 }}
               />
 
-              <div className="mt-2">
-                <div className="mb-4 w-full border-b border-stone-400 px-2">
-                  <div className="flex flex-wrap items-end gap-3">
-                    <FilingTab
-                      active={activeTab === "reflection"}
-                      onClick={() => setActiveTab("reflection")}
-                    >
-                      Reading Reflection
-                    </FilingTab>
-
-                    <FilingTab
-                      active={activeTab === "study"}
-                      onClick={() => setActiveTab("study")}
-                    >
-                      Vocab Tools
-                    </FilingTab>
-
-                    <FilingTab
-                      active={activeTab === "reading"}
-                      onClick={() => setActiveTab("reading")}
-                    >
-                      Reading Sessions
-                    </FilingTab>
-
-                    <FilingTab
-                      active={activeTab === "story"}
-                      onClick={() => setActiveTab("story")}
-                    >
-                      Story Notes
-                    </FilingTab>
-
-                    <FilingTab
-                      active={activeTab === "bookInfo"}
-                      onClick={() => setActiveTab("bookInfo")}
-                    >
-                      Book Info
-                    </FilingTab>
-                  </div>
-                </div>
-              </div>
+              <BookHubTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
               {activeTab === "bookInfo" && (
                 <div className="space-y-4">
@@ -5627,31 +5589,6 @@ export default function BookHubPage() {
         </section>
       </div >
     </main >
-  );
-}
-
-function FilingTab({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "relative -mb-px rounded-t-2xl border px-5 py-3 text-base font-semibold transition-all",
-        active
-          ? "z-10 border-stone-600 border-b-white bg-stone-700 text-white shadow-sm"
-          : "border-stone-300 bg-stone-200 text-stone-700 hover:bg-stone-300",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }
 
