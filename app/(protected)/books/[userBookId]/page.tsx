@@ -20,6 +20,7 @@ import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
 import BookHubTabBar from "./components/BookHubTabBar";
+import BookHubTabSectionHeader from "./components/BookHubTabSectionHeader";
 
 type Book = {
   id: string;
@@ -5193,10 +5194,7 @@ export default function BookHubPage() {
 
               {activeTab === "bookInfo" && (
                 <div className="space-y-4">
-                  <div className="px-4 md:px-6">
-                    <div className="text-base font-semibold text-stone-900">Book Info</div>
-                  </div>
-
+                  <BookHubTabSectionHeader title="Book Info" />
                   <BookInfoTab
                     book={book}
                     canEditBookInfo={canEditBookInfo}
@@ -5301,10 +5299,7 @@ export default function BookHubPage() {
 
               {activeTab === "study" && (
                 <div className="space-y-4">
-                  <div className="px-4 md:px-6">
-                    <div className="text-base font-semibold text-stone-900">Vocab</div>
-                  </div>
-
+                  <BookHubTabSectionHeader title="Vocab" />
                   <VocabTab
                     row={row}
                     vocabTab={vocabTab}
@@ -5315,10 +5310,7 @@ export default function BookHubPage() {
 
               {activeTab === "reading" && (
                 <div className="space-y-4">
-                  <div className="px-4 md:px-6">
-                    <div className="text-base font-semibold text-stone-900">Reading</div>
-                  </div>
-
+                  <BookHubTabSectionHeader title="Reading" />
                   <ReadingTab
                     row={row}
                     book={book}
@@ -5368,10 +5360,7 @@ export default function BookHubPage() {
 
               {activeTab === "story" && (
                 <div className="space-y-4">
-                  <div className="px-4 md:px-6">
-                    <div className="text-base font-semibold text-stone-900">Story</div>
-                  </div>
-
+                  <BookHubTabSectionHeader title="Story" />
                   <StoryTab
                     storyTab={storyTab}
                     setStoryTab={setStoryTab}
@@ -5445,12 +5434,7 @@ export default function BookHubPage() {
 
               {activeTab === "reflection" && (
                 <div id="reading-reflection-panel" className="space-y-4 scroll-mt-6">
-                  <div className="px-4 md:px-6">
-                    <div className="text-base font-semibold text-stone-900">
-                      Reading Reflection
-                    </div>
-                  </div>
-
+                  <BookHubTabSectionHeader title="Reading Reflection" />
                   <RatingTab
                     row={row}
                     onSaveReflection={saveReadingReflectionFields}
