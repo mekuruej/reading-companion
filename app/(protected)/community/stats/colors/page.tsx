@@ -15,6 +15,8 @@ import { supabase } from "@/lib/supabaseClient";
 import ReadingColorsHeader from "./components/ReadingColorsHeader";
 import ReadingColorsErrorBanner from "./components/ReadingColorsErrorBanner";
 import ColorDeltaPill from "./components/ColorDeltaPill";
+import ColorGuideGroupLabel from "./components/ColorGuideGroupLabel";
+import ColorGuideStepCard from "./components/ColorGuideStepCard";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
@@ -79,52 +81,6 @@ function stagePill(stage: MainStage) {
   if (stage === "blue") return `${base} bg-blue-600 text-white`;
   if (stage === "purple") return `${base} bg-purple-600 text-white`;
   return `${base} bg-slate-500 text-white`;
-}
-
-function GroupLabel({
-  title,
-  detail,
-}: {
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-stone-200" />
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-          {title}
-        </div>
-        <div className="h-px flex-1 bg-stone-200" />
-      </div>
-      <p className="mt-2 text-center text-xs leading-5 text-stone-500">
-        {detail}
-      </p>
-    </div>
-  );
-}
-
-function ColorStepCard({
-  stage,
-  title,
-  detail,
-  note,
-}: {
-  stage: MainStage;
-  title: string;
-  detail: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-xl border border-stone-200 bg-white p-3">
-      <span className={stagePill(stage)}>{colorLabel(stage)}</span>
-      <div className="mt-2 text-sm font-semibold leading-5 text-stone-900">
-        {title}
-      </div>
-      <div className="mt-1 text-xs leading-5 text-stone-600">{detail}</div>
-      <div className="mt-2 text-[11px] leading-4 text-stone-500">{note}</div>
-    </div>
-  );
 }
 
 export default function ReadingColorsPage() {
@@ -351,25 +307,28 @@ export default function ReadingColorsPage() {
 
             <div className="mt-6 space-y-6 rounded-2xl border border-white/80 bg-white/80 p-4">
               <div>
-                <GroupLabel
+                <ColorGuideGroupLabel
                   title="Based on encounters"
                   detail="Red, orange, and yellow come from real reading encounters, not quiz answers. After yellow, you can decide to repeat these three levels if you are not ready for the Reading Gate."
                 />
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  <ColorStepCard
-                    stage="red"
+                  <ColorGuideStepCard
+                    stageLabel={colorLabel("red")}
+                    stageClassName={stagePill("red")}
                     title="Early encounter support"
                     detail="You have started meeting this word in real reading, but it is still too new for Ability Check."
                     note="If a word feels far above your level, Mekuru can give it more time."
                   />
-                  <ColorStepCard
-                    stage="orange"
+                  <ColorGuideStepCard
+                    stageLabel={colorLabel("orange")}
+                    stageClassName={stagePill("orange")}
                     title="Repeated encounter support"
                     detail="The word is showing up again, but Mekuru is still gathering reading support before testing it."
                     note="Encounters keep building quietly in the background."
                   />
-                  <ColorStepCard
-                    stage="yellow"
+                  <ColorGuideStepCard
+                    stageLabel={colorLabel("yellow")}
+                    stageClassName={stagePill("yellow")}
                     title="Ready for gate checks"
                     detail="Yellow means the word has enough encounter support to ask whether it is ready for Ability Check."
                     note="Yellow is the readiness checkpoint before the Reading Gate."
@@ -378,31 +337,35 @@ export default function ReadingColorsPage() {
               </div>
 
               <div>
-                <GroupLabel
+                <ColorGuideGroupLabel
                   title="Based on ability"
                   detail="Green, blue, purple, and Limbo come from Ability Check results."
                 />
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <ColorStepCard
-                    stage="green"
+                  <ColorGuideStepCard
+                    stageLabel={colorLabel("green")}
+                    stageClassName={stagePill("green")}
                     title="Reading Gate"
                     detail="The word is ready for a reading question in Ability Check."
                     note="Pass this gate to move toward meaning."
                   />
-                  <ColorStepCard
-                    stage="blue"
+                  <ColorGuideStepCard
+                    stageLabel={colorLabel("blue")}
+                    stageClassName={stagePill("blue")}
                     title="Meaning Gate"
                     detail="The reading is supported, and the word is ready for a meaning question."
                     note="Advanced words may care about the saved definition number."
                   />
-                  <ColorStepCard
-                    stage="purple"
+                  <ColorGuideStepCard
+                    stageLabel={colorLabel("purple")}
+                    stageClassName={stagePill("purple")}
                     title="Mastered"
                     detail="The word has cleared the major study gates and is no longer demanding regular attention."
                     note="Purple cards return only occasionally."
                   />
-                  <ColorStepCard
-                    stage="grey"
+                  <ColorGuideStepCard
+                    stageLabel={colorLabel("grey")}
+                    stageClassName={stagePill("grey")}
                     title="Limbo: between gates"
                     detail="Limbo only appears after a word has entered the gate path: between Green and Blue, or between Blue and Purple."
                     note="Choosing Not yet after Yellow repeats Red, Orange, and Yellow instead."
@@ -465,7 +428,7 @@ export default function ReadingColorsPage() {
               </div>
             </div>
           );
-          })}
+        })}
       </section>
       <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="mb-4">
