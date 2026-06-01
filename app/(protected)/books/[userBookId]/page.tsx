@@ -24,6 +24,7 @@ import BookHubTabSectionHeader from "./components/BookHubTabSectionHeader";
 import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
 import BookHubActionPrompt from "./components/BookHubActionPrompt";
+import WordExplorerModal from "./components/WordExplorerModal";
 
 type Book = {
   id: string;
@@ -4955,7 +4956,7 @@ export default function BookHubPage() {
               />
 
               <BookHubActionPrompt />
-              
+
               <BookHubNotices
                 error={error}
                 hideError={isEditingBookInfoPeople}
@@ -5277,105 +5278,18 @@ export default function BookHubPage() {
                 </div>
               )}
             </div>
-            {showWordExplorer && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                onClick={() => setShowWordExplorer(false)}
-              >
-                <div
-                  className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-stone-900">Word Explorer</h2>
-                      <p className="mt-1 text-sm text-stone-500">
-                        Search and explore a word without leaving the page.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowWordExplorer(false)}
-                      className="rounded-lg px-2 py-1 text-sm text-stone-500 hover:bg-stone-100"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={wordExplorerQuery}
-                        onChange={(e) => setWordExplorerQuery(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            searchWordExplorer();
-                          }
-                        }}
-                        placeholder="Search a word..."
-                        className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={searchWordExplorer}
-                        disabled={wordExplorerLoading || !wordExplorerQuery.trim()}
-                        className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                      >
-                        {wordExplorerLoading ? "Searching..." : "Search"}
-                      </button>
-                    </div>
-
-                    {wordExplorerError ? (
-                      <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                        {wordExplorerError}
-                      </div>
-                    ) : null}
-
-                    {wordExplorerResults.length > 0 ? (
-                      <div className="space-y-3">
-                        {wordExplorerResults.map((item, i) => {
-                          const japanese = item?.japanese?.[0];
-                          const senses = item?.senses ?? [];
-
-                          return (
-                            <div key={i} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-                              <div className="text-lg font-semibold text-stone-900">
-                                {japanese?.word || item?.slug || "—"}
-                              </div>
-
-                              {japanese?.reading ? (
-                                <div className="mt-1 text-sm text-stone-500">{japanese.reading}</div>
-                              ) : null}
-
-                              <div className="mt-3 space-y-2">
-                                {senses.slice(0, 3).map((sense: any, idx: number) => (
-                                  <div key={idx} className="text-sm text-stone-700">
-                                    <span className="font-medium text-stone-500">{idx + 1}.</span>{" "}
-                                    {(sense?.english_definitions ?? []).join("; ") || "—"}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : !wordExplorerLoading && !wordExplorerError && wordExplorerQuery.trim() ? (
-                      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-                        No results yet.
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-                        Type a word to explore.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+            
+            {showWordExplorer ? (
+              <WordExplorerModal
+                query={wordExplorerQuery}
+                loading={wordExplorerLoading}
+                error={wordExplorerError}
+                results={wordExplorerResults}
+                onQueryChange={setWordExplorerQuery}
+                onSearch={searchWordExplorer}
+                onClose={() => setShowWordExplorer(false)}
+              />
+            ) : null}
           </div>
         </section>
       </div >
