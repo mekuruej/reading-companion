@@ -1268,7 +1268,13 @@ export default function AddWordPage() {
               </div>
             ) : null}
 
-            <div ref={wordFieldsRef} className="grid gap-3 sm:grid-cols-2">
+            <div ref={wordFieldsRef} className="space-y-3">
+              <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
+                <span className="font-semibold text-stone-900">Manual entry:</span>{" "}
+                1. Type the word. 2. Add the reading. 3. Add the meaning. 4. Save.
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
                 <input
@@ -1292,6 +1298,7 @@ export default function AddWordPage() {
                   placeholder="Book form, if different"
                   className="w-full rounded border bg-white px-3 py-2 text-sm"
                 />
+              </div>
               </div>
             </div>
 
