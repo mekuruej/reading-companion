@@ -28,6 +28,7 @@ import WordExplorerModal from "./components/WordExplorerModal";
 import Detail from "./components/Detail";
 import PersonRow from "./components/PersonRow";
 import DateField from "./components/DateField";
+import StarRatingField from "./components/StarRatingField";
 
 type Book = {
   id: string;
@@ -5297,86 +5298,6 @@ export default function BookHubPage() {
         </section>
       </div >
     </main >
-  );
-}
-
-function StarRatingField({
-  label,
-  value,
-  editing,
-  inputValue,
-  setInputValue,
-  descriptions,
-}: {
-  label: string;
-  value: number | null;
-  editing: boolean;
-  inputValue: string;
-  setInputValue: (v: string) => void;
-  descriptions: Record<number, string>;
-}) {
-  const selected = inputValue ? Number(inputValue) : null;
-
-  return (
-    <div className="rounded border bg-white p-3 text-sm">
-      <div className="text-stone-600">{label}</div>
-
-      {!editing ? (
-        <>
-          <div className="mt-1 font-medium">
-            {value ? `${formatRating(value)}/5` : "—"}
-          </div>
-          <div className="text-amber-600">{stars5(value)}</div>
-          <div className="mt-1 text-xs text-stone-500">
-            {ratingDescription(descriptions, value)}
-          </div>
-        </>
-      ) : (
-        <div className="mt-3 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold text-amber-700">
-                {selected ? `${formatRating(selected)}/5` : "—"}
-              </div>
-              <div className="text-xs text-stone-500">
-                {ratingDescription(descriptions, selected)}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setInputValue("")}
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
-            >
-              Clear
-            </button>
-          </div>
-
-          <input
-            type="range"
-            min="1"
-            max="5"
-            step="0.25"
-            value={selected ?? 3}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="w-full"
-          />
-
-          <div className="grid grid-cols-5 gap-1 text-center text-[11px] text-stone-500">
-            <span>1</span>
-            <span>2</span>
-            <span>3</span>
-            <span>4</span>
-            <span>5</span>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 text-[11px] text-stone-500">
-            <span>Not for me</span>
-            <span>Loved it</span>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
