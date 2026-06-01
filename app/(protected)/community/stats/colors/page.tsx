@@ -13,6 +13,7 @@ import {
 } from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingColorsHeader from "./components/ReadingColorsHeader";
+import ReadingColorsErrorBanner from "./components/ReadingColorsErrorBanner";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
@@ -315,14 +316,6 @@ export default function ReadingColorsPage() {
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-8">
         <ReadingColorsHeader />
-        <p className="mt-6 text-sm font-semibold uppercase tracking-[0.25em] text-stone-500">
-          Study colors
-        </p>
-
-        <h1 className="mt-2 text-3xl font-black text-stone-900 sm:text-4xl">
-          Reading Colors
-        </h1>
-
         <details className="group mt-4 rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4 shadow-sm sm:p-5">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
             <div>
@@ -440,11 +433,7 @@ export default function ReadingColorsPage() {
         </details>
       </div>
 
-      {errorMsg ? (
-        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {errorMsg}
-        </div>
-      ) : null}
+      <ReadingColorsErrorBanner message={errorMsg} />
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {colorItems.map((item) => {
