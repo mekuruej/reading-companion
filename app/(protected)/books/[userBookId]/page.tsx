@@ -18,6 +18,7 @@ import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
+import BookHubNotices from "./components/BookHubNotices";
 
 type Book = {
   id: string;
@@ -5146,21 +5147,12 @@ export default function BookHubPage() {
                 </p>
               </div>
 
-              {error && !isEditingBookInfoPeople ? (
-                <div className="border-t border-stone-200 px-5 py-3 text-sm text-red-600 md:px-8">
-                  {error}
-                </div>
-              ) : null}
-
-              {saveNotice ? (
-                <div
-                  className={`border-t border-stone-200 px-5 py-3 text-sm md:px-8 ${saveNoticeTone === "warning" ? "text-amber-700" : "text-emerald-700"
-                    }`}
-                >
-                  {saveNotice}
-                </div>
-              ) : null}
-
+              <BookHubNotices
+                error={error}
+                hideError={isEditingBookInfoPeople}
+                saveNotice={saveNotice}
+                saveNoticeTone={saveNoticeTone}
+              />
               <BookHubActionGrid
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
