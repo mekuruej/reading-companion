@@ -58,7 +58,31 @@ Revisit API routes after Add Book / Global Book Entry redesign is clearer.
 
 Status: In progress
 
-Finished so far:
+## Finished / updated today:
+
+/library-study/kanji
+Confirmed Kanji Study is intentionally global.
+Added safe learner flagging through kanji_map_reports.
+Connected learner reports to Teacher Hub and /teacher/kanji.
+Teacher queue clear/save behavior is now working for reported flags.
+/community/stats/*
+Audited and passed:
+/community/stats
+/community/stats/monthly
+/community/stats/colors
+/community/stats/reading-habits
+/community/stats/vocabulary
+/community/stats/reading-ability
+/community/stats/book-difficulty
+No code changes needed for those.
+/library-study/word-sky
+Audited and passed.
+Global pool is okay; personal claims/progress are scoped to logged-in user.
+/vocab/explore
+Found a real local ownership-check gap.
+Added authorizedUserBookId.
+Private vocab queries and links now use the verified book ID.
+npm run build passed.
 
 ### `/users/[username]/books`
 
@@ -106,12 +130,186 @@ Decision:
 
 No code change needed for `/library-study/practice` right now.
 
-Next possible pages under this audit:
+### `/library-study/book-flashcards`
 
-* `/library-study/book-flashcards`
-* `/library-study/kanji`
-* `/community/stats/*`
+Finished:
 
+* Confirmed the route page itself is an index wrapper.
+* Confirmed it renders `components/library/LibraryBookActionIndex.tsx`.
+* Confirmed the shared index component requires a logged-in user through `supabase.auth.getUser()`.
+* Confirmed it shows a sign-in message when no user is logged in.
+* Confirmed it loads `user_books` with `.eq("user_id", user.id)`.
+* Confirmed it only renders links from the logged-in user’s own `user_books` rows.
+* Confirmed the destination route `/books/[userBookId]/study` was already included in the private book route guard pass.
+
+Decision:
+
+No code change needed for `/library-study/book-flashcards` right now.
+
+### `/library-study/kanji`
+
+Finished:
+
+* Confirmed Kanji Study is intentionally global and may use global `vocabulary_kanji_map` / `vocabulary_cache` rows.
+* Confirmed learner-owned book/saved-word context is optional and safely scoped through the logged-in user’s own `user_books` → `user_book_words`.
+* Confirmed learners should be able to flag kanji cards, but should not directly update the global `vocabulary_kanji_map` table.
+* Created safe learner-report flow with `kanji_map_reports`.
+* Confirmed learner-facing “Flag for Review” now inserts into `kanji_map_reports` instead of directly updating `vocabulary_kanji_map` or inserting into `user_alerts`.
+* Confirmed Teacher Hub “Kanji Needing My Attention” count includes learner reports.
+* Confirmed `/teacher/kanji` shows learner-reported kanji cards in the queue.
+* Confirmed Teacher Kanji Queue clear/save/resolve behavior now removes reported/flagged kanji from the queue correctly.
+* Confirmed no RLS loosening was needed for learners to update the global kanji map.
+
+Decision:
+
+`/library-study/kanji` learner-safe reporting and Teacher Kanji Queue visibility are working now.
+
+Note:
+
+The Teacher Kanji Queue has historically had some gobliny edge cases, so keep an eye on normal use. But this specific learner-report/security flow can be treated as finished unless another queue issue appears.
+
+
+### `/community/stats`
+
+Finished:
+
+* Confirmed the stats hub gets the logged-in user from the Supabase session.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed reading sessions and saved words are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed color totals are loaded with `fetchLibraryStudyColorBreakdown(user.id, ...)`.
+* Confirmed there are no route username, search param, teacher/student selector, or other-user ID paths on this page.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/community/stats` right now.
+
+### `/community/stats/monthly`
+
+Finished:
+
+* Confirmed the monthly stats page gets the logged-in user from the Supabase session.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed reading sessions are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed saved words are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed there are no route username, search param, teacher/student selector, or other-user ID paths on this page.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/community/stats/monthly` right now.
+
+### `/community/stats/colors`
+
+Finished:
+
+* Confirmed the colors stats page gets the logged-in user from the Supabase session.
+* Confirmed color and limbo totals are loaded with `fetchLibraryStudyColorBreakdown(user.id, ...)`.
+* Confirmed there are no route username, search param, teacher/student selector, or other-user ID paths on this page.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/community/stats/colors` right now.
+
+### `/community/stats/reading-habits`
+
+Finished:
+
+* Confirmed the reading habits stats page gets the logged-in user from the Supabase session.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed reading sessions are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed filler sessions are filtered out.
+* Confirmed there are no route username, search param, teacher/student selector, or other-user ID paths on this page.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/community/stats/reading-habits` right now.
+
+### `/community/stats/vocabulary`
+
+Finished:
+
+* Confirmed the vocabulary stats page gets the logged-in user from the Supabase session.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed reading sessions are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed saved words are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed study events are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed there are no route username, search param, teacher/student selector, or other-user ID paths on this page.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/community/stats/vocabulary` right now.
+
+### `/community/stats/reading-ability`
+
+Finished:
+
+* Confirmed the reading ability stats page gets the logged-in user from the Supabase session.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed reading sessions are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed saved words are loaded only through the logged-in user’s own `user_book_ids`.
+* Confirmed filler sessions are filtered out.
+* Confirmed there are no route username, search param, teacher/student selector, profile lookup, or other-user ID paths on this page.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/community/stats/reading-ability` right now.
+
+### `/community/stats/book-difficulty`
+
+Finished:
+
+* Confirmed the book difficulty stats page gets the logged-in user from the Supabase session.
+* Confirmed `user_books` are loaded with `.eq("user_id", user.id)`.
+* Confirmed difficulty, entertainment, recommendation, and teacher/student-use ratings come from the logged-in user’s own `user_books` rows.
+* Confirmed book metadata is joined only through the logged-in user’s owned `user_books`.
+* Confirmed there is no public/community ratings query on this page.
+* Confirmed there are no route username, search param, teacher/student selector, profile lookup, or other-user ID paths on this page.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/community/stats/book-difficulty` right now.
+
+### `/library-study/word-sky`
+
+Finished:
+
+* Confirmed Word Sky requires a logged-in user through `supabase.auth.getUser()`.
+* Confirmed unauthenticated users are redirected to `/login`.
+* Confirmed the global Word Sky pool is intentionally global/starter-pool based.
+* Confirmed personal learning settings are loaded with `.eq("user_id", user.id)`.
+* Confirmed personal library summaries are loaded with `.eq("user_id", user.id)`.
+* Confirmed personal library progress is loaded with `.eq("user_id", user.id)`.
+* Confirmed Word Sky claims are loaded with `.eq("user_id", user.id)`.
+* Confirmed Word Sky claim saves use `user_id: userId`, where `userId` comes from the logged-in user.
+* Confirmed Word Sky claim deletion is scoped with `.eq("user_id", userId)`.
+* Confirmed there are no additional hidden Supabase queries lower in the file.
+
+Decision:
+
+No code change needed for `/library-study/word-sky` right now.
+
+### `/vocab/explore`
+
+Finished:
+
+* Found that the page accepted `userBookId` from the URL and used it directly for private book/vocabulary queries.
+* Added an `authorizedUserBookId` state.
+* Confirmed the page now checks the logged-in user before authorizing the URL `userBookId`.
+* Confirmed private queries only use `authorizedUserBookId` after ownership is verified with `.eq("id", userBookId)` and `.eq("user_id", user.id)`.
+* Confirmed `user_book_words` browse/search queries use `authorizedUserBookId`.
+* Confirmed book/vocab navigation links use `authorizedUserBookId`.
+* Confirmed `/api/jisho` requests still send the Supabase session token.
+* Ran `npm run build` and it passed.
+
+Decision:
+
+`/vocab/explore` had a local ownership-check gap. It is now fixed.
 
 
 ## 3. Teacher / Student Access Boundaries
@@ -159,7 +357,7 @@ Important future direction:
 
 Prefer user_public_profile or limited public views instead of exposing full profiles rows.
 
-5. Discovery / Ratings / Find Your Next Book Privacy
+## 5. Discovery / Ratings / Find Your Next Book Privacy
 
 Later task, not now.
 
@@ -180,7 +378,7 @@ Goal:
 
 Public discovery reads safe anonymous rating data, not private library rows.
 
-6. Input Validation Review
+## 6. Input Validation Review
 
 Still not deeply done.
 
@@ -198,7 +396,7 @@ search fields
 long text fields
 weird empty strings
 
-7. RLS Cleanup / Duplicate Policy Cleanup
+## 7. RLS Cleanup / Duplicate Policy Cleanup
 
 Big scary RLS pass mostly handled for the most important tables, but cleanup remains.
 
@@ -224,7 +422,7 @@ revisit public profile read policy
 revisit linked teacher delete/update permissions if teacher workflows change
 revisit teacher_alert_completions to possibly verify linked student relationship
 
-8. Future Shared Flashcards Boundary
+## 8. Future Shared Flashcards Boundary
 
 Not building now, but rule is clear.
 

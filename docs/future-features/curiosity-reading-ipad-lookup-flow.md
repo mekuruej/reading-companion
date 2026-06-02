@@ -1,8 +1,8 @@
-# Curiosity Reading iPad Lookup Flow Notes
+# Curiosity Reading Lookup Flow Notes
 
 ## Context
 
-These notes come from first real iPad use of Curiosity Reading. The current lookup tools work, but on a smaller touch screen the helper panels can stay open too long and make it harder to see the actual rapid search results.
+These notes come from first real iPad use of Curiosity Reading, but the improvements apply across devices. The current lookup tools work, but the helper panels can stay open too long and make it harder to see the actual rapid search results, especially on smaller or touch screens.
 
 ## Future UX Improvements
 
@@ -25,7 +25,7 @@ C. Build a Word to Rapid Search Flow
 - Anything sent into Build a Word from Kanji Lookup should also collapse the Kanji Lookup panel so the user can see the next useful area.
 
 D. Collapse Helper Panels After Use
-- On iPad, keeping Build a Word / Kanji Lookup open can push the real results too far down.
+- Keeping Build a Word / Kanji Lookup open can push the real results too far down.
 - After a helper action completes, collapse the helper panels so the search results are easier to see.
 - The user can reopen the helper tools if needed.
 
@@ -33,7 +33,7 @@ E. Kanji Lookup Should Prioritize Stroke Count
 - The Kanji Lookup tool should become a stricter stroke-count lookup.
 - “Common kanji” choices are not reliable enough for this use case.
 - Stroke count should be the main path because the reader is likely looking at an unknown character visually.
-- Use a clear numbered grid for stroke counts so the choices are easy to see and tap on iPad.
+- Use a clear numbered grid for stroke counts so the choices are easy to see and tap or click.
 - The numbers should be large enough to scan quickly without crowding the search results.
 
 F. Possible Stroke Lookup Refinements
@@ -47,4 +47,4 @@ F. Possible Stroke Lookup Refinements
 
 ## Status
 
-Not started. Save this for a future Curiosity Reading / Add Word mobile UX cleanup pass.
+Not started. Save this for a future Curiosity Reading / Add Word lookup UX cleanup pass.
