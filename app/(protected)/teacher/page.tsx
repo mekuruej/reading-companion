@@ -44,6 +44,14 @@ const lessonPrepCards: TeacherCard[] = [
     status: "Active",
   },
   {
+    title: "Teacher Library",
+    href: "/teacher/library",
+    eyebrow: "Lesson prep",
+    description:
+      "Prepare books for yourself to teach the vocabulary, phrases, grammar notes, sentence translations, and follow-along support.",
+    status: "Active",
+  },
+  {
     title: "Book Club Prep",
     href: "/teacher/clubs",
     eyebrow: "Groups",
@@ -217,10 +225,22 @@ export default function TeacherHubPage() {
       bookRequestCount = pendingBookRequestCount ?? 0;
     }
 
-    const { count: kanjiCount } = await supabase
-      .from("vocabulary_kanji_map")
-      .select("id", { count: "exact", head: true })
-      .eq("flagged_for_review", true);
+    const [
+      { count: oldKanjiFlagCount },
+      { count: kanjiReportCount },
+    ] = await Promise.all([
+      supabase
+        .from("vocabulary_kanji_map")
+        .select("id", { count: "exact", head: true })
+        .eq("flagged_for_review", true),
+
+      supabase
+        .from("kanji_map_reports")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["open", "reviewing"]),
+    ]);
+
+    const kanjiCount = (oldKanjiFlagCount ?? 0) + (kanjiReportCount ?? 0);
 
     const { data: teacherLinks } = await supabase
       .from("teacher_students")

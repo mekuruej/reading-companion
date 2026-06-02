@@ -503,25 +503,95 @@ export default function TeacherKanjiPage() {
       }
 
       const knownCacheIds = new Set(cacheIds.map((id) => String(id)));
-      const { data: flaggedRows, error: flaggedRowsError } = await supabase
-        .from("vocabulary_kanji_map")
-        .select(
-          "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
-        )
-        .eq("flagged_for_review", true)
-        .limit(1000);
 
-      if (flaggedRowsError) throw flaggedRowsError;
+      const [
+        { data: oldFlaggedRows, error: oldFlaggedRowsError },
+        { data: reportRows, error: reportRowsError },
+      ] = await Promise.all([
+        supabase
+          .from("vocabulary_kanji_map")
+          .select(
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+          )
+          .eq("flagged_for_review", true)
+          .limit(1000),
+
+        supabase
+          .from("kanji_map_reports")
+          .select("id, vocabulary_kanji_map_id, created_at, status")
+          .in("status", ["open", "reviewing"])
+          .limit(1000),
+      ]);
+
+      if (oldFlaggedRowsError) throw oldFlaggedRowsError;
+      if (reportRowsError) throw reportRowsError;
+
+      const reportByKanjiMapId = new Map<number, { created_at: string | null }>();
+
+      const reportedKanjiMapIds = Array.from(
+        new Set(
+          ((reportRows ?? []) as any[])
+            .map((row) => Number(row.vocabulary_kanji_map_id))
+            .filter((id) => Number.isFinite(id))
+        )
+      );
+
+      for (const report of (reportRows ?? []) as any[]) {
+        const mapId = Number(report.vocabulary_kanji_map_id);
+        if (!Number.isFinite(mapId)) continue;
+
+        reportByKanjiMapId.set(mapId, {
+          created_at: report.created_at ?? null,
+        });
+      }
+
+      let reportedMapRows: KanjiMapRow[] = [];
+
+      if (reportedKanjiMapIds.length > 0) {
+        const { data: reportMapRows, error: reportMapRowsError } = await supabase
+          .from("vocabulary_kanji_map")
+          .select(
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+          )
+          .in("id", reportedKanjiMapIds)
+          .limit(1000);
+
+        if (reportMapRowsError) throw reportMapRowsError;
+
+        reportedMapRows = ((reportMapRows ?? []) as KanjiMapRow[]).map((row) => {
+          const report = reportByKanjiMapId.get(Number(row.id));
+
+          return {
+            ...row,
+            // Treat learner reports as "flagged" in the teacher queue,
+            // without giving learners direct update access to the global map row.
+            flagged_for_review: true,
+            flagged_at: row.flagged_at ?? report?.created_at ?? null,
+          };
+        });
+      }
+
+      const flaggedRowsById = new Map<number, KanjiMapRow>();
+
+      for (const row of (oldFlaggedRows ?? []) as KanjiMapRow[]) {
+        flaggedRowsById.set(Number(row.id), row);
+      }
+
+      for (const row of reportedMapRows) {
+        flaggedRowsById.set(Number(row.id), row);
+      }
+
+      const flaggedRows = Array.from(flaggedRowsById.values());
 
       const flaggedCacheIds = Array.from(
         new Set(
-          ((flaggedRows ?? []) as KanjiMapRow[])
+          flaggedRows
             .map((row) => Number(row.vocabulary_cache_id))
             .filter((id) => Number.isFinite(id))
         )
       );
 
-      for (const row of (flaggedRows ?? []) as KanjiMapRow[]) {
+      for (const row of flaggedRows) {
         const cacheKey = String(row.vocabulary_cache_id);
         if (knownCacheIds.has(cacheKey)) continue;
 
@@ -967,6 +1037,36 @@ export default function TeacherKanjiPage() {
 
       if (clearFlagError) throw clearFlagError;
     }
+
+    if (item.vocabularyCacheId) {
+      await updateKanjiReportsForCache(item.vocabularyCacheId, "resolved");
+    }
+  }
+
+  async function updateKanjiReportsForCache(
+    vocabularyCacheId: number,
+    status: "resolved" | "dismissed"
+  ) {
+    const { data: mapRows, error: mapRowsError } = await supabase
+      .from("vocabulary_kanji_map")
+      .select("id")
+      .eq("vocabulary_cache_id", vocabularyCacheId);
+
+    if (mapRowsError) throw mapRowsError;
+
+    const mapIds = (mapRows ?? [])
+      .map((row: any) => Number(row.id))
+      .filter((id) => Number.isFinite(id));
+
+    if (mapIds.length === 0) return;
+
+    const { error: reportUpdateError } = await supabase
+      .from("kanji_map_reports")
+      .update({ status })
+      .in("vocabulary_kanji_map_id", mapIds)
+      .in("status", ["open", "reviewing"]);
+
+    if (reportUpdateError) throw reportUpdateError;
   }
 
   async function saveAllOpenEditors() {
@@ -1076,6 +1176,8 @@ export default function TeacherKanjiPage() {
           .eq("vocabulary_cache_id", item.vocabularyCacheId);
 
         if (excludeError) throw excludeError;
+
+        await updateKanjiReportsForCache(item.vocabularyCacheId, "dismissed");
       }
 
       if (!item.userBookWordId.startsWith("cache:")) {
@@ -1129,6 +1231,8 @@ export default function TeacherKanjiPage() {
         .eq("vocabulary_cache_id", item.vocabularyCacheId);
 
       if (clearFlagError) throw clearFlagError;
+
+      await updateKanjiReportsForCache(item.vocabularyCacheId, "dismissed");
 
       await loadQueue();
       setSaveMessage(`Cleared the kanji flag for ${item.surface}.`);
@@ -1620,15 +1724,6 @@ export default function TeacherKanjiPage() {
                                     ? "Editor open above"
                                     : "Open editor"}
                               </button>
-
-                              {item.userBookId ? (
-                                <Link
-                                  href={`/teacher/books/${item.userBookId}`}
-                                  className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
-                                >
-                                  Teacher Review
-                                </Link>
-                              ) : null}
 
                               {item.flaggedMapRowCount > 0 ? (
                                 <button

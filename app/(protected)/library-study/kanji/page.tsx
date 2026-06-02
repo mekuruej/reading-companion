@@ -688,48 +688,37 @@ export default function KanjiReadingStudyPage() {
   }, [notice]);
 
   async function flagKanjiCardForReview(cardToFlag: QuizCard) {
-    const flaggedAt = new Date().toISOString();
+    const { data: authForReport, error: authError } = await supabase.auth.getUser();
+    const user = authForReport?.user;
 
-    const { error } = await supabase
-      .from("vocabulary_kanji_map")
-      .update({
-        flagged_for_review: true,
-        excluded_from_kanji_practice: false,
-        flagged_by_user_id: null,
-        flagged_at: flaggedAt,
-      })
-      .eq("id", cardToFlag.kanjiMapId);
-
-    if (error) {
-      console.error("Error flagging kanji card:", error);
+    if (authError || !user) {
+      setNotice("Please sign in to flag this card.");
       return;
     }
 
-    const { data: authForAlert } = await supabase.auth.getUser();
-    const superTeacherId = authForAlert?.user?.id;
-    if (!superTeacherId) return;
+    const reportReason = `Kanji reading flagged: ${cardToFlag.kanji} in ${cardToFlag.sourceWord}`;
 
-    const { error: alertError } = await supabase.from("user_alerts").insert({
-      user_id: superTeacherId,
-      user_book_id: cardToFlag.userBookId,
-      type: "kanji_flag",
-      message: `Kanji reading flagged: ${cardToFlag.kanji} in ${cardToFlag.sourceWord}`,
+    const { error } = await supabase.from("kanji_map_reports").insert({
+      vocabulary_kanji_map_id: cardToFlag.kanjiMapId,
+      reported_by_user_id: user.id,
+      reason: reportReason,
+      status: "open",
     });
 
-    if (alertError) {
-      console.error("Error creating kanji flag alert:", alertError);
+    if (error) {
+      if (error.code === "23505") {
+        setNotice("Already flagged for review");
+        setDeck((prev) => prev.filter((_, i) => i !== index));
+        return;
+      }
+
+      console.error("Error reporting kanji card:", error);
+      setNotice("Could not flag this card.");
+      return;
     }
 
     setNotice("✅ Flagged for review");
-    setDeck((prev) => {
-      return prev.filter((_, i) => i !== index);
-    });
-
-    if (index >= deck.length - 1) {
-      setIndex((prev) => Math.max(prev - 1, 0));
-    }
-
-    resetCardState();
+    setDeck((prev) => prev.filter((_, i) => i !== index));
   }
 
   function resetCardState() {
@@ -1269,7 +1258,7 @@ export default function KanjiReadingStudyPage() {
               {cardQuestionMode === "kanjiChoice" ? card.sourceReading : card.kanji}
               {cardQuestionMode === "readingChoice" &&
                 (card.readingType === "other" ||
-                (card.readingType === "kunyomi" && isKunWithOkurigana(card.sourceWord))) &&
+                  (card.readingType === "kunyomi" && isKunWithOkurigana(card.sourceWord))) &&
                 card.sourceWord ? (
                 <span className="ml-1 font-medium text-slate-300">
                   {getTrailingReadingHint(card.sourceWord, card.kanji)}
@@ -1494,9 +1483,8 @@ export default function KanjiReadingStudyPage() {
 
                       {recallMatchedWord && recallMode !== "wordForKanji" ? (
                         <p
-                          className={`mt-1 text-center text-sm ${
-                            recallResult === "unverified" ? "text-amber-700" : "text-green-700"
-                          }`}
+                          className={`mt-1 text-center text-sm ${recallResult === "unverified" ? "text-amber-700" : "text-green-700"
+                            }`}
                         >
                           Your answer: {recallMatchedWord}
                         </p>

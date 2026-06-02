@@ -84,6 +84,10 @@ export default function WordHistorySearchPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
 
+  // The URL can provide a userBookId, but private queries should only use it
+  // after we confirm it belongs to the logged-in user.
+  const [authorizedUserBookId, setAuthorizedUserBookId] = useState("");
+
   const [surface, setSurface] = useState("");
   const [reading, setReading] = useState<string | null>(null);
   const [definitions, setDefinitions] = useState<string[]>([]);
@@ -101,44 +105,86 @@ export default function WordHistorySearchPage() {
   const shouldShowBrowse = !hasActiveResult && !hasSearchText;
 
   useEffect(() => {
-    if (!userBookId) return;
+    let cancelled = false;
 
-    (async () => {
-      const { data, error } = await supabase
-        .from("user_books")
-        .select(
+    async function loadAuthorizedBookInfo() {
+      setAuthorizedUserBookId("");
+      setBookTitle("");
+      setBookCover(null);
+
+      if (!userBookId) return;
+
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) throw authError;
+
+        if (!user) {
+          if (!cancelled) {
+            setErrorMsg("Please sign in to view this book vocabulary.");
+          }
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("user_books")
+          .select(
+            `
+            id,
+            books:book_id (
+              title,
+              cover_url
+            )
           `
-          id,
-          books:book_id (
-            title,
-            cover_url
           )
-        `
-        )
-        .eq("id", userBookId)
-        .single();
+          .eq("id", userBookId)
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Could not load book info:", error);
-        return;
+        if (error) throw error;
+
+        if (!data) {
+          if (!cancelled) {
+            setErrorMsg("You do not have access to this book vocabulary.");
+          }
+          return;
+        }
+
+        if (cancelled) return;
+
+        const b = (data as any)?.books;
+        setAuthorizedUserBookId((data as any).id);
+        setBookTitle(b?.title ?? "");
+        setBookCover(b?.cover_url ?? null);
+      } catch (error) {
+        console.error("Could not load authorized book info:", error);
+
+        if (!cancelled) {
+          setErrorMsg("Could not load this book vocabulary.");
+        }
       }
+    }
 
-      const b = (data as any)?.books;
-      setBookTitle(b?.title ?? "");
-      setBookCover(b?.cover_url ?? null);
-    })();
+    void loadAuthorizedBookInfo();
+
+    return () => {
+      cancelled = true;
+    };
   }, [userBookId]);
 
   useEffect(() => {
-    if (!initialWord || !userBookId) return;
+    if (!initialWord || !authorizedUserBookId) return;
     void runSearch(initialWord);
-  }, [initialWord, userBookId]);
+  }, [initialWord, authorizedUserBookId]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadBookPatterns() {
-      if (!userBookId) {
+      if (!authorizedUserBookId) {
         setBrowseLoading(false);
         setOftenLookedUp([]);
         return;
@@ -150,7 +196,7 @@ export default function WordHistorySearchPage() {
         const { data, error } = await supabase
           .from("user_book_words")
           .select("surface, reading, meaning, created_at")
-          .eq("user_book_id", userBookId)
+          .eq("user_book_id", authorizedUserBookId)
           .eq("hidden", false);
 
         if (error) throw error;
@@ -234,11 +280,11 @@ export default function WordHistorySearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [userBookId]);
+  }, [authorizedUserBookId]);
 
   async function runSearch(raw?: string) {
     const q = (raw ?? query).trim();
-    if (!q || !userBookId) return;
+    if (!q || !authorizedUserBookId) return;
 
     setLoading(true);
     setErrorMsg(null);
@@ -273,7 +319,7 @@ export default function WordHistorySearchPage() {
           created_at
         `
         )
-        .eq("user_book_id", userBookId)
+        .eq("user_book_id", authorizedUserBookId)
         .eq("surface", q)
         .order("created_at", { ascending: false });
 
@@ -380,7 +426,7 @@ export default function WordHistorySearchPage() {
     setTotalLookupCount(0);
     setNotFoundEntry(null);
     setOtherMatches([]);
-    router.replace(`/vocab/explore?userBookId=${encodeURIComponent(userBookId)}`);
+    router.replace(`/vocab/explore?userBookId=${encodeURIComponent(authorizedUserBookId)}`);
   }
 
   return (
@@ -395,7 +441,7 @@ export default function WordHistorySearchPage() {
           <button
             type="button"
             onClick={() => {
-              router.push(`/books/${encodeURIComponent(userBookId)}`);
+              router.push(`/books/${encodeURIComponent(authorizedUserBookId)}`);
             }}
             className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
             title={`Go to ${bookTitle} Book Hub`}
@@ -423,7 +469,7 @@ export default function WordHistorySearchPage() {
             <button
               type="button"
               onClick={() => {
-                router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                router.push(`/books/${encodeURIComponent(authorizedUserBookId)}/words`);
               }}
               className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
             >
@@ -433,7 +479,7 @@ export default function WordHistorySearchPage() {
             <button
               type="button"
               onClick={() => {
-                router.push(`/books/${encodeURIComponent(userBookId)}`);
+                router.push(`/books/${encodeURIComponent(authorizedUserBookId)}`);
               }}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
             >
@@ -490,7 +536,7 @@ export default function WordHistorySearchPage() {
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/vocab/explore?userBookId=${encodeURIComponent(userBookId)}&word=${encodeURIComponent(item.surface)}`
+                      `/vocab/explore?userBookId=${encodeURIComponent(authorizedUserBookId)}&word=${encodeURIComponent(item.surface)}`
                     )
                   }
                   className="w-full rounded-xl border p-3 text-left transition hover:bg-stone-50"
