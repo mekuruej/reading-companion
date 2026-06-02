@@ -185,8 +185,8 @@ const SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY =
 const PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY =
   "pending-book-requests-alert-hidden-signature";
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
-const REGULAR_GATE_RECHECK_MIN_DAYS = 4;
-const REGULAR_GATE_RECHECK_WINDOW_DAYS = 6;
+const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
+const REGULAR_GATE_RECHECK_WINDOW_DAYS = 5;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
@@ -296,6 +296,27 @@ function daysSinceIso(value: string | null | undefined, now = new Date()) {
   return (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
 }
 
+function appDayNumber(now = new Date()) {
+  const today = ymdInTimeZone(now, "Asia/Tokyo") ?? new Date().toISOString().slice(0, 10);
+  const [year, month, day] = today.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+}
+
+function regularGateRecheckDays(studyIdentityKey: string) {
+  return (
+    REGULAR_GATE_RECHECK_MIN_DAYS +
+    (hashString(`${studyIdentityKey}::regular-gate`) % REGULAR_GATE_RECHECK_WINDOW_DAYS)
+  );
+}
+
+function isInitialGateSlotDue(studyIdentityKey: string, now = new Date()) {
+  const recheckDays = regularGateRecheckDays(studyIdentityKey);
+  const releaseOffset =
+    hashString(`${studyIdentityKey}::initial-gate-slot`) % recheckDays;
+
+  return appDayNumber(now) % recheckDays === releaseOffset;
+}
+
 function isReadyForReadingGateProgress(progress: AbilityCheckProgressRow | null | undefined) {
   return Boolean(
     progress &&
@@ -373,14 +394,14 @@ function isAbilityCheckCardInDailyPool(
     return true;
   }
 
-  if (!progress?.last_studied_at) return true;
+  if (!progress?.last_studied_at) {
+    return isInitialGateSlotDue(summary.study_identity_key, now);
+  }
 
-  const regularRecheckDays =
-    REGULAR_GATE_RECHECK_MIN_DAYS +
-    (hashString(`${summary.study_identity_key}::regular-gate`) %
-      REGULAR_GATE_RECHECK_WINDOW_DAYS);
-
-  return daysSinceIso(progress.last_studied_at, now) >= regularRecheckDays;
+  return (
+    daysSinceIso(progress.last_studied_at, now) >=
+    regularGateRecheckDays(summary.study_identity_key)
+  );
 }
 
 function ymdToDayNumber(ymd: string) {
