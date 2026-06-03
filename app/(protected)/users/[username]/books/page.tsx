@@ -21,6 +21,7 @@ import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
 import LibraryBookCard from "./components/LibraryBookCard";
+import LibraryBookRow from "./components/LibraryBookRow";
 
 type Book = {
   id: string;
@@ -2382,33 +2383,13 @@ export default function BooksPage() {
   }
 
   function renderBookRow(row: UserBookRow) {
-    const book = row.books;
-    if (!book) return null;
-
-    const stats = readingStatsByUserBookId[row.id];
-    const status = getStatusLabel(row);
-
     return (
-      <li
+      <LibraryBookRow
         key={row.id}
-        className="cursor-pointer flex items-center gap-4 border-b px-3 py-3 hover:bg-stone-50"
-        onClick={() => router.push(`/books/${row.id}`)}
-      >
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt=""
-            className="h-16 w-11 shrink-0 rounded object-cover"
-          />
-        ) : (
-          <div className="h-16 w-11 shrink-0 rounded bg-gray-200" />
-        )}
-
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-stone-900">{book.title}</div>
-          <div className="mt-1 text-xs text-stone-500">{status}</div>
-        </div>
-      </li>
+        row={row}
+        status={getStatusLabel(row)}
+        onOpen={() => router.push(`/books/${row.id}`)}
+      />
     );
   }
 
