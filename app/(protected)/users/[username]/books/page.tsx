@@ -18,6 +18,7 @@ import {
   type LibraryStudyLimboTotals,
 } from "@/lib/libraryStudyTotals";
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
+import LibraryHeader from "./components/LibraryHeader";
 
 type Book = {
   id: string;
@@ -2551,29 +2552,12 @@ export default function BooksPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-screen-xl">
-        <div className="mb-5 flex items-center justify-between gap-4 pr-6 sm:pr-10">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-semibold sm:text-3xl">
-                {libraryOwnerLabel}
-              </span>
-              <img
-                src="/mekuru-logo.png"
-                alt="Mekuru"
-                className="h-12 w-12 object-contain sm:h-20 sm:w-20"
-              />
-              <span className="text-2xl font-semibold sm:text-3xl">Library</span>
-            </div>
-
-            {libraryContextLabel ? (
-              <div className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                {libraryContextLabel}
-              </div>
-            ) : null}
-          </div>
-
+        <LibraryHeader
+          libraryOwnerLabel={libraryOwnerLabel}
+          libraryContextLabel={libraryContextLabel}
+        >
           <UserBar isTeacher={isTeacher} variant="logoutOnly" />
-        </div>
+        </LibraryHeader>
 
         {showAbilityCheckReminder ? (
           <div className="mb-5 rounded-3xl border border-sky-200 bg-sky-50 px-4 py-4 shadow-sm">
@@ -2769,96 +2753,7 @@ export default function BooksPage() {
           </div>
         ) : null}
 
-        <div className="mb-8 w-full">
-          <details className="max-w-[1200px] rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm">
-            <summary className="cursor-pointer text-sm font-black text-slate-900">
-              How do I use this library?
-            </summary>
-
-            <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
-              After requesting a book and adding it to your library, you can choose how
-              you want to read, study, listen, or review.
-            </p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push("/library/curiosity-reading-index")}
-                  className="rounded-2xl border border-rose-100 bg-rose-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-rose-100"
-                >
-                  <div className="text-sm font-black text-slate-950">
-                    Read + Save Words
-                  </div>
-                  <p className="mt-1 truncate text-xs text-slate-600">
-                    Time your reading while looking up new words.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => router.push("/library/saved-word-reading-index")}
-                  className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-indigo-100"
-                >
-                  <div className="text-sm font-black text-slate-950">
-                    Saved Word Reading
-                  </div>
-                  <p className="mt-1 truncate text-xs text-slate-600">
-                    Time your reading your saved-word support.
-                  </p>
-                </button>
-              </div>
-
-              <div className="grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push("/library/just-reading-index")}
-                  className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-emerald-100"
-                >
-                  <div className="text-sm font-black text-slate-950">Just Read</div>
-                  <p className="mt-1 truncate text-xs text-slate-600">
-                    Just time and read, the old-fashioned way.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => router.push("/library/just-listening-index")}
-                  className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
-                >
-                  <div className="text-sm font-black text-slate-950">Just Listen</div>
-                  <p className="mt-1 truncate text-xs text-slate-600">
-                    Time and track your listening for ear-training purposes.
-                  </p>
-                </button>
-              </div>
-
-              <div className="grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push("/library-study")}
-                  className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
-                >
-                  <div className="text-sm font-black text-slate-950">Study Hub</div>
-                  <p className="mt-1 truncate text-xs text-slate-600">
-                    Study saved words in a variety of ways.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => router.push("/community/stats")}
-                  className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
-                >
-                  <div className="text-sm font-black text-slate-950">Stats Hub</div>
-                  <p className="mt-1 truncate text-xs text-slate-600">
-                    See habits, vocab, and progress.
-                  </p>
-                </button>
-              </div>
-            </div>
-          </details>
-        </div>
+        <LibraryGuidePanel onNavigate={(path) => router.push(path)} />
 
         {false && isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
