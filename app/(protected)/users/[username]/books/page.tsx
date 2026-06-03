@@ -27,6 +27,7 @@ import LibraryEmptyState from "./components/LibraryEmptyState";
 import FloatingAddBookButton from "./components/FloatingAddBookButton";
 import LibraryReminderBanner from "./components/LibraryReminderBanner";
 import LearningTaskCard from "./components/LearningTaskCard";
+import LearningTasksPanel from "./components/LearningTasksPanel";
 
 type Book = {
   id: string;
@@ -2537,65 +2538,56 @@ export default function BooksPage() {
         ) : null}
 
         {showLearningTasks ? (
-          <div className="mb-5 rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-emerald-950">
-                  {isViewingStudentLibrary
-                    ? `${viewingLabel}’s learning tasks`
-                    : "Learning tasks from your teacher"}
-                </div>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  These are small study directions for your next reading or review session.
-                </p>
-              </div>
-            </div>
+          <LearningTasksPanel
+            title={
+              isViewingStudentLibrary
+                ? `${viewingLabel}’s learning tasks`
+                : "Learning tasks from your teacher"
+            }
+          >
+            {learningTasks.map((task) => {
+              const bookTitle =
+                rows.find((row) => row.id === task.user_book_id)?.books?.title ?? null;
+              const pageStart = task.task_payload?.page_start;
+              const pageEnd = task.task_payload?.page_end;
+              const taskAction = learningTaskAction(task);
+              const chapterNumber = task.task_payload?.chapter_number;
+              const savedFrom = task.task_payload?.saved_from;
+              const savedTo = task.task_payload?.saved_to;
+              const cardCount = task.task_payload?.card_count;
+              const pageLabel =
+                pageStart && pageEnd
+                  ? pageStart === pageEnd
+                    ? `p.${pageStart}`
+                    : `pp.${pageStart}-${pageEnd}`
+                  : null;
+              const taskDetails = [
+                bookTitle,
+                pageLabel,
+                chapterNumber ? `Chapter ${chapterNumber}` : null,
+                savedFrom || savedTo
+                  ? `Saved ${savedFrom || "…"} to ${savedTo || "…"}`
+                  : null,
+                cardCount ? `${cardCount} cards` : null,
+                task.due_on ? `Due ${task.due_on}` : null,
+              ].filter(Boolean);
 
-            <div className="mt-3 grid gap-2">
-              {learningTasks.map((task) => {
-                const bookTitle =
-                  rows.find((row) => row.id === task.user_book_id)?.books?.title ?? null;
-                const pageStart = task.task_payload?.page_start;
-                const pageEnd = task.task_payload?.page_end;
-                const taskAction = learningTaskAction(task);
-                const chapterNumber = task.task_payload?.chapter_number;
-                const savedFrom = task.task_payload?.saved_from;
-                const savedTo = task.task_payload?.saved_to;
-                const cardCount = task.task_payload?.card_count;
-                const pageLabel =
-                  pageStart && pageEnd
-                    ? pageStart === pageEnd
-                      ? `p.${pageStart}`
-                      : `pp.${pageStart}-${pageEnd}`
-                    : null;
-                const taskDetails = [
-                  bookTitle,
-                  pageLabel,
-                  chapterNumber ? `Chapter ${chapterNumber}` : null,
-                  savedFrom || savedTo
-                    ? `Saved ${savedFrom || "…"} to ${savedTo || "…"}`
-                    : null,
-                  cardCount ? `${cardCount} cards` : null,
-                  task.due_on ? `Due ${task.due_on}` : null,
-                ].filter(Boolean);
-
-                return (
-                  <LearningTaskCard
-                    key={task.id}
-                    title={task.title}
-                    typeLabel={learningTaskTypeLabel(task.task_type)}
-                    instructions={task.instructions}
-                    details={taskDetails as string[]}
-                    action={taskAction}
-                    canComplete={viewingUserId === meId}
-                    isCompleting={completingLearningTaskId === task.id}
-                    onOpenAction={(href) => router.push(href)}
-                    onComplete={() => void completeLearningTask(task.id)}
-                  />
-                );
-              })}
-            </div>
-          </div>
+              return (
+                <LearningTaskCard
+                  key={task.id}
+                  title={task.title}
+                  typeLabel={learningTaskTypeLabel(task.task_type)}
+                  instructions={task.instructions}
+                  details={taskDetails as string[]}
+                  action={taskAction}
+                  canComplete={viewingUserId === meId}
+                  isCompleting={completingLearningTaskId === task.id}
+                  onOpenAction={(href) => router.push(href)}
+                  onComplete={() => void completeLearningTask(task.id)}
+                />
+              );
+            })}
+          </LearningTasksPanel>
         ) : null}
 
         {showLearningTasksError ? (
@@ -2896,6 +2888,6 @@ export default function BooksPage() {
           </>
         )}
       </div>
-    </main>
+    </main >
   );
 }
