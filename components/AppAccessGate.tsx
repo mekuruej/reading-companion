@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getAppAccessStatus } from "@/lib/appAccess";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
