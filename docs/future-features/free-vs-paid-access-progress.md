@@ -235,15 +235,85 @@ Need to confirm whether it uses saved/private vocabulary.
 
 If yes, full-access only.
 
-### Header/index pages
+### Header/index pages and free-user demos
 
-Need to decide how free users see indexes.
+Need to decide how free users see indexes and study-tool entry points.
 
-Current thinking:
+Current principle:
 
-* Book Hub index can remain useful for free users.
-* Vocabulary Index may be better as an example/demo page for free users.
-* Some study tool indexes may show examples or explain locked features.
+Free users should not be sent through normal chooser/index pages that only lead to locked private-data pages. That can feel like a tease or a dead end.
+
+Better pattern:
+
+* Full-access users see the real index/tool.
+* Free users see a read-only demo, screenshot-style explanation, or sample page explaining what the feature does.
+* The sample/demo should use fake/static demo data, not the user’s saved vocabulary and not another user’s data.
+* The real private/data page should still stay full-access gated even if the index has a nicer free-user demo.
+
+Example pattern:
+
+```txt
+if (canUseFeature) {
+  show real index/tool
+} else {
+  show read-only demo/explanation
+}
+```
+
+This gives Mekuru both:
+
+* Nice UX at the doorway
+* Real protection at the actual data page
+
+Possible free-user demo/index behavior:
+
+#### Book Flashcards index
+
+Path:
+
+`app/(protected)/library-study/book-flashcards/page.tsx`
+
+Current behavior:
+
+* This is only an index/doorway.
+* It links to `/books/[userBookId]/study`.
+* The actual `/study` page is already full-access gated.
+
+Future free-user behavior:
+
+* Free users should see a read-only sample flashcard page or screenshot-style explanation.
+* The page should explain that full access lets users study saved vocabulary from each book.
+* Free users should not be asked to choose a real book if clicking the book only leads to a locked page.
+
+#### Vocabulary index
+
+Future free-user behavior:
+
+* Free users should see a sample saved vocabulary list/card grid.
+* This is probably one of the clearest demo pages because saved vocabulary is a major paid boundary.
+* The demo should explain that full access unlocks saved words, book-specific vocabulary lists, and vocabulary study tools.
+
+#### Ability Check / Library Review indexes
+
+Future free-user behavior:
+
+* Free users should see a color/gate demo instead of the real saved-vocabulary study tool.
+* Possible sample explanation: Yellow → Green → Blue → Purple.
+* Use a fake sample word and fake progress.
+* Do not load real saved vocabulary, progress rows, or color data for free users.
+
+#### Kanji Study
+
+Decision needed:
+
+* Kanji Study may be different because the current global Kanji Study can use global `vocabulary_kanji_map` / `vocabulary_cache` data.
+* It could potentially remain free as a discovery/acquisition tool.
+* If it becomes full-access later, free users should see a sample kanji card/explanation instead of the real study queue.
+
+Important note:
+
+Do not attempt these sample/demo pages yet. First finish the basic feature gates and access helpers. Then return to these indexes as a UX polish pass.
+
 
 ## Test Lab plan
 
@@ -301,15 +371,51 @@ Later, possibly add a super-teacher-only button:
 
 This should be handled carefully because it writes test data.
 
-## Next recommended step
+## Next recommended steps
 
-Before gating more pages, create the first Test Lab page:
+### 1. Finish first-pass feature gates
+
+Continue gating full-access saved-vocabulary features before changing the overall expired-trial behavior.
+
+Main remaining areas to identify/review:
+
+* Vocab Tools tab
+* Story Notes tab
+* Vocabulary stats / reading colors pages, if they show saved-word/color progress
+* Any other Study Hub routes that load saved vocabulary or progress data
+
+### 2. Use Test Lab while testing gates
+
+Use:
 
 `/teacher/testing/feature-access`
 
+to confirm:
+
+* current full-access users/testers still have full access
+* simulated free users show full-access features as locked
+* simulated full-access users show full-access features as allowed
+* teachers/super-teachers still have access
+
+Use:
+
+`/teacher/testing/ability-check`
+
+to understand why Ability Check can or cannot be tested with the current account.
+
+### 3. Later UX polish: access-aware indexes and demos
+
+After the basic gates are stable, improve the free-user experience for index pages.
+
 Goal:
 
-* Confirm helper functions work.
-* Confirm current users/testers still have full access.
-* Confirm future free users can be tested safely.
-* Make the rest of the free/paid rollout easier to debug.
+* Do not send free users into dead-end choosers.
+* Show honest read-only samples or explanations instead.
+* Keep real private/data pages locked.
+
+Likely demo candidates:
+
+* Book Flashcards
+* Vocabulary List / Vocabulary Index
+* Ability Check / Library Review
+* Possibly Kanji Study, depending on the final free/paid decision
