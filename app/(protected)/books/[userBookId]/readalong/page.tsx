@@ -6,6 +6,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+    canUseFullAccessFeature,
+    getFullAccessRequiredCopy,
+} from "@/lib/access/requireFullAccess";
 import ReadAlongLoadingState from "./components/ReadAlongLoadingState";
 import ReadAlongPageHeader from "./components/ReadAlongPageHeader";
 import ReadAlongBookContextCard from "./components/ReadAlongBookContextCard";
@@ -130,6 +136,8 @@ export default function ReadAlongPage() {
     const [username, setUsername] = useState("");
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccessBook, setCanAccessBook] = useState(false);
+    const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
+    const [fullAccessLocked, setFullAccessLocked] = useState(false);
     const [accessMessage, setAccessMessage] = useState("");
 
     useEffect(() => {
@@ -167,6 +175,8 @@ export default function ReadAlongPage() {
             setLoading(true);
             setAccessChecked(false);
             setCanAccessBook(false);
+            setCanUseSavedWordReading(false);
+            setFullAccessLocked(false);
             setAccessMessage("");
 
             const {
@@ -177,13 +187,15 @@ export default function ReadAlongPage() {
                 setAccessMessage("Please sign in.");
                 setAccessChecked(true);
                 setCanAccessBook(false);
+                setCanUseSavedWordReading(false);
+                setFullAccessLocked(false);
                 setLoading(false);
                 return;
             }
 
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("role, is_super_teacher")
+                .select("role, is_super_teacher, app_access_type, app_access_expires_at")
                 .eq("id", user.id)
                 .maybeSingle();
 
@@ -245,6 +257,35 @@ export default function ReadAlongPage() {
             setAccessChecked(true);
             setBookTitle(book?.title ?? "");
             setBookCover(book?.cover_url ?? "");
+
+            const appAccessStatus = profile
+                ? getAppAccessStatus(profile)
+                : { hasAccess: false, reason: "missing_profile" };
+
+            const featureAccess = getFeatureAccess({
+                role: (profile as any)?.is_super_teacher
+                    ? "super_teacher"
+                    : (profile as any)?.role ?? null,
+
+                // First pass: anyone who currently has app access keeps full saved-word reading access.
+                // Later, expired trials can enter free reading pages while this saved-word support page locks.
+                hasFullAccess: appAccessStatus.hasAccess,
+            });
+
+            const canUseSavedWordReadingNow = canUseFullAccessFeature(
+                featureAccess,
+                "saved_word_reading"
+            );
+
+            setCanUseSavedWordReading(canUseSavedWordReadingNow);
+
+            if (!canUseSavedWordReadingNow) {
+                setWords([]);
+                setLibraryColorByWordKey({});
+                setFullAccessLocked(true);
+                setLoading(false);
+                return;
+            }
 
             const { data, error } = await supabase
                 .from("user_book_words")
@@ -599,7 +640,7 @@ export default function ReadAlongPage() {
     async function saveReadingSession() {
         if (!userBookId) return;
 
-        if (!canAccessBook) {
+        if (!canAccessBook || !canUseSavedWordReading) {
             setTimerSaveMessage("❌ You do not have access to save sessions to this book.");
             return;
         }
@@ -786,6 +827,63 @@ export default function ReadAlongPage() {
 
     if (!canAccessBook) {
         return <ReadAlongAccessDeniedState message={accessMessage} />;
+    }
+
+    if (fullAccessLocked) {
+        const copy = getFullAccessRequiredCopy("saved_word_reading");
+
+        return (
+            <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+                <div className="mx-auto max-w-3xl">
+                    <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+                            Full access feature
+                        </p>
+
+                        <h1 className="mt-2 text-2xl font-black text-stone-950">
+                            Saved-word reading support
+                        </h1>
+
+                        <p className="mt-3 text-sm leading-6 text-stone-600">
+                            {copy.message}
+                        </p>
+
+                        <p className="mt-3 text-sm leading-6 text-stone-600">
+                            You can still read this book with the timer-only Just Reading page.
+                        </p>
+
+                        {bookTitle ? (
+                            <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                                <p className="text-xs uppercase tracking-wide text-stone-500">
+                                    Current book
+                                </p>
+                                <p className="mt-1 font-semibold text-stone-900">{bookTitle}</p>
+                            </div>
+                        ) : null}
+
+                        <div className="mt-6 flex flex-wrap gap-3">
+                            <button
+                                type="button"
+                                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+                            >
+                                Back to Book Hub
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    router.push(`/books/${encodeURIComponent(userBookId)}/just-reading`)
+                                }
+                                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+                            >
+                                Use Just Reading Timer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        );
     }
 
     function handleStartTimer() {
