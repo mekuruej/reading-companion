@@ -31,7 +31,7 @@ export default function BookVocabFilterPanel({
         <input
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Try 犬, いぬ, dog, p45, etc."
+          placeholder="Try 犬, いぬ, dog, (page) 45, etc."
           className="h-12 w-full rounded-xl border border-stone-300 bg-white px-4 text-base text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
         />
 

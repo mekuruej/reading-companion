@@ -12,6 +12,13 @@ const libraryCards = [
     className: "border-amber-200 bg-amber-50 text-amber-950",
   },
   {
+    title: "Add a Book",
+    href: "/books/add",
+    eyebrow: "New book",
+    description: "Look up an ISBN and add a new book to your Mekuru library.",
+    className: "border-rose-200 bg-rose-50 text-rose-950",
+  },
+  {
     title: "Book Hubs",
     href: "/library/book-hubs",
     eyebrow: "Book spaces",
