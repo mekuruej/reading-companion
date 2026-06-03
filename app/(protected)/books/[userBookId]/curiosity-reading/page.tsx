@@ -23,6 +23,7 @@ import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import CuriosityPageHeader from "../components/CuriosityPageHeader";
 import CuriosityStatusMessage from "../components/CuriosityStatusMessage";
 import CuriosityBookContextCard from "../components/CuriosityBookContextCard";
+import CuriosityDictionaryChoices from "../components/CuriosityDictionaryChoices";
 
 type QuickPreview = {
   id: string | null;
@@ -1536,62 +1537,27 @@ export default function CuriosityReadingPage() {
               </div>
             ) : null}
 
-            {quickLookupCandidates.length > 1 ? (
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
-                <div className="text-sm font-medium text-sky-900">
-                  Dictionary choices for "{quickPreview.surface.trim()}"
-                </div>
-                <p className="mt-1 text-sm text-sky-800">
-                  Choose the reading and meaning that match your book.
-                </p>
-
-                <div className="mt-3 space-y-2">
-                  {quickLookupCandidates.map((candidate) => {
-                    const isSelected =
-                      quickPreview.surface === candidate.surface &&
-                      quickPreview.reading === candidate.reading &&
-                      quickPreview.meaning === candidate.meaning;
-
-                    return (
-                      <button
-                        key={candidate.id}
-                        type="button"
-                        onClick={() => {
-                          setQuickPreview((prev) => ({
-                            ...prev,
-                            surface: candidate.surface,
-                            cacheSurface: candidate.cacheSurface,
-                            reading: candidate.reading,
-                            meanings: candidate.meanings,
-                            selectedMeaningIndex: candidate.selectedMeaningIndex,
-                            meaning: candidate.meaning,
-                            isCustomMeaning: candidate.isCustomMeaning,
-                          }));
-                          setQuickError(null);
-                          jumpToQuickWordFields();
-                        }}
-                        className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
-                          ? "border-sky-400 bg-white shadow-sm"
-                          : "border-sky-200 bg-white/80 hover:bg-white"
-                          }`}
-                      >
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <span className="text-base font-semibold text-stone-900">
-                            {candidate.surface}
-                          </span>
-                          <span className="text-sm text-stone-600">
-                            {candidate.reading || "No reading listed"}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-sm text-stone-700">
-                          {candidate.meaning || "No meaning listed"}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
+            <CuriosityDictionaryChoices
+              surface={quickPreview.surface}
+              candidates={quickLookupCandidates}
+              selectedSurface={quickPreview.surface}
+              selectedReading={quickPreview.reading}
+              selectedMeaning={quickPreview.meaning}
+              onSelectCandidate={(candidate) => {
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  surface: candidate.surface,
+                  cacheSurface: candidate.cacheSurface,
+                  reading: candidate.reading,
+                  meanings: candidate.meanings,
+                  selectedMeaningIndex: candidate.selectedMeaningIndex,
+                  meaning: candidate.meaning,
+                  isCustomMeaning: candidate.isCustomMeaning,
+                }));
+                setQuickError(null);
+                jumpToQuickWordFields();
+              }}
+            />
 
             <div ref={quickWordFieldsRef} className="space-y-3">
               <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
