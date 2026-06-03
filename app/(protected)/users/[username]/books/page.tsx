@@ -25,6 +25,7 @@ import LibraryBookRow from "./components/LibraryBookRow";
 import LibrarySection from "./components/LibrarySection";
 import LibraryEmptyState from "./components/LibraryEmptyState";
 import FloatingAddBookButton from "./components/FloatingAddBookButton";
+import LibraryReminderBanner from "./components/LibraryReminderBanner";
 
 type Book = {
   id: string;
@@ -2450,31 +2451,10 @@ export default function BooksPage() {
         </LibraryHeader>
 
         {showAbilityCheckReminder ? (
-          <div className="mb-5 rounded-3xl border border-sky-200 bg-sky-50 px-4 py-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-sky-950">
-                  Ability Check is ready today
-                </div>
-                {abilityCheckReminderCount > 0 ? (
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    You have {abilityCheckReminderCount} due card
-                    {abilityCheckReminderCount === 1 ? "" : "s"}. Ability Check is intentionally
-                    small and spaced. For more study, use Library Review, Word Sky, or book
-                    flashcards.
-                  </p>
-                ) : (
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    No Ability Check cards are due today. That is normal, especially in the beginning!
-                    Ability Check only shows spaced cards when they are ready.
-                    <br />
-                    For extra study, use Library Review or Book Flashcards. To boost words in your
-                    Ability Check, try Word Sky or read and add more words!
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
+          <LibraryReminderBanner
+            title="Ability Check is ready today"
+            actions={
+              <>
                 {abilityCheckReminderCount > 0 ? (
                   <button
                     type="button"
@@ -2484,6 +2464,7 @@ export default function BooksPage() {
                     Start Ability Check
                   </button>
                 ) : null}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -2494,9 +2475,26 @@ export default function BooksPage() {
                 >
                   {abilityCheckReminderCount > 0 ? "Hide today" : "Hide"}
                 </button>
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          >
+            {abilityCheckReminderCount > 0 ? (
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                You have {abilityCheckReminderCount} due card
+                {abilityCheckReminderCount === 1 ? "" : "s"}. Ability Check is
+                intentionally small and spaced. For more study, use Library Review,
+                Word Sky, or book flashcards.
+              </p>
+            ) : (
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                No Ability Check cards are due today. That is normal, especially in the
+                beginning! Ability Check only shows spaced cards when they are ready.
+                <br />
+                For extra study, use Library Review or Book Flashcards. To boost words
+                in your Ability Check, try Word Sky or read and add more words!
+              </p>
+            )}
+          </LibraryReminderBanner>
         ) : null}
 
         {showSuperTeacherKanjiReminder ? (
