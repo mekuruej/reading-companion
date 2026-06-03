@@ -25,6 +25,7 @@ import CuriosityStatusMessage from "../components/CuriosityStatusMessage";
 import CuriosityBookContextCard from "../components/CuriosityBookContextCard";
 import CuriosityDictionaryChoices from "../components/CuriosityDictionaryChoices";
 import CuriosityRecentSessionWordCard from "../components/CuriosityRecentSessionWordCard";
+import CuriosityRecentSessionWords from "../components/CuriosityRecentSessionWords";
 
 type QuickPreview = {
   id: string | null;
@@ -1719,16 +1720,7 @@ export default function CuriosityReadingPage() {
             </div>
           </div>
 
-          {quickSessionWords.length > 0 ? (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <div>
-                <div className="text-sm font-medium text-stone-900">
-                  Recently added
-                </div>
-                <p className="mt-1 text-xs text-stone-500">
-                  {quickSessionWords.length} word{quickSessionWords.length === 1 ? "" : "s"} saved this session
-                </p>
-              </div>
+          <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
 
               <div className="mt-3 space-y-3">
                 {quickSessionWords.slice(0, 2).map((item, index) => {
@@ -1804,8 +1796,7 @@ export default function CuriosityReadingPage() {
                   </div>
                 </details>
               ) : null}
-            </div>
-          ) : null}
+            </CuriosityRecentSessionWords>
         </div>
       </div>
     </main >
