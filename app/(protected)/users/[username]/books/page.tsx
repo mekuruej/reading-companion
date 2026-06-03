@@ -17,6 +17,7 @@ import {
   type LibraryStudyColorTotals,
   type LibraryStudyLimboTotals,
 } from "@/lib/libraryStudyTotals";
+import LibraryGuidePanel from "./components/LibraryGuidePanel";
 
 type Book = {
   id: string;
