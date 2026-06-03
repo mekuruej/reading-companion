@@ -23,6 +23,7 @@ import LibraryViewControls from "./components/LibraryViewControls";
 import LibraryBookCard from "./components/LibraryBookCard";
 import LibraryBookRow from "./components/LibraryBookRow";
 import LibrarySection from "./components/LibrarySection";
+import LibraryEmptyState from "./components/LibraryEmptyState";
 
 type Book = {
   id: string;
@@ -2822,9 +2823,7 @@ export default function BooksPage() {
           </>
         )}
 
-        {allValidRows.length === 0 ? (
-          <div className="mt-8 text-sm text-gray-600">No books yet.</div>
-        ) : null}
+        {allValidRows.length === 0 ? <LibraryEmptyState /> : null}
 
         {isTeacher ? (
           <>
