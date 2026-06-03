@@ -314,6 +314,36 @@ Important note:
 
 Do not attempt these sample/demo pages yet. First finish the basic feature gates and access helpers. Then return to these indexes as a UX polish pass.
 
+#### Kanji Study
+
+Current leaning:
+
+* Kanji Study can probably remain free because it uses global kanji-reading data rather than only a learner’s private saved vocabulary.
+* This could make Kanji Study a useful discovery/acquisition feature for free users.
+* Because of that, Kanji Study should feel polished, clear, and representative of Mekuru’s study quality.
+
+Important UX concern:
+
+If Kanji Study is free, it may become the main flashcard-like experience that free users try first. If it feels clunky, confusing, or buggy, users may assume the rest of Mekuru’s study tools feel the same way.
+
+Before treating Kanji Study as a free showcase feature, review:
+
+* card clarity
+* answer flow
+* mobile layout
+* loading states
+* error states
+* flag/report behavior
+* whether users understand what they are studying
+* whether it feels visually consistent with the rest of Mekuru’s study tools
+
+Decision for now:
+
+* Keep Kanji Study as a possible free feature.
+* Do not gate it in the same way as saved-vocabulary study tools unless the design changes later.
+* Polish it carefully before relying on it as a free-user study preview.
+
+Kanji Study can act as Mekuru’s real free study experience, while Book Flashcards, Ability Check, and Library Review can be honest previews of full-access saved-word study.
 
 ## Test Lab plan
 
