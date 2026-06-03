@@ -8,6 +8,12 @@ import { supabase } from "@/lib/supabaseClient";
 import KanjiComponentLookup from "@/components/KanjiComponentLookup";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+  canUseFullAccessFeature,
+  getFullAccessRequiredCopy,
+} from "@/lib/access/requireFullAccess";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -179,6 +185,7 @@ export default function AddWordPage() {
   const [bookCover, setBookCover] = useState("");
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
+  const [canUseAddWord, setCanUseAddWord] = useState(false);
   const [accessMessage, setAccessMessage] = useState("");
 
   const [word, setWord] = useState("");
@@ -259,6 +266,7 @@ export default function AddWordPage() {
     async function loadBookInfo() {
       setAccessChecked(false);
       setCanAccessBook(false);
+      setCanUseAddWord(false);
       setAccessMessage("");
 
       const {
@@ -268,6 +276,7 @@ export default function AddWordPage() {
       if (!user?.id) {
         setSuperTeacherRole(null);
         setProfileIsSuperTeacher(false);
+        setCanUseAddWord(false);
         setAccessMessage("Please sign in.");
         setAccessChecked(true);
         setCanAccessBook(false);
@@ -276,7 +285,7 @@ export default function AddWordPage() {
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("role, is_super_teacher")
+        .select("role, is_super_teacher, app_access_type, app_access_expires_at")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -286,6 +295,21 @@ export default function AddWordPage() {
 
       setSuperTeacherRole(profile?.role ?? null);
       setProfileIsSuperTeacher(!!profile?.is_super_teacher);
+
+      const appAccessStatus = profile
+        ? getAppAccessStatus(profile)
+        : { hasAccess: false, reason: "missing_profile" };
+
+      const featureAccess = getFeatureAccess({
+        role: profile?.is_super_teacher ? "super_teacher" : profile?.role ?? null,
+
+        // For this first pass, anyone who currently has app access keeps
+        // full vocabulary access. Later, when expired trials become free users,
+        // we can separate "can enter app" from "has full learning access."
+        hasFullAccess: appAccessStatus.hasAccess,
+      });
+
+      setCanUseAddWord(canUseFullAccessFeature(featureAccess, "add_word"));
 
       const { data, error } = await supabase
         .from("user_books")
@@ -741,6 +765,13 @@ export default function AddWordPage() {
         return;
       }
 
+      if (!canUseAddWord) {
+        const copy = getFullAccessRequiredCopy("add_word");
+        setMessage(`❌ ${copy.message}`);
+        setSaving(false);
+        return;
+      }
+
       const finalSurface = useAlternateSurface ? cleanAlternateSurface : cleanWord;
       const hasVerifiedDictionaryMatch = lookupCandidates.some(
         (candidate) =>
@@ -981,6 +1012,57 @@ export default function AddWordPage() {
   if (!canAccessBook) {
     return (
       <AccessDeniedMessage message={accessMessage || "You do not have access to this book."} />
+    );
+  }
+
+  if (!canUseAddWord) {
+    const copy = getFullAccessRequiredCopy("add_word");
+
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+              Full access feature
+            </p>
+
+            <h1 className="mt-2 text-2xl font-black text-stone-950">
+              {copy.title}
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              {copy.message}
+            </p>
+
+            {bookTitle ? (
+              <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-stone-500">
+                  Current book
+                </p>
+                <p className="mt-1 font-semibold text-stone-900">{bookTitle}</p>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+              >
+                Back to Book Hub
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/books")}
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                Go to Library
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -1275,30 +1357,30 @@ export default function AddWordPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
-                <input
-                  value={reading}
-                  onChange={(e) => setReading(e.target.value)}
-                  placeholder="Reading"
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
-                />
-              </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
+                  <input
+                    value={reading}
+                    onChange={(e) => setReading(e.target.value)}
+                    placeholder="Reading"
+                    className="w-full rounded border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">
-                  Alternate surface
-                </label>
-                <input
-                  value={alternateSurface}
-                  onChange={(e) => {
-                    setAlternateSurface(e.target.value);
-                    setUseAlternateSurface(e.target.value.trim().length > 0);
-                  }}
-                  placeholder="Book form, if different"
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
-                />
-              </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-stone-700">
+                    Alternate surface
+                  </label>
+                  <input
+                    value={alternateSurface}
+                    onChange={(e) => {
+                      setAlternateSurface(e.target.value);
+                      setUseAlternateSurface(e.target.value.trim().length > 0);
+                    }}
+                    placeholder="Book form, if different"
+                    className="w-full rounded border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
             </div>
 
