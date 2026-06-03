@@ -19,6 +19,7 @@ import {
 } from "@/lib/libraryStudyTotals";
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
+import LibraryViewControls from "./components/LibraryViewControls";
 
 type Book = {
   id: string;
@@ -2866,64 +2867,14 @@ export default function BooksPage() {
 
         {null}
 
-        <div className="mb-4 space-y-3">
-          <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
-            <button
-              onClick={() => setViewMode("cover")}
-              className={`px-3 py-1 ${viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
-                }`}
-            >
-              Cover
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-3 py-1 ${viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
-                }`}
-            >
-              List
-            </button>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <select
-              value={bookTypeFilter}
-              onChange={(e) => setBookTypeFilter(e.target.value)}
-              className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
-            >
-              <option value="all">Book Type</option>
-              <option value="picture_book">Picture Book</option>
-              <option value="early_reader">Early Reader</option>
-              <option value="chapter_book">Chapter Book</option>
-              <option value="middle_grade">Middle Grade</option>
-              <option value="ya">YA</option>
-              <option value="novel">Novel</option>
-              <option value="short_story">Short Story</option>
-              <option value="manga">Manga</option>
-              <option value="nonfiction">Nonfiction</option>
-              <option value="essay">Essay</option>
-              <option value="memoir">Memoir</option>
-              <option value="textbook">Textbook</option>
-              <option value="other">Other</option>
-            </select>
-
-            <select
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as LibrarySortMode)}
-              className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
-            >
-              <option value="status">Book Status</option>
-              <option value="title">Title</option>
-              <option value="last_read">Recently Finished</option>
-              <option value="last_engaged">Last Engaged with</option>
-              <option value="rating_high">High to Low Rating</option>
-              <option value="rating_low">Low to High Rating</option>
-              <option value="difficulty_high">High to Low Difficulty</option>
-              <option value="difficulty_low">Low to High Difficulty</option>
-              <option value="pace_fast">Fastest to Slowest Pace</option>
-              <option value="pace_slow">Slowest to Fastest Pace</option>
-            </select>
-          </div>
-        </div>
+        <LibraryViewControls
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          bookTypeFilter={bookTypeFilter}
+          onBookTypeFilterChange={setBookTypeFilter}
+          sortMode={sortMode}
+          onSortModeChange={setSortMode}
+        />
 
         <p className="mb-6 text-sm text-gray-600">
           All reading/study tools live inside each book. Click a cover to open its Book Hub.
