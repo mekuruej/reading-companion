@@ -28,6 +28,7 @@ import CuriosityRecentSessionWordCard from "../components/CuriosityRecentSession
 import CuriosityRecentSessionWords from "../components/CuriosityRecentSessionWords";
 import CuriosityFullAccessRequired from "../components/CuriosityFullAccessRequired";
 import CuriosityTimerPanel from "../components/CuriosityTimerPanel";
+import CuriosityQuickSearchRow from "../components/CuriosityQuickSearchRow";
 
 type QuickPreview = {
   id: string | null;
@@ -1236,64 +1237,29 @@ export default function CuriosityReadingPage() {
               </div>
             ) : null}
 
-            <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">
-                  Rapid search
-                </label>
-                <p className="mb-1 text-xs text-stone-500">
-                  Already know the kanji? Search with a simple Enter tap.
-                </p>
-
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    ref={quickWordInputRef}
-                    type="text"
-                    value={quickPreview.surface}
-                    onChange={(e) => {
-                      setQuickPreview((prev) => ({
-                        ...prev,
-                        surface: e.target.value,
-                        cacheSurface: e.target.value.trim() ? prev.cacheSurface : "",
-                      }));
-                      setSavedQuickNotice("");
-                      if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void pullQuickWord();
-                      }
-                    }}
-                    placeholder="Search or edit a word..."
-                    className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => void pullQuickWord()}
-                    disabled={quickLoading || !quickPreview.surface.trim()}
-                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                  >
-                    {quickLoading ? "Searching..." : "Search"}
-                  </button>
-                </div>
-              </div>
-
-              {quickPreview.surface.trim() && quickPreview.reading.trim() ? (
-                <div className="flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
-                  <span>Current library status:</span>
-                  {quickPreviewLibraryColorInfo ? (
-                    <LibraryColorBadge
-                      colorStatus={quickPreviewLibraryColorInfo.colorStatus}
-                      stageLabel={quickPreviewLibraryColorInfo.stageLabel}
-                    />
-                  ) : (
-                    <LibraryColorBadge color="none" label="Not in library yet" />
-                  )}
-                </div>
-              ) : null}
-            </div>
+            <CuriosityQuickSearchRow
+              surface={quickPreview.surface}
+              reading={quickPreview.reading}
+              quickLoading={quickLoading}
+              quickPreviewLibraryColorInfo={quickPreviewLibraryColorInfo}
+              quickWordInputRef={quickWordInputRef}
+              onSurfaceChange={(value) => {
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  surface: value,
+                  cacheSurface: value.trim() ? prev.cacheSurface : "",
+                }));
+                setSavedQuickNotice("");
+                if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+              }}
+              onSearch={() => void pullQuickWord()}
+              onSearchKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void pullQuickWord();
+                }
+              }}
+            />
 
             <details
               open={isWordHelpOpen}
