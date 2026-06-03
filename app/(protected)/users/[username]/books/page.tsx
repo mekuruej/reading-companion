@@ -2498,18 +2498,11 @@ export default function BooksPage() {
         ) : null}
 
         {showSuperTeacherKanjiReminder ? (
-          <div className="mb-5 rounded-3xl border border-violet-200 bg-violet-50 px-4 py-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-violet-950">
-                  Kanji enrichment reminder
-                </div>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  A little kanji cleanup keeps the shared Kanji Reading Study bank healthier.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
+          <LibraryReminderBanner
+            tone="violet"
+            title="Kanji enrichment reminder"
+            actions={
+              <>
                 <button
                   type="button"
                   onClick={() => {
@@ -2521,6 +2514,7 @@ export default function BooksPage() {
                 >
                   Open Kanji Queue
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -2531,9 +2525,14 @@ export default function BooksPage() {
                 >
                   Hide today
                 </button>
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          >
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              A little kanji cleanup keeps the shared Kanji Reading Study bank
+              healthier.
+            </p>
+          </LibraryReminderBanner>
         ) : null}
 
         {showLearningTasks ? (
