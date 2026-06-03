@@ -6,6 +6,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+  canUseFullAccessFeature,
+  getFullAccessRequiredCopy,
+} from "@/lib/access/requireFullAccess";
 import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
@@ -269,6 +275,8 @@ export default function BookFlashcardsPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
+  const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
+  const [fullAccessLocked, setFullAccessLocked] = useState(false);
   const [accessMessage, setAccessMessage] = useState("");
 
   const [jlptSelected, setJlptSelected] = useState<string[]>([]);
@@ -364,6 +372,8 @@ export default function BookFlashcardsPage() {
       setNeedsSignIn(false);
       setAccessChecked(false);
       setCanAccessBook(false);
+      setCanUseStudyFlashcards(false);
+      setFullAccessLocked(false);
       setAccessMessage("");
 
       try {
@@ -387,13 +397,33 @@ export default function BookFlashcardsPage() {
 
         const { data: profile, error: profileErr } = await supabase
           .from("profiles")
-          .select("role, is_super_teacher")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", user.id)
           .maybeSingle();
 
         if (profileErr) {
           console.error("Error loading profile role:", profileErr);
         }
+
+        const appAccessStatus = profile
+          ? getAppAccessStatus(profile)
+          : { hasAccess: false, reason: "missing_profile" };
+
+        const featureAccess = getFeatureAccess({
+          role: profile?.is_super_teacher ? "super_teacher" : profile?.role ?? null,
+
+          // For this first pass, anyone who currently has app access keeps
+          // full learning access. Later, when expired trials become free users,
+          // we can separate "can enter app" from "has full learning access."
+          hasFullAccess: appAccessStatus.hasAccess,
+        });
+
+        const canUseStudyFlashcardsNow = canUseFullAccessFeature(
+          featureAccess,
+          "study_flashcards"
+        );
+
+        setCanUseStudyFlashcards(canUseStudyFlashcardsNow);
 
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")
@@ -443,6 +473,16 @@ export default function BookFlashcardsPage() {
         setAccessChecked(true);
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
+
+        if (!canUseStudyFlashcardsNow) {
+          setFullAccessLocked(true);
+          setCards([]);
+          setFilteredCards([]);
+          setLibraryCards([]);
+          setChapterOptions([]);
+          setLoading(false);
+          return;
+        }
 
         const totalCounts = new Map<string, number>();
 
@@ -1058,8 +1098,8 @@ export default function BookFlashcardsPage() {
   }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect]);
 
   async function logStudyEvent(result: "revealed" | "correct" | "wrong") {
-    if (!canAccessBook) {
-      console.warn("Cannot write study log without access to this flashcard set.");
+    if (!canAccessBook || !canUseStudyFlashcards) {
+      console.warn("Cannot write study log without full access to this flashcard set.");
       return;
     }
 
@@ -1173,7 +1213,7 @@ export default function BookFlashcardsPage() {
   }
 
   async function skipCardForToday(cardId: string) {
-    if (!canAccessBook) {
+    if (!canAccessBook || !canUseStudyFlashcards) {
       console.warn("Cannot skip card without access to this flashcard set.");
       return;
     }
@@ -1195,7 +1235,7 @@ export default function BookFlashcardsPage() {
   }
 
   async function flagCardForReview(cardId: string) {
-    if (!canAccessBook) {
+    if (!canAccessBook || !canUseStudyFlashcards) {
       console.warn("Cannot flag card without access to this flashcard set.");
       return;
     }
@@ -1221,7 +1261,7 @@ export default function BookFlashcardsPage() {
   }
 
   async function hideCardPermanently(cardId: string) {
-    if (!canAccessBook) {
+    if (!canAccessBook || !canUseStudyFlashcards) {
       console.warn("Cannot hide card without access to this flashcard set.");
       return;
     }
@@ -1457,7 +1497,7 @@ export default function BookFlashcardsPage() {
   }
 
   async function setDefinitionForCurrent(newIndex: number) {
-    if (!canAccessBook) {
+    if (!canAccessBook || !canUseStudyFlashcards) {
       setDefError("You do not have access to this flashcard set.");
       return;
     }
@@ -1621,6 +1661,63 @@ export default function BookFlashcardsPage() {
       <AccessDeniedMessage
         message={accessMessage || "You do not have access to this flashcard set."}
       />
+    );
+  }
+
+  if (fullAccessLocked) {
+    const copy = getFullAccessRequiredCopy("study_flashcards");
+
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+              Full access feature
+            </p>
+
+            <h1 className="mt-2 text-2xl font-black text-stone-950">
+              {copy.title}
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              {copy.message}
+            </p>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              Your vocabulary progress is saved. Full vocabulary study is available with full Mekuru access.
+            </p>
+
+            {bookTitle ? (
+              <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-stone-500">
+                  Current book
+                </p>
+                <p className="mt-1 font-semibold text-stone-900">{bookTitle}</p>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+              >
+                Back to Book Hub
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(`/books/${encodeURIComponent(userBookId)}/just-reading`)
+                }
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                Use Just Reading Timer
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
     );
   }
 
