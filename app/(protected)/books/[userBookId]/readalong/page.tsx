@@ -269,7 +269,7 @@ export default function ReadAlongPage() {
 
                 // First pass: anyone who currently has app access keeps full saved-word reading access.
                 // Later, expired trials can enter free reading pages while this saved-word support page locks.
-                hasFullAccess: appAccessStatus.hasAccess,
+                hasFullAccess: appAccessStatus.hasFullAccess,
             });
 
             const canUseSavedWordReadingNow = canUseFullAccessFeature(

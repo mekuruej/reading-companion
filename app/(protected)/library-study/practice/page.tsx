@@ -1674,7 +1674,7 @@ export default function LibraryStudyPage() {
 
           // First pass: Library Review uses the same full-access bucket as Ability Check
           // because both are saved-vocabulary study features.
-          hasFullAccess: appAccessStatus.hasAccess,
+          hasFullAccess: appAccessStatus.hasFullAccess,
         });
 
         const canUseLibraryReviewNow = canUseFullAccessFeature(

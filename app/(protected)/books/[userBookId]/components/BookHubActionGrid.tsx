@@ -4,6 +4,11 @@
 "use client";
 
 type BookHubActionGridProps = {
+    canUseCuriosityReading: boolean;
+    canUseSavedWordReading: boolean;
+    canUseStudyFlashcards: boolean;
+    canUseVocabularyList: boolean;
+
     onCuriosityReading: () => void;
     onFluidReadingExtensive: () => void;
     onFluidReadingJustReading: () => void;
@@ -20,42 +25,81 @@ function ActionButton({
     description,
     className,
     onClick,
+    locked = false,
+    lockedLabel = "Full access",
 }: {
     title: string;
     subtitle?: string;
     description: string;
     className: string;
     onClick: () => void | Promise<void>;
+    locked?: boolean;
+    lockedLabel?: string;
 }) {
     return (
         <button
             type="button"
-            onClick={onClick}
-            className={`rounded-xl border border-stone-900 px-3.5 py-3 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md ${className}`}
+            onClick={locked ? undefined : onClick}
+            disabled={locked}
+            aria-disabled={locked}
+            title={locked ? `${title} is a full-access feature.` : undefined}
+            className={[
+                "relative rounded-xl border border-stone-900 px-3.5 py-3 text-center shadow-sm transition-all",
+                locked
+                    ? "cursor-not-allowed bg-stone-100 text-stone-400 opacity-60 grayscale"
+                    : `hover:-translate-y-[1px] hover:shadow-md ${className}`,
+            ].join(" ")}
         >
-            <div className="text-base font-semibold text-stone-900 sm:text-lg">
+            {locked ? (
+                <div className="absolute right-2 top-2 rounded-full border border-stone-300 bg-white/80 px-2 py-0.5 text-xs font-black text-stone-500 shadow-sm">
+                    🔒
+                </div>
+            ) : null}
+
+            <div
+                className={[
+                    "text-base font-semibold sm:text-lg",
+                    locked ? "text-stone-500" : "text-stone-900",
+                ].join(" ")}
+            >
                 {title}
             </div>
 
             {subtitle ? (
                 <div
-                    className={`font-semibold text-stone-900 ${subtitle.startsWith("(")
-                        ? "text-xs sm:text-sm"
-                        : "text-base sm:text-lg"
-                        }`}
+                    className={[
+                        "font-semibold",
+                        locked ? "text-stone-500" : "text-stone-900",
+                        subtitle.startsWith("(") ? "text-xs sm:text-sm" : "text-base sm:text-lg",
+                    ].join(" ")}
                 >
                     {subtitle}
                 </div>
             ) : null}
 
-            <div className="mt-2 text-xs leading-5 text-stone-700">
+            <div
+                className={[
+                    "mt-2 text-xs leading-5",
+                    locked ? "text-stone-500" : "text-stone-700",
+                ].join(" ")}
+            >
                 {description}
             </div>
+
+            {locked ? (
+                <div className="mt-3 text-xs font-black uppercase tracking-[0.14em] text-stone-500">
+                    {lockedLabel}
+                </div>
+            ) : null}
         </button>
     );
 }
 
 export default function BookHubActionGrid({
+    canUseCuriosityReading,
+    canUseSavedWordReading,
+    canUseStudyFlashcards,
+    canUseVocabularyList,
     onCuriosityReading,
     onFluidReadingExtensive,
     onFluidReadingJustReading,
@@ -73,6 +117,7 @@ export default function BookHubActionGrid({
                     subtitle="(Intensive)"
                     description="Read while saving vocab and logging a slower, mindful session."
                     className="bg-rose-50 hover:bg-rose-100"
+                    locked={!canUseCuriosityReading}
                     onClick={onCuriosityReading}
                 />
 
@@ -81,6 +126,7 @@ export default function BookHubActionGrid({
                     subtitle="(Saved Word Support)"
                     description="Read forward with light support from words you already saved."
                     className="bg-emerald-50 hover:bg-emerald-100"
+                    locked={!canUseSavedWordReading}
                     onClick={onFluidReadingExtensive}
                 />
 
@@ -105,6 +151,7 @@ export default function BookHubActionGrid({
                     subtitle="Flashcards"
                     description="Review the words you saved from this book."
                     className="bg-violet-50 hover:bg-violet-100"
+                    locked={!canUseStudyFlashcards}
                     onClick={onStudyFlashcards}
                 />
 
@@ -113,6 +160,7 @@ export default function BookHubActionGrid({
                     subtitle="List"
                     description="Open the saved words and vocabulary tools for this book."
                     className="bg-sky-50 hover:bg-sky-100"
+                    locked={!canUseVocabularyList}
                     onClick={onVocabularyList}
                 />
 

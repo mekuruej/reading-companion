@@ -5,6 +5,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+  canUseFullAccessFeature,
+  getFullAccessRequiredCopy,
+} from "@/lib/access/requireFullAccess";
 import BookInfoTab from "./components/BookInfoTab";
 import ReadingTab from "./components/ReadingTab";
 import RatingTab from "./components/RatingTab";
@@ -579,6 +585,37 @@ function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
+function FullAccessBookHubTabPanel({
+  feature,
+  title,
+  message,
+}: {
+  feature: "vocab_tools" | "story_notes";
+  title: string;
+  message: string;
+}) {
+  const copy = getFullAccessRequiredCopy(feature);
+
+  return (
+    <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+        Full access feature
+      </p>
+
+      <h2 className="mt-2 text-2xl font-black text-stone-950">{title}</h2>
+
+      <p className="mt-3 text-sm leading-6 text-stone-600">{copy.message}</p>
+
+      <p className="mt-3 text-sm leading-6 text-stone-600">{message}</p>
+
+      <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 text-stone-600">
+        You can still use this Book Hub for Book Info, Reading Sessions, and
+        Reading Reflection.
+      </div>
+    </div>
+  );
+}
+
 export default function BookHubPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -600,6 +637,13 @@ export default function BookHubPage() {
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
   const [profileLevel, setProfileLevel] = useState<string>("");
   const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
+
+  const [canUseVocabTools, setCanUseVocabTools] = useState(false);
+  const [canUseStoryNotes, setCanUseStoryNotes] = useState(false);
+  const [canUseCuriosityReading, setCanUseCuriosityReading] = useState(false);
+  const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
+  const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
+  const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
 
   const isTeacher = myRole === "teacher";
   const isTeacherContext = isTeacher || isSuperTeacher;
@@ -3246,6 +3290,12 @@ export default function BookHubPage() {
 
     setLoading(true);
     setError(null);
+    setCanUseVocabTools(false);
+    setCanUseStoryNotes(false);
+    setCanUseCuriosityReading(false);
+    setCanUseSavedWordReading(false);
+    setCanUseStudyFlashcards(false);
+    setCanUseVocabularyList(false);
 
     const {
       data: { session },
@@ -3264,7 +3314,7 @@ export default function BookHubPage() {
 
     const { data: meProfile, error: meProfileErr } = await supabase
       .from("profiles")
-      .select("role, is_super_teacher, level")
+      .select("role, is_super_teacher, level, app_access_type, app_access_expires_at")
       .eq("id", user.id)
       .single();
 
@@ -3280,6 +3330,36 @@ export default function BookHubPage() {
     setMyRole(currentProfileRole);
     setIsSuperTeacher(currentProfileIsSuperTeacher);
     setProfileLevel(meProfile?.level ?? "");
+
+    const appAccessStatus = meProfile
+      ? getAppAccessStatus({
+        role: currentProfileIsSuperTeacher ? "super_teacher" : currentProfileRole,
+        app_access_type: (meProfile as any).app_access_type,
+        app_access_expires_at: (meProfile as any).app_access_expires_at,
+      })
+      : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
+
+    const featureAccess = getFeatureAccess({
+      role: currentProfileIsSuperTeacher ? "super_teacher" : currentProfileRole,
+
+      // Book Hub stays free, but these two tabs use full-access saved-vocab/private-note tools.
+      hasFullAccess: appAccessStatus.hasFullAccess
+    });
+
+    setCanUseVocabTools(canUseFullAccessFeature(featureAccess, "vocab_tools"));
+    setCanUseStoryNotes(canUseFullAccessFeature(featureAccess, "story_notes"));
+    setCanUseCuriosityReading(
+      canUseFullAccessFeature(featureAccess, "curiosity_reading")
+    );
+    setCanUseSavedWordReading(
+      canUseFullAccessFeature(featureAccess, "saved_word_reading")
+    );
+    setCanUseStudyFlashcards(
+      canUseFullAccessFeature(featureAccess, "study_flashcards")
+    );
+    setCanUseVocabularyList(
+      canUseFullAccessFeature(featureAccess, "vocabulary_list")
+    );
 
     const { data, error } = await supabase
       .from("user_books")
@@ -5045,6 +5125,10 @@ export default function BookHubPage() {
                 saveNoticeTone={saveNoticeTone}
               />
               <BookHubActionGrid
+                canUseCuriosityReading={canUseCuriosityReading}
+                canUseSavedWordReading={canUseSavedWordReading}
+                canUseStudyFlashcards={canUseStudyFlashcards}
+                canUseVocabularyList={canUseVocabularyList}
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/curiosity-reading`);
@@ -5189,11 +5273,20 @@ export default function BookHubPage() {
               {activeTab === "study" && (
                 <div className="space-y-4">
                   <BookHubTabSectionHeader title="Vocab" />
-                  <VocabTab
-                    row={row}
-                    vocabTab={vocabTab}
-                    setVocabTab={setVocabTab}
-                  />
+
+                  {canUseVocabTools ? (
+                    <VocabTab
+                      row={row}
+                      vocabTab={vocabTab}
+                      setVocabTab={setVocabTab}
+                    />
+                  ) : (
+                    <FullAccessBookHubTabPanel
+                      feature="vocab_tools"
+                      title="Vocab Tools uses saved vocabulary"
+                      message="Full access unlocks tools for exploring, bulk adding, and studying vocabulary connected to this book."
+                    />
+                  )}
                 </div>
               )}
 
@@ -5250,74 +5343,83 @@ export default function BookHubPage() {
               {activeTab === "story" && (
                 <div className="space-y-4">
                   <BookHubTabSectionHeader title="Story" />
-                  <StoryTab
-                    storyTab={storyTab}
-                    setStoryTab={setStoryTab}
 
-                    characters={characters}
-                    visibleCharacters={visibleCharacters}
-                    showCharacters={showCharacters}
-                    setShowCharacters={setShowCharacters}
-                    charactersReverseOrder={charactersReverseOrder}
-                    setCharactersReverseOrder={setCharactersReverseOrder}
-                    editingCharacterIds={editingCharacterIds}
-                    savingCharacterIds={savingCharacterIds}
-                    savedCharacterIds={savedCharacterIds}
-                    addCharacter={addCharacter}
-                    updateCharacter={updateCharacter}
-                    startEditingCharacter={startEditingCharacter}
-                    stopEditingCharacter={stopEditingCharacter}
-                    saveCharacter={saveCharacter}
-                    deleteCharacter={deleteCharacter}
+                  {canUseStoryNotes ? (
+                    <StoryTab
+                      storyTab={storyTab}
+                      setStoryTab={setStoryTab}
 
-                    chapterSummaries={chapterSummaries}
-                    visibleChapterSummaries={visibleChapterSummaries}
-                    showChapterSummaries={showChapterSummaries}
-                    setShowChapterSummaries={setShowChapterSummaries}
-                    chapterReverseOrder={chapterReverseOrder}
-                    setChapterReverseOrder={setChapterReverseOrder}
-                    editingChapterIds={editingChapterIds}
-                    savingChapterIds={savingChapterIds}
-                    savedChapterIds={savedChapterIds}
-                    addChapterSummary={addChapterSummary}
-                    updateChapterSummary={updateChapterSummary}
-                    startEditingChapter={startEditingChapter}
-                    stopEditingChapter={stopEditingChapter}
-                    saveChapterSummary={saveChapterSummary}
-                    deleteChapterSummary={deleteChapterSummary}
+                      characters={characters}
+                      visibleCharacters={visibleCharacters}
+                      showCharacters={showCharacters}
+                      setShowCharacters={setShowCharacters}
+                      charactersReverseOrder={charactersReverseOrder}
+                      setCharactersReverseOrder={setCharactersReverseOrder}
+                      editingCharacterIds={editingCharacterIds}
+                      savingCharacterIds={savingCharacterIds}
+                      savedCharacterIds={savedCharacterIds}
+                      addCharacter={addCharacter}
+                      updateCharacter={updateCharacter}
+                      startEditingCharacter={startEditingCharacter}
+                      stopEditingCharacter={stopEditingCharacter}
+                      saveCharacter={saveCharacter}
+                      deleteCharacter={deleteCharacter}
 
-                    settingItems={settingItems}
-                    visibleSettingItems={visibleSettingItems}
-                    showSettingItems={showSettingItems}
-                    setShowSettingItems={setShowSettingItems}
-                    settingReverseOrder={settingReverseOrder}
-                    setSettingReverseOrder={setSettingReverseOrder}
-                    editingSettingIds={editingSettingIds}
-                    savingSettingIds={savingSettingIds}
-                    savedSettingIds={savedSettingIds}
-                    addSettingItem={addSettingItem}
-                    updateSettingItem={updateSettingItem}
-                    startEditingSettingItem={startEditingSettingItem}
-                    stopEditingSettingItem={stopEditingSettingItem}
-                    saveSettingItem={saveSettingItem}
-                    deleteSettingItem={deleteSettingItem}
+                      chapterSummaries={chapterSummaries}
+                      visibleChapterSummaries={visibleChapterSummaries}
+                      showChapterSummaries={showChapterSummaries}
+                      setShowChapterSummaries={setShowChapterSummaries}
+                      chapterReverseOrder={chapterReverseOrder}
+                      setChapterReverseOrder={setChapterReverseOrder}
+                      editingChapterIds={editingChapterIds}
+                      savingChapterIds={savingChapterIds}
+                      savedChapterIds={savedChapterIds}
+                      addChapterSummary={addChapterSummary}
+                      updateChapterSummary={updateChapterSummary}
+                      startEditingChapter={startEditingChapter}
+                      stopEditingChapter={stopEditingChapter}
+                      saveChapterSummary={saveChapterSummary}
+                      deleteChapterSummary={deleteChapterSummary}
 
-                    culturalItems={culturalItems}
-                    visibleCulturalItems={visibleCulturalItems}
-                    showCulturalItems={showCulturalItems}
-                    setShowCulturalItems={setShowCulturalItems}
-                    culturalReverseOrder={culturalReverseOrder}
-                    setCulturalReverseOrder={setCulturalReverseOrder}
-                    editingCulturalIds={editingCulturalIds}
-                    savingCulturalIds={savingCulturalIds}
-                    savedCulturalIds={savedCulturalIds}
-                    addCulturalItem={addCulturalItem}
-                    updateCulturalItem={updateCulturalItem}
-                    startEditingCulturalItem={startEditingCulturalItem}
-                    stopEditingCulturalItem={stopEditingCulturalItem}
-                    saveCulturalItem={saveCulturalItem}
-                    deleteCulturalItem={deleteCulturalItem}
-                  />
+                      settingItems={settingItems}
+                      visibleSettingItems={visibleSettingItems}
+                      showSettingItems={showSettingItems}
+                      setShowSettingItems={setShowSettingItems}
+                      settingReverseOrder={settingReverseOrder}
+                      setSettingReverseOrder={setSettingReverseOrder}
+                      editingSettingIds={editingSettingIds}
+                      savingSettingIds={savingSettingIds}
+                      savedSettingIds={savedSettingIds}
+                      addSettingItem={addSettingItem}
+                      updateSettingItem={updateSettingItem}
+                      startEditingSettingItem={startEditingSettingItem}
+                      stopEditingSettingItem={stopEditingSettingItem}
+                      saveSettingItem={saveSettingItem}
+                      deleteSettingItem={deleteSettingItem}
+
+                      culturalItems={culturalItems}
+                      visibleCulturalItems={visibleCulturalItems}
+                      showCulturalItems={showCulturalItems}
+                      setShowCulturalItems={setShowCulturalItems}
+                      culturalReverseOrder={culturalReverseOrder}
+                      setCulturalReverseOrder={setCulturalReverseOrder}
+                      editingCulturalIds={editingCulturalIds}
+                      savingCulturalIds={savingCulturalIds}
+                      savedCulturalIds={savedCulturalIds}
+                      addCulturalItem={addCulturalItem}
+                      updateCulturalItem={updateCulturalItem}
+                      startEditingCulturalItem={startEditingCulturalItem}
+                      stopEditingCulturalItem={stopEditingCulturalItem}
+                      saveCulturalItem={saveCulturalItem}
+                      deleteCulturalItem={deleteCulturalItem}
+                    />
+                  ) : (
+                    <FullAccessBookHubTabPanel
+                      feature="story_notes"
+                      title="Story Notes are a full-access tool"
+                      message="Full access unlocks private character notes, plot notes, setting notes, and cultural notes for this book."
+                    />
+                  )}
                 </div>
               )}
 

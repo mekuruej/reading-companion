@@ -224,7 +224,7 @@ export default function FeatureAccessTestPage() {
 
         return getFeatureAccess({
             role: roleForAccess,
-            hasFullAccess: appAccessStatus.hasAccess,
+            hasFullAccess: appAccessStatus.hasFullAccess,
         });
     }, [appAccessStatus, roleForAccess]);
 

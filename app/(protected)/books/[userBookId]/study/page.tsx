@@ -415,7 +415,7 @@ export default function BookFlashcardsPage() {
           // For this first pass, anyone who currently has app access keeps
           // full learning access. Later, when expired trials become free users,
           // we can separate "can enter app" from "has full learning access."
-          hasFullAccess: appAccessStatus.hasAccess,
+          hasFullAccess: appAccessStatus.hasFullAccess,
         });
 
         const canUseStudyFlashcardsNow = canUseFullAccessFeature(

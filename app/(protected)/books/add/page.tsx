@@ -415,6 +415,11 @@ export default function AddBookPage() {
                     first, then you can confirm where it should go.
                 </p>
 
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-white/70 px-4 py-3 text-sm leading-6 text-amber-900">
+                    Please only add Japanese books for now. Use the book&apos;s ISBN-13,
+                    not an Amazon link.
+                </div>
+
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                     <input
                         value={isbn}
