@@ -21,6 +21,7 @@ import {
 } from "@/lib/libraryStudyColorLookup";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import CuriosityPageHeader from "../components/CuriosityPageHeader";
+import CuriosityStatusMessage from "../components/CuriosityStatusMessage";
 
 type QuickPreview = {
   id: string | null;
@@ -1236,16 +1237,7 @@ export default function CuriosityReadingPage() {
           </p>
         )}
 
-        {message ? (
-          <div className="mb-4">
-            <p
-              className={`text-base font-medium ${message.startsWith("❌") ? "text-red-700" : "text-green-700"
-                }`}
-            >
-              {message}
-            </p>
-          </div>
-        ) : null}
+        <CuriosityStatusMessage message={message} />
 
         <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4">
           <div className="mb-2 text-sm font-medium text-stone-900">Log your reading session</div>
