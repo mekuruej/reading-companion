@@ -2590,7 +2590,7 @@ export default function BooksPage() {
                     canComplete={viewingUserId === meId}
                     isCompleting={completingLearningTaskId === task.id}
                     onOpenAction={(href) => router.push(href)}
-                    onComplete={() => completeLearningTask(task.id)}
+                    onComplete={() => void completeLearningTask(task.id)}
                   />
                 );
               })}
