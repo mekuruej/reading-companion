@@ -22,6 +22,7 @@ import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
 import LibraryBookCard from "./components/LibraryBookCard";
 import LibraryBookRow from "./components/LibraryBookRow";
+import LibrarySection from "./components/LibrarySection";
 
 type Book = {
   id: string;
@@ -2245,32 +2246,7 @@ export default function BooksPage() {
   const gridClass =
     "grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
-  function Section({
-    title,
-    subtitle,
-    items,
-  }: {
-    title: string;
-    subtitle?: string;
-    items: UserBookRow[];
-  }) {
-    if (items.length === 0) return null;
 
-    return (
-      <section className="mb-10">
-        <div className="mb-3 flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800">
-              {title} <span className="font-normal text-gray-500">({items.length})</span>
-            </h2>
-            {subtitle ? <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p> : null}
-          </div>
-        </div>
-
-        <ul className={gridClass}>{items.map((row) => renderBookCard(row))}</ul>
-      </section>
-    );
-  }
 
   function getStatusOrder(row: UserBookRow) {
     if (row.started_at && !row.finished_at && !row.dnf_at) return 0;
@@ -2795,14 +2771,41 @@ export default function BooksPage() {
           sortMode === "status" ? (
             <>
               {null}
-              <Section
+              <LibrarySection
                 title="Currently Reading"
                 subtitle="Started but not finished yet"
-                items={currentlyReading}
-              />
-              <Section title="Want to Read" subtitle="Not started yet" items={notStarted} />
-              <Section title="Finished" subtitle="Completed books" items={finished} />
-              <Section title="DNF" subtitle="Did not finish" items={dnf} />
+                count={currentlyReading.length}
+                gridClassName={gridClass}
+              >
+                {currentlyReading.map((row) => renderBookCard(row))}
+              </LibrarySection>
+
+              <LibrarySection
+                title="Want to Read"
+                subtitle="Not started yet"
+                count={notStarted.length}
+                gridClassName={gridClass}
+              >
+                {notStarted.map((row) => renderBookCard(row))}
+              </LibrarySection>
+
+              <LibrarySection
+                title="Finished"
+                subtitle="Completed books"
+                count={finished.length}
+                gridClassName={gridClass}
+              >
+                {finished.map((row) => renderBookCard(row))}
+              </LibrarySection>
+
+              <LibrarySection
+                title="DNF"
+                subtitle="Did not finish"
+                count={dnf.length}
+                gridClassName={gridClass}
+              >
+                {dnf.map((row) => renderBookCard(row))}
+              </LibrarySection>
             </>
           ) : (
             <ul className={gridClass}>
