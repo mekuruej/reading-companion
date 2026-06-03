@@ -25,6 +25,11 @@ type RecommendationSignalRow = {
   books: BookMeta | BookMeta[] | null;
 };
 
+type UserBookMatchRow = {
+  id: string;
+  book_id: string | null;
+};
+
 type BookRatingSignal = {
   id: string;
   readerLevel: string | null;
@@ -195,6 +200,7 @@ export default function FindBooksPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [bookTypeFilter, setBookTypeFilter] = useState("all");
   const [readerLevelFilter, setReaderLevelFilter] = useState("all");
+  const [userBookIdsByBookId, setUserBookIdsByBookId] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let alive = true;
@@ -234,6 +240,53 @@ export default function FindBooksPage() {
 
         const rows = (data ?? []) as RecommendationSignalRow[];
         setRatingRows(rows);
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setUserBookIdsByBookId({});
+          return;
+        }
+
+        const bookIds = Array.from(
+          new Set(
+            rows
+              .map((row) => firstBook(row)?.id)
+              .filter((bookId): bookId is string => !!bookId)
+          )
+        );
+
+        if (bookIds.length === 0) {
+          setUserBookIdsByBookId({});
+          return;
+        }
+
+        const { data: userBooks, error: userBooksError } = await supabase
+          .from("user_books")
+          .select("id, book_id")
+          .eq("user_id", user.id)
+          .in("book_id", bookIds);
+
+        if (userBooksError) {
+          console.error("Error loading find-books library matches:", userBooksError);
+          setUserBookIdsByBookId({});
+          return;
+        }
+
+        if (!alive) return;
+
+        setUserBookIdsByBookId(
+          ((userBooks ?? []) as UserBookMatchRow[]).reduce<Record<string, string>>(
+            (matches, row) => {
+              if (row.book_id) matches[row.book_id] = row.id;
+              return matches;
+            },
+            {}
+          )
+        );
       } catch (error: any) {
         console.error("Error loading find-books recommendation signals:", error);
         if (!alive) return;
@@ -440,6 +493,7 @@ export default function FindBooksPage() {
             ratedBookGroups.map((book) => {
               const shouldShowAverageRatings = book.signals.length >= 2;
               const readerCountLabel = `${book.signals.length} reader${book.signals.length === 1 ? "" : "s"}`;
+              const userBookId = userBookIdsByBookId[book.bookId];
 
               return (
                 <article
@@ -470,6 +524,14 @@ export default function FindBooksPage() {
                             <p className="mt-1 text-sm text-slate-500">
                               {book.author}
                             </p>
+                          ) : null}
+                          {userBookId ? (
+                            <Link
+                              href={`/books/${userBookId}`}
+                              className="mt-3 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100"
+                            >
+                              In your library · Open Book Hub →
+                            </Link>
                           ) : null}
                         </div>
 
