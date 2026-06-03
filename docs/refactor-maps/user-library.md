@@ -204,42 +204,6 @@ This first pass should be presentational only. Components should receive already
 
 The suggested components below are ordered from easiest / lowest-risk to more complex: A, B, C, and onward.
 
-### A. `LibraryHeader`
-
-* What JSX it owns:
-  * top library heading
-  * Mekuru logo
-  * optional student-library context pill
-  * placement of the logout-only user bar slot, if passed as children
-* Expected props:
-  * `libraryOwnerLabel`
-  * `libraryContextLabel`
-  * `children` or a `rightAction` node
-* What stays in `page.tsx`:
-  * current-user/viewed-user calculation
-  * teacher/student context logic
-  * `UserBar` data loading and logout behavior
-* Category: presentational UI.
-* Risk level: low.
-* Recommended order: 1.
-* Helpful comment notes:
-  * Note that this component should not decide whether the viewer is seeing their own library or a student library.
-
-### B. `LibraryGuidePanel`
-
-* What JSX it owns:
-  * "How do I use this library?" collapsible details block
-  * guide buttons for reading, listening, study, and stats routes
-* Expected props:
-  * `onNavigate(path: string)` or individual route callbacks
-* What stays in `page.tsx`:
-  * router instance
-  * route strings if the page wants to keep navigation decisions centralized
-* Category: presentational UI with passed navigation callback.
-* Risk level: low.
-* Recommended order: 2.
-* Helpful comment notes:
-  * Keep this as a visual guide; it should not load data or decide reading eligibility.
 
 ### C. `LibraryViewControls`
 
@@ -629,3 +593,7 @@ Use these labels for this page:
 Recommended current status: `Not started`.
 
 When all safe presentational extractions are complete, use `Visual pass done / architecture deferred`. That should mean the page-thinning layer is complete and the deeper controller/service/DAO/helper cleanup is intentionally saved for later, not that the visual work is unfinished.
+
+
+- [✔️] Extracted `LibraryGuidePanel`.
+- [✔️] Extracted `LibraryHeader`.
