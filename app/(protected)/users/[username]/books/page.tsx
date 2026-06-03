@@ -28,6 +28,7 @@ import FloatingAddBookButton from "./components/FloatingAddBookButton";
 import LibraryReminderBanner from "./components/LibraryReminderBanner";
 import LearningTaskCard from "./components/LearningTaskCard";
 import LearningTasksPanel from "./components/LearningTasksPanel";
+import PendingBookRequestsAlert from "./components/PendingBookRequestsAlert";
 
 type Book = {
   id: string;
@@ -2635,74 +2636,17 @@ export default function BooksPage() {
         ) : null}
 
         {isSuperTeacher && showPendingBookRequestsAlert ? (
-          <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-amber-900">Pending Book Requests</h2>
-                <p className="mt-1 text-xs text-amber-800">
-                  {bookRequests.length} pending{" "}
-                  {bookRequests.length === 1 ? "request" : "requests"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  hidePendingBookRequestsAlert(pendingBookRequestsAlertSignature);
-                  setDismissedPendingBookRequestsSignature(pendingBookRequestsAlertSignature);
-                }}
-                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
-              >
-                Dismiss
-              </button>
-            </div>
-
-            <div className="mt-3 space-y-3">
-              {bookRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="rounded-xl border border-amber-200 bg-white px-3 py-3"
-                >
-                  <div className="text-sm font-medium text-stone-900">
-                    {req.title || "Untitled"}
-                  </div>
-
-                  <div className="mt-1 text-xs text-stone-600">
-                    {req.author ? `Author: ${req.author}` : "Author: —"}
-                  </div>
-
-                  <div className="mt-1 text-xs text-stone-600">
-                    {req.isbn13 ? `ISBN: ${req.isbn13}` : "ISBN: —"}
-                  </div>
-
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={() => handleApproveRequest(req.id)}
-                      className="rounded-lg bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700"
-                    >
-                      Add to Library
-                    </button>
-                    <button
-                      onClick={() => handleRejectBookRequest(req.id)}
-                      className="rounded-lg border border-rose-200 bg-white px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                    >
-                      Reject
-                    </button>
-                  </div>
-
-                  <div className="mt-2 text-xs text-stone-500">
-                    Requested by{" "}
-                    <span className="font-medium text-stone-700">
-                      {req.profiles?.display_name || req.profiles?.username || "User"}
-                    </span>
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-stone-400">
-                    {req.created_at ? new Date(req.created_at).toLocaleDateString() : ""}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PendingBookRequestsAlert
+            requests={bookRequests}
+            onDismiss={() => {
+              hidePendingBookRequestsAlert(pendingBookRequestsAlertSignature);
+              setDismissedPendingBookRequestsSignature(
+                pendingBookRequestsAlertSignature
+              );
+            }}
+            onApprove={(requestId) => handleApproveRequest(requestId)}
+            onReject={(requestId) => handleRejectBookRequest(requestId)}
+          />
         ) : null}
 
         <UserBar isTeacher={isTeacher} variant="labelOnly" />
