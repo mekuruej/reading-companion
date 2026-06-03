@@ -11,81 +11,264 @@ type KanjiComponentLookupProps = {
   onPickKanji: (kanji: string) => void;
 };
 
-// Later: replace or supplement this with component metadata
-// for stroke count, visual group, and learner-level ordering.
-// For now, this list only controls which parts appear first.
-const COMMON_COMPONENT_ORDER = [
-  "人",
-  "亻",
-  "口",
-  "日",
-  "月",
-  "木",
-  "水",
-  "氵",
-  "火",
-  "灬",
-  "土",
-  "金",
-  "女",
-  "子",
-  "心",
-  "忄",
-  "手",
-  "扌",
-  "目",
-  "耳",
-  "言",
-  "糸",
-  "艹",
-  "⺌",
-  "宀",
-  "門",
-  "車",
-  "食",
-  "馬",
-  "魚",
-  "雨",
-  "山",
-  "川",
-  "田",
-  "石",
-  "竹",
-  "米",
-  "貝",
-  "足",
-  "辶",
-  "阝",
-  "刂",
-  "力",
-  "刀",
-  "弓",
-  "犬",
-  "犭",
-  "虫",
-  "鳥",
-  "頁",
-  "衣",
-  "衤",
-  "示",
-  "礻",
+const COMPONENT_STROKE_GROUPS = [
+  ["一", "｜", "丶", "ノ", "乙", "亅"],
+  [
+    "二",
+    "亠",
+    "人",
+    "亻",
+    "𠆢",
+    "儿",
+    "入",
+    "ハ",
+    "丷",
+    "冂",
+    "冖",
+    "冫",
+    "几",
+    "凵",
+    "刀",
+    "刂",
+    "力",
+    "勹",
+    "匕",
+    "匚",
+    "十",
+    "卩",
+    "厂",
+    "厶",
+    "又",
+    "マ",
+    "ユ",
+    "九",
+    "乃",
+  ],
+  [
+    "口",
+    "囗",
+    "土",
+    "士",
+    "夂",
+    "夕",
+    "大",
+    "女",
+    "子",
+    "宀",
+    "寸",
+    "小",
+    "⺌",
+    "尢",
+    "尸",
+    "屮",
+    "山",
+    "川",
+    "巛",
+    "工",
+    "已",
+    "巾",
+    "干",
+    "幺",
+    "广",
+    "廴",
+    "廾",
+    "弋",
+    "弓",
+    "ヨ",
+    "彑",
+    "彡",
+    "彳",
+    "忄",
+    "扌",
+    "氵",
+    "犭",
+    "艹",
+    "辶",
+    "阝",
+    "也",
+    "亡",
+    "及",
+    "久",
+    "乞",
+  ],
+  [
+    "心",
+    "戈",
+    "戸",
+    "手",
+    "支",
+    "攵",
+    "文",
+    "斗",
+    "斤",
+    "方",
+    "无",
+    "日",
+    "曰",
+    "月",
+    "木",
+    "欠",
+    "止",
+    "歹",
+    "殳",
+    "比",
+    "毛",
+    "氏",
+    "气",
+    "水",
+    "火",
+    "灬",
+    "爪",
+    "父",
+    "爻",
+    "爿",
+    "片",
+    "牛",
+    "犬",
+    "礻",
+    "耂",
+    "王",
+    "元",
+    "井",
+    "勿",
+    "尤",
+    "五",
+    "屯",
+    "巴",
+    "卜",
+  ],
+  [
+    "毋",
+    "玄",
+    "瓦",
+    "甘",
+    "生",
+    "用",
+    "田",
+    "疋",
+    "疒",
+    "癶",
+    "白",
+    "皮",
+    "皿",
+    "罒",
+    "目",
+    "矛",
+    "矢",
+    "石",
+    "示",
+    "禹",
+    "禾",
+    "穴",
+    "立",
+    "衤",
+    "世",
+    "巨",
+    "冊",
+    "母",
+    "牙",
+  ],
+  [
+    "瓜",
+    "竹",
+    "米",
+    "糸",
+    "缶",
+    "羊",
+    "羽",
+    "而",
+    "耒",
+    "耳",
+    "聿",
+    "肉",
+    "自",
+    "至",
+    "臼",
+    "舌",
+    "舟",
+    "艮",
+    "色",
+    "虍",
+    "虫",
+    "血",
+    "行",
+    "衣",
+    "西",
+    "舛",
+  ],
+  [
+    "臣",
+    "見",
+    "角",
+    "言",
+    "谷",
+    "豆",
+    "豕",
+    "豸",
+    "貝",
+    "赤",
+    "走",
+    "足",
+    "身",
+    "車",
+    "辛",
+    "辰",
+    "酉",
+    "釆",
+    "里",
+    "麦",
+  ],
+  ["金", "長", "門", "隶", "隹", "雨", "青", "非", "奄", "岡", "免", "斉"],
+  ["面", "革", "韋", "音", "頁", "風", "飛", "食", "首", "香", "品", "韭"],
+  ["馬", "骨", "高", "髟", "鬥", "鬯", "鬲", "鬼", "竜", "黒"],
+  ["魚", "鳥", "鹵", "鹿", "麻", "亀", "黄"],
+  ["黍", "黹", "無", "歯"],
+  ["鼠", "鼎", "鼓", "黽"],
+  ["鼻", "齊", "滴"],
+  ["龠"],
 ];
 
-const COMMON_COMPONENT_RANK = new Map(
-  COMMON_COMPONENT_ORDER.map((component, index) => [component, index])
+const COMPONENT_STROKE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17];
+
+const COMPONENT_STROKE_INFO = new Map(
+  COMPONENT_STROKE_GROUPS.flatMap((group, groupIndex) =>
+    group.map((component, componentIndex) => [
+      component,
+      { strokes: COMPONENT_STROKE_NUMBERS[groupIndex] ?? 99, rank: componentIndex },
+    ])
+  )
 );
 
 function sortComponents(components: string[]) {
   return [...components].sort((a, b) => {
-    const aRank = COMMON_COMPONENT_RANK.get(a);
-    const bRank = COMMON_COMPONENT_RANK.get(b);
+    const aInfo = COMPONENT_STROKE_INFO.get(a);
+    const bInfo = COMPONENT_STROKE_INFO.get(b);
 
-    if (aRank != null && bRank != null) return aRank - bRank;
-    if (aRank != null) return -1;
-    if (bRank != null) return 1;
+    if (aInfo && bInfo) {
+      if (aInfo.strokes !== bInfo.strokes) return aInfo.strokes - bInfo.strokes;
+      if (aInfo.rank !== bInfo.rank) return aInfo.rank - bInfo.rank;
+    }
+
+    if (aInfo) return -1;
+    if (bInfo) return 1;
 
     return a.localeCompare(b, "ja");
   });
+}
+
+function groupComponentsByStroke(components: string[]) {
+  const grouped = new Map<number, string[]>();
+
+  for (const component of components) {
+    const strokes = COMPONENT_STROKE_INFO.get(component)?.strokes ?? 99;
+    grouped.set(strokes, [...(grouped.get(strokes) ?? []), component]);
+  }
+
+  return Array.from(grouped.entries()).sort(([a], [b]) => a - b);
+}
+
+function sortKanjiResults(kanji: string[]) {
+  return [...kanji].sort((a, b) => a.localeCompare(b, "ja"));
 }
 
 export default function KanjiComponentLookup({
@@ -103,14 +286,18 @@ export default function KanjiComponentLookup({
     );
   }, [componentSearch]);
 
+  const pieceGroups = useMemo(() => groupComponentsByStroke(pieces), [pieces]);
+
   const filteredKanji = useMemo(() => {
     if (selectedPieces.length === 0) return [];
 
     const [firstPiece, ...restPieces] = selectedPieces;
     const firstSet = new Set(KANJI_BY_COMPONENT[firstPiece] ?? []);
 
-    return Array.from(firstSet).filter((kanji) =>
-      restPieces.every((piece) => KANJI_COMPONENTS[kanji]?.includes(piece))
+    return sortKanjiResults(
+      Array.from(firstSet).filter((kanji) =>
+        restPieces.every((piece) => KANJI_COMPONENTS[kanji]?.includes(piece))
+      )
     );
   }, [selectedPieces]);
 
@@ -145,25 +332,35 @@ export default function KanjiComponentLookup({
         className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
       />
 
-      <div className="mt-3 flex max-h-44 flex-wrap gap-2 overflow-y-auto rounded-xl border border-stone-100 bg-white/60 p-2">
-        {pieces.map((piece) => {
-          const selected = selectedPieces.includes(piece);
+      <div className="mt-3 max-h-44 overflow-y-auto rounded-xl border border-stone-100 bg-white/60 p-2">
+        <div className="flex flex-wrap gap-2">
+          {pieceGroups.map(([strokes, groupPieces]) => (
+            <div key={strokes} className="contents">
+              <div className="flex min-h-9 min-w-9 items-center justify-center rounded-xl bg-stone-900 px-2 text-sm font-black text-white">
+                {strokes === 99 ? "?" : strokes}
+              </div>
 
-          return (
-            <button
-              key={piece}
-              type="button"
-              onClick={() => togglePiece(piece)}
-              className={`min-h-9 rounded-xl border px-3 py-1.5 text-lg font-semibold transition ${
-                selected
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-200 bg-white text-stone-800 hover:bg-stone-100"
-              }`}
-            >
-              {piece}
-            </button>
-          );
-        })}
+              {groupPieces.map((piece) => {
+                const selected = selectedPieces.includes(piece);
+
+                return (
+                  <button
+                    key={piece}
+                    type="button"
+                    onClick={() => togglePiece(piece)}
+                    className={`min-h-9 rounded-xl border px-3 py-1.5 text-lg font-semibold transition ${
+                      selected
+                        ? "border-stone-900 bg-stone-900 text-white"
+                        : "border-stone-200 bg-white text-stone-800 hover:bg-stone-100"
+                    }`}
+                  >
+                    {piece}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
 
       {selectedPieces.length > 0 ? (
