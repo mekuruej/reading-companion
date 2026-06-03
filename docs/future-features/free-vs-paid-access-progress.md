@@ -34,6 +34,75 @@ Likely free features:
 
 Free users should not have vocabulary-saving capabilities.
 
+## Finished: free access state and helper split
+
+Mekuru now has a real first-pass free access state.
+
+### Database access state
+
+A new `app_access_type` value was added:
+
+* `free`
+
+This allows a user to enter Mekuru without having full vocabulary/study access.
+
+Test user created:
+
+* Username/display name: `DEMO3STUDENT`
+* Email: `demo3@mekuru.app`
+* Role: `student`
+* Level: `Level 1`
+* `app_access_type`: `free`
+* `app_access_expires_at`: `null`
+
+This user is the main test account for checking free-user behavior.
+
+### Access helper split
+
+`lib/access/appAccess.ts` now separates:
+
+* `hasAccess` — whether the user can enter the app
+* `hasFullAccess` — whether the user can use full-access learning features
+
+Important current behavior:
+
+* Staff / teachers / super teachers: `hasAccess: true`, `hasFullAccess: true`
+* Free users: `hasAccess: true`, `hasFullAccess: false`
+* Inactive / expired / none users: `hasAccess: false`, `hasFullAccess: false`
+
+This fixes the old problem where “can enter the app” and “has full learning access” were effectively glued together.
+
+### Feature access helper update
+
+Pages that use `getFeatureAccess()` should pass:
+
+```ts
+hasFullAccess: appAccessStatus.hasFullAccess
+```
+
+not:
+
+```ts
+hasFullAccess: appAccessStatus.hasAccess
+```
+
+This is important because free users can enter the app, but should not be treated as full-access learners.
+
+Fallback access objects should include both fields:
+
+```ts
+{ hasAccess: false, hasFullAccess: false, reason: "missing_profile" }
+```
+
+not only:
+
+```ts
+{ hasAccess: false, reason: "missing_profile" }
+```
+
+This was needed to make TypeScript and Vercel builds pass after adding `hasFullAccess`.
+
+
 ## Full-access features should include
 
 Full-access features are the deeper vocabulary, study, and saved-word tools.

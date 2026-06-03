@@ -252,6 +252,7 @@ export default function CuriosityReadingPage() {
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
   const [pickedKanji, setPickedKanji] = useState("");
   const [scratchWord, setScratchWord] = useState("");
+  const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
 
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
@@ -263,6 +264,18 @@ export default function CuriosityReadingPage() {
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
   const quickWordFieldsRef = useRef<HTMLDivElement | null>(null);
+
+  function closeAndClearWordHelp() {
+    setIsWordHelpOpen(false);
+    setScratchWord("");
+    setPickedKanji("");
+    setKanjiLookupResetKey((key) => key + 1);
+  }
+
+  function clearKanjiLookupSelection() {
+    setPickedKanji("");
+    setKanjiLookupResetKey((key) => key + 1);
+  }
 
   // Timer
   const [isRunning, setIsRunning] = useState(false);
@@ -1524,7 +1537,7 @@ export default function CuriosityReadingPage() {
                           surface: nextWord,
                           cacheSurface: nextWord ? prev.cacheSurface : "",
                         }));
-                        setScratchWord("");
+                        closeAndClearWordHelp();
                         setSavedQuickNotice("");
                         if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
                         window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
@@ -1539,7 +1552,7 @@ export default function CuriosityReadingPage() {
                 {pickedKanji ? (
                   <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-sm text-stone-600">
-                      Selected kanji:{" "}
+                      Last Kanji:{" "}
                       <span className="text-2xl font-semibold text-stone-900">
                         {pickedKanji}
                       </span>
@@ -1547,14 +1560,7 @@ export default function CuriosityReadingPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setQuickPreview((prev) => ({
-                          ...prev,
-                          surface: pickedKanji,
-                          cacheSurface: pickedKanji ? prev.cacheSurface : "",
-                        }));
-                        setSavedQuickNotice("");
-                        if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-                        window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
+                        clearKanjiLookupSelection();
                       }}
                       className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
                     >
@@ -1564,6 +1570,7 @@ export default function CuriosityReadingPage() {
                 ) : null}
 
                 <KanjiComponentLookup
+                  resetKey={kanjiLookupResetKey}
                   onPickKanji={(kanji) => {
                     setPickedKanji(kanji);
                     setScratchWord((prev) => `${prev}${kanji}`);

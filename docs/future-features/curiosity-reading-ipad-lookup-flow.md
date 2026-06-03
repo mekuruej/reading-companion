@@ -30,11 +30,14 @@ D. Collapse Helper Panels After Use
 - The user can reopen the helper tools if needed.
 
 E. Kanji Lookup Should Prioritize Stroke Count
-- The Kanji Lookup tool should become a stricter stroke-count lookup.
-- “Common kanji” choices are not reliable enough for this use case.
+- The Kanji Lookup tool should stay a stricter stroke-count lookup.
+- “Common kanji” ordering is not reliable enough for this use case.
 - Stroke count should be the main path because the reader is likely looking at an unknown character visually.
-- Use a clear numbered grid for stroke counts so the choices are easy to see and tap or click.
-- The numbers should be large enough to scan quickly without crowding the search results.
+- The current shared `KanjiComponentLookup` now sorts radical/component choices by stroke count only.
+- The component grid now shows visible stroke-count number markers so readers can scan it quickly, similar to Jisho.
+- Component stroke metadata currently covers all generated KRADFILE components used by the app.
+- Known checked component counts include `十 = 2`, `辶 = 3`, and `罒 = 5`.
+- The numbers should stay large enough to scan quickly without crowding the search results.
 
 F. Possible Stroke Lookup Refinements
 - Open design question from iPad use: should the Kanji Lookup have multiple stroke-count support options?
@@ -43,8 +46,15 @@ F. Possible Stroke Lookup Refinements
   - nearby stroke counts, such as one fewer / one more
   - grouped number ranges if the full grid feels too large
   - simple radical or shape hints later, if needed
-- Keep this lightweight at first. The immediate need is better stroke-count lookup, not a full kanji dictionary redesign.
+- Add true stroke-count metadata for result kanji themselves, then sort matching kanji by actual kanji stroke count instead of neutral Japanese locale order.
+- Keep this lightweight. The immediate need is better stroke-count lookup, not a full kanji dictionary redesign.
 
 ## Status
 
-Not started. Save this for a future Curiosity Reading / Add Word lookup UX cleanup pass.
+Partially implemented.
+
+- Done: shared Add Word / Curiosity Reading kanji component choices are stroke-count ordered.
+- Done: visible stroke-count markers appear in the component grid.
+- Done: previous learner/commonness ordering was removed from the component lookup.
+- Remaining: result kanji need real stroke-count metadata before they can be sorted by stroke count without guessing.
+- Remaining: helper panel cleanup still needs the separate “clear/collapse after use” work above.

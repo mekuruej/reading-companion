@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   KANJI_BY_COMPONENT,
   KANJI_COMPONENTS,
@@ -9,6 +9,7 @@ import {
 
 type KanjiComponentLookupProps = {
   onPickKanji: (kanji: string) => void;
+  resetKey?: number;
 };
 
 const COMPONENT_STROKE_GROUPS = [
@@ -273,9 +274,15 @@ function sortKanjiResults(kanji: string[]) {
 
 export default function KanjiComponentLookup({
   onPickKanji,
+  resetKey = 0,
 }: KanjiComponentLookupProps) {
   const [selectedPieces, setSelectedPieces] = useState<string[]>([]);
   const [componentSearch, setComponentSearch] = useState("");
+
+  useEffect(() => {
+    setSelectedPieces([]);
+    setComponentSearch("");
+  }, [resetKey]);
 
   const pieces = useMemo(() => {
     const query = componentSearch.trim();
