@@ -207,6 +207,7 @@ export default function AddWordPage() {
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
   const [pickedKanji, setPickedKanji] = useState("");
+  const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
 
   const [lookupLoading, setLookupLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -225,6 +226,18 @@ export default function AddWordPage() {
   >({});
 
   const wordInputRef = useRef<HTMLInputElement | null>(null);
+
+  function closeAndClearWordHelp() {
+    setIsWordHelpOpen(false);
+    setScratchWord("");
+    setPickedKanji("");
+    setKanjiLookupResetKey((key) => key + 1);
+  }
+
+  function clearKanjiLookupSelection() {
+    setPickedKanji("");
+    setKanjiLookupResetKey((key) => key + 1);
+  }
   const wordFieldsRef = useRef<HTMLDivElement | null>(null);
   const isSuperTeacher = superTeacherRole === "super_teacher" || profileIsSuperTeacher;
 
@@ -1244,7 +1257,7 @@ export default function AddWordPage() {
                       disabled={!scratchWord.trim()}
                       onClick={() => {
                         setWord(scratchWord.trim());
-                        setScratchWord("");
+                        closeAndClearWordHelp();
                         setSavedNotice("");
                         if (lookupCandidates.length > 0) setLookupCandidates([]);
                         window.requestAnimationFrame(() => wordInputRef.current?.focus());
@@ -1259,7 +1272,7 @@ export default function AddWordPage() {
                 {pickedKanji ? (
                   <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-sm text-stone-600">
-                      Selected kanji:{" "}
+                      Last Kanji:{" "}
                       <span className="text-2xl font-semibold text-stone-900">
                         {pickedKanji}
                       </span>
@@ -1267,10 +1280,7 @@ export default function AddWordPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setWord(pickedKanji);
-                        setSavedNotice("");
-                        if (lookupCandidates.length > 0) setLookupCandidates([]);
-                        window.requestAnimationFrame(() => wordInputRef.current?.focus());
+                        clearKanjiLookupSelection();
                       }}
                       className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
                     >
@@ -1280,6 +1290,7 @@ export default function AddWordPage() {
                 ) : null}
 
                 <KanjiComponentLookup
+                  resetKey={kanjiLookupResetKey}
                   onPickKanji={(kanji) => {
                     setPickedKanji(kanji);
                     setScratchWord((prev) => `${prev}${kanji}`);
