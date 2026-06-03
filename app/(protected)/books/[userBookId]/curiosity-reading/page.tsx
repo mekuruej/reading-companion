@@ -27,6 +27,7 @@ import CuriosityDictionaryChoices from "../components/CuriosityDictionaryChoices
 import CuriosityRecentSessionWordCard from "../components/CuriosityRecentSessionWordCard";
 import CuriosityRecentSessionWords from "../components/CuriosityRecentSessionWords";
 import CuriosityFullAccessRequired from "../components/CuriosityFullAccessRequired";
+import CuriosityTimerPanel from "../components/CuriosityTimerPanel";
 
 type QuickPreview = {
   id: string | null;
@@ -1167,170 +1168,54 @@ export default function CuriosityReadingPage() {
 
         <CuriosityStatusMessage message={message} />
 
-        <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4">
-          <div className="mb-2 text-sm font-medium text-stone-900">Log your reading session</div>
-
-          <div className="mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3">
-            <div className="mb-2 text-center text-sm text-stone-600">
-              Use the timer to track a curiosity reading session where you stop, check, and save new words.
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {!isRunning && !isPaused ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStartTime(Date.now());
-                    setElapsed(0);
-                    setIsRunning(true);
-                    setIsPaused(false);
-                    setHasFinishedTimer(false);
-                  }}
-                  className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
-                >
-                  Start Timer
-                </button>
-              ) : null}
-
-              {isRunning ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (startTime) {
-                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                      }
-                      setIsRunning(false);
-                      setIsPaused(true);
-                    }}
-                    className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
-                  >
-                    Pause
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (startTime) {
-                        setElapsed(Math.floor((Date.now() - startTime) / 1000));
-                      }
-                      setIsRunning(false);
-                      setIsPaused(false);
-                      setHasFinishedTimer(true);
-                      void openTimedSessionFormWithDefaults();
-                    }}
-                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-                  >
-                    Finish
-                  </button>
-                </>
-              ) : null}
-
-              {isPaused ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStartTime(Date.now() - elapsed * 1000);
-                      setIsPaused(false);
-                      setIsRunning(true);
-                    }}
-                    className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
-                  >
-                    Resume
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPaused(false);
-                      setIsRunning(false);
-                      setHasFinishedTimer(true);
-                      void openTimedSessionFormWithDefaults();
-                    }}
-                    className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-                  >
-                    Finish
-                  </button>
-                </>
-              ) : null}
-
-              <div className="flex items-center rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700">
-                ⏱ {formatTimer(elapsed)}
-              </div>
-            </div>
-          </div>
-
-          {showTimedSessionForm && !isRunning ? (
-            <div className="mt-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">
-              <div className="mb-3 text-sm font-medium text-stone-700">
-                Save this reading session
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="mb-1 text-sm text-stone-600">Start page</div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={sessionStartPage}
-                    onChange={(e) => setSessionStartPage(e.target.value)}
-                    placeholder="e.g. 45"
-                    className="w-full rounded border px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm text-stone-600">End page</div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={sessionEndPage}
-                    onChange={(e) => setSessionEndPage(e.target.value)}
-                    placeholder="e.g. 52"
-                    className="w-full rounded border px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-3 text-sm text-stone-500">Time: {formatTimer(elapsed)}</div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void saveReadingSession()}
-                  className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                >
-                  Save Timed Session
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowTimedSessionForm(false);
-                    setElapsed(0);
-                    setStartTime(null);
-                    setIsPaused(false);
-                    setIsRunning(false);
-                  }}
-                  className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {isRunning || isPaused ? (
-            <p className="mt-2 text-xs text-amber-600">
-              Timer is active. If you leave or refresh the page, you may lose your session.
-            </p>
-          ) : null}
-
-          {timerSaveMessage ? (
-            <p className="mt-2 text-xs text-emerald-600">{timerSaveMessage}</p>
-          ) : null}
-        </div>
+        <CuriosityTimerPanel
+          isRunning={isRunning}
+          isPaused={isPaused}
+          elapsed={elapsed}
+          showTimedSessionForm={showTimedSessionForm}
+          sessionStartPage={sessionStartPage}
+          sessionEndPage={sessionEndPage}
+          timerSaveMessage={timerSaveMessage}
+          formatTimer={formatTimer}
+          onStart={() => {
+            setStartTime(Date.now());
+            setElapsed(0);
+            setIsRunning(true);
+            setIsPaused(false);
+            setHasFinishedTimer(false);
+          }}
+          onPause={() => {
+            if (startTime) {
+              setElapsed(Math.floor((Date.now() - startTime) / 1000));
+            }
+            setIsRunning(false);
+            setIsPaused(true);
+          }}
+          onFinish={() => {
+            if (startTime) {
+              setElapsed(Math.floor((Date.now() - startTime) / 1000));
+            }
+            setIsRunning(false);
+            setIsPaused(false);
+            setHasFinishedTimer(true);
+            void openTimedSessionFormWithDefaults();
+          }}
+          onResume={() => {
+            setStartTime(Date.now() - elapsed * 1000);
+            setIsPaused(false);
+            setIsRunning(true);
+          }}
+          onSaveSession={() => void saveReadingSession()}
+          onCancelSession={() => {
+            setShowTimedSessionForm(false);
+            setElapsed(0);
+            setStartTime(null);
+            setIsPaused(false);
+            setIsRunning(false);
+          }}
+          onSessionStartPageChange={setSessionStartPage}
+          onSessionEndPageChange={setSessionEndPage}
+        />
 
         <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
           <div className="mb-3">
