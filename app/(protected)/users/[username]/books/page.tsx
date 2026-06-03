@@ -26,6 +26,7 @@ import LibrarySection from "./components/LibrarySection";
 import LibraryEmptyState from "./components/LibraryEmptyState";
 import FloatingAddBookButton from "./components/FloatingAddBookButton";
 import LibraryReminderBanner from "./components/LibraryReminderBanner";
+import LearningTaskCard from "./components/LearningTaskCard";
 
 type Book = {
   id: string;
@@ -2579,55 +2580,18 @@ export default function BooksPage() {
                 ].filter(Boolean);
 
                 return (
-                  <div
+                  <LearningTaskCard
                     key={task.id}
-                    className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-left shadow-sm"
-                  >
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">
-                          {task.title}
-                        </div>
-                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                          {learningTaskTypeLabel(task.task_type)}
-                        </div>
-                        {task.instructions ? (
-                          <div className="mt-1 text-xs leading-5 text-slate-600">
-                            {task.instructions}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="text-xs font-semibold text-emerald-700">
-                        {taskDetails.join(" · ")}
-                      </div>
-                    </div>
-
-                    {taskAction || viewingUserId === meId ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {taskAction ? (
-                          <button
-                            type="button"
-                            onClick={() => router.push(taskAction.href)}
-                            className="rounded-xl bg-emerald-800 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-900"
-                          >
-                            {taskAction.label}
-                          </button>
-                        ) : null}
-
-                        {viewingUserId === meId ? (
-                          <button
-                            type="button"
-                            onClick={() => completeLearningTask(task.id)}
-                            disabled={completingLearningTaskId === task.id}
-                            className="rounded-xl border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-50 disabled:opacity-50"
-                          >
-                            {completingLearningTaskId === task.id ? "Marking..." : "Mark done"}
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
+                    title={task.title}
+                    typeLabel={learningTaskTypeLabel(task.task_type)}
+                    instructions={task.instructions}
+                    details={taskDetails as string[]}
+                    action={taskAction}
+                    canComplete={viewingUserId === meId}
+                    isCompleting={completingLearningTaskId === task.id}
+                    onOpenAction={(href) => router.push(href)}
+                    onComplete={() => completeLearningTask(task.id)}
+                  />
                 );
               })}
             </div>
