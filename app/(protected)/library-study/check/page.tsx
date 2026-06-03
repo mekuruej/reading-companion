@@ -12,6 +12,12 @@ import {
   type LibraryStudyColorStatus,
 } from "@/lib/libraryStudyColor";
 import { normalizeKanaReading } from "@/lib/kanaInput";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+  canUseFullAccessFeature,
+  getFullAccessRequiredCopy,
+} from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import { todayYmdAppTimeZone, ymdInTimeZone } from "@/lib/timeZone";
@@ -1219,102 +1225,101 @@ function LibraryPracticePanel({
         </button>
       ) : (
         <div className="relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[36vh]">
-        <div className="absolute left-4 top-4 flex">
-          <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-            Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}
-          </div>
-        </div>
-
-        <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
-          <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-            <span
-              className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
-                card.colorStatus
-              )}`}
-            />
-            {libraryStudyColorName(card.colorStatus)}
-          </div>
-
-          {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
-        </div>
-
-        <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-          {definitionLabel(card) ? (
-            <div className={libraryStudyChipClass(card.colorStatus)}>
-              {definitionLabel(card)}
+          <div className="absolute left-4 top-4 flex">
+            <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
+              Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}
             </div>
-          ) : null}
-        </div>
-
-        <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
-          <div className={libraryStudyChipClass(card.colorStatus)}>
-            Read {card.encounterCount}x
           </div>
-        </div>
 
-        <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {typingLabel}
+          <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
+            <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+              <span
+                className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
+                  card.colorStatus
+                )}`}
+              />
+              {libraryStudyColorName(card.colorStatus)}
+            </div>
+
+            {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
           </div>
-          <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
-          {typingStep === "meaning" ? (
-            <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
-          ) : null}
 
-          <div className="w-full max-w-md space-y-3">
-            <input
-              ref={typingPracticeInputRef}
-              value={typingInput}
-              onChange={(e) => setTypingInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                e.stopPropagation();
-                if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
-              }}
-              placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
-              inputMode="text"
-              autoCorrect="off"
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              disabled={typingFeedback?.ok === true}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
-            />
+          <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+            {definitionLabel(card) ? (
+              <div className={libraryStudyChipClass(card.colorStatus)}>
+                {definitionLabel(card)}
+              </div>
+            ) : null}
+          </div>
 
-            {typingFeedback ? (
-              <div
-                className={`rounded-2xl border px-4 py-3 ${
-                  typingFeedback.ok
+          <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
+            <div className={libraryStudyChipClass(card.colorStatus)}>
+              Read {card.encounterCount}x
+            </div>
+          </div>
+
+          <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {typingLabel}
+            </div>
+            <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+            {typingStep === "meaning" ? (
+              <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
+            ) : null}
+
+            <div className="w-full max-w-md space-y-3">
+              <input
+                ref={typingPracticeInputRef}
+                value={typingInput}
+                onChange={(e) => setTypingInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
+                }}
+                placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
+                inputMode="text"
+                autoCorrect="off"
+                autoCapitalize="none"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={typingFeedback?.ok === true}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
+              />
+
+              {typingFeedback ? (
+                <div
+                  className={`rounded-2xl border px-4 py-3 ${typingFeedback.ok
                     ? "border-emerald-100 bg-emerald-50"
                     : "border-rose-100 bg-rose-50"
-                }`}
-              >
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {typingFeedback.ok ? "Looks right" : "Check this one"}
+                    }`}
+                >
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {typingFeedback.ok ? "Looks right" : "Check this one"}
+                  </div>
+                  <div className="mt-1 text-xl font-semibold text-slate-900">
+                    {typingFeedback.label}: {typingFeedback.answer}
+                  </div>
+                  <p className="mt-2 text-xs font-medium text-slate-500">
+                    {typingFeedback.ok
+                      ? "Next card comes automatically."
+                      : typingStep === "reading"
+                        ? "Retype the reading once to continue."
+                        : `Retype "${shortMeaningRetypeHint(typingFeedback.answer)}" from the meaning to continue.`}
+                  </p>
                 </div>
-                <div className="mt-1 text-xl font-semibold text-slate-900">
-                  {typingFeedback.label}: {typingFeedback.answer}
-                </div>
-                <p className="mt-2 text-xs font-medium text-slate-500">
-                  {typingFeedback.ok
-                    ? "Next card comes automatically."
-                    : typingStep === "reading"
-                      ? "Retype the reading once to continue."
-                      : `Retype "${shortMeaningRetypeHint(typingFeedback.answer)}" from the meaning to continue.`}
-                </p>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={submitTypingPractice}
-                className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-semibold text-white"
-              >
-                Show answer
-              </button>
-            )}
+              ) : (
+                <button
+                  type="button"
+                  onClick={submitTypingPractice}
+                  className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Show answer
+                </button>
+              )}
+            </div>
           </div>
-        </div>
         </div>
       )}
 
@@ -1525,6 +1530,8 @@ export default function LibraryStudyPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [canUseAbilityCheck, setCanUseAbilityCheck] = useState(false);
+  const [fullAccessLocked, setFullAccessLocked] = useState(false);
 
   const [allCards, setAllCards] = useState<StudyCard[]>([]);
   const [deck, setDeck] = useState<StudyCard[]>([]);
@@ -1671,6 +1678,8 @@ export default function LibraryStudyPage() {
       setLoading(true);
       setNeedsSignIn(false);
       setErrorMsg(null);
+      setCanUseAbilityCheck(false);
+      setFullAccessLocked(false);
 
       try {
         const {
@@ -1687,15 +1696,53 @@ export default function LibraryStudyPage() {
 
         setCurrentUserId(user.id);
 
+        const { data: profile, error: profileErr } = await supabase
+          .from("profiles")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileErr) {
+          console.error("Error loading profile access for Ability Check:", profileErr);
+        }
+
+        const appAccessStatus = profile
+          ? getAppAccessStatus(profile)
+          : { hasAccess: false, reason: "missing_profile" };
+
+        const featureAccess = getFeatureAccess({
+          role: profile?.is_super_teacher ? "super_teacher" : profile?.role ?? null,
+
+          // For this first pass, anyone who currently has app access keeps
+          // full learning access. Later, when expired trials become free users,
+          // we can separate "can enter app" from "has full learning access."
+          hasFullAccess: appAccessStatus.hasAccess,
+        });
+
+        const canUseAbilityCheckNow = canUseFullAccessFeature(
+          featureAccess,
+          "ability_check"
+        );
+
+        setCanUseAbilityCheck(canUseAbilityCheckNow);
+
+        if (!canUseAbilityCheckNow) {
+          setAllCards([]);
+          setDeck([]);
+          setFullAccessLocked(true);
+          setLoading(false);
+          return;
+        }
+
         const { data: userBooks, error: userBooksErr } = await supabase
           .from("user_books")
           .select(`
-            id,
-            books:book_id (
-              title,
-              cover_url
-            )
-          `)
+    id,
+    books:book_id (
+      title,
+      cover_url
+    )
+  `)
           .eq("user_id", user.id)
           .returns<UserBookJoinRow[]>();
 
@@ -2401,6 +2448,7 @@ export default function LibraryStudyPage() {
     isCorrect: boolean | null,
     cardType: string
   ) {
+    if (!canUseAbilityCheck) return;
     if (!currentCard) return;
 
     void recordStudyEvent({
@@ -2425,6 +2473,7 @@ export default function LibraryStudyPage() {
     options: { forceMeaning?: boolean; card?: StudyCard } = {}
   ) {
     const activeCard = options.card ?? currentCard;
+    if (!canUseAbilityCheck) return;
     if (!currentUserId || !activeCard) return;
 
     const now = new Date().toISOString();
@@ -2571,10 +2620,11 @@ export default function LibraryStudyPage() {
   }
 
   async function comeBackLaterForCurrentCard(waitKind: "soft" | "hard" = "hard") {
+    if (!canUseAbilityCheck) return;
     if (!currentUserId || !currentCard || !canComeBackLater(currentCard)) return;
 
-    const now = new Date().toISOString();
     const existing = currentCard.progress;
+    const now = new Date().toISOString();
     const isHardHold = waitKind === "hard";
     const nextSupportAttempt = (existing?.reading_gate_attempts ?? 0) + 1;
 
@@ -2605,26 +2655,26 @@ export default function LibraryStudyPage() {
       )
       .select(
         `
-          id,
-          user_id,
-          study_identity_key,
-          surface,
-          reading,
-          definition_key,
-          reading_gate_status,
-          meaning_gate_status,
-          held_before_reading_gate,
-          held_before_meaning_gate,
-          mastered,
-          reading_gate_attempts,
-          meaning_gate_attempts,
-          reading_gate_passed_at,
-          reading_gate_failed_at,
-          meaning_gate_passed_at,
-          meaning_gate_failed_at,
-          mastered_at,
-          last_studied_at
-        `
+        id,
+        user_id,
+        study_identity_key,
+        surface,
+        reading,
+        definition_key,
+        reading_gate_status,
+        meaning_gate_status,
+        held_before_reading_gate,
+        held_before_meaning_gate,
+        mastered,
+        reading_gate_attempts,
+        meaning_gate_attempts,
+        reading_gate_passed_at,
+        reading_gate_failed_at,
+        meaning_gate_passed_at,
+        meaning_gate_failed_at,
+        mastered_at,
+        last_studied_at
+      `
       )
       .single<LibraryWordProgressRow>();
 
@@ -2683,6 +2733,7 @@ export default function LibraryStudyPage() {
   }
 
   async function moveCurrentCardToReadingGate() {
+    if (!canUseAbilityCheck) return;
     if (!currentUserId || !currentCard || currentCard.activeGate !== "readiness") return;
 
     const existing = currentCard.progress;
@@ -2715,26 +2766,26 @@ export default function LibraryStudyPage() {
       )
       .select(
         `
-          id,
-          user_id,
-          study_identity_key,
-          surface,
-          reading,
-          definition_key,
-          reading_gate_status,
-          meaning_gate_status,
-          held_before_reading_gate,
-          held_before_meaning_gate,
-          mastered,
-          reading_gate_attempts,
-          meaning_gate_attempts,
-          reading_gate_passed_at,
-          reading_gate_failed_at,
-          meaning_gate_passed_at,
-          meaning_gate_failed_at,
-          mastered_at,
-          last_studied_at
-        `
+        id,
+        user_id,
+        study_identity_key,
+        surface,
+        reading,
+        definition_key,
+        reading_gate_status,
+        meaning_gate_status,
+        held_before_reading_gate,
+        held_before_meaning_gate,
+        mastered,
+        reading_gate_attempts,
+        meaning_gate_attempts,
+        reading_gate_passed_at,
+        reading_gate_failed_at,
+        meaning_gate_passed_at,
+        meaning_gate_failed_at,
+        mastered_at,
+        last_studied_at
+      `
       )
       .single<LibraryWordProgressRow>();
 
@@ -2745,10 +2796,12 @@ export default function LibraryStudyPage() {
     }
 
     const readyProgress = data;
+
     if (!readyProgress) {
       setNotice("Could not move this word to the Reading Gate.");
       return;
     }
+
     const updateCard = (card: StudyCard): StudyCard => {
       if (card.studyIdentityKey !== currentCard.studyIdentityKey) return card;
 
@@ -2857,6 +2910,7 @@ export default function LibraryStudyPage() {
   }
 
   async function flagCurrentCard() {
+    if (!canUseAbilityCheck) return;
     if (!currentCard) return;
 
     const ok = window.confirm("Hide this card from study?");
@@ -2910,6 +2964,52 @@ export default function LibraryStudyPage() {
         <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
           Go to Login
         </button>
+      </main>
+    );
+  }
+
+  if (fullAccessLocked) {
+    const copy = getFullAccessRequiredCopy("ability_check");
+
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+              Full access feature
+            </p>
+
+            <h1 className="mt-2 text-2xl font-black text-stone-950">
+              {copy.title}
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              {copy.message}
+            </p>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              Your vocabulary progress is saved. Full vocabulary study is available with full Mekuru access.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/books")}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+              >
+                Back to Library
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/community/stats")}
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                View Reading Stats
+              </button>
+            </div>
+          </div>
+        </div>
       </main>
     );
   }
@@ -3202,9 +3302,9 @@ export default function LibraryStudyPage() {
                 type="button"
                 onClick={() => router.push("/library-study/practice")}
                 className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-            >
-              Open Library Review
-            </button>
+              >
+                Open Library Review
+              </button>
             ) : null}
             <button
               type="button"
@@ -3267,11 +3367,10 @@ export default function LibraryStudyPage() {
                     <div className="mt-1 text-sm text-slate-500">{item.card.reading}</div>
                   </div>
                   <div
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                      item.originalOk
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-rose-100 text-rose-800"
-                    }`}
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.originalOk
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-rose-100 text-rose-800"
+                      }`}
                   >
                     {item.originalOk ? "Matched" : "Moved back if Purple"}
                   </div>
@@ -3777,13 +3876,13 @@ export default function LibraryStudyPage() {
               ) : null}
 
               {currentCard?.activeGate !== "readiness" && activeStudyMode === "reading_typing" && (
-                  <>
-                    <div className={promptModeClass("reading")}>
-                      READING
-                    </div>
-                    <div className="text-5xl font-bold">{currentCard?.surface}</div>
-                  </>
-                )}
+                <>
+                  <div className={promptModeClass("reading")}>
+                    READING
+                  </div>
+                  <div className="text-5xl font-bold">{currentCard?.surface}</div>
+                </>
+              )}
 
               {currentCard?.activeGate !== "readiness" && activeStudyMode === "meaning_typing" && (
                 <>
@@ -3796,63 +3895,63 @@ export default function LibraryStudyPage() {
               )}
 
               {currentCard?.activeGate !== "readiness" && (
-                  <div className="w-full max-w-sm">
-                    <input
-                      ref={typingInputRef}
-                      value={typingInput}
-                      onChange={(e) => setTypingInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
+                <div className="w-full max-w-sm">
+                  <input
+                    ref={typingInputRef}
+                    value={typingInput}
+                    onChange={(e) => setTypingInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
 
-                        e.preventDefault();
-                        e.stopPropagation();
+                      e.preventDefault();
+                      e.stopPropagation();
 
-                        if (!checked || !checked.ok) {
-                          checkTypingSingle();
-                        }
-                      }}
-                      placeholder={
-                        activeStudyMode === "reading_typing"
-                          ? "Type kana or Hepburn romaji"
-                          : "Type the meaning"
+                      if (!checked || !checked.ok) {
+                        checkTypingSingle();
                       }
-                      inputMode="text"
-                      autoCorrect="off"
-                      autoCapitalize="none"
-                      autoComplete="off"
-                      spellCheck={false}
-                      className="w-full rounded border px-4 py-3 text-base"
-                      disabled={!!checked && checked.ok}
-                    />
+                    }}
+                    placeholder={
+                      activeStudyMode === "reading_typing"
+                        ? "Type kana or Hepburn romaji"
+                        : "Type the meaning"
+                    }
+                    inputMode="text"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="w-full rounded border px-4 py-3 text-base"
+                    disabled={!!checked && checked.ok}
+                  />
 
-                    {currentInstructionText ? (
-                      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-center text-sm font-semibold text-stone-700">
-                        {currentInstructionText}
-                      </div>
-                    ) : null}
+                  {currentInstructionText ? (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-center text-sm font-semibold text-stone-700">
+                      {currentInstructionText}
+                    </div>
+                  ) : null}
 
-                    {!checked ? (
-                      <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
+                  {!checked ? (
+                    <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={checkTypingSingle}
+                        className="rounded bg-gray-700 px-4 py-2 text-white"
+                      >
+                        Check
+                      </button>
+
+                      {canComeBackLater(currentCard) ? (
                         <button
                           type="button"
-                          onClick={checkTypingSingle}
-                          className="rounded bg-gray-700 px-4 py-2 text-white"
+                          onClick={() => void comeBackLaterForCurrentCard("hard")}
+                          className="rounded border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                         >
-                          Check
+                          Send back to Red support
                         </button>
-
-                        {canComeBackLater(currentCard) ? (
-                          <button
-                            type="button"
-                            onClick={() => void comeBackLaterForCurrentCard("hard")}
-                            className="rounded border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                          >
-                            Send back to Red support
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               )}
 
               {checked ? (
