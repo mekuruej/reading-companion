@@ -6,6 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+  canUseFullAccessFeature,
+  getFullAccessRequiredCopy,
+} from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import BookVocabIntroCopy from "./components/BookVocabIntroCopy";
 import BookVocabReorderHint from "./components/BookVocabReorderHint";
@@ -218,6 +224,7 @@ export default function BookWordsPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [fullAccessLocked, setFullAccessLocked] = useState(false);
 
   const [myRole, setMyRole] = useState<ProfileRole>("student");
   const isTeacher = myRole === "teacher";
@@ -526,6 +533,7 @@ export default function BookWordsPage() {
       setLoading(true);
       setErrorMsg(null);
       setNeedsSignIn(false);
+      setFullAccessLocked(false);
 
       try {
         const { data: auth } = await supabase.auth.getUser();
@@ -542,7 +550,7 @@ export default function BookWordsPage() {
 
         const { data: meProfile, error: meProfileErr } = await supabase
           .from("profiles")
-          .select("role, is_super_teacher")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", authedUser.id)
           .single();
 
@@ -551,6 +559,24 @@ export default function BookWordsPage() {
         }
 
         setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
+
+        const appAccessStatus = meProfile
+          ? getAppAccessStatus(meProfile)
+          : { hasAccess: false, reason: "missing_profile" };
+
+        const featureAccess = getFeatureAccess({
+          role: meProfile?.is_super_teacher ? "super_teacher" : meProfile?.role ?? null,
+
+          // For this first pass, anyone who currently has app access keeps
+          // full learning access. Later, when expired trials become free users,
+          // we can separate "can enter app" from "has full learning access."
+          hasFullAccess: appAccessStatus.hasAccess,
+        });
+
+        const canUseVocabularyList = canUseFullAccessFeature(
+          featureAccess,
+          "vocabulary_list"
+        );
 
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")
@@ -601,6 +627,12 @@ export default function BookWordsPage() {
 
         if (!isOwner && !isSuperTeacher && !isLinkedTeacher) {
           setErrorMsg("You do not have access to this vocabulary list.");
+          setLoading(false);
+          return;
+        }
+
+        if (!canUseVocabularyList) {
+          setFullAccessLocked(true);
           setLoading(false);
           return;
         }
@@ -887,17 +919,76 @@ export default function BookWordsPage() {
 
   if (errorMsg) {
     if (errorMsg === "You do not have access to this vocabulary list.") {
-      return (
-        <AccessDeniedMessage message={errorMsg} />
-      );
+      return <AccessDeniedMessage message={errorMsg} />;
     }
 
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-red-700">{errorMsg}</p>
-        <button onClick={() => router.push("/books")} className="px-4 py-2 bg-gray-200 rounded">
+        <button
+          type="button"
+          onClick={() => router.push("/books")}
+          className="px-4 py-2 bg-gray-200 rounded"
+        >
           Back to Books
         </button>
+      </main>
+    );
+  }
+
+  if (fullAccessLocked) {
+    const copy = getFullAccessRequiredCopy("vocabulary_list");
+
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+              Full access feature
+            </p>
+
+            <h1 className="mt-2 text-2xl font-black text-stone-950">
+              {copy.title}
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              {copy.message}
+            </p>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              Your vocabulary progress is saved. Full vocabulary study is available with full Mekuru access.
+            </p>
+
+            {bookTitle ? (
+              <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-stone-500">
+                  Current book
+                </p>
+                <p className="mt-1 font-semibold text-stone-900">{bookTitle}</p>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+              >
+                Back to Book Hub
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(`/books/${encodeURIComponent(userBookId)}/just-reading`)
+                }
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                Use Just Reading Timer
+              </button>
+            </div>
+          </div>
+        </div>
       </main>
     );
   }
