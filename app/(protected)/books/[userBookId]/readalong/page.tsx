@@ -260,7 +260,7 @@ export default function ReadAlongPage() {
 
             const appAccessStatus = profile
                 ? getAppAccessStatus(profile)
-                : { hasAccess: false, reason: "missing_profile" };
+                : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
 
             const featureAccess = getFeatureAccess({
                 role: (profile as any)?.is_super_teacher

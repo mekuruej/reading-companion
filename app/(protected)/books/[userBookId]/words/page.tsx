@@ -562,7 +562,7 @@ export default function BookWordsPage() {
 
         const appAccessStatus = meProfile
           ? getAppAccessStatus(meProfile)
-          : { hasAccess: false, reason: "missing_profile" };
+          : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
 
         const featureAccess = getFeatureAccess({
           role: meProfile?.is_super_teacher ? "super_teacher" : meProfile?.role ?? null,

@@ -1667,7 +1667,7 @@ export default function LibraryStudyPage() {
 
         const appAccessStatus = profileRow
           ? getAppAccessStatus(profileRow)
-          : { hasAccess: false, reason: "missing_profile" };
+          : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
 
         const featureAccess = getFeatureAccess({
           role: superTeacherFlag ? "super_teacher" : role,
