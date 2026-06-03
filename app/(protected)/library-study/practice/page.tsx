@@ -11,6 +11,12 @@ import {
   type LibraryStudyGateStatus,
   type LibraryStudyColorStatus,
 } from "@/lib/libraryStudyColor";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+  canUseFullAccessFeature,
+  getFullAccessRequiredCopy,
+} from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 
@@ -1129,102 +1135,101 @@ function LibraryPracticePanel({
         </button>
       ) : (
         <div className="relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[36vh]">
-        <div className="absolute left-4 top-4 flex">
-          <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-            Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}
-          </div>
-        </div>
-
-        <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
-          <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-            <span
-              className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
-                card.colorStatus
-              )}`}
-            />
-            {libraryStudyColorName(card.colorStatus)}
-          </div>
-
-          {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
-        </div>
-
-        <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-          {definitionLabel(card) ? (
-            <div className={libraryStudyChipClass(card.colorStatus)}>
-              {definitionLabel(card)}
+          <div className="absolute left-4 top-4 flex">
+            <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
+              Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}
             </div>
-          ) : null}
-        </div>
-
-        <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
-          <div className={libraryStudyChipClass(card.colorStatus)}>
-            Read {card.encounterCount}x
           </div>
-        </div>
 
-        <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
-          <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
-            {typingLabel}
+          <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
+            <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+              <span
+                className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
+                  card.colorStatus
+                )}`}
+              />
+              {libraryStudyColorName(card.colorStatus)}
+            </div>
+
+            {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
           </div>
-          <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
-          {typingStep === "meaning" ? (
-            <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
-          ) : null}
 
-          <div className="w-full max-w-md space-y-3">
-            <input
-              ref={typingPracticeInputRef}
-              value={typingInput}
-              onChange={(e) => setTypingInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                e.stopPropagation();
-                if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
-              }}
-              placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
-              inputMode="text"
-              autoCorrect="off"
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              disabled={typingFeedback?.ok === true}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
-            />
+          <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+            {definitionLabel(card) ? (
+              <div className={libraryStudyChipClass(card.colorStatus)}>
+                {definitionLabel(card)}
+              </div>
+            ) : null}
+          </div>
 
-            {typingFeedback ? (
-              <div
-                className={`rounded-2xl border px-4 py-3 ${
-                  typingFeedback.ok
+          <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
+            <div className={libraryStudyChipClass(card.colorStatus)}>
+              Read {card.encounterCount}x
+            </div>
+          </div>
+
+          <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
+            <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
+              {typingLabel}
+            </div>
+            <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+            {typingStep === "meaning" ? (
+              <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
+            ) : null}
+
+            <div className="w-full max-w-md space-y-3">
+              <input
+                ref={typingPracticeInputRef}
+                value={typingInput}
+                onChange={(e) => setTypingInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
+                }}
+                placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
+                inputMode="text"
+                autoCorrect="off"
+                autoCapitalize="none"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={typingFeedback?.ok === true}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
+              />
+
+              {typingFeedback ? (
+                <div
+                  className={`rounded-2xl border px-4 py-3 ${typingFeedback.ok
                     ? "border-emerald-100 bg-emerald-50"
                     : "border-rose-100 bg-rose-50"
-                }`}
-              >
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {typingFeedback.ok ? "Looks right" : "Check this one"}
+                    }`}
+                >
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {typingFeedback.ok ? "Looks right" : "Check this one"}
+                  </div>
+                  <div className="mt-1 text-xl font-semibold text-slate-900">
+                    {typingFeedback.label}: {typingFeedback.answer}
+                  </div>
+                  <p className="mt-2 text-xs font-medium text-slate-500">
+                    {typingFeedback.ok
+                      ? "Next card comes automatically."
+                      : typingStep === "reading"
+                        ? "Retype the reading once to continue."
+                        : "Type one meaning word once to continue."}
+                  </p>
                 </div>
-                <div className="mt-1 text-xl font-semibold text-slate-900">
-                  {typingFeedback.label}: {typingFeedback.answer}
-                </div>
-                <p className="mt-2 text-xs font-medium text-slate-500">
-                  {typingFeedback.ok
-                    ? "Next card comes automatically."
-                    : typingStep === "reading"
-                      ? "Retype the reading once to continue."
-                      : "Type one meaning word once to continue."}
-                </p>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={submitTypingPractice}
-                className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-semibold text-white"
-              >
-                Show answer
-              </button>
-            )}
+              ) : (
+                <button
+                  type="button"
+                  onClick={submitTypingPractice}
+                  className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Show answer
+                </button>
+              )}
+            </div>
           </div>
-        </div>
         </div>
       )}
 
@@ -1417,6 +1422,8 @@ export default function LibraryStudyPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
+  const [fullAccessLocked, setFullAccessLocked] = useState(false);
 
   const [allCards, setAllCards] = useState<StudyCard[]>([]);
   const [deck, setDeck] = useState<StudyCard[]>([]);
@@ -1622,6 +1629,8 @@ export default function LibraryStudyPage() {
       setLoading(true);
       setNeedsSignIn(false);
       setErrorMsg(null);
+      setCanUseLibraryReview(false);
+      setFullAccessLocked(false);
 
       try {
         const {
@@ -1640,7 +1649,7 @@ export default function LibraryStudyPage() {
 
         const { data: profileRow, error: profileErr } = await supabase
           .from("profiles")
-          .select("role, is_super_teacher")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -1655,6 +1664,34 @@ export default function LibraryStudyPage() {
           role === "teacher" || role === "super_teacher" || superTeacherFlag;
 
         setIsTeacherUser(teacherAccess);
+
+        const appAccessStatus = profileRow
+          ? getAppAccessStatus(profileRow)
+          : { hasAccess: false, reason: "missing_profile" };
+
+        const featureAccess = getFeatureAccess({
+          role: superTeacherFlag ? "super_teacher" : role,
+
+          // First pass: Library Review uses the same full-access bucket as Ability Check
+          // because both are saved-vocabulary study features.
+          hasFullAccess: appAccessStatus.hasAccess,
+        });
+
+        const canUseLibraryReviewNow = canUseFullAccessFeature(
+          featureAccess,
+          "ability_check"
+        );
+
+        setCanUseLibraryReview(canUseLibraryReviewNow);
+
+        if (!canUseLibraryReviewNow) {
+          setAllCards([]);
+          setDeck([]);
+          setPracticeDeck([]);
+          setFullAccessLocked(true);
+          setLoading(false);
+          return;
+        }
 
         const { data: userBooks, error: userBooksErr } = await supabase
           .from("user_books")
@@ -1704,7 +1741,7 @@ export default function LibraryStudyPage() {
           ...(learningSettings ?? {}),
           library_check_daily_limit: cleanDailyCheckLimit(
             learningSettings?.library_check_daily_limit ??
-              DEFAULT_LEARNING_SETTINGS.library_check_daily_limit
+            DEFAULT_LEARNING_SETTINGS.library_check_daily_limit
           ),
         };
         const encounterThreshold = getLibraryStudyEncounterStageCounts(colorSettings).total;
@@ -2404,6 +2441,7 @@ export default function LibraryStudyPage() {
     isCorrect: boolean | null,
     cardType: string
   ) {
+    if (!canUseLibraryReview) return;
     if (!currentCard) return;
 
     void recordStudyEvent({
@@ -2428,6 +2466,7 @@ export default function LibraryStudyPage() {
     options: { forceMeaning?: boolean; card?: StudyCard } = {}
   ) {
     const activeCard = options.card ?? currentCard;
+    if (!canUseLibraryReview) return;
     if (!currentUserId || !activeCard) return;
 
     const now = new Date().toISOString();
@@ -2563,6 +2602,7 @@ export default function LibraryStudyPage() {
   }
 
   async function comeBackLaterForCurrentCard() {
+    if (!canUseLibraryReview) return;
     if (!currentUserId || !currentCard || !canComeBackLater(currentCard)) return;
 
     const now = new Date().toISOString();
@@ -2799,6 +2839,7 @@ export default function LibraryStudyPage() {
   }
 
   async function flagCurrentCard() {
+    if (!canUseLibraryReview) return;
     if (!currentCard) return;
 
     const ok = window.confirm("Hide this card from study?");
@@ -2852,6 +2893,52 @@ export default function LibraryStudyPage() {
         <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
           Go to Login
         </button>
+      </main>
+    );
+  }
+
+  if (fullAccessLocked) {
+    const copy = getFullAccessRequiredCopy("ability_check");
+
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+              Full access feature
+            </p>
+
+            <h1 className="mt-2 text-2xl font-black text-stone-950">
+              Library Review uses saved vocabulary
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              {copy.message}
+            </p>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              Your saved vocabulary and color progress are kept safe. Library Review is available with full Mekuru access.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/books")}
+                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+              >
+                Back to Library
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/community/stats")}
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                View Reading Stats
+              </button>
+            </div>
+          </div>
+        </div>
       </main>
     );
   }
@@ -2931,11 +3018,10 @@ export default function LibraryStudyPage() {
                     <div className="mt-1 text-sm text-slate-500">{item.card.reading}</div>
                   </div>
                   <div
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                      item.originalOk
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-rose-100 text-rose-800"
-                    }`}
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.originalOk
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-rose-100 text-rose-800"
+                      }`}
                   >
                     {item.originalOk ? "Matched" : "Moved back"}
                   </div>
@@ -3117,22 +3203,20 @@ export default function LibraryStudyPage() {
               <button
                 type="button"
                 onClick={() => setPracticeStudyMode("reveal")}
-                className={`rounded-lg px-4 py-2 transition ${
-                  practiceStudyMode === "reveal"
-                    ? "bg-white text-slate-950 shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={`rounded-lg px-4 py-2 transition ${practiceStudyMode === "reveal"
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
+                  }`}
               >
                 Reveal
               </button>
               <button
                 type="button"
                 onClick={() => setPracticeStudyMode("typing")}
-                className={`rounded-lg px-4 py-2 transition ${
-                  practiceStudyMode === "typing"
-                    ? "bg-white text-slate-950 shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={`rounded-lg px-4 py-2 transition ${practiceStudyMode === "typing"
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
+                  }`}
               >
                 Typing
               </button>
