@@ -22,6 +22,7 @@ import {
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import CuriosityPageHeader from "../components/CuriosityPageHeader";
 import CuriosityStatusMessage from "../components/CuriosityStatusMessage";
+import CuriosityBookContextCard from "../components/CuriosityBookContextCard";
 
 type QuickPreview = {
   id: string | null;
@@ -1180,56 +1181,18 @@ export default function CuriosityReadingPage() {
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
         <CuriosityPageHeader />
-
         {userBookId ? (
           bookTitle ? (
-            <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-              <button
-                type="button"
-                onClick={() => {
-                  router.push(`/books/${encodeURIComponent(userBookId)}`);
-                }}
-                className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
-                title={`Go to ${bookTitle} Book Hub`}
-              >
-                {bookCover ? (
-                  <img
-                    src={bookCover}
-                    alt={`Go to ${bookTitle} Book Hub`}
-                    className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
-                  />
-                ) : null}
-
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
-                  <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
-                    {bookTitle}
-                  </div>
-                </div>
-              </button>
-
-              <div className="flex flex-wrap gap-2 sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
-                  }}
-                  className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                >
-                  Vocab List
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push(`/books/${encodeURIComponent(userBookId)}`);
-                  }}
-                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-                >
-                  Book Hub
-                </button>
-              </div>
-            </div>
+            <CuriosityBookContextCard
+              bookTitle={bookTitle}
+              bookCover={bookCover}
+              onOpenBookHub={() => {
+                router.push(`/books/${encodeURIComponent(userBookId)}`);
+              }}
+              onOpenVocabList={() => {
+                router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+              }}
+            />
           ) : null
         ) : (
           <p className="mb-6 text-sm text-gray-500">
