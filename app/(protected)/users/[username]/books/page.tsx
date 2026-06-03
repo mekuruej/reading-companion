@@ -20,6 +20,7 @@ import {
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
+import LibraryBookCard from "./components/LibraryBookCard";
 
 type Book = {
   id: string;
@@ -2369,85 +2370,14 @@ export default function BooksPage() {
   }
 
   function renderBookCard(row: UserBookRow) {
-    const book = row.books;
-    if (!book) return null;
-
     return (
-      <li
+      <LibraryBookCard
         key={row.id}
-        className="flex flex-col items-center rounded-lg p-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-200/40"
-      >
-        <a
-          href={`/books/${row.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="block"
-        >
-          {book.cover_url ? (
-            <img
-              src={book.cover_url}
-              alt={`${book.title} cover`}
-              className="h-48 w-32 rounded-md object-cover shadow-md"
-            />
-          ) : (
-            <div className="flex h-48 w-32 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-400">
-              No cover
-            </div>
-          )}
-        </a>
-
-        <a
-          href={`/books/${row.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-2 text-center text-sm font-medium underline hover:text-blue-700"
-        >
-          {book.title}
-        </a>
-
-        <div className="mt-2 w-full text-center">
-          {row.finished_at ? (
-            <div className="space-y-1 text-[11px] text-gray-500">
-              {row.started_at ? (
-                <div>Started: {new Date(row.started_at).toLocaleDateString()}</div>
-              ) : null}
-              <div>Finished: {new Date(row.finished_at).toLocaleDateString()}</div>
-            </div>
-          ) : row.dnf_at ? (
-            <div className="text-[11px] text-gray-400">
-              DNF: {new Date(row.dnf_at).toLocaleDateString()}
-            </div>
-          ) : row.started_at ? (
-            <div className="space-y-1">
-              <div className="text-[11px] text-gray-600">
-                {readingStatsByUserBookId[row.id]?.progressPercent != null &&
-                  readingStatsByUserBookId[row.id]?.furthestPage != null
-                  ? `${readingStatsByUserBookId[row.id].progressPercent}% · p.${readingStatsByUserBookId[row.id].furthestPage}`
-                  : "In progress"}
-              </div>
-
-              <div className="mx-auto h-3 w-20 overflow-hidden rounded-full bg-gray-200">
-                <div
-                  className="h-full bg-gray-700 transition-all"
-                  style={{
-                    width:
-                      readingStatsByUserBookId[row.id]?.progressPercent != null
-                        ? `${readingStatsByUserBookId[row.id].progressPercent}%`
-                        : "8%",
-                  }}
-                />
-              </div>
-              {readingStatsByUserBookId[row.id]?.lastEngagedAt ? (
-                <div className="mt-1 text-[10px] text-gray-500">
-                  Last engaged with{" "}
-                  {formatRelativeDate(readingStatsByUserBookId[row.id].lastEngagedAt!)
-                  }
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="text-[11px] text-gray-400">Not started</div>
-          )}
-        </div>
-      </li>
+        row={row}
+        stats={readingStatsByUserBookId[row.id]}
+        href={`/books/${row.id}`}
+        formatRelativeDate={formatRelativeDate}
+      />
     );
   }
 
