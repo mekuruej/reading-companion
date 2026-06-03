@@ -20,6 +20,7 @@ import {
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import CuriosityPageHeader from "../components/CuriosityPageHeader";
 
 type QuickPreview = {
   id: string | null;
@@ -1177,12 +1178,7 @@ export default function CuriosityReadingPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
-        <div>
-          <h1 className="text-2xl font-semibold text-stone-900">Curiosity Reading</h1>
-          <p className="mt-1 hidden text-sm text-stone-600 sm:block">
-            Use this for a slower, exploratory reading experience. This is where you stop, investigate, save new words, and let lookup time count as part of the reading session.
-          </p>
-        </div>
+        <CuriosityPageHeader />
 
         {userBookId ? (
           bookTitle ? (
