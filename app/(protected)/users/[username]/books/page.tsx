@@ -24,6 +24,7 @@ import LibraryBookCard from "./components/LibraryBookCard";
 import LibraryBookRow from "./components/LibraryBookRow";
 import LibrarySection from "./components/LibrarySection";
 import LibraryEmptyState from "./components/LibraryEmptyState";
+import FloatingAddBookButton from "./components/FloatingAddBookButton";
 
 type Book = {
   id: string;
@@ -2827,13 +2828,7 @@ export default function BooksPage() {
 
         {isTeacher ? (
           <>
-            <button
-              type="button"
-              onClick={() => router.push("/books/add")}
-              className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
-            >
-              + Add a Book
-            </button>
+            <FloatingAddBookButton onClick={() => router.push("/books/add")} />
 
             {false && showAddBook ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
