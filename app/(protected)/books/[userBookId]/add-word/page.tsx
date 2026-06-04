@@ -23,6 +23,7 @@ import AddWordPageHeader from "../components/AddWordPageHeader";
 import AddWordStatusMessage from "../components/AddWordStatusMessage";
 import AddWordBookContextCard from "../components/AddWordBookContextCard";
 import AddWordFullAccessRequired from "../components/AddWordFullAccessRequired";
+import AddWordDictionaryChoices from "../components/AddWordDictionaryChoices";
 
 type JishoChoice = {
   surface: string;
@@ -1229,61 +1230,20 @@ export default function AddWordPage() {
               </div>
             ) : null}
 
-            {lookupCandidates.length > 1 ? (
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
-                <div className="text-sm font-medium text-sky-900">
-                  Dictionary choices for "{word.trim()}"
-                </div>
-                <p className="mt-1 text-sm text-sky-800">
-                  Choose the reading and meaning that match your book.
-                </p>
-
-                <div className="mt-3 space-y-2">
-                  {lookupCandidates.map((candidate) => {
-                    const isSelected =
-                      candidate.surface === word &&
-                      candidate.reading === reading &&
-                      candidate.defaultMeaning === meaning;
-
-                    return (
-                      <button
-                        key={candidate.id}
-                        type="button"
-                        onClick={() => {
-                          applyJisho(candidate);
-                          setMessage(
-                            `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
-                            }.`
-                          );
-                          jumpToWordFields();
-                        }}
-                        className={`w-full rounded-xl border px-3 py-3 text-left transition ${isSelected
-                          ? "border-sky-400 bg-white shadow-sm"
-                          : "border-sky-200 bg-white/80 hover:bg-white"
-                          }`}
-                      >
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <span className="text-base font-semibold text-stone-900">
-                            {candidate.surface}
-                          </span>
-                          <span className="text-sm text-stone-600">
-                            {candidate.reading || "No reading listed"}
-                          </span>
-                          {candidate.jlpt !== "NON-JLPT" ? (
-                            <span className="text-xs font-medium text-sky-700">
-                              {candidate.jlpt}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 text-sm text-stone-700">
-                          {candidate.defaultMeaning || "No meaning listed"}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
+            <AddWordDictionaryChoices
+              word={word}
+              reading={reading}
+              meaning={meaning}
+              candidates={lookupCandidates}
+              onSelectCandidate={(candidate) => {
+                applyJisho(candidate);
+                setMessage(
+                  `✅ Loaded ${candidate.surface}${candidate.reading ? `【${candidate.reading}】` : ""
+                  }.`
+                );
+                jumpToWordFields();
+              }}
+            />
 
             <div ref={wordFieldsRef} className="space-y-3">
               <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
