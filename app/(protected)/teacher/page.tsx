@@ -7,75 +7,34 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-type TeacherCard = {
+type TeacherHubCard = {
   title: string;
   href: string;
   eyebrow: string;
   description: string;
-  status: "Active" | "Planned" | "Later";
-  count?: number | null;
-  countLabel?: string;
-  disabled?: boolean;
-  actionLabel?: string;
 };
 
-type QueueCounts = {
-  books: number | null;
-  bookRequests: number | null;
-  kanji: number | null;
-  words: number | null;
-  readingFit: number | null;
-};
-
-const lessonPrepCards: TeacherCard[] = [
+const teacherHubCards: TeacherHubCard[] = [
   {
-    title: "My Students",
-    href: "/teacher/students",
-    eyebrow: "Student setup",
+    title: "Lesson Prep",
+    href: "/teacher/lesson-prep",
+    eyebrow: "Prepare",
     description:
-      "View student setup tools, assign prepared books, and make sure each learner has the right reading support.",
-    status: "Active",
+      "Prepare student lessons, trial prep, reusable materials, and teaching workflows.",
   },
   {
-    title: "Add a Book",
-    href: "/books/add",
-    eyebrow: "Catalog prep",
+    title: "Needs Attention",
+    href: "/teacher/needs-attention",
+    eyebrow: "Review",
     description:
-      "Look up a book by ISBN, then add it to your library, a student, or the global catalog if you have access.",
-    status: "Active",
+      "Review book requests, kanji reports, missing book info, and other cleanup queues.",
   },
   {
-    title: "Teacher Library",
-    href: "/teacher/library",
-    eyebrow: "Lesson prep",
+    title: "General Upkeep",
+    href: "/teacher/general-upkeep",
+    eyebrow: "Maintain",
     description:
-      "Prepare books for yourself to teach the vocabulary, phrases, grammar notes, sentence translations, and follow-along support.",
-    status: "Active",
-  },
-  {
-    title: "Global Word Entry",
-    href: "/teacher/global-words",
-    eyebrow: "Global prep",
-    description:
-      "Add or prepare global vocabulary data, famous people, places, and Word Sky candidates.",
-    status: "Active",
-    actionLabel: "Open Global Word Entry",
-  },
-  {
-    title: "Book Club Prep",
-    href: "/teacher/clubs",
-    eyebrow: "Groups",
-    description:
-      "Plan club groups, weekly readings, shared support words, and student-facing club materials.",
-    status: "Planned",
-  },
-  {
-    title: "Trial Prep",
-    href: "/teacher/trials",
-    eyebrow: "Trial lessons",
-    description:
-      "Prepare trial reading materials, key words, notes, and reusable trial sets by level.",
-    status: "Planned",
+      "Handle global word data, Word Sky candidates, cleanup, and admin-ish teacher tools.",
   },
 ];
 
@@ -83,307 +42,59 @@ function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
-function TeacherCardGrid({ cards }: { cards: TeacherCard[] }) {
+function TeacherHubCardGrid({ cards }: { cards: TeacherHubCard[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {cards.map((card) => {
-        const cardContent = (
-          <div
-            className={`h-full rounded-3xl border p-5 shadow-sm transition ${card.disabled
-              ? "border-stone-200 bg-stone-50 text-stone-500"
-              : "border-stone-200 bg-white hover:-translate-y-0.5 hover:shadow-md"
-              }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-                {card.eyebrow}
-              </p>
-
-              <span
-                className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${card.status === "Active"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-stone-200 bg-white text-stone-500"
-                  }`}
-              >
-                {card.status}
-              </span>
-            </div>
-
-            <h2 className="mt-3 text-xl font-black text-stone-900">
-              {card.title}
-            </h2>
-
-            {card.count != null ? (
-              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <div className="text-3xl font-black text-stone-900">{card.count}</div>
-                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
-                  {card.countLabel ?? "open"}
-                </div>
-              </div>
-            ) : null}
-
-            <p className="mt-3 text-sm leading-6 text-stone-600">
-              {card.description}
+      {cards.map((card) => (
+        <Link key={card.title} href={card.href}>
+          <div className="h-full rounded-3xl border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+              {card.eyebrow}
             </p>
 
-            <p className="mt-4 text-sm font-semibold text-stone-900">
-              {card.disabled ? "Coming later" : card.actionLabel ?? "Open →"}
-            </p>
+            <h2 className="mt-3 text-xl font-black text-stone-900">{card.title}</h2>
+
+            <p className="mt-3 text-sm leading-6 text-stone-600">{card.description}</p>
+
+            <p className="mt-4 text-sm font-semibold text-stone-900">Open →</p>
           </div>
-        );
-
-        if (card.disabled) {
-          return <div key={card.title}>{cardContent}</div>;
-        }
-
-        return (
-          <Link key={card.title} href={card.href}>
-            {cardContent}
-          </Link>
-        );
-      })}
+        </Link>
+      ))}
     </div>
   );
 }
 
 export default function TeacherHubPage() {
-  const [counts, setCounts] = useState<QueueCounts>({
-    books: null,
-    bookRequests: null,
-    kanji: null,
-    words: null,
-    readingFit: null,
-  });
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    void loadCounts();
+    let cancelled = false;
+
+    async function loadTeacherRole() {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth?.user;
+
+      if (!user || cancelled) return;
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("role, is_super_teacher")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error || cancelled) return;
+
+      setIsSuperTeacher(
+        profile?.role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher)
+      );
+    }
+
+    void loadTeacherRole();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  async function loadCounts() {
-    setMessage("");
-
-    const { data: auth, error: authError } = await supabase.auth.getUser();
-    const user = auth?.user;
-
-    if (authError || !user) {
-      setMessage("Please sign in to see teacher queues.");
-      return;
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role, is_super_teacher")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profileError) {
-      setMessage(profileError.message ?? "Could not load teacher profile.");
-      return;
-    }
-
-    const isTeacher =
-      profile?.role === "teacher" ||
-      profile?.role === "super_teacher" ||
-      isSuperTeacherFlag(profile?.is_super_teacher);
-    const hasSuperTeacherAccess =
-      profile?.role === "super_teacher" ||
-      isSuperTeacherFlag(profile?.is_super_teacher);
-
-    setIsSuperTeacher(hasSuperTeacherAccess);
-
-    if (!isTeacher) {
-      setMessage("Teacher access is required.");
-      return;
-    }
-
-    let bookCount: number | null = null;
-    let bookRequestCount: number | null = null;
-
-    if (hasSuperTeacherAccess) {
-      const { count } = await supabase
-        .from("user_alerts")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("type", "book_flag");
-
-      const { data: globalBooksNeedingInfo } = await supabase
-        .from("books")
-        .select("id, title, isbn13, cover_url, book_type, author, publisher, published_date, page_count");
-
-      const missingGlobalBookInfoCount = (globalBooksNeedingInfo ?? []).filter((book: any) => {
-        return (
-          !String(book.title ?? "").trim() ||
-          !String(book.isbn13 ?? "").trim() ||
-          !String(book.cover_url ?? "").trim() ||
-          !String(book.book_type ?? "").trim() ||
-          !String(book.author ?? "").trim() ||
-          !String(book.publisher ?? "").trim() ||
-          !String(book.published_date ?? "").trim() ||
-          book.page_count == null
-        );
-      }).length;
-
-      bookCount = (count ?? 0) + missingGlobalBookInfoCount;
-
-      const { count: pendingBookRequestCount } = await supabase
-        .from("book_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending");
-
-      bookRequestCount = pendingBookRequestCount ?? 0;
-    }
-
-    const [
-      { count: oldKanjiFlagCount },
-      { count: kanjiReportCount },
-    ] = await Promise.all([
-      supabase
-        .from("vocabulary_kanji_map")
-        .select("id", { count: "exact", head: true })
-        .eq("flagged_for_review", true),
-
-      supabase
-        .from("kanji_map_reports")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["open", "reviewing"]),
-    ]);
-
-    const kanjiCount = (oldKanjiFlagCount ?? 0) + (kanjiReportCount ?? 0);
-
-    const { data: teacherLinks } = await supabase
-      .from("teacher_students")
-      .select("student_id")
-      .eq("teacher_id", user.id)
-      .is("archived_at", null);
-
-    const studentIds = Array.from(
-      new Set([
-        user.id,
-        ...((teacherLinks ?? [])
-          .map((row: any) => row.student_id)
-          .filter(Boolean) as string[]),
-      ])
-    );
-
-    let wordCount = 0;
-    let readingFitCount = 0;
-
-    if (studentIds.length > 0) {
-      const [{ data: profileLevels }, { data: userBooks }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, level")
-          .in("id", studentIds),
-        supabase
-          .from("user_books")
-          .select("id, user_id, finished_at, reader_level, rating_difficulty, rating_overall, teacher_review_cleared_at")
-          .in("user_id", studentIds),
-      ]);
-
-      const profileLevelById = new Map<string, string | null>();
-      for (const item of profileLevels ?? []) {
-        profileLevelById.set((item as any).id, (item as any).level ?? null);
-      }
-
-      const userBookIds = (userBooks ?? []).map((book: any) => book.id).filter(Boolean);
-
-      readingFitCount = (userBooks ?? []).filter((book: any) => {
-        const isFinished = !!book.finished_at;
-        const isCleared = !!book.teacher_review_cleared_at;
-        const effectiveReaderLevel =
-          book.reader_level || profileLevelById.get(book.user_id) || null;
-        const missingReaderLevel = !String(effectiveReaderLevel ?? "").trim();
-        const missingEaseRating = book.rating_difficulty == null;
-        const missingEntertainmentRating = book.rating_overall == null;
-
-        return (
-          isFinished &&
-          !isCleared &&
-          (missingReaderLevel || missingEaseRating || missingEntertainmentRating)
-        );
-      }).length;
-
-      if (userBookIds.length > 0) {
-        const { count } = await supabase
-          .from("user_book_words")
-          .select("id", { count: "exact", head: true })
-          .in("user_book_id", userBookIds)
-          .eq("flagged_for_review", true);
-
-        wordCount = count ?? 0;
-      }
-    }
-
-    setCounts({
-      books: bookCount ?? 0,
-      bookRequests: bookRequestCount ?? 0,
-      kanji: kanjiCount ?? 0,
-      words: wordCount,
-      readingFit: readingFitCount,
-    });
-  }
-
-  const workbenchCards: TeacherCard[] = [
-    {
-      title: "Teacher Review Index",
-      href: "/teacher/reading-fit",
-      eyebrow: "Missing ratings",
-      description:
-        "Review finished books missing learner reflection signals: reader level, ease rating, or entertainment rating. Teacher placement ratings can move here later.",
-      status: "Active",
-      count: counts.readingFit,
-      countLabel: "finished books to review",
-    },
-    ...(isSuperTeacher
-      ? [
-        {
-          title: "Pending Book Requests",
-          href: "/teacher/books",
-          eyebrow: "ISBN requests",
-          description:
-            "Books requested after Mekuru could not find enough lookup data. These do not have global book records yet.",
-          status: "Active" as const,
-          count: counts.bookRequests,
-          countLabel:
-            counts.bookRequests === 1
-              ? "pending book request"
-              : "pending book requests",
-        },
-        {
-          title: "Books Needing My Attention",
-          href: "/teacher/books",
-          eyebrow: "Book flags",
-          description:
-            "Books marked for super-teacher review and global books missing core info.",
-          status: "Active" as const,
-          count: counts.books,
-          countLabel: "book flags",
-        },
-      ]
-      : []),
-    {
-      title: "Kanji Needing My Attention",
-      href: "/teacher/kanji",
-      eyebrow: "Kanji enrichment",
-      description:
-        "Kanji readings flagged from study plus vocabulary that needs kanji-reading enrichment.",
-      status: "Active",
-      count: counts.kanji,
-      countLabel: "kanji flags",
-    },
-    {
-      title: "Words Needing My Attention",
-      href: "/teacher/words",
-      eyebrow: "Vocabulary review",
-      description:
-        "Words flagged from study or vocabulary work. This can grow into the vocabulary-cache problem queue.",
-      status: "Active",
-      count: counts.words,
-      countLabel: "word flags",
-    },
-  ];
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -393,39 +104,60 @@ export default function TeacherHubPage() {
         </p>
 
         <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
-          Teacher Home
+          Teacher Hub
         </h1>
 
         <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-          Manage student reading support, lesson prep, book club planning,
-          kanji enrichment, and teacher-side workflows from one workspace.
+          Start with lesson prep, review what needs attention, or keep global teacher-side data tidy.
         </p>
+      </section>
 
-        {message ? <p className="mt-3 text-sm text-amber-700">{message}</p> : null}
+      <section className="mt-8">
+        <TeacherHubCardGrid cards={teacherHubCards} />
       </section>
 
       <section className="mt-8">
         <div className="mb-3">
-          <h2 className="text-lg font-black text-stone-900">Lesson Prep</h2>
+          <h2 className="text-lg font-black text-stone-900">Today</h2>
           <p className="mt-1 text-sm text-stone-500">
-            Set up students, groups, and trial reading experiences.
+            Future alerts should answer two questions: what do my learners need, and what does the app need from me?
           </p>
         </div>
 
-        <TeacherCardGrid cards={lessonPrepCards} />
-      </section>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+              Learner / Lesson Alerts
+            </p>
+            <h3 className="mt-2 text-xl font-black text-stone-900">
+              What do I need to do for my learners?
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-stone-700">
+              After each lesson, remember to add new words, notes, or prep items while they are still fresh.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              Later, this area can show linked-student work due or completed, upcoming lessons, student prep needs, and assignment follow-up.
+            </p>
+          </div>
 
-      <section className="mt-10">
-        <div className="mb-3">
-          <h2 className="text-lg font-black text-stone-900">
-            Needs My Attention
-          </h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Review books, kanji, and words that need teacher judgment.
-          </p>
+          <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+              App / Upkeep Alerts
+            </p>
+            <h3 className="mt-2 text-xl font-black text-stone-900">
+              What does the app or global data need from me?
+            </h3>
+            {isSuperTeacher ? (
+              <p className="mt-2 text-sm leading-6 text-stone-600">
+                Pending book requests, missing book info, kanji reports, global word cleanup, Word Sky review, and app data cleanup can move here later.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-stone-600">
+                No app upkeep alerts are shown for your role right now. Learner and lesson follow-up will stay separate from global maintenance work.
+              </p>
+            )}
+          </div>
         </div>
-
-        <TeacherCardGrid cards={workbenchCards} />
       </section>
     </main>
   );

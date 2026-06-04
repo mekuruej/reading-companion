@@ -117,7 +117,6 @@ export default function Header() {
   const teacherSectionActive = pathname.startsWith("/teacher");
   const showTeacherLink =
     profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher;
-  const showSuperTeacherLinks = profileRole === "super_teacher" || profileIsSuperTeacher;
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -550,6 +549,39 @@ export default function Header() {
                     </Link>
 
                     <Link
+                      href="/teacher/lesson-prep"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/lesson-prep"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      Lesson Prep
+                    </Link>
+
+                    <Link
+                      href="/teacher/needs-attention"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/needs-attention"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      Needs Attention
+                    </Link>
+
+                    <Link
+                      href="/teacher/general-upkeep"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/general-upkeep"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      General Upkeep
+                    </Link>
+
+                    <Link
                       href="/teacher/students"
                       className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/students"
                         ? "bg-stone-100 font-medium text-stone-900"
@@ -557,53 +589,7 @@ export default function Header() {
                         }`}
                       onClick={() => setShowTeacherMenu(false)}
                     >
-                      My Students
-                    </Link>
-
-                    <Link
-                      href="/teacher/reading-fit"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/reading-fit"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowTeacherMenu(false)}
-                    >
-                      Reading Fit Queue
-                    </Link>
-
-                    {showSuperTeacherLinks ? (
-                      <Link
-                        href="/teacher/books"
-                        className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/books"
-                          ? "bg-stone-100 font-medium text-stone-900"
-                          : "text-stone-700 hover:bg-stone-50"
-                          }`}
-                        onClick={() => setShowTeacherMenu(false)}
-                      >
-                        Book Flags
-                      </Link>
-                    ) : null}
-
-                    <Link
-                      href="/teacher/kanji"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/kanji"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowTeacherMenu(false)}
-                    >
-                      Kanji Queue
-                    </Link>
-
-                    <Link
-                      href="/teacher/words"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/words"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowTeacherMenu(false)}
-                    >
-                      Word Flags
+                      Students
                     </Link>
                   </div>
                 ) : null}
