@@ -29,6 +29,7 @@ import AddWordRecentSessionWords from "../components/AddWordRecentSessionWords";
 import AddWordQuickSearchForm from "../components/AddWordQuickSearchForm";
 import AddWordHelpPanel from "../components/AddWordHelpPanel";
 import AddWordDetailFields from "../components/AddWordDetailFields";
+import AddWordSuperTeacherTools from "../components/AddWordSuperTeacherTools";
 
 type JishoChoice = {
   surface: string;
@@ -1210,52 +1211,14 @@ export default function AddWordPage() {
               onClearWordFields={() => clearForm(true)}
             />
 
-            {isSuperTeacher && (
-              <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                <div className="text-sm font-semibold text-amber-950">
-                  Super teacher tools
-                </div>
-                <p className="mt-1 text-xs leading-5 text-amber-800">
-                  These actions update global word data. They do not have to save the word
-                  to this book.
-                </p>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void saveToGlobalWordData(false)}
-                    disabled={superToolSaving != null}
-                    className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                  >
-                    {superToolSaving === "cache"
-                      ? "Saving..."
-                      : "Save to vocabulary cache only"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => void saveToGlobalWordData(true)}
-                    disabled={superToolSaving != null}
-                    className="rounded-xl bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-50"
-                  >
-                    {superToolSaving === "wordSky"
-                      ? "Approving..."
-                      : "Save to cache + approve for Word Sky"}
-                  </button>
-                </div>
-
-                {superToolMessage ? (
-                  <p
-                    className={`mt-2 text-sm font-medium ${superToolMessage.startsWith("❌")
-                      ? "text-red-700"
-                      : "text-emerald-700"
-                      }`}
-                  >
-                    {superToolMessage}
-                  </p>
-                ) : null}
-              </section>
-            )}
+            {isSuperTeacher ? (
+              <AddWordSuperTeacherTools
+                saving={superToolSaving}
+                message={superToolMessage}
+                onSaveCacheOnly={() => void saveToGlobalWordData(false)}
+                onSaveAndApproveWordSky={() => void saveToGlobalWordData(true)}
+              />
+            ) : null}
           </div>
 
           <AddWordRecentSessionWords wordCount={sessionWords.length}>
