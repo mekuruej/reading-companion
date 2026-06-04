@@ -19,6 +19,7 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import AddWordPageHeader from "../components/AddWordPageHeader";
 
 type JishoChoice = {
   surface: string;
@@ -1082,13 +1083,7 @@ export default function AddWordPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
-        <div>
-          <h1 className="text-2xl font-semibold text-stone-900">Add Word</h1>
-          <p className="mt-1 hidden text-sm text-stone-600 sm:block">
-            Save a word from this book, adjust the reading and meaning, and keep your page and
-            chapter ready for the next entry.
-          </p>
-        </div>
+        <AddWordPageHeader />
 
         {bookTitle ? (
           <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
