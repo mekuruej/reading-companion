@@ -30,6 +30,7 @@ import AddWordQuickSearchForm from "../components/AddWordQuickSearchForm";
 import AddWordHelpPanel from "../components/AddWordHelpPanel";
 import AddWordDetailFields from "../components/AddWordDetailFields";
 import AddWordSuperTeacherTools from "../components/AddWordSuperTeacherTools";
+import AddWordFormShell from "../components/AddWordFormShell";
 
 type JishoChoice = {
   surface: string;
@@ -1085,16 +1086,7 @@ export default function AddWordPage() {
             </p>
           </div>
 
-          <div className={`space-y-4 rounded-xl border p-4 ${editingSessionWordId
-            ? "border-amber-200 bg-amber-50"
-            : "border-stone-200 bg-stone-50"
-            }`}
-          >
-            {editingSessionWordId ? (
-              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800">
-                Editing "{word}"
-              </div>
-            ) : null}
+          <AddWordFormShell editingSurface={editingSessionWordId ? word : null}>
 
             <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
               <AddWordQuickSearchForm
@@ -1219,7 +1211,7 @@ export default function AddWordPage() {
                 onSaveAndApproveWordSky={() => void saveToGlobalWordData(true)}
               />
             ) : null}
-          </div>
+          </AddWordFormShell>
 
           <AddWordRecentSessionWords wordCount={sessionWords.length}>
 
