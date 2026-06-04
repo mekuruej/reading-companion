@@ -26,6 +26,7 @@ import AddWordFullAccessRequired from "../components/AddWordFullAccessRequired";
 import AddWordDictionaryChoices from "../components/AddWordDictionaryChoices";
 import AddWordRecentSessionWordCard from "../components/AddWordRecentSessionWordCard";
 import AddWordRecentSessionWords from "../components/AddWordRecentSessionWords";
+import AddWordQuickSearchForm from "../components/AddWordQuickSearchForm";
 
 type JishoChoice = {
   surface: string;
@@ -1093,43 +1094,20 @@ export default function AddWordPage() {
             ) : null}
 
             <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
+              <AddWordQuickSearchForm
+                word={word}
+                lookupLoading={lookupLoading}
+                wordInputRef={wordInputRef}
+                onWordChange={(value) => {
+                  setWord(value);
+                  setSavedNotice("");
+                  if (lookupCandidates.length > 0) setLookupCandidates([]);
+                }}
+                onSubmitLookup={() => {
                   if (!word.trim() || lookupLoading) return;
                   void handleLookup();
                 }}
-                className="space-y-1"
-              >
-                <label className="block text-sm font-medium text-stone-700">
-                  Rapid search
-                </label>
-                <p className="text-xs text-stone-500">
-                  Already know the kanji? Search with a simple Enter tap.
-                </p>
-
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    ref={wordInputRef}
-                    value={word}
-                    onChange={(event) => {
-                      setWord(event.target.value);
-                      setSavedNotice("");
-                      if (lookupCandidates.length > 0) setLookupCandidates([]);
-                    }}
-                    placeholder="Search or edit a word..."
-                    className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
-                  />
-
-                  <button
-                    type="submit"
-                    disabled={lookupLoading || !word.trim()}
-                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-                  >
-                    {lookupLoading ? "Searching..." : "Search"}
-                  </button>
-                </div>
-              </form>
+              />
 
               {currentColorSurface.trim() && reading.trim() ? (
                 <div className="flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
@@ -1439,81 +1417,81 @@ export default function AddWordPage() {
 
           <AddWordRecentSessionWords wordCount={sessionWords.length}>
 
-              <div className="mt-3 space-y-3">
-                {sessionWords.slice(0, 2).map((item, index) => {
-                  const colorInfo =
-                    libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+            <div className="mt-3 space-y-3">
+              {sessionWords.slice(0, 2).map((item, index) => {
+                const colorInfo =
+                  libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
-                  return (
-                    <AddWordRecentSessionWordCard
-                      key={item.id}
-                      word={item}
-                      colorInfo={colorInfo}
-                      className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""
-                        }`}
-                      showLocation
-                      showLibraryBadge
-                      onEdit={() => loadSessionWordIntoForm(item)}
-                      onDelete={() => void deleteSessionWord(item.id)}
-                    />
-                  );
-                })}
-              </div>
+                return (
+                  <AddWordRecentSessionWordCard
+                    key={item.id}
+                    word={item}
+                    colorInfo={colorInfo}
+                    className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""
+                      }`}
+                    showLocation
+                    showLibraryBadge
+                    onEdit={() => loadSessionWordIntoForm(item)}
+                    onDelete={() => void deleteSessionWord(item.id)}
+                  />
+                );
+              })}
+            </div>
 
-              {sessionWords.length > 1 ? (
-                <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                    Saved words from this session
-                  </summary>
-                  <div className="space-y-3 border-t border-stone-200 p-3">
-                    {sessionWords.slice(1).map((item) => {
-                      const colorInfo =
-                        libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+            {sessionWords.length > 1 ? (
+              <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
+                <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                  Saved words from this session
+                </summary>
+                <div className="space-y-3 border-t border-stone-200 p-3">
+                  {sessionWords.slice(1).map((item) => {
+                    const colorInfo =
+                      libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
-                      return (
-                        <AddWordRecentSessionWordCard
-                          key={item.id}
-                          word={item}
-                          colorInfo={colorInfo}
-                          className="rounded-lg border bg-stone-50 p-3"
-                          showLocation={false}
-                          showLibraryBadge={false}
-                          onEdit={() => loadSessionWordIntoForm(item)}
-                          onDelete={() => void deleteSessionWord(item.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                </details>
-              ) : null}
+                    return (
+                      <AddWordRecentSessionWordCard
+                        key={item.id}
+                        word={item}
+                        colorInfo={colorInfo}
+                        className="rounded-lg border bg-stone-50 p-3"
+                        showLocation={false}
+                        showLibraryBadge={false}
+                        onEdit={() => loadSessionWordIntoForm(item)}
+                        onDelete={() => void deleteSessionWord(item.id)}
+                      />
+                    );
+                  })}
+                </div>
+              </details>
+            ) : null}
 
-              {sessionWords.length > 2 ? (
-                <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                    Saved words from this session
-                  </summary>
-                  <div className="space-y-3 border-t border-stone-200 p-3">
-                    {sessionWords.slice(1).map((item) => {
-                      const colorInfo =
-                        libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+            {sessionWords.length > 2 ? (
+              <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
+                <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                  Saved words from this session
+                </summary>
+                <div className="space-y-3 border-t border-stone-200 p-3">
+                  {sessionWords.slice(1).map((item) => {
+                    const colorInfo =
+                      libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
-                      return (
-                        <AddWordRecentSessionWordCard
-                          key={item.id}
-                          word={item}
-                          colorInfo={colorInfo}
-                          className="rounded-lg border bg-stone-50 p-3"
-                          showLocation={false}
-                          showLibraryBadge={false}
-                          onEdit={() => loadSessionWordIntoForm(item)}
-                          onDelete={() => void deleteSessionWord(item.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                </details>
-              ) : null}
-            </AddWordRecentSessionWords>
+                    return (
+                      <AddWordRecentSessionWordCard
+                        key={item.id}
+                        word={item}
+                        colorInfo={colorInfo}
+                        className="rounded-lg border bg-stone-50 p-3"
+                        showLocation={false}
+                        showLibraryBadge={false}
+                        onEdit={() => loadSessionWordIntoForm(item)}
+                        onDelete={() => void deleteSessionWord(item.id)}
+                      />
+                    );
+                  })}
+                </div>
+              </details>
+            ) : null}
+          </AddWordRecentSessionWords>
         </div>
       </div>
     </main >
