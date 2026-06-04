@@ -31,6 +31,7 @@ import CuriosityTimerPanel from "../components/CuriosityTimerPanel";
 import CuriosityQuickSearchRow from "../components/CuriosityQuickSearchRow";
 import CuriosityWordHelpPanel from "../components/CuriosityWordHelpPanel";
 import CuriosityQuickErrorMessage from "../components/CuriosityQuickErrorMessage";
+import CuriosityWordDetailFields from "../components/CuriosityWordDetailFields";
 
 type QuickPreview = {
   id: string | null;
@@ -1296,7 +1297,6 @@ export default function CuriosityReadingPage() {
             />
 
             <CuriosityQuickErrorMessage message={quickError} />
-
             <CuriosityDictionaryChoices
               surface={quickPreview.surface}
               candidates={quickLookupCandidates}
@@ -1319,163 +1319,49 @@ export default function CuriosityReadingPage() {
               }}
             />
 
-            <div ref={quickWordFieldsRef} className="space-y-3">
-              <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
-                <span className="font-semibold text-stone-900">Manual entry:</span>{" "}
-                1. Type the word. 2. Add the reading. 3. Add the meaning. 4. Save.
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
-                  <input
-                    value={quickPreview.reading}
-                    onChange={(e) =>
-                      setQuickPreview((prev) => ({ ...prev, reading: e.target.value }))
-                    }
-                    placeholder="Reading"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">
-                    Alternate surface
-                  </label>
-                  <input
-                    value={quickPreview.alternateSurface}
-                    onChange={(e) =>
-                      setQuickPreview((prev) => ({
-                        ...prev,
-                        alternateSurface: e.target.value,
-                        useAlternateSurface: e.target.value.trim().length > 0,
-                      }))
-                    }
-                    placeholder="Book form, if different"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-stone-700">Meaning</label>
-
-              {quickPreview.meanings.length > 0 ? (
-                <div className="mb-3 space-y-2 rounded-xl border border-stone-200 bg-white p-3">
-                  {quickPreview.meanings.map((meaning, index) => (
-                    <label key={index} className="flex items-start gap-2 text-sm text-stone-700">
-                      <input
-                        type="radio"
-                        checked={
-                          !quickPreview.isCustomMeaning &&
-                          quickPreview.selectedMeaningIndex === index
-                        }
-                        onChange={() =>
-                          setQuickPreview((prev) => ({
-                            ...prev,
-                            selectedMeaningIndex: index,
-                            meaning,
-                            isCustomMeaning: false,
-                          }))
-                        }
-                      />
-                      <span>{meaning || "—"}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-
-              <textarea
-                value={quickPreview.isCustomMeaning ? quickPreview.meaning : ""}
-                onChange={(e) =>
-                  setQuickPreview((prev) => ({
-                    ...prev,
-                    meaning: e.target.value,
-                    isCustomMeaning: true,
-                  }))
-                }
-                placeholder="Type your meaning"
-                className="min-h-[80px] w-full rounded border bg-white px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">Page</span>
-                <input
-                  type="number"
-                  min={1}
-                  inputMode="numeric"
-                  value={quickPreview.page}
-                  onChange={(e) =>
-                    setQuickPreview((prev) => ({ ...prev, page: e.target.value }))
-                  }
-                  placeholder="Page"
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">
-                  Chapter number
-                </span>
-                <input
-                  value={quickPreview.chapterNumber}
-                  onChange={(e) =>
-                    setQuickPreview((prev) => ({ ...prev, chapterNumber: e.target.value }))
-                  }
-                  placeholder="Chapter #"
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">
-                  Chapter name
-                </span>
-                <input
-                  value={quickPreview.chapterName}
-                  onChange={(e) =>
-                    setQuickPreview((prev) => ({ ...prev, chapterName: e.target.value }))
-                  }
-                  placeholder="Chapter name"
-                  className="w-full rounded border bg-white px-3 py-2 text-sm"
-                />
-              </label>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm text-stone-700">
-              <input
-                type="checkbox"
-                checked={hideKanjiInReadingSupport}
-                onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
-              />
-              <span>Hide kanji in Read Along (does not affect Vocab List)</span>
-            </label>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void saveQuickWord()}
-                disabled={!quickPreview.surface.trim()}
-                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-              >
-                Save Word
-              </button>
-
-              <button
-                type="button"
-                onClick={() => clearQuickWordFields()}
-                className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-              >
-                Clear Word Fields
-              </button>
-
-              {savedQuickNotice ? (
-                <span className="text-sm font-medium text-emerald-700">{savedQuickNotice}</span>
-              ) : null}
-            </div>
+            <CuriosityWordDetailFields
+              quickPreview={quickPreview}
+              hideKanjiInReadingSupport={hideKanjiInReadingSupport}
+              savedQuickNotice={savedQuickNotice}
+              quickWordFieldsRef={quickWordFieldsRef}
+              onReadingChange={(value) =>
+                setQuickPreview((prev) => ({ ...prev, reading: value }))
+              }
+              onAlternateSurfaceChange={(value) =>
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  alternateSurface: value,
+                  useAlternateSurface: value.trim().length > 0,
+                }))
+              }
+              onMeaningChoiceChange={(index, meaning) =>
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  selectedMeaningIndex: index,
+                  meaning,
+                  isCustomMeaning: false,
+                }))
+              }
+              onCustomMeaningChange={(value) =>
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  meaning: value,
+                  isCustomMeaning: true,
+                }))
+              }
+              onPageChange={(value) =>
+                setQuickPreview((prev) => ({ ...prev, page: value }))
+              }
+              onChapterNumberChange={(value) =>
+                setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+              }
+              onChapterNameChange={(value) =>
+                setQuickPreview((prev) => ({ ...prev, chapterName: value }))
+              }
+              onHideKanjiChange={setHideKanjiInReadingSupport}
+              onSaveWord={() => void saveQuickWord()}
+              onClearWordFields={() => clearQuickWordFields()}
+            />
           </div>
 
           <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
