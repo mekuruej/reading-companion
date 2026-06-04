@@ -30,6 +30,7 @@ export default function TeacherGlobalWordsPage() {
   const [entryType, setEntryType] = useState<GlobalWordType>("vocabulary");
   const [jlpt, setJlpt] = useState("NON-JLPT");
   const [isCommon, setIsCommon] = useState(false);
+  const [contextNote, setContextNote] = useState("");
 
   const [lookupLoading, setLookupLoading] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
@@ -104,6 +105,7 @@ export default function TeacherGlobalWordsPage() {
     setEntryType("vocabulary");
     setJlpt("NON-JLPT");
     setIsCommon(false);
+    setContextNote("");
     clearWordHelp();
     setMessage("");
     window.setTimeout(() => surfaceInputRef.current?.focus({ preventScroll: true }), 0);
@@ -195,7 +197,7 @@ export default function TeacherGlobalWordsPage() {
               />
 
               <div className="flex min-h-12 items-center rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
-                Global save, cache writes, Word Sky approval, and kanji-map generation are intentionally disabled.
+                Single global entry draft. Cache writes, Word Sky approval, and kanji-map generation are intentionally disabled.
               </div>
             </div>
 
@@ -222,11 +224,13 @@ export default function TeacherGlobalWordsPage() {
               entryType={entryType}
               jlpt={jlpt}
               isCommon={isCommon}
+              contextNote={contextNote}
               onReadingChange={setReading}
               onMeaningNoteChange={setMeaningNote}
               onEntryTypeChange={setEntryType}
               onJlptChange={setJlpt}
               onIsCommonChange={setIsCommon}
+              onContextNoteChange={setContextNote}
               onPlaceholderSave={handlePlaceholderSave}
               onClear={clearForm}
             />

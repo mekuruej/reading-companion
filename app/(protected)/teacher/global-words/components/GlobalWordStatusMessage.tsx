@@ -11,9 +11,9 @@ export default function GlobalWordStatusMessage({ message }: Props) {
   const isSuccess = message.startsWith("✅");
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 mb-4">
       <p
-        className={`text-sm font-medium ${
+        className={`text-base font-medium ${
           isError
             ? "text-red-700"
             : isSuccess

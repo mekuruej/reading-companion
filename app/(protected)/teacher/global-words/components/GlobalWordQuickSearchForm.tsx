@@ -30,7 +30,7 @@ export default function GlobalWordQuickSearchForm({
         Rapid search
       </label>
       <p className="text-xs text-stone-500">
-        Use this as a preparation field for the next global lookup pass.
+        Start with the surface, name, or reference title. Lookup stays placeholder-only for now.
       </p>
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -47,7 +47,7 @@ export default function GlobalWordQuickSearchForm({
           disabled={lookupLoading || !surface.trim()}
           className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
         >
-          {lookupLoading ? "Searching..." : "Preview Lookup"}
+          {lookupLoading ? "Searching..." : "Search"}
         </button>
       </div>
     </form>
