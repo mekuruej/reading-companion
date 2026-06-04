@@ -16,6 +16,7 @@ type TeacherCard = {
   count?: number | null;
   countLabel?: string;
   disabled?: boolean;
+  actionLabel?: string;
 };
 
 type QueueCounts = {
@@ -50,6 +51,15 @@ const lessonPrepCards: TeacherCard[] = [
     description:
       "Prepare books for yourself to teach the vocabulary, phrases, grammar notes, sentence translations, and follow-along support.",
     status: "Active",
+  },
+  {
+    title: "Global Word Entry",
+    href: "/teacher/global-words",
+    eyebrow: "Global prep",
+    description:
+      "Add or prepare global vocabulary data, famous people, places, and Word Sky candidates.",
+    status: "Active",
+    actionLabel: "Open Global Word Entry",
   },
   {
     title: "Book Club Prep",
@@ -117,7 +127,7 @@ function TeacherCardGrid({ cards }: { cards: TeacherCard[] }) {
             </p>
 
             <p className="mt-4 text-sm font-semibold text-stone-900">
-              {card.disabled ? "Coming later" : "Open →"}
+              {card.disabled ? "Coming later" : card.actionLabel ?? "Open →"}
             </p>
           </div>
         );
