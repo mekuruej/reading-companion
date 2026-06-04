@@ -24,6 +24,8 @@ import AddWordStatusMessage from "../components/AddWordStatusMessage";
 import AddWordBookContextCard from "../components/AddWordBookContextCard";
 import AddWordFullAccessRequired from "../components/AddWordFullAccessRequired";
 import AddWordDictionaryChoices from "../components/AddWordDictionaryChoices";
+import AddWordRecentSessionWordCard from "../components/AddWordRecentSessionWordCard";
+import AddWordRecentSessionWords from "../components/AddWordRecentSessionWords";
 
 type JishoChoice = {
   surface: string;
@@ -1435,16 +1437,7 @@ export default function AddWordPage() {
             )}
           </div>
 
-          {sessionWords.length > 0 ? (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <div>
-                <div className="text-sm font-medium text-stone-900">
-                  Recently added
-                </div>
-                <p className="mt-1 text-xs text-stone-500">
-                  {sessionWords.length} word{sessionWords.length === 1 ? "" : "s"} saved this session
-                </p>
-              </div>
+          <AddWordRecentSessionWords wordCount={sessionWords.length}>
 
               <div className="mt-3 space-y-3">
                 {sessionWords.slice(0, 2).map((item, index) => {
@@ -1452,48 +1445,17 @@ export default function AddWordPage() {
                     libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
                   return (
-                    <div
+                    <AddWordRecentSessionWordCard
                       key={item.id}
-                      className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 text-sm">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="font-medium text-stone-900">{item.surface}</div>
-                            {colorInfo ? (
-                              <LibraryColorBadge
-                                colorStatus={colorInfo.colorStatus}
-                                stageLabel={colorInfo.stageLabel}
-                              />
-                            ) : null}
-                          </div>
-                          <div className="text-stone-500">{item.reading || "—"}</div>
-                          <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                          <div className="mt-1 text-xs text-stone-500">
-                            Page {item.pageNumber || "—"} · Ch {item.chapterNumber || "—"} ·{" "}
-                            {item.chapterName || "—"}
-                          </div>
-                        </div>
-
-                        <div className="flex shrink-0 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => loadSessionWordIntoForm(item)}
-                            className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => void deleteSessionWord(item.id)}
-                            className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      word={item}
+                      colorInfo={colorInfo}
+                      className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""
+                        }`}
+                      showLocation
+                      showLibraryBadge
+                      onEdit={() => loadSessionWordIntoForm(item)}
+                      onDelete={() => void deleteSessionWord(item.id)}
+                    />
                   );
                 })}
               </div>
@@ -1509,31 +1471,16 @@ export default function AddWordPage() {
                         libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
                       return (
-                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 text-sm">
-                              <div className="font-medium text-stone-900">{item.surface}</div>
-                              <div className="text-stone-500">{item.reading || "—"}</div>
-                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                            </div>
-                            <div className="flex shrink-0 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => loadSessionWordIntoForm(item)}
-                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void deleteSessionWord(item.id)}
-                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        <AddWordRecentSessionWordCard
+                          key={item.id}
+                          word={item}
+                          colorInfo={colorInfo}
+                          className="rounded-lg border bg-stone-50 p-3"
+                          showLocation={false}
+                          showLibraryBadge={false}
+                          onEdit={() => loadSessionWordIntoForm(item)}
+                          onDelete={() => void deleteSessionWord(item.id)}
+                        />
                       );
                     })}
                   </div>
@@ -1551,38 +1498,22 @@ export default function AddWordPage() {
                         libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
                       return (
-                        <div key={item.id} className="rounded-lg border bg-stone-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 text-sm">
-                              <div className="font-medium text-stone-900">{item.surface}</div>
-                              <div className="text-stone-500">{item.reading || "—"}</div>
-                              <div className="mt-1 text-stone-700">{item.meaning || "—"}</div>
-                            </div>
-                            <div className="flex shrink-0 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => loadSessionWordIntoForm(item)}
-                                className="rounded bg-stone-200 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-300"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void deleteSessionWord(item.id)}
-                                className="rounded bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        <AddWordRecentSessionWordCard
+                          key={item.id}
+                          word={item}
+                          colorInfo={colorInfo}
+                          className="rounded-lg border bg-stone-50 p-3"
+                          showLocation={false}
+                          showLibraryBadge={false}
+                          onEdit={() => loadSessionWordIntoForm(item)}
+                          onDelete={() => void deleteSessionWord(item.id)}
+                        />
                       );
                     })}
                   </div>
                 </details>
               ) : null}
-            </div>
-          ) : null}
+            </AddWordRecentSessionWords>
         </div>
       </div>
     </main >
