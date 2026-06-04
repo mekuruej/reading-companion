@@ -28,6 +28,7 @@ import AddWordRecentSessionWordCard from "../components/AddWordRecentSessionWord
 import AddWordRecentSessionWords from "../components/AddWordRecentSessionWords";
 import AddWordQuickSearchForm from "../components/AddWordQuickSearchForm";
 import AddWordHelpPanel from "../components/AddWordHelpPanel";
+import AddWordDetailFields from "../components/AddWordDetailFields";
 
 type JishoChoice = {
   surface: string;
@@ -1174,147 +1175,40 @@ export default function AddWordPage() {
               }}
             />
 
-            <div ref={wordFieldsRef} className="space-y-3">
-              <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
-                <span className="font-semibold text-stone-900">Manual entry:</span>{" "}
-                1. Type the word. 2. Add the reading. 3. Add the meaning. 4. Save.
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">Reading</label>
-                  <input
-                    value={reading}
-                    onChange={(e) => setReading(e.target.value)}
-                    placeholder="Reading"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">
-                    Alternate surface
-                  </label>
-                  <input
-                    value={alternateSurface}
-                    onChange={(e) => {
-                      setAlternateSurface(e.target.value);
-                      setUseAlternateSurface(e.target.value.trim().length > 0);
-                    }}
-                    placeholder="Book form, if different"
-                    className="w-full rounded border bg-white px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-stone-700">Meaning</label>
-
-              <div className="space-y-2">
-                {meaningChoices.length > 0 ? (
-                  <div className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
-                    {meaningChoices.map((choice, index) => (
-                      <label
-                        key={index}
-                        className="flex items-start gap-2 text-sm text-stone-700"
-                      >
-                        <input
-                          type="radio"
-                          checked={meaningChoiceIndex === index}
-                          onChange={() => {
-                            setMeaningChoiceIndex(index);
-                            setMeaning(choice);
-                          }}
-                        />
-                        <span>{choice || "—"}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-stone-500">
-                    No dictionary meanings loaded. Enter your own meaning below.
-                  </p>
-                )}
-
-                <textarea
-                  value={meaningChoiceIndex == null ? meaning : ""}
-                  onChange={(e) => {
-                    setMeaningChoiceIndex(null);
-                    setMeaning(e.target.value);
-                  }}
-                  placeholder="Type your meaning"
-                  className="min-h-[80px] w-full rounded border px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">Page</span>
-                <input
-                  type="number"
-                  min={1}
-                  inputMode="numeric"
-                  value={pageNumber}
-                  onChange={(e) => setPageNumber(e.target.value)}
-                  placeholder="Page"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">Chapter number</span>
-                <input
-                  value={chapterNumber}
-                  onChange={(e) => setChapterNumber(e.target.value)}
-                  placeholder="Chapter #"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-stone-700">Chapter name</span>
-                <input
-                  value={chapterName}
-                  onChange={(e) => setChapterName(e.target.value)}
-                  placeholder="Chapter name"
-                  className="w-full rounded border px-3 py-2 text-sm"
-                />
-              </label>
-            </div>
-
-            <label className="flex items-start gap-2 text-sm text-stone-700">
-              <input
-                type="checkbox"
-                checked={hideKanjiInReadingSupport}
-                onChange={(e) => setHideKanjiInReadingSupport(e.target.checked)}
-              />
-              <span>Hide kanji in Read Along (does not affect Vocab List)</span>
-            </label>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={saving || !word.trim()}
-                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save Word"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => clearForm(true)}
-                className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-              >
-                Clear Word Fields
-              </button>
-
-              {savedNotice ? (
-                <span className="text-sm font-medium text-emerald-700">{savedNotice}</span>
-              ) : null}
-            </div>
+            <AddWordDetailFields
+              wordFieldsRef={wordFieldsRef}
+              reading={reading}
+              alternateSurface={alternateSurface}
+              meaning={meaning}
+              meaningChoices={meaningChoices}
+              meaningChoiceIndex={meaningChoiceIndex}
+              pageNumber={pageNumber}
+              chapterNumber={chapterNumber}
+              chapterName={chapterName}
+              hideKanjiInReadingSupport={hideKanjiInReadingSupport}
+              saving={saving}
+              word={word}
+              savedNotice={savedNotice}
+              onReadingChange={setReading}
+              onAlternateSurfaceChange={(value) => {
+                setAlternateSurface(value);
+                setUseAlternateSurface(value.trim().length > 0);
+              }}
+              onMeaningChoiceChange={(index, choice) => {
+                setMeaningChoiceIndex(index);
+                setMeaning(choice);
+              }}
+              onCustomMeaningChange={(value) => {
+                setMeaningChoiceIndex(null);
+                setMeaning(value);
+              }}
+              onPageNumberChange={setPageNumber}
+              onChapterNumberChange={setChapterNumber}
+              onChapterNameChange={setChapterName}
+              onHideKanjiChange={setHideKanjiInReadingSupport}
+              onSaveWord={() => void handleSave()}
+              onClearWordFields={() => clearForm(true)}
+            />
 
             {isSuperTeacher && (
               <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
