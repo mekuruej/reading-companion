@@ -20,6 +20,7 @@ import {
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
 import AddWordPageHeader from "../components/AddWordPageHeader";
+import AddWordStatusMessage from "../components/AddWordStatusMessage";
 
 type JishoChoice = {
   surface: string;
@@ -1131,15 +1132,7 @@ export default function AddWordPage() {
           <p className="mb-6 text-sm text-gray-500">Loading book info…</p>
         )}
 
-        {message ? (
-          <div className="mb-4">
-            {message.startsWith("❌") ? (
-              <p className="text-base font-medium text-red-700">{message}</p>
-            ) : (
-              <p className="text-lg font-semibold text-green-700">{message}</p>
-            )}
-          </div>
-        ) : null}
+        <AddWordStatusMessage message={message} />
 
         <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
           <div className="mb-3">
