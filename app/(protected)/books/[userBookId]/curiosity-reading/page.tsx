@@ -33,6 +33,7 @@ import CuriosityWordHelpPanel from "../components/CuriosityWordHelpPanel";
 import CuriosityQuickErrorMessage from "../components/CuriosityQuickErrorMessage";
 import CuriosityWordDetailFields from "../components/CuriosityWordDetailFields";
 import CuriosityAddEditWordFormShell from "../components/CuriosityAddEditWordFormShell";
+import CuriosityAddEditWordCard from "../components/CuriosityAddEditWordCard";
 
 type QuickPreview = {
   id: string | null;
@@ -1222,14 +1223,7 @@ export default function CuriosityReadingPage() {
           onSessionEndPageChange={setSessionEndPage}
         />
 
-        <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-          <div className="mb-3">
-            <div className="text-sm font-semibold text-stone-900">Add / Edit Word</div>
-            <p className="mt-1 text-sm text-stone-600">
-              Search, adjust, and save from one place. Page and chapter stay ready for the next word.
-            </p>
-          </div>
-
+        <CuriosityAddEditWordCard>
           <CuriosityAddEditWordFormShell
             editingSurface={quickPreview.id ? quickPreview.surface : null}
           >
@@ -1434,8 +1428,8 @@ export default function CuriosityReadingPage() {
               </details>
             ) : null}
           </CuriosityRecentSessionWords>
-        </div>
-      </div>
+      </CuriosityAddEditWordCard>
+    </div>
     </main >
   );
 }
