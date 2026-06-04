@@ -30,6 +30,7 @@ import CuriosityFullAccessRequired from "../components/CuriosityFullAccessRequir
 import CuriosityTimerPanel from "../components/CuriosityTimerPanel";
 import CuriosityQuickSearchRow from "../components/CuriosityQuickSearchRow";
 import CuriosityWordHelpPanel from "../components/CuriosityWordHelpPanel";
+import CuriosityQuickErrorMessage from "../components/CuriosityQuickErrorMessage";
 
 type QuickPreview = {
   id: string | null;
@@ -1294,11 +1295,7 @@ export default function CuriosityReadingPage() {
               }}
             />
 
-            {quickError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {quickError}
-              </div>
-            ) : null}
+            <CuriosityQuickErrorMessage message={quickError} />
 
             <CuriosityDictionaryChoices
               surface={quickPreview.surface}
