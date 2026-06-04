@@ -32,6 +32,7 @@ import CuriosityQuickSearchRow from "../components/CuriosityQuickSearchRow";
 import CuriosityWordHelpPanel from "../components/CuriosityWordHelpPanel";
 import CuriosityQuickErrorMessage from "../components/CuriosityQuickErrorMessage";
 import CuriosityWordDetailFields from "../components/CuriosityWordDetailFields";
+import CuriosityAddEditWordFormShell from "../components/CuriosityAddEditWordFormShell";
 
 type QuickPreview = {
   id: string | null;
@@ -1229,16 +1230,9 @@ export default function CuriosityReadingPage() {
             </p>
           </div>
 
-          <div className={`space-y-4 rounded-xl border p-4 ${quickPreview.id
-            ? "border-amber-200 bg-amber-50"
-            : "border-stone-200 bg-stone-50"
-            }`}
+          <CuriosityAddEditWordFormShell
+            editingSurface={quickPreview.id ? quickPreview.surface : null}
           >
-            {quickPreview.id ? (
-              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800">
-                Editing "{quickPreview.surface}"
-              </div>
-            ) : null}
 
             <CuriosityQuickSearchRow
               surface={quickPreview.surface}
@@ -1362,8 +1356,7 @@ export default function CuriosityReadingPage() {
               onSaveWord={() => void saveQuickWord()}
               onClearWordFields={() => clearQuickWordFields()}
             />
-          </div>
-
+          </CuriosityAddEditWordFormShell>
           <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
 
             <div className="mt-3 space-y-3">
