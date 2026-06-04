@@ -31,6 +31,7 @@ import AddWordHelpPanel from "../components/AddWordHelpPanel";
 import AddWordDetailFields from "../components/AddWordDetailFields";
 import AddWordSuperTeacherTools from "../components/AddWordSuperTeacherTools";
 import AddWordFormShell from "../components/AddWordFormShell";
+import AddWordAddEditCard from "../components/AddWordAddEditCard";
 
 type JishoChoice = {
   surface: string;
@@ -1077,15 +1078,7 @@ export default function AddWordPage() {
         )}
 
         <AddWordStatusMessage message={message} />
-
-        <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
-          <div className="mb-3">
-            <div className="text-sm font-semibold text-stone-900">Add / Edit Word</div>
-            <p className="mt-1 text-sm text-stone-600">
-              Search, adjust, and save from one place. Page and chapter stay ready for the next word.
-            </p>
-          </div>
-
+        <AddWordAddEditCard>
           <AddWordFormShell editingSurface={editingSessionWordId ? word : null}>
 
             <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
@@ -1290,7 +1283,7 @@ export default function AddWordPage() {
               </details>
             ) : null}
           </AddWordRecentSessionWords>
-        </div>
+        </AddWordAddEditCard>
       </div>
     </main >
   );
