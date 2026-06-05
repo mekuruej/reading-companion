@@ -21,6 +21,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import LibraryReviewIntroCard from "../components/LibraryReviewIntroCard";
 import LibraryReviewWordSkyCta from "../components/LibraryReviewWordSkyCta";
+import LibraryReviewProgressCard from "../components/LibraryReviewProgressCard";
 
 type UserBookJoinRow = {
   id: string;
@@ -3140,28 +3141,10 @@ export default function LibraryStudyPage() {
         <LibraryReviewWordSkyCta
           onOpenWordSky={() => router.push("/library-study/word-sky")}
         />
-
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                Review Progress
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                Card {`${practiceDeck.length > 0 ? practiceIndex + 1 : 0}/${practiceDeck.length}`}
-              </p>
-            </div>
-
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                Review Pool
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                {practiceDeck.length}
-              </p>
-            </div>
-          </div>
-        </div>
+        <LibraryReviewProgressCard
+          current={practiceDeck.length > 0 ? practiceIndex + 1 : 0}
+          total={practiceDeck.length}
+        />
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row">
