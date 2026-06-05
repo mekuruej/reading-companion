@@ -21,6 +21,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import { todayYmdAppTimeZone, ymdInTimeZone } from "@/lib/timeZone";
+import AbilityCheckLoadingState from "../components/AbilityCheckLoadingState";
 
 type UserBookJoinRow = {
   id: string;
@@ -2957,11 +2958,7 @@ export default function LibraryStudyPage() {
   }
 
   if (loading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <p className="text-lg text-gray-500">Loading Ability Check...</p>
-      </main>
-    );
+    return <AbilityCheckLoadingState />;
   }
 
   if (needsSignIn) {
