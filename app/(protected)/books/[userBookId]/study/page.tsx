@@ -16,6 +16,7 @@ import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
+import StudyBookHeader from "../components/StudyBookHeader";
 
 type StudySet =
   | "READING"
@@ -1832,20 +1833,7 @@ export default function BookFlashcardsPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-4 bg-slate-100 sm:px-6">
-      <div className="w-full max-w-3xl mb-3 flex flex-col items-center justify-center gap-3 md:flex-row md:items-center md:gap-2">
-        <div className="flex flex-col items-center shrink-0">
-          {bookCover ? (
-            <img src={bookCover} alt="" className="w-24 h-32 rounded mb-2 object-cover" />
-          ) : null}
-          <h1 className="text-2xl font-semibold text-center">{bookTitle}</h1>
-        </div>
-
-        <div className="w-full max-w-md">
-          <p className="text-sm text-gray-500 text-left leading-6">
-            Review the words from this book in a simple, random study session. Each word appears once per session.
-          </p>
-        </div>
-      </div>
+      <StudyBookHeader bookTitle={bookTitle} bookCover={bookCover} />
 
       <div className="mb-2 w-full max-w-2xl space-y-2">
         <div className="mb-2 w-full max-w-2xl space-y-2">
