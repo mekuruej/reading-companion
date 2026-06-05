@@ -27,6 +27,7 @@ import StudyModePanel from "../components/StudyModePanel";
 import MultipleChoiceAnswerPanel from "../components/MultipleChoiceAnswerPanel";
 import TypingAnswerPanel from "../components/TypingAnswerPanel";
 import StudyLoadingState from "../components/StudyLoadingState";
+import StudyNeedsSignInState from "../components/StudyNeedsSignInState";
 
 type StudySet =
   | "READING"
@@ -1648,12 +1649,8 @@ export default function BookFlashcardsPage() {
   }
 
   if (needsSignIn) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-gray-700">You need to sign in to see your book flashcards.</p>
-      </main>
-    );
-  }
+  return <StudyNeedsSignInState />;
+}
 
   if (!accessChecked) {
     return <StudyLoadingState />;
