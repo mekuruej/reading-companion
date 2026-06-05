@@ -29,6 +29,7 @@ import TypingAnswerPanel from "../components/TypingAnswerPanel";
 import StudyLoadingState from "../components/StudyLoadingState";
 import StudyNeedsSignInState from "../components/StudyNeedsSignInState";
 import StudyErrorState from "../components/StudyErrorState";
+import StudyEmptyState from "../components/StudyEmptyState";
 
 type StudySet =
   | "READING"
@@ -1650,8 +1651,8 @@ export default function BookFlashcardsPage() {
   }
 
   if (needsSignIn) {
-  return <StudyNeedsSignInState />;
-}
+    return <StudyNeedsSignInState />;
+  }
 
   if (!accessChecked) {
     return <StudyLoadingState />;
@@ -1723,27 +1724,18 @@ export default function BookFlashcardsPage() {
   }
 
   if (errorMsg) {
-  return <StudyErrorState message={errorMsg} />;
-}
+    return <StudyErrorState message={errorMsg} />;
+  }
 
   if (filteredCards.length === 0) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p>No words match your filters (or none have been added to this book yet).</p>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setJlptSelected([]);
-              setChapterFilter("all");
-              setRepeatsOnly(false);
-            }}
-            className="px-4 py-2 bg-gray-200 rounded"
-          >
-            Clear Filters
-          </button>
-        </div>
-      </main>
+      <StudyEmptyState
+        onClearFilters={() => {
+          setJlptSelected([]);
+          setChapterFilter("all");
+          setRepeatsOnly(false);
+        }}
+      />
     );
   }
 
