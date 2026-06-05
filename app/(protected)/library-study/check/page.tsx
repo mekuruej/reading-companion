@@ -35,6 +35,8 @@ import AbilityCheckPageHeader from "../components/AbilityCheckPageHeader";
 import AbilityCheckNoDueState from "../components/AbilityCheckNoDueState";
 import AbilityCheckCompleteState from "../components/AbilityCheckCompleteState";
 import AbilityCheckMeaningReviewScreen from "../components/AbilityCheckMeaningReviewScreen";
+import AbilityCheckCardShell from "../components/AbilityCheckCardShell";
+import AbilityCheckActionPanel from "../components/AbilityCheckActionPanel";
 
 type UserBookJoinRow = {
   id: string;
@@ -3309,43 +3311,23 @@ export default function LibraryStudyPage() {
         />
       ) : (
         <>
-          <div className={libraryStudyCardClass(currentCard?.colorStatus)}>
-            {currentCard ? (
-              <div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-2 sm:left-4 sm:right-4 sm:top-4 sm:gap-3">
-                <div className={gatePromptClass(currentCard)}>
-                  {gatePromptText(currentCard)}
-                </div>
-
-                <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
-                  <div className="rounded-full border border-slate-100 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 shadow-sm sm:px-3 sm:py-1.5 sm:text-sm">
-                    <span
-                      className={`mr-1 inline-block h-2.5 w-2.5 rounded-full sm:mr-1.5 sm:h-5 sm:w-5 ${libraryStudyDotClass(
-                        currentCard.colorStatus
-                      )}`}
-                    />
-                    {libraryStudyColorName(currentCard.colorStatus)}
-                  </div>
-                  {isKatakanaOnly(currentCard.surface) ? <KatakanaBadge /> : null}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5 sm:bottom-4 sm:left-4 sm:gap-2">
-              {definitionLabel(currentCard) ? (
-                <div className={libraryStudyChipClass(currentCard?.colorStatus)}>
-                  {definitionLabel(currentCard)}
-                </div>
-              ) : null}
-            </div>
-
-            {currentCard ? (
-              <div className="absolute bottom-3 right-3 flex flex-wrap justify-end gap-1.5 sm:bottom-4 sm:right-4 sm:gap-2">
-                <div className={libraryStudyChipClass(currentCard.colorStatus)}>
-                  Read {currentCard.encounterCount}x
-                </div>
-              </div>
-            ) : null}
-
+          <AbilityCheckCardShell
+            cardClassName={libraryStudyCardClass(currentCard?.colorStatus)}
+            hasCard={!!currentCard}
+            gateClassName={currentCard ? gatePromptClass(currentCard) : ""}
+            gateLabel={currentCard ? gatePromptText(currentCard) : ""}
+            colorDotClassName={
+              currentCard ? libraryStudyDotClass(currentCard.colorStatus) : ""
+            }
+            colorName={currentCard ? libraryStudyColorName(currentCard.colorStatus) : ""}
+            showKatakanaBadge={currentCard ? isKatakanaOnly(currentCard.surface) : false}
+            definitionText={definitionLabel(currentCard)}
+            definitionChipClassName={libraryStudyChipClass(currentCard?.colorStatus)}
+            readChipClassName={
+              currentCard ? libraryStudyChipClass(currentCard.colorStatus) : ""
+            }
+            encounterCount={currentCard?.encounterCount}
+          >
             <div className="flex w-full flex-col items-center gap-6 pt-12 pb-10">
               {currentCard?.activeGate === "readiness" ? (
                 <>
@@ -3478,28 +3460,28 @@ export default function LibraryStudyPage() {
                         Mastered words leave normal Ability Check.
                       </div>
                       <style jsx>{`
-                        @keyframes purpleBurst {
-                          0% {
-                            opacity: 0;
-                            transform: scale(0.2);
-                            box-shadow:
-                              0 0 0 0 currentColor,
-                              0 0 0 0 currentColor,
-                              0 0 0 0 currentColor;
-                          }
-                          35% {
-                            opacity: 1;
-                          }
-                          100% {
-                            opacity: 0;
-                            transform: scale(1.2);
-                            box-shadow:
-                              18px -10px 0 -1px currentColor,
-                              -16px -8px 0 -1px currentColor,
-                              2px 18px 0 -1px currentColor;
-                          }
-                        }
-                      `}</style>
+              @keyframes purpleBurst {
+                0% {
+                  opacity: 0;
+                  transform: scale(0.2);
+                  box-shadow:
+                    0 0 0 0 currentColor,
+                    0 0 0 0 currentColor,
+                    0 0 0 0 currentColor;
+                }
+                35% {
+                  opacity: 1;
+                }
+                100% {
+                  opacity: 0;
+                  transform: scale(1.2);
+                  box-shadow:
+                    18px -10px 0 -1px currentColor,
+                    -16px -8px 0 -1px currentColor,
+                    2px 18px 0 -1px currentColor;
+                }
+              }
+            `}</style>
                     </div>
                   ) : checked.ok ? (
                     <p className="text-green-700">Correct!</p>
@@ -3519,7 +3501,7 @@ export default function LibraryStudyPage() {
                 </div>
               ) : null}
             </div>
-          </div>
+          </AbilityCheckCardShell>
 
           <div className="mt-2 w-full max-w-2xl space-y-2">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -3540,44 +3522,15 @@ export default function LibraryStudyPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-2 md:w-[180px]">
-                  <button
-                    type="button"
-                    onClick={finishForToday}
-                    className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <div className="leading-tight">Finish early</div>
-                    <div className="text-[10px] font-normal text-slate-500">
-                      {meaningReviewItems.length > 0
-                        ? "Review meaning answers"
-                        : "Save your place"}
-                    </div>
-                  </button>
-
-                  {canComeBackLater(currentCard) ? (
-                    <button
-                      type="button"
-                      onClick={() => void comeBackLaterForCurrentCard("hard")}
-                      className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                    >
-                      <div className="leading-tight">Too hard for now</div>
-                      <div className="text-[10px] font-normal text-slate-500">
-                        Red support · 90 days
-                      </div>
-                    </button>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    onClick={flagCurrentCard}
-                    className="min-h-[74px] w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
-                  >
-                    <div className="leading-tight">Flag</div>
-                    <div className="text-[10px] font-normal text-amber-700">
-                      Problem card
-                    </div>
-                  </button>
-                </div>
+                <AbilityCheckActionPanel
+                  modeLabel={checkModeLabel(currentCard)}
+                  modeDescription={checkModeDescription(currentCard)}
+                  meaningReviewCount={meaningReviewItems.length}
+                  canComeBackLater={canComeBackLater(currentCard)}
+                  onFinishForToday={finishForToday}
+                  onComeBackLater={() => void comeBackLaterForCurrentCard("hard")}
+                  onFlagCurrentCard={() => void flagCurrentCard()}
+                />
               </div>
             </div>
           </div>
