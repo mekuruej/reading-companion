@@ -602,6 +602,69 @@ Risk:
 Suggested order:
 * 10
 
+## Visual Pass Status
+
+Recommended current status: `Visual pass mostly done / architecture deferred`.
+
+Tracker row:
+
+Visual pass mostly done / architecture deferred | `app/(protected)/library-study/practice/page.tsx` | 3304 | 2961 | -343 |
+
+This means the safe visual/page-thinning layer has mostly been completed. The page is still intentionally architecture-deferred because it contains a mix of Library Practice, Ability Check, daily check setup, progress writes, meaning review, and study-flow behavior.
+
+## Finished:
+
+Finished:
+
+* Extracted `LibraryReviewPageHeader`
+* Extracted `LibraryReviewIntroCard`
+* Extracted `LibraryReviewWordSkyCta`
+* Extracted `LibraryReviewProgressCard`
+* Extracted `LibraryPracticeFilterPanel`
+* Extracted `LibraryPracticeCompleteCard`
+* Extracted `LibraryReviewEmptyState`
+* Extracted `LibraryReviewLoadingState`
+* Extracted `LibraryReviewNeedsSignInState`
+* Extracted `LibraryReviewErrorState`
+* Extracted `LibraryReviewFullAccessLockedState`
+* Extracted `PracticeMeaningReviewScreen`
+* Extracted `LibraryPracticeCardBadges`
+* Extracted `LibraryPracticeNoCardsState`
+* Removed the now-unused local `KatakanaBadge` helper after `LibraryPracticeCardBadges` took over that display
+* Cleaned up “Hepburn Romanji” wording to “Hepburn romaji”
+
+Still intentionally deferred:
+
+* access checks
+* full-access checks
+* Supabase queries
+* card loading and selection logic
+* daily Ability Check selection logic
+* Library Practice filtering logic
+* answer checking logic
+* study result, progress, log, and event writes
+* previous, next, retry, shuffle, and finish behavior
+* auto-forward timers
+* focus timers
+* keyboard event behavior
+* `LibraryPracticePanel` as a whole
+* `load()` data-loading effect
+* progress save helpers
+* Ability Check setup/check-again behavior
+* timing/recheck availability logic
+* card construction helpers
+* services, DAOs, controllers, hooks, or page-local types
+* suspicious/possibly unused code cleanup
+
+Notes:
+
+* The page went from about 3304 lines to 2961 lines.
+* The first visual pass brought the page under 3000 lines without moving the dangerous study/progress behavior.
+* `LibraryPracticePanel` was only lightly touched by extracting visual badges and the no-cards state.
+* Do not start the next pass by moving data loading or study logic.
+* The next pass should start with behavior verification: Library Review filters, reveal mode, typing mode, review completion, meaning review, Word Sky CTA, full-access locked state, empty state, and sign-in/error states.
+
+
 ## Do Not Extract Yet
 
 Do not extract in the first pass:
