@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import LibraryReviewIntroCard from "../components/LibraryReviewIntroCard";
+import LibraryReviewWordSkyCta from "../components/LibraryReviewWordSkyCta";
 
 type UserBookJoinRow = {
   id: string;
@@ -3136,23 +3137,9 @@ export default function LibraryStudyPage() {
 
       <div className="mb-2 w-full max-w-3xl space-y-2">
         <LibraryReviewIntroCard />
-        <button
-          type="button"
-          onClick={() => router.push("/library-study/word-sky")}
-          className="w-full rounded-2xl border border-sky-100 bg-[#f5fbff] px-4 py-3 text-left shadow-sm transition hover:border-sky-200 hover:bg-sky-50"
-        >
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-sky-950">
-                Want more easy review words?
-              </div>
-              <div className="text-xs leading-5 text-slate-500">
-                Use Word Sky to add easier words to your study pool.
-              </div>
-            </div>
-            <div className="text-sm font-semibold text-sky-900">Open Word Sky</div>
-          </div>
-        </button>
+        <LibraryReviewWordSkyCta
+          onOpenWordSky={() => router.push("/library-study/word-sky")}
+        />
 
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex items-center justify-between gap-3">
