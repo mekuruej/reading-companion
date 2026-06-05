@@ -26,6 +26,7 @@ import StudyFilterPanel from "../components/StudyFilterPanel";
 import StudyModePanel from "../components/StudyModePanel";
 import MultipleChoiceAnswerPanel from "../components/MultipleChoiceAnswerPanel";
 import TypingAnswerPanel from "../components/TypingAnswerPanel";
+import StudyLoadingState from "../components/StudyLoadingState";
 
 type StudySet =
   | "READING"
@@ -1643,11 +1644,7 @@ export default function BookFlashcardsPage() {
   ]);
 
   if (loading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-gray-500">Loading flashcards…</p>
-      </main>
-    );
+    return <StudyLoadingState />;
   }
 
   if (needsSignIn) {
@@ -1659,11 +1656,7 @@ export default function BookFlashcardsPage() {
   }
 
   if (!accessChecked) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-gray-500">Loading flashcards…</p>
-      </main>
-    );
+    return <StudyLoadingState />;
   }
 
   if (!canAccessBook) {
