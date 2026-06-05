@@ -22,6 +22,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import { todayYmdAppTimeZone, ymdInTimeZone } from "@/lib/timeZone";
 import AbilityCheckLoadingState from "../components/AbilityCheckLoadingState";
+import AbilityCheckNeedsSignInState from "../components/AbilityCheckNeedsSignInState";
 
 type UserBookJoinRow = {
   id: string;
@@ -2963,12 +2964,9 @@ export default function LibraryStudyPage() {
 
   if (needsSignIn) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-gray-700">You need to sign in to use Ability Check.</p>
-        <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
-          Go to Login
-        </button>
-      </main>
+      <AbilityCheckNeedsSignInState
+        onGoToLogin={() => router.push("/login")}
+      />
     );
   }
 
