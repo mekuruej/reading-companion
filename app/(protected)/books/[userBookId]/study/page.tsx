@@ -30,6 +30,7 @@ import StudyLoadingState from "../components/StudyLoadingState";
 import StudyNeedsSignInState from "../components/StudyNeedsSignInState";
 import StudyErrorState from "../components/StudyErrorState";
 import StudyEmptyState from "../components/StudyEmptyState";
+import StudyCompleteState from "../components/StudyCompleteState";
 
 type StudySet =
   | "READING"
@@ -1741,39 +1742,21 @@ export default function BookFlashcardsPage() {
 
   if (studyOnceMode && sessionIndex >= sessionOrder.length) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-xl border rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">Nice work!</h1>
-          <p className="mt-3 text-gray-700">You reviewed each word once.</p>
-
-          <div className="mt-6 flex justify-center gap-3">
-            <button
-              onClick={() => router.push(`/books/${userBookId}/words`)}
-              className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-            >
-              Go to Vocab List
-            </button>
-
-            <button
-              onClick={() => {
-                const newOrder = shuffleArray(filteredCards.map((_, i) => i));
-                setSessionOrder(newOrder);
-                setSessionIndex(0);
-                setStepIndex(0);
-                setTypedInput("");
-                setTypedFeedback(null);
-                setTypeRevealIndex(0);
-                setReadyForNextCard(false);
-                setLastTypedResult(null);
-                setFirstTouch(true);
-              }}
-              className="px-4 py-2 bg-gray-200 rounded"
-            >
-              Study Again
-            </button>
-          </div>
-        </div>
-      </main>
+      <StudyCompleteState
+        onGoToVocabList={() => router.push(`/books/${userBookId}/words`)}
+        onStudyAgain={() => {
+          const newOrder = shuffleArray(filteredCards.map((_, i) => i));
+          setSessionOrder(newOrder);
+          setSessionIndex(0);
+          setStepIndex(0);
+          setTypedInput("");
+          setTypedFeedback(null);
+          setTypeRevealIndex(0);
+          setReadyForNextCard(false);
+          setLastTypedResult(null);
+          setFirstTouch(true);
+        }}
+      />
     );
   }
 
