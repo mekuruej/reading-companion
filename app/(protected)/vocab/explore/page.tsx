@@ -84,8 +84,8 @@ export default function WordHistorySearchPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
 
-  // The URL can provide a userBookId, but private queries should only use it
-  // after we confirm it belongs to the logged-in user.
+  // The route/local state can provide a userBookId, but private queries and writes
+  // should only use it after confirming it belongs to the logged-in user.
   const [authorizedUserBookId, setAuthorizedUserBookId] = useState("");
 
   const [surface, setSurface] = useState("");
