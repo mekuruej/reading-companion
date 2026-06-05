@@ -28,6 +28,7 @@ import AbilityCheckFullAccessLockedState from "../components/AbilityCheckFullAcc
 import AbilityCheckNoCardsState from "../components/AbilityCheckNoCardsState";
 import AbilityCheckRestingState from "../components/AbilityCheckRestingState";
 import AbilityCheckSetupPanel from "../components/AbilityCheckSetupPanel";
+import AbilityCheckProgressCard from "../components/AbilityCheckProgressCard";
 
 type UserBookJoinRow = {
   id: string;
@@ -3461,33 +3462,24 @@ export default function LibraryStudyPage() {
         </button>
 
         <AbilityCheckFaq />
-
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                {libraryMode === "practice" ? "Practice Progress" : "Session Progress"}
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                Card{" "}
-                {libraryMode === "practice"
-                  ? `${practiceDeck.length > 0 ? practiceIndex + 1 : 0}/${practiceDeck.length}`
-                  : `${index + 1}/${deck.length}`}
-              </p>
-            </div>
-
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                {libraryMode === "practice" ? "Practice Pool" : "Cards Left"}
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                {libraryMode === "practice"
-                  ? practiceDeck.length
-                  : Math.max(deck.length - index, 0)}
-              </p>
-            </div>
-          </div>
-        </div>
+        
+        <AbilityCheckProgressCard
+          label={libraryMode === "practice" ? "Practice Progress" : "Session Progress"}
+          current={
+            libraryMode === "practice"
+              ? practiceDeck.length > 0
+                ? practiceIndex + 1
+                : 0
+              : index + 1
+          }
+          total={libraryMode === "practice" ? practiceDeck.length : deck.length}
+          rightLabel={libraryMode === "practice" ? "Practice Pool" : "Cards Left"}
+          rightValue={
+            libraryMode === "practice"
+              ? practiceDeck.length
+              : Math.max(deck.length - index, 0)
+          }
+        />
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row">
