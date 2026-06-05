@@ -38,6 +38,7 @@ import AbilityCheckMeaningReviewScreen from "../components/AbilityCheckMeaningRe
 import AbilityCheckCardShell from "../components/AbilityCheckCardShell";
 import AbilityCheckActionPanel from "../components/AbilityCheckActionPanel";
 import AbilityCheckReadinessPrompt from "../components/AbilityCheckReadinessPrompt";
+import AbilityCheckTypingPrompt from "../components/AbilityCheckTypingPrompt";
 
 type UserBookJoinRow = {
   id: string;
@@ -3339,91 +3340,36 @@ export default function LibraryStudyPage() {
                 />
               ) : null}
 
-              {currentCard?.activeGate !== "readiness" && activeStudyMode === "reading_typing" && (
-                <>
-                  <div className={promptModeClass("reading")}>
-                    READING
-                  </div>
-                  <div className="text-5xl font-bold">{currentCard?.surface}</div>
-                </>
-              )}
+              {currentCard?.activeGate !== "readiness" && currentCard ? (
+                <AbilityCheckTypingPrompt
+                  mode={activeStudyMode}
+                  surface={currentCard.surface}
+                  reading={currentCard.reading}
+                  promptClassName={
+                    activeStudyMode === "reading_typing"
+                      ? promptModeClass("reading")
+                      : promptModeClass("meaning")
+                  }
+                  typingInput={typingInput}
+                  checked={checked}
+                  instructionText={currentInstructionText}
+                  canSendBackToSupport={canComeBackLater(currentCard)}
+                  inputRef={typingInputRef}
+                  onTypingInputChange={setTypingInput}
+                  onInputKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
 
-              {currentCard?.activeGate !== "readiness" && activeStudyMode === "meaning_typing" && (
-                <>
-                  <div className={promptModeClass("meaning")}>
-                    MEANING
-                  </div>
-                  <div className="text-5xl font-bold">{currentCard?.surface}</div>
-                  <div className="text-lg text-slate-500">{currentCard?.reading}</div>
-                </>
-              )}
+                    event.preventDefault();
+                    event.stopPropagation();
 
-              {currentCard?.activeGate !== "readiness" && (
-                <div className="w-full max-w-sm">
-                  {activeStudyMode === "reading_typing" ? (
-                    <p className="mb-2 text-center text-xs text-gray-500">
-                      <span className="inline sm:whitespace-nowrap">Kana is best; </span>
-                      <span className="inline sm:whitespace-nowrap">Hepburn romaji also works</span>
-                    </p>
-                  ) : null}
-
-                  <input
-                    ref={typingInputRef}
-                    value={typingInput}
-                    onChange={(e) => setTypingInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-
-                      e.preventDefault();
-                      e.stopPropagation();
-
-                      if (!checked || !checked.ok) {
-                        checkTypingSingle();
-                      }
-                    }}
-                    placeholder={
-                      activeStudyMode === "reading_typing"
-                        ? "Type kana or Hepburn romaji"
-                        : "Type the meaning"
+                    if (!checked || !checked.ok) {
+                      checkTypingSingle();
                     }
-                    inputMode="text"
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="w-full rounded border px-4 py-3 text-base"
-                    disabled={!!checked && checked.ok}
-                  />
-
-                  {currentInstructionText ? (
-                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-center text-sm font-semibold text-stone-700">
-                      {currentInstructionText}
-                    </div>
-                  ) : null}
-
-                  {!checked ? (
-                    <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={checkTypingSingle}
-                        className="rounded bg-gray-700 px-4 py-2 text-white"
-                      >
-                        Check
-                      </button>
-
-                      {canComeBackLater(currentCard) ? (
-                        <button
-                          type="button"
-                          onClick={() => void comeBackLaterForCurrentCard("hard")}
-                          className="rounded border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                        >
-                          Send back to Red support
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              )}
+                  }}
+                  onCheckAnswer={checkTypingSingle}
+                  onSendBackToSupport={() => void comeBackLaterForCurrentCard("hard")}
+                />
+              ) : null}
 
               {checked ? (
                 <div className="mt-2 w-full max-w-sm text-center text-sm">
