@@ -12,7 +12,10 @@ import {
   canUseFullAccessFeature,
   getFullAccessRequiredCopy,
 } from "@/lib/access/requireFullAccess";
-import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
+import {
+  computeLibraryStudyColorStatus,
+  type LibraryStudyColor,
+} from "@/lib/libraryStudyColor";
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
@@ -212,6 +215,31 @@ function shuffledCandidatePool(card: Flashcard, pool: Flashcard[]) {
 }
 
 const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1", "NON-JLPT"] as const;
+const LIBRARY_COLOR_FILTERS: LibraryStudyColor[] = [
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "purple",
+  "grey",
+];
+const STUDY_MODE_ORDER: StudySet[] = [
+  "READING",
+  "MEANING",
+  "FROM_READING_MEANING",
+  "READING_MC",
+  "MEANING_MC",
+  "FROM_READING_MC",
+  "FROM_READING_MEANING_MC",
+  "COMPLETE",
+];
+
+function getNextStudySet(studySet: StudySet) {
+  const currentIndex = STUDY_MODE_ORDER.indexOf(studySet);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % STUDY_MODE_ORDER.length : 0;
+  return STUDY_MODE_ORDER[nextIndex];
+}
 
 export default function BookFlashcardsPage() {
   const params = useParams<{ userBookId: string }>();
@@ -297,6 +325,7 @@ export default function BookFlashcardsPage() {
   const [accessMessage, setAccessMessage] = useState("");
 
   const [jlptSelected, setJlptSelected] = useState<string[]>([]);
+  const [colorSelected, setColorSelected] = useState<LibraryStudyColor[]>([]);
   const [chapterFilter, setChapterFilter] = useState("all");
   const [repeatsOnly, setRepeatsOnly] = useState(false);
 
@@ -358,6 +387,13 @@ export default function BookFlashcardsPage() {
       const parsed = JSON.parse(raw);
       if (parsed?.studySet) setStudySet(parsed.studySet as StudySet);
       if (Array.isArray(parsed?.jlptSelected)) setJlptSelected(parsed.jlptSelected);
+      if (Array.isArray(parsed?.colorSelected)) {
+        setColorSelected(
+          parsed.colorSelected.filter((color: string) =>
+            LIBRARY_COLOR_FILTERS.includes(color as LibraryStudyColor)
+          )
+        );
+      }
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
     } catch { }
@@ -373,12 +409,22 @@ export default function BookFlashcardsPage() {
           studySet,
           studyOnceMode,
           jlptSelected,
+          colorSelected,
           chapterFilter,
           repeatsOnly,
         })
       );
     } catch { }
-  }, [settingsKey, userBookId, studySet, studyOnceMode, jlptSelected, chapterFilter, repeatsOnly]);
+  }, [
+    settingsKey,
+    userBookId,
+    studySet,
+    studyOnceMode,
+    jlptSelected,
+    colorSelected,
+    chapterFilter,
+    repeatsOnly,
+  ]);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -767,6 +813,14 @@ export default function BookFlashcardsPage() {
       result = result.filter((c) => jlptSelected.includes(c.jlpt));
     }
 
+    if (colorSelected.length > 0) {
+      result = result.filter((c) =>
+        colorSelected.includes(
+          computeLibraryStudyColorStatus({ encounterCount: c.totalCount }).color
+        )
+      );
+    }
+
     if (chapterFilter !== "all") {
       result = result.filter((c) => c.chapterLabel === chapterFilter);
     }
@@ -794,7 +848,7 @@ export default function BookFlashcardsPage() {
     setShowDefPicker(false);
     setCorrectionInput("");
     setCorrectionFeedback(null);
-  }, [cards, jlptSelected, chapterFilter, repeatsOnly, studySet]);
+  }, [cards, jlptSelected, colorSelected, chapterFilter, repeatsOnly, studySet]);
 
   useEffect(() => {
     const order = filteredCards.map((_, i) => i);
@@ -1691,33 +1745,82 @@ export default function BookFlashcardsPage() {
     return <StudyErrorState message={errorMsg} />;
   }
 
+  const clearFilters = () => {
+    setJlptSelected([]);
+    setColorSelected([]);
+    setChapterFilter("all");
+    setRepeatsOnly(false);
+  };
+
+  const restartCurrentFilteredSet = () => {
+    const newOrder = shuffleArray(filteredCards.map((_, i) => i));
+    setSessionOrder(newOrder);
+    setSessionIndex(0);
+    setStepIndex(0);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setTypeRevealIndex(0);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
+    setFirstTouch(true);
+    resetMcState();
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
+  };
+
+  const nextStudySet = getNextStudySet(studySet);
+
+  const filterControls = (
+    <StudyFilterPanel
+      jlptLevels={JLPT_LEVELS}
+      jlptSelected={jlptSelected}
+      colorOptions={LIBRARY_COLOR_FILTERS}
+      colorSelected={colorSelected}
+      chapterFilter={chapterFilter}
+      chapterOptions={chapterOptions}
+      repeatsOnly={repeatsOnly}
+      onToggleJlpt={(level) =>
+        setJlptSelected((prev) =>
+          prev.includes(level) ? prev.filter((item) => item !== level) : [...prev, level]
+        )
+      }
+      onSelectAllJlpt={() => setJlptSelected([...JLPT_LEVELS])}
+      onClearJlpt={() => setJlptSelected([])}
+      onToggleColor={(color) =>
+        setColorSelected((prev) =>
+          prev.includes(color)
+            ? prev.filter((item) => item !== color)
+            : [...prev, color]
+        )
+      }
+      onSelectAllColors={() => setColorSelected([...LIBRARY_COLOR_FILTERS])}
+      onClearColors={() => setColorSelected([])}
+      onChapterFilterChange={setChapterFilter}
+      onRepeatsOnlyChange={setRepeatsOnly}
+    />
+  );
+
   if (filteredCards.length === 0) {
     return (
-      <StudyEmptyState
-        onClearFilters={() => {
-          setJlptSelected([]);
-          setChapterFilter("all");
-          setRepeatsOnly(false);
-        }}
-      />
+      <main className="min-h-screen flex flex-col items-center gap-3 px-4 py-4 bg-slate-100 sm:px-6">
+        <StudyBookHeader bookTitle={bookTitle} bookCover={bookCover} />
+
+        <div className="w-full max-w-2xl">{filterControls}</div>
+
+        <StudyEmptyState onClearFilters={clearFilters} />
+      </main>
     );
   }
 
   if (studyOnceMode && sessionIndex >= sessionOrder.length) {
     return (
       <StudyCompleteState
+        nextStudyModeLabel={studySetLabel(nextStudySet)}
         onGoToVocabList={() => router.push(`/books/${userBookId}/words`)}
-        onStudyAgain={() => {
-          const newOrder = shuffleArray(filteredCards.map((_, i) => i));
-          setSessionOrder(newOrder);
-          setSessionIndex(0);
-          setStepIndex(0);
-          setTypedInput("");
-          setTypedFeedback(null);
-          setTypeRevealIndex(0);
-          setReadyForNextCard(false);
-          setLastTypedResult(null);
-          setFirstTouch(true);
+        onStudyAgain={restartCurrentFilteredSet}
+        onNextStudyMode={() => {
+          setStudySet(nextStudySet);
+          restartCurrentFilteredSet();
         }}
       />
     );
@@ -1741,22 +1844,7 @@ export default function BookFlashcardsPage() {
       <StudyBookHeader bookTitle={bookTitle} bookCover={bookCover} />
 
       <div className="mb-2 w-full max-w-2xl space-y-2">
-        <StudyFilterPanel
-          jlptLevels={JLPT_LEVELS}
-          jlptSelected={jlptSelected}
-          chapterFilter={chapterFilter}
-          chapterOptions={chapterOptions}
-          repeatsOnly={repeatsOnly}
-          onToggleJlpt={(level) =>
-            setJlptSelected((prev) =>
-              prev.includes(level) ? prev.filter((item) => item !== level) : [...prev, level]
-            )
-          }
-          onSelectAllJlpt={() => setJlptSelected([...JLPT_LEVELS])}
-          onClearJlpt={() => setJlptSelected([])}
-          onChapterFilterChange={setChapterFilter}
-          onRepeatsOnlyChange={setRepeatsOnly}
-        />
+        {filterControls}
         <StudyProgressPanel
           currentNumber={Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}
           totalNumber={studyOnceMode ? sessionOrder.length : filteredCards.length}
@@ -1837,7 +1925,7 @@ export default function BookFlashcardsPage() {
                 correctionInputRef={correctionInputRef}
                 correctionPlaceholder={
                   studySet === "READING_MC"
-                    ? "Type kana or Hepburn romaji"
+                    ? "Type kana or Hepburn Romanji"
                     : studySet === "FROM_READING_MC"
                       ? "Type the kanji word"
                       : "Type one meaning word"
@@ -1913,7 +2001,7 @@ export default function BookFlashcardsPage() {
                   readyForNextCard={readyForNextCard}
                   placeholder={
                     studySet === "READING"
-                      ? "Type kana or Hepburn romaji"
+                      ? "Type kana or Hepburn Romanji"
                       : studySet === "MEANING"
                         ? "Type a meaning"
                         : studySet === "FROM_READING_MEANING"

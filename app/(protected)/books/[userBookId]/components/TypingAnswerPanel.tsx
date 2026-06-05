@@ -40,8 +40,8 @@ export default function TypingAnswerPanel({
 
       {showReadingHint ? (
         <p className="mb-2 text-xs text-gray-500">
-          Kana is best practice; Hepburn romaji also works if predictive text
-          gets in the way.
+          <span className="inline sm:whitespace-nowrap">Kana is best; </span>
+          <span className="inline sm:whitespace-nowrap">Hepburn Romanji also works</span>
         </p>
       ) : null}
 
