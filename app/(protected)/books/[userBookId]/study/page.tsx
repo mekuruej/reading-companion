@@ -22,6 +22,7 @@ import Row from "../components/StudyCardFieldRow";
 import StudyCardBadges from "../components/StudyCardBadges";
 import StudyBottomNavigation from "../components/StudyBottomNavigation";
 import StudyInstructionNav from "../components/StudyInstructionNav";
+import StudyFilterPanel from "../components/StudyFilterPanel";
 
 type StudySet =
   | "READING"
@@ -1812,78 +1813,22 @@ export default function BookFlashcardsPage() {
       <StudyBookHeader bookTitle={bookTitle} bookCover={bookCover} />
 
       <div className="mb-2 w-full max-w-2xl space-y-2">
-        <div className="mb-2 w-full max-w-2xl space-y-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="flex flex-wrap gap-2">
-              {JLPT_LEVELS.map((lvl) => {
-                const checkedLvl = jlptSelected.includes(lvl);
-
-                return (
-                  <label
-                    key={lvl}
-                    className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-700"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checkedLvl}
-                      onChange={() =>
-                        setJlptSelected((prev) =>
-                          checkedLvl ? prev.filter((x) => x !== lvl) : [...prev, lvl]
-                        )
-                      }
-                    />
-                    {lvl}
-                  </label>
-                );
-              })}
-
-              <button
-                type="button"
-                onClick={() => setJlptSelected([...JLPT_LEVELS])}
-                className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-300"
-              >
-                All
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setJlptSelected([])}
-                className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-300"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <select
-                value={chapterFilter}
-                onChange={(e) => setChapterFilter(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="all">All Chapters</option>
-                {chapterOptions.map((ch) => (
-                  <option key={ch.value} value={ch.value}>
-                    {ch.label}
-                  </option>
-                ))}
-              </select>
-
-              <label
-                className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
-                title="Show only words that appear 2+ times in this book"
-              >
-                <input
-                  type="checkbox"
-                  checked={repeatsOnly}
-                  onChange={() => setRepeatsOnly((v) => !v)}
-                />
-                Repeats only
-              </label>
-            </div>
-          </div>
-        </div>
+        <StudyFilterPanel
+          jlptLevels={JLPT_LEVELS}
+          jlptSelected={jlptSelected}
+          chapterFilter={chapterFilter}
+          chapterOptions={chapterOptions}
+          repeatsOnly={repeatsOnly}
+          onToggleJlpt={(level) =>
+            setJlptSelected((prev) =>
+              prev.includes(level) ? prev.filter((item) => item !== level) : [...prev, level]
+            )
+          }
+          onSelectAllJlpt={() => setJlptSelected([...JLPT_LEVELS])}
+          onClearJlpt={() => setJlptSelected([])}
+          onChapterFilterChange={setChapterFilter}
+          onRepeatsOnlyChange={setRepeatsOnly}
+        />
         <StudyProgressPanel
           currentNumber={Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}
           totalNumber={studyOnceMode ? sessionOrder.length : filteredCards.length}
