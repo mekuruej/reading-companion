@@ -27,6 +27,7 @@ import LibraryPracticeCompleteCard from "../components/LibraryPracticeCompleteCa
 import LibraryReviewEmptyState from "../components/LibraryReviewEmptyState";
 import LibraryReviewLoadingState from "../components/LibraryReviewLoadingState";
 import LibraryReviewNeedsSignInState from "../components/LibraryReviewNeedsSignInState";
+import LibraryReviewErrorState from "../components/LibraryReviewErrorState";
 
 type UserBookJoinRow = {
   id: string;
@@ -2968,12 +2969,10 @@ export default function LibraryStudyPage() {
 
   if (errorMsg) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-red-700">{errorMsg}</p>
-        <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-          Back to Library
-        </button>
-      </main>
+      <LibraryReviewErrorState
+        message={errorMsg}
+        onBackToLibrary={() => router.push("/books")}
+      />
     );
   }
 
