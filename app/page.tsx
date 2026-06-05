@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import AuthReturnRedirect from "@/components/AuthReturnRedirect";
 
+const SHOW_STUDENT_APP_CARD = true;
+
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-950">
@@ -77,7 +79,11 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid gap-4 pb-2 md:grid-cols-3">
+          <div
+            className={`grid gap-4 pb-2 ${
+              SHOW_STUDENT_APP_CARD ? "md:grid-cols-3" : "md:grid-cols-2"
+            }`}
+          >
             <Link
               href="/japanese"
               className="group flex min-h-[210px] flex-col justify-between rounded-[1.75rem] border border-slate-300 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
@@ -123,27 +129,29 @@ export default function HomePage() {
               </p>
             </Link>
 
-            <Link
-              href="/dashboard"
-              className="group flex min-h-[210px] flex-col justify-between rounded-[1.75rem] border border-slate-400 bg-slate-700 p-6 text-white shadow-md transition hover:-translate-y-1 hover:bg-slate-800 hover:shadow-xl"
-            >
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.25em] text-slate-200">
-                  Japanese Student App
-                </p>
-                <h3 className="mt-3 text-2xl font-black leading-tight">
-                  Continue your MEKURU reading practice
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-slate-100">
-                  Current Japanese-reading students can track books, save vocabulary,
-                  review words, and continue reading between lessons.
-                </p>
-              </div>
+            {SHOW_STUDENT_APP_CARD ? (
+              <Link
+                href="/dashboard"
+                className="group flex min-h-[210px] flex-col justify-between rounded-[1.75rem] border border-slate-400 bg-slate-700 p-6 text-white shadow-md transition hover:-translate-y-1 hover:bg-slate-800 hover:shadow-xl"
+              >
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-[0.25em] text-slate-200">
+                    Japanese Student App
+                  </p>
+                  <h3 className="mt-3 text-2xl font-black leading-tight">
+                    Continue your MEKURU reading practice
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-slate-100">
+                    Current Japanese-reading students can track books, save vocabulary,
+                    review words, and continue reading between lessons.
+                  </p>
+                </div>
 
-              <p className="mt-6 text-sm font-bold group-hover:underline">
-                Student entrance →
-              </p>
-            </Link>
+                <p className="mt-6 text-sm font-bold group-hover:underline">
+                  Student entrance →
+                </p>
+              </Link>
+            ) : null}
           </div>
         </section>
 

@@ -3,6 +3,8 @@
 
 import Link from "next/link";
 
+const SHOW_READING_COMPANION_CARD = false;
+
 export default function MekuruHomepage() {
     return (
         <main className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-950">
@@ -165,36 +167,40 @@ export default function MekuruHomepage() {
                             All students get access to the Mekuru Reading Companion — a private tool designed to support your reading
                             outside of lessons.
                         </p>
-                        <ul className="mt-4 space-y-2 text-sm text-stone-700">
-                            <li>• Review words saved during your lessons</li>
-                            <li>• Save your own words while reading (optional)</li>
-                            <li>• Track your reading progress over time</li>
-                            <li>• Study vocabulary in context</li>
-                            <li>• Prepare readings between lessons</li>
-                        </ul>
-                        <div className="mt-6">
-                            <p className="mb-2 text-xs text-stone-500">Inside the Mekuru Reading Companion</p>
-                            <img
-                                src="/app-preview.jpg"
-                                alt="Mekuru Reading Companion preview"
-                                className="rounded-xl border border-stone-200 shadow-sm"
-                            />
-                            <p className="mt-2 text-xs text-stone-500">Track your reading, review vocabulary, and study between lessons.</p>
-                        </div>
-                        <p className="mt-2 text-xs leading-5 text-stone-500">
-                            Not currently taking lessons? MEKURU app access is still limited while I continue
-                            developing the system, but independent Japanese readers can join the future beta
-                            waitlist.
-                        </p>
+                        {SHOW_READING_COMPANION_CARD ? (
+                            <>
+                            <ul className="mt-4 space-y-2 text-sm text-stone-700">
+                                <li>• Review words saved during your lessons</li>
+                                <li>• Save your own words while reading (optional)</li>
+                                <li>• Track your reading progress over time</li>
+                                <li>• Study vocabulary in context</li>
+                                <li>• Prepare readings between lessons</li>
+                            </ul>
+                            <div className="mt-6">
+                                <p className="mb-2 text-xs text-stone-500">Inside the Mekuru Reading Companion</p>
+                                <img
+                                    src="/app-preview.jpg"
+                                    alt="Mekuru Reading Companion preview"
+                                    className="rounded-xl border border-stone-200 shadow-sm"
+                                />
+                                <p className="mt-2 text-xs text-stone-500">Track your reading, review vocabulary, and study between lessons.</p>
+                            </div>
+                            <p className="mt-2 text-xs leading-5 text-stone-500">
+                                Not currently taking lessons? MEKURU app access is still limited while I continue
+                                developing the system, but independent Japanese readers can join the future beta
+                                waitlist.
+                            </p>
 
-                        <a
-                            href="https://forms.gle/5QLgohvkNvDBzTuH9"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-3 inline-flex rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
-                        >
-                            Join the beta waitlist
-                        </a>
+                            <a
+                                href="https://forms.gle/5QLgohvkNvDBzTuH9"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 inline-flex rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
+                            >
+                                Join the beta waitlist
+                            </a>
+                            </>
+                        ) : null}
                     </div>
                 </div>
 
