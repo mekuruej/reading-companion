@@ -119,6 +119,10 @@ export default function BulkVocabPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
 
+  // The route/local state can provide a userBookId, but private queries and writes
+  // should only use it after confirming it belongs to the logged-in user.
+  const [authorizedUserBookId, setAuthorizedUserBookId] = useState("");
+
   const [step, setStep] = useState<BulkStep>("paste");
 
   const [bulkPageNumber, setBulkPageNumber] = useState("");
@@ -151,56 +155,99 @@ export default function BulkVocabPage() {
   }, []);
 
   // -------------------------------------------------------------
-  // Load book info
+  // Load authorized book info
   // -------------------------------------------------------------
   useEffect(() => {
-    if (!userBookId) return;
+    let cancelled = false;
 
-    const saved = localStorage.getItem(`chapter_userBook_${userBookId}`);
-    if (saved) {
+    async function loadAuthorizedBookInfo() {
+      setAuthorizedUserBookId("");
+      setBookTitle("");
+      setBookCover(null);
+
+      if (!userBookId) return;
+
       try {
-        const { number, name } = JSON.parse(saved);
-        setBulkChapterNumber(number || "");
-        setBulkChapterName(name || "");
-      } catch { }
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) throw authError;
+
+        if (!user) {
+          if (!cancelled) {
+            setMessage("❌ Please sign in to add words to this book.");
+          }
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("user_books")
+          .select(
+            `
+            id,
+            books:book_id (
+              title,
+              cover_url
+            )
+          `
+          )
+          .eq("id", userBookId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          if (!cancelled) {
+            setMessage("❌ You do not have access to add words to this book.");
+          }
+          return;
+        }
+
+        if (cancelled) return;
+
+        const b = (data as any)?.books;
+        setAuthorizedUserBookId((data as any).id);
+        setBookTitle(b?.title ?? "");
+        setBookCover(b?.cover_url ?? null);
+
+        const saved = localStorage.getItem(`chapter_userBook_${(data as any).id}`);
+        if (saved) {
+          try {
+            const { number, name } = JSON.parse(saved);
+            setBulkChapterNumber(number || "");
+            setBulkChapterName(name || "");
+          } catch { }
+        }
+      } catch (error: any) {
+        console.error("Could not load authorized book info:", error);
+
+        if (!cancelled) {
+          setMessage(`❌ Could not load book info: ${error?.message ?? "Unknown error"}`);
+        }
+      }
     }
 
-    (async () => {
-      const { data, error } = await supabase
-        .from("user_books")
-        .select(
-          `
-          id,
-          books:book_id (
-            title,
-            cover_url
-          )
-        `
-        )
-        .eq("id", userBookId)
-        .single();
+    void loadAuthorizedBookInfo();
 
-      if (error) {
-        setMessage(`❌ Could not load book info: ${error.message}`);
-        return;
-      }
-
-      const b = (data as any)?.books;
-      setBookTitle(b?.title ?? "");
-      setBookCover(b?.cover_url ?? "");
-    })();
+    return () => {
+      cancelled = true;
+    };
   }, [userBookId]);
 
   useEffect(() => {
-    if (!userBookId) return;
+    if (!authorizedUserBookId) return;
+
     localStorage.setItem(
-      `chapter_userBook_${userBookId}`,
+      `chapter_userBook_${authorizedUserBookId}`,
       JSON.stringify({
         number: bulkChapterNumber,
         name: bulkChapterName,
       })
     );
-  }, [bulkChapterNumber, bulkChapterName, userBookId]);
+  }, [bulkChapterNumber, bulkChapterName, authorizedUserBookId]);
 
   // -------------------------------------------------------------
   // Helpers
@@ -374,8 +421,8 @@ export default function BulkVocabPage() {
     e.preventDefault();
     setMessage("");
 
-    if (!userBookId) {
-      setMessage("❌ Missing userBookId.");
+    if (!authorizedUserBookId) {
+      setMessage("❌ You do not have access to add words to this book.");
       return;
     }
 
@@ -482,7 +529,7 @@ export default function BulkVocabPage() {
   async function handleSaveAll() {
     setMessage("");
 
-    if (!userBookId || items.length === 0) return;
+    if (!authorizedUserBookId || items.length === 0) return;
 
     const incompleteWords = getIncompleteWordLabels();
 
@@ -504,6 +551,12 @@ export default function BulkVocabPage() {
       const user = auth?.user;
       if (!user) {
         setMessage("❌ Please sign in.");
+        setIsSaving(false);
+        return;
+      }
+
+      if (!authorizedUserBookId) {
+        setMessage("❌ You do not have access to add words to this book.");
         setIsSaving(false);
         return;
       }
@@ -530,7 +583,7 @@ export default function BulkVocabPage() {
         let query = supabase
           .from("user_book_words")
           .select("page_order")
-          .eq("user_book_id", userBookId);
+          .eq("user_book_id", authorizedUserBookId);
 
         if (chNum == null) query = query.is("chapter_number", null);
         else query = query.eq("chapter_number", chNum);
@@ -561,7 +614,7 @@ export default function BulkVocabPage() {
         nextOrderByCombo.set(comboKey, nextPageOrder);
 
         return {
-          user_book_id: userBookId,
+          user_book_id: authorizedUserBookId,
           surface: i.surface,
           reading: i.reading || null,
           meaning: i.meaning?.trim() || null,
@@ -613,7 +666,7 @@ export default function BulkVocabPage() {
           <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
             <button
               type="button"
-              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+              onClick={() => router.push(`/books/${encodeURIComponent(authorizedUserBookId)}`)}
               className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
               title={`Go to ${bookTitle} Book Hub`}
             >
@@ -646,7 +699,7 @@ export default function BulkVocabPage() {
 
               <button
                 type="button"
-                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
+                onClick={() => router.push(`/books/${encodeURIComponent(authorizedUserBookId)}/words`)}
                 className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
               >
                 Vocab List
@@ -654,7 +707,7 @@ export default function BulkVocabPage() {
 
               <button
                 type="button"
-                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                onClick={() => router.push(`/books/${encodeURIComponent(authorizedUserBookId)}`)}
                 className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
               >
                 Book Hub
