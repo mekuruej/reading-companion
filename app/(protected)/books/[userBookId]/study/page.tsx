@@ -19,6 +19,7 @@ import { recordStudyEvent } from "@/lib/studyEvents";
 import StudyBookHeader from "../components/StudyBookHeader";
 import StudyProgressPanel from "../components/StudyProgressPanel";
 import Row from "../components/StudyCardFieldRow";
+import StudyCardBadges from "../components/StudyCardBadges";
 
 type StudySet =
   | "READING"
@@ -1906,27 +1907,12 @@ export default function BookFlashcardsPage() {
           p-6
         "
       >
-        <div className="absolute top-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-          <div className="text-xs font-medium leading-none">
-            {card?.jlpt ?? "NON-JLPT"}
-          </div>
-        </div>
-
-        <div className="absolute top-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-          <LibraryColorBadge colorStatus={cardColorStatus} size="sm" />
-        </div>
-
-        <div className="absolute bottom-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-          <div className="text-xs font-medium leading-none">
-            Def #{((card?.meaningChoiceIndex ?? 0) as number) + 1}
-          </div>
-        </div>
-
-        <div className="absolute bottom-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-          <div className="text-xs font-medium leading-none">
-            Read {card?.totalCount ?? 0}x
-          </div>
-        </div>
+        <StudyCardBadges
+          jlpt={card?.jlpt ?? "NON-JLPT"}
+          colorStatus={cardColorStatus}
+          meaningChoiceIndex={(card?.meaningChoiceIndex ?? 0) as number}
+          totalCount={card?.totalCount ?? 0}
+        />
 
         <div className="w-full flex flex-col items-center justify-center gap-3">
           {isMultipleChoiceMode &&
