@@ -25,6 +25,7 @@ import AbilityCheckLoadingState from "../components/AbilityCheckLoadingState";
 import AbilityCheckNeedsSignInState from "../components/AbilityCheckNeedsSignInState";
 import AbilityCheckErrorState from "../components/AbilityCheckErrorState";
 import AbilityCheckFullAccessLockedState from "../components/AbilityCheckFullAccessLockedState";
+import AbilityCheckNoCardsState from "../components/AbilityCheckNoCardsState";
 
 type UserBookJoinRow = {
   id: string;
@@ -2996,33 +2997,10 @@ export default function LibraryStudyPage() {
 
   if (allCards.length === 0) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <p className="text-2xl font-semibold text-gray-700">
-            No saved vocab is ready for Ability Check yet.
-          </p>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
-            Real reading encounters will unlock strict checks. You can also warm up with Word Sky.
-          </p>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/library-study/word-sky")}
-              className="rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-200"
-            >
-              Try Word Sky
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/books")}
-              className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium"
-            >
-              Back to Library
-            </button>
-          </div>
-        </div>
-      </main>
+      <AbilityCheckNoCardsState
+        onOpenWordSky={() => router.push("/library-study/word-sky")}
+        onBackToLibrary={() => router.push("/books")}
+      />
     );
   }
 
