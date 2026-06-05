@@ -25,6 +25,7 @@ import StudyInstructionNav from "../components/StudyInstructionNav";
 import StudyFilterPanel from "../components/StudyFilterPanel";
 import StudyModePanel from "../components/StudyModePanel";
 import MultipleChoiceAnswerPanel from "../components/MultipleChoiceAnswerPanel";
+import TypingAnswerPanel from "../components/TypingAnswerPanel";
 
 type StudySet =
   | "READING"
@@ -1980,105 +1981,64 @@ export default function BookFlashcardsPage() {
               />
 
               {currentTypeAnswerField ? (
-                <div className="w-full max-w-md">
-                  <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                    Type{" "}
-                    {studySet === "READING"
+                <TypingAnswerPanel
+                  answerLabel={
+                    studySet === "READING"
                       ? "Reading"
                       : studySet === "MEANING"
                         ? "Meaning"
                         : studySet === "FROM_READING_MEANING"
                           ? "Meaning"
-                          : "Answer"}
-                  </div>
+                          : "Answer"
+                  }
+                  showReadingHint={studySet === "READING"}
+                  inputKey={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
+                  typedInput={typedInput}
+                  typedFeedback={typedFeedback}
+                  readyForNextCard={readyForNextCard}
+                  placeholder={
+                    studySet === "READING"
+                      ? "Type kana or Hepburn romaji"
+                      : studySet === "MEANING"
+                        ? "Type a meaning"
+                        : studySet === "FROM_READING_MEANING"
+                          ? "Type a meaning"
+                          : "Type your answer"
+                  }
+                  feedbackHelpText={
+                    studySet === "READING"
+                      ? "Type the correct reading to continue."
+                      : studySet === "MEANING" || studySet === "FROM_READING_MEANING"
+                        ? "Type one correct meaning word to continue."
+                        : null
+                  }
+                  typedInputRef={typedInputRef}
+                  onTypedInputChange={(value) => {
+                    setTypedInput(value);
 
-                  {studySet === "READING" ? (
-                    <p className="mb-2 text-xs text-gray-500">
-                      Kana is best practice; Hepburn romaji also works if predictive text gets in the way.
-                    </p>
-                  ) : null}
+                    if (!typedFeedback) {
+                      setLastTypedResult(null);
+                    } else if (studySet === "READING" && typedFeedback.ok) {
+                      setTypedFeedback(null);
+                      setLastTypedResult(null);
+                    }
 
-                  <div className="flex gap-2">
-                    <input
-                      ref={typedInputRef}
-                      key={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
-                      type="text"
-                      value={typedInput}
-                      onChange={(e) => {
-                        setTypedInput(e.target.value);
+                    setReadyForNextCard(false);
+                  }}
+                  onTypedInputKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.stopPropagation();
 
-                        if (!typedFeedback) {
-                          setLastTypedResult(null);
-                        } else if (studySet === "READING" && typedFeedback && typedFeedback.ok) {
-                          setTypedFeedback(null);
-                          setLastTypedResult(null);
-                        }
-
-                        setReadyForNextCard(false);
-                      }}
-
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          if (readyForNextCard) {
-                            goToNextWord(lastTypedResult ?? "revealed");
-                            return;
-                          }
-
-                          checkTypedAnswer();
-                        }
-                      }}
-                      inputMode="text"
-                      autoCorrect="off"
-                      autoCapitalize="none"
-                      autoComplete="off"
-                      spellCheck={false}
-                      autoFocus
-                      className="border p-2 rounded w-full"
-                      placeholder={
-                        readyForNextCard
-                          ? "Press Enter for next card"
-                          : studySet === "READING"
-                            ? "Type kana or Hepburn romaji"
-                            : studySet === "MEANING"
-                              ? "Type a meaning"
-                              : studySet === "FROM_READING_MEANING"
-                                ? "Type a meaning"
-                                : "Type your answer"
+                      if (readyForNextCard) {
+                        void goToNextWord(lastTypedResult ?? "revealed");
+                        return;
                       }
-                    />
-                  </div>
 
-                  {typedFeedback ? (
-                    <div className={`mt-2 text-sm ${typedFeedback.ok ? "text-green-700" : "text-red-700"}`}>
-                      <p>
-                        {typedFeedback.ok ? "✅ " : "❌ "}
-                        {typedFeedback.message}
-                      </p>
-
-                      {!typedFeedback.ok && studySet === "READING" ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Type the correct reading to continue.
-                        </p>
-                      ) : null}
-
-                      {!typedFeedback.ok && studySet === "MEANING" ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Type one correct meaning word to continue.
-                        </p>
-                      ) : null}
-
-                      {!typedFeedback.ok && studySet === "FROM_READING_MEANING" ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Type one correct meaning word to continue.
-                        </p>
-                      ) : null}
-
-                    </div>
-                  ) : null}
-                </div>
+                      checkTypedAnswer();
+                    }
+                  }}
+                />
               ) : null}
             </>
 
