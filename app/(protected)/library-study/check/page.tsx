@@ -1268,6 +1268,13 @@ function LibraryPracticePanel({
             ) : null}
 
             <div className="w-full max-w-md space-y-3">
+              {typingStep === "reading" ? (
+                <p className="text-center text-xs text-gray-500">
+                  <span className="inline sm:whitespace-nowrap">Kana is best; </span>
+                  <span className="inline sm:whitespace-nowrap">Hepburn Romanji also works</span>
+                </p>
+              ) : null}
+
               <input
                 ref={typingPracticeInputRef}
                 value={typingInput}
@@ -1278,7 +1285,7 @@ function LibraryPracticePanel({
                   e.stopPropagation();
                   if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
                 }}
-                placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
+                placeholder={typingStep === "reading" ? "Type kana or Hepburn Romanji" : "Type the meaning"}
                 inputMode="text"
                 autoCorrect="off"
                 autoCapitalize="none"
@@ -3896,6 +3903,13 @@ export default function LibraryStudyPage() {
 
               {currentCard?.activeGate !== "readiness" && (
                 <div className="w-full max-w-sm">
+                  {activeStudyMode === "reading_typing" ? (
+                    <p className="mb-2 text-center text-xs text-gray-500">
+                      <span className="inline sm:whitespace-nowrap">Kana is best; </span>
+                      <span className="inline sm:whitespace-nowrap">Hepburn Romanji also works</span>
+                    </p>
+                  ) : null}
+
                   <input
                     ref={typingInputRef}
                     value={typingInput}
@@ -3912,7 +3926,7 @@ export default function LibraryStudyPage() {
                     }}
                     placeholder={
                       activeStudyMode === "reading_typing"
-                        ? "Type kana or Hepburn romaji"
+                        ? "Type kana or Hepburn Romanji"
                         : "Type the meaning"
                     }
                     inputMode="text"
