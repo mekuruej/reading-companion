@@ -25,6 +25,7 @@ import LibraryReviewProgressCard from "../components/LibraryReviewProgressCard";
 import LibraryPracticeFilterPanel from "../components/LibraryPracticeFilterPanel";
 import LibraryPracticeCompleteCard from "../components/LibraryPracticeCompleteCard";
 import LibraryReviewEmptyState from "../components/LibraryReviewEmptyState";
+import LibraryReviewLoadingState from "../components/LibraryReviewLoadingState";
 
 type UserBookJoinRow = {
   id: string;
@@ -2907,11 +2908,7 @@ export default function LibraryStudyPage() {
   }
 
   if (loading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <p className="text-lg text-gray-500">Loading Library Review...</p>
-      </main>
-    );
+    return <LibraryReviewLoadingState />;
   }
 
   if (needsSignIn) {
