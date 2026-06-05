@@ -20,6 +20,7 @@ import StudyBookHeader from "../components/StudyBookHeader";
 import StudyProgressPanel from "../components/StudyProgressPanel";
 import Row from "../components/StudyCardFieldRow";
 import StudyCardBadges from "../components/StudyCardBadges";
+import StudyBottomNavigation from "../components/StudyBottomNavigation";
 
 type StudySet =
   | "READING"
@@ -2323,21 +2324,10 @@ export default function BookFlashcardsPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => router.push(`/books/${userBookId}/words`)}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-          >
-            Vocab List
-          </button>
-
-          <button
-            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-          >
-            Book Hub
-          </button>
-        </div>
+        <StudyBottomNavigation
+          onGoToVocabList={() => router.push(`/books/${userBookId}/words`)}
+          onGoToBookHub={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+        />
       </div>
     </main>
   );
