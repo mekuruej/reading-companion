@@ -19,6 +19,7 @@ import {
 } from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
+import LibraryReviewIntroCard from "../components/LibraryReviewIntroCard";
 
 type UserBookJoinRow = {
   id: string;
@@ -178,6 +179,14 @@ const REGULAR_GATE_RECHECK_WINDOW_DAYS = 3;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
+
+function nextPracticeStudyMode(mode: PracticeStudyMode): PracticeStudyMode {
+  return mode === "reveal" ? "typing" : "reveal";
+}
+
+function practiceStudyModeLabel(mode: PracticeStudyMode) {
+  return mode === "reveal" ? "Reveal" : "Typing";
+}
 const PRE_READING_WAIT_RECHECK_DAYS = 90;
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
@@ -1178,6 +1187,13 @@ function LibraryPracticePanel({
             ) : null}
 
             <div className="w-full max-w-md space-y-3">
+              {typingStep === "reading" ? (
+                <p className="text-center text-xs text-gray-500">
+                  <span className="inline sm:whitespace-nowrap">Kana is best; </span>
+                  <span className="inline sm:whitespace-nowrap">Hepburn Romanji also works</span>
+                </p>
+              ) : null}
+
               <input
                 ref={typingPracticeInputRef}
                 value={typingInput}
@@ -1188,7 +1204,7 @@ function LibraryPracticePanel({
                   e.stopPropagation();
                   if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
                 }}
-                placeholder={typingStep === "reading" ? "Type the reading" : "Type the meaning"}
+                placeholder={typingStep === "reading" ? "Type kana or Hepburn Romanji" : "Type the meaning"}
                 inputMode="text"
                 autoCorrect="off"
                 autoCapitalize="none"
@@ -2351,6 +2367,13 @@ export default function LibraryStudyPage() {
     resetPracticeReveal();
   }
 
+  function movePracticeDeckToNextMode() {
+    setPracticeStudyMode(nextPracticeStudyMode(practiceStudyMode));
+    setPracticeIndex(0);
+    setPracticeFinished(false);
+    resetPracticeReveal();
+  }
+
   function nextCardWithoutMarkingSeen() {
     if (index + 1 >= deck.length) {
       setIndex(deck.length);
@@ -3112,19 +3135,7 @@ export default function LibraryStudyPage() {
       </div>
 
       <div className="mb-2 w-full max-w-3xl space-y-2">
-        <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Library Review
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                Review your existing words freely. Review does not move colors.
-              </p>
-            </div>
-          </div>
-        </div>
-
+        <LibraryReviewIntroCard />
         <button
           type="button"
           onClick={() => router.push("/library-study/word-sky")}
@@ -3237,6 +3248,14 @@ export default function LibraryStudyPage() {
           </p>
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={movePracticeDeckToNextMode}
+              className="rounded-2xl border border-slate-300 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              Next: {practiceStudyModeLabel(nextPracticeStudyMode(practiceStudyMode))}
+            </button>
+
             <button
               type="button"
               onClick={shufflePracticeDeck}
