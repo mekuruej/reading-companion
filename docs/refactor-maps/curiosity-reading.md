@@ -293,26 +293,6 @@ Render sections in order:
 
 ## First Pass: Visual / Presentational Extractions
 
-### 1. 
-
-What JSX it owns:
-* top page title and description
-
-What stays in `page.tsx`:
-* all state, data, access checks, and handlers
-
-Expected props:
-* none, or `title` and `description` if the copy should be supplied by the page
-
-Category:
-* presentational UI
-
-Risk level:
-* very low
-
-Suggested order:
-* 1
-
 ### 2. `CuriosityStatusMessage`
 
 What JSX it owns:
@@ -789,18 +769,60 @@ Do not remove in the first pass. Check behavior first.
 ## Suggested Status Labels
 
 Use these labels for this page:
+
 * Not started
 * Visual pass in progress
-* Visual pass mostly done
+* Visual pass mostly done / architecture deferred
 * Visual pass done / architecture deferred
 * Architecture pass later
 * Architecture pass in progress
 * Architecture pass done
 
-Recommended current status: `Not started`.
+Recommended current status: `Visual pass mostly done / architecture deferred`.
 
-When all safe presentational extractions are complete, use `Visual pass done / architecture deferred`. That should mean the page-thinning layer is complete and the deeper controller/service/DAO/helper cleanup is intentionally saved for later.
+Current tracker row:
+
+Visual pass mostly done / architecture deferred | `app/(protected)/books/[userBookId]/curiosity-reading/page.tsx` | 1979 | 1435 | -544 |
+
+This means the safe visual/page-thinning layer has mostly been completed, and deeper controller/service/DAO/helper cleanup is intentionally saved for later.
 
 ## Finished
 
-- [✔️] Extracted `CuriosityPageHeader`
+Finished:
+
+* Extracted `CuriosityPageHeader`
+* Extracted `CuriosityStatusMessage`
+* Extracted `CuriosityBookContextCard`
+* Extracted `CuriosityDictionaryChoices`
+* Extracted `CuriosityRecentSessionWordCard`
+* Extracted `CuriosityRecentSessionWords`
+* Extracted `CuriosityFullAccessRequired`
+* Extracted `CuriosityTimerPanel`
+* Extracted `CuriosityQuickSearchRow`
+* Extracted `CuriosityWordHelpPanel`
+* Extracted `CuriosityQuickErrorMessage`
+* Extracted `CuriosityWordDetailFields`
+* Extracted `CuriosityAddEditWordFormShell`
+* Extracted `CuriosityAddEditWordCard`
+
+Still intentionally deferred:
+
+* access checks
+* ownership checks
+* Supabase queries
+* `saveQuickWord`
+* `deleteQuickWordById`
+* `pullQuickWord`
+* `vocabulary_cache` lookup/insert behavior
+* `vocabulary_kanji_map` generation behavior
+* timer/session save behavior
+* page/chapter tracking behavior
+* page-order behavior
+* localStorage quick meta behavior
+* suspicious/possibly unused code cleanup
+
+Notes:
+
+* The visual pass reduced the page from 1979 lines to 1435 lines.
+* The remaining work should be treated as architecture/refactor-later work, not part of the first visual extraction pass.
+* Do not remove suspicious code yet without behavior testing.

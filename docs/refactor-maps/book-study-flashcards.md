@@ -728,6 +728,78 @@ Suggested order:
 
 This order starts with the least interactive markup and postpones the answer panels until the simpler presentation pieces are stable.
 
+## Visual Pass Status
+
+Recommended current status: `Visual pass mostly done / architecture deferred`.
+
+Current tracker row:
+
+Visual pass mostly done / architecture deferred | `app/(protected)/books/[userBookId]/study/page.tsx` | 2414 | NEED_FINAL_COUNT | NEED_CHANGE |
+
+Update `NEED_FINAL_COUNT` after running:
+
+`wc -l app/'(protected)'/books/'[userBookId]'/study/page.tsx`
+
+Then calculate:
+
+`2414 - NEW_COUNT = CHANGE`
+
+This means the safe visual/page-thinning layer has mostly been completed, and deeper study-flow cleanup is intentionally saved for later.
+
+## Finished
+
+Finished:
+
+* Extracted `StudyBookHeader`
+* Extracted `StudyProgressPanel`
+* Extracted `StudyCardFieldRow`
+* Extracted `StudyCardBadges`
+* Extracted `StudyBottomNavigation`
+* Extracted `StudyInstructionNav`
+* Extracted `StudyFilterPanel`
+* Extracted `StudyModePanel`
+* Extracted `MultipleChoiceAnswerPanel`
+* Extracted `TypingAnswerPanel`
+* Extracted `StudyLoadingState`
+* Extracted `StudyNeedsSignInState`
+* Extracted `StudyErrorState`
+* Extracted `StudyEmptyState`
+* Extracted `StudyCompleteState`
+* Extracted `StudyFullAccessLockedState`
+* Extracted `StudyFlashcardShell`
+
+Still intentionally deferred:
+
+* access checks
+* ownership checks
+* teacher/student permission checks
+* app/full-access checks
+* Supabase queries
+* card loading and selection logic
+* duplicate/repeat-count logic
+* library distractor pool logic
+* multiple-choice option generation
+* answer checking logic
+* study result/log/event writes
+* previous/next/retry behavior
+* auto-forward timers
+* keyboard event behavior
+* flag/hide database writes
+* definition update behavior
+* helper functions
+* services, DAOs, controllers, or hooks
+* page-local types
+* suspicious/possibly unused code cleanup
+
+Notes:
+
+* The visual pass reduced the page from 2414 lines to at least 2149 lines before the final `StudyFlashcardShell` extraction.
+* After `StudyFlashcardShell`, rerun the line count and update the tracker row.
+* This page is behavior-sensitive. Do not remove suspicious code yet without focused testing.
+* The next pass should start with behavior verification, not architecture.
+* Test typing modes, multiple-choice modes, Complete Review, Previous, Flag, Hide, full-access lock, empty state, and session complete before doing deeper cleanup.
+* During the visual pass, a color filter and small study-flow UI fixes were added, so the final line reduction is smaller than the intermediate count. The page is still considered visually thinned, with architecture/study-flow logic intentionally deferred.
+
 ## Suspicious / Possibly Unused Code
 
 Do not remove yet.

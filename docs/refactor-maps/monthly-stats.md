@@ -319,5 +319,5 @@ A future status of `Visual pass done / architecture deferred` should mean the sa
 - [✔️] Extracted `MonthlyMoodSection`.
 - [✔️] Extracted `MonthlySmallMetricCard`.
 - [✔️] Extracted `MonthlyChartsSection`.
-- [✔️] Extracted
+
 
