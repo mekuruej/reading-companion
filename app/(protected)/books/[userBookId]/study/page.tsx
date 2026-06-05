@@ -17,6 +17,7 @@ import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import StudyBookHeader from "../components/StudyBookHeader";
+import StudyProgressPanel from "../components/StudyProgressPanel";
 
 type StudySet =
   | "READING"
@@ -1908,31 +1909,14 @@ export default function BookFlashcardsPage() {
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                Session Progress
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                Card {Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}/
-                {studyOnceMode ? sessionOrder.length : filteredCards.length}
-              </p>
-            </div>
-
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                Cards Left
-              </p>
-              <p className="text-base font-semibold text-slate-800">
-                {Math.max(
-                  (studyOnceMode ? sessionOrder.length : filteredCards.length) - sessionIndex,
-                  0
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
+        <StudyProgressPanel
+          currentNumber={Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}
+          totalNumber={studyOnceMode ? sessionOrder.length : filteredCards.length}
+          cardsLeft={Math.max(
+            (studyOnceMode ? sessionOrder.length : filteredCards.length) - sessionIndex,
+            0
+          )}
+        />
 
       </div>
 
