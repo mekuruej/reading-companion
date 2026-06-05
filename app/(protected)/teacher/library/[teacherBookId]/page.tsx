@@ -6,7 +6,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -52,6 +52,19 @@ type PrepItemDraft = {
   meaningChoices: string[];
   meaningChoiceIndex: number | null;
   vocabularyCacheId: number | null;
+  page: string;
+  chapterNumber: string;
+  chapterName: string;
+  teacherNote: string;
+  explanation: string;
+  translation: string;
+};
+
+type SavedItemEditDraft = {
+  itemType: ItemType;
+  surfaceText: string;
+  reading: string;
+  meaning: string;
   page: string;
   chapterNumber: string;
   chapterName: string;
@@ -126,6 +139,50 @@ function cleanNullable(value: string) {
   return cleaned ? cleaned : null;
 }
 
+function compactText(value: string | null | undefined) {
+  const cleaned = (value ?? "").trim();
+  return cleaned || "—";
+}
+
+function chapterDisplay(item: TeacherBookItem) {
+  const numberPart = item.chapter_number == null ? "" : `Ch ${item.chapter_number}`;
+  const namePart = (item.chapter_name ?? "").trim();
+  if (numberPart && namePart) return `${numberPart} · ${namePart}`;
+  return numberPart || namePart || "—";
+}
+
+function savedItemSearchText(item: TeacherBookItem) {
+  return [
+    item.item_type,
+    item.surface_text,
+    item.reading,
+    item.meaning,
+    item.teacher_note,
+    item.explanation,
+    item.translation,
+    item.chapter_name,
+    item.chapter_number == null ? "" : String(item.chapter_number),
+    item.page_number == null ? "" : String(item.page_number),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function editDraftFromItem(item: TeacherBookItem): SavedItemEditDraft {
+  return {
+    itemType: item.item_type,
+    surfaceText: item.surface_text ?? "",
+    reading: item.reading ?? "",
+    meaning: item.meaning ?? "",
+    page: item.page_number == null ? "" : String(item.page_number),
+    chapterNumber: item.chapter_number == null ? "" : String(item.chapter_number),
+    chapterName: item.chapter_name ?? "",
+    teacherNote: item.teacher_note ?? "",
+    explanation: item.explanation ?? "",
+    translation: item.translation ?? "",
+  };
+}
+
 function blankDraft(surfaceText: string, defaultType: ItemType): PrepItemDraft {
   return {
     itemType: defaultType,
@@ -164,8 +221,37 @@ export default function TeacherBookPrepPage() {
   const [bulkPageNumber, setBulkPageNumber] = useState("");
   const [bulkChapterNumber, setBulkChapterNumber] = useState("");
   const [bulkChapterName, setBulkChapterName] = useState("");
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<SavedItemEditDraft | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(() => new Set());
+  const [savedSearch, setSavedSearch] = useState("");
+  const [savedPageFilter, setSavedPageFilter] = useState("all");
+  const editPanelRef = useRef<HTMLElement | null>(null);
 
   const itemCount = useMemo(() => parseItems(rawInput).length, [rawInput]);
+  const savedPageOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        savedItems
+          .map((item) => item.page_number)
+          .filter((page): page is number => page != null)
+      )
+    ).sort((a, b) => a - b);
+  }, [savedItems]);
+
+  const visibleSavedItems = useMemo(() => {
+    const query = savedSearch.trim().toLowerCase();
+    const pageNumber =
+      savedPageFilter === "all" ? null : Number.parseInt(savedPageFilter, 10);
+
+    return savedItems.filter((item) => {
+      if (pageNumber != null && item.page_number !== pageNumber) return false;
+      if (!query) return true;
+      return savedItemSearchText(item).includes(query);
+    });
+  }, [savedItems, savedSearch, savedPageFilter]);
 
   useEffect(() => {
     void loadTeacherBook();
@@ -414,6 +500,101 @@ export default function TeacherBookPrepPage() {
     setDrafts([]);
     setRawInput("");
     setMessage("");
+  }
+
+  function startEditItem(item: TeacherBookItem) {
+    setEditingItemId(item.id);
+    setEditDraft(editDraftFromItem(item));
+    setMessage("");
+    window.requestAnimationFrame(() => {
+      editPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function updateEditDraft(patch: Partial<SavedItemEditDraft>) {
+    setEditDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  function toggleExpandedItem(itemId: string) {
+    setExpandedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  }
+
+  async function saveEditedItem() {
+    if (!editingItemId || !editDraft) return;
+
+    setEditSaving(true);
+    setMessage("Saving prep item...");
+
+    try {
+      const payload = {
+        item_type: editDraft.itemType,
+        surface_text: cleanNullable(editDraft.surfaceText),
+        reading: cleanNullable(editDraft.reading),
+        meaning: cleanNullable(editDraft.meaning),
+        page_number: toNullableInt(editDraft.page),
+        chapter_number: toNullableInt(editDraft.chapterNumber),
+        chapter_name: cleanNullable(editDraft.chapterName),
+        teacher_note: cleanNullable(editDraft.teacherNote),
+        explanation: cleanNullable(editDraft.explanation),
+        translation: cleanNullable(editDraft.translation),
+      };
+
+      const { error } = await supabase
+        .from("teacher_book_items")
+        .update(payload)
+        .eq("id", editingItemId)
+        .eq("teacher_book_id", teacherBookId);
+
+      if (error) throw error;
+
+      setEditingItemId(null);
+      setEditDraft(null);
+      setMessage("Prep item updated.");
+      await loadTeacherBook();
+    } catch (error: any) {
+      console.error("Error updating teacher prep item:", error);
+      setMessage(error?.message ?? "Could not update prep item.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deleteSavedItem(item: TeacherBookItem) {
+    const label = item.surface_text?.trim() || "this prep item";
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+
+    setDeletingItemId(item.id);
+    setMessage("Deleting prep item...");
+
+    try {
+      const { error } = await supabase
+        .from("teacher_book_items")
+        .delete()
+        .eq("id", item.id)
+        .eq("teacher_book_id", teacherBookId);
+
+      if (error) throw error;
+
+      setSavedItems((prev) => prev.filter((saved) => saved.id !== item.id));
+      if (editingItemId === item.id) {
+        setEditingItemId(null);
+        setEditDraft(null);
+      }
+      setMessage("Prep item deleted.");
+    } catch (error: any) {
+      console.error("Error deleting teacher prep item:", error);
+      setMessage(error?.message ?? "Could not delete prep item.");
+    } finally {
+      setDeletingItemId(null);
+    }
   }
 
   const book = firstBook(teacherBook?.books ?? null);
@@ -797,33 +978,338 @@ export default function TeacherBookPrepPage() {
             ) : null}
 
             <section className="mt-8">
-              <h2 className="text-xl font-black text-stone-900">Saved prep items</h2>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black text-stone-900">Saved prep items</h2>
+                  {savedItems.length > 0 ? (
+                    <p className="mt-1 text-sm text-stone-500">
+                      Showing {visibleSavedItems.length} of {savedItems.length} prep item
+                      {savedItems.length === 1 ? "" : "s"}.
+                    </p>
+                  ) : null}
+                </div>
+
+                {savedItems.length > 0 ? (
+                  <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_140px]">
+                    <label className="text-sm">
+                      <span className="mb-1 block text-xs font-semibold text-stone-500">
+                        Search
+                      </span>
+                      <input
+                        value={savedSearch}
+                        onChange={(event) => setSavedSearch(event.target.value)}
+                        placeholder="Word, reading, meaning, note..."
+                        className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                      />
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-xs font-semibold text-stone-500">
+                        Page
+                      </span>
+                      <select
+                        value={savedPageFilter}
+                        onChange={(event) => setSavedPageFilter(event.target.value)}
+                        className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                      >
+                        <option value="all">All pages</option>
+                        {savedPageOptions.map((page) => (
+                          <option key={page} value={String(page)}>
+                            Page {page}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+
               {savedItems.length === 0 ? (
                 <div className="mt-3 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
                   No prep items yet.
                 </div>
+              ) : visibleSavedItems.length === 0 ? (
+                <div className="mt-3 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
+                  No prep items match those filters.
+                </div>
               ) : (
-                <div className="mt-3 grid gap-3">
-                  {savedItems.map((item) => (
-                    <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                          {itemTypeLabel(item.item_type)}
-                        </span>
-                        {item.page_number != null ? (
-                          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                            Page {item.page_number}
-                          </span>
-                        ) : null}
-                      </div>
-                      <h3 className="mt-3 text-xl font-black text-stone-900">{item.surface_text || "Teaching note"}</h3>
-                      {item.reading ? <p className="mt-1 text-sm text-stone-500">{item.reading}</p> : null}
-                      {item.meaning ? <p className="mt-1 text-sm text-stone-700">{item.meaning}</p> : null}
-                    </article>
-                  ))}
+                <div className="mt-3 overflow-x-auto rounded border bg-white">
+                  <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className="text-left">
+                        <th className="w-24 p-2 text-xs font-semibold text-stone-600">
+                          Type
+                        </th>
+                        <th className="w-36 p-2 text-xs font-semibold text-stone-600">
+                          Word
+                        </th>
+                        <th className="w-32 p-2 text-xs font-semibold text-stone-600">
+                          Reading
+                        </th>
+                        <th className="w-56 p-2 text-xs font-semibold text-stone-600">
+                          Meaning
+                        </th>
+                        <th className="w-32 p-2 text-xs font-semibold text-stone-600">
+                          Chapter
+                        </th>
+                        <th className="w-20 p-2 text-xs font-semibold text-stone-600">
+                          Page
+                        </th>
+                        <th className="w-36 p-2 text-xs font-semibold text-stone-600">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {visibleSavedItems.map((item) => {
+                        const isExpanded = expandedItemIds.has(item.id);
+                        return (
+                          <Fragment key={item.id}>
+                            <tr className="border-t align-top">
+                              <td className="border-t border-stone-100 p-2">
+                                <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+                                  {itemTypeLabel(item.item_type)}
+                                </span>
+                              </td>
+                              <td className="border-t border-stone-100 p-2 font-medium text-stone-900">
+                                {compactText(item.surface_text || "Teaching note")}
+                              </td>
+                              <td className="border-t border-stone-100 p-2 text-stone-700">
+                                {compactText(item.reading)}
+                              </td>
+                              <td className="border-t border-stone-100 p-2 text-stone-700">
+                                <div className="max-w-80 leading-snug">
+                                  {compactText(item.meaning)}
+                                </div>
+                              </td>
+                              <td className="border-t border-stone-100 p-2 text-stone-700">
+                                {chapterDisplay(item)}
+                              </td>
+                              <td className="border-t border-stone-100 p-2 text-stone-700">
+                                {item.page_number ?? "—"}
+                              </td>
+                              <td className="border-t border-stone-100 p-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditItem(item)}
+                                    className="rounded bg-blue-400 px-2 py-1 text-xs hover:bg-green-500"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteSavedItem(item)}
+                                    disabled={deletingItemId === item.id}
+                                    className="rounded bg-gray-700 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+                                  >
+                                    {deletingItemId === item.id ? "Deleting..." : "Delete"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpandedItem(item.id)}
+                                    className="rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
+                                  >
+                                    {isExpanded ? "Hide Details" : "Details"}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {isExpanded ? (
+                              <tr>
+                                <td colSpan={7} className="border-t border-stone-100 bg-stone-50 p-3">
+                                  <div className="grid gap-3 text-sm md:grid-cols-3">
+                                    <div>
+                                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                                        Teacher note
+                                      </div>
+                                      <div className="mt-1 whitespace-pre-wrap leading-6 text-stone-700">
+                                        {compactText(item.teacher_note)}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                                        Explanation
+                                      </div>
+                                      <div className="mt-1 whitespace-pre-wrap leading-6 text-stone-700">
+                                        {compactText(item.explanation)}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                                        Translation
+                                      </div>
+                                      <div className="mt-1 whitespace-pre-wrap leading-6 text-stone-700">
+                                        {compactText(item.translation)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>
+
+            {editingItemId && editDraft ? (
+              <section
+                ref={editPanelRef}
+                className="mt-4 scroll-mt-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-black text-stone-900">
+                      Edit prep item
+                    </h2>
+                    <p className="mt-1 text-sm text-stone-500">
+                      Updates this teacher prep item only. It does not affect learner vocab.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingItemId(null);
+                      setEditDraft(null);
+                    }}
+                    className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Type</span>
+                    <select
+                      value={editDraft.itemType}
+                      onChange={(event) =>
+                        updateEditDraft({ itemType: event.target.value as ItemType })
+                      }
+                      className="w-full rounded border bg-white p-2 text-sm"
+                    >
+                      {itemTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {itemTypeLabel(type)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Word / item</span>
+                    <input
+                      value={editDraft.surfaceText}
+                      onChange={(event) => updateEditDraft({ surfaceText: event.target.value })}
+                      className="w-full rounded border p-2 text-sm"
+                    />
+                  </label>
+
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Reading</span>
+                    <input
+                      value={editDraft.reading}
+                      onChange={(event) => updateEditDraft({ reading: event.target.value })}
+                      className="w-full rounded border p-2 text-sm"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <label className="text-sm md:col-span-3">
+                    <span className="mb-1 block text-xs text-gray-500">Meaning</span>
+                    <textarea
+                      value={editDraft.meaning}
+                      onChange={(event) => updateEditDraft({ meaning: event.target.value })}
+                      rows={2}
+                      className="w-full rounded border bg-white p-2 text-sm"
+                    />
+                  </label>
+
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Teacher note</span>
+                    <textarea
+                      value={editDraft.teacherNote}
+                      onChange={(event) => updateEditDraft({ teacherNote: event.target.value })}
+                      rows={4}
+                      className="w-full rounded border bg-white p-2 text-sm"
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Explanation</span>
+                    <textarea
+                      value={editDraft.explanation}
+                      onChange={(event) => updateEditDraft({ explanation: event.target.value })}
+                      rows={4}
+                      className="w-full rounded border bg-white p-2 text-sm"
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Translation</span>
+                    <textarea
+                      value={editDraft.translation}
+                      onChange={(event) => updateEditDraft({ translation: event.target.value })}
+                      rows={4}
+                      className="w-full rounded border bg-white p-2 text-sm"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Page</span>
+                    <input
+                      value={editDraft.page}
+                      onChange={(event) => updateEditDraft({ page: event.target.value })}
+                      className="w-full rounded border p-2 text-sm"
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Chapter #</span>
+                    <input
+                      value={editDraft.chapterNumber}
+                      onChange={(event) => updateEditDraft({ chapterNumber: event.target.value })}
+                      className="w-full rounded border p-2 text-sm"
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs text-gray-500">Chapter Name</span>
+                    <input
+                      value={editDraft.chapterName}
+                      onChange={(event) => updateEditDraft({ chapterName: event.target.value })}
+                      className="w-full rounded border p-2 text-sm"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveEditedItem()}
+                    disabled={editSaving}
+                    className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
+                  >
+                    {editSaving ? "Saving..." : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingItemId(null);
+                      setEditDraft(null);
+                    }}
+                    className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </section>
+            ) : null}
           </>
         )}
       </div>
