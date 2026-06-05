@@ -21,6 +21,7 @@ import StudyProgressPanel from "../components/StudyProgressPanel";
 import Row from "../components/StudyCardFieldRow";
 import StudyCardBadges from "../components/StudyCardBadges";
 import StudyBottomNavigation from "../components/StudyBottomNavigation";
+import StudyInstructionNav from "../components/StudyInstructionNav";
 
 type StudySet =
   | "READING"
@@ -2294,9 +2295,9 @@ export default function BookFlashcardsPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-gray-500">
-            {isMultipleChoiceMode
+        <StudyInstructionNav
+          instructionText={
+            isMultipleChoiceMode
               ? mcAnswered
                 ? mcWasCorrect
                   ? "Moving to next card..."
@@ -2312,17 +2313,11 @@ export default function BookFlashcardsPage() {
                 ? "Press Enter to check."
                 : stepIndex === 0
                   ? "Tap once to reveal"
-                  : "Tap again for the next word"}
-          </p>
-          <button
-            type="button"
-            onClick={prevCardReveal}
-            disabled={filteredCards.length <= 1}
-            className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-        </div>
+                  : "Tap again for the next word"
+          }
+          canGoPrevious={filteredCards.length > 1}
+          onPrevious={prevCardReveal}
+        />
 
         <StudyBottomNavigation
           onGoToVocabList={() => router.push(`/books/${userBookId}/words`)}
