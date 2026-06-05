@@ -31,6 +31,7 @@ import AbilityCheckSetupPanel from "../components/AbilityCheckSetupPanel";
 import AbilityCheckProgressCard from "../components/AbilityCheckProgressCard";
 import AbilityCheckIntroCard from "../components/AbilityCheckIntroCard";
 import AbilityCheckWordSkyCta from "../components/AbilityCheckWordSkyCta";
+import AbilityCheckPageHeader from "../components/AbilityCheckPageHeader";
 
 type UserBookJoinRow = {
   id: string;
@@ -3410,9 +3411,7 @@ export default function LibraryStudyPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
-      <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">
-        <h1 className="text-2xl font-semibold">Ability Check</h1>
-      </div>
+      <AbilityCheckPageHeader />
 
       <div className="mb-2 w-full max-w-3xl space-y-2">
         <AbilityCheckIntroCard
