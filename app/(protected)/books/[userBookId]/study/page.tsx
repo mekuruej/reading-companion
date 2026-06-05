@@ -23,6 +23,7 @@ import StudyCardBadges from "../components/StudyCardBadges";
 import StudyBottomNavigation from "../components/StudyBottomNavigation";
 import StudyInstructionNav from "../components/StudyInstructionNav";
 import StudyFilterPanel from "../components/StudyFilterPanel";
+import StudyModePanel from "../components/StudyModePanel";
 
 type StudySet =
   | "READING"
@@ -2166,79 +2167,54 @@ export default function BookFlashcardsPage() {
       </div>
 
       <div className="mt-2 w-full max-w-2xl space-y-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
-                Study Mode
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <select
-                  value={studySet}
-                  onChange={(e) => setStudySet(e.target.value as StudySet)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="READING">{studySetLabel("READING")}</option>
-                  <option value="MEANING">{studySetLabel("MEANING")}</option>
-                  <option value="FROM_READING_MEANING">{studySetLabel("FROM_READING_MEANING")}</option>
-
-                  <option disabled>──────────</option>
-
-                  <option value="READING_MC">{studySetLabel("READING_MC")}</option>
-                  <option value="MEANING_MC">{studySetLabel("MEANING_MC")}</option>
-                  <option value="FROM_READING_MC">{studySetLabel("FROM_READING_MC")}</option>
-                  <option value="FROM_READING_MEANING_MC">
-                    {studySetLabel("FROM_READING_MEANING_MC")}
-                  </option>
-
-                  <option disabled>──────────</option>
-
-                  <option value="COMPLETE">{studySetLabel("COMPLETE")}</option>
-                </select>
-              </div>
-
-              <p className="mt-3 text-sm leading-6 text-gray-600">
-                {studySet === "READING" && "Show word + meaning → type the reading"}
-                {studySet === "MEANING" && "Show word + reading → type the meaning"}
-                {studySet === "FROM_READING_MEANING" && "Show reading → type the meaning"}
-                {studySet === "READING_MC" && "Show word + meaning → choose the reading"}
-                {studySet === "MEANING_MC" && "Show word + reading → choose the meaning"}
-                {studySet === "FROM_READING_MC" && "Show reading + meaning → choose the kanji"}
-                {studySet === "FROM_READING_MEANING_MC" && "Show reading → choose the meaning"}
-                {studySet === "COMPLETE" && "Tap and reveal only — no typing"}
-              </p>
-            </div>
-
-            <div className="md:w-[220px] space-y-2">
-              <button
-                onClick={() => {
-                  if (!card) return;
-                  flagCardForReview(card.id);
-                }}
-                className="w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 hover:bg-amber-100 transition"
-              >
-                <div className="leading-tight">Flag</div>
-                <div className="text-[10px] font-normal text-amber-700">
-                  Problem card
-                </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (!card) return;
-                  hideCardPermanently(card.id);
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-200 transition"
-              >
-                <div className="leading-tight">Hide</div>
-                <div className="text-[10px] font-normal text-slate-500">
-                  I know this word
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
+        <StudyModePanel
+          studySet={studySet}
+          modeOptions={[
+            { value: "READING", label: studySetLabel("READING") },
+            { value: "MEANING", label: studySetLabel("MEANING") },
+            {
+              value: "FROM_READING_MEANING",
+              label: studySetLabel("FROM_READING_MEANING"),
+            },
+            { value: "divider-1", label: "──────────", disabled: true },
+            { value: "READING_MC", label: studySetLabel("READING_MC") },
+            { value: "MEANING_MC", label: studySetLabel("MEANING_MC") },
+            { value: "FROM_READING_MC", label: studySetLabel("FROM_READING_MC") },
+            {
+              value: "FROM_READING_MEANING_MC",
+              label: studySetLabel("FROM_READING_MEANING_MC"),
+            },
+            { value: "divider-2", label: "──────────", disabled: true },
+            { value: "COMPLETE", label: studySetLabel("COMPLETE") },
+          ]}
+          modeHelpText={
+            studySet === "READING"
+              ? "Show word + meaning → type the reading"
+              : studySet === "MEANING"
+                ? "Show word + reading → type the meaning"
+                : studySet === "FROM_READING_MEANING"
+                  ? "Show reading → type the meaning"
+                  : studySet === "READING_MC"
+                    ? "Show word + meaning → choose the reading"
+                    : studySet === "MEANING_MC"
+                      ? "Show word + reading → choose the meaning"
+                      : studySet === "FROM_READING_MC"
+                        ? "Show reading + meaning → choose the kanji"
+                        : studySet === "FROM_READING_MEANING_MC"
+                          ? "Show reading → choose the meaning"
+                          : "Tap and reveal only — no typing"
+          }
+          hasCard={!!card}
+          onStudySetChange={(value) => setStudySet(value as StudySet)}
+          onFlagCurrentCard={() => {
+            if (!card) return;
+            void flagCardForReview(card.id);
+          }}
+          onHideCurrentCard={() => {
+            if (!card) return;
+            void hideCardPermanently(card.id);
+          }}
+        />
 
         <StudyInstructionNav
           instructionText={
