@@ -1150,7 +1150,7 @@ function LibraryPracticePanel({
               {typingStep === "reading" ? (
                 <p className="text-center text-xs text-gray-500">
                   <span className="inline sm:whitespace-nowrap">Kana is best; </span>
-                  <span className="inline sm:whitespace-nowrap">Hepburn Romanji also works</span>
+                  <span className="inline sm:whitespace-nowrap">Hepburn romaji also works</span>
                 </p>
               ) : null}
 
@@ -1164,7 +1164,7 @@ function LibraryPracticePanel({
                   e.stopPropagation();
                   if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
                 }}
-                placeholder={typingStep === "reading" ? "Type kana or Hepburn Romanji" : "Type the meaning"}
+                placeholder={typingStep === "reading" ? "Type kana or Hepburn romaji" : "Type the meaning"}
                 inputMode="text"
                 autoCorrect="off"
                 autoCapitalize="none"

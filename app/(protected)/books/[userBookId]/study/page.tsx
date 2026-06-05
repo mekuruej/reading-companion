@@ -1925,7 +1925,7 @@ export default function BookFlashcardsPage() {
                 correctionInputRef={correctionInputRef}
                 correctionPlaceholder={
                   studySet === "READING_MC"
-                    ? "Type kana or Hepburn Romanji"
+                    ? "Type kana or Hepburn romaji"
                     : studySet === "FROM_READING_MC"
                       ? "Type the kanji word"
                       : "Type one meaning word"
@@ -2001,7 +2001,7 @@ export default function BookFlashcardsPage() {
                   readyForNextCard={readyForNextCard}
                   placeholder={
                     studySet === "READING"
-                      ? "Type kana or Hepburn Romanji"
+                      ? "Type kana or Hepburn romaji"
                       : studySet === "MEANING"
                         ? "Type a meaning"
                         : studySet === "FROM_READING_MEANING"

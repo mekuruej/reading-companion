@@ -41,7 +41,7 @@ export default function TypingAnswerPanel({
       {showReadingHint ? (
         <p className="mb-2 text-xs text-gray-500">
           <span className="inline sm:whitespace-nowrap">Kana is best; </span>
-          <span className="inline sm:whitespace-nowrap">Hepburn Romanji also works</span>
+          <span className="inline sm:whitespace-nowrap">Hepburn romaji also works</span>
         </p>
       ) : null}
 
