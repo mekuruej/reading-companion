@@ -37,6 +37,7 @@ import AbilityCheckCompleteState from "../components/AbilityCheckCompleteState";
 import AbilityCheckMeaningReviewScreen from "../components/AbilityCheckMeaningReviewScreen";
 import AbilityCheckCardShell from "../components/AbilityCheckCardShell";
 import AbilityCheckActionPanel from "../components/AbilityCheckActionPanel";
+import AbilityCheckReadinessPrompt from "../components/AbilityCheckReadinessPrompt";
 
 type UserBookJoinRow = {
   id: string;
@@ -3330,36 +3331,12 @@ export default function LibraryStudyPage() {
           >
             <div className="flex w-full flex-col items-center gap-6 pt-12 pb-10">
               {currentCard?.activeGate === "readiness" ? (
-                <>
-                  <div className={promptModeClass("readiness")}>
-                    READINESS
-                  </div>
-                  <div className="text-center text-5xl font-bold leading-tight">
-                    {currentCard.surface}
-                  </div>
-                  <p className="max-w-md text-center text-sm leading-6 text-slate-500">
-                    Does this word feel ready for a real reading check?
-                  </p>
-                  <div className="grid w-full max-w-md gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => void moveCurrentCardToReadingGate()}
-                      className="rounded-2xl border border-emerald-200 bg-emerald-100 px-4 py-3 text-sm font-black text-emerald-950 shadow-sm transition hover:bg-emerald-50"
-                    >
-                      Ready for Reading Gate
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void comeBackLaterForCurrentCard("hard")}
-                      className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                    >
-                      Not yet
-                      <span className="mt-1 block text-[10px] font-normal text-slate-500">
-                        Give it more reading support
-                      </span>
-                    </button>
-                  </div>
-                </>
+                <AbilityCheckReadinessPrompt
+                  surface={currentCard.surface}
+                  promptClassName={promptModeClass("readiness")}
+                  onReadyForReadingGate={() => void moveCurrentCardToReadingGate()}
+                  onNeedsSupport={() => void comeBackLaterForCurrentCard("hard")}
+                />
               ) : null}
 
               {currentCard?.activeGate !== "readiness" && activeStudyMode === "reading_typing" && (
