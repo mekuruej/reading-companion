@@ -32,6 +32,7 @@ import StudyErrorState from "../components/StudyErrorState";
 import StudyEmptyState from "../components/StudyEmptyState";
 import StudyCompleteState from "../components/StudyCompleteState";
 import StudyFullAccessLockedState from "../components/StudyFullAccessLockedState";
+import StudyFlashcardShell from "../components/StudyFlashcardShell";
 
 type StudySet =
   | "READING"
@@ -1767,19 +1768,9 @@ export default function BookFlashcardsPage() {
 
       </div>
 
-      <div
-        onClick={isMultipleChoiceMode ? undefined : flip}
-        className="
-          relative
-          w-full max-w-2xl
-          min-h-[30vh] sm:min-h-[36vh]
-          bg-white rounded-2xl
-          border border-slate-500
-          shadow-2xl
-          flex items-center justify-center
-          cursor-pointer text-center select-none
-          p-6
-        "
+      <StudyFlashcardShell
+        isClickable={!isMultipleChoiceMode}
+        onReveal={flip}
       >
         <StudyCardBadges
           jlpt={card?.jlpt ?? "NON-JLPT"}
@@ -1984,7 +1975,7 @@ export default function BookFlashcardsPage() {
             </>
           ) : null}
         </div>
-      </div>
+      </StudyFlashcardShell>
 
       <div className="mt-2 w-full max-w-2xl space-y-2">
         <StudyModePanel
