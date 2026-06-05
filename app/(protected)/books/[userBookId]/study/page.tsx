@@ -28,6 +28,7 @@ import MultipleChoiceAnswerPanel from "../components/MultipleChoiceAnswerPanel";
 import TypingAnswerPanel from "../components/TypingAnswerPanel";
 import StudyLoadingState from "../components/StudyLoadingState";
 import StudyNeedsSignInState from "../components/StudyNeedsSignInState";
+import StudyErrorState from "../components/StudyErrorState";
 
 type StudySet =
   | "READING"
@@ -1722,12 +1723,8 @@ export default function BookFlashcardsPage() {
   }
 
   if (errorMsg) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-red-700">{errorMsg}</p>
-      </main>
-    );
-  }
+  return <StudyErrorState message={errorMsg} />;
+}
 
   if (filteredCards.length === 0) {
     return (
