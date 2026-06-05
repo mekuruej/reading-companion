@@ -29,6 +29,7 @@ import LibraryReviewLoadingState from "../components/LibraryReviewLoadingState";
 import LibraryReviewNeedsSignInState from "../components/LibraryReviewNeedsSignInState";
 import LibraryReviewErrorState from "../components/LibraryReviewErrorState";
 import LibraryReviewFullAccessLockedState from "../components/LibraryReviewFullAccessLockedState";
+import LibraryReviewPageHeader from "../components/LibraryReviewPageHeader";
 
 type UserBookJoinRow = {
   id: string;
