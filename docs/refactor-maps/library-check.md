@@ -781,6 +781,29 @@ Risk:
 Suggested order:
 * 15
 
+## Finished
+
+* Extracted `AbilityCheckLoadingState`
+* Extracted `AbilityCheckNeedsSignInState`
+* Extracted `AbilityCheckErrorState`
+* Extracted `AbilityCheckFullAccessLockedState`
+* Extracted `AbilityCheckNoCardsState`
+* Extracted `AbilityCheckRestingState`
+* Extracted `AbilityCheckSetupPanel`
+* Extracted `AbilityCheckProgressCard`
+* Extracted `AbilityCheckIntroCard`
+* Extracted `AbilityCheckWordSkyCta`
+* Extracted `AbilityCheckPageHeader`
+* Extracted `AbilityCheckNoDueState`
+* Extracted `AbilityCheckCompleteState`
+* Extracted `AbilityCheckMeaningReviewScreen`
+* Extracted `AbilityCheckCardShell`
+* Extracted `AbilityCheckActionPanel`
+* Extracted `AbilityCheckReadinessPrompt`
+* Extracted `AbilityCheckTypingPrompt`
+* Extracted `AbilityCheckFeedbackPanel`
+* Extracted `AbilityCheckModeStatusPanel`
+
 ## Do Not Extract Yet
 
 Do not extract in the first pass:
