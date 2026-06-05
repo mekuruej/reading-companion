@@ -31,6 +31,7 @@ import LibraryReviewErrorState from "../components/LibraryReviewErrorState";
 import LibraryReviewFullAccessLockedState from "../components/LibraryReviewFullAccessLockedState";
 import LibraryReviewPageHeader from "../components/LibraryReviewPageHeader";
 import PracticeMeaningReviewScreen from "../components/PracticeMeaningReviewScreen";
+import LibraryPracticeCardBadges from "../components/LibraryPracticeCardBadges";
 
 type UserBookJoinRow = {
   id: string;
@@ -848,17 +849,6 @@ function promptModeClass(gate: LibraryCheckGate | undefined) {
   return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
 }
 
-function KatakanaBadge() {
-  return (
-    <span
-      title="Katakana-only word"
-      className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white shadow-sm"
-    >
-      カ
-    </span>
-  );
-}
-
 function LibraryCheckIntroCard({
   mode,
   onModeChange,
@@ -1093,38 +1083,17 @@ function LibraryPracticePanel({
           onClick={onAdvance}
           className="relative flex min-h-[30vh] w-full max-w-2xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[36vh]"
         >
-          <div className="absolute left-4 top-4 flex">
-            <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-              Review{card.jlpt ? ` · ${card.jlpt}` : ""}
-            </div>
-          </div>
-
-          <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
-            <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-              <span
-                className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
-                  card.colorStatus
-                )}`}
-              />
-              {libraryStudyColorName(card.colorStatus)}
-            </div>
-
-            {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
-          </div>
-
-          <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-            {definitionLabel(card) ? (
-              <div className={libraryStudyChipClass(card.colorStatus)}>
-                {definitionLabel(card)}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
-            <div className={libraryStudyChipClass(card.colorStatus)}>
-              Read {card.encounterCount}x
-            </div>
-          </div>
+          <LibraryPracticeCardBadges
+            modeLabel="Review"
+            jlpt={card.jlpt}
+            colorDotClassName={libraryStudyDotClass(card.colorStatus)}
+            colorName={libraryStudyColorName(card.colorStatus)}
+            showKatakanaBadge={isKatakanaOnly(card.surface)}
+            definitionText={definitionLabel(card)}
+            definitionChipClassName={libraryStudyChipClass(card.colorStatus)}
+            readChipClassName={libraryStudyChipClass(card.colorStatus)}
+            encounterCount={card.encounterCount}
+          />
 
           <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1154,39 +1123,19 @@ function LibraryPracticePanel({
           </div>
         </button>
       ) : (
+
         <div className="relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[36vh]">
-          <div className="absolute left-4 top-4 flex">
-            <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
-              Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}
-            </div>
-          </div>
-
-          <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
-            <div className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-              <span
-                className={`mr-1.5 inline-block h-2.5 w-2.5 rounded-full ${libraryStudyDotClass(
-                  card.colorStatus
-                )}`}
-              />
-              {libraryStudyColorName(card.colorStatus)}
-            </div>
-
-            {isKatakanaOnly(card.surface) ? <KatakanaBadge /> : null}
-          </div>
-
-          <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-            {definitionLabel(card) ? (
-              <div className={libraryStudyChipClass(card.colorStatus)}>
-                {definitionLabel(card)}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
-            <div className={libraryStudyChipClass(card.colorStatus)}>
-              Read {card.encounterCount}x
-            </div>
-          </div>
+          <LibraryPracticeCardBadges
+            modeLabel="Typing Practice"
+            jlpt={card.jlpt}
+            colorDotClassName={libraryStudyDotClass(card.colorStatus)}
+            colorName={libraryStudyColorName(card.colorStatus)}
+            showKatakanaBadge={isKatakanaOnly(card.surface)}
+            definitionText={definitionLabel(card)}
+            definitionChipClassName={libraryStudyChipClass(card.colorStatus)}
+            readChipClassName={libraryStudyChipClass(card.colorStatus)}
+            encounterCount={card.encounterCount}
+          />
 
           <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
             <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
@@ -3016,20 +2965,6 @@ export default function LibraryStudyPage() {
           onReviewMeanings={() => setShowPracticeMeaningReview(true)}
         />
       )}
-      <LibraryPracticePanel
-        card={practiceCard}
-        total={practiceDeck.length}
-        revealStep={practiceRevealStep}
-        practiceMode={practiceStudyMode}
-        onAdvance={advancePracticeCard}
-        onNext={goToNextPracticeCard}
-        onPrevious={goToPreviousPracticeCard}
-        onShuffle={shufflePracticeDeck}
-        onMeaningAnswered={queuePracticeMeaningReview}
-        onTypingMissed={handlePracticeTypingMiss}
-        meaningReviewCount={meaningReviewItems.length}
-        onReviewMeanings={() => setShowPracticeMeaningReview(true)}
-      />
     </main>
   );
 }
