@@ -26,6 +26,7 @@ import LibraryPracticeFilterPanel from "../components/LibraryPracticeFilterPanel
 import LibraryPracticeCompleteCard from "../components/LibraryPracticeCompleteCard";
 import LibraryReviewEmptyState from "../components/LibraryReviewEmptyState";
 import LibraryReviewLoadingState from "../components/LibraryReviewLoadingState";
+import LibraryReviewNeedsSignInState from "../components/LibraryReviewNeedsSignInState";
 
 type UserBookJoinRow = {
   id: string;
@@ -2913,12 +2914,9 @@ export default function LibraryStudyPage() {
 
   if (needsSignIn) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-gray-700">You need to sign in to use Library Review.</p>
-        <button onClick={() => router.push("/login")} className="rounded bg-gray-200 px-4 py-2">
-          Go to Login
-        </button>
-      </main>
+      <LibraryReviewNeedsSignInState
+        onGoToLogin={() => router.push("/login")}
+      />
     );
   }
 
