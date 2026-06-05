@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import StudyBookHeader from "../components/StudyBookHeader";
 import StudyProgressPanel from "../components/StudyProgressPanel";
+import Row from "../components/StudyCardFieldRow";
 
 type StudySet =
   | "READING"
@@ -1802,35 +1803,6 @@ export default function BookFlashcardsPage() {
   const cardColorStatus = card
     ? computeLibraryStudyColorStatus({ encounterCount: card.totalCount })
     : null;
-
-  function Row({
-    label,
-    value,
-    visible,
-    big,
-    placeholder = "—",
-  }: {
-    label: string;
-    value: string;
-    visible: boolean;
-    big?: boolean;
-    placeholder?: string;
-  }) {
-    return (
-      <div className="w-full flex flex-col items-center gap-1">
-        <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-        <div
-          className={[
-            big ? "text-[2rem] font-bold sm:text-[2.3rem]" : "text-[1.25rem] sm:text-[1.45rem]",
-            "transition-opacity duration-200",
-            visible ? "opacity-100 text-slate-900" : "opacity-70 text-slate-300",
-          ].join(" ")}
-        >
-          {visible ? value : placeholder}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-4 bg-slate-100 sm:px-6">
