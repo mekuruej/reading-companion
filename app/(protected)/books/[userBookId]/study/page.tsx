@@ -24,6 +24,7 @@ import StudyBottomNavigation from "../components/StudyBottomNavigation";
 import StudyInstructionNav from "../components/StudyInstructionNav";
 import StudyFilterPanel from "../components/StudyFilterPanel";
 import StudyModePanel from "../components/StudyModePanel";
+import MultipleChoiceAnswerPanel from "../components/MultipleChoiceAnswerPanel";
 
 type StudySet =
   | "READING"
@@ -1892,125 +1893,60 @@ export default function BookFlashcardsPage() {
                 </>
               )}
 
-              <div className="w-full max-w-md pt-2">
-                <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
-                  {studySet === "READING_MC"
+              <MultipleChoiceAnswerPanel
+                answerPrompt={
+                  studySet === "READING_MC"
                     ? "Choose the Reading"
                     : studySet === "MEANING_MC"
                       ? "Choose the Meaning"
                       : studySet === "FROM_READING_MC"
                         ? "Choose the Kanji"
-                        : "Choose the Meaning"}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {mcOptions.map((option) => {
-                    const isSelected = mcSelected === option;
-                    const isCorrect =
-                      mcAnswered &&
-                      (
-                        studySet === "READING_MC"
-                          ? normalizeReading(option) === mcCorrectAnswer
-                          : studySet === "FROM_READING_MC"
-                            ? option.trim() === mcCorrectAnswer
-                            : option.trim().toLowerCase() === mcCorrectAnswer
-                      );
-                    const isWrongSelected = mcAnswered && isSelected && !isCorrect;
-
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMcAnswer(option);
-                        }}
-                        disabled={mcAnswered}
-                        className={[
-                          "rounded-xl border px-3 py-3 text-sm font-medium transition",
-                          isCorrect
-                            ? "border-green-600 bg-green-50 text-green-800"
-                            : isWrongSelected
-                              ? "border-red-600 bg-red-50 text-red-800"
-                              : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50",
-                          mcAnswered ? "cursor-default" : "",
-                        ].join(" ")}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {mcAnswered ? (
-                  <div className="mt-3 w-full">
-                    <p className={`text-sm ${mcWasCorrect ? "text-green-700" : "text-red-700"}`}>
-                      {mcWasCorrect
-                        ? "✅ You got it!"
-                        : `❌ Not quite. Correct answer: ${studySet === "READING_MC"
-                          ? card.reading || "—"
-                          : studySet === "MEANING_MC"
-                            ? card.meaning || "—"
-                            : studySet === "FROM_READING_MC"
-                              ? card.word || "—"
-                              : card.meaning || "—"
-                        }`}
-                    </p>
-
-                    {!mcWasCorrect ? (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-xs text-slate-500">
-                          Type one word from the answer to continue.
-                        </p>
-                        <div className="flex gap-2">
-                          <input
-                            ref={correctionInputRef}
-                            type="text"
-                            value={correctionInput}
-                            onChange={(e) => {
-                              setCorrectionInput(e.target.value);
-                              setCorrectionFeedback(null);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                checkCorrectionAnswer();
-                              }
-                            }}
-                            autoCorrect="off"
-                            autoCapitalize="none"
-                            autoComplete="off"
-                            spellCheck={false}
-                            autoFocus
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                            placeholder={
-                              studySet === "READING_MC"
-                                ? "Type kana or Hepburn romaji"
-                                : studySet === "FROM_READING_MC"
-                                  ? "Type the kanji word"
-                                  : "Type one meaning word"
-                            }
-                          />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              checkCorrectionAnswer();
-                            }}
-                            className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
-                          >
-                            Check
-                          </button>
-                        </div>
-                        {correctionFeedback ? (
-                          <p className="text-xs text-red-700">{correctionFeedback}</p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
+                        : "Choose the Meaning"
+                }
+                options={mcOptions}
+                selected={mcSelected}
+                answered={mcAnswered}
+                wasCorrect={mcWasCorrect}
+                correctAnswerText={
+                  studySet === "READING_MC"
+                    ? card.reading || "—"
+                    : studySet === "MEANING_MC"
+                      ? card.meaning || "—"
+                      : studySet === "FROM_READING_MC"
+                        ? card.word || "—"
+                        : card.meaning || "—"
+                }
+                correctionInput={correctionInput}
+                correctionFeedback={correctionFeedback}
+                correctionInputRef={correctionInputRef}
+                correctionPlaceholder={
+                  studySet === "READING_MC"
+                    ? "Type kana or Hepburn romaji"
+                    : studySet === "FROM_READING_MC"
+                      ? "Type the kanji word"
+                      : "Type one meaning word"
+                }
+                isOptionCorrect={(option) =>
+                  studySet === "READING_MC"
+                    ? normalizeReading(option) === mcCorrectAnswer
+                    : studySet === "FROM_READING_MC"
+                      ? option.trim() === mcCorrectAnswer
+                      : option.trim().toLowerCase() === mcCorrectAnswer
+                }
+                onSelectOption={handleMcAnswer}
+                onCorrectionInputChange={(value) => {
+                  setCorrectionInput(value);
+                  setCorrectionFeedback(null);
+                }}
+                onCorrectionInputKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    checkCorrectionAnswer();
+                  }
+                }}
+                onCheckCorrection={checkCorrectionAnswer}
+              />
             </>
           ) : typeModeEnabled && card ? (
             <>
