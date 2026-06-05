@@ -23,6 +23,7 @@ import { recordStudyEvent } from "@/lib/studyEvents";
 import { todayYmdAppTimeZone, ymdInTimeZone } from "@/lib/timeZone";
 import AbilityCheckLoadingState from "../components/AbilityCheckLoadingState";
 import AbilityCheckNeedsSignInState from "../components/AbilityCheckNeedsSignInState";
+import AbilityCheckErrorState from "../components/AbilityCheckErrorState";
 
 type UserBookJoinRow = {
   id: string;
@@ -3018,12 +3019,10 @@ export default function LibraryStudyPage() {
 
   if (errorMsg) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-        <p className="text-red-700">{errorMsg}</p>
-        <button onClick={() => router.push("/books")} className="rounded bg-gray-200 px-4 py-2">
-          Back to Library
-        </button>
-      </main>
+      <AbilityCheckErrorState
+        message={errorMsg}
+        onBackToLibrary={() => router.push("/books")}
+      />
     );
   }
 
