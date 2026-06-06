@@ -11,6 +11,7 @@ import BookStatsLoadingState from "./components/BookStatsLoadingState";
 import BookStatsErrorState from "./components/BookStatsErrorState";
 import StatCard from "./components/StatCard";
 import StatsSection from "./components/StatsSection";
+import BookStatsHeader from "./components/BookStatsHeader";
 
 type Book = {
     id: string;
@@ -525,66 +526,15 @@ export default function BookStatsPage() {
     return (
         <main className="min-h-screen bg-stone-50 p-6">
             <div className="mx-auto max-w-6xl space-y-5">
-                <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <button
-                            type="button"
-                            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-                            className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
-                            title={`Go to ${book.title ?? "this book"} Book Hub`}
-                        >
-                            {book.cover_url ? (
-                                <img
-                                    src={book.cover_url}
-                                    alt={`${book.title ?? "Book"} cover`}
-                                    className="h-32 w-24 shrink-0 rounded-xl border border-stone-200 object-cover shadow-sm"
-                                />
-                            ) : (
-                                <div className="flex h-32 w-24 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-xs text-stone-400 shadow-sm">
-                                    No cover
-                                </div>
-                            )}
-
-                            <div className="min-w-0">
-                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                                    Book Stats
-                                </p>
-
-                                <h1 className="mt-1 truncate text-xl font-black tracking-tight text-stone-900 sm:text-2xl">
-                                    {book.title ?? "Untitled book"}
-                                </h1>
-
-                                {book.title_reading ? (
-                                    <p className="mt-1 truncate text-sm text-stone-500">
-                                        {book.title_reading}
-                                    </p>
-                                ) : null}
-
-                                <p className="mt-2 hidden text-sm text-stone-600 sm:block">
-                                    Reading history, time, pace, vocabulary, and difficulty.
-                                </p>
-                            </div>
-                        </button>
-
-                        <div className="flex flex-wrap gap-2 sm:justify-end">
-                            <button
-                                type="button"
-                                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
-                                className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                            >
-                                Vocab List
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-                                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-                            >
-                                Book Hub
-                            </button>
-                        </div>
-                    </div>
-                </section>
+                <BookStatsHeader
+                    bookTitle={book.title}
+                    bookTitleReading={book.title_reading}
+                    coverUrl={book.cover_url}
+                    onOpenBookHub={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                    onOpenVocabList={() =>
+                        router.push(`/books/${encodeURIComponent(userBookId)}/words`)
+                    }
+                />
 
                 <section className={`rounded-3xl border p-5 shadow-sm ${neighborhood.colorClass}`}>
                     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_210px] md:items-stretch">
