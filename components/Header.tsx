@@ -515,7 +515,7 @@ export default function Header() {
                     setShowProfileMenu(false);
                   }}
                 >
-                  Teacher
+                  Teacher Hub
                 </Link>
 
                 <button
@@ -532,7 +532,7 @@ export default function Header() {
                     : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                     }`}
                 >
-                  Teacher
+                  Teacher Hub
                 </button>
 
                 {showTeacherMenu ? (

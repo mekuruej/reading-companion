@@ -54,10 +54,10 @@ export default function GlobalWordDetailFields({
   onClear,
 }: Props) {
   return (
-    <div ref={fieldsRef} className="space-y-3">
+      <div ref={fieldsRef} className="space-y-3">
       <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
         <span className="font-semibold text-stone-900">Manual entry:</span>{" "}
-        1. Type the surface or name. 2. Add the reading. 3. Choose the type. 4. Add the note.
+        type the surface or name, add the reading, choose the entry type, then add the meaning or context note.
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -151,7 +151,7 @@ export default function GlobalWordDetailFields({
           disabled={!surface.trim()}
           className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
         >
-          Save Placeholder
+          Show Placeholder Message
         </button>
 
         <button
@@ -160,7 +160,7 @@ export default function GlobalWordDetailFields({
           className="rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-500"
           title="Global save is not wired yet."
         >
-          Save Globally
+          Save Globally Disabled
         </button>
 
         <button

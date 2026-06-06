@@ -9,9 +9,10 @@ import { supabase } from "@/lib/supabaseClient";
 
 type PrepCard = {
   title: string;
-  href: string;
+  href?: string;
   eyebrow: string;
   description: string;
+  disabled?: boolean;
 };
 
 const prepCards: PrepCard[] = [
@@ -39,6 +40,13 @@ const prepCards: PrepCard[] = [
     eyebrow: "Groups",
     description: "Plan club groups, weekly readings, and shared support materials.",
   },
+  {
+    title: "Lesson Follow-Along Prep",
+    eyebrow: "Future workflow",
+    description:
+      "Placeholder for lesson-specific follow-along notes, prep checklists, and reusable teaching sequences.",
+    disabled: true,
+  },
 ];
 
 function isSuperTeacherFlag(value: unknown) {
@@ -48,18 +56,36 @@ function isSuperTeacherFlag(value: unknown) {
 function PrepCardGrid({ cards }: { cards: PrepCard[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {cards.map((card) => (
-        <Link key={card.title} href={card.href}>
-          <div className="h-full rounded-3xl border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      {cards.map((card) => {
+        const cardContent = (
+          <div
+            className={`h-full rounded-3xl border p-5 shadow-sm transition ${
+              card.disabled
+                ? "border-stone-200 bg-stone-50 text-stone-500"
+                : "border-stone-200 bg-white hover:-translate-y-0.5 hover:shadow-md"
+            }`}
+          >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
               {card.eyebrow}
             </p>
             <h2 className="mt-3 text-xl font-black text-stone-900">{card.title}</h2>
             <p className="mt-3 text-sm leading-6 text-stone-600">{card.description}</p>
-            <p className="mt-4 text-sm font-semibold text-stone-900">Open →</p>
+            <p className="mt-4 text-sm font-semibold text-stone-900">
+              {card.disabled ? "Placeholder" : "Open →"}
+            </p>
           </div>
-        </Link>
-      ))}
+        );
+
+        if (!card.href || card.disabled) {
+          return <div key={card.title}>{cardContent}</div>;
+        }
+
+        return (
+          <Link key={card.title} href={card.href}>
+            {cardContent}
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -158,7 +184,7 @@ export default function TeacherLessonPrepPage() {
           <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
             Lesson Prep
           </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
             Prepare teaching books, student assignments, trial materials, clubs, and lesson-ready materials.
           </p>
         </section>

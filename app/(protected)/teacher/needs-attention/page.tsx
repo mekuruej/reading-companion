@@ -23,7 +23,13 @@ const attentionCards: AttentionCard[] = [
     description: "Review pending book requests, book flags, and global books missing core information.",
   },
   {
-    title: "Kanji Queue",
+    title: "Missing Book Info",
+    href: "/teacher/books",
+    eyebrow: "Book cleanup",
+    description: "Find books that need covers, authors, reading metadata, ISBN cleanup, or other global book details.",
+  },
+  {
+    title: "Kanji Reports / Errors",
     href: "/teacher/kanji",
     eyebrow: "Kanji",
     description: "Review kanji reports, flagged kanji readings, and enrichment queues.",

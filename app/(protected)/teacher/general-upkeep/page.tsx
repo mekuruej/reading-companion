@@ -9,9 +9,10 @@ import { supabase } from "@/lib/supabaseClient";
 
 type UpkeepCard = {
   title: string;
-  href: string;
+  href?: string;
   eyebrow: string;
   description: string;
+  disabled?: boolean;
 };
 
 const baseUpkeepCards: UpkeepCard[] = [
@@ -28,10 +29,23 @@ const baseUpkeepCards: UpkeepCard[] = [
     description: "Review word data flags and vocabulary cleanup that is not tied to one lesson.",
   },
   {
+    title: "Global Vocabulary Cleanup",
+    eyebrow: "Future cleanup",
+    description:
+      "Placeholder for deduping global vocabulary, reviewing cultural-reference metadata, and cleaning shared word records.",
+    disabled: true,
+  },
+  {
     title: "Global Book / Data Cleanup",
     href: "/teacher/books",
     eyebrow: "Book data",
     description: "Review global book data cleanup, missing book information, and book review queues.",
+  },
+  {
+    title: "Kanji Queue",
+    href: "/teacher/kanji",
+    eyebrow: "Kanji maintenance",
+    description: "Review kanji reports and queue items as general data maintenance without moving the workflow yet.",
   },
 ];
 
@@ -51,18 +65,36 @@ function isSuperTeacherFlag(value: unknown) {
 function UpkeepCardGrid({ cards }: { cards: UpkeepCard[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {cards.map((card) => (
-        <Link key={card.title} href={card.href}>
-          <div className="h-full rounded-3xl border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      {cards.map((card) => {
+        const cardContent = (
+          <div
+            className={`h-full rounded-3xl border p-5 shadow-sm transition ${
+              card.disabled
+                ? "border-stone-200 bg-stone-50 text-stone-500"
+                : "border-stone-200 bg-white hover:-translate-y-0.5 hover:shadow-md"
+            }`}
+          >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
               {card.eyebrow}
             </p>
             <h2 className="mt-3 text-xl font-black text-stone-900">{card.title}</h2>
             <p className="mt-3 text-sm leading-6 text-stone-600">{card.description}</p>
-            <p className="mt-4 text-sm font-semibold text-stone-900">Open →</p>
+            <p className="mt-4 text-sm font-semibold text-stone-900">
+              {card.disabled ? "Placeholder" : "Open →"}
+            </p>
           </div>
-        </Link>
-      ))}
+        );
+
+        if (!card.href || card.disabled) {
+          return <div key={card.title}>{cardContent}</div>;
+        }
+
+        return (
+          <Link key={card.title} href={card.href}>
+            {cardContent}
+          </Link>
+        );
+      })}
     </div>
   );
 }
