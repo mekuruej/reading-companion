@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import BookStatsLoadingState from "./components/BookStatsLoadingState";
 
 type Book = {
     id: string;
@@ -515,23 +516,11 @@ export default function BookStatsPage() {
     const typeLabel = bookTypeLabel(book?.book_type);
 
     if (loading) {
-        return (
-            <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-5xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
-                    Loading book stats...
-                </div>
-            </main>
-        );
+        return <BookStatsLoadingState />;
     }
 
     if (!accessChecked) {
-        return (
-            <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-5xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
-                    Loading book stats...
-                </div>
-            </main>
-        );
+        return <BookStatsLoadingState message="Checking book access..." />;
     }
 
     if (!canAccessBook) {
