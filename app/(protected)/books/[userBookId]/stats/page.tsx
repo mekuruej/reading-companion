@@ -10,6 +10,7 @@ import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
 import BookStatsErrorState from "./components/BookStatsErrorState";
 import StatCard from "./components/StatCard";
+import StatsSection from "./components/StatsSection";
 
 type Book = {
     id: string;
@@ -633,9 +634,11 @@ export default function BookStatsPage() {
                 </section>
 
                 <section className="space-y-3">
-                    <h2 className="text-lg font-black text-stone-900">Progress Snapshot</h2>
+                    <h2 className="text-lg font-black text-stone-950">
+                        Progress Snapshot
+                    </h2>
 
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <StatCard label="Status" value={statusLabel(row)} />
                         <StatCard
                             label="Pages Read"
@@ -653,9 +656,11 @@ export default function BookStatsPage() {
 
                 {totalTrackedMinutes > 0 && (
                     <section className="space-y-3">
-                        <h2 className="text-lg font-black text-stone-900">Time by Mode</h2>
+                        <h2 className="text-lg font-black text-stone-950">
+                            Time by Mode
+                        </h2>
 
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             {curiosityMinutes > 0 && (
                                 <StatCard
                                     label="Curiosity Reading"
@@ -694,9 +699,11 @@ export default function BookStatsPage() {
                     curiosityPageStats != null ||
                     fluidPageStats != null) && (
                         <section className="space-y-3">
-                            <h2 className="text-lg font-black text-stone-900">Pace</h2>
+                            <h2 className="text-lg font-black text-stone-950">
+                                Pace
+                            </h2>
 
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 {overallMinPerPage != null && (
                                     <StatCard
                                         label="Overall Min/Page"
@@ -733,9 +740,11 @@ export default function BookStatsPage() {
                     )}
 
                 <section className="space-y-3">
-                    <h2 className="text-lg font-black text-stone-900">Vocabulary</h2>
+                    <h2 className="text-lg font-black text-stone-950">
+                        Vocabulary
+                    </h2>
 
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <StatCard
                             label="Words Saved"
                             value={wordCount ?? "—"}
