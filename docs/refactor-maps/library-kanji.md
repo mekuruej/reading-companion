@@ -287,11 +287,28 @@ Main study experience:
 * recall typing/result panel
 * bottom controls
 
-## Recommended First-Pass Visual Extractions
+## First-Pass Visual Extractions
 
-These should be page-local components at first. Do not promote shared components yet.
+Status: visual component pass completed.
 
-### 1. `KanjiStudyLoadingState`
+These were extracted as page-local presentational components. Do not promote shared components yet.
+
+Completed:
+* `KanjiStudyLoadingState`
+* `KanjiStudyAccessState`
+* `KanjiStudyHeader`
+* `KanjiStudyProgressPanel`
+* `KanjiStudyNotice`
+* `KanjiStudyCompleteState`
+* `KanjiStudyBottomControls`
+* `KanjiStudyPreviewLockedState`
+* `KanjiRecallPanel`
+* `KanjiStudyOptionList`
+* `KanjiStudyFeedbackPanel`
+* `KanjiStudyCardFrame`
+* `KanjiStudyPrompt`
+
+### 1. `KanjiStudyLoadingState` - Done
 
 Owns:
 * loading-state JSX
@@ -311,17 +328,15 @@ Risk:
 Suggested order:
 * 1
 
-### 2. `KanjiStudyAccessState`
+### 2. `KanjiStudyAccessState` - Done
 
 Owns:
 * sign-in required message
 * error message
 * empty-state message
-* locked/preview message, if kept as one shared simple state component
 
 Stays in `page.tsx`:
 * auth check
-* full-access decision
 * branch selection
 * navigation target decisions
 
@@ -340,7 +355,7 @@ Risk:
 Suggested order:
 * 2
 
-### 3. `KanjiStudyCompleteState`
+### 3. `KanjiStudyCompleteState` - Done
 
 Owns:
 * completed-session card
@@ -367,7 +382,7 @@ Risk:
 Suggested order:
 * 3
 
-### 4. `KanjiStudyHeader`
+### 4. `KanjiStudyHeader` - Done
 
 Owns:
 * page title/introduction
@@ -389,7 +404,7 @@ Risk:
 Suggested order:
 * 4
 
-### 5. `KanjiStudyProgressPanel`
+### 5. `KanjiStudyProgressPanel` - Done
 
 Owns:
 * progress count
@@ -416,7 +431,7 @@ Risk:
 Suggested order:
 * 5
 
-### 6. `KanjiStudyNotice`
+### 6. `KanjiStudyNotice` - Done
 
 Owns:
 * notice/banner JSX
@@ -437,7 +452,31 @@ Risk:
 Suggested order:
 * 6
 
-### 7. `KanjiStudyCardFrame`
+### 7. `KanjiStudyPreviewLockedState` - Done
+
+Owns:
+* locked/full-access preview message
+* preview-mode callout/card JSX
+
+Stays in `page.tsx`:
+* full-access decision
+* locked branch selection
+* access state
+
+Expected props:
+* optional `title`
+* optional `message`
+
+Category:
+* presentational UI
+
+Risk:
+* low
+
+Suggested order:
+* 7
+
+### 8. `KanjiStudyCardFrame` - Done
 
 Owns:
 * outer card container
@@ -463,9 +502,9 @@ Risk:
 * medium-low
 
 Suggested order:
-* 7
+* 8
 
-### 8. `KanjiStudyPrompt`
+### 9. `KanjiStudyPrompt` - Done
 
 Owns:
 * prompt heading/label
@@ -491,9 +530,9 @@ Risk:
 * low
 
 Suggested order:
-* 8
+* 9
 
-### 9. `KanjiStudyOptionList`
+### 10. `KanjiStudyOptionList` - Done
 
 Owns:
 * multiple-choice answer buttons
@@ -519,9 +558,9 @@ Risk:
 * medium-low
 
 Suggested order:
-* 9
+* 10
 
-### 10. `KanjiStudyFeedbackPanel`
+### 11. `KanjiStudyFeedbackPanel` - Done
 
 Owns:
 * checked-answer feedback copy
@@ -545,9 +584,9 @@ Risk:
 * low
 
 Suggested order:
-* 10
+* 11
 
-### 11. `KanjiRecallPanel`
+### 12. `KanjiRecallPanel` - Done
 
 Owns:
 * recall input
@@ -577,9 +616,9 @@ Risk:
 * medium
 
 Suggested order:
-* 11
+* 12
 
-### 12. `KanjiStudyBottomControls`
+### 13. `KanjiStudyBottomControls` - Done
 
 Owns:
 * Previous button
@@ -604,7 +643,7 @@ Risk:
 * low
 
 Suggested order:
-* 12
+* 13
 
 ## Suspicious / Possibly Unused Code
 
@@ -620,9 +659,10 @@ Do not remove anything yet.
 
 ## Recommended Next Step
 
-First implementation pass:
-* create only page-local presentational components
-* move only JSX and styling
-* keep all state, effects, handlers, queries, card selection, reporting, answer checking, and event writes in `page.tsx`
+The first visual extraction pass is complete.
 
-After the visual pass, the next safe behavioral fix to consider is the card identity bug documented in `kanji-study-card-identity-bug.md`.
+Next safe behavioral fix to consider:
+* address the card identity bug documented in `kanji-study-card-identity-bug.md`
+
+Future feature direction:
+* see `docs/future-features/kanji-study-modes.md` for the core reading mode roadmap
