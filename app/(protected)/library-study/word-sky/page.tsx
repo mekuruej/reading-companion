@@ -12,6 +12,7 @@ import {
 } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
 import WordSkyLoadingState from "../components/WordSkyLoadingState";
+import WordSkyHeader from "../components/WordSkyHeader";
 
 type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;
@@ -608,31 +609,11 @@ export default function WordSkyPage() {
   return (
     <main className="min-h-screen bg-[#eef5fb] px-4 py-5 text-slate-900 sm:px-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-4">
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Word Sky</h1>
-            <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
-              Pick words you think you can read. These words can automatically move into Ability Check and Library Practice,
-              but encountering words through your reading is still the ideal path.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
-              {claimedCount} claimed
-            </div>
-            <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
-              {wordPool.length} in sky
-            </div>
-            <button
-              type="button"
-              onClick={() => router.push("/library-study")}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Ability Check
-            </button>
-          </div>
-        </div>
+        <WordSkyHeader
+          claimedCount={claimedCount}
+          wordPoolCount={wordPool.length}
+          onBackToStudy={() => router.push("/library-study")}
+        />
 
         {message ? (
           <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
