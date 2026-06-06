@@ -16,13 +16,17 @@ type BookMeta = {
 
 type RecommendationSignalRow = {
   id: string;
+  book_id: string;
   reader_level: string | null;
   book_type: string | null;
   difficulty_rating: number | null;
   entertainment_rating: number | null;
   reader_advice: string | null;
   updated_at: string | null;
-  books: BookMeta | BookMeta[] | null;
+  book_title: string | null;
+  book_author: string | null;
+  book_cover_url: string | null;
+  book_metadata_type: string | null;
 };
 
 type UserBookMatchRow = {
@@ -63,9 +67,16 @@ function formatAverage(value: number | null) {
   return value.toFixed(1);
 }
 
-function firstBook(row: RecommendationSignalRow) {
-  if (Array.isArray(row.books)) return row.books[0] ?? null;
-  return row.books ?? null;
+function firstBook(row: RecommendationSignalRow): BookMeta | null {
+  if (!row.book_id) return null;
+
+  return {
+    id: row.book_id,
+    title: row.book_title,
+    author: row.book_author,
+    cover_url: row.book_cover_url,
+    book_type: row.book_metadata_type ?? row.book_type,
+  };
 }
 
 function cleanReaderAdvice(value: string | null | undefined) {
@@ -211,27 +222,23 @@ export default function FindBooksPage() {
 
       try {
         const { data, error } = await supabase
-          .from("book_recommendation_signals")
+          .from("public_book_recommendation_signals")
           .select(
             `
-            id,
-            reader_level,
-            book_type,
-            difficulty_rating,
-            entertainment_rating,
-            reader_advice,
-            updated_at,
-            books:book_id (
               id,
-              title,
-              author,
-              cover_url,
-              book_type
-            )
-          `
+              book_id,
+              reader_level,
+              book_type,
+              difficulty_rating,
+              entertainment_rating,
+              reader_advice,
+              updated_at,
+              book_title,
+              book_author,
+              book_cover_url,
+              book_metadata_type
+            `
           )
-          .eq("is_active", true)
-          .or("difficulty_rating.not.is.null,entertainment_rating.not.is.null,reader_advice.not.is.null")
           .order("updated_at", { ascending: false, nullsFirst: false })
           .limit(1000);
 

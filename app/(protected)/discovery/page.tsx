@@ -24,6 +24,21 @@ type UserBookRatingRow = {
   books: BookMeta | BookMeta[] | null;
 };
 
+type PublicRecommendationSignalRow = {
+  id: string;
+  book_id: string;
+  reader_level: string | null;
+  book_type: string | null;
+  difficulty_rating: number | null;
+  entertainment_rating: number | null;
+  reader_advice: string | null;
+  updated_at: string | null;
+  book_title: string | null;
+  book_author: string | null;
+  book_cover_url: string | null;
+  book_metadata_type: string | null;
+};
+
 type BookRatingSignal = {
   id: string;
   readerLevel: string | null;
@@ -228,68 +243,49 @@ export default function DiscoveryHubPage() {
 
       try {
         const { data, error } = await supabase
-          .from("user_books")
+          .from("public_book_recommendation_signals")
           .select(
             `
             id,
-            user_id,
-            rating_overall,
-            rating_difficulty,
+            book_id,
             reader_level,
-            finished_at,
-            books:book_id (
-              id,
-              title,
-              author,
-              cover_url,
-              book_type
-            )
+            book_type,
+            difficulty_rating,
+            entertainment_rating,
+            reader_advice,
+            updated_at,
+            book_title,
+            book_author,
+            book_cover_url,
+            book_metadata_type
           `
           )
-          .or("rating_overall.not.is.null,rating_difficulty.not.is.null")
-          .order("finished_at", { ascending: false, nullsFirst: false })
+          .order("updated_at", { ascending: false, nullsFirst: false })
           .limit(1000);
 
         if (error) throw error;
         if (!alive) return;
 
-        const rows = (data ?? []) as UserBookRatingRow[];
+        const rows: UserBookRatingRow[] = ((data ?? []) as PublicRecommendationSignalRow[]).map(
+          (row) => ({
+            id: row.id,
+            user_id: null,
+            rating_overall: row.entertainment_rating,
+            rating_difficulty: row.difficulty_rating,
+            reader_level: row.reader_level,
+            finished_at: row.updated_at,
+            books: {
+              id: row.book_id,
+              title: row.book_title,
+              author: row.book_author,
+              cover_url: row.book_cover_url,
+              book_type: row.book_metadata_type ?? row.book_type,
+            },
+          })
+        );
+
         setRatingRows(rows);
-
-        const userIds = Array.from(
-          new Set(
-            rows
-              .map((row) => row.user_id)
-              .filter((userId): userId is string => !!userId)
-          )
-        );
-
-        if (userIds.length === 0) {
-          setProfileLevelsByUserId({});
-          return;
-        }
-
-        const { data: profiles, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id, level")
-          .in("id", userIds);
-
-        if (profilesError) {
-          console.error("Error loading discovery profile levels:", profilesError);
-          if (alive) setProfileLevelsByUserId({});
-          return;
-        }
-
-        if (!alive) return;
-
-        setProfileLevelsByUserId(
-          Object.fromEntries(
-            (profiles ?? []).map((profile) => [
-              profile.id as string,
-              (profile.level as string | null) ?? null,
-            ])
-          )
-        );
+        setProfileLevelsByUserId({});
       } catch (error: any) {
         console.error("Error loading discovery ratings:", error);
         if (!alive) return;
