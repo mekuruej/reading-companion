@@ -16,6 +16,7 @@ import KanjiStudyCompleteState from "../components/KanjiStudyCompleteState";
 import KanjiStudyBottomControls from "../components/KanjiStudyBottomControls";
 import KanjiStudyPreviewLockedState from "../components/KanjiStudyPreviewLockedState";
 import KanjiRecallPanel from "../components/KanjiRecallPanel";
+import KanjiStudyOptionList from "../components/KanjiStudyOptionList";
 
 type UserBookWordRow = {
   id: string;
@@ -1122,61 +1123,39 @@ export default function KanjiReadingStudyPage() {
             </div>
           </div>
 
-          <div className="flex w-full max-w-sm flex-col gap-3">
-            {options.length < 2 ? (
-              <div className="text-sm text-amber-700">
-                Not enough answer choices for this card. Skip to the next one.
-              </div>
-            ) : (
-              options.map((opt, i) => {
-                const displayedCorrect =
-                  cardQuestionMode === "kanjiChoice"
-                    ? card.kanji
-                    : formatReadingForType(card.reading, card.readingType);
+          <KanjiStudyOptionList
+            disabled={!!checked}
+            onChoose={checkAnswer}
+            options={options.map((opt) => {
+              const displayedCorrect =
+                cardQuestionMode === "kanjiChoice"
+                  ? card.kanji
+                  : formatReadingForType(card.reading, card.readingType);
 
-                const isCorrect =
-                  !!checked &&
-                  (cardQuestionMode === "kanjiChoice"
-                    ? opt.trim() === displayedCorrect
-                    : normalizeReading(opt) === normalizeReading(displayedCorrect));
-                const isChosen =
-                  !!selected &&
-                  (cardQuestionMode === "kanjiChoice"
-                    ? opt.trim() === selected.trim()
-                    : normalizeReading(opt) === normalizeReading(selected));
+              const isCorrect =
+                !!checked &&
+                (cardQuestionMode === "kanjiChoice"
+                  ? opt.trim() === displayedCorrect
+                  : normalizeReading(opt) === normalizeReading(displayedCorrect));
 
-                let className = "w-full rounded border px-4 py-3 text-base ";
+              const isChosen =
+                !!selected &&
+                (cardQuestionMode === "kanjiChoice"
+                  ? opt.trim() === selected.trim()
+                  : normalizeReading(opt) === normalizeReading(selected));
 
-                if (!checked) {
-                  className += "bg-white hover:bg-gray-50";
-                } else if (isCorrect && isChosen) {
-                  className += "border-green-400 bg-green-100";
-                } else if (isCorrect) {
-                  className += "border-green-400 bg-green-100";
-                } else if (isChosen) {
-                  className += "border-red-400 bg-red-100";
-                } else {
-                  className += "bg-white";
-                }
-
-                return (
-                  <button
-                    key={`${opt}-${i}`}
-                    type="button"
-                    disabled={!!checked}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      checkAnswer(opt);
-                    }}
-                    className={className}
-                  >
-                    <span className="mr-2 text-sm text-gray-500">{i + 1}.</span>
-                    {opt}
-                  </button>
-                );
-              })
-            )}
-          </div>
+              return {
+                value: opt,
+                state: !checked
+                  ? "idle"
+                  : isCorrect
+                    ? "correct"
+                    : isChosen
+                      ? "wrong"
+                      : "neutral",
+              };
+            })}
+          />
 
           {checked ? (
             <div className="mt-2 w-full max-w-sm text-center text-sm">
