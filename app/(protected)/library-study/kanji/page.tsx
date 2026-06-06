@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
+import KanjiStudyLoadingState from "../components/KanjiStudyLoadingState";
 
 type UserBookWordRow = {
   id: string;
@@ -959,11 +960,7 @@ export default function KanjiReadingStudyPage() {
   }
 
   if (loading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-lg text-gray-500">Loading your readings…</p>
-      </main>
-    );
+    return <KanjiStudyLoadingState />;
   }
 
   if (needsSignIn) {
