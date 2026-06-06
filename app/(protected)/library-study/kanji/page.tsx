@@ -11,6 +11,7 @@ import KanjiStudyLoadingState from "../components/KanjiStudyLoadingState";
 import KanjiStudyAccessState from "../components/KanjiStudyAccessState";
 import KanjiStudyHeader from "../components/KanjiStudyHeader";
 import KanjiStudyProgressPanel from "../components/KanjiStudyProgressPanel";
+import KanjiStudyNotice from "../components/KanjiStudyNotice";
 
 type UserBookWordRow = {
   id: string;
@@ -1168,11 +1169,7 @@ export default function KanjiReadingStudyPage() {
         onLevelFilterChange={(value) => setLevelFilter(value as LevelFilter)}
       />
 
-      {notice ? (
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-          {notice}
-        </div>
-      ) : null}
+      <KanjiStudyNotice notice={notice} />
 
       <div
         className={`relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl ${card.flaggedForReview ? "border-red-400 bg-red-50/30" : "border-slate-500"
