@@ -17,6 +17,7 @@ import KanjiStudyBottomControls from "../components/KanjiStudyBottomControls";
 import KanjiStudyPreviewLockedState from "../components/KanjiStudyPreviewLockedState";
 import KanjiRecallPanel from "../components/KanjiRecallPanel";
 import KanjiStudyOptionList from "../components/KanjiStudyOptionList";
+import KanjiStudyFeedbackPanel from "../components/KanjiStudyFeedbackPanel";
 
 type UserBookWordRow = {
   id: string;
@@ -1158,67 +1159,36 @@ export default function KanjiReadingStudyPage() {
           />
 
           {checked ? (
-            <div className="mt-2 w-full max-w-sm text-center text-sm">
-              {checked.ok ? (
-                <>
-                  <p className="text-green-700">✅ Correct!</p>
-                  {cardQuestionMode === "readingChoice" &&
-                    card.readingType === "kunyomi" &&
-                    isKunWithOkurigana(card.sourceWord) &&
-                    card.baseReading &&
-                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
-                    <p className="mt-1 text-gray-600">Base reading: {card.baseReading}</p>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <p className="text-red-700">❌ Not quite.</p>
-                  <p className="mt-1 text-gray-600">Correct answer: {checked.correct}</p>
-                  {cardQuestionMode === "readingChoice" &&
-                    card.readingType === "kunyomi" &&
-                    isKunWithOkurigana(card.sourceWord) &&
-                    card.baseReading &&
-                    normalizeReading(card.baseReading) !== normalizeReading(card.reading) ? (
-                    <p className="mt-1 text-gray-600">Base reading: {card.baseReading}</p>
-                  ) : null}
-                </>
-              )}
-
-              {!inRecallFlow ? (
-                <>
-                  <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                    <div className="text-lg font-semibold">{card.sourceWord}</div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      {card.bookTitle ? `Seen in: ${card.bookTitle}` : "Shared kanji bank"}
-                    </div>
-                    {card.sourceReading ? (
-                      <div className="mt-1 text-sm text-slate-500">{card.sourceReading}</div>
-                    ) : null}
-                    {card.sourceMeaning ? (
-                      <div className="mt-1 text-sm text-slate-700">{card.sourceMeaning}</div>
-                    ) : null}
-                  </div>
-
-                  <p className="mt-2 text-xs text-slate-400">Next word comes automatically.</p>
-                </>
-              ) : null}
-
-              {inRecallFlow ? (
-                <KanjiRecallPanel
-                  card={card}
-                  recallMode={recallMode}
-                  recallRevealed={recallRevealed}
-                  recallResult={recallResult}
-                  recallMatchedWord={recallMatchedWord}
-                  recallMatchedCard={recallMatchedCard}
-                  guessInput={guessInput}
-                  onGuessChange={setGuessInput}
-                  onSubmitGuess={submitGuess}
-                  onRevealRecallCard={() => revealRecallCard("shown")}
-                  onNext={nextCard}
-                />
-              ) : null}
-            </div>
+            <KanjiStudyFeedbackPanel
+              checked={checked}
+              card={card}
+              showBaseReading={
+                cardQuestionMode === "readingChoice" &&
+                card.readingType === "kunyomi" &&
+                isKunWithOkurigana(card.sourceWord) &&
+                Boolean(card.baseReading) &&
+                normalizeReading(card.baseReading) !== normalizeReading(card.reading)
+              }
+              baseReading={card.baseReading}
+              showExample={!inRecallFlow}
+              recallSlot={
+                inRecallFlow ? (
+                  <KanjiRecallPanel
+                    card={card}
+                    recallMode={recallMode}
+                    recallRevealed={recallRevealed}
+                    recallResult={recallResult}
+                    recallMatchedWord={recallMatchedWord}
+                    recallMatchedCard={recallMatchedCard}
+                    guessInput={guessInput}
+                    onGuessChange={setGuessInput}
+                    onSubmitGuess={submitGuess}
+                    onRevealRecallCard={() => revealRecallCard("shown")}
+                    onNext={nextCard}
+                  />
+                ) : null
+              }
+            />
           ) : null}
         </div>
       </div>
