@@ -558,12 +558,17 @@ export default function TeacherAddBookPage() {
         setSaving(true);
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from("book_requests")
                 .update({ status: "rejected" })
-                .eq("id", bookRequest.id);
+                .eq("id", bookRequest.id)
+                .select("id, status")
+                .maybeSingle();
 
             if (error) throw error;
+            if (!data || data.status !== "rejected") {
+                throw new Error("This book request was not updated. Please refresh and try again.");
+            }
 
             setMessage("Book request marked as rejected.");
             router.replace("/teacher/books");

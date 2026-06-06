@@ -1445,6 +1445,28 @@ export default function BooksPage() {
     setIsSavingRequest(true);
 
     try {
+      let existingRequestQuery = supabase
+        .from("book_requests")
+        .select("id")
+        .eq("user_id", meId)
+        .eq("status", "pending")
+        .limit(1);
+
+      existingRequestQuery = cleanIsbn
+        ? existingRequestQuery.eq("isbn13", cleanIsbn)
+        : existingRequestQuery.eq("title", cleanTitle);
+
+      const { data: existingPendingRequest, error: existingPendingRequestError } =
+        await existingRequestQuery.maybeSingle();
+
+      if (existingPendingRequestError) throw existingPendingRequestError;
+
+      if (existingPendingRequest) {
+        alert("This book request is already waiting for review.");
+        setShowRequestBook(false);
+        return;
+      }
+
       const { error } = await supabase.from("book_requests").insert({
         user_id: meId,
         title: cleanTitle,
@@ -1498,14 +1520,21 @@ export default function BooksPage() {
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("book_requests")
         .update({ status: "rejected" })
-        .eq("id", requestId);
+        .eq("id", requestId)
+        .select("id, status")
+        .maybeSingle();
 
       if (error) {
         console.error("Reject request error:", error);
         alert("Could not reject request.");
+        return;
+      }
+
+      if (!data || data.status !== "rejected") {
+        alert("This book request was not updated. Please refresh and try again.");
         return;
       }
 

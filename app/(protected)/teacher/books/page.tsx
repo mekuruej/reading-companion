@@ -240,12 +240,17 @@ export default function TeacherBooksQueuePage() {
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("book_requests")
         .update({ status: "rejected" })
-        .eq("id", requestId);
+        .eq("id", requestId)
+        .select("id, status")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data || data.status !== "rejected") {
+        throw new Error("This book request was not updated. Please refresh and try again.");
+      }
 
       setMessage("Book request marked as rejected.");
       await loadFlags();

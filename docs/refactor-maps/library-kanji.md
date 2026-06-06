@@ -6,6 +6,51 @@ No-code refactor map for:
 
 Current size: about 1,572 lines.
 
+## Current Status
+
+Visual pass mostly done / architecture deferred.
+
+Line count:
+* Before: about 1,572 lines
+* Now: about 1,192 lines
+* Change: about -380 lines
+
+Finished:
+* extracted `KanjiStudyLoadingState`
+* extracted `KanjiStudyAccessState`
+* extracted `KanjiStudyHeader`
+* extracted `KanjiStudyProgressPanel`
+* extracted `KanjiStudyNotice`
+* extracted `KanjiStudyCompleteState`
+* extracted `KanjiStudyBottomControls`
+* extracted `KanjiStudyPreviewLockedState`
+* extracted `KanjiRecallPanel`
+* extracted `KanjiStudyOptionList`
+* extracted `KanjiStudyFeedbackPanel`
+* extracted `KanjiStudyCardFrame`
+* extracted `KanjiStudyPrompt`
+
+Still intentionally deferred:
+* access checks
+* full-access checks
+* Supabase queries
+* global `vocabulary_kanji_map` / `vocabulary_cache` loading logic
+* optional personal user-book context loading
+* learner report/flag behavior through `kanji_map_reports`
+* answer checking logic
+* recall matching logic
+* studied-today behavior
+* study event writes
+* previous/next/retry/session behavior
+* keyboard behavior
+* helper functions
+* services, DAOs, controllers, hooks, or page-local types
+
+Notes:
+* The visual pass removed about 380 lines while keeping the global kanji/reporting boundary untouched.
+* The page is still architecture-deferred because the remaining complexity is mostly behavior/data logic, not safe visual JSX.
+* Later behavioral follow-up: review the kanji card identity issue where same-kanji/different-reading entries such as `市【いち】` and `市【し】` may collapse too aggressively.
+
 ## Current Page Purpose
 
 This page is the global Kanji Study flow.

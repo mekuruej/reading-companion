@@ -21,6 +21,8 @@ import KanjiStudyFeedbackPanel from "../components/KanjiStudyFeedbackPanel";
 import KanjiStudyCardFrame from "../components/KanjiStudyCardFrame";
 import KanjiStudyPrompt from "../components/KanjiStudyPrompt";
 import KanjiStudyModeSelector from "../components/KanjiStudyModeSelector";
+import KanjiAnswerStyleSelector from "../components/KanjiAnswerStyleSelector";
+import KanjiStudyTypingAnswer from "../components/KanjiStudyTypingAnswer";
 
 type UserBookWordRow = {
   id: string;
@@ -84,6 +86,7 @@ type RecallResult = "correct" | "wrong" | "shown" | "unverified" | null;
 type RecallMode = "wordForKanji" | "kanjiForReading";
 type CardQuestionMode = "readingChoice" | "kanjiChoice";
 type LevelFilter = "beginner" | "n3" | "n2" | "advanced" | "unlabeled" | "all";
+type KanjiAnswerStyle = "multipleChoice" | "typing";
 type KanjiStudyMode =
   | "kunyomiToKanji"
   | "kanjiToKunyomi"
@@ -179,6 +182,12 @@ function promptTextForStudyMode(card: QuizCard, mode: KanjiStudyMode) {
     : card.kanji;
 }
 
+function answerStyleForMode(mode: KanjiStudyMode, preferredStyle: KanjiAnswerStyle) {
+  return questionModeForStudyMode(mode) === "readingChoice"
+    ? preferredStyle
+    : "multipleChoice";
+}
+
 function relatedReadingExamplesForCard(card: QuizCard, cards: QuizCard[]) {
   const normalizedReading = normalizeReading(card.reading);
   const seenWords = new Set<string>([normalizeWord(card.sourceWord)]);
@@ -227,6 +236,10 @@ function normalizeReading(s: string) {
     .replace(/\s+/g, "")
     .replace(/[・･]/g, "")
     .toLowerCase();
+}
+
+function normalizeReadingAnswer(s: string) {
+  return normalizeReading(kataToHira(s));
 }
 
 function normalizeWord(s: string) {
@@ -397,6 +410,8 @@ export default function KanjiReadingStudyPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
   const [autoAdvancePaused, setAutoAdvancePaused] = useState(false);
+  const [answerStyle, setAnswerStyle] = useState<KanjiAnswerStyle>("multipleChoice");
+  const [typingAnswer, setTypingAnswer] = useState("");
 
   const [guessInput, setGuessInput] = useState("");
   const [recallRevealed, setRecallRevealed] = useState(false);
@@ -610,6 +625,10 @@ export default function KanjiReadingStudyPage() {
     () => questionModeForStudyMode(studyMode),
     [studyMode]
   );
+  const effectiveAnswerStyle = useMemo(
+    () => answerStyleForMode(studyMode, answerStyle),
+    [studyMode, answerStyle]
+  );
 
   const canStartRecall = false;
 
@@ -745,6 +764,14 @@ export default function KanjiReadingStudyPage() {
       }
 
       if (!checked) {
+        if (effectiveAnswerStyle === "typing" && e.key === "Enter") {
+          e.preventDefault();
+          submitTypingAnswer();
+          return;
+        }
+
+        if (effectiveAnswerStyle !== "multipleChoice") return;
+
         if (e.key === "1" && options[0]) checkAnswer(options[0]);
         if (e.key === "2" && options[1]) checkAnswer(options[1]);
         if (e.key === "3" && options[2]) checkAnswer(options[2]);
@@ -754,7 +781,7 @@ export default function KanjiReadingStudyPage() {
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [card, checked, options, inRecallFlow]);
+  }, [card, checked, options, inRecallFlow, effectiveAnswerStyle, typingAnswer]);
 
   useEffect(() => {
     if (!notice) return;
@@ -803,6 +830,7 @@ export default function KanjiReadingStudyPage() {
   function resetCardState() {
     setSelected(null);
     setChecked(null);
+    setTypingAnswer("");
     setGuessInput("");
     setRecallRevealed(false);
     setRecallResult(null);
@@ -877,7 +905,7 @@ export default function KanjiReadingStudyPage() {
     const ok =
       cardQuestionMode === "kanjiChoice"
         ? choice.trim() === displayedCorrect
-        : normalizeReading(choice) === normalizeReading(displayedCorrect);
+        : normalizeReadingAnswer(choice) === normalizeReadingAnswer(displayedCorrect);
 
     setSelected(choice);
     setChecked({ ok, correct: displayedCorrect });
@@ -891,6 +919,28 @@ export default function KanjiReadingStudyPage() {
       cardType: `kanji_reading_choice_${studyMode}`,
     });
 
+  }
+
+  function submitTypingAnswer() {
+    if (!card || checked || effectiveAnswerStyle !== "typing") return;
+
+    const answer = typingAnswer.trim();
+    if (!answer) return;
+
+    const displayedCorrect = correctAnswerForCard(card, studyMode);
+    const ok = normalizeReadingAnswer(answer) === normalizeReadingAnswer(displayedCorrect);
+
+    setSelected(answer);
+    setChecked({ ok, correct: displayedCorrect });
+    setGuessInput("");
+    setRecallRevealed(false);
+    setRecallResult(null);
+
+    recordKanjiReadingStudyEvent({
+      result: ok ? "correct" : "incorrect",
+      isCorrect: ok,
+      cardType: `kanji_reading_typing_${studyMode}`,
+    });
   }
 
   function revealRecallCard(
@@ -1070,6 +1120,13 @@ export default function KanjiReadingStudyPage() {
         summaryText={studyModeSummary(studyMode)}
       />
 
+      {cardQuestionMode === "readingChoice" && !noCardsForCurrentMode ? (
+        <KanjiAnswerStyleSelector
+          value={effectiveAnswerStyle}
+          onChange={setAnswerStyle}
+        />
+      ) : null}
+
       <KanjiStudyNotice notice={notice} />
 
       {noCardsForCurrentMode ? (
@@ -1107,37 +1164,51 @@ export default function KanjiReadingStudyPage() {
             targetKanji={cardQuestionMode === "readingChoice" ? card.kanji : undefined}
           />
 
-          <KanjiStudyOptionList
-            disabled={!!checked}
-            onChoose={checkAnswer}
-            options={options.map((opt) => {
-              const displayedCorrect = correctAnswerForCard(card, studyMode);
+          {effectiveAnswerStyle === "typing" ? (
+            <KanjiStudyTypingAnswer
+              value={typingAnswer}
+              disabled={!!checked}
+              placeholder={
+                card.readingType === "onyomi"
+                  ? "Type the onyomi reading"
+                  : "Type the kunyomi reading"
+              }
+              onChange={setTypingAnswer}
+              onSubmit={submitTypingAnswer}
+            />
+          ) : (
+            <KanjiStudyOptionList
+              disabled={!!checked}
+              onChoose={checkAnswer}
+              options={options.map((opt) => {
+                const displayedCorrect = correctAnswerForCard(card, studyMode);
 
-              const isCorrect =
-                !!checked &&
-                (cardQuestionMode === "kanjiChoice"
-                  ? opt.trim() === displayedCorrect
-                  : normalizeReading(opt) === normalizeReading(displayedCorrect));
+                const isCorrect =
+                  !!checked &&
+                  (cardQuestionMode === "kanjiChoice"
+                    ? opt.trim() === displayedCorrect
+                    : normalizeReadingAnswer(opt) === normalizeReadingAnswer(displayedCorrect));
 
-              const isChosen =
-                !!selected &&
-                (cardQuestionMode === "kanjiChoice"
-                  ? opt.trim() === selected.trim()
-                  : normalizeReading(opt) === normalizeReading(selected));
+                const isChosen =
+                  !!selected &&
+                  (cardQuestionMode === "kanjiChoice"
+                    ? opt.trim() === selected.trim()
+                    : normalizeReadingAnswer(opt) === normalizeReadingAnswer(selected));
 
-              return {
-                value: opt,
-                largeText: cardQuestionMode === "kanjiChoice",
-                state: !checked
-                  ? "idle"
-                  : isCorrect
-                    ? "correct"
-                    : isChosen
-                      ? "wrong"
-                      : "neutral",
-              };
-            })}
-          />
+                return {
+                  value: opt,
+                  largeText: cardQuestionMode === "kanjiChoice",
+                  state: !checked
+                    ? "idle"
+                    : isCorrect
+                      ? "correct"
+                      : isChosen
+                        ? "wrong"
+                        : "neutral",
+                };
+              })}
+            />
+          )}
 
           {checked ? (
             <KanjiStudyFeedbackPanel

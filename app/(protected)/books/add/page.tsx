@@ -355,6 +355,24 @@ export default function AddBookPage() {
                 return;
             }
 
+            const { data: existingPendingRequest, error: existingPendingRequestError } =
+                await supabase
+                    .from("book_requests")
+                    .select("id")
+                    .eq("user_id", user.id)
+                    .eq("status", "pending")
+                    .eq("isbn13", cleanIsbn)
+                    .limit(1)
+                    .maybeSingle();
+
+            if (existingPendingRequestError) throw existingPendingRequestError;
+
+            if (existingPendingRequest) {
+                setCanRequestBook(false);
+                setError("This book request is already waiting for review.");
+                return;
+            }
+
             const { error: requestError } = await supabase.from("book_requests").insert({
                 user_id: user.id,
                 title: `ISBN ${cleanIsbn}`,
