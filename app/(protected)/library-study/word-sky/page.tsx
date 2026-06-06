@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import WordSkyLoadingState from "../components/WordSkyLoadingState";
 import WordSkyHeader from "../components/WordSkyHeader";
+import WordSkyMessageBanner from "../components/WordSkyMessageBanner";
 
 type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;
@@ -615,11 +616,7 @@ export default function WordSkyPage() {
           onBackToStudy={() => router.push("/library-study")}
         />
 
-        {message ? (
-          <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {message}
-          </div>
-        ) : null}
+        <WordSkyMessageBanner message={message} />
 
         <section className="relative min-h-[68vh] overflow-hidden rounded-3xl border border-sky-100/80 bg-gradient-to-b from-[#f3fbff] via-[#e4f4ff] to-[#f4f7ff] shadow-sm">
           <div className="pointer-events-none absolute inset-0 opacity-80">
