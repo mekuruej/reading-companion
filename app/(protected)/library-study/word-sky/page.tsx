@@ -17,6 +17,7 @@ import WordSkyMessageBanner from "../components/WordSkyMessageBanner";
 import WordSkyScene from "../components/WordSkyScene";
 import WordSkyBubble from "../components/WordSkyBubble";
 import WordSkySelectedPanel from "../components/WordSkySelectedPanel";
+import WordSkyEmptySelectionPanel from "../components/WordSkyEmptySelectionPanel";
 
 type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;
@@ -662,12 +663,7 @@ export default function WordSkyPage() {
                 onClose={() => setSelectedWord(null)}
               />
             ) : (
-              <div>
-                <div className="text-sm font-semibold text-slate-700">Tap a floating word.</div>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Claimed words stay separate from real reading encounters.
-                </p>
-              </div>
+              <WordSkyEmptySelectionPanel />
             )}
           </div>
         </WordSkyScene>
