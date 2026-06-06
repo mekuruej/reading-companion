@@ -10,6 +10,7 @@ import { recordStudyEvent } from "@/lib/studyEvents";
 import KanjiStudyLoadingState from "../components/KanjiStudyLoadingState";
 import KanjiStudyAccessState from "../components/KanjiStudyAccessState";
 import KanjiStudyHeader from "../components/KanjiStudyHeader";
+import KanjiStudyProgressPanel from "../components/KanjiStudyProgressPanel";
 
 type UserBookWordRow = {
   id: string;
@@ -1160,29 +1161,12 @@ export default function KanjiReadingStudyPage() {
         </details>
       </div>
 
-      <p className="text-sm text-gray-500">
-        Card {index + 1}/{deck.length}
-      </p>
-
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm">
-        <span className="font-medium text-stone-700">Level:</span>
-
-        <select
-          value={levelFilter}
-          onChange={(e) => setLevelFilter(e.target.value as LevelFilter)}
-          className="rounded border bg-white px-3 py-2 text-sm text-stone-800"
-        >
-          <option value="beginner">Beginner: N5/N4</option>
-          <option value="intermediate">Intermediate: N3/N2</option>
-          <option value="advanced">Advanced: N1</option>
-          <option value="unlabeled">Unlabeled</option>
-          <option value="all">All levels</option>
-        </select>
-
-        <div className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-semibold text-emerald-900">
-          Onyomi focus · occasional kunyomi check
-        </div>
-      </div>
+      <KanjiStudyProgressPanel
+        current={index + 1}
+        total={deck.length}
+        levelFilter={levelFilter}
+        onLevelFilterChange={(value) => setLevelFilter(value as LevelFilter)}
+      />
 
       {notice ? (
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
