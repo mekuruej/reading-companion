@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import KanjiStudyLoadingState from "../components/KanjiStudyLoadingState";
 import KanjiStudyAccessState from "../components/KanjiStudyAccessState";
+import KanjiStudyHeader from "../components/KanjiStudyHeader";
 
 type UserBookWordRow = {
   id: string;
@@ -1125,14 +1126,7 @@ export default function KanjiReadingStudyPage() {
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-6 py-4">
       <div className="mb-2 w-full max-w-3xl rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-4 shadow-sm">
-        <div className="flex items-center justify-center gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm">
-            漢
-          </div>
-          <h1 className="text-center text-2xl font-semibold text-emerald-950">
-            Kanji Reading Study
-          </h1>
-        </div>
+        <KanjiStudyHeader />
 
         <details className="group mt-4 rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-sm leading-6 text-gray-600 shadow-sm">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
