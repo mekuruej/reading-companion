@@ -18,6 +18,8 @@ import KanjiStudyPreviewLockedState from "../components/KanjiStudyPreviewLockedS
 import KanjiRecallPanel from "../components/KanjiRecallPanel";
 import KanjiStudyOptionList from "../components/KanjiStudyOptionList";
 import KanjiStudyFeedbackPanel from "../components/KanjiStudyFeedbackPanel";
+import KanjiStudyCardFrame from "../components/KanjiStudyCardFrame";
+import KanjiStudyPrompt from "../components/KanjiStudyPrompt";
 
 type UserBookWordRow = {
   id: string;
@@ -1066,63 +1068,35 @@ export default function KanjiReadingStudyPage() {
 
       <KanjiStudyNotice notice={notice} />
 
-      <div
-        className={`relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl ${card.flaggedForReview ? "border-red-400 bg-red-50/30" : "border-slate-500"
-          }`}
-        onClick={() => {
+      <KanjiStudyCardFrame
+        flaggedForReview={card.flaggedForReview}
+        kanji={card.kanji}
+        showReadingTypeBadge={
+          cardQuestionMode === "readingChoice" && Boolean(card.readingType)
+        }
+        readingTypeText={card.readingType ? readingTypeLabel(card.readingType) : ""}
+        strokeCount={card.strokeCount}
+        radical={card.radical}
+        radicalName={card.radicalName}
+        onCardClick={() => {
           if (!checked && !inRecallFlow) return;
           if (inRecallFlow) return;
           if (checked) nextCard();
         }}
       >
-        {card.flaggedForReview ? (
-          <div className="absolute left-4 top-3 z-10 rounded-full bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700">
-            Review Carefully
-          </div>
-        ) : null}
-
-        {cardQuestionMode === "readingChoice" && card.readingType ? (
-          <div
-            className={`absolute z-10 rounded-full px-3 py-1.5 text-sm font-medium ${card.flaggedForReview
-              ? "left-4 top-14 bg-slate-100 text-slate-600"
-              : "left-4 top-3 bg-slate-100 text-slate-600"
-              }`}
-          >
-            {readingTypeLabel(card.readingType)}
-          </div>
-        ) : null}
-
-        {card.strokeCount != null || card.radical || card.radicalName ? (
-          <div className="absolute right-4 top-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
-            <div className="flex flex-col items-end leading-none">
-              <div className="text-sm font-medium">
-                {card.kanji} {card.strokeCount ?? ""}
-              </div>
-              <div className="mt-1 text-[10px] text-slate-400">
-                {card.radical ? `radical: ${card.radical}` : ""}
-                {card.radicalName ? ` (${card.radicalName})` : ""}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         <div className="flex w-full flex-col items-center justify-center gap-6">
-          <div className="flex w-full flex-col items-center gap-1">
-            <div className="text-xs uppercase tracking-wide text-slate-500">
-              {cardQuestionMode === "kanjiChoice" ? "Reading" : "Kanji"}
-            </div>
-            <div className="text-5xl font-bold">
-              {cardQuestionMode === "kanjiChoice" ? card.sourceReading : card.kanji}
-              {cardQuestionMode === "readingChoice" &&
+          <KanjiStudyPrompt
+            label={cardQuestionMode === "kanjiChoice" ? "Reading" : "Kanji"}
+            mainText={cardQuestionMode === "kanjiChoice" ? card.sourceReading : card.kanji}
+            trailingHint={
+              cardQuestionMode === "readingChoice" &&
                 (card.readingType === "other" ||
                   (card.readingType === "kunyomi" && isKunWithOkurigana(card.sourceWord))) &&
-                card.sourceWord ? (
-                <span className="ml-1 font-medium text-slate-300">
-                  {getTrailingReadingHint(card.sourceWord, card.kanji)}
-                </span>
-              ) : null}
-            </div>
-          </div>
+                card.sourceWord
+                ? getTrailingReadingHint(card.sourceWord, card.kanji)
+                : ""
+            }
+          />
 
           <KanjiStudyOptionList
             disabled={!!checked}
@@ -1191,7 +1165,7 @@ export default function KanjiReadingStudyPage() {
             />
           ) : null}
         </div>
-      </div>
+      </KanjiStudyCardFrame>
 
       <KanjiStudyBottomControls
         canGoPrevious={index > 0}
