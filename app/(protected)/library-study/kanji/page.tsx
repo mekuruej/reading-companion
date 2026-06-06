@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import KanjiStudyLoadingState from "../components/KanjiStudyLoadingState";
+import KanjiStudyAccessState from "../components/KanjiStudyAccessState";
 
 type UserBookWordRow = {
   id: string;
@@ -965,45 +966,34 @@ export default function KanjiReadingStudyPage() {
 
   if (needsSignIn) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-gray-700">You need to sign in to view your readings.</p>
-        <button
-          onClick={() => router.push("/books")}
-          className="rounded bg-gray-200 px-4 py-2"
-        >
-          Back to Books
-        </button>
-      </main>
+      <KanjiStudyAccessState
+        title="Sign in required"
+        message="You need to sign in to use Kanji Study."
+        primaryHref="/login"
+        primaryLabel="Go to Login"
+      />
     );
   }
 
   if (errorMsg) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-red-700">{errorMsg}</p>
-        <button
-          onClick={() => router.push("/library-study")}
-          className="rounded bg-gray-200 px-4 py-2"
-        >
-          Back to Study Hub
-        </button>
-      </main>
+      <KanjiStudyAccessState
+        title="Kanji Study could not load"
+        message={errorMsg}
+        primaryHref="/books"
+        primaryLabel="Back to Library"
+      />
     );
   }
 
   if (baseCards.length === 0) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
-        <p className="mb-8 text-2xl font-semibold text-gray-700">
-          No saved vocabulary with kanji readings is available yet.
-        </p>
-        <button
-          onClick={() => router.push("/library-study")}
-          className="rounded bg-gray-200 px-4 py-2"
-        >
-          Back to Study Hub
-        </button>
-      </main>
+      <KanjiStudyAccessState
+        title="No kanji cards are ready yet"
+        message="Kanji Study does not have cards available right now."
+        primaryHref="/books"
+        primaryLabel="Back to Library"
+      />
     );
   }
 
