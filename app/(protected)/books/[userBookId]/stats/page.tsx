@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
+import BookStatsErrorState from "./components/BookStatsErrorState";
 
 type Book = {
     id: string;
@@ -531,13 +532,11 @@ export default function BookStatsPage() {
         );
     }
 
-    if (errorMessage || !row || !book) {
+    if (errorMessage || !row) {
         return (
-            <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-5xl rounded-3xl border border-red-200 bg-red-50 p-6 text-red-700">
-                    {errorMessage || "Book stats not found."}
-                </div>
-            </main>
+            <BookStatsErrorState
+                message={errorMessage ?? "Book stats could not be loaded."}
+            />
         );
     }
 
