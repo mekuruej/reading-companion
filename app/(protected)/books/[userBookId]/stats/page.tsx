@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
 import BookStatsErrorState from "./components/BookStatsErrorState";
+import StatCard from "./components/StatCard";
 
 type Book = {
     id: string;
@@ -164,26 +165,6 @@ function difficultyNeighborhood(percentHarderThan: number | null) {
         colorClass: "border-sky-200 bg-sky-50 text-sky-900",
         note: "This one sits near the gentler end of your shelf.",
     };
-}
-
-function StatCard({
-    label,
-    value,
-    note,
-}: {
-    label: string;
-    value: string | number;
-    note?: string;
-}) {
-    return (
-        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                {label}
-            </div>
-            <div className="mt-2 text-2xl font-black text-stone-900">{value}</div>
-            {note ? <div className="mt-1 text-xs text-stone-500">{note}</div> : null}
-        </div>
-    );
 }
 
 export default function BookStatsPage() {
