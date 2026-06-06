@@ -12,6 +12,7 @@ import BookStatsErrorState from "./components/BookStatsErrorState";
 import StatCard from "./components/StatCard";
 import StatsSection from "./components/StatsSection";
 import BookStatsHeader from "./components/BookStatsHeader";
+import DifficultyNeighborhoodPanel from "./components/DifficultyNeighborhoodPanel";
 
 type Book = {
     id: string;
@@ -536,52 +537,14 @@ export default function BookStatsPage() {
                     }
                 />
 
-                <section className={`rounded-3xl border p-5 shadow-sm ${neighborhood.colorClass}`}>
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_210px] md:items-stretch">
-                        <div className="rounded-2xl bg-white/35 p-4">
-                            <div className="text-xs font-semibold uppercase tracking-[0.2em] opacity-70">
-                                Difficulty Neighborhood
-                            </div>
-
-                            <div className="mt-2 text-3xl font-black">
-                                {neighborhood.label}
-                            </div>
-
-                            {difficultyComparison.percentHarderThan != null ? (
-                                <p className="mt-2 text-sm leading-6">
-                                    Harder than{" "}
-                                    <span className="font-black">
-                                        {difficultyComparison.percentHarderThan}%
-                                    </span>{" "}
-                                    of your other {typeLabel}.
-                                </p>
-                            ) : (
-                                <p className="mt-2 text-sm leading-6">{neighborhood.note}</p>
-                            )}
-
-                            <div className="mt-4 text-xs opacity-70">
-                                Compared only with your rated {typeLabel}.{" "}
-                                {difficultyComparison.sampleSize > 0
-                                    ? `Based on ${difficultyComparison.sampleSize} other rated ${typeLabel}.`
-                                    : "Rate more books of this type to compare fairly."}
-                            </div>
-                        </div>
-
-                        <div className="flex min-h-[150px] flex-col justify-center rounded-2xl border border-white/70 bg-white/75 p-5 text-center shadow-sm">
-                            <div className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
-                                Your Rating
-                            </div>
-
-                            <div className="mt-2 text-4xl font-black">
-                                {row.rating_difficulty ? `${row.rating_difficulty}/5` : "—"}
-                            </div>
-
-                            <div className="mt-2 text-sm font-semibold opacity-80">
-                                {difficultyText(row.rating_difficulty)}
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                <DifficultyNeighborhoodPanel
+                    neighborhood={neighborhood}
+                    percentHarderThan={difficultyComparison.percentHarderThan}
+                    sampleSize={difficultyComparison.sampleSize}
+                    typeLabel={typeLabel}
+                    ratingDifficulty={row.rating_difficulty}
+                    ratingText={difficultyText(row.rating_difficulty)}
+                />
 
                 <section className="space-y-3">
                     <h2 className="text-lg font-black text-stone-950">
