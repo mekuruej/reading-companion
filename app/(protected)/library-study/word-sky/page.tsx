@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabaseClient";
 import WordSkyLoadingState from "../components/WordSkyLoadingState";
 import WordSkyHeader from "../components/WordSkyHeader";
 import WordSkyMessageBanner from "../components/WordSkyMessageBanner";
+import WordSkyScene from "../components/WordSkyScene";
 
 type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;
@@ -618,13 +619,7 @@ export default function WordSkyPage() {
 
         <WordSkyMessageBanner message={message} />
 
-        <section className="relative min-h-[68vh] overflow-hidden rounded-3xl border border-sky-100/80 bg-gradient-to-b from-[#f3fbff] via-[#e4f4ff] to-[#f4f7ff] shadow-sm">
-          <div className="pointer-events-none absolute inset-0 opacity-80">
-            <div className="absolute left-[8%] top-[12%] h-28 w-28 rounded-full bg-white/60 blur-3xl" />
-            <div className="absolute right-[10%] top-[18%] h-56 w-56 rounded-full bg-sky-200/60 blur-3xl" />
-            <div className="absolute bottom-[10%] left-[26%] h-44 w-44 rounded-full bg-blue-100/80 blur-3xl" />
-            <div className="absolute bottom-[18%] right-[28%] h-36 w-36 rounded-full bg-cyan-100/70 blur-3xl" />
-          </div>
+        <WordSkyScene>
 
           <div className="absolute inset-0">
             {visibleWords.map((word) => {
@@ -726,7 +721,7 @@ export default function WordSkyPage() {
               </div>
             )}
           </div>
-        </section>
+        </WordSkyScene>
       </div>
 
       <style jsx>{`
