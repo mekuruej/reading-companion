@@ -3,6 +3,7 @@ type KanjiStudyProgressPanelProps = {
   total: number;
   levelFilter: string;
   onLevelFilterChange: (value: string) => void;
+  summaryText?: string;
 };
 
 export default function KanjiStudyProgressPanel({
@@ -10,6 +11,7 @@ export default function KanjiStudyProgressPanel({
   total,
   levelFilter,
   onLevelFilterChange,
+  summaryText,
 }: KanjiStudyProgressPanelProps) {
   return (
     <>
@@ -26,15 +28,18 @@ export default function KanjiStudyProgressPanel({
           className="rounded border bg-white px-3 py-2 text-sm text-stone-800"
         >
           <option value="beginner">Beginner: N5/N4</option>
-          <option value="intermediate">Intermediate: N3/N2</option>
+          <option value="n3">Lower Intermediate: N3</option>
+          <option value="n2">Upper Intermediate: N2</option>
           <option value="advanced">Advanced: N1</option>
           <option value="unlabeled">Unlabeled</option>
           <option value="all">All levels</option>
         </select>
 
-        <div className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-semibold text-emerald-900">
-          Onyomi focus · occasional kunyomi check
-        </div>
+        {summaryText ? (
+          <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+            {summaryText}
+          </div>
+        ) : null}
       </div>
     </>
   );

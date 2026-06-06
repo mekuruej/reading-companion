@@ -29,11 +29,11 @@ export default function KanjiStudyCompleteState({
         ) : (
           <>
             <p className="mt-3 text-gray-700">
-              You’re more ready for more readings.
+              You reviewed every card in this set.
             </p>
 
             <p className="mt-2 text-sm text-gray-500">
-              Come back tomorrow to reinforce the readings.
+              Study again to reshuffle this mode and level.
             </p>
           </>
         )}
