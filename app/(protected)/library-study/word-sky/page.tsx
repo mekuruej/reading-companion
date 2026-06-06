@@ -15,6 +15,7 @@ import WordSkyLoadingState from "../components/WordSkyLoadingState";
 import WordSkyHeader from "../components/WordSkyHeader";
 import WordSkyMessageBanner from "../components/WordSkyMessageBanner";
 import WordSkyScene from "../components/WordSkyScene";
+import WordSkyBubble from "../components/WordSkyBubble";
 
 type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;
@@ -629,29 +630,13 @@ export default function WordSkyPage() {
               const isSelected = selectedKey === key;
 
               return (
-                <button
+                <WordSkyBubble
                   key={word.skyId}
-                  type="button"
+                  word={word}
+                  bubbleClassName={colorClass(bubbleColor)}
+                  isSelected={isSelected}
                   onClick={() => setSelectedWord(isSelected ? null : word)}
-                  className={[
-                    "absolute rounded-full border-0 bg-transparent p-0 text-left shadow-none transition",
-                    isSelected ? "ring-2 ring-slate-700" : "",
-                  ].join(" ")}
-                  style={{
-                    left: "-18%",
-                    top: `${word.lane}%`,
-                    animation: `word-sky-cross ${word.duration}s linear ${word.delay}s infinite`,
-                  }}
-                >
-                  <span
-                    className={`block rounded-full border px-4 py-3 shadow-sm backdrop-blur transition hover:shadow-md ${colorClass(bubbleColor)}`}
-                    style={{
-                      animation: `word-sky-bob ${word.bobDuration}s ease-in-out ${word.bobDelay}s infinite`,
-                    }}
-                  >
-                    <span className="block text-lg font-semibold leading-none">{word.surface}</span>
-                  </span>
-                </button>
+                />
               );
             })}
           </div>
