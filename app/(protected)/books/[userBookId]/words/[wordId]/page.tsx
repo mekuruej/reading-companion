@@ -5,8 +5,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { supabase } from "@/lib/supabaseClient";
+import WordDetailErrorState from "./components/WordDetailErrorState";
+import WordDetailLoadingState from "./components/WordDetailLoadingState";
+import WordDetailNeedsSignInState from "./components/WordDetailNeedsSignInState";
+import WordDetailHeader from "./components/WordDetailHeader";
+import WordDetailFooterActions from "./components/WordDetailFooterActions";
+import WordDetailReportIssueLink from "./components/WordDetailReportIssueLink";
+import WordDetailTeacherPhraseSection from "./components/WordDetailTeacherPhraseSection";
+import WordKanjiInfoPanel from "./components/WordKanjiInfoPanel";
+import RelatedKanjiWordsPanel from "./components/RelatedKanjiWordsPanel";
+import WordSeenInSection from "./components/WordSeenInSection";
+import WordDictionaryInfoSection from "./components/WordDictionaryInfoSection";
 
 // -------------------------------------------------------------
 // Types
@@ -616,38 +626,23 @@ export default function WordDetailPage() {
   }, [word, ownerUserId]);
 
   if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center p-6">
-        <p className="text-lg text-gray-500">Loading word…</p>
-      </main>
-    );
+    return <WordDetailLoadingState />;
   }
 
   if (needsSignIn) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 p-6">
-        <p className="text-gray-700">You need to sign in to view this word.</p>
-        <button onClick={() => router.push(`/books`)} className="rounded bg-gray-200 px-4 py-2">
-          Back to Books
-        </button>
-      </main>
+      <WordDetailNeedsSignInState
+        onBackToBooks={() => router.push(`/books`)}
+      />
     );
   }
 
   if (errorMsg || !word) {
-    if (errorMsg === "You do not have access to this word.") {
-      return (
-        <AccessDeniedMessage message={errorMsg} />
-      );
-    }
-
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 p-6">
-        <p className="text-red-700">{errorMsg ?? "Word not found."}</p>
-        <button onClick={() => router.back()} className="rounded bg-gray-200 px-4 py-2">
-          ← Back
-        </button>
-      </main>
+      <WordDetailErrorState
+        errorMsg={errorMsg}
+        onBack={() => router.back()}
+      />
     );
   }
 
@@ -657,227 +652,59 @@ export default function WordDetailPage() {
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto w-full max-w-4xl">
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-4">
-          <button
-            type="button"
-            onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
-            title={`Go to ${bookTitle || "this book"} Book Hub`}
-          >
-            {bookCover ? (
-              <img
-                src={bookCover}
-                alt={`Go to ${bookTitle || "this book"} Book Hub`}
-                className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
-              />
-            ) : null}
+        <WordDetailHeader
+          bookTitle={bookTitle}
+          bookCover={bookCover}
+          chapter={chapter}
+          pageNumber={word.page_number}
+          onGoToBookHub={() =>
+            router.push(`/books/${encodeURIComponent(userBookId)}`)
+          }
+          onGoToVocabList={() =>
+            router.push(`/books/${encodeURIComponent(userBookId)}/words`)
+          }
+        />
 
-            <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
-              <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
-                {bookTitle || "Book"}
-              </div>
-              <p className="mt-1 truncate text-sm text-stone-500">
-                {chapter ? chapter : null}
-                {word.page_number != null ? ` • p. ${word.page_number}` : null}
-              </p>
-            </div>
-          </button>
+        <WordDictionaryInfoSection
+          surface={word.surface}
+          reading={word.reading}
+          jlpt={jlpt}
+          isCommon={word.is_common}
+        >
+          <WordKanjiInfoPanel
+            dictionaryLoading={dictionaryLoading}
+            kanjiMeta={kanjiMeta}
+          />
 
-          <div className="flex flex-wrap gap-2 sm:justify-end">
-            <button
-              type="button"
-              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}/words`)}
-              className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-            >
-              Vocab List
-            </button>
+          <RelatedKanjiWordsPanel kanjiGroups={kanjiGroups} />
+        </WordDictionaryInfoSection>
 
-            <button
-              type="button"
-              onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-            >
-              Book Hub
-            </button>
-          </div>
-        </div>
+        <WordSeenInSection
+          repeatsInThisBook={repeatsInThisBook}
+          totalLookupCount={totalLookupCount}
+          seenInstances={seenInstances}
+          meaningChoices={meaningChoices}
+          getChapterDisplay={chapterDisplay}
+        />
 
-        {/* 1) Dictionary Info */}
-        <section className="rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Dictionary Info</div>
-
-          <div className="flex flex-col gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-wide text-slate-500">Word</div>
-              <div className="break-words text-4xl font-bold">{word.surface}</div>
-            </div>
-
-            <div>
-              <div className="text-xs uppercase tracking-wide text-slate-500">Reading</div>
-              <div className="text-2xl font-medium">{word.reading || "—"}</div>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              {jlpt !== "NON-JLPT" ? (
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-[17px] font-medium leading-none text-gray-800">
-                  {jlpt}
-                </span>
-              ) : null}
-
-              {word.is_common ? <span className="text-gray-500">Common</span> : null}
-            </div>
-
-            <div className="mt-2 rounded-xl border p-4">
-              <div className="mb-2 text-sm font-semibold">Kanji Info</div>
-
-              {dictionaryLoading ? (
-                <div className="text-sm text-gray-500">Loading kanji info…</div>
-              ) : kanjiMeta.length === 0 ? (
-                <div className="text-sm text-gray-500">No kanji info for this word.</div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {kanjiMeta.map((k) => (
-                    <span
-                      key={k.kanji}
-                      className="rounded-full border bg-stone-50 px-3 py-1 text-sm"
-                    >
-                      {k.kanji} · {k.strokes ?? "?"} strokes
-                      {k.radical ? ` · radical ${k.radical}` : ""}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-2 rounded-xl border p-4">
-              <div className="mb-2 text-sm font-semibold">Words Using These Kanji</div>
-
-              {kanjiGroups.length === 0 ? (
-                <div className="text-sm text-gray-500">No related kanji words found.</div>
-              ) : (
-                <div className="space-y-5">
-                  {kanjiGroups.map((group) => (
-                    <div key={group.kanji}>
-                      <div className="mb-2 text-sm font-semibold text-stone-700">
-                        Words with {group.kanji}
-                      </div>
-
-                      {group.relatedWords.length === 0 ? (
-                        <div className="text-sm text-gray-500">No related words found.</div>
-                      ) : (
-                        <div className="space-y-2">
-                          {group.relatedWords.map((kw, i) => (
-                            <div key={`${group.kanji}-${kw.word}-${i}`} className="text-sm">
-                              <span className="font-medium text-stone-900">{kw.word}</span>
-                              {kw.reading ? (
-                                <span className="ml-2 text-stone-600">（{kw.reading}）</span>
-                              ) : null}
-                              {kw.meaning ? (
-                                <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* 2) Seen In */}
-        <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Seen In</div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border p-3">
-              <div className="text-xs text-gray-500">Repeats in this book</div>
-              <div className="text-2xl font-semibold">{repeatsInThisBook}</div>
-              <div className="mt-1 text-xs text-gray-400">All saved uses of this word in this book</div>
-            </div>
-
-            <div className="rounded-xl border p-3">
-              <div className="text-xs text-gray-500">Total lookup count</div>
-              <div className="text-2xl font-semibold">{totalLookupCount}</div>
-              <div className="mt-1 text-xs text-gray-400">Across all your books</div>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <div className="mb-2 text-sm font-semibold">Seen in</div>
-
-            {seenInstances.length === 0 ? (
-              <div className="text-sm text-gray-500">No saved instances found yet.</div>
-            ) : (
-              <div className="space-y-2">
-                {seenInstances.map((item) => {
-                  const defIndex =
-                    item.meaning_choice_index != null
-                      ? item.meaning_choice_index
-                      : meaningChoices.findIndex((m) => m === item.meaning);
-
-                  return (
-                    <div key={item.id} className="rounded-xl border p-3">
-                      <div className="font-medium text-stone-900">{item.books_title}</div>
-
-                      <div className="mt-1 text-sm text-stone-600">
-                        {chapterDisplay(item.chapter_number, item.chapter_name)
-                          ? chapterDisplay(item.chapter_number, item.chapter_name)
-                          : "No chapter"}
-                        {item.page_number != null ? ` • p. ${item.page_number}` : ""}
-                      </div>
-
-                      {item.meaning ? (
-                        <div className="mt-1 text-sm text-stone-500">
-                          {defIndex !== -1 && defIndex != null ? `Def ${defIndex + 1}: ` : ""}
-                          {item.meaning}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* 3) Useful Phrases */}
-        <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-2 text-sm text-stone-500">
-            Save short useful phrases from your reading here later.
-          </div>
-
+        <WordDetailTeacherPhraseSection>
           {isTeacher ? (
             <CollocationsPanel userBookId={userBookId} userBookWordId={word.id} />
           ) : null}
-        </section>
+        </WordDetailTeacherPhraseSection>
 
-        {!isTeacher && (
-          <div className="mt-4">
-            <button
-              onClick={() => {
-                alert("Thanks! Your teacher will review this word.");
-              }}
-              className="text-xs text-gray-500 underline hover:text-gray-700"
-            >
-              Something seems off?
-            </button>
-          </div>
-        )}
+        {!isTeacher ? (
+          <WordDetailReportIssueLink
+            onReportIssue={() => {
+              alert("Thanks! Your teacher will review this word.");
+            }}
+          />
+        ) : null}
 
-        <div className="mt-8 flex justify-between">
-          <button onClick={() => router.back()} className="rounded bg-gray-200 px-4 py-2">
-            ← Back
-          </button>
-
-          <button onClick={() => loadAll()} className="rounded bg-gray-100 px-4 py-2">
-            Refresh
-          </button>
-        </div>
+        <WordDetailFooterActions
+          onBack={() => router.back()}
+          onRefresh={() => loadAll()}
+        />
       </div>
     </main>
   );
