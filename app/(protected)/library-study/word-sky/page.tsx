@@ -16,6 +16,7 @@ import WordSkyHeader from "../components/WordSkyHeader";
 import WordSkyMessageBanner from "../components/WordSkyMessageBanner";
 import WordSkyScene from "../components/WordSkyScene";
 import WordSkyBubble from "../components/WordSkyBubble";
+import WordSkySelectedPanel from "../components/WordSkySelectedPanel";
 
 type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;
@@ -643,60 +644,23 @@ export default function WordSkyPage() {
 
           <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur md:left-auto md:w-[360px]">
             {selectedWord ? (
-              <>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Selected
-                    </div>
-                    <div className="mt-1 text-2xl font-semibold">{selectedWord.surface}</div>
-                    <div className="text-sm text-slate-500">
-                      {selectedWord.reading} · {selectedWord.meaning}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      {(selectedWord.jlpt ?? "Non-JLPT").toUpperCase()}
-                      {selectedWord.encounterCount
-                        ? ` · ${selectedWord.encounterCount} library encounters`
-                        : ""}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedWord(null)}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50"
-                    aria-label="Close selected word"
-                  >
-                    Close
-                  </button>
-                </div>
-
-                <div className="grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => saveClaim(selectedWord, "green")}
-                    disabled={savingKey === selectedKey}
-                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition hover:brightness-95 disabled:opacity-60 ${colorClass("green")}`}
-                  >
-                    {colorLabel("green")}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (claims[selectedKey]) {
-                        void clearClaim(selectedWord);
-                      } else {
-                        setSelectedWord(null);
-                      }
-                    }}
-                    disabled={savingKey === selectedKey}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
-                  >
-                    Leave it clear
-                  </button>
-                </div>
-              </>
+              <WordSkySelectedPanel
+                selectedWord={selectedWord}
+                selectedKey={selectedKey}
+                hasClaim={Boolean(claims[selectedKey])}
+                isSaving={savingKey === selectedKey}
+                greenButtonClassName={colorClass("green")}
+                greenLabel={colorLabel("green")}
+                onSaveGreen={() => void saveClaim(selectedWord, "green")}
+                onClearOrClose={() => {
+                  if (claims[selectedKey]) {
+                    void clearClaim(selectedWord);
+                  } else {
+                    setSelectedWord(null);
+                  }
+                }}
+                onClose={() => setSelectedWord(null)}
+              />
             ) : (
               <div>
                 <div className="text-sm font-semibold text-slate-700">Tap a floating word.</div>
