@@ -1520,21 +1520,27 @@ export default function BooksPage() {
     if (!confirmed) return;
 
     try {
-      const { data, error } = await supabase
-        .from("book_requests")
-        .update({ status: "rejected" })
-        .eq("id", requestId)
-        .select("id, status")
-        .maybeSingle();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
 
-      if (error) {
-        console.error("Reject request error:", error);
-        alert("Could not reject request.");
+      if (sessionError || !token) {
+        alert("Please sign in again before rejecting this request.");
         return;
       }
 
-      if (!data || data.status !== "rejected") {
-        alert("This book request was not updated. Please refresh and try again.");
+      const response = await fetch("/api/book-requests/reject", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ requestId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data?.error ?? "Could not reject request.");
         return;
       }
 

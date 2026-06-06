@@ -158,6 +158,32 @@ function requestTitleNeedsManualResearch(request: BookRequestRow | null) {
     return !title || title === `ISBN ${isbn}`;
 }
 
+async function rejectBookRequestWithSession(requestId: string) {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+
+    if (sessionError || !token) {
+        throw new Error("Please sign in again before rejecting this request.");
+    }
+
+    const response = await fetch("/api/book-requests/reject", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ requestId }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data?.error ?? "Could not reject this book request.");
+    }
+
+    return data;
+}
+
 export default function TeacherAddBookPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -558,18 +584,7 @@ export default function TeacherAddBookPage() {
         setSaving(true);
 
         try {
-            const { data, error } = await supabase
-                .from("book_requests")
-                .update({ status: "rejected" })
-                .eq("id", bookRequest.id)
-                .select("id, status")
-                .maybeSingle();
-
-            if (error) throw error;
-            if (!data || data.status !== "rejected") {
-                throw new Error("This book request was not updated. Please refresh and try again.");
-            }
-
+            await rejectBookRequestWithSession(bookRequest.id);
             setMessage("Book request marked as rejected.");
             router.replace("/teacher/books");
         } catch (error: any) {

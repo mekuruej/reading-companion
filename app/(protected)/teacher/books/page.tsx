@@ -59,6 +59,32 @@ function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
+async function rejectBookRequestWithSession(requestId: string) {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+
+  if (sessionError || !token) {
+    throw new Error("Please sign in again before rejecting this request.");
+  }
+
+  const response = await fetch("/api/book-requests/reject", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ requestId }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error ?? "Could not reject this book request.");
+  }
+
+  return data;
+}
+
 export default function TeacherBooksQueuePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -240,18 +266,7 @@ export default function TeacherBooksQueuePage() {
     if (!confirmed) return;
 
     try {
-      const { data, error } = await supabase
-        .from("book_requests")
-        .update({ status: "rejected" })
-        .eq("id", requestId)
-        .select("id, status")
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data || data.status !== "rejected") {
-        throw new Error("This book request was not updated. Please refresh and try again.");
-      }
-
+      await rejectBookRequestWithSession(requestId);
       setMessage("Book request marked as rejected.");
       await loadFlags();
     } catch (error: any) {
