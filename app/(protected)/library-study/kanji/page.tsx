@@ -13,6 +13,7 @@ import KanjiStudyHeader from "../components/KanjiStudyHeader";
 import KanjiStudyProgressPanel from "../components/KanjiStudyProgressPanel";
 import KanjiStudyNotice from "../components/KanjiStudyNotice";
 import KanjiStudyCompleteState from "../components/KanjiStudyCompleteState";
+import KanjiStudyBottomControls from "../components/KanjiStudyBottomControls";
 
 type UserBookWordRow = {
   id: string;
@@ -1473,32 +1474,14 @@ export default function KanjiReadingStudyPage() {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap justify-center gap-3">
-        <button
-          type="button"
-          onClick={previousCard}
-          disabled={index <= 0}
-          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Previous
-        </button>
-
-        <button
-          type="button"
-          onClick={finishForToday}
-          className="rounded bg-gray-700 px-4 py-2 text-white"
-        >
-          Finished for the Day
-        </button>
-
-        <button
-          type="button"
-          onClick={() => flagKanjiCardForReview(card)}
-          className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-amber-800"
-        >
-          Flag for Review
-        </button>
-      </div>
+      <KanjiStudyBottomControls
+        canGoPrevious={index > 0}
+        onPrevious={previousCard}
+        onFinish={finishForToday}
+        onFlag={() => {
+          if (card) void flagKanjiCardForReview(card);
+        }}
+      />
     </main>
   );
 }
