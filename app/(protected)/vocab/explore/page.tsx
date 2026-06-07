@@ -1,8 +1,11 @@
+//Explore Book Word History
+// 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import VocabExplorePageHeader from "./components/VocabExplorePageHeader";
 
 type SeenInstance = {
   id: string;
@@ -431,10 +434,10 @@ export default function WordHistorySearchPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 pb-10 pt-15">
-      <h1 className="mb-1 text-2xl font-semibold">Word History in This Book</h1>
-      <p className="mb-4 text-sm text-stone-500">
-        Search this book to see where a word appeared and how you saved it.
-      </p>
+      <VocabExplorePageHeader
+        title="Word History in This Book"
+        description="Search this book to see where a word appeared and how you saved it."
+      />
 
       {bookTitle ? (
         <div className="mb-6 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-4">
