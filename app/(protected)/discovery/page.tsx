@@ -10,6 +10,7 @@ import DiscoveryErrorBanner from "./components/DiscoveryErrorBanner";
 import DiscoveryCardGrid from "./components/DiscoveryCardGrid";
 import DiscoveryPreviewState from "./components/DiscoveryPreviewState";
 import DiscoveryPreviewBookCard from "./components/DiscoveryPreviewBookCard";
+import DiscoveryPreviewSection from "./components/DiscoveryPreviewSection";
 
 type BookMeta = {
   id: string;
@@ -423,64 +424,39 @@ export default function DiscoveryHubPage() {
 
         <DiscoveryCardGrid cards={discoveryCards} />
 
-        <section className="mt-8">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                  Find Your Next Book
-                </p>
-                <h2 className="mt-1 text-xl font-black text-slate-950">
-                  Recently rated books
-                </h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  A quick peek at reader-fit signals. Open the full page to filter and compare.
-                </p>
-              </div>
+        <DiscoveryPreviewSection>
+          {loading ? (
+            <DiscoveryPreviewState type="loading" />
+          ) : ratedBookGroups.length === 0 ? (
+            <DiscoveryPreviewState type="empty" />
+          ) : (
+            ratedBookGroups.slice(0, 4).map((book) => {
+              const latestSignal = book.signals[0] ?? null;
 
-              <Link
-                href="/discovery/find-books"
-                className="inline-flex rounded-2xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-black"
-              >
-                Open Find Your Next Book
-              </Link>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              {loading ? (
-                <DiscoveryPreviewState type="loading" />
-              ) : ratedBookGroups.length === 0 ? (
-                <DiscoveryPreviewState type="empty" />
-              ) : (
-                ratedBookGroups.slice(0, 4).map((book) => {
-                  const latestSignal = book.signals[0] ?? null;
-
-                  return (
-                    <DiscoveryPreviewBookCard
-                      key={book.bookId}
-                      bookId={book.bookId}
-                      title={book.title}
-                      author={book.author}
+              return (
+                <DiscoveryPreviewBookCard
+                  key={book.bookId}
+                  bookId={book.bookId}
+                  title={book.title}
+                  author={book.author}
+                  bookType={book.bookType}
+                  coverUrl={book.coverUrl}
+                  latestReaderLevel={latestSignal?.readerLevel}
+                  bookTypeLabel={bookTypeLabel}
+                  formatReaderLevel={formatReaderLevel}
+                >
+                  {latestSignal ? (
+                    <HubDifficultyRating
+                      signal={latestSignal}
                       bookType={book.bookType}
-                      coverUrl={book.coverUrl}
-                      latestReaderLevel={latestSignal?.readerLevel}
-                      bookTypeLabel={bookTypeLabel}
-                      formatReaderLevel={formatReaderLevel}
-                    >
-                      {latestSignal ? (
-                        <HubDifficultyRating
-                          signal={latestSignal}
-                          bookType={book.bookType}
-                        />
-                      ) : null}
-                    </DiscoveryPreviewBookCard>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
-    </main>
+                    />
+                  ) : null}
+                </DiscoveryPreviewBookCard>
+              );
+            })
+          )}
+        </DiscoveryPreviewSection>
+      </div >
+    </main >
   );
 }
