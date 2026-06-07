@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import VocabExplorePageHeader from "./components/VocabExplorePageHeader";
 import VocabExploreBookCard from "./components/VocabExploreBookCard";
+import VocabExploreSearchBar from "./components/VocabExploreSearchBar";
 
 type SeenInstance = {
   id: string;
@@ -449,29 +450,12 @@ export default function WordHistorySearchPage() {
         />
       ) : null}
 
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              void runSearch();
-            }
-          }}
-          placeholder="Search Japanese word..."
-          className="flex-1 rounded border bg-white px-3 py-2"
-        />
-
-        <button
-          type="button"
-          onClick={() => void runSearch()}
-          disabled={loading}
-          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "Searching..." : "Search"}
-        </button>
-      </div>
+      <VocabExploreSearchBar
+        query={query}
+        loading={loading}
+        onQueryChange={setQuery}
+        onSearch={() => runSearch(query)}
+      />
 
       {errorMsg ? <p className="mb-4 text-sm text-red-600">{errorMsg}</p> : null}
 
