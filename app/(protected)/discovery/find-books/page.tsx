@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import FindBooksPageHeader from "./components/FindBooksPageHeader";
 
 type BookMeta = {
   id: string;
@@ -414,21 +415,7 @@ export default function FindBooksPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-6">
-          <Link href="/discovery" className="text-sm font-semibold text-slate-500 hover:text-slate-900">
-            &larr; Discovery Hub
-          </Link>
-          <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-slate-400">
-            Discovery
-          </p>
-          <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-            Find Your Next Book
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Search anonymous reader-fit ratings by book type, reader level, and rating direction.
-            Ratings stay anonymous and are meant to help you find a better match.
-          </p>
-        </div>
+        <FindBooksPageHeader />
 
         {errorMsg ? (
           <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
