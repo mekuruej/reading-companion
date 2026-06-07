@@ -9,6 +9,7 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/lib/supabaseClient";
 import DashboardBackground from "./components/DashboardBackground";
+import DashboardLoadingCard from "./components/DashboardLoadingCard";
 
 const POST_LOGIN_TARGET = "/books";
 const POST_LOGIN_PARAM = "after_login";
@@ -333,12 +334,7 @@ export default function DashboardPage() {
       <div className="relative z-10 flex flex-col items-center gap-10 px-6 py-12 text-center">
         {checkingSession ? (
           <section className="w-full max-w-xl">
-            <div className="rounded-3xl border border-slate-200 bg-white/85 px-6 py-6 text-center shadow-sm">
-              <>
-                <h2 className="text-3xl font-semibold">Welcome to Mekuru</h2>
-                <p className="mt-3 text-gray-500">Signing you in...</p>
-              </>
-            </div>
+            <DashboardLoadingCard />
           </section>
         ) : isLoggedIn ? (
           <section className="w-full max-w-xl">
