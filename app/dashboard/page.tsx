@@ -10,6 +10,7 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/lib/supabaseClient";
 import DashboardBackground from "./components/DashboardBackground";
 import DashboardLoadingCard from "./components/DashboardLoadingCard";
+import DashboardBackButton from "./components/DashboardBackButton";
 
 const POST_LOGIN_TARGET = "/books";
 const POST_LOGIN_PARAM = "after_login";
@@ -589,12 +590,7 @@ export default function DashboardPage() {
         )}
 
         <div className="flex w-full justify-center">
-          <button
-            onClick={() => router.push("/")}
-            className="rounded-full border border-slate-300 bg-white/75 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
-          >
-            Back to MEKURU site
-          </button>
+          <DashboardBackButton onBack={() => router.push("/")} />
         </div>
       </div>
 
