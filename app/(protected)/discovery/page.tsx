@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import DiscoveryHubHeader from "./components/DiscoveryHubHeader";
 
 type BookMeta = {
   id: string;
@@ -408,20 +409,11 @@ export default function DiscoveryHubPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-            Mekuru Discovery
-          </p>
-
-          <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-            Discovery Hub
-          </h1>
-
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Look up words, revisit your word history, and find books through
-            anonymous community ratings.
-          </p>
-        </div>
+        <DiscoveryHubHeader
+          eyebrow="Mekuru Discovery"
+          title="Discovery Hub"
+          description="Look up words, revisit your word history, and find books through anonymous community ratings."
+        />
 
         {errorMsg ? (
           <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
