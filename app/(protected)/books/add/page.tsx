@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddBookLookupCard from "./components/AddBookLookupCard";
 import AddBookMessagePanel from "./components/AddBookMessagePanel";
+import AddBookLibraryNotice from "./components/AddBookLibraryNotice";
 
 type LookupBook = {
     isbn13: string;
@@ -441,23 +442,12 @@ export default function AddBookPage() {
                 />
 
                 {libraryNotice ? (
-                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                        <p className="font-bold">{libraryNotice.message}</p>
-
-                        {libraryNotice.detail ? (
-                            <p className="mt-1">{libraryNotice.detail}</p>
-                        ) : null}
-
-                        {libraryNotice.userBookId ? (
-                            <button
-                                type="button"
-                                onClick={() => router.push(`/books/${libraryNotice.userBookId}`)}
-                                className="mt-3 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
-                            >
-                                Open this book
-                            </button>
-                        ) : null}
-                    </div>
+                    <AddBookLibraryNotice
+                        message={libraryNotice.message}
+                        detail={libraryNotice.detail}
+                        userBookId={libraryNotice.userBookId}
+                        onOpenBook={(userBookId) => router.push(`/books/${userBookId}`)}
+                    />
                 ) : null}
             </AddBookLookupCard>
 
