@@ -228,7 +228,7 @@ export default function MekuruHomepage() {
                         <br />
                         <br />
                         <p className="text-base leading-7 text-[#4f473d]">Over time, I realized something important:</p>
-                        <p className="text-base font-medium leading-7 text-[#2f2a24]">
+                        <p className="text-base leading-7 text-[#4f473d]">
                             • Perfection or complete understanding shouldn&apos;t be the goal, especially in the early stages.
                         </p>
                         <p className="text-base leading-7 text-[#4f473d]">

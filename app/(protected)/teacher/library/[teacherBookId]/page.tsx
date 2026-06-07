@@ -598,6 +598,8 @@ export default function TeacherBookPrepPage() {
   }
 
   const book = firstBook(teacherBook?.books ?? null);
+  const isShortStoryBook = book?.book_type === "short_story";
+  const chapterNameLabel = isShortStoryBook ? "Story Name" : "Chapter Name";
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
@@ -887,7 +889,7 @@ export default function TeacherBookPrepPage() {
                     {[
                       ["page", bulkPageNumber, setBulkPageNumber, "Page"],
                       ["chapterNumber", bulkChapterNumber, setBulkChapterNumber, "Chapter #"],
-                      ["chapterName", bulkChapterName, setBulkChapterName, "Chapter Name"],
+                      ["chapterName", bulkChapterName, setBulkChapterName, chapterNameLabel],
                     ].map(([field, value, setter, label]) => (
                       <label key={field as string} className="text-sm">
                         <span className="mb-1 block text-xs text-gray-500">{label as string}</span>
@@ -943,7 +945,7 @@ export default function TeacherBookPrepPage() {
                           />
                         </label>
                         <label className="text-sm">
-                          <span className="mb-1 block text-xs text-gray-500">Chapter Name</span>
+                          <span className="mb-1 block text-xs text-gray-500">{chapterNameLabel}</span>
                           <input
                             value={draft.chapterName}
                             onChange={(event) => updateDraft(index, { chapterName: event.target.value })}
@@ -1279,7 +1281,7 @@ export default function TeacherBookPrepPage() {
                     />
                   </label>
                   <label className="text-sm">
-                    <span className="mb-1 block text-xs text-gray-500">Chapter Name</span>
+                    <span className="mb-1 block text-xs text-gray-500">{chapterNameLabel}</span>
                     <input
                       value={editDraft.chapterName}
                       onChange={(event) => updateEditDraft({ chapterName: event.target.value })}
