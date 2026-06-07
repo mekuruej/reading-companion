@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import FindBooksPageHeader from "./components/FindBooksPageHeader";
+import FindBooksErrorBanner from "./components/FindBooksErrorBanner";
 
 type BookMeta = {
   id: string;
@@ -417,11 +418,7 @@ export default function FindBooksPage() {
       <div className="mx-auto max-w-6xl">
         <FindBooksPageHeader />
 
-        {errorMsg ? (
-          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {errorMsg}
-          </div>
-        ) : null}
+        <FindBooksErrorBanner message={errorMsg} />
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
