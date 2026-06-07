@@ -10,6 +10,7 @@ import VocabExploreBookCard from "./components/VocabExploreBookCard";
 import VocabExploreSearchBar from "./components/VocabExploreSearchBar";
 import VocabExploreFooterActions from "./components/VocabExploreFooterActions";
 import DictionaryFallbackCard from "./components/DictionaryFallbackCard";
+import OtherMatchesPanel from "./components/OtherMatchesPanel";
 
 type SeenInstance = {
   id: string;
@@ -581,24 +582,7 @@ export default function WordHistorySearchPage() {
         <DictionaryFallbackCard entry={notFoundEntry} />
       ) : null}
 
-      {otherMatches.length > 0 ? (
-        <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 text-lg font-semibold">Other Possible Matches</div>
-
-          <div className="space-y-3">
-            {otherMatches.map((entry, idx) => (
-              <div
-                key={`${entry.word}-${entry.reading}-${idx}`}
-                className="w-full rounded-xl border p-4"
-              >
-                <div className="font-medium text-stone-900">{entry.word}</div>
-                <div className="mt-1 text-sm text-stone-500">{entry.reading || "—"}</div>
-                <div className="mt-2 text-sm text-stone-700">{entry.meanings[0] || "—"}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <OtherMatchesPanel matches={otherMatches} />
 
       <VocabExploreFooterActions
         onBack={() => router.back()}
