@@ -11,6 +11,7 @@ import FindBooksResultsState from "./components/FindBooksResultsState";
 import RatingStars from "./components/RatingStars";
 import CompactRatingPill from "./components/CompactRatingPill";
 import FindBooksFilterPanel from "./components/FindBooksFilterPanel";
+import ReaderSignalCard from "./components/ReaderSignalCard";
 
 type BookMeta = {
   id: string;
@@ -430,44 +431,14 @@ export default function FindBooksPage() {
 
                       <div className="mt-4 grid gap-2">
                         {book.signals.map((signal) => (
-                          <div
+                          <ReaderSignalCard
                             key={signal.id}
-                            className="rounded-2xl border border-slate-200 border-l-4 border-l-slate-300 bg-white px-3 py-2"
-                          >
-                            <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                  <div className="text-sm font-semibold text-slate-900">
-                                    {formatReaderLevel(signal.readerLevel)} Reader
-                                  </div>
-                                </div>
-
-                                {signal.readerAdvice ? (
-                                  <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-600">
-                                    <span className="font-semibold text-slate-900">
-                                      Advice to the reader:
-                                    </span>{" "}
-                                    {signal.readerAdvice}
-                                  </div>
-                                ) : null}
-                              </div>
-
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                <CompactRatingPill
-                                  label={`${bookTypeLabel(book.bookType)} Difficulty`}
-                                  value={signal.difficultyRating}
-                                  tone="sky"
-                                  formatValue={formatAverage}
-                                />
-                                <CompactRatingPill
-                                  label="Entertainment"
-                                  value={signal.entertainmentRating}
-                                  tone="amber"
-                                  formatValue={formatAverage}
-                                />
-                              </div>
-                            </div>
-                          </div>
+                            signal={signal}
+                            bookType={book.bookType}
+                            bookTypeLabel={bookTypeLabel}
+                            formatReaderLevel={formatReaderLevel}
+                            formatValue={formatAverage}
+                          />
                         ))}
                       </div>
                     </div>
