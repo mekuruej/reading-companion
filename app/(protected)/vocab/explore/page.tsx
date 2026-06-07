@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import VocabExplorePageHeader from "./components/VocabExplorePageHeader";
 import VocabExploreBookCard from "./components/VocabExploreBookCard";
 import VocabExploreSearchBar from "./components/VocabExploreSearchBar";
+import VocabExploreFooterActions from "./components/VocabExploreFooterActions";
 
 type SeenInstance = {
   id: string;
@@ -629,15 +630,10 @@ export default function WordHistorySearchPage() {
         </section>
       ) : null}
 
-      <div className="mt-8 flex justify-between">
-        <button onClick={() => router.back()} className="rounded bg-gray-200 px-4 py-2">
-          ← Back
-        </button>
-
-        <button onClick={clearSearch} className="rounded bg-gray-100 px-4 py-2">
-          Clear
-        </button>
-      </div>
+      <VocabExploreFooterActions
+        onBack={() => router.back()}
+        onClear={clearSearch}
+      />
     </main>
   );
 }
