@@ -11,6 +11,7 @@ import VocabExploreSearchBar from "./components/VocabExploreSearchBar";
 import VocabExploreFooterActions from "./components/VocabExploreFooterActions";
 import DictionaryFallbackCard from "./components/DictionaryFallbackCard";
 import OtherMatchesPanel from "./components/OtherMatchesPanel";
+import WordHistorySummaryCard from "./components/WordHistorySummaryCard";
 
 type SeenInstance = {
   id: string;
@@ -509,36 +510,14 @@ export default function WordHistorySearchPage() {
 
       {surface ? (
         <>
-          <section className="w-full rounded-2xl border bg-white p-6 shadow-sm">
-            <div className="mb-4 text-lg font-semibold">Word History</div>
-
-            <div className="flex flex-col gap-4">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500">Word</div>
-                <div className="break-words text-4xl font-bold">{surface}</div>
-              </div>
-
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500">Reading</div>
-                <div className="text-2xl font-medium">{reading || "—"}</div>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                {normalizeJlpt(jlpt) !== "NON-JLPT" ? (
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-[17px] font-medium leading-none text-gray-800">
-                    {normalizeJlpt(jlpt)}
-                  </span>
-                ) : null}
-
-                {isCommon ? <span className="text-gray-500">Common</span> : null}
-              </div>
-
-              <div className="mt-2 rounded-xl border p-3">
-                <div className="text-xs text-gray-500">Appearances in this book</div>
-                <div className="text-2xl font-semibold">{totalLookupCount}</div>
-              </div>
-            </div>
-          </section>
+          <WordHistorySummaryCard
+            surface={surface}
+            reading={reading}
+            jlpt={jlpt}
+            isCommon={isCommon}
+            totalLookupCount={totalLookupCount}
+            normalizeJlpt={normalizeJlpt}
+          />
 
           <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
             <div className="mb-4 text-lg font-semibold">Seen in</div>
