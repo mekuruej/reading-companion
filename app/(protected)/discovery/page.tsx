@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import DiscoveryHubHeader from "./components/DiscoveryHubHeader";
 import DiscoveryErrorBanner from "./components/DiscoveryErrorBanner";
 import DiscoveryCardGrid from "./components/DiscoveryCardGrid";
+import DiscoveryPreviewState from "./components/DiscoveryPreviewState";
 
 type BookMeta = {
   id: string;
@@ -446,11 +447,9 @@ export default function DiscoveryHubPage() {
 
             <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               {loading ? (
-                <p className="text-sm text-slate-500">Loading rated books...</p>
+                <DiscoveryPreviewState type="loading" />
               ) : ratedBookGroups.length === 0 ? (
-                <p className="text-sm leading-6 text-slate-500">
-                  No shared book ratings match these filters yet.
-                </p>
+                <DiscoveryPreviewState type="empty" />
               ) : (
                 ratedBookGroups.slice(0, 4).map((book) => {
                   const latestSignal = book.signals[0] ?? null;
