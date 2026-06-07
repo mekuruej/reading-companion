@@ -9,6 +9,7 @@ import DiscoveryHubHeader from "./components/DiscoveryHubHeader";
 import DiscoveryErrorBanner from "./components/DiscoveryErrorBanner";
 import DiscoveryCardGrid from "./components/DiscoveryCardGrid";
 import DiscoveryPreviewState from "./components/DiscoveryPreviewState";
+import DiscoveryPreviewBookCard from "./components/DiscoveryPreviewBookCard";
 
 type BookMeta = {
   id: string;
@@ -455,41 +456,24 @@ export default function DiscoveryHubPage() {
                   const latestSignal = book.signals[0] ?? null;
 
                   return (
-                    <div
+                    <DiscoveryPreviewBookCard
                       key={book.bookId}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5"
+                      bookId={book.bookId}
+                      title={book.title}
+                      author={book.author}
+                      bookType={book.bookType}
+                      coverUrl={book.coverUrl}
+                      latestReaderLevel={latestSignal?.readerLevel}
+                      bookTypeLabel={bookTypeLabel}
+                      formatReaderLevel={formatReaderLevel}
                     >
-                      <div className="flex min-w-0 gap-2.5">
-                        {book.coverUrl ? (
-                          <img
-                            src={book.coverUrl}
-                            alt=""
-                            className="h-16 w-11 shrink-0 rounded-lg object-cover shadow-sm"
-                          />
-                        ) : (
-                          <div className="h-16 w-11 shrink-0 rounded-lg bg-slate-200" />
-                        )}
-
-                        <div className="min-w-0 flex-1">
-                          <div className="line-clamp-2 text-sm font-black leading-tight text-slate-950">
-                            {book.title}
-                          </div>
-                          <div className="mt-0.5 truncate text-xs text-slate-500">
-                            {book.author || bookTypeLabel(book.bookType)}
-                          </div>
-                          <div className="mt-2 text-xs font-semibold text-slate-600">
-                            {formatReaderLevel(latestSignal?.readerLevel)}
-                          </div>
-                        </div>
-                      </div>
-
                       {latestSignal ? (
                         <HubDifficultyRating
                           signal={latestSignal}
                           bookType={book.bookType}
                         />
                       ) : null}
-                    </div>
+                    </DiscoveryPreviewBookCard>
                   );
                 })
               )}
