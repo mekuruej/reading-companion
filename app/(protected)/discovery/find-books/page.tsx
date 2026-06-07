@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import FindBooksPageHeader from "./components/FindBooksPageHeader";
 import FindBooksErrorBanner from "./components/FindBooksErrorBanner";
+import FindBooksResultsState from "./components/FindBooksResultsState";
 
 type BookMeta = {
   id: string;
@@ -473,13 +474,9 @@ export default function FindBooksPage() {
 
         <section className="mt-5 grid gap-4">
           {loading ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
-              Loading rated books...
-            </div>
+            <FindBooksResultsState type="loading" />
           ) : ratedBookGroups.length === 0 ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 text-sm leading-6 text-slate-500 shadow-sm">
-              No shared book ratings match these filters yet.
-            </div>
+            <FindBooksResultsState type="empty" />
           ) : (
             ratedBookGroups.map((book) => {
               const shouldShowAverageRatings = book.signals.length >= 2;
