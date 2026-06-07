@@ -9,6 +9,7 @@ import FindBooksPageHeader from "./components/FindBooksPageHeader";
 import FindBooksErrorBanner from "./components/FindBooksErrorBanner";
 import FindBooksResultsState from "./components/FindBooksResultsState";
 import RatingStars from "./components/RatingStars";
+import CompactRatingPill from "./components/CompactRatingPill";
 
 type BookMeta = {
   id: string;
@@ -121,44 +122,6 @@ function formatReaderLevel(value: string | null | undefined) {
   }
 
   return cleaned;
-}
-
-function CompactRatingPill({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | null;
-  tone: "amber" | "sky";
-}) {
-  const colorClass = tone === "amber" ? "text-amber-500" : "text-sky-500";
-  const hasValue = value != null && Number.isFinite(value);
-  const roundedValue = hasValue
-    ? Math.round(Math.max(0, Math.min(5, value)))
-    : 0;
-  const pillClass = hasValue
-    ? "bg-white text-slate-700 ring-slate-200"
-    : "bg-slate-100/80 text-slate-400 ring-slate-200";
-
-  return (
-    <div className={`rounded-lg px-3 py-2 ring-1 ring-inset ${pillClass}`}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-          {label}
-        </span>
-        <span className="text-xs font-black text-slate-700">
-          {hasValue ? `${formatAverage(value)}/5` : "-"}
-        </span>
-      </div>
-      <div className={`mt-1 text-sm leading-none tracking-[0.08em] ${hasValue ? colorClass : "text-slate-200"}`}>
-        {"*".repeat(roundedValue)}
-        <span className="text-slate-200">
-          {"*".repeat(5 - roundedValue)}
-        </span>
-      </div>
-    </div>
-  );
 }
 
 export default function FindBooksPage() {
@@ -531,11 +494,13 @@ export default function FindBooksPage() {
                                   label={`${bookTypeLabel(book.bookType)} Difficulty`}
                                   value={signal.difficultyRating}
                                   tone="sky"
+                                  formatValue={formatAverage}
                                 />
                                 <CompactRatingPill
                                   label="Entertainment"
                                   value={signal.entertainmentRating}
                                   tone="amber"
+                                  formatValue={formatAverage}
                                 />
                               </div>
                             </div>
