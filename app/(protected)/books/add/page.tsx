@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import AddBookLookupCard from "./components/AddBookLookupCard";
 import AddBookMessagePanel from "./components/AddBookMessagePanel";
 import AddBookLibraryNotice from "./components/AddBookLibraryNotice";
+import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
 
 type LookupBook = {
     isbn13: string;
@@ -452,209 +453,149 @@ export default function AddBookPage() {
             </AddBookLookupCard>
 
             {book ? (
-                <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-col gap-5 sm:flex-row">
-                        <div className="w-full sm:w-32">
-                            {coverUrl ? (
-                                <img
-                                    src={coverUrl}
-                                    alt=""
-                                    className="mx-auto aspect-[2/3] w-32 rounded-2xl object-cover shadow-sm"
+                <LookupBookPreviewCard
+                    title={book.title ?? "Untitled book"}
+                    subtitle={book.subtitle}
+                    coverUrl={coverUrl}
+                    displayAuthor={displayAuthor}
+                    publisher={book.publisher}
+                    publishedDate={publishedDate}
+                    pageCount={pageCount}
+                    isbn13={book.isbn13}
+                    isNewToMekuru={isNewToMekuru}
+                >
+                    <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                            Destination
+                        </p>
+
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
+                                <input
+                                    type="radio"
+                                    checked={destinationMode === "me"}
+                                    onChange={() => {
+                                        setDestinationMode("me");
+                                        setDestinationUserId("");
+                                        setLibraryNotice(null);
+                                    }}
                                 />
-                            ) : (
-                                <div className="mx-auto flex aspect-[2/3] w-32 items-center justify-center rounded-2xl bg-stone-100 px-3 text-center text-xs font-bold text-stone-500">
-                                    No cover found
-                                </div>
-                            )}
-                        </div>
+                                My library
+                            </label>
 
-                        <div className="flex-1">
-                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-                                Preview
-                            </p>
-
-                            <h2 className="mt-2 text-2xl font-black text-stone-900">
-                                {book.title}
-                            </h2>
-
-                            {book.subtitle ? (
-                                <p className="mt-1 text-sm font-medium text-stone-600">
-                                    {book.subtitle}
-                                </p>
+                            {isTeacher ? (
+                                <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
+                                    <input
+                                        type="radio"
+                                        checked={destinationMode === "student"}
+                                        onChange={() => {
+                                            setDestinationMode("student");
+                                            setDestinationUserId(studentOptions[0]?.id ?? "");
+                                            setLibraryNotice(null);
+                                        }}
+                                    />
+                                    Linked student
+                                </label>
                             ) : null}
 
-                            <p className="mt-3 text-sm leading-6 text-stone-700">
-                                {displayAuthor}
-                            </p>
-
-                            <div className="mt-4 grid gap-2 text-sm text-stone-600 sm:grid-cols-2">
-                                {book.publisher ? (
-                                    <p>
-                                        <span className="font-bold text-stone-800">Publisher:</span>{" "}
-                                        {book.publisher}
-                                    </p>
-                                ) : null}
-
-                                {publishedDate ? (
-                                    <p>
-                                        <span className="font-bold text-stone-800">Published:</span>{" "}
-                                        {publishedDate}
-                                    </p>
-                                ) : null}
-
-                                {pageCount ? (
-                                    <p>
-                                        <span className="font-bold text-stone-800">Pages:</span>{" "}
-                                        {pageCount}
-                                    </p>
-                                ) : null}
-
-                                <p>
-                                    <span className="font-bold text-stone-800">ISBN:</span>{" "}
-                                    {book.isbn13}
-                                </p>
-                            </div>
-
-                            {isNewToMekuru ? (
-                                <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                                    This book is not in Mekuru’s database yet. You can still add it to your library now, but an admin may need to review it before all book details show up.
-                                </p>
-                            ) : null}
-
-                            <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                                <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
-                                    Destination
-                                </p>
-
-                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            {isSuperTeacher ? (
+                                <>
                                     <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
                                         <input
                                             type="radio"
-                                            checked={destinationMode === "me"}
+                                            checked={destinationMode === "user"}
                                             onChange={() => {
-                                                setDestinationMode("me");
+                                                setDestinationMode("user");
+                                                setDestinationUserId(userOptions[0]?.id ?? "");
+                                                setLibraryNotice(null);
+                                            }}
+                                        />
+                                        Any user
+                                    </label>
+
+                                    <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
+                                        <input
+                                            type="radio"
+                                            checked={destinationMode === "global"}
+                                            onChange={() => {
+                                                setDestinationMode("global");
                                                 setDestinationUserId("");
                                                 setLibraryNotice(null);
                                             }}
                                         />
-                                        My library
+                                        Global catalog only
                                     </label>
-
-                                    {isTeacher ? (
-                                        <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
-                                            <input
-                                                type="radio"
-                                                checked={destinationMode === "student"}
-                                                onChange={() => {
-                                                    setDestinationMode("student");
-                                                    setDestinationUserId(studentOptions[0]?.id ?? "");
-                                                    setLibraryNotice(null);
-                                                }}
-                                            />
-                                            Linked student
-                                        </label>
-                                    ) : null}
-
-                                    {isSuperTeacher ? (
-                                        <>
-                                            <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
-                                                <input
-                                                    type="radio"
-                                                    checked={destinationMode === "user"}
-                                                    onChange={() => {
-                                                        setDestinationMode("user");
-                                                        setDestinationUserId(userOptions[0]?.id ?? "");
-                                                        setLibraryNotice(null);
-                                                    }}
-                                                />
-                                                Any user
-                                            </label>
-
-                                            <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
-                                                <input
-                                                    type="radio"
-                                                    checked={destinationMode === "global"}
-                                                    onChange={() => {
-                                                        setDestinationMode("global");
-                                                        setDestinationUserId("");
-                                                        setLibraryNotice(null);
-                                                    }}
-                                                />
-                                                Global catalog only
-                                            </label>
-                                        </>
-                                    ) : null}
-                                </div>
-
-                                {destinationMode === "student" ? (
-                                    <select
-                                        value={destinationUserId}
-                                        onChange={(event) => {
-                                            setDestinationUserId(event.target.value);
-                                            setLibraryNotice(null);
-                                        }}
-                                        className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800"
-                                    >
-                                        {studentOptions.length === 0 ? (
-                                            <option value="">No active linked students</option>
-                                        ) : null}
-                                        {studentOptions.map((student) => (
-                                            <option key={student.id} value={student.id}>
-                                                {student.display_name || student.username || student.id}
-                                                {student.level ? ` · ${student.level}` : ""}
-                                            </option>
-                                        ))}
-                                    </select>
-                                ) : null}
-
-                                {destinationMode === "user" ? (
-                                    <select
-                                        value={destinationUserId}
-                                        onChange={(event) => {
-                                            setDestinationUserId(event.target.value);
-                                            setLibraryNotice(null);
-                                        }}
-                                        className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800"
-                                    >
-                                        {userOptions.length === 0 ? (
-                                            <option value="">No users found</option>
-                                        ) : null}
-                                        {userOptions.map((user) => (
-                                            <option key={user.id} value={user.id}>
-                                                {user.display_name || user.username || user.id}
-                                                {user.level ? ` · ${user.level}` : ""}
-                                            </option>
-                                        ))}
-                                    </select>
-                                ) : null}
-                            </div>
-
-                            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                                <button
-                                    type="button"
-                                    onClick={handleAddToLibrary}
-                                    disabled={addLoading}
-                                    className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {addLoading
-                                        ? "Adding..."
-                                        : destinationMode === "global"
-                                            ? "Open Global Review"
-                                            : `Add to ${selectedDestinationLabel}`}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => router.push("/dashboard")}
-                                    className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
+                                </>
+                            ) : null}
                         </div>
+
+                        {destinationMode === "student" ? (
+                            <select
+                                value={destinationUserId}
+                                onChange={(event) => {
+                                    setDestinationUserId(event.target.value);
+                                    setLibraryNotice(null);
+                                }}
+                                className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800"
+                            >
+                                {studentOptions.length === 0 ? (
+                                    <option value="">No active linked students</option>
+                                ) : null}
+                                {studentOptions.map((student) => (
+                                    <option key={student.id} value={student.id}>
+                                        {student.display_name || student.username || student.id}
+                                        {student.level ? ` · ${student.level}` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : null}
+
+                        {destinationMode === "user" ? (
+                            <select
+                                value={destinationUserId}
+                                onChange={(event) => {
+                                    setDestinationUserId(event.target.value);
+                                    setLibraryNotice(null);
+                                }}
+                                className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800"
+                            >
+                                {userOptions.length === 0 ? (
+                                    <option value="">No users found</option>
+                                ) : null}
+                                {userOptions.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.display_name || user.username || user.id}
+                                        {user.level ? ` · ${user.level}` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : null}
                     </div>
-                </section>
+
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                        <button
+                            type="button"
+                            onClick={handleAddToLibrary}
+                            disabled={addLoading}
+                            className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {addLoading
+                                ? "Adding..."
+                                : destinationMode === "global"
+                                    ? "Open Global Review"
+                                    : `Add to ${selectedDestinationLabel}`}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => router.push("/dashboard")}
+                            className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </LookupBookPreviewCard>
             ) : null}
-        </main>
+        </main >
     );
 }
