@@ -12,6 +12,7 @@ import VocabExploreFooterActions from "./components/VocabExploreFooterActions";
 import DictionaryFallbackCard from "./components/DictionaryFallbackCard";
 import OtherMatchesPanel from "./components/OtherMatchesPanel";
 import WordHistorySummaryCard from "./components/WordHistorySummaryCard";
+import SeenInstancesPanel from "./components/SeenInstancesPanel";
 
 type SeenInstance = {
   id: string;
@@ -526,31 +527,11 @@ export default function WordHistorySearchPage() {
               <div className="text-sm text-gray-500">No saved instances found yet.</div>
             ) : (
               <div className="space-y-2">
-                {seenInstances.map((instance) => {
-                  const choices = asStringArray(instance.meaning_choices);
-                  const defIndex =
-                    instance.meaning_choice_index != null
-                      ? instance.meaning_choice_index
-                      : choices.findIndex((m) => m === instance.meaning);
-
-                  return (
-                    <div key={instance.id} className="rounded-xl border p-3">
-                      <div className="text-sm text-stone-600">
-                        {chapterDisplay(instance.chapter_number, instance.chapter_name)
-                          ? chapterDisplay(instance.chapter_number, instance.chapter_name)
-                          : "No chapter"}
-                        {instance.page_number != null ? ` • p. ${instance.page_number}` : ""}
-                      </div>
-
-                      {instance.meaning ? (
-                        <div className="mt-2 text-sm text-stone-500">
-                          {defIndex !== -1 && defIndex != null ? `Def ${defIndex + 1}: ` : ""}
-                          {instance.meaning}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                <SeenInstancesPanel
+                  instances={seenInstances}
+                  getMeaningChoices={asStringArray}
+                  chapterDisplay={chapterDisplay}
+                />
               </div>
             )}
           </section>
