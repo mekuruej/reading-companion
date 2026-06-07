@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import DiscoveryHubHeader from "./components/DiscoveryHubHeader";
 import DiscoveryErrorBanner from "./components/DiscoveryErrorBanner";
+import DiscoveryCardGrid from "./components/DiscoveryCardGrid";
 
 type BookMeta = {
   id: string;
@@ -418,32 +419,7 @@ export default function DiscoveryHubPage() {
 
         <DiscoveryErrorBanner message={errorMsg} />
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {discoveryCards.map((card) => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className={`group rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.className}`}
-            >
-              <div className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                {card.eyebrow}
-              </div>
-
-              <div className="mt-3 flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-black">{card.title}</h2>
-                  <p className="mt-2 text-sm leading-6 opacity-80">
-                    {card.description}
-                  </p>
-                </div>
-
-                <span className="rounded-full bg-white/80 px-3 py-1 text-sm font-black shadow-sm transition group-hover:bg-white">
-                  &rarr;
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <DiscoveryCardGrid cards={discoveryCards} />
 
         <section className="mt-8">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
