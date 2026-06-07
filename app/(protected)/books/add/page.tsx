@@ -1,8 +1,12 @@
+// ISBN Add Book
+// 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import AddBookLookupCard from "./components/AddBookLookupCard";
+import AddBookMessagePanel from "./components/AddBookMessagePanel";
 
 type LookupBook = {
     isbn13: string;
@@ -419,68 +423,31 @@ export default function AddBookPage() {
 
     return (
         <main className="mx-auto max-w-3xl px-4 py-8">
-            <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">
-                    Add a book
-                </p>
-
-                <h1 className="mt-2 text-3xl font-black text-stone-900">
-                    Add a book by ISBN
-                </h1>
-
-                <p className="mt-3 text-sm leading-6 text-stone-700">
-                    Enter the ISBN-13 from your book. Mekuru will look up the book details
-                    first, then you can confirm where it should go.
-                </p>
-
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-white/70 px-4 py-3 text-sm leading-6 text-amber-900">
-                    Please only add Japanese books for now. Use the book&apos;s ISBN-13,
-                    not an Amazon link.
-                </div>
-
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                    <input
-                        value={isbn}
-                        onChange={(event) => {
-                            setIsbn(event.target.value);
-                            setLibraryNotice(null);
-                        }}
-                        placeholder="9784094071733"
-                        className="min-h-12 flex-1 rounded-2xl border border-amber-200 bg-white px-4 text-base text-stone-900 shadow-sm outline-none focus:border-amber-400"
-                    />
-
-                    <button
-                        type="button"
-                        onClick={handleLookup}
-                        disabled={lookupLoading || !isbn.trim()}
-                        className="min-h-12 rounded-2xl bg-stone-900 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {lookupLoading ? "Looking..." : "Look up book"}
-                    </button>
-                </div>
-
-                {error ? (
-                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                        <p>{error}</p>
-                        {canRequestBook ? (
-                            <button
-                                type="button"
-                                onClick={handleRequestBook}
-                                disabled={requestLoading}
-                                className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-xs font-black text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {requestLoading ? "Sending..." : "Request this book for review"}
-                            </button>
-                        ) : null}
-                    </div>
-                ) : null}
+            <AddBookLookupCard
+                isbn={isbn}
+                lookupLoading={lookupLoading}
+                lookupDisabled={!isbn.trim()}
+                onIsbnChange={(value) => {
+                    setIsbn(value);
+                    setLibraryNotice(null);
+                }}
+                onLookup={handleLookup}
+            >
+                <AddBookMessagePanel
+                    message={error}
+                    canRequestBook={canRequestBook}
+                    requestLoading={requestLoading}
+                    onRequestBook={handleRequestBook}
+                />
 
                 {libraryNotice ? (
                     <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
                         <p className="font-bold">{libraryNotice.message}</p>
+
                         {libraryNotice.detail ? (
                             <p className="mt-1">{libraryNotice.detail}</p>
                         ) : null}
+
                         {libraryNotice.userBookId ? (
                             <button
                                 type="button"
@@ -492,7 +459,7 @@ export default function AddBookPage() {
                         ) : null}
                     </div>
                 ) : null}
-            </div>
+            </AddBookLookupCard>
 
             {book ? (
                 <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
