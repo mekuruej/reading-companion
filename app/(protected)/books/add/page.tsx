@@ -10,6 +10,7 @@ import AddBookMessagePanel from "./components/AddBookMessagePanel";
 import AddBookLibraryNotice from "./components/AddBookLibraryNotice";
 import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
 import AddBookActionRow from "./components/AddBookActionRow";
+import AddBookDestinationPanel from "./components/AddBookDestinationPanel";
 
 type LookupBook = {
     isbn13: string;
@@ -465,113 +466,31 @@ export default function AddBookPage() {
                     isbn13={book.isbn13}
                     isNewToMekuru={isNewToMekuru}
                 >
-                    <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
-                            Destination
-                        </p>
+                    <AddBookDestinationPanel
+                        destinationMode={destinationMode}
+                        destinationUserId={destinationUserId}
+                        isTeacher={isTeacher}
+                        isSuperTeacher={isSuperTeacher}
+                        studentOptions={studentOptions}
+                        userOptions={userOptions}
+                        onDestinationModeChange={(mode) => {
+                            setDestinationMode(mode);
 
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
-                                <input
-                                    type="radio"
-                                    checked={destinationMode === "me"}
-                                    onChange={() => {
-                                        setDestinationMode("me");
-                                        setDestinationUserId("");
-                                        setLibraryNotice(null);
-                                    }}
-                                />
-                                My library
-                            </label>
+                            if (mode === "student") {
+                                setDestinationUserId(studentOptions[0]?.id ?? "");
+                            } else if (mode === "user") {
+                                setDestinationUserId(userOptions[0]?.id ?? "");
+                            } else {
+                                setDestinationUserId("");
+                            }
 
-                            {isTeacher ? (
-                                <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
-                                    <input
-                                        type="radio"
-                                        checked={destinationMode === "student"}
-                                        onChange={() => {
-                                            setDestinationMode("student");
-                                            setDestinationUserId(studentOptions[0]?.id ?? "");
-                                            setLibraryNotice(null);
-                                        }}
-                                    />
-                                    Linked student
-                                </label>
-                            ) : null}
-
-                            {isSuperTeacher ? (
-                                <>
-                                    <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
-                                        <input
-                                            type="radio"
-                                            checked={destinationMode === "user"}
-                                            onChange={() => {
-                                                setDestinationMode("user");
-                                                setDestinationUserId(userOptions[0]?.id ?? "");
-                                                setLibraryNotice(null);
-                                            }}
-                                        />
-                                        Any user
-                                    </label>
-
-                                    <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
-                                        <input
-                                            type="radio"
-                                            checked={destinationMode === "global"}
-                                            onChange={() => {
-                                                setDestinationMode("global");
-                                                setDestinationUserId("");
-                                                setLibraryNotice(null);
-                                            }}
-                                        />
-                                        Global catalog only
-                                    </label>
-                                </>
-                            ) : null}
-                        </div>
-
-                        {destinationMode === "student" ? (
-                            <select
-                                value={destinationUserId}
-                                onChange={(event) => {
-                                    setDestinationUserId(event.target.value);
-                                    setLibraryNotice(null);
-                                }}
-                                className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800"
-                            >
-                                {studentOptions.length === 0 ? (
-                                    <option value="">No active linked students</option>
-                                ) : null}
-                                {studentOptions.map((student) => (
-                                    <option key={student.id} value={student.id}>
-                                        {student.display_name || student.username || student.id}
-                                        {student.level ? ` · ${student.level}` : ""}
-                                    </option>
-                                ))}
-                            </select>
-                        ) : null}
-
-                        {destinationMode === "user" ? (
-                            <select
-                                value={destinationUserId}
-                                onChange={(event) => {
-                                    setDestinationUserId(event.target.value);
-                                    setLibraryNotice(null);
-                                }}
-                                className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800"
-                            >
-                                {userOptions.length === 0 ? (
-                                    <option value="">No users found</option>
-                                ) : null}
-                                {userOptions.map((user) => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.display_name || user.username || user.id}
-                                        {user.level ? ` · ${user.level}` : ""}
-                                    </option>
-                                ))}
-                            </select>
-                        ) : null}
-                    </div>
+                            setLibraryNotice(null);
+                        }}
+                        onDestinationUserChange={(userId) => {
+                            setDestinationUserId(userId);
+                            setLibraryNotice(null);
+                        }}
+                    />
 
                     <AddBookActionRow
                         addLoading={addLoading}
