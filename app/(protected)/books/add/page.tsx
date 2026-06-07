@@ -9,6 +9,7 @@ import AddBookLookupCard from "./components/AddBookLookupCard";
 import AddBookMessagePanel from "./components/AddBookMessagePanel";
 import AddBookLibraryNotice from "./components/AddBookLibraryNotice";
 import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
+import AddBookActionRow from "./components/AddBookActionRow";
 
 type LookupBook = {
     isbn13: string;
@@ -572,28 +573,13 @@ export default function AddBookPage() {
                         ) : null}
                     </div>
 
-                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                        <button
-                            type="button"
-                            onClick={handleAddToLibrary}
-                            disabled={addLoading}
-                            className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {addLoading
-                                ? "Adding..."
-                                : destinationMode === "global"
-                                    ? "Open Global Review"
-                                    : `Add to ${selectedDestinationLabel}`}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => router.push("/dashboard")}
-                            className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
-                        >
-                            Cancel
-                        </button>
-                    </div>
+                    <AddBookActionRow
+                        addLoading={addLoading}
+                        destinationMode={destinationMode}
+                        selectedDestinationLabel={selectedDestinationLabel}
+                        onAdd={handleAddToLibrary}
+                        onCancel={() => router.push("/dashboard")}
+                    />
                 </LookupBookPreviewCard>
             ) : null}
         </main >
