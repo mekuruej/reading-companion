@@ -11,6 +11,7 @@ import {
 } from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
 import CommunityStatsHeader from "./components/CommunityStatsHeader";
+import StatsErrorBanner from "./components/StatsErrorBanner";
 
 type SessionRow = {
   user_book_id: string;
@@ -398,17 +399,8 @@ export default function CommunityStatsHomePage() {
         description="See your reading habits, vocabulary growth, book difficulty, reading ability, monthly rhythm, and reading color progress."
       />
 
-      {snapshotError ? (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {snapshotError}
-        </div>
-      ) : null}
-
-      {colorError ? (
-        <div className="mb-4 rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700">
-          {colorError}
-        </div>
-      ) : null}
+      <StatsErrorBanner message={snapshotError} tone="red" />
+      <StatsErrorBanner message={colorError} tone="purple" />
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
