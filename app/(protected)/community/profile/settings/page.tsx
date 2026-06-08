@@ -9,6 +9,13 @@ import ProfileShell from "@/components/profile/ProfileShell";
 import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
 import { supabase } from "@/lib/supabaseClient";
 import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
+import ProfileSettingsLoadingState from "./components/ProfileSettingsLoadingState";
+import ProfileSettingsMessage from "./components/ProfileSettingsMessage";
+import ProfileSettingsSaveBar from "./components/ProfileSettingsSaveBar";
+import ProfileSettingsSectionLabel from "./components/ProfileSettingsSectionLabel";
+import FavoriteGenreEditor from "./components/FavoriteGenreEditor";
+import ProfileSettingsCoreCard from "./components/ProfileSettingsCoreCard";
+import ProfileSettingsPublicCard from "./components/ProfileSettingsPublicCard";
 
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher";
 
@@ -39,28 +46,6 @@ const NATIVE_LANGUAGE_OPTIONS = [
 ] as const;
 
 const NATIVE_LANGUAGE_OTHER = "Other";
-
-function SectionLabel({
-  title,
-  detail,
-  eyebrow,
-}: {
-  title: string;
-  detail: string;
-  eyebrow?: string;
-}) {
-  return (
-    <div>
-      {eyebrow ? (
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-          {eyebrow}
-        </div>
-      ) : null}
-      <h2 className="text-lg font-semibold text-stone-900">{title}</h2>
-      <p className="mt-1 text-sm leading-6 text-stone-600">{detail}</p>
-    </div>
-  );
-}
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
@@ -317,14 +302,11 @@ export default function ProfileSettingsPage() {
 
   if (loading) {
     return (
-      <ProfileShell
+      <ProfileSettingsLoadingState
         title="Edit Profile"
         description="Update your account basics and reader profile details."
-      >
-        <div className="mx-auto w-full max-w-4xl rounded-xl border bg-white p-6 text-center shadow-sm">
-          <p className="text-stone-600">Loading profile details...</p>
-        </div>
-      </ProfileShell>
+        message="Loading profile details..."
+      />
     );
   }
 
@@ -339,202 +321,48 @@ export default function ProfileSettingsPage() {
       description="Update your Mekuru profile, reading level, and public reader details."
     >
       <div className="mx-auto max-w-4xl space-y-4">
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <SectionLabel
-            eyebrow="Account basics"
-            title="Core profile"
-            detail="These details keep your account, Library link, and reading setup working smoothly."
-          />
-
-          <div className="mt-5 grid gap-5 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-stone-800">Display name</label>
-              <input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                placeholder="Devon"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-stone-800">Username</label>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                placeholder="devon"
-              />
-              <p className="mt-1 text-xs text-stone-500">
-                Lowercase letters, numbers, and underscores only. Your Library link uses this name.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-stone-800">Native language</label>
-              <select
-                value={nativeLanguageChoice}
-                onChange={(e) => setNativeLanguageChoice(e.target.value)}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-              >
-                <option value="">Choose a language</option>
-                {NATIVE_LANGUAGE_OPTIONS.map((language) => (
-                  <option key={language} value={language}>
-                    {language}
-                  </option>
-                ))}
-                <option value={NATIVE_LANGUAGE_OTHER}>Other</option>
-              </select>
-              {nativeLanguageChoice === NATIVE_LANGUAGE_OTHER ? (
-                <input
-                  value={customNativeLanguage}
-                  onChange={(e) => setCustomNativeLanguage(e.target.value)}
-                  className="mt-2 w-full rounded-xl border px-3 py-2"
-                  placeholder="Type your language"
-                />
-              ) : null}
-              <p className="mt-1 text-xs text-stone-500">
-                One primary language for now. You can use Other for bilingual or less common
-                answers.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-stone-800">Target language</label>
-              <select
-                value={targetLanguage}
-                onChange={(e) => setTargetLanguage(e.target.value)}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-              >
-                <option value="Japanese">Japanese</option>
-              </select>
-              <p className="mt-1 text-xs text-stone-500">
-                Japanese is currently the only supported language.
-              </p>
-            </div>
-          </div>
-        </div>
+        <ProfileSettingsCoreCard
+          displayName={displayName}
+          username={username}
+          nativeLanguageChoice={nativeLanguageChoice}
+          customNativeLanguage={customNativeLanguage}
+          targetLanguage={targetLanguage}
+          nativeLanguageOptions={NATIVE_LANGUAGE_OPTIONS}
+          nativeLanguageOther={NATIVE_LANGUAGE_OTHER}
+          onDisplayNameChange={setDisplayName}
+          onUsernameChange={setUsername}
+          onNativeLanguageChoiceChange={setNativeLanguageChoice}
+          onCustomNativeLanguageChange={setCustomNativeLanguage}
+          onTargetLanguageChange={setTargetLanguage}
+        />
 
         <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
 
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <SectionLabel
-            eyebrow="Community"
-            title="Public reader profile"
-            detail="These details are optional. Keep them simple now, or use them to make your reader profile feel more like you."
-          />
+        <ProfileSettingsPublicCard
+          publicNameChoice={publicNameChoice}
+          displayName={displayName}
+          username={username}
+          chosenPublicName={chosenPublicName}
+          publicLevel={publicLevel}
+          favoriteGenres={favoriteGenres}
+          favoriteGenreInput={favoriteGenreInput}
+          bio={bio}
+          profileLevelOptions={PROFILE_LEVEL_OPTIONS}
+          onPublicNameChoiceChange={setPublicNameChoice}
+          onPublicLevelChange={setPublicLevel}
+          onFavoriteGenreInputChange={setFavoriteGenreInput}
+          onAddFavoriteGenres={addFavoriteGenresFromInput}
+          onRemoveFavoriteGenre={removeFavoriteGenre}
+          onBioChange={setBio}
+        />
 
-          <div className="mt-5 space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-stone-800">
-                Name shown to other readers
-              </label>
-              <select
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                value={publicNameChoice}
-                onChange={(e) =>
-                  setPublicNameChoice(e.target.value as "display_name" | "username")
-                }
-              >
-                <option value="display_name">
-                  Display Name ({displayName.trim() || "not set yet"})
-                </option>
-                <option value="username">Username ({username.trim() || "not set yet"})</option>
-              </select>
-              <p className="mt-2 text-sm text-stone-600">
-                Other readers will see:{" "}
-                <span className="font-medium text-stone-900">{chosenPublicName}</span>
-              </p>
-            </div>
+        <ProfileSettingsMessage type="error" message={errorMsg} />
+        <ProfileSettingsMessage type="success" message={successMsg} />
 
-            <div>
-              <label className="block text-sm font-medium text-stone-800">
-                Japanese reading level shown publicly
-              </label>
-              <select
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                value={publicLevel}
-                onChange={(e) => setPublicLevel(e.target.value)}
-              >
-                <option value="None">Prefer not to share</option>
-                {PROFILE_LEVEL_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.title} · {option.plain} ({option.cefr} · {option.jlpt})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-stone-800">Favorite genres</label>
-              <p className="mt-1 text-xs text-stone-500">
-                Add one or more genres, then press Enter or click Add.
-              </p>
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="text"
-                  className="w-full rounded-xl border px-3 py-2"
-                  placeholder="fantasy, slice-of-life"
-                  value={favoriteGenreInput}
-                  onChange={(e) => setFavoriteGenreInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addFavoriteGenresFromInput();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={addFavoriteGenresFromInput}
-                  className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-                >
-                  Add
-                </button>
-              </div>
-
-              {favoriteGenres.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {favoriteGenres.map((genre) => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => removeFavoriteGenre(genre)}
-                      className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100"
-                    >
-                      {genre} ×
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-stone-800">Bio</label>
-              <textarea
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                rows={5}
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="A little about your reading life, interests, or goals."
-              />
-            </div>
-          </div>
-        </div>
-
-        {errorMsg ? <p className="text-sm text-red-600">{errorMsg}</p> : null}
-        {successMsg ? <p className="text-sm text-emerald-700">{successMsg}</p> : null}
-
-        <div className="sticky bottom-4 z-10 rounded-2xl border border-stone-200 bg-white/95 p-3 shadow-lg backdrop-blur">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full rounded-xl bg-stone-900 px-4 py-3 text-white disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Save profile"}
-          </button>
-        </div>
+        <ProfileSettingsSaveBar
+          saving={saving}
+          onSave={handleSave}
+        />
       </div>
     </ProfileShell>
   );
