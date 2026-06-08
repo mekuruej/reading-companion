@@ -5,24 +5,20 @@ import KanjiComponentLookup from "@/components/KanjiComponentLookup";
 type Props = {
   isOpen: boolean;
   scratchWord: string;
-  pickedKanji: string;
   resetKey: number;
   onToggleOpen: (open: boolean) => void;
   onScratchWordChange: (value: string) => void;
   onUseScratchWord: () => void;
-  onClearPickedKanji: () => void;
   onPickKanji: (kanji: string) => void;
 };
 
 export default function GlobalWordHelpPanel({
   isOpen,
   scratchWord,
-  pickedKanji,
   resetKey,
   onToggleOpen,
   onScratchWordChange,
   onUseScratchWord,
-  onClearPickedKanji,
   onPickKanji,
 }: Props) {
   return (
@@ -67,22 +63,6 @@ export default function GlobalWordHelpPanel({
             </button>
           </div>
         </div>
-
-        {pickedKanji ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-stone-600">
-              Last Kanji:{" "}
-              <span className="text-2xl font-semibold text-stone-900">{pickedKanji}</span>
-            </div>
-            <button
-              type="button"
-              onClick={onClearPickedKanji}
-              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-            >
-              Clear selection
-            </button>
-          </div>
-        ) : null}
 
         <KanjiComponentLookup
           resetKey={resetKey}

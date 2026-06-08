@@ -35,7 +35,6 @@ export default function TeacherGlobalWordsPage() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
   const [scratchWord, setScratchWord] = useState("");
-  const [pickedKanji, setPickedKanji] = useState("");
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
 
   const surfaceInputRef = useRef<HTMLInputElement | null>(null);
@@ -94,7 +93,6 @@ export default function TeacherGlobalWordsPage() {
   function clearWordHelp() {
     setIsWordHelpOpen(false);
     setScratchWord("");
-    setPickedKanji("");
     setKanjiLookupResetKey((key) => key + 1);
   }
 
@@ -134,7 +132,6 @@ export default function TeacherGlobalWordsPage() {
   }
 
   function handlePickKanji(kanji: string) {
-    setPickedKanji(kanji);
     setScratchWord((prev) => `${prev}${kanji}`);
   }
 
@@ -204,15 +201,10 @@ export default function TeacherGlobalWordsPage() {
             <GlobalWordHelpPanel
               isOpen={isWordHelpOpen}
               scratchWord={scratchWord}
-              pickedKanji={pickedKanji}
               resetKey={kanjiLookupResetKey}
               onToggleOpen={setIsWordHelpOpen}
               onScratchWordChange={setScratchWord}
               onUseScratchWord={handleUseScratchWord}
-              onClearPickedKanji={() => {
-                setPickedKanji("");
-                setKanjiLookupResetKey((key) => key + 1);
-              }}
               onPickKanji={handlePickKanji}
             />
 

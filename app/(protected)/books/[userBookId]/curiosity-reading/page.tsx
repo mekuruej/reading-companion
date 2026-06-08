@@ -264,7 +264,6 @@ export default function CuriosityReadingPage() {
   const [quickError, setQuickError] = useState<string | null>(null);
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
-  const [pickedKanji, setPickedKanji] = useState("");
   const [scratchWord, setScratchWord] = useState("");
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
 
@@ -282,12 +281,6 @@ export default function CuriosityReadingPage() {
   function closeAndClearWordHelp() {
     setIsWordHelpOpen(false);
     setScratchWord("");
-    setPickedKanji("");
-    setKanjiLookupResetKey((key) => key + 1);
-  }
-
-  function clearKanjiLookupSelection() {
-    setPickedKanji("");
     setKanjiLookupResetKey((key) => key + 1);
   }
 
@@ -1255,7 +1248,6 @@ export default function CuriosityReadingPage() {
             <CuriosityWordHelpPanel
               isOpen={isWordHelpOpen}
               scratchWord={scratchWord}
-              pickedKanji={pickedKanji}
               kanjiLookupResetKey={kanjiLookupResetKey}
               onToggleOpen={setIsWordHelpOpen}
               onScratchWordChange={setScratchWord}
@@ -1277,9 +1269,7 @@ export default function CuriosityReadingPage() {
                 if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
                 window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
               }}
-              onClearPickedKanji={clearKanjiLookupSelection}
               onPickKanji={(kanji) => {
-                setPickedKanji(kanji);
                 setScratchWord((prev) => `${prev}${kanji}`);
               }}
             />

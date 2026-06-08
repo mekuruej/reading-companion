@@ -219,7 +219,6 @@ export default function AddWordPage() {
   const [chapterName, setChapterName] = useState("");
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
-  const [pickedKanji, setPickedKanji] = useState("");
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
 
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -243,12 +242,6 @@ export default function AddWordPage() {
   function closeAndClearWordHelp() {
     setIsWordHelpOpen(false);
     setScratchWord("");
-    setPickedKanji("");
-    setKanjiLookupResetKey((key) => key + 1);
-  }
-
-  function clearKanjiLookupSelection() {
-    setPickedKanji("");
     setKanjiLookupResetKey((key) => key + 1);
   }
   const wordFieldsRef = useRef<HTMLDivElement | null>(null);
@@ -1115,7 +1108,6 @@ export default function AddWordPage() {
             <AddWordHelpPanel
               isOpen={isWordHelpOpen}
               scratchWord={scratchWord}
-              pickedKanji={pickedKanji}
               kanjiLookupResetKey={kanjiLookupResetKey}
               onToggleOpen={setIsWordHelpOpen}
               onScratchWordChange={setScratchWord}
@@ -1133,9 +1125,7 @@ export default function AddWordPage() {
                 if (lookupCandidates.length > 0) setLookupCandidates([]);
                 window.requestAnimationFrame(() => wordInputRef.current?.focus());
               }}
-              onClearPickedKanji={clearKanjiLookupSelection}
               onPickKanji={(kanji) => {
-                setPickedKanji(kanji);
                 setScratchWord((prev) => `${prev}${kanji}`);
               }}
             />

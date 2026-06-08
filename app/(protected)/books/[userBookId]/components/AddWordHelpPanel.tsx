@@ -4,26 +4,22 @@ import KanjiComponentLookup from "@/components/KanjiComponentLookup";
 type AddWordHelpPanelProps = {
   isOpen: boolean;
   scratchWord: string;
-  pickedKanji: string;
   kanjiLookupResetKey: number;
   onToggleOpen: (open: boolean) => void;
   onScratchWordChange: (value: string) => void;
   onScratchWordKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onUseScratchWord: () => void;
-  onClearPickedKanji: () => void;
   onPickKanji: (kanji: string) => void;
 };
 
 export default function AddWordHelpPanel({
   isOpen,
   scratchWord,
-  pickedKanji,
   kanjiLookupResetKey,
   onToggleOpen,
   onScratchWordChange,
   onScratchWordKeyDown,
   onUseScratchWord,
-  onClearPickedKanji,
   onPickKanji,
 }: AddWordHelpPanelProps) {
   return (
@@ -66,25 +62,6 @@ export default function AddWordHelpPanel({
             </button>
           </div>
         </div>
-
-        {pickedKanji ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-stone-600">
-              Last Kanji:{" "}
-              <span className="text-2xl font-semibold text-stone-900">
-                {pickedKanji}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClearPickedKanji}
-              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-            >
-              Use this kanji
-            </button>
-          </div>
-        ) : null}
 
         <KanjiComponentLookup
           resetKey={kanjiLookupResetKey}
