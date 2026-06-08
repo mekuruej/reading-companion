@@ -832,3 +832,206 @@ Do not remove yet.
 * `libraryMode` supports `practice`, but this route initializes to `check` and often routes users to `/library-study/practice`.
 * Summary-backed loading and fallback `user_book_words` loading duplicate card construction and debug mapping.
 * Some reading helper copy in this file may drift from the updated book/practice wording; verify separately before changing because this doc pass is no-code.
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status: `Visual pass done / good stopping point`.
+
+Why this fits:
+* the main Ability Check render branches are now mostly composed from named page-local components
+* the most obvious presentational states and panels have already been extracted
+* remaining code is dominated by access, data loading, queue selection, answer checking, progress movement, localStorage, keyboard/focus behavior, and study event writes
+* further extraction would mostly create large prop baskets or move behavior-sensitive boundaries
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/library-study/check/page.tsx | 4090 | 3341 | -749 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before.
+
+The extracted components help readability most in these areas:
+* loading/sign-in/error/full-access/no-card states
+* daily setup and no-due states
+* page header and intro/status panels
+* progress card
+* card shell
+* readiness prompt
+* typing prompt
+* feedback panel
+* action panel
+* meaning review and complete states
+
+The remaining page sections are understandable, but still dense because the behavior is complex.
+
+Areas that still feel visually or mentally overwhelming:
+* the long helper section before the component body
+* the main `load()` effect and card construction
+* daily plan and seen-today localStorage behavior
+* card availability/ranking helpers
+* `saveTypedGateProgress`
+* stage/color movement functions
+* meaning review and practice leftovers
+
+These are now behavior/architecture problems, not easy JSX cleanup.
+
+### 3. Remaining Code Classification
+
+The remaining code is mostly:
+* access / ownership / role checks: signed-in user, profile, app access, feature access, full-access gate
+* Supabase loading: profiles, user books, learning settings, summaries, claims, saved words, progress rows
+* study/check session behavior: daily plan, due cards, seen-today tracking, completed-today tracking
+* answer checking behavior: reading typing, meaning typing, correction/retype requirements
+* card progression behavior: readiness to Reading Gate, support holds, moving past cards, finishing early
+* keyboard/interaction behavior: Enter suppression, input focus timers, auto-forward timers
+* UI state: deck, index, setup levels, notices, checked answer state, meaning review state
+* derived values: filtered cards, due counts, current card, session summary, prompts, labels
+* helper functions: answer normalization, queue building, gate rules, color/stage rules, storage helpers
+* visual JSX still in `page.tsx`: mostly high-level composition and render branches
+* component composition: clear and useful now
+* legacy or suspicious code: `LibraryPracticePanel`, practice deck state, discarded debug state, possible stale practice-related helpers
+
+The remaining 3,341 lines are mostly behavior/architecture rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+Do not extract more right now just for line count.
+
+Possible candidates, all deferred:
+
+* `AbilityCheckMainContent`
+  * Owns the main non-branch render block from page header through action panel.
+  * Safe or not safe: not safe enough for this pass because it would require many state, derived-value, and handler props.
+  * Risk level: high.
+  * Recommendation: defer.
+
+* `AbilityCheckFaq`
+  * Owns the FAQ/help box already defined locally.
+  * Safe or not safe: visually safe, but low value because it is already isolated as a local helper component.
+  * Risk level: low.
+  * Recommendation: defer unless it becomes reused elsewhere.
+
+* `KatakanaBadge`
+  * Owns the small katakana badge already defined locally.
+  * Safe or not safe: visually safe, but too tiny to matter.
+  * Risk level: low.
+  * Recommendation: defer.
+
+* `LibraryCheckIntroCard`
+  * Owns an older intro card helper.
+  * Safe or not safe: suspicious because it may be unused or superseded by `AbilityCheckIntroCard`.
+  * Risk level: medium until usage is verified.
+  * Recommendation: defer and verify before extracting/removing.
+
+* `LibraryPracticePanel`
+  * Owns practice-mode UI still inside this check page.
+  * Safe or not safe: not safe for a visual pass because it includes its own local state, typing behavior, practice progression, and practice review handling.
+  * Risk level: high.
+  * Recommendation: defer until feature cleanup decides whether this route should still contain practice behavior.
+
+### 5. Prop Basket / Over-Extraction Check
+
+No extracted component appears obviously too prop-heavy for the value it provides.
+
+Medium prop-surface components:
+* `AbilityCheckSetupPanel`
+* `AbilityCheckTypingPrompt`
+* `AbilityCheckCardShell`
+* `AbilityCheckMeaningReviewScreen`
+* `AbilityCheckActionPanel`
+
+These still make the page easier to understand because they hide real UI blocks and keep behavior in `page.tsx`.
+
+No extraction appears to make the page harder to understand.
+
+Components that should stay local and page-specific:
+* all `AbilityCheck*` components for now
+* `AbilityCheckModeStatusPanel`
+* `AbilityCheckActionPanel`
+* `AbilityCheckMeaningReviewScreen`
+
+Components that might eventually become shared but should stay local for now:
+* loading/error/locked/no-card state components
+* progress card
+* typing prompt
+* feedback panel
+
+Do not promote shared components until Library Check and Library Practice boundaries are clearer.
+
+### 6. Behavior Boundary Check
+
+The visual pass appears to have preserved:
+* access checks
+* current-user scoped study data
+* Supabase queries
+* save/update/delete handlers
+* Ability Check progression behavior
+* reading/meaning gate behavior
+* answer validation behavior
+* card movement / stage movement behavior
+* study event/log behavior
+* private saved-word data boundaries
+
+Suspicious but do not fix now:
+* this route still contains practice-mode state and `LibraryPracticePanel` behavior despite `/library-study/practice` existing separately
+* `setDebugInfo` keeps debug state write behavior without a visible read
+* summary-backed card loading and fallback saved-word loading duplicate some card construction
+* discarded/hidden debug paths should be reviewed before removal
+
+### 7. Architecture Deferred List
+
+Keep these deferred:
+* shared types: wait until Ability Check vs Practice boundaries are stable
+* helper functions: many encode study rules and should move only with tests
+* access helpers: feature access and full-access checks are safety-sensitive
+* services/DAOs/controllers: data loading and writes are too intertwined for a visual pass
+* repeated Supabase loading: needs a focused data-loading pass
+* study/check calculation helpers: card availability and ranking rules are easy to regress
+* card queue helpers: daily plan, due cards, seen-today tracking, and deck source rules should move together later
+* answer normalization helpers: reading/meaning answer matching needs a focused correctness pass
+* stage/color movement rules: these define core learning behavior
+* study logging/event logic: writes must remain consistent with progress movement
+* localStorage helpers: daily plan, completed-day, reminder-hide, and seen-today behavior should be reviewed together
+* practice leftovers: decide whether to remove, move, or keep before architecture extraction
+
+### 8. Browser Smoke Test Suggestions
+
+Manual smoke checklist:
+* logged-in user can open Ability Check / Library Check
+* logged-out or invalid access behavior still shows the correct sign-in/locked state
+* full-access locked state still works for non-full-access users
+* cards load for a user with due cards
+* no-card state still works
+* no-due/resting state still works
+* daily setup levels can be selected and started
+* reading gate/check flow works
+* meaning gate/check flow works
+* correct answer behavior works
+* incorrect answer behavior works
+* retype/correction requirement works
+* readiness card can move to Reading Gate
+* “Too hard for now” / support hold still works
+* finish early still saves place
+* meaning review pass/miss behavior still works
+* flag/problem-card behavior still hides/removes as intended
+* card stage/color movement still works
+* study events/logs still save where applicable
+* keyboard Enter behavior still works and does not double-advance
+* auto-focus and auto-forward behavior still work
+* empty state still works
+* mobile-ish visual check for card shell, prompt, feedback, and action panel
+
+Do not run browser tests during this doc pass.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+Recommended next step:
+* move to second-pass architecture planning later
+* do not do another visual extraction just to reduce line count
+* first clarify whether practice-mode leftovers belong in this route
+* then plan behavior-sensitive architecture cleanup around card loading, queue rules, progress writes, and answer matching

@@ -705,9 +705,11 @@ Recommended approach:
 * Compare them against `Curiosity*` components after both pages are visually thinned.
 * Promote only purely presentational, prop-driven pieces to shared components.
 
-## Recommended First Extraction
+## Original First-Pass Extraction Plan
 
-Start with `AddWordPageHeader`.
+Historical note: this was the original safe extraction order before the first visual pass was completed. These recommendations are no longer pending.
+
+The suggested starting point was `AddWordPageHeader`.
 
 It is the smallest and clearest low-risk visual extraction because it only owns static page copy. It does not touch access checks, Supabase queries, routing, Jisho lookup, save handlers, vocabulary cache behavior, kanji-map behavior, page/chapter behavior, refs, or controlled form state.
 
@@ -864,14 +866,288 @@ Use these labels for this page:
 * Visual pass in progress
 * Visual pass mostly done
 * Visual pass done / architecture deferred
+* Visual pass done / good stopping point
 * Architecture pass later
 * Architecture pass in progress
 * Architecture pass done
 
-Recommended current status: `Not started`.
+Recommended current status: `Visual pass done / good stopping point`.
 
-When all safe presentational extractions are complete, use `Visual pass done / architecture deferred`. That should mean the page-thinning layer is complete and the deeper controller/service/DAO/helper cleanup is intentionally saved for later.
+Current tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/books/[userBookId]/add-word/page.tsx | 1706 | 1280 | -426 |`
+
+The first visual pass is finished. The remaining work is behavior-aware cleanup or second-pass architecture planning, not more first-pass presentational thinning.
 
 ## Finished
 
-No extractions have been completed yet.
+First visual pass completed. Extracted page-local visual components:
+
+* `AddWordPageHeader`
+* `AddWordStatusMessage`
+* `AddWordBookContextCard`
+* `AddWordFullAccessRequired`
+* `AddWordDictionaryChoices`
+* `AddWordRecentSessionWordCard`
+* `AddWordRecentSessionWords`
+* `AddWordQuickSearchForm`
+* `AddWordHelpPanel`
+* `AddWordDetailFields`
+* `AddWordSuperTeacherTools`
+* `AddWordFormShell`
+* `AddWordAddEditCard`
+
+Remaining work is intentionally deferred to behavior-aware cleanup or second-pass architecture planning.
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status label:
+
+`Visual pass done / good stopping point`
+
+This status fits because the first-pass visual component extraction has now covered the major Add Word render surfaces:
+
+* `AddWordPageHeader`
+* `AddWordStatusMessage`
+* `AddWordBookContextCard`
+* `AddWordFullAccessRequired`
+* `AddWordDictionaryChoices`
+* `AddWordRecentSessionWordCard`
+* `AddWordRecentSessionWords`
+* `AddWordQuickSearchForm`
+* `AddWordHelpPanel`
+* `AddWordDetailFields`
+* `AddWordSuperTeacherTools`
+* `AddWordFormShell`
+* `AddWordAddEditCard`
+
+The current page is about 1280 lines, down from the tracker's original 1706. The tracker row's "now" count is slightly stale.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/books/[userBookId]/add-word/page.tsx | 1706 | 1280 | -426 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before. The top-level return now reads as page composition: header, book context, status message, add/edit card, quick search, help panel, dictionary choices, detail fields, super-teacher tools, and recent session words.
+
+The extracted components are helping readability because the page no longer carries the full JSX for the form fields, dictionary choice cards, recent word cards, and support panels inline.
+
+The remaining page sections are understandable. Most of the remaining length is behavior and orchestration rather than obvious low-risk visual markup.
+
+The most visually overwhelming remaining section is the recent-session word mapping near the bottom, but it is tied to mobile/desktop display differences, edit/delete callbacks, and Library Study badge enrichment. It is not worth forcing into another extraction unless the session-list behavior is cleaned up at the same time.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly behavior/architecture:
+
+* access / ownership checks: signed-in user lookup, profile role lookup, owner/super-teacher/linked-teacher access check through `teacher_students`, render gates, and save-time access guards.
+* full-access checks: app access status, feature access for `add_word`, full-access-required copy, and blocked save messaging.
+* Supabase loading: book context, profile access, teacher/student relationship check, Library Study color lookup, page-order lookup, vocabulary cache lookup/insert, `user_book_words` insert/update/delete.
+* book/context loading: `loadBookInfo`, `bookTitle`, `bookCover`, and access messages.
+* Jisho lookup behavior: session token, `/api/jisho` call, dictionary candidate parsing, exact-match behavior, and candidate selection.
+* manual word/meaning behavior: controlled word, reading, meaning, alternate surface, meaning choices, and custom meaning state.
+* vocabulary cache lookup/insert/update behavior: verified dictionary-backed kanji words reuse or create `vocabulary_cache` rows.
+* `user_book_words` insert/update/delete behavior: `handleSave`, `deleteSessionWord`, editing current-session words, and session-list updates.
+* vocabulary kanji-map generation behavior: `generateVocabularyKanjiMap` after successful cache-backed kanji saves.
+* page/chapter/default behavior: localStorage chapter defaults, page/chapter normalization, page order, and group-preserving edit behavior.
+* saved session/current-page word list behavior: `sessionWords`, mobile/desktop detail disclosure, Library Study color badges, and edit/delete callbacks.
+* edit/delete saved word behavior: `loadSessionWordIntoForm`, `deleteSessionWord`, editing state, and form reset behavior.
+* alternative kanji/candidate behavior: alternate surface state, kanji component lookup, scratch word, lookup reset key, and dictionary candidates.
+* UI state: loading, saving, messages, saved notice, help panel, lookup state, refs, and super-teacher tool state.
+* derived values: `isSuperTeacher`, `currentColorSurface`, and `currentLibraryColorInfo`.
+* helper functions: dictionary parsing, formatting, viewport/focus helpers, access helper, payload shaping, and page-order helper.
+* visual JSX still in `page.tsx`: loading book info state, current library status pill, inline duplicate message near the form, and recent-session mapping/disclosures.
+* component composition: imported `AddWord*` components with callbacks and controlled values passed down.
+* legacy or suspicious code: stale first-pass comments, unused `useMemo` import, alternate-surface UI assumptions, message duplication, and recent-session desktop/mobile slice behavior.
+
+The remaining 1280 lines are mostly behavior/data flow and page orchestration rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `AddWordLoadingState`
+
+What JSX it owns:
+
+* the `!accessChecked` loading shell
+* the fallback "Loading book info..." paragraph when the book title is not loaded
+
+Why it is safe or not safe:
+
+* Safe visually, but very small. It would not meaningfully improve the page.
+
+Expected risk level:
+
+* Low
+
+Do now or defer:
+
+* Defer. It is too small to justify another pass by itself.
+
+#### `AddWordCurrentLibraryStatus`
+
+What JSX it owns:
+
+* the current library status pill beside the quick search form
+* `LibraryColorBadge` display for current word/reading
+
+Why it is safe or not safe:
+
+* Mostly presentational, but it depends on Library Study color semantics and current surface/reading derivation. Extracting it would be reasonable only if the same status pill is reused elsewhere.
+
+Expected risk level:
+
+* Low-medium
+
+Do now or defer:
+
+* Defer. It is not a high-value extraction.
+
+#### `AddWordInlineMessage`
+
+What JSX it owns:
+
+* the inline message shown inside the form
+
+Why it is safe or not safe:
+
+* Safe, but the page already has `AddWordStatusMessage` above the card. This should be reviewed as message behavior, not extracted as more UI.
+
+Expected risk level:
+
+* Low
+
+Do now or defer:
+
+* Defer. Clarify whether the duplicate message display is intended first.
+
+#### `AddWordRecentSessionWordListBody`
+
+What JSX it owns:
+
+* the `sessionWords.slice(...)` maps
+* mobile and desktop detail disclosures
+* per-word Library Study color lookup before rendering `AddWordRecentSessionWordCard`
+
+Why it is safe or not safe:
+
+* This is the most obvious remaining visual chunk, but it has enough behavior-adjacent display rules that it could become a prop basket. It also contains the suspicious desktop/mobile slice behavior noted earlier.
+
+Expected risk level:
+
+* Medium
+
+Do now or defer:
+
+* Defer. Revisit only when cleaning up the session-list behavior.
+
+### 5. Prop Basket / Over-Extraction Check
+
+Some extracted components necessarily receive many controlled props, especially `AddWordDetailFields` and `AddWordHelpPanel`, but they still improve readability because they own coherent visual areas.
+
+No extraction appears to make the page harder to understand. The page still clearly owns state, handlers, data loading, and save behavior.
+
+Components that should stay local and page-specific for now:
+
+* `AddWordDetailFields`
+* `AddWordHelpPanel`
+* `AddWordSuperTeacherTools`
+* `AddWordRecentSessionWords`
+* `AddWordRecentSessionWordCard`
+
+Components that might eventually become shared, but should stay local for now:
+
+* status message/banner components
+* book context card shell
+* dictionary choice list/card
+* recent session word card shape
+* full-access-required shell
+
+Do not promote these to shared components until Add Word, Curiosity Reading, and any future Teacher Prep word-entry flows have stable prop contracts.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to have moved or blurred these boundaries:
+
+* access checks remain in `page.tsx`
+* owner/private book checks remain in `page.tsx`
+* linked-teacher checks remain in `page.tsx`
+* full-access checks remain in `page.tsx`
+* Supabase queries remain in `page.tsx`
+* Jisho lookup behavior remains in `handleLookup`
+* manual meaning behavior remains in page state and handlers
+* meaning-choice behavior remains in page state and handlers
+* `vocabulary_cache` lookup/insert behavior remains in `handleSave`
+* `user_book_words` insert/update/delete behavior remains in `handleSave` and `deleteSessionWord`
+* `vocabulary_cache_id` assignment behavior remains in `handleSave`
+* `vocabulary_kanji_map` generation remains in `generateVocabularyKanjiMap` and post-save logic
+* page/chapter defaults remain in localStorage effects and save helpers
+* localStorage chapter defaults remain page-local
+* private saved-word data boundaries remain guarded by access checks and `user_book_id` filters
+* navigation back to Book Hub and Vocab List remains page-owned
+
+Suspicious but not fixed:
+
+* `message` renders both above the add/edit card and inside the form.
+* Desktop recent-session details appear to use `sessionWords.slice(1)` even though two cards can already be visible on desktop.
+* `useAlternateSurface` is controlled by alternate surface text rather than an obvious explicit checkbox.
+* The feature-access comment still says "For this first pass."
+
+### 7. Architecture Deferred List
+
+* shared types: defer until multiple pages need the same `JishoChoice`, `JishoCandidate`, or `SessionWord` contracts.
+* helper functions: defer because dictionary parsing, page-order, and access helpers are behavior-sensitive.
+* access helpers: defer until Book Hub, Add Word, Curiosity Reading, Study, Vocab List, and teacher access rules are centralized together.
+* services/DAOs/controllers: defer because save ordering and access checks are still tightly coupled in this page.
+* repeated Supabase loading: defer until shared user-book access and vocabulary save services are designed.
+* Jisho lookup service: defer because candidate parsing and exact-match behavior still need careful testing, especially same-surface/different-reading cases.
+* vocabulary cache service: defer because cache identity affects `vocabulary_cache_id`, global data, and kanji-map generation.
+* saved-word service: defer because insert/update/delete interacts with page order, chapter/page defaults, and session list state.
+* kanji-map generation service: defer because API auth, cache identity, and post-save timing are behavior-sensitive.
+* page/chapter default helpers: defer because Add Word and Curiosity Reading use different localStorage key patterns.
+* edit/delete saved-word helpers: defer because current-session editing is not the same as general Vocab List editing.
+* meaning-choice helpers: defer until dictionary candidate identity and selected-definition rules are stable.
+
+### 8. Browser Smoke Test Suggestions
+
+Manual checklist for later implementation work:
+
+* owner can open their own Add Word page
+* unauthorized user is blocked from another user's private Add Word page
+* full-access locked behavior still works if applicable
+* linked teacher/super-teacher access still works if intended
+* Jisho lookup works for a normal word
+* Jisho lookup works for same-surface/different-reading words such as `市`
+* manual word/meaning save works
+* saved word gets a `vocabulary_cache_id` when expected
+* manual/unverified saved word can save without a `vocabulary_cache_id`
+* kanji-map generation works for kanji-containing cache-backed saved words
+* alternate surface/candidate behavior works if present
+* page number save works
+* chapter number/name save works
+* default page/chapter behavior persists and reloads
+* saved word appears in the saved/session list
+* editing a saved session word works
+* deleting a saved session word works
+* duplicate or duplicate-like word behavior still works if present
+* Library Study color/status badge displays for current and recent words
+* super-teacher cache-only save works for authorized users
+* super-teacher Word Sky approval works for authorized users
+* navigation back to Book Hub and Vocab List works
+* mobile/iPad-ish layout still looks usable
+* empty/error states still work
+
+Do not run browser tests unless explicitly asked.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+The first visual pass has reached a good stopping point. One more tiny extraction would not meaningfully improve maintainability, and the remaining high-line-count areas are mostly access, lookup, save, cache, page/chapter, and current-session behavior.
+
+Next useful work should be either:
+
+* behavior-aware cleanup of suspicious session-list/message/alternate-surface details, or
+* second-pass architecture planning for access, Jisho lookup, vocabulary cache, saved-word writes, and page/chapter helpers.

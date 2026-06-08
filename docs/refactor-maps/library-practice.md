@@ -691,3 +691,311 @@ Do not remove yet.
 * `libraryMode` supports `check` and `practice`, but the page currently initializes to `practice`; verify whether the check/practice switch is still visible or legacy.
 * The file path is `library-study/practice/page.tsx`, but the file still contains Ability Check, Library Practice, daily plan setup, progress writes, and meaning review. Later architecture should probably split these, but not during the visual pass.
 * Summary-backed card loading and fallback `user_book_words` card loading duplicate card construction/debug summary work.
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status label:
+
+`Visual pass done / good stopping point`
+
+This status fits because the easy outer-shell JSX has already been extracted into page-local components, and the remaining large sections are mostly behavior-heavy Library Practice / Ability Check logic rather than simple presentational markup. The page is now easier to scan at the top-level render branch: loading, sign-in, full-access locked, error, empty, meaning review, and main practice view are all clear.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/library-study/practice/page.tsx | 3304 | 2961 | -343 |`
+
+The remaining work should be treated as architecture deferred, not visual thinning. The next pass should not chase line count; it should first clarify whether this page should continue containing both Library Practice and Ability Check support logic.
+
+### 2. Readability Check
+
+The page is easier to scan than before. The extracted state components, intro/progress/filter components, complete card, empty state, and meaning review screen make the render branch much calmer.
+
+The extracted components are helping readability because they remove the most repetitive UI shell from `page.tsx` while leaving decisions and handlers visible in one place.
+
+The remaining page sections are understandable, but the middle of the file is still dense because it mixes data loading, deck construction, daily check setup, practice reveal flow, typing flow, meaning review, study event writes, and gate progression.
+
+The most visually overwhelming remaining area is `LibraryPracticePanel`. It still contains a lot of JSX, but it also owns local typing state, focus timers, answer checking, feedback, and meaning-review callbacks. Extracting it further is possible, but not as a low-risk line-count task.
+
+### 3. Remaining Code Classification
+
+Access / full-access checks:
+* Supabase auth user loading.
+* Profile lookup.
+* app/full-access checks through `getAppAccessStatus`, `getFeatureAccess`, and `canUseFullAccessFeature`.
+* locked state setup and render branch.
+
+Supabase loading:
+* user profile.
+* user books.
+* learning settings.
+* library word summaries.
+* Word Sky claims.
+* sample `user_book_words`.
+* `library_word_progress`.
+* fallback full `user_book_words` loading.
+
+Practice deck loading:
+* summary-backed card construction.
+* fallback grouped saved-word card construction.
+* Word Sky claim-only card construction.
+* progress merging and color status calculation.
+
+Practice mode/filter behavior:
+* JLPT filter.
+* color filter.
+* search-param color initialization.
+* reveal/typing mode state.
+* shuffled practice deck rebuilds.
+
+Reveal/typing behavior:
+* `practiceRevealStep`.
+* reveal progression.
+* typing sub-step state inside `LibraryPracticePanel`.
+* typing focus/reselect behavior.
+
+Answer checking behavior:
+* kana normalization.
+* meaning matching.
+* practice typing pass/miss handling.
+* meaning-review queueing.
+* Ability Check multiple-choice and typing helpers still present in the file.
+
+Card progression behavior:
+* next/previous/shuffle.
+* complete state.
+* move same deck to next practice mode.
+* daily check seen-today behavior still present.
+
+Meaning review behavior:
+* practice meaning review queue.
+* pass/miss/keep-missed handlers.
+* progress write hooks from review decisions.
+
+Keyboard/focus behavior:
+* typing input focus timers.
+* Enter-key submit handling.
+* broader Ability Check focus/auto-forward timers still present.
+
+Study event/log behavior:
+* `recordCurrentStudyEvent`.
+* `recordStudyEvent`.
+* progress upsert logic.
+* hide/remove claim behavior.
+
+UI state:
+* loading/error/sign-in/locked state.
+* selected filters.
+* active card indices.
+* complete/review state.
+* notice/debug state.
+
+Derived values:
+* filtered card pools.
+* daily setup counts.
+* option lists.
+* current active cards.
+* labels/classes for colors, gates, and modes.
+
+Helper functions:
+* normalization helpers.
+* color/gate helpers.
+* availability helpers.
+* daily plan helpers.
+* card identity/card construction helpers.
+* formatting helpers.
+
+Visual JSX still in `page.tsx`:
+* `LibraryCheckIntroCard`.
+* `LibraryPracticePanel`.
+* main composition around extracted components.
+
+Component composition:
+* top-level render now composes extracted components cleanly.
+* `LibraryPracticePanel` composes `LibraryPracticeCardBadges` and `LibraryPracticeNoCardsState`, but otherwise remains local.
+
+Legacy or suspicious code:
+* discarded `setDebugInfo` state.
+* `LibraryCheckDebug`.
+* possibly unused gate prompt helpers.
+* `libraryMode` / check-mode support inside a practice route.
+* summary-backed and fallback card construction duplication.
+
+Overall, the remaining 2961 lines are mostly behavior/architecture rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `LibraryPracticeRevealCard`
+
+What JSX it owns:
+* reveal-mode card button.
+* card badges.
+* word, reading, and meaning reveal fields.
+
+Why it is safe or not safe:
+* It is mostly presentational, but it depends on reveal state, color helpers, definition helpers, and the card model. Extracting it would reduce one visible block inside `LibraryPracticePanel`, but it would still need several props or callback/helper props.
+
+Expected risk level:
+* Medium.
+
+Do now or defer:
+* Defer. It is not worth doing until the practice panel behavior is stabilized.
+
+#### `LibraryPracticeTypingCard`
+
+What JSX it owns:
+* typing-mode card.
+* typing label, surface/reading display.
+* input.
+* feedback panel.
+* submit button.
+
+Why it is safe or not safe:
+* Not low-risk. It is tightly connected to local typing state, focus timers, Enter-key behavior, answer checking, missed-step behavior, and meaning-review callbacks.
+
+Expected risk level:
+* Medium-high.
+
+Do now or defer:
+* Defer. Extracting this now would either move behavior or create a large prop basket.
+
+#### `LibraryPracticeNavigationControls`
+
+What JSX it owns:
+* Previous, review meanings, Skip, and Shuffle buttons.
+* bottom explanatory copy.
+
+Why it is safe or not safe:
+* This is the clearest remaining visual extraction candidate. It only needs practice mode, total, meaning review count, and handlers.
+
+Expected risk level:
+* Low-medium.
+
+Do now or defer:
+* Defer for now. It is safe enough, but small; it will not materially clarify the page compared with the risk of another prop surface.
+
+#### `LibraryCheckIntroCard`
+
+What JSX it owns:
+* mode intro card and Check/Practice segmented buttons.
+* mode-specific explanation tiles.
+
+Why it is safe or not safe:
+* It is already a visual component but still local in `page.tsx`. Moving it to the shared components folder would be easy, but its check/practice split may be legacy or pending product clarification.
+
+Expected risk level:
+* Low.
+
+Do now or defer:
+* Defer until the page’s relationship to Ability Check is clearer.
+
+### 5. Prop Basket / Over-Extraction Check
+
+No extracted component appears too prop-heavy yet. `LibraryPracticeFilterPanel`, `PracticeMeaningReviewScreen`, and the full-access/empty/error states have reasonable prop surfaces.
+
+The extraction did not make the page harder to understand. The page now reads more like orchestration at the render boundary.
+
+Components that should stay local and page-specific for now:
+* `LibraryPracticeFilterPanel`.
+* `LibraryPracticeCompleteCard`.
+* `PracticeMeaningReviewScreen`.
+* `LibraryPracticeCardBadges`.
+* all Library Review early/empty/full-access state components.
+
+Components that might eventually become shared, but should stay local for now:
+* `LibraryReviewProgressCard`.
+* early loading/sign-in/error/locked states.
+* card badges.
+
+Do not move shared components yet. Ability Check, Library Practice, Book Study, and Kanji Study now have similar-looking study UI, but their behavior is still different enough that shared components should wait.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to have moved or blurred:
+* access checks.
+* full-access checks.
+* current-user scoped study data.
+* Supabase queries.
+* practice deck selection.
+* practice filter behavior.
+* reveal behavior.
+* reading/meaning/typing behavior.
+* answer validation behavior.
+* card progression behavior.
+* study event/log behavior.
+* private saved-word data boundaries.
+
+Nothing in the extracted components appears to own Supabase writes, access decisions, deck construction, answer validation, progress movement, or private saved-word loading.
+
+Suspicious, but not fixed here:
+* The route still includes substantial Ability Check machinery even though it is the Library Practice page.
+* `libraryMode` and `LibraryCheckIntroCard` suggest older check/practice switching behavior, but the current render is practice-focused.
+* Debug state and debug type may be leftovers.
+
+### 7. Architecture Deferred List
+
+Shared types:
+* Defer because the page still mixes Library Practice and Ability Check concepts. Shared types should wait until the split is clearer.
+
+Helper functions:
+* Defer because helpers encode color gates, timing windows, daily plan rules, card identity, and answer matching. Moving them without tests could hide behavior changes.
+
+Access helpers:
+* Defer because access is currently explicit and easy to audit in-place. Centralize only after several pages use the same stable pattern.
+
+Services / DAOs / controllers:
+* Defer because the data-loading flow builds several derived models in-line. Extracting services should come with behavior tests or at least focused smoke tests.
+
+Repeated Supabase loading:
+* Defer because summary-backed loading and fallback saved-word loading need careful privacy and correctness verification before consolidation.
+
+Practice deck helpers:
+* Defer because deck construction uses learning settings, progress rows, color state, claims, and filters.
+
+Filter helpers:
+* Defer until JLPT/color behavior is fully settled across Library Practice and Book Study.
+
+Answer normalization helpers:
+* Defer because kana/meaning matching affects learner-facing correctness. This should be extracted only with tests or careful examples.
+
+Study logging / event logic:
+* Defer because event writes and progress movement are high-risk behavior.
+
+Meaning review helpers:
+* Defer because meaning review can move forgotten words back through gates and touches saved progress.
+
+Card progression helpers:
+* Defer because next/previous/shuffle/complete/next-mode behavior has UX implications and can easily change what students see.
+
+### 8. Browser Smoke Test Suggestions
+
+Manual smoke checklist:
+* Log in as a full-access user and open `/library-study/practice`.
+* Confirm logged-out behavior redirects or shows the expected sign-in state.
+* Confirm a non-full-access user still sees the full-access locked state.
+* Confirm cards load from the user’s own saved vocabulary.
+* Confirm JLPT and color filters update the review pool.
+* Confirm reveal practice shows word, then reading, then meaning.
+* Confirm typing practice starts at reading, accepts a correct reading, then moves to meaning.
+* Confirm typing practice handles incorrect reading and keeps focus in the input.
+* Confirm typing practice handles correct and incorrect meaning answers.
+* Confirm meaning review appears when missed meanings are queued.
+* Confirm meaning review pass/miss/keep-missed buttons behave correctly.
+* Confirm Previous, Skip, Shuffle, and completion behavior still work.
+* Confirm “same cards to next mode” behavior works from the complete card.
+* Confirm Word Sky CTA still navigates correctly.
+* Confirm study events/progress save where applicable.
+* Confirm keyboard Enter behavior still works in typing mode.
+* Confirm the empty state still appears for a user with no cards.
+* Check mobile-ish layout for the card shell, filter panel, completion card, feedback panel, and navigation controls.
+
+Do not run this smoke test during the doc-only audit unless specifically requested.
+
+### 9. Final Recommendation
+
+Recommendation:
+
+Stop visual thinning here.
+
+The first visual pass reached a good stopping point. Further extraction should wait until second-pass architecture planning clarifies whether Library Practice and Ability Check should remain intertwined in this route. The next useful work is behavior verification and architecture planning, not another visual component pass.

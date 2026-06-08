@@ -833,3 +833,350 @@ Do not extract or rewrite:
 * keyboard handling
 
 Those are second-pass or later candidates after the page's visual shell is safer and easier to read.
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status label:
+
+`Visual pass done / good stopping point`
+
+This status fits because the first visual pass extracted the reusable page-local shell and most repeated UI pieces: header, filters, progress, field rows, badges, flashcard frame, multiple-choice panel, typing panel, mode panel, instruction/nav, bottom navigation, complete/empty/error/loading/sign-in/full-access states. The page still has a large active render branch, but the remaining branching is mostly study-mode orchestration and answer-flow behavior rather than low-risk visual JSX.
+
+The current tracker row can change from `Visual pass mostly done / architecture deferred` to `Visual pass done / good stopping point`.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/books/[userBookId]/study/page.tsx | 2414 | 2149 | -265 |`
+
+The remaining work should be treated as architecture deferred. Do not keep extracting simply to reduce lines.
+
+### 2. Readability Check
+
+The page is easier to scan than before. The top-level branches now clearly show access/loading states, empty state, complete state, and the main flashcard layout.
+
+The extracted components are helping readability. `StudyBookHeader`, `StudyFilterPanel`, `StudyProgressPanel`, `StudyFlashcardShell`, `StudyCardBadges`, `MultipleChoiceAnswerPanel`, `TypingAnswerPanel`, `StudyModePanel`, `StudyInstructionNav`, and `StudyBottomNavigation` give names to the major visual surfaces.
+
+The remaining page sections are understandable, but the core flashcard content branch is still dense because it decides which fields to show for each study mode and wires answer panels to local answer state.
+
+The visually overwhelming area that remains is the in-card mode branch for multiple-choice, typing, and tap-to-reveal. It is not a simple visual block: it connects directly to answer validation, correction flow, typed input reset keys, mode prompts, and current-card state.
+
+### 3. Remaining Code Classification
+
+Access / ownership checks:
+* Supabase auth user check.
+* `user_books` row loading.
+* owner access.
+* super-teacher access.
+* linked-teacher access through `teacher_students`.
+* no-access message state and access-denied render.
+
+Full-access checks:
+* profile/app access loading.
+* feature access check for `study_flashcards`.
+* full-access locked render and safe navigation options.
+* write actions guard against missing `canAccessBook` / `canUseStudyFlashcards`.
+
+Supabase loading:
+* current user.
+* profile access fields.
+* current `user_books` row and joined book metadata.
+* owner's broader `user_books`.
+* owner library `user_book_words`.
+* current book `user_book_words`.
+
+Saved-word / book-word loading:
+* active cards come from the current book's saved words.
+* library cards come from the owner user's broader library for distractors and repeat counts.
+* hidden, skipped, and excluded cards are filtered.
+* meaning choices are normalized.
+* chapter metadata is normalized.
+
+Flashcard deck construction:
+* cards are normalized from raw `user_book_words`.
+* repeat counts and total counts are computed.
+* cards are deduped by normalized surface.
+* filtered cards drive `sessionOrder`.
+
+Study mode behavior:
+* `studySet` controls reveal fields, typing modes, multiple-choice modes, and complete review.
+* local settings persist mode/filter choices.
+* next study mode can be selected from the complete state.
+
+Answer checking behavior:
+* reading typing uses normalized kana/romaji behavior.
+* meaning typing uses one-word meaning matching.
+* multiple-choice modes compare reading, meaning, or word.
+* wrong multiple-choice answers require a correction input.
+
+Card progression behavior:
+* study-once session order.
+* next/previous reveal progression.
+* auto-forward after correct typed or multiple-choice answers.
+* session complete state.
+
+Typed-input behavior:
+* typed input state.
+* typed feedback state.
+* input reset key.
+* typed input refs.
+* correction input refs.
+* Enter-key handling.
+
+Previous / next / retry behavior:
+* `goToNextWord`.
+* `goToPrevWord`.
+* `nextCardReveal`.
+* `prevCardReveal`.
+* `restartCurrentFilteredSet`.
+* `Study Again` and next-study-mode behavior.
+
+Study progress writes:
+* legacy `study_logs`.
+* unified `recordStudyEvent`.
+* skip-for-today write.
+* flag/exclude write.
+* hide write.
+* definition choice update write.
+
+UI state:
+* loading/access/error state.
+* filter state.
+* study mode state.
+* card/session state.
+* typed and multiple-choice answer state.
+* definition update state.
+
+Derived values:
+* `settingsKey`.
+* `steps`.
+* `isMultipleChoiceMode`.
+* `typeModeEnabled`.
+* current card index/card.
+* visible field booleans.
+* current answer field.
+* card color status.
+* mode help text and instruction text.
+
+Helper functions:
+* normalization helpers.
+* chapter helpers.
+* repeat key helpers.
+* shuffle/distractor helpers.
+* multiple-choice option builders.
+* answer checking helpers.
+* study event helper.
+* access helper.
+
+Visual JSX still in `page.tsx`:
+* `filterControls` composition.
+* in-card mode branches and `Row` composition.
+* mode option list and mode help text.
+* instruction text derivation.
+
+Component composition:
+* most shell/UI components are extracted.
+* remaining composition is mainly wiring extracted components to behavior state.
+
+Legacy or suspicious code:
+* `skipCardForToday` is defined but does not appear wired to a rendered button.
+* definition picker/update state appears present without visible picker UI.
+* `firstTouch` appears possibly unused.
+* non-study-once branches remain even though `studyOnceMode` is hardcoded true.
+* surface-only dedupe may collapse same-surface/different-reading entries.
+
+Overall, the remaining 2149 lines are mostly behavior, state, data loading, and study-flow orchestration rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `StudyCardContent`
+
+What JSX it owns:
+* the full in-card branch for multiple-choice, typing, and reveal field rows.
+
+Why it is safe or not safe:
+* Not low-risk. It would require many props: study mode, card, row visibility, MC state, correction state, typed state, refs, handlers, and helper callbacks. It would hide the central study-flow wiring behind a large prop basket.
+
+Expected risk level:
+* High.
+
+Do now or defer:
+* Defer. This should only happen after answer/mode behavior is separated into a view model or controller.
+
+#### `StudyModeOptions`
+
+What JSX it owns:
+* the `modeOptions` array and separator entries passed to `StudyModePanel`.
+
+Why it is safe or not safe:
+* Safe as a constant, but small. Extracting it would not materially improve the page and might obscure mode ordering during active study-mode work.
+
+Expected risk level:
+* Low.
+
+Do now or defer:
+* Defer.
+
+#### `StudyModeHelpText`
+
+What JSX it owns:
+* the nested mode help text ternary passed to `StudyModePanel`.
+
+Why it is safe or not safe:
+* This is display-oriented, but it is tightly coupled to the study-mode union and should probably become a helper with mode labels in a later cleanup.
+
+Expected risk level:
+* Low-medium.
+
+Do now or defer:
+* Defer to a helper/mode metadata pass.
+
+#### `StudyInstructionText`
+
+What JSX it owns:
+* the nested instruction text passed to `StudyInstructionNav`.
+
+Why it is safe or not safe:
+* Similar to mode help text. It is extractable, but it is driven by MC answered/correct state, typing mode state, and reveal step.
+
+Expected risk level:
+* Medium.
+
+Do now or defer:
+* Defer until study state is represented more cleanly.
+
+#### `StudyFilterControlsWrapper`
+
+What JSX it owns:
+* `filterControls` constant and props to `StudyFilterPanel`.
+
+Why it is safe or not safe:
+* The visual component already exists. The remaining wrapper is mainly controlled state wiring.
+
+Expected risk level:
+* Low.
+
+Do now or defer:
+* Defer. No meaningful readability gain.
+
+### 5. Prop Basket / Over-Extraction Check
+
+Some extracted components are necessarily prop-rich, especially `MultipleChoiceAnswerPanel`, `TypingAnswerPanel`, `StudyFilterPanel`, and `StudyModePanel`, but they are still manageable. Their props represent UI state and callbacks rather than hidden Supabase or access logic.
+
+No extraction appears to have made the page harder to understand. The page now reads as orchestration around extracted study UI pieces.
+
+Components that should stay local and page-specific:
+* `StudyFilterPanel`.
+* `MultipleChoiceAnswerPanel`.
+* `TypingAnswerPanel`.
+* `StudyModePanel`.
+* `StudyCompleteState`.
+* `StudyFullAccessLockedState`.
+
+Components that might eventually become shared, but should stay local for now:
+* `StudyFlashcardShell`.
+* `StudyCardBadges`.
+* `StudyProgressPanel`.
+* `StudyInstructionNav`.
+* `StudyBottomNavigation`.
+
+Do not move shared components yet. Book Study, Library Practice, Ability Check, and Kanji Study now share some visual language, but their behavior and data boundaries are still different.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to have moved or blurred:
+* access checks.
+* owner/private book checks.
+* linked-teacher checks.
+* full-access checks.
+* Supabase queries.
+* saved-word loading.
+* flashcard deck construction.
+* study mode selection.
+* answer validation.
+* typed answer normalization.
+* card progression.
+* previous/retry behavior.
+* study progress writes.
+* private saved-word data boundaries.
+
+The extracted components own display and input surfaces. The page still owns data loading, permission checks, deck construction, answer validation, event writes, and mutation handlers.
+
+Suspicious, but not fixed here:
+* Surface-only dedupe remains a possible identity issue for same-surface/different-reading words.
+* `skipCardForToday` and definition picker state may be dormant.
+* keyboard handler complexity should be reviewed before any behavior extraction.
+
+### 7. Architecture Deferred List
+
+Shared types:
+* Defer because `WordRow` and `Flashcard` are tightly shaped around this page's Supabase selects and study behavior.
+
+Helper functions:
+* Defer because helpers encode answer correctness, distractor quality, card identity, and text normalization. Extracting them should come with tests or examples.
+
+Access helpers:
+* Defer because owner/teacher/super-teacher access is privacy-sensitive. Centralize only when the shared access contract is stable.
+
+Services / DAOs / controllers:
+* Defer because the load path combines book access, owner library loading, distractor loading, active card loading, and normalization.
+
+Repeated Supabase loading:
+* Defer because owner-library and current-book loading have different purposes and privacy implications.
+
+Deck construction helpers:
+* Defer because dedupe, repeat counts, skipped/hidden/excluded filters, chapter options, and library distractors need careful behavior checks.
+
+Answer normalization helpers:
+* Defer because reading/meaning matching affects learner correctness and should be protected by examples.
+
+Flashcard mode helpers:
+* Defer until mode metadata, labels, prompts, and answer fields can be described in one structure.
+
+Card progression helpers:
+* Defer because auto-forward, previous behavior, study-once sessions, and retry/correction flows are easy to break.
+
+Study progress / event helpers:
+* Defer because legacy and unified event writes both matter and currently share page-local context.
+
+### 8. Browser Smoke Test Suggestions
+
+Manual smoke checklist:
+* Owner can open their own book study page.
+* Unauthorized user is blocked from another user's private book study page.
+* Full-access locked behavior still works if applicable.
+* Linked teacher access still works if intended.
+* Super-teacher access still works if intended.
+* Cards load from this book's saved words.
+* Empty state works for a book with no saved words or no matching filters.
+* JLPT, color, chapter, and repeats filters work.
+* Reading typing mode works.
+* Meaning typing mode works.
+* Reading-to-meaning typing mode works.
+* Tap/reveal complete study mode works.
+* Multiple-choice reading mode works.
+* Multiple-choice meaning mode works.
+* Reading-to-kanji multiple-choice mode works.
+* Reading-to-meaning multiple-choice mode works.
+* Correct answer behavior works.
+* Incorrect answer behavior works.
+* Correction/retype behavior works after wrong multiple-choice answers.
+* Previous behavior works.
+* Study Again works from complete state.
+* Next Study Mode works from complete state.
+* Flag current card works if intended.
+* Hide current card works if intended.
+* Study logs/events still save correctly.
+* Keyboard Enter/arrow behavior works where applicable.
+* Mobile-ish layout works for card shell, answer area, feedback, filters, and controls.
+
+Do not run this smoke test during this doc-only audit unless specifically requested.
+
+### 9. Final Recommendation
+
+Recommendation:
+
+Stop visual thinning here.
+
+The first visual pass reached a good stopping point. The next useful work is behavior verification and second-pass architecture planning around card identity, deck construction, study-mode metadata, answer normalization, and study event writes. Do not do another visual extraction unless a specific UI change creates a clean, low-prop component boundary.

@@ -323,13 +323,14 @@ Use these labels for this page:
 * Visual pass in progress
 * Visual pass mostly done
 * Visual pass done / architecture deferred
+* Visual pass done / good stopping point
 * Architecture pass later
 * Architecture pass in progress
 * Architecture pass done
 
-Recommended current status: `Not started`.
+Recommended current status: `Visual pass done / good stopping point`.
 
-When all safe presentational extractions are complete, use `Visual pass done / architecture deferred`. That means page thinning is complete and deeper controller/service/DAO/helper cleanup is intentionally saved for later.
+This means the first visual pass reached a useful stopping point. The remaining page size is still large, but most remaining code is behavior, orchestration, data loading, access control, save/update/delete logic, derived values, and architecture-heavy tab wiring rather than easy low-risk JSX.
 
 ## Finished
 
@@ -343,4 +344,169 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `BookHubHero`.
 - [✔️] Extracted `BookHubStatusPanel`.
 - [✔️] Extracted `WordExplorerModal`.
-- [✔️] Extracted 
+- [✔️] Extracted `BookHubActionGrid`.
+- [✔️] Extracted `BookFlagModal`.
+- [✔️] Extracted `BookHubActionPrompt`.
+- [✔️] Extracted `BookInfoTab`.
+- [✔️] Extracted `VocabTab`.
+- [✔️] Extracted `ReadingTab`.
+- [✔️] Extracted `StoryTab`.
+- [✔️] Extracted `RatingTab`.
+- [✔️] Moved small UI helpers into page-local components: `Detail`, `PersonRow`, `DateField`, `StarRatingField`, and `DifficultyField`.
+
+Current tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/books/[userBookId]/page.tsx | 6026 | 5481 | -545 |`
+
+## Visual Pass Wrap-Up Audit
+
+### Status Decision
+
+Final status: `Visual pass done / good stopping point`.
+
+Why:
+* the major obvious presentational shell is no longer raw page JSX
+* the render tail now reads mostly as composition
+* the remaining code is dominated by behavior and page orchestration
+* further extraction would mostly create huge prop baskets instead of clearer code
+
+### Readability Check
+
+The page is easier to scan than before.
+
+The most helpful extractions are:
+* `BookHubHero`
+* `BookHubStatusPanel`
+* `BookHubProgressSummary`
+* `BookHubActionGrid`
+* `BookHubTabBar`
+* `BookInfoTab`
+* `ReadingTab`
+* `StoryTab`
+* `RatingTab`
+
+Remaining visually/mentally heavy areas:
+* the state block
+* `load`
+* `saveAll`
+* kanji enrichment logic
+* reading-session/timer logic
+* large prop lists into the tab components
+
+These are now architecture/behavior problems, not simple visual JSX problems.
+
+### Remaining Code Classification
+
+The remaining code is mostly:
+* access / ownership / role checks
+* Supabase loading
+* save/update/delete behavior
+* tab state and UI state
+* derived values
+* helper functions
+* component composition
+* architecture-heavy prop wiring
+* legacy or suspicious dormant flows
+
+Remaining visual JSX in `page.tsx` is mostly wrapper composition and conditional tab rendering.
+
+### Visual Chunks Still Worth Extracting?
+
+Do not extract more right now.
+
+Possible candidates, all deferred:
+* `BookHubTabPanels`
+  * Owns the conditional tab render block.
+  * Risk: high.
+  * Why defer: the prop surface would be huge and would make ownership boundaries harder to reason about.
+* `BookHubMainCard`
+  * Owns the outer white card wrapper.
+  * Risk: medium.
+  * Why defer: small readability gain, extra composition churn.
+* `BookHubTeacherPrepSection`
+  * Owns the conditional `TeacherPrepAssignBox` wrapper.
+  * Risk: low.
+  * Why defer: too small to matter.
+* `BookHubWordExplorerSection`
+  * Owns the conditional `WordExplorerModal`.
+  * Risk: low.
+  * Why defer: already clear enough.
+
+### Prop Basket / Over-Extraction Check
+
+Some extracted tab components are already prop-heavy:
+* `BookInfoTab`
+* `ReadingTab`
+* `StoryTab`
+* `RatingTab`
+
+They still help because they hide large UI sections, but further tab-level extraction would probably make the page harder to understand.
+
+Keep these components page-local for now.
+
+Possible future shared pieces:
+* `DateField`
+* `StarRatingField`
+* `DifficultyField`
+* `Detail`
+* `PersonRow`
+
+Do not promote them to shared components yet.
+
+### Behavior Boundary Check
+
+The visual pass appears to have preserved the main behavior boundaries:
+* access checks remain page-owned
+* ownership checks remain page-owned
+* teacher/super-teacher checks remain page-owned
+* save/update/delete handlers remain page-owned
+* rating/reflection behavior remains page-owned
+* book status behavior remains page-owned
+* private user data boundaries remain page-owned
+* public/community display boundaries remain mostly page-owned
+
+Suspicious but do not fix now:
+* `BookInfoTab` appears to contain Supabase-backed people/publisher search behavior. This may blur the original visual-only boundary. Mark it for later review rather than changing it during this pass.
+
+### Architecture Deferred List
+
+Keep these deferred:
+* shared types: wait until component/service boundaries settle
+* helper functions: many are coupled to save/data behavior
+* access helpers: security-sensitive
+* services/DAOs/controllers: wait for a dedicated architecture pass
+* repeated Supabase loading: needs a focused data-loading pass
+* tab-specific logic: especially Book Info and Reading
+* rating/reflection logic: affects public recommendation signals
+* community/shared signal logic: privacy boundary matters
+* teacher review logic: teacher alert workflow is still evolving
+* kanji enrichment: complex and recently debugged
+* old quick saved-word flow: verify reachability before moving/removing
+* Word Explorer: needs a product decision before cleanup
+
+### Browser Smoke Test Suggestions
+
+Manual smoke checklist:
+* owner opens their own Book Hub
+* unauthorized user is blocked from another user's private Book Hub
+* super-teacher access works if intended
+* linked teacher access works if intended
+* tab navigation works: Book Info, Vocab, Reading, Story, Reading Reflection
+* status buttons work: start, finish, DNF
+* reflection/rating display and edit work
+* reading session add/edit/delete works
+* story notes display/edit if full access
+* Book Info edit remains super-teacher-only
+* Vocab tools respect full-access gating
+* Remove from Library modal opens, cancels, and guards correctly
+* Word Explorer modal still works if a trigger exists
+* mobile-ish visual check for hero, status panel, action grid, and tabs
+
+### Final Recommendation
+
+Stop visual thinning here.
+
+Recommended next step:
+* move to second-pass architecture planning later
+* do not do one more visual extraction just for line count
+* prioritize feature cleanup and behavior-sensitive architecture passes when ready

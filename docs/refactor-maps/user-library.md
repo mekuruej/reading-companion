@@ -407,3 +407,310 @@ When all safe presentational extractions are complete, use `Visual pass done / a
 - [✔️] Extracted `LearningTasksPanel` with LearningTaskCard
 - [✔️] Extracted `PendingBookRequestsAlert`
 - [✔️] Extracted `FloatingAddBookButton`
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status label:
+
+`Visual pass done / good stopping point`
+
+This status fits because the main repeated visual structures are already page-local components: header, guide panel, controls, book card, book row, section wrapper, empty state, reminder banner, learning task cards, pending request alert, and floating add button. The remaining page is still large, but its size now comes mostly from privacy-sensitive user/profile lookup, teacher/student context, Supabase loading, reminders, stats, alerts, sorting, and legacy paused flows.
+
+The current tracker label can change from `Visual pass done / architecture deferred` to `Visual pass done / good stopping point`.
+
+Updated tracker row based on the current line count:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/users/[username]/books/page.tsx | 3089 | 2872 | -217 |`
+
+The line count differs from the older tracker row's 2837-line count. Treat 2872 as the current observed count for this audit.
+
+### 2. Readability Check
+
+The page is easier to scan than before. The extracted components make the bottom render branch much clearer: the page now reads as high-level library composition rather than a long wall of repeated card and row markup.
+
+The extracted components are helping readability. `LibraryHeader`, `LibraryViewControls`, `LibraryBookCard`, `LibraryBookRow`, `LibrarySection`, `LearningTaskCard`, and `PendingBookRequestsAlert` are all good visual boundaries.
+
+The remaining page sections are understandable, but the file is still conceptually busy because it handles the user's own library, teacher viewing contexts, super-teacher alerts, learning tasks, Ability Check reminders, monthly stats, color stats, pending book requests, old add-book code, and route fallback behavior in one page.
+
+The most visually overwhelming remaining area is not the active book list. It is the disabled old add-book modal plus surrounding legacy add/request state and handlers. That should be reviewed as feature cleanup rather than extracted for visual thinning.
+
+### 3. Remaining Code Classification
+
+Username route / profile lookup behavior:
+* `routeUsername` comes from params.
+* the current user is loaded from Supabase auth.
+* the current user's profile loads role, super-teacher flag, username, and time zone.
+* the viewed profile is resolved by route username.
+* when the route username is missing or unresolved, the page falls back to the current user's own library.
+
+Public/private profile boundary:
+* profile display context is limited to display labels, usernames, roles, levels, and lesson-day alert context.
+* private library rows are loaded through the effective target user logic and RLS.
+* this page should continue avoiding broad public/private profile expansion during visual cleanup.
+
+Effective viewer/current-user fallback behavior:
+* regular users load their own data even when a different route username is supplied.
+* teachers can load viewed student/member data when role/RLS allow it.
+* super-teacher behavior has broader profile/student context.
+* monthly stats and color counts align to the same effective target user logic.
+
+Supabase loading:
+* current auth user.
+* current profile.
+* viewed profile by username.
+* teacher/student relationships.
+* profile lists for super teachers or linked students.
+* `user_books` joined to `books`.
+* reading sessions and saved-word counts.
+* monthly stats data.
+* Library Study color breakdown.
+* Ability Check reminder summaries/progress.
+* learning tasks.
+* pending book requests.
+* kanji enrichment alert data.
+* lesson alert profile/completion data.
+
+Public book list loading:
+* despite the route shape, this page is currently a protected library page with private `user_books` loading.
+* regular users are safely scoped back to their own `user.id`.
+* teacher/super-teacher viewing remains role/RLS-dependent.
+
+Stats/color count loading:
+* monthly stats use an effective target user.
+* color counts use the same effective target user as the library query.
+* reading stats and lookup counts are loaded through the loaded user book IDs.
+
+Filter/sort behavior:
+* book type filter.
+* format filter state exists, though visible controls do not appear to expose it.
+* view mode cover/list.
+* sort modes for status, title, last engagement, rating, difficulty, and pace.
+* status sections for currently reading, want to read, finished, and DNF.
+
+Derived values:
+* `isTeacher`.
+* `filteredRows`.
+* pending request alert signature/visibility.
+* `validRows` and teacher-prep exclusion.
+* viewed-library labels.
+* status buckets.
+* sorted rows.
+* reminder/task visibility booleans.
+
+Helper functions:
+* date/time-zone helpers.
+* localStorage reminder helpers.
+* pending request signature helpers.
+* Ability Check reminder eligibility helpers.
+* monthly stats helpers.
+* formatting helpers.
+* book key / ISBN helpers.
+* Mekuru color helpers.
+* sorting/status helpers.
+* learning-task label/action helpers.
+
+Visual JSX still in `page.tsx`:
+* Ability Check reminder banner body/actions.
+* super-teacher kanji reminder banner body/actions.
+* learning-task mapping and view-model shaping.
+* learning task error banner.
+* disabled kanji enrichment alert block.
+* book-list composition around extracted components.
+* disabled old add-book modal.
+* regular-user floating add button.
+
+Component composition:
+* active book list composition is much clearer.
+* extracted components are page-local and appropriately narrow.
+* `UserBar` remains inline and includes auth/profile behavior, so it is not a simple visual component.
+
+Legacy or suspicious code:
+* old add-book modal is guarded by `false && showAddBook`.
+* request-book state/handler appears unrendered.
+* `formatFilter` affects filtering but is not visibly controlled.
+* `message` and `messageType` appear set but not rendered.
+* `alertBox` and `teacherPrepAlerts` are loaded/set but not rendered.
+* monthly and Mekuru color snapshot state is loaded but not visibly rendered.
+* kanji enrichment alert UI is guarded by `false &&`.
+
+Overall, the remaining 2872 lines are mostly behavior, privacy, and architecture rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `LibraryReminderActions`
+
+What JSX it owns:
+* small action-button groups inside Ability Check and Kanji reminder banners.
+
+Why it is safe or not safe:
+* The JSX is presentational, but each action directly calls localStorage hide helpers, state setters, and navigation. Extracting would create callback props for a small gain.
+
+Expected risk level:
+* Low-medium.
+
+Do now or defer:
+* Defer. `LibraryReminderBanner` already captured the important visual shell.
+
+#### `LearningTaskList`
+
+What JSX it owns:
+* mapping `learningTasks` into `LearningTaskCard`.
+* task details display.
+
+Why it is safe or not safe:
+* Not purely visual. The map builds task labels, route actions, page/chapter/detail text, completion ability, and navigation handlers inline.
+
+Expected risk level:
+* Medium.
+
+Do now or defer:
+* Defer until task view-model shaping is separated from render.
+
+#### `LibraryBookSections`
+
+What JSX it owns:
+* Currently Reading, Want to Read, Finished, and DNF section composition.
+
+Why it is safe or not safe:
+* Visually safe, but it would need section arrays, render callbacks, grid class, and row groups. It would not reduce the underlying complexity much.
+
+Expected risk level:
+* Low-medium.
+
+Do now or defer:
+* Defer. Current `LibrarySection` extraction is enough.
+
+#### `LegacyAddBookModal`
+
+What JSX it owns:
+* disabled add-book modal guarded by `false && showAddBook`.
+
+Why it is safe or not safe:
+* It is visually extractable but probably legacy/paused. Extracting it would preserve and legitimize dead UI instead of clarifying whether it should be removed later.
+
+Expected risk level:
+* Medium.
+
+Do now or defer:
+* Defer to feature cleanup. Do not extract just for line count.
+
+#### `UserBar`
+
+What JSX it owns:
+* current user label/logout UI.
+
+Why it is safe or not safe:
+* Not presentational. It performs its own auth/profile loading and logout behavior.
+
+Expected risk level:
+* Medium-high.
+
+Do now or defer:
+* Defer until auth/profile header behavior is redesigned or shared intentionally.
+
+### 5. Prop Basket / Over-Extraction Check
+
+No extracted component appears too prop-heavy. `LibraryBookCard` and `LibraryBookRow` naturally receive several display props, but they are good page-specific visual boundaries.
+
+No extraction appears to make the page harder to understand. The active render path is easier to follow because book cards, rows, sections, controls, guide panels, and reminders have names.
+
+Components that should stay local and page-specific:
+* `LibraryBookCard`.
+* `LibraryBookRow`.
+* `LibraryViewControls`.
+* `LearningTaskCard`.
+* `PendingBookRequestsAlert`.
+* `LibraryGuidePanel`.
+
+Components that might eventually become shared, but should stay local for now:
+* `LibraryReminderBanner`.
+* `LibraryEmptyState`.
+* `FloatingAddBookButton`.
+* section/card layout patterns.
+
+Do not move shared components yet. This page's UI is tied to private library behavior and teacher/super-teacher contexts.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to have moved or blurred:
+* current user lookup.
+* viewed username/profile lookup.
+* fallback to current user's own library when needed.
+* public/private library behavior.
+* public profile display behavior.
+* private book data boundaries.
+* private saved-word data boundaries.
+* stats/color count privacy.
+* Supabase queries.
+* route/navigation behavior.
+
+The extracted components are visual shells or display components. They do not appear to own Supabase loading, profile lookup, access decisions, private data targeting, or RLS-sensitive behavior.
+
+Suspicious, but not fixed here:
+* This is still a protected/private library page despite the `/users/[username]/books` shape. The route name can suggest a public profile/library page, but current behavior falls regular users back to their own library.
+* Some old public/private profile assumptions may need a later dedicated profile-boundary pass.
+* Hidden and legacy feature blocks make the file look more active than the rendered UI really is.
+
+### 7. Architecture Deferred List
+
+Shared types:
+* Defer because page row shapes include specific Supabase joins and teacher/task fields that may not match other pages.
+
+Helper functions:
+* Defer because helpers mix date/time-zone, Ability Check rules, color logic, sorting, and display labels. Extract one concern at a time later.
+
+Access/profile lookup helpers:
+* Defer because current-user vs viewed-user fallback behavior is privacy-sensitive and should be centralized only after the route model is stable.
+
+Services / DAOs / controllers:
+* Defer because the page still coordinates many flows. Moving queries without tests could accidentally change RLS-dependent behavior.
+
+Repeated Supabase loading:
+* Defer until public/private library behavior and Teacher Hub alert movement are settled.
+
+Public profile boundary helpers:
+* Defer because public profile behavior should be designed as an intentional boundary, not inferred from this protected library page.
+
+Book list filtering/sorting helpers:
+* Defer because they are lower risk, but the current page is not blocked on them. Extract later with focused tests or before a second architecture pass.
+
+Stats/color count helpers:
+* Defer because they involve private user book IDs, time zones, sessions, saved words, and color progress. These are user-visible and privacy-sensitive.
+
+Learning task helpers:
+* Defer because task payload routing and completion rules mix teacher and learner behavior.
+
+Book request / alert helpers:
+* Defer because pending book requests have recently changed and are moving toward Teacher Hub / admin upkeep patterns.
+
+### 8. Browser Smoke Test Suggestions
+
+Manual smoke checklist:
+* Log in as a regular user and open their own `/users/[username]/books` page.
+* Manually open another user's `/users/[username]/books` route and confirm the fallback behavior still safely shows the current user's own library.
+* Log in as a teacher and confirm intended student-library viewing still works when linked and allowed.
+* Confirm public/profile display labels appear correctly.
+* Confirm private-only information is not shown for an unauthorized route target.
+* Confirm book cards render in cover mode.
+* Confirm book rows render in list mode.
+* Confirm book type filter works.
+* Confirm sort controls work for status, title, recent engagement, ratings, difficulty, and pace where data exists.
+* Confirm monthly stats and Mekuru color counts use the same safe effective user target as the loaded library.
+* Confirm book links point only to accessible Book Hubs.
+* Confirm learning tasks render and learner completion still works when applicable.
+* Confirm pending book request alert only appears for super teachers and dismiss/reject/open actions still work.
+* Confirm Ability Check reminder appears only for the current user's own library and hide-today behavior works.
+* Confirm empty state works for a user with no books.
+* Check mobile-ish layout for header, reminders, guide, controls, book cards, list rows, and floating add button.
+
+Do not run this smoke test during this doc-only audit unless specifically requested.
+
+### 9. Final Recommendation
+
+Recommendation:
+
+Stop visual thinning here.
+
+This page has reached a good stopping point for the first visual component pass. The useful next work is not another presentational extraction; it is feature cleanup and second-pass architecture planning around route semantics, private/public library boundaries, Teacher Hub alert movement, old add/request-book code, stats/color loading, and learning-task behavior.

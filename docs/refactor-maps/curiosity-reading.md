@@ -826,3 +826,340 @@ Notes:
 * The visual pass reduced the page from 1979 lines to 1435 lines.
 * The remaining work should be treated as architecture/refactor-later work, not part of the first visual extraction pass.
 * Do not remove suspicious code yet without behavior testing.
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status label:
+
+`Visual pass done / good stopping point`
+
+This status fits because the first visual pass extracted the major visual surfaces: page header, book context card, status message, full-access state, timer panel, add/edit card shell, quick search row, word help panel, quick error, dictionary choices, detail fields, recent session words wrapper, and recent session word cards. The remaining page is now mostly access/data loading, timer/session behavior, word lookup/save behavior, vocabulary cache/kanji-map behavior, and wiring extracted components to local state.
+
+The current tracker row can change from `Visual pass mostly done / architecture deferred` to `Visual pass done / good stopping point`.
+
+Updated tracker row based on the current line count:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/books/[userBookId]/curiosity-reading/page.tsx | 1979 | 1425 | -554 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before. The render branch now reads as a sequence of named components rather than one large form.
+
+The extracted components are helping readability. The timer, quick search, dictionary choices, word details, word help, and recent word cards are all named in a way that makes the page easier to navigate.
+
+The remaining page sections are understandable. The biggest remaining chunks are now behavior and callback wiring rather than raw visual layout.
+
+The only remaining visually noisy area is the repeated recent-session detail logic for first visible cards, mobile details, and desktop details. It is understandable, but it repeats the same color lookup and card rendering pattern.
+
+### 3. Remaining Code Classification
+
+Access / ownership checks:
+* current user lookup.
+* profile/app access lookup.
+* owner access.
+* super-teacher access.
+* linked-teacher access through `teacher_students`.
+* access-denied render gate.
+
+Full-access checks:
+* feature access check for `curiosity_reading`.
+* full-access-required render gate and navigation options.
+* save-word guard when the viewer cannot use Curiosity Reading.
+
+Supabase loading:
+* current username/profile lookup.
+* `user_books` ownership/context lookup.
+* joined `books` title/cover lookup.
+* latest reading session lookup.
+* Library Study color lookup for quick preview/session words.
+
+Book/context loading:
+* route `userBookId`.
+* effective `userBookId` state.
+* book title and cover.
+* stale query-param fallback copy still present when `userBookId` is missing.
+
+Reading session / timer behavior:
+* start/pause/resume/finish state.
+* elapsed timer interval.
+* before-unload warning.
+* latest-session default start page.
+* save-session validation.
+* `user_book_reading_sessions` insert.
+* `user_books` status/page update after saving.
+
+Page/chapter/default behavior:
+* `single-add-meta:${userBookId}` localStorage defaults.
+* page/chapter preservation after saving/clearing.
+* page-order calculation and preservation when editing within the same group.
+
+Word lookup behavior:
+* quick word input.
+* Jisho API call through `/api/jisho`.
+* dictionary candidate building.
+* exact-match preference.
+* candidate selection.
+* kanji component lookup panel and scratch-word behavior.
+
+Vocabulary save behavior:
+* manual/dictionary distinction.
+* insert/update decision for current-session words.
+* `user_book_words` insert/update.
+* recent-session word list update.
+* delete saved session word.
+
+Vocabulary cache behavior:
+* dictionary-backed entries look up or insert `vocabulary_cache`.
+* manual entries skip cache creation.
+* cache identity uses surface/cache surface plus reading.
+
+Vocabulary kanji-map generation behavior:
+* after save, calls `/api/vocabulary-kanji-map/generate`.
+* only when a cache row exists and the cache surface contains kanji.
+* sends Supabase access token when available.
+
+Session word list behavior:
+* current-session saved words are stored in `quickSessionWords`.
+* visible recent cards and details sections reuse `CuriosityRecentSessionWordCard`.
+* Library Study color info is looked up by surface/reading key.
+
+Edit/delete saved session word behavior:
+* editing loads a recent session word back into `quickPreview`.
+* deleting removes a `user_book_words` row and filters the item out locally.
+
+iPad/lookup interaction behavior:
+* `isSmallViewport` adjusts scroll offset to the word fields.
+* refs focus the quick word input after actions.
+* word-help scratch input suppresses Enter submit.
+
+UI state:
+* access and message state.
+* quick lookup/loading/error state.
+* form preview state.
+* word-help open/scratch/reset state.
+* timer/session state.
+* saved notice state.
+
+Derived values:
+* quick preview Library Study color info.
+* localStorage meta.
+* normalized save payload values.
+* page order.
+* recent session color keys.
+
+Helper functions:
+* preview construction.
+* timer formatting.
+* nullable integer parsing.
+* page/chapter grouping.
+* Jisho candidate shaping.
+* viewport and kanji helpers.
+* cache/kanji-map API helper.
+
+Visual JSX still in `page.tsx`:
+* loading state shell.
+* access denied component call.
+* query-param fallback copy.
+* component composition and callback wiring.
+* repeated recent-session card maps/details.
+
+Component composition:
+* the active render path now mostly composes page-local components.
+* behavior remains in `page.tsx`, which is correct for this pass.
+
+Legacy or suspicious code:
+* `username`, `hasFinishedTimer`, and `sortQuickSessionWords` still look unused.
+* `upsertAndSortQuickSessionWords` name does not match behavior.
+* query-param fallback copy looks stale for a route-param page.
+* recent-session details still duplicate display patterns.
+
+Overall, the remaining 1425 lines are mostly behavior/architecture rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `CuriosityLoadingState`
+
+What JSX it owns:
+* loading shell that says "Loading book info..."
+
+Why it is safe or not safe:
+* Very safe. It is a small early state with no behavior.
+
+Expected risk level:
+* Low.
+
+Do now or defer:
+* Defer. It is too small to justify another pass by itself.
+
+#### `CuriosityRecentSessionWordList`
+
+What JSX it owns:
+* first visible recent words.
+* mobile details list.
+* desktop details list.
+* repeated color lookup and `CuriosityRecentSessionWordCard` mapping.
+
+Why it is safe or not safe:
+* This is the clearest remaining visual extraction. It would reduce repeated JSX, but it would need props for `quickSessionWords`, `libraryColorByWordKey`, edit/delete handlers, and key helper behavior.
+
+Expected risk level:
+* Low-medium.
+
+Do now or defer:
+* Defer unless recent-session display changes again. The page is readable enough now.
+
+#### `CuriosityMainContent`
+
+What JSX it owns:
+* everything inside the main page after access gates.
+
+Why it is safe or not safe:
+* Not safe as a first-pass extraction. It would create a giant prop basket and hide orchestration.
+
+Expected risk level:
+* High.
+
+Do now or defer:
+* Defer.
+
+#### `CuriosityWordFormCallbacks`
+
+What JSX it owns:
+* none; this would be a callback/view-model helper rather than visual JSX.
+
+Why it is safe or not safe:
+* Not a visual extraction. It belongs in architecture planning later.
+
+Expected risk level:
+* Medium-high.
+
+Do now or defer:
+* Defer to second-pass architecture.
+
+### 5. Prop Basket / Over-Extraction Check
+
+Some extracted components are necessarily prop-heavy, especially `CuriosityTimerPanel` and `CuriosityWordDetailFields`, but they remain understandable because they receive controlled form state and callbacks, not Supabase logic.
+
+No extraction appears to have made the page harder to understand. The page now clearly separates presentation from save/session orchestration.
+
+Components that should stay local and page-specific:
+* `CuriosityTimerPanel`
+* `CuriosityQuickSearchRow`
+* `CuriosityWordHelpPanel`
+* `CuriosityWordDetailFields`
+* `CuriosityRecentSessionWords`
+* `CuriosityRecentSessionWordCard`
+
+Components that might eventually become shared, but should stay local for now:
+* `CuriosityBookContextCard`
+* `CuriosityStatusMessage`
+* `CuriosityFullAccessRequired`
+* `CuriosityAddEditWordCard`
+* `CuriosityAddEditWordFormShell`
+
+Do not move shared components yet. Add Word and Curiosity Reading now share visual ideas, but their behavior contracts are still different.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to have moved or blurred:
+* access checks.
+* owner/private book checks.
+* linked-teacher checks.
+* full-access checks.
+* Supabase queries.
+* reading session creation/update behavior.
+* timer behavior.
+* page/chapter handling.
+* Jisho lookup behavior.
+* manual meaning behavior.
+* `vocabulary_cache` lookup/insert behavior.
+* `user_book_words` insert/update/delete behavior.
+* `vocabulary_kanji_map` generation behavior.
+* private saved-word data boundaries.
+* navigation back to Book Hub / Vocab / Just Reading timer.
+
+The extracted components own UI, inputs, and display surfaces. The page still owns all mutations, lookups, access decisions, and app-rule logic.
+
+Suspicious, but not fixed here:
+* stale `?userBookId=...` fallback copy.
+* unused-looking timer/username helpers.
+* recent-session duplicate display pattern.
+
+### 7. Architecture Deferred List
+
+Shared types:
+* Defer because `QuickPreview`, `QuickSessionWord`, and `QuickLookupCandidate` still reflect page-specific behavior.
+
+Helper functions:
+* Defer because they encode page/chapter behavior, Jisho shaping, and save grouping rules.
+
+Access helpers:
+* Defer because owner/teacher/super-teacher access is privacy-sensitive and repeated across private book pages.
+
+Services / DAOs / controllers:
+* Defer because mutations and reads are interleaved with user-facing save/session behavior.
+
+Repeated Supabase loading:
+* Defer until private book access and shared book-page data loading are centralized intentionally.
+
+Reading-session helpers:
+* Defer because timer state, latest page defaults, session insert, and user-book update need behavior coverage.
+
+Timer helpers:
+* Defer because browser lifecycle and state transitions are easy to break.
+
+Lookup helpers:
+* Defer because Jisho candidate selection and exact-match behavior affect save results.
+
+Vocabulary cache service:
+* Defer because cache identity and manual-entry exceptions are app-rule logic.
+
+Saved-word service:
+* Defer because insert/update/delete behavior touches private saved-word rows and page-order logic.
+
+Kanji-map generation service:
+* Defer because API auth, cache IDs, and kanji detection should be preserved exactly.
+
+Session-word edit/delete helpers:
+* Defer because current-session display, edit preload, and delete mutation are tightly connected.
+
+Page/chapter default helpers:
+* Defer because Add Word and Curiosity Reading have similar but not identical storage/default behavior.
+
+### 8. Browser Smoke Test Suggestions
+
+Manual smoke checklist:
+* Owner can open their own Curiosity Reading page.
+* Unauthorized user is blocked from another user's private Curiosity Reading page.
+* Full-access locked behavior still works if applicable.
+* Linked teacher access still works if intended.
+* Super-teacher access still works if intended.
+* Reading timer starts, pauses, resumes, finishes, and saves correctly.
+* Begin/end page validation works.
+* Latest-session default start page works.
+* Chapter/page defaults persist and refill correctly.
+* Jisho lookup works with session token.
+* Dictionary candidate selection fills the form.
+* Manual word/meaning save works.
+* Saved dictionary word gets a `vocabulary_cache_id` when expected.
+* Manual entry skips `vocabulary_cache` when expected.
+* Kanji-map generation runs for kanji-containing cached saved words.
+* Saved session word list updates after save.
+* Edit saved session word loads it into the form and saves update.
+* Delete saved session word removes it from the session list and database.
+* Hide-kanji/reading-support checkbox persists on saved word.
+* Kanji component lookup/scratch word flow still works on mobile/iPad-ish layout.
+* Navigation back to Book Hub / Vocab / Just Reading timer works.
+* Empty/error states still work.
+
+Do not run this smoke test during this doc-only audit unless specifically requested.
+
+### 9. Final Recommendation
+
+Recommendation:
+
+Stop visual thinning here.
+
+The first visual pass reached a good stopping point. Further work should move to second-pass architecture planning or targeted behavior cleanup. The only small visual extraction still worth considering later is a `CuriosityRecentSessionWordList`, but it is not necessary before behavior verification.

@@ -316,7 +316,18 @@ Future shared flashcards should use separate structures, for example:
 
 ## Page Thinning Status
 
-Detailed maps live in `docs/refactor-maps/`.
+Detailed maps live in:
+
+* `docs/refactor-maps/`
+
+Current status:
+
+* non-teacher first-pass visual component extraction is mostly complete
+* teacher pages are intentionally deferred until Teacher Hub / teacher navigation cleanup settles
+* tiny static/index pages probably do not need thinning right now
+* remaining work is mostly architecture cleanup, not first-pass visual extraction
+
+### Finished: First Visual Pass
 
 Completed or mostly completed first visual passes:
 
@@ -325,32 +336,96 @@ Completed or mostly completed first visual passes:
 * Monthly Stats
 * Reading Ability Stats
 * Vocabulary Stats
+* Colors Stats
+* Community Stats Home
+* Dashboard
+* Discovery Home
+* Discovery Dictionary
+* Find Books
+* Book Add / ISBN Add
+* Vocab Explore
 * Book Vocab List
+* Saved Word Detail
+* Word Sky
 * Readalong
 * Bulk Vocab
 * Book Hub
+* Book Stats
 * Add Word
 * Curiosity Reading
 * Book Study Flashcards
+* Library Kanji Study
+* Library Practice
+* Library Check
+* User Public Books
+* Profile Preview
+* Profile Settings
+
+Recent first-pass results:
+
+* `app/(protected)/community/profile/preview/page.tsx`
+
+  * 418 → 280
+  * -138
+* `app/(protected)/community/profile/settings/page.tsx`
+
+  * 541 → 369
+  * -172
+* `app/(protected)/discovery/dictionary/page.tsx`
+
+  * 468 → 352
+  * -116
+* `app/(protected)/books/[userBookId]/words/[wordId]/page.tsx`
+
+  * 884 → 711
+  * -173
+* `app/(protected)/library-study/word-sky/page.tsx`
+
+  * 787 → 702
+  * -85
+
+### Finished: Recent Refactor Maps
 
 Recent refactor maps added:
 
 * `docs/refactor-maps/library-practice.md`
 * `docs/refactor-maps/library-check.md`
+* profile preview refactor/status map
+* profile settings refactor/status map
+* discovery dictionary refactor/status map
 
-Current rule:
+### Deferred: Teacher Area
+
+Teacher pages are intentionally paused until Teacher Hub organization and teacher navigation are cleaned up.
+
+Deferred pages include:
+
+* `/teacher`
+* `/teacher/lesson-prep`
+* `/teacher/needs-attention`
+* `/teacher/general-upkeep`
+* `/teacher/global-words`
+* `/teacher/words`
+* `/teacher/books`
+* `/teacher/books/add`
+* `/teacher/books/[userBookId]`
+* `/teacher/assign`
+* `/teacher/reading-fit`
+* `/teacher/library/[teacherBookId]`
+* `/teacher/library/[teacherBookId]/follow`
+* `/teacher/clubs`
+* `/teacher/trials`
+* `/teacher/students`
+* `/teacher/kanji`
+* `/teacher/testing/*`
+
+Teacher pages should be mapped again after the Teacher Hub cleanup, because some pages may be renamed, merged, simplified, or moved into clearer teacher sections.
+
+### Current Rule
 
 * Keep components local while page thinning is still in progress.
 * Consider shared stats components later.
 * Do not combine shared components during small page-specific extraction commits unless that is the explicit task.
-
-## Working Rules
-
-* Keep this stabilization plan concise.
-* Put detailed page notes in `docs/refactor-maps/*.md`.
-* Refactor one page or feature at a time.
-* Prefer visual component extraction before service/DAO/controller work.
-* Do not change behavior unless intentional and documented.
-* For UI pages, take before/after screenshots when possible.
-* Run `npm run build` after meaningful code changes.
-* Treat recurring `next-env.d.ts` changes as generated noise unless intentionally investigating typed routes.
+* Do not move access checks, Supabase queries, save/update/delete logic, helper functions, services, DAOs, controllers, or page-local types during first-pass visual extraction.
+* Prefer low-risk JSX/presentational components first.
+* Stop when the remaining page code is mostly behavior, data loading, validation, or access logic.
