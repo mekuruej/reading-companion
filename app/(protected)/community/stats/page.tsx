@@ -12,6 +12,8 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import CommunityStatsHeader from "./components/CommunityStatsHeader";
 import StatsErrorBanner from "./components/StatsErrorBanner";
+import MonthlyStatMiniCard from "./components/MonthlyStatMiniCard";
+import MonthlySnapshotCard from "./components/MonthlySnapshotCard";
 
 type SessionRow = {
   user_book_id: string;
@@ -333,7 +335,7 @@ export default function CommunityStatsHomePage() {
     };
   }, []);
 
-  const monthlyStats = useMemo(
+  const monthlyStats = useMemo<Array<[string, number]>>(
     () => [
       ["Current streak", snapshot.currentStreak],
       ["Best streak", snapshot.bestStreak],
@@ -403,38 +405,10 @@ export default function CommunityStatsHomePage() {
       <StatsErrorBanner message={colorError} tone="purple" />
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-500">
-                This month
-              </p>
-              <h2 className="mt-1 text-2xl font-black text-stone-900">
-                Monthly Snapshot
-              </h2>
-            </div>
-          </div>
-
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            A quick check of your reading rhythm this month.
-          </p>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {monthlyStats.map(([label, value]) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-stone-200 bg-white p-3"
-              >
-                <p className="text-[11px] font-semibold text-stone-500">
-                  {label}
-                </p>
-                <p className="mt-1 text-xl font-black text-stone-900">
-                  {loadingSnapshot ? "—" : value}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <MonthlySnapshotCard
+          items={monthlyStats}
+          loading={loadingSnapshot}
+        />
 
         <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
