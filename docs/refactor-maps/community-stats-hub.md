@@ -474,3 +474,12 @@ Do not move:
 * `statCards` navigation data
 
 After the visual pass, the page can be revisited for small cleanup of duplicate session loading and unused selected fields, but that should be a separate behavior-aware cleanup pass.
+
+* Extracted `CommunityStatsHeader`
+* Extracted `StatsErrorBanner`
+* Extracted `MonthlyStatMiniCard`
+* Extracted `MonthlySnapshotCard`
+* Extracted `ColorSnapshotMiniCard`
+* Extracted `ColorSnapshotCard`
+* Extracted `StatsNavCard`
+* Extracted `StatsExploreSection`
