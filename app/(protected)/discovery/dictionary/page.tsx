@@ -4,11 +4,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
+import DictionaryHeader from "./components/DictionaryHeader";
+import DictionaryErrorMessage from "./components/DictionaryErrorMessage";
+import DictionarySearchForm from "./components/DictionarySearchForm";
+import DictionaryMeaningsList from "./components/DictionaryMeaningsList";
+import DictionaryEntryBadges from "./components/DictionaryEntryBadges";
+import DictionaryKanjiInfoPanel from "./components/DictionaryKanjiInfoPanel";
+import DictionaryRelatedKanjiWordsPanel from "./components/DictionaryRelatedKanjiWordsPanel";
+import DictionaryWordHistoryLink from "./components/DictionaryWordHistoryLink";
+import DictionaryResultCard from "./components/DictionaryResultCard";
 
 type DictionaryEntry = {
   word: string;
@@ -301,167 +308,44 @@ export default function DictionaryPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 pb-10 pt-15">
-      <h1 className="mb-1 text-2xl font-semibold">Dictionary</h1>
-      <p className="mb-4 text-sm text-stone-500">
-        Look up a word directly. When you want to know where you met it, jump over to Word History.
-      </p>
+      <DictionaryHeader
+        title="Dictionary"
+        description="Look up a word directly. When you want to know where you met it, jump over to Word History."
+      />
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void runSearch();
-          }}
-          placeholder="Search Japanese word..."
-          className="flex-1 border rounded px-3 py-2 bg-white"
-        />
+      <DictionarySearchForm
+        query={query}
+        loading={loading}
+        onQueryChange={setQuery}
+        onSearch={() => void runSearch()}
+      />
 
-        <button
-          type="button"
-          onClick={() => void runSearch()}
-          disabled={loading}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "Searching..." : "Search"}
-        </button>
-      </div>
-
-      {errorMsg ? <p className="text-sm text-red-600 mb-3">{errorMsg}</p> : null}
+      <DictionaryErrorMessage message={errorMsg} />
 
       <div className="space-y-3">
-        {results.map((entry, idx) => (
-          (() => {
-            const key = studyIdentityKey(entry.word, entry.reading);
-            const encounterCount = summaryCountsByKey[key] ?? 0;
-            const status = computeLibraryStudyColorStatus({
-              encounterCount,
-              settings: learningSettings,
-            });
-            const showBadge = encounterCount > 0;
+        {results.map((entry, idx) => {
+          const key = studyIdentityKey(entry.word, entry.reading);
+          const encounterCount = summaryCountsByKey[key] ?? 0;
+          const status = computeLibraryStudyColorStatus({
+            encounterCount,
+            settings: learningSettings,
+          });
+          const showBadge = encounterCount > 0;
 
-            return (
-              <div
-                key={`${entry.word}-${entry.reading}-${idx}`}
-                className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-2xl font-semibold text-stone-900">
-                    {entry.word || "—"}
-                  </div>
-                  {showBadge ? (
-                    <LibraryColorBadge colorStatus={status} size="md" />
-                  ) : null}
-                </div>
-
-                <div className="mt-1 text-base text-stone-500">
-                  {entry.reading || "—"}
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {entry.meanings.map((meaning, meaningIndex) => (
-                    <div
-                      key={`${entry.word}-${entry.reading}-${meaningIndex}`}
-                      className="rounded-xl border border-stone-200 bg-stone-50 p-4"
-                    >
-                      <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                        Meaning {meaningIndex + 1}
-                      </div>
-                      <div className="mt-2 text-sm leading-7 text-stone-800">
-                        {meaning}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                  {normalizeJlpt(entry.jlpt) !== "NON-JLPT" ? (
-                    <span className="rounded-full border bg-white px-2 py-1">
-                      {normalizeJlpt(entry.jlpt)}
-                    </span>
-                  ) : null}
-
-                  {entry.isCommon ? (
-                    <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-green-700">
-                      Common
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 rounded-xl border p-4">
-                  <div className="mb-2 text-sm font-semibold text-stone-900">Kanji Info</div>
-
-                  {extraLoadingWord === entry.word ? (
-                    <div className="text-sm text-stone-500">Loading kanji info…</div>
-                  ) : (kanjiMetaByWord[entry.word] ?? []).length === 0 ? (
-                    <div className="text-sm text-stone-500">No kanji info for this word.</div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {(kanjiMetaByWord[entry.word] ?? []).map((k) => (
-                        <span
-                          key={`${entry.word}-${k.kanji}`}
-                          className="rounded-full border bg-stone-50 px-3 py-1 text-sm"
-                        >
-                          {k.kanji} · {k.strokes ?? "?"} strokes
-                          {k.radical ? ` · radical ${k.radical}` : ""}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 rounded-xl border p-4">
-                  <div className="mb-2 text-sm font-semibold text-stone-900">Words Using These Kanji</div>
-
-                  {(kanjiGroupsByWord[entry.word] ?? []).length === 0 ? (
-                    <div className="text-sm text-stone-500">No related kanji words found.</div>
-                  ) : (
-                    <div className="space-y-5">
-                      {(kanjiGroupsByWord[entry.word] ?? []).map((group) => (
-                        <div key={`${entry.word}-${group.kanji}`}>
-                          <div className="mb-2 text-sm font-semibold text-stone-700">
-                            Words with {group.kanji}
-                          </div>
-
-                          {group.relatedWords.length === 0 ? (
-                            <div className="text-sm text-stone-500">No related words found.</div>
-                          ) : (
-                            <div className="space-y-2">
-                              {group.relatedWords.map((kw, meaningIndex) => (
-                                <div
-                                  key={`${entry.word}-${group.kanji}-${kw.word}-${meaningIndex}`}
-                                  className="text-sm"
-                                >
-                                  <span className="font-medium text-stone-900">{kw.word}</span>
-                                  {kw.reading ? (
-                                    <span className="ml-2 text-stone-600">（{kw.reading}）</span>
-                                  ) : null}
-                                  {kw.meaning ? (
-                                    <div className="mt-0.5 text-stone-500">{kw.meaning}</div>
-                                  ) : null}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    href={`/discovery/word-history?word=${encodeURIComponent(entry.word || query)}`}
-                    className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Open in Word History
-                  </Link>
-                </div>
-              </div>
-            );
-          })()
-        ))}
+          return (
+            <DictionaryResultCard
+              key={`${entry.word}-${entry.reading}-${idx}`}
+              entry={entry}
+              fallbackWord={query}
+              showBadge={showBadge}
+              colorStatus={status}
+              jlptLabel={normalizeJlpt(entry.jlpt)}
+              isKanjiLoading={extraLoadingWord === entry.word}
+              kanjiMeta={kanjiMetaByWord[entry.word] ?? []}
+              kanjiGroups={kanjiGroupsByWord[entry.word] ?? []}
+            />
+          );
+        })}
       </div>
     </main>
   );
