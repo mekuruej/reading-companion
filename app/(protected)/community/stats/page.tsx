@@ -14,6 +14,7 @@ import CommunityStatsHeader from "./components/CommunityStatsHeader";
 import StatsErrorBanner from "./components/StatsErrorBanner";
 import MonthlyStatMiniCard from "./components/MonthlyStatMiniCard";
 import MonthlySnapshotCard from "./components/MonthlySnapshotCard";
+import ColorSnapshotMiniCard from "./components/ColorSnapshotMiniCard";
 
 type SessionRow = {
   user_book_id: string;
@@ -428,26 +429,15 @@ export default function CommunityStatsHomePage() {
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {colorSnapshotItems.map((item) => (
-              <div
+              <ColorSnapshotMiniCard
                 key={item.label}
-                className={`rounded-2xl border p-3 ${item.cardClasses}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${item.dotClass}`}
-                  />
-                  <p className="text-[11px] font-bold">{item.label}</p>
-                </div>
-
-                <div className="mt-1 flex items-end justify-between gap-2">
-                  <p className={`text-xl font-black ${item.valueClass}`}>
-                    {loadingColors ? "—" : item.value}
-                  </p>
-                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-stone-500">
-                    This month
-                  </span>
-                </div>
-              </div>
+                label={item.label}
+                value={item.value}
+                cardClasses={item.cardClasses}
+                dotClass={item.dotClass}
+                valueClass={item.valueClass}
+                loading={loadingColors}
+              />
             ))}
           </div>
 
