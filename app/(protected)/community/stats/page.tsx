@@ -10,6 +10,7 @@ import {
   type LibraryStudyColorTotals,
 } from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
+import CommunityStatsHeader from "./components/CommunityStatsHeader";
 
 type SessionRow = {
   user_book_id: string;
@@ -391,18 +392,11 @@ export default function CommunityStatsHomePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-stone-500">
-          Community
-        </p>
-        <h1 className="mt-2 text-3xl font-black text-stone-900 sm:text-4xl">
-          Stats Home
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-stone-600 sm:text-base">
-          A calmer place to check your reading month, your word colors, and the
-          deeper patterns behind your Japanese reading life.
-        </p>
-      </div>
+      <CommunityStatsHeader
+        eyebrow="Stats"
+        title="Stats Home"
+        description="See your reading habits, vocabulary growth, book difficulty, reading ability, monthly rhythm, and reading color progress."
+      />
 
       {snapshotError ? (
         <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
