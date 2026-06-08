@@ -16,6 +16,7 @@ import MonthlyStatMiniCard from "./components/MonthlyStatMiniCard";
 import MonthlySnapshotCard from "./components/MonthlySnapshotCard";
 import ColorSnapshotMiniCard from "./components/ColorSnapshotMiniCard";
 import ColorSnapshotCard from "./components/ColorSnapshotCard";
+import StatsNavCard from "./components/StatsNavCard";
 
 type SessionRow = {
   user_book_id: string;
@@ -432,22 +433,13 @@ export default function CommunityStatsHomePage() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {statCards.map((card) => (
-            <Link
+            <StatsNavCard
               key={card.title}
+              title={card.title}
+              description={card.description}
               href={card.href}
-              className="group rounded-3xl border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <span className="inline-flex rounded-full bg-stone-100 px-3 py-1 text-xs font-bold text-stone-600">
-                {card.tag}
-              </span>
-              <h3 className="mt-4 text-lg font-black text-stone-900 group-hover:text-black">
-                {card.title}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-stone-600">
-                {card.description}
-              </p>
-              <p className="mt-4 text-sm font-bold text-stone-900">Open →</p>
-            </Link>
+              tag={card.tag}
+            />
           ))}
         </div>
       </section>
