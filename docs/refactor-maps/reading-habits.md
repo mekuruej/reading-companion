@@ -203,3 +203,133 @@ Future home:
 - [✔️] Removed unused `DailyActivityChart`.
 - [✔️] Removed unused `isThisMonth`.
 
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status:
+
+`Visual pass mostly done / architecture deferred`
+
+This status fits because the first visual pass extracted the repeated stats UI primitives: stat cards, section bands, bar strips, mode strips, pie chart, and time range selector. It also removed two unused pieces: `DailyActivityChart` and `isThisMonth`.
+
+The page is significantly clearer, but the large reading rhythm calendar/grid section still remains in `page.tsx`. That section is visual, but it contains enough inline classification and summary display logic that extracting it now would create a medium prop basket. This makes it better as a later view-model/component cleanup, not a final tiny visual pass.
+
+Current tracker row remains accurate:
+
+`- [x] Visual pass mostly done / architecture deferred | app/(protected)/community/stats/reading-habits/page.tsx | 1310 | 985 | -325 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before. The extracted stat/chart primitives make the main dashboard sections less repetitive and easier to read.
+
+The remaining page sections are understandable, but the reading rhythm area is still visually dense. It includes header controls, calendar tiles, mode/intensity color classification, month labels, legend, summary cards, and a summary sentence.
+
+The remaining complexity is not just easy JSX. It is mixed with display classification logic and derived rhythm values, so it should wait for a more deliberate extraction.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly behavior, calculations, and architecture:
+
+* access / current-user checks: Supabase session/current-user loading remains in `page.tsx`.
+* Supabase loading: user books and reading sessions remain loaded in the page effect.
+* reading-session loading: `user_book_reading_sessions` rows are loaded through current user's `user_books`.
+* filler-session filtering: filler rows are filtered out during loading.
+* time range behavior: `timeRange` state and selected time filter behavior remain page-owned.
+* reading rhythm behavior: visible/collapsed rhythm window, full-window toggle, rhythm summary, and day classification remain page-owned.
+* stats calculations: habit stats, mode totals, pace stats, pages/time/session chart data, and reading personality remain in `page.tsx`.
+* chart/list data shaping: `timePie`, `pagesPie`, `modeStripItems`, and `sessionBars` remain page-owned.
+* UI state: loading, error message, selected range, and full rhythm toggle.
+* derived values: filtered sessions, selected labels/themes, rhythm activity, summaries, chart arrays, and stat values.
+* helper functions: date helpers, page counting, formatting, theme selection, and personality classification.
+* visual JSX still in `page.tsx`: loading state, error banner, page header/back link, reading rhythm calendar/grid/summary section, and high-level composition.
+* component composition: extracted primitives are wired from page-owned derived values.
+* legacy or suspicious code: none urgent after removing `DailyActivityChart` and `isThisMonth`.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+`ReadingRhythmSection`
+
+* What JSX it owns: the full reading rhythm `SectionBand` body, including the window label, expand/collapse button, calendar grid, legend, summary cards, and rhythm summary copy.
+* Why it is safe or not safe: it is presentational, but it receives many props and contains inline display classification logic for session mode/intensity colors and month labels.
+* Risk level: medium.
+* Recommendation: defer. Extract only after rhythm data is shaped into a cleaner view model.
+
+`ReadingHabitsHeader`
+
+* What JSX it owns: the back link/title/description at the top of the page.
+* Why it is safe or not safe: safe, simple, and presentational.
+* Risk level: low.
+* Recommendation: optional, but defer unless doing a polish pass. It will not materially reduce the page's complexity.
+
+`ReadingHabitsLoadingState` / `ReadingHabitsErrorBanner`
+
+* What JSX it owns: loading shell and error banner.
+* Why it is safe or not safe: safe, but tiny.
+* Risk level: low.
+* Recommendation: defer. Low readability payoff.
+
+### 5. Prop Basket / Over-Extraction Check
+
+The extracted components do not appear too prop-heavy. `StatCard`, `SectionBand`, `BarStrip`, `ModeStrip`, `PieChart`, and `TimeRangeSelector` all have clear presentational boundaries.
+
+No extraction appears to make the page harder to understand. These components should remain page-local for now while the stats pages settle.
+
+`StatCard`, `SectionBand`, `BarStrip`, and `PieChart` may eventually be shared across stats pages, but that should happen in a dedicated shared-stats pass.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to have moved or blurred these boundaries:
+
+* current-user/session checks remain in `page.tsx`.
+* Supabase queries remain in `page.tsx`.
+* private reading-session data remains scoped to the current user's `user_books`.
+* filler-session filtering remains page-owned.
+* time range filtering remains page-owned.
+* reading rhythm calculations remain in `page.tsx`.
+* stats calculations remain in `page.tsx`.
+* chart/list data shaping remains in `page.tsx`.
+* event handlers for time range and rhythm expand/collapse remain in `page.tsx`.
+
+Nothing suspicious needs an immediate fix during this audit.
+
+### 7. Architecture Deferred List
+
+* shared types: defer because session and mode types are still page-local and simple.
+* helper functions: defer until stats services/view models are introduced.
+* access/current-user helper: defer until stats pages share a common loading pattern.
+* services/DAOs/controllers: defer because moving Supabase reads and calculations is behavior-aware.
+* repeated Supabase loading: defer to a broader stats data-loading cleanup.
+* reading rhythm view model: defer because the rhythm section needs cleaner display-ready rows before extraction.
+* stats calculation helpers: defer because session mode/page counting affects visible totals.
+* chart data helpers: defer until multiple stats pages can share chart view models.
+* shared stats UI components: defer until a dedicated shared-stats component pass.
+
+### 8. Browser Smoke Test Suggestions
+
+Manual smoke test checklist:
+
+* logged-in user can open Reading Habits stats.
+* logged-out or invalid access behavior still works.
+* reading sessions load only for the current user's books.
+* filler sessions are excluded.
+* time range selector changes the displayed stats.
+* top stat cards update with selected range.
+* time-by-mode chart and mode strip display correctly.
+* reading rhythm calendar displays active/inactive days correctly.
+* rhythm expand/collapse works.
+* rhythm summary cards update correctly.
+* pages-by-mode chart displays correctly.
+* session balance bar strip displays correctly.
+* empty state works for users with no reading sessions.
+* mobile-ish visual check for filters, cards, rhythm grid, charts, and summary cards.
+
+### 9. Final Recommendation
+
+Pause visual thinning here.
+
+This page is readable enough after the first visual pass, but it should stay labeled:
+
+`Visual pass mostly done / architecture deferred`
+
+The only substantial visual chunk left is the reading rhythm section. Do not extract it just for line count. Move it later when there is a cleaner rhythm view model or during a second-pass stats architecture cleanup.

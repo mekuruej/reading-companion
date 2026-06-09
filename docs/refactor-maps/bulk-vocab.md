@@ -274,3 +274,161 @@ Future home:
 - [✔️] Extracted `PasteWordsPanel`.
 - [✔️] Extracted `BulkColumnPastePanel`.
 - [✔️] Extracted `BulkApplyFieldsPanel`.
+- [✔️] Extracted `BulkDefinitionReviewItem`.
+- [✔️] Extracted `BulkDetailEditItem`.
+
+Current tracker row:
+
+Visual pass done / good stopping point | `app/(protected)/vocab/bulk/page.tsx` | 1034 | 841 | -193
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status:
+
+`Visual pass done / good stopping point`
+
+This status now fits. The first visual pass extracted the safe shell/panel pieces plus the two controlled item cards: message banner, save bar, done panel, step intro card, paste words panel, column paste panel, bulk apply fields panel, definition review item, and detail edit item.
+
+The page no longer needs to stay paused for visual thinning. The only obvious remaining visual chunk is the header/book context block, and that is optional rather than necessary for readability.
+
+Current line count note:
+
+The tracker row said the page was reduced to `880` lines. The current file is about `841` lines after the item-card extractions.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/vocab/bulk/page.tsx | 1034 | 841 | -193 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before. The step-level panels are named, and the render sections are clearer than the original all-in-one flow.
+
+The remaining page sections are understandable. Step 2 and Step 3 now map to named item components, so the render reads as step composition rather than nested controlled form JSX.
+
+The only visual area that remains inline is the top header/book context block. It is not large enough to block a good stopping point.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly behavior and form orchestration:
+
+* access / ownership checks: URL `userBookId`, authorized user book ID, current user, and book authorization behavior remain page-owned.
+* Supabase loading: book context, current user, existing page-order rows, and `user_book_words` upserts remain in `page.tsx`.
+* book/context loading: book title/cover loading remains page-owned.
+* Jisho/API behavior: preview requests and parsing remain in `page.tsx`.
+* kanji stroke metadata behavior: `getStrokeData` remains page-owned.
+* bulk paste behavior: raw input and preview flow remain page-owned.
+* definition review behavior: reading edits, definition choice selection, custom meaning textarea, and save definitions remain in `page.tsx`.
+* detail edit behavior: page/chapter/chapter-name inputs and hide-kanji checkbox remain in `page.tsx`.
+* bulk apply behavior: bulk single-value and column paste handlers remain page-owned.
+* page/chapter behavior: localStorage chapter persistence and page ordering logic remain in `page.tsx`.
+* save behavior: validation, incomplete labels, payload shaping, and Supabase upsert remain in `page.tsx`.
+* UI state: step, input text, item rows, bulk fields, messages, saving/previewing flags, recent action state.
+* derived values: word count and incomplete word labels.
+* helper functions: parse, normalize, meaning extraction, nullable integer parsing, bulk field handling, column parsing, and reset behavior.
+* visual JSX still in `page.tsx`: header/book context block and high-level step composition.
+* component composition: extracted panels are wired from page-owned state and handlers.
+* legacy or suspicious code: component names in the older map differ slightly from file names (`SaveBar` vs future `BulkSaveBar`, `StepIntroCard` vs `BulkStepIntroCard`, `PasteWordsPanel` vs `BulkPasteWordsPanel`).
+
+### 4. Visual Chunks Still Worth Extracting?
+
+`BulkVocabHeader`
+
+* What JSX it owns: page title, book context card, missing `userBookId` hint, and Book Hub/Vocab List navigation buttons.
+* Why it is safe or not safe: mostly presentational, but needs navigation callbacks, authorized user book ID, book title/cover, and current step/reset behavior.
+* Risk level: low-medium.
+* Recommendation: optional next tiny pass if you want the page shell cleaner.
+
+`BulkDefinitionReviewItem`
+
+* What JSX it owns: one Step 2 definition review card with surface, reading input, definition selector, and meaning textarea.
+* Why it is safe or not safe: visually valuable, but controlled-input-heavy and directly tied to meaning-choice behavior.
+* Risk level: medium.
+* Recommendation: done. Keep behavior in `page.tsx`; test definition selection after any future changes.
+
+`BulkDetailEditItem`
+
+* What JSX it owns: one Step 3 detail card with surface, reading/meaning preview, page/chapter/chapter-name inputs, and hide-kanji checkbox.
+* Why it is safe or not safe: visually valuable, but controlled-input-heavy and tied to page/chapter/save payload behavior.
+* Risk level: medium.
+* Recommendation: done. Keep page/chapter/save behavior in `page.tsx`; test row edits after any future changes.
+
+`BulkStepSection`
+
+* What JSX it owns: a full step wrapper with intro card, save bars, and content.
+* Why it is safe or not safe: would mostly reorganize composition and could obscure step flow.
+* Risk level: medium.
+* Recommendation: defer.
+
+### 5. Prop Basket / Over-Extraction Check
+
+The extracted panels have reasonable prop boundaries. `BulkApplyFieldsPanel` and `BulkColumnPastePanel` receive several values and callbacks, but their behavior remains in the page.
+
+The item-card extractions have reasonable prop surfaces for controlled form components. Keeping step composition in `page.tsx` remains clearer than extracting a large “step” component.
+
+All bulk components should stay page-local. This flow is different from single Add Word and Teacher Global Word Entry, so do not promote shared components yet.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to have moved or blurred these boundaries:
+
+* access checks remain in `page.tsx`.
+* ownership checks remain in `page.tsx`.
+* authorized user book ID behavior remains in `page.tsx`.
+* Supabase queries remain in `page.tsx`.
+* Jisho/API preview behavior remains in `page.tsx`.
+* kanji stroke lookup remains in `page.tsx`.
+* definition choice behavior remains in `page.tsx`.
+* bulk field and column paste behavior remains in `page.tsx`.
+* page/chapter/localStorage behavior remains in `page.tsx`.
+* save/upsert behavior remains in `page.tsx`.
+* validation/confirmation behavior remains in `page.tsx`.
+* private saved-word data boundaries remain page-owned.
+
+Nothing suspicious needs an immediate fix during this audit.
+
+### 7. Architecture Deferred List
+
+* shared types: defer because `BulkItem` and `BulkStep` are tightly tied to this page's step flow.
+* helper functions: defer until parsing, meaning choices, page/chapter defaults, and payload shaping are stable.
+* access helpers: defer until private book access checks are centralized across book routes.
+* services/DAOs/controllers: defer because preview/save orchestration is behavior-sensitive.
+* Jisho preview service: defer because parsing and meaning choice behavior need focused testing.
+* kanji stroke lookup service: defer because it is optional metadata and external API behavior.
+* saved-word upsert service: defer because save payload/page ordering behavior is delicate.
+* page/chapter helper: defer until Add Word, Curiosity Reading, Vocab List, and Bulk Add chapter behavior are reviewed together.
+* bulk column parsing helper: defer until the teacher prep/bulk workflows settle.
+
+### 8. Browser Smoke Test Suggestions
+
+Manual smoke test checklist:
+
+* owner can open Bulk Add with an authorized `userBookId`.
+* unauthorized/raw other-user `userBookId` does not expose or save private data.
+* missing `userBookId` hint displays.
+* book context displays correctly.
+* pasted words parse correctly.
+* Jisho preview works.
+* kanji stroke metadata fetch does not block the flow if unavailable.
+* reading edits work in Step 2.
+* definition selection works.
+* custom meaning/Other works.
+* save definitions advances to details.
+* bulk page/chapter fields apply correctly.
+* column paste applies correctly.
+* per-row page/chapter edits work.
+* hide-kanji checkbox saves correctly.
+* incomplete validation works.
+* save all writes expected `user_book_words` rows.
+* done panel displays.
+* navigation back to Book Hub/Vocab List works.
+* mobile-ish visual check for Step 2 and Step 3 item cards.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+The visual pass has reached a good stopping point. The remaining header/book context block could become `BulkVocabHeader`, but it is optional and not worth another pass unless doing polish.
+
+Do not move parsing, preview, save, validation, Supabase writes, page ordering, or chapter persistence yet.
