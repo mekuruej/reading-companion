@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import TeacherKanjiHeader from "./components/TeacherKanjiHeader";
 import TeacherKanjiAccessState from "./components/TeacherKanjiAccessState";
@@ -19,6 +19,7 @@ import TeacherKanjiWordCell from "./components/TeacherKanjiWordCell";
 import TeacherKanjiStudentCell from "./components/TeacherKanjiStudentCell";
 import TeacherKanjiBookCell from "./components/TeacherKanjiBookCell";
 import TeacherKanjiQueueActions from "./components/TeacherKanjiQueueActions";
+import TeacherKanjiQueueItem from "./components/TeacherKanjiQueueItem";
 
 const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 const BULK_OPEN_LIMIT = 10;
@@ -1514,62 +1515,30 @@ export default function TeacherKanjiPage() {
 
                   <tbody className="divide-y divide-stone-100">
                     {filteredItems.map((item) => (
-                      <Fragment key={item.userBookWordId}>
-                        <tr className="align-top">
-                          <td className="px-4 py-4">
-                            <TeacherKanjiStudentCell
-                              studentName={item.studentName}
-                              username={item.username}
-                            />
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <div className="max-w-[240px] font-medium text-stone-800">
-                              {item.bookTitle}
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <TeacherKanjiWordCell
-                              surface={item.surface}
-                              reading={item.reading}
-                              katakanaReading={hiraToKata(item.reading)}
-                              vocabularyCacheId={item.vocabularyCacheId}
-                            />
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <TeacherKanjiStatusBadge
-                              label={statusLabel(item.status)}
-                              detail={statusDetailLabel(item.status)}
-                              toneClassName={statusTone(item.status)}
-                            />
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <TeacherKanjiRowCounts
-                              kanjiCount={item.kanjiCount}
-                              mapRowCount={item.mapRowCount}
-                              completePositionCount={item.completePositionCount}
-                              incompleteRowCount={item.incompleteRowCount}
-                              flaggedMapRowCount={item.flaggedMapRowCount}
-                            />
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <TeacherKanjiQueueActions
-                              isPreparing={preparingId === item.userBookWordId}
-                              isEditorOpen={!!editorOpenByWordId[item.userBookWordId]}
-                              isIgnoring={ignoringId === item.userBookWordId}
-                              flaggedMapRowCount={item.flaggedMapRowCount}
-                              onOpenEditor={() => void openKanjiEditor(item)}
-                              onClearFlag={() => void clearKanjiFlag(item)}
-                              onExclude={() => void ignoreWord(item)}
-                            />
-                          </td>
-                        </tr>
-
-                      </Fragment>
+                      <TeacherKanjiQueueItem
+                        key={item.userBookWordId}
+                        studentName={item.studentName}
+                        username={item.username}
+                        bookTitle={item.bookTitle}
+                        surface={item.surface}
+                        reading={item.reading}
+                        katakanaReading={hiraToKata(item.reading)}
+                        vocabularyCacheId={item.vocabularyCacheId}
+                        statusLabel={statusLabel(item.status)}
+                        statusDetail={statusDetailLabel(item.status)}
+                        statusToneClassName={statusTone(item.status)}
+                        kanjiCount={item.kanjiCount}
+                        mapRowCount={item.mapRowCount}
+                        completePositionCount={item.completePositionCount}
+                        incompleteRowCount={item.incompleteRowCount}
+                        flaggedMapRowCount={item.flaggedMapRowCount}
+                        isPreparing={preparingId === item.userBookWordId}
+                        isEditorOpen={!!editorOpenByWordId[item.userBookWordId]}
+                        isIgnoring={ignoringId === item.userBookWordId}
+                        onOpenEditor={() => void openKanjiEditor(item)}
+                        onClearFlag={() => void clearKanjiFlag(item)}
+                        onExclude={() => void ignoreWord(item)}
+                      />
                     ))}
                   </tbody>
                 </table>
