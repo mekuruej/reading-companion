@@ -12,6 +12,8 @@ import BulkStepIntroCard from "./components/BulkStepIntroCard";
 import BulkPasteWordsPanel from "./components/BulkPasteWordsPanel";
 import BulkColumnPastePanel from "./components/BulkColumnPastePanel";
 import BulkApplyFieldsPanel from "./components/BulkApplyFieldsPanel";
+import BulkDefinitionReviewItem from "./components/BulkDefinitionReviewItem";
+import BulkDetailEditItem from "./components/BulkDetailEditItem";
 
 // -------------------------------------------------------------
 // Helpers
@@ -745,66 +747,17 @@ export default function BulkVocabPage() {
 
             <ul className="space-y-3">
               {items.map((i, idx) => (
-                <li
+                <BulkDefinitionReviewItem
                   key={`${i.surface}_${idx}`}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="mb-3 text-lg font-semibold">{i.surface}</div>
-
-                  <div className="grid gap-3">
-                    <div>
-                      <div className="mb-1 text-xs text-gray-500">Reading</div>
-                      <input
-                        value={i.reading}
-                        onChange={(e) => updateItem(idx, "reading", e.target.value)}
-                        className="w-full rounded border p-2 text-sm"
-                        placeholder="Reading"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-1 text-xs text-gray-500">Definition #</div>
-                      <div className="flex flex-col gap-3 md:flex-row">
-                        <select
-                          value={i.meaningChoiceIndex == null ? "other" : String(i.meaningChoiceIndex)}
-                          onChange={(e) => chooseMeaning(idx, e.target.value)}
-                          className="w-full rounded border bg-white px-3 py-2 text-sm md:w-40"
-                        >
-                          {i.meaningChoices.map((_, mi) => (
-                            <option key={mi} value={mi}>
-                              {`Def ${mi + 1}`}
-                            </option>
-                          ))}
-                          <option value="other">Other</option>
-                        </select>
-
-                        {i.meaningChoiceIndex == null ? (
-                          <textarea
-                            key={`${i.surface}-${idx}-custom-meaning`}
-                            rows={2}
-                            value={i.meaning}
-                            onChange={(e) => updateItem(idx, "meaning", e.target.value)}
-                            className="w-full rounded border bg-white p-2 text-sm"
-                            placeholder="Type your custom meaning"
-                            autoFocus
-                          />
-                        ) : (
-                          <textarea
-                            key={`${i.surface}-${idx}-picked-meaning`}
-                            rows={2}
-                            value={i.meaning}
-                            readOnly
-                            className="w-full rounded border bg-slate-100 p-2 text-sm text-slate-700"
-                            placeholder="Meaning"
-                          />
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs text-stone-500">
-                        Choose Other to write your own definition.
-                      </p>
-                    </div>
-                  </div>
-                </li>
+                  surface={i.surface}
+                  reading={i.reading}
+                  meaning={i.meaning}
+                  meaningChoices={i.meaningChoices}
+                  meaningChoiceIndex={i.meaningChoiceIndex}
+                  onReadingChange={(value) => updateItem(idx, "reading", value)}
+                  onMeaningChoiceChange={(value) => chooseMeaning(idx, value)}
+                  onMeaningChange={(value) => updateItem(idx, "meaning", value)}
+                />
               ))}
             </ul>
 
@@ -853,67 +806,22 @@ export default function BulkVocabPage() {
 
             <ul className="space-y-3">
               {items.map((i, idx) => (
-                <li
+                <BulkDetailEditItem
                   key={`${i.surface}_${idx}`}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="mb-2 font-semibold text-lg">{i.surface}</div>
-                  <div className="mb-2 text-sm text-gray-600">
-                    {i.reading || "—"} · {i.meaning || "—"}
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div>
-                      <div className="mb-1 text-xs text-gray-500">Page</div>
-                      <input
-                        type="number"
-                        placeholder="Page"
-                        value={i.page}
-                        onChange={(e) => updateItem(idx, "page", e.target.value)}
-                        className="w-full rounded border p-2 text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-1 text-xs text-gray-500">Chapter #</div>
-                      <input
-                        type="number"
-                        placeholder="Chapter #"
-                        value={i.chapterNumber}
-                        onChange={(e) => updateItem(idx, "chapterNumber", e.target.value)}
-                        className="w-full rounded border p-2 text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-1 text-xs text-gray-500">Chapter Name</div>
-                      <input
-                        type="text"
-                        placeholder="Chapter name"
-                        value={i.chapterName}
-                        onChange={(e) => updateItem(idx, "chapterName", e.target.value)}
-                        className="w-full rounded border p-2 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <label className="mt-3 flex items-start gap-2 text-sm text-stone-700">
-                    <input
-                      type="checkbox"
-                      checked={i.hideKanjiInReadingSupport}
-                      onChange={(e) =>
-                        updateItem(idx, "hideKanjiInReadingSupport", e.target.checked)
-                      }
-                      className="mt-0.5"
-                    />
-                    <span>
-                      <span className="font-medium">Hide kanji in Reading Support</span>
-                      <span className="block text-xs text-stone-500">
-                        Use kana to match the book.
-                      </span>
-                    </span>
-                  </label>
-                </li>
+                  surface={i.surface}
+                  reading={i.reading}
+                  meaning={i.meaning}
+                  page={i.page}
+                  chapterNumber={i.chapterNumber}
+                  chapterName={i.chapterName}
+                  hideKanjiInReadingSupport={i.hideKanjiInReadingSupport}
+                  onPageChange={(value) => updateItem(idx, "page", value)}
+                  onChapterNumberChange={(value) => updateItem(idx, "chapterNumber", value)}
+                  onChapterNameChange={(value) => updateItem(idx, "chapterName", value)}
+                  onHideKanjiInReadingSupportChange={(checked) =>
+                    updateItem(idx, "hideKanjiInReadingSupport", checked)
+                  }
+                />
               ))}
             </ul>
 
