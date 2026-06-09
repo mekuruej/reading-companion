@@ -456,3 +456,190 @@ Next pass should stay architecture-aware:
 * keep all state, effects, handlers, Supabase queries, claim logic, color/progress logic, and helper functions in `page.tsx` unless the task is explicitly to move behavior
 * consider suspicious/unused code cleanup only after verifying behavior
 * only revisit access/full-access behavior as a deliberate access pass
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status:
+
+`Visual pass done / good stopping point`
+
+The first visual pass reached a good stopping point. The render is now short and mostly composed from page-local presentational components:
+
+* `WordSkyLoadingState`
+* `WordSkyHeader`
+* `WordSkyMessageBanner`
+* `WordSkyScene`
+* `WordSkyBubble`
+* `WordSkySelectedPanel`
+* `WordSkyEmptySelectionPanel`
+
+The remaining code is dominated by Word Sky pool loading, current-user scoping, claim behavior, Library Study color/progress filtering, animation identity, and helper functions. Those are not low-risk visual extractions.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/library-study/word-sky/page.tsx | 787 | 702 | -85 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before. The visual pieces now have clear names, and the render section shows the app shape without burying it in repeated JSX.
+
+The extracted components help readability:
+
+* the loading state is isolated
+* the header and message banner are easy to recognize
+* the animated scene wrapper is separate from the data decisions
+* each floating word bubble is presentational
+* the selected/empty panels are easier to read as branches
+
+The remaining page sections are understandable. The visually heaviest part still in `page.tsx` is the `visibleWords.map()` block plus selected-panel branch, but it is tied to identity, claim, color, and selected-state decisions. Extracting it further would probably create a prop-heavy component.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly in these buckets:
+
+* access / full-access checks: logged-in-user check and redirect to `/login`; no full-access gate is currently obvious.
+* Supabase loading: global Word Sky pool, current user learning settings, library summaries, library progress, and claims.
+* Word Sky pool behavior: fallback words, starter pool, personal pool, duplicate removal, shuffling, and visible-word rotation.
+* claim/add/save behavior: `saveClaim`, `clearClaim`, local claim state updates, and `user_library_word_claims` writes.
+* study/color/progress behavior: Library Study color computation and hiding words already further along.
+* animation/identity behavior: `studyIdentityKey`, `skyId`, lanes, and refresh timing.
+* UI state: selected word, saving key, message, visible words, loading state.
+* derived values: selected key, claimed count, bubble color, selected state.
+* helper functions: normalization, color labels/classes, library color logic, shuffling, clamping, timeout handling.
+* visual JSX still in `page.tsx`: page shell, `visibleWords.map()`, selected panel branch, and animation CSS.
+* component composition: the render mainly wires derived values into extracted visual components.
+* legacy or suspicious code: `ClaimedColor` supports blue/purple but only green is exposed; no study event writes are present.
+
+The remaining 702 lines are mostly behavior/data orchestration rather than easy presentational JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `WordSkyBubbleLayer`
+
+What JSX it owns:
+
+* the absolute bubble layer
+* `visibleWords.map()`
+* each `WordSkyBubble`
+
+Why it is safe or not safe:
+
+* visually it is tempting, but it would need claim lookup, library color lookup, selected-key comparison, identity-key generation, and click behavior.
+
+Risk level:
+
+* Medium.
+
+Do now or defer:
+
+* Defer. This would likely create a prop basket and blur behavior/visual boundaries.
+
+#### `WordSkyDockPanel`
+
+What JSX it owns:
+
+* the bottom selected/empty panel wrapper
+* selected vs empty branch
+
+Why it is safe or not safe:
+
+* the wrapper is presentational, but the branch depends on selected word, claim state, save state, and clear/save handlers.
+
+Risk level:
+
+* Medium.
+
+Do now or defer:
+
+* Defer. The current branch is readable and still close to the behavior it controls.
+
+#### `WordSkyAnimationStyles`
+
+What JSX it owns:
+
+* the local `style jsx` animation block.
+
+Why it is safe:
+
+* the CSS is visual-only.
+
+Risk level:
+
+* Low.
+
+Do now or defer:
+
+* Defer. It is not worth a separate extraction unless the scene/background styling is being redesigned.
+
+### 5. Prop Basket / Over-Extraction Check
+
+The extracted components are not too prop-heavy for this pass.
+
+* `WordSkyHeader` has a clean count/action API.
+* `WordSkyMessageBanner` and `WordSkyEmptySelectionPanel` are very small and clear.
+* `WordSkyScene` is a good wrapper boundary.
+* `WordSkyBubble` stays presentational while the page keeps color/selection decisions.
+* `WordSkySelectedPanel` has the most behavior-adjacent props, but it still avoids owning save/clear logic.
+
+These components should stay local to Word Sky for now. Nothing here needs to become shared until there is another sky-like or claim-like interface.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to move or blur:
+
+* logged-in-user check and redirect behavior
+* Supabase queries
+* current-user scoped learning settings
+* current-user scoped library summaries/progress
+* current-user scoped claim loading
+* claim save/delete behavior
+* Word Sky pool generation
+* personal-library filtering
+* Library Study color/progress behavior
+* hidden green/blue/purple behavior
+* selected-word state
+* visible-word rotation behavior
+
+No suspicious behavior-boundary issue was found during this wrap-up audit.
+
+### 7. Architecture Deferred List
+
+Keep these deferred for later:
+
+* shared/page-local types: useful only after a service/helper split is planned.
+* helper functions: many are behavior-sensitive identity/color helpers and should move together carefully.
+* access/full-access checks: add or change only in a deliberate access pass.
+* services/DAOs/controllers: pool loading and claim writes are stable and should not move during visual cleanup.
+* Word Sky pool service: useful later, but it owns product rules about starter/personal words.
+* claim service: save/delete behavior is user-scoped and should be extracted only with tests or careful smoke testing.
+* Library Study color helper: shared with broader study behavior, so extraction should align with Library Study architecture.
+* animation/view model helper: possible later if bubble generation becomes more complex.
+
+### 8. Browser Smoke Test Suggestions
+
+Suggested manual smoke test checklist:
+
+* logged-in user can open Word Sky.
+* logged-out user redirects to `/login`.
+* global starter-pool words appear.
+* personal library words appear only when eligible.
+* words already green/blue/purple in Library Study are hidden.
+* floating bubbles animate and remain clickable.
+* selecting a bubble opens the selected-word panel.
+* saving a word as green claim works.
+* clearing an existing claim works.
+* saved claim state changes the visible bubble color.
+* visible words refresh after the interval when no word is selected.
+* selected word prevents disruptive refresh behavior.
+* empty/fallback pool state still looks acceptable.
+* mobile-ish check for bubbles, selected panel, and header stats.
+
+Do not run browser tests unless explicitly requested.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+The first visual pass is complete. The next useful work should be behavior-aware architecture planning around pool loading, claim handling, Library Study color rules, and possible access/full-access decisions.

@@ -521,5 +521,181 @@ Leave access checks, Supabase queries, search/filter logic, Jisho/global lookup 
 * Extracted `DictionaryFallbackCard`
 * Extracted `OtherMatchesPanel`
 * Extracted `WordHistorySummaryCard`
-* Extracted `SeenInstancesPanel`
 * Extracted `RecurringWordsPanel`
+* Extracted `SeenInstancesPanel`
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status:
+
+`Visual pass done / good stopping point`
+
+The first visual pass has reached a good stopping point. All originally recommended page-local visual components now exist and are used:
+
+* `VocabExplorePageHeader`
+* `VocabExploreBookCard`
+* `VocabExploreSearchBar`
+* `RecurringWordsPanel`
+* `WordHistorySummaryCard`
+* `SeenInstancesPanel`
+* `DictionaryFallbackCard`
+* `OtherMatchesPanel`
+* `VocabExploreFooterActions`
+
+The final `Seen in` shell has also been folded into `SeenInstancesPanel`, so the remaining render is mostly high-level composition and behavior wiring.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/vocab/explore/page.tsx | 699 | 513 | -186 |`
+
+### 2. Readability Check
+
+The page is much easier to scan than before. The main render now reads as:
+
+* page header
+* book card
+* search bar
+* error message
+* recurring words
+* word summary
+* seen-in section
+* dictionary fallback
+* other matches
+* footer actions
+
+The extracted components are helping readability. The remaining page sections are understandable.
+
+The previous split between the `Seen in` wrapper and `SeenInstancesPanel` has been cleaned up. No remaining render area feels visually awkward or overwhelming.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly in these buckets:
+
+* access / ownership checks: current user lookup and verified `authorizedUserBookId`.
+* full-access checks: no obvious full-access gate is currently present.
+* Supabase loading: book context, local saved-word search, recurring words.
+* private book context loading: joined book title/cover after ownership verification.
+* vocabulary explore/search behavior: query state, exact local surface search, clear behavior, initial URL search.
+* recurring-word browse behavior: grouping by surface + reading and routing to selected word.
+* Jisho fallback behavior: authenticated `/api/jisho` request when no local result exists.
+* global vocabulary/cache behavior: no `vocabulary_cache` writes or global vocabulary mutations are present.
+* UI state: query, loading, browse loading, error message, active result, fallback entry, other matches.
+* derived values: `hasActiveResult`, `hasSearchText`, `shouldShowBrowse`, mapped dictionary results.
+* helper functions: JLPT normalization, chapter display, string array normalization, unique-string handling.
+* visual JSX still in `page.tsx`: page shell, error paragraph, and high-level component composition.
+* component composition: the render wires page-owned state and callbacks into extracted components.
+* legacy or suspicious code: `definitions` is set for local results but not rendered directly; `runSearch` still does not filter hidden rows.
+
+The remaining 513 lines are mostly behavior/data/search logic rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `VocabExploreErrorBanner`
+
+What JSX it owns:
+
+* the small red error paragraph.
+
+Why it is safe:
+
+* presentational only.
+
+Risk level:
+
+* Low.
+
+Do now or defer:
+
+* Defer. It is too small to justify by itself.
+
+#### `VocabExplorePageShell`
+
+What JSX it owns:
+
+* outer `main` wrapper.
+
+Why it is safe:
+
+* visual-only.
+
+Risk level:
+
+* Low.
+
+Do now or defer:
+
+* Defer. It would not meaningfully improve readability.
+
+No remaining low-risk visual extraction is necessary before marking this pass complete.
+
+### 5. Prop Basket / Over-Extraction Check
+
+The extracted components are reasonable and not too prop-heavy.
+
+* `VocabExplorePageHeader`, `VocabExploreBookCard`, and `VocabExploreFooterActions` have clean APIs.
+* `VocabExploreSearchBar` keeps search behavior in the page through callbacks.
+* `RecurringWordsPanel` keeps route construction in the page through `onSelectWord`.
+* `WordHistorySummaryCard` is display-only.
+* `SeenInstancesPanel` now owns the full `Seen in` card shell and receives helper callbacks, which is acceptable because helper logic remains page-owned.
+* `DictionaryFallbackCard` and `OtherMatchesPanel` are straightforward display components.
+
+Keep these components page-local. None need promotion to shared components yet.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to move or blur:
+
+* current-user lookup
+* raw `userBookId` distrust
+* ownership verification through `authorizedUserBookId`
+* Supabase queries
+* local saved-word search
+* recurring-word grouping
+* Jisho fallback behavior
+* `/api/jisho` auth-token behavior
+* clear/search behavior
+* navigation to Book Hub / Vocab List
+* private saved-word data boundaries
+
+No suspicious behavior-boundary issue was found during this audit.
+
+### 7. Architecture Deferred List
+
+Keep these deferred for later:
+
+* shared types: useful later, but current types can stay page-local.
+* helper functions: move only when a feature-local utility home is clear.
+* access helpers: centralize with other private book routes later.
+* services/DAOs/controllers: private search and Jisho fallback are stable and should not move during visual cleanup.
+* recurring-word grouping helper: behavior-sensitive because it defines what counts as repeated.
+* exact search vs broader search behavior: product decision, not visual cleanup.
+* hidden-word handling in direct search: behavior decision for a later pass.
+* Jisho fallback normalization: should wait for dictionary/global vocabulary architecture work.
+
+### 8. Browser Smoke Test Suggestions
+
+Suggested manual smoke test checklist:
+
+* owner can open Vocab Explore for their own book.
+* unauthorized user cannot browse another user's book history.
+* Book Hub navigation works.
+* Vocab List navigation works.
+* recurring words load when no search is active.
+* clicking a recurring word searches/routes correctly.
+* exact local saved-word search finds saved instances.
+* seen-in instances show page/chapter/meaning correctly.
+* Jisho fallback appears when the word is not found locally.
+* other matches display when Jisho returns alternatives.
+* clear resets search state and URL safely.
+* back button works.
+* mobile-ish check for book card, search bar, recurring list, seen-in cards, and fallback cards.
+
+Do not run browser tests unless explicitly requested.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+The first visual pass is complete. Further work should be second-pass architecture planning around access helpers, search behavior, recurring-word grouping, and Jisho fallback normalization.

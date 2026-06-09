@@ -303,7 +303,7 @@ For the first actual code changes, prefer low-risk presentational components onl
 * Architecture pass in progress
 * Architecture pass done
 
-Recommended current status: `Not started`.
+Recommended current status: `Visual pass done / good stopping point`.
 
 A future status of `Visual pass done / architecture deferred` should mean the safe presentational extraction pass is complete and deeper architecture work is intentionally saved for later.
 
@@ -320,4 +320,181 @@ A future status of `Visual pass done / architecture deferred` should mean the sa
 - [✔️] Extracted `MonthlySmallMetricCard`.
 - [✔️] Extracted `MonthlyChartsSection`.
 
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status:
+
+`Visual pass done / good stopping point`
+
+The first visual pass has reached a good stopping point. The page render is now short and mostly composed from page-local presentational components:
+
+* `MonthlyStatsPageHeader`
+* `MonthlyStatsErrorBanner`
+* `MonthlyTopStatsGrid`
+* `MonthlyChartsSection`
+* `MonthlyRhythmSection`
+* `MonthlyMoodSection`
+
+The lower-level visual pieces are also extracted:
+
+* `MonthlyStatCard`
+* `MonthlyChartPanel`
+* `PieChart`
+* `MonthlySmallMetricCard`
+
+The remaining page code is mostly private current-user data loading, monthly stat calculations, date/month boundaries, chart data shaping, and mood/rhythm derived values. Those are architecture or calculation concerns, not safe first-pass visual JSX.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/community/stats/monthly/page.tsx | 873 | 600 | -273 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before. The render now reads as a compact monthly dashboard outline:
+
+* header
+* error banner
+* top stats grid
+* chart section
+* rhythm and mood section
+
+The extracted components are helping readability. The remaining page sections are understandable, and no render area feels visually overwhelming.
+
+The page is still calculation-heavy above the render, but that is expected because monthly stats have many private-data and date-boundary rules.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly in these buckets:
+
+* access / current-user checks: Supabase session lookup and current-user scoping.
+* Supabase loading: `user_books`, monthly reading sessions, and monthly saved words.
+* private data boundaries: all loaded activity data is scoped through the signed-in user's own `user_books`.
+* month/date helpers: current month start, local date formatting, and this-month filtering.
+* paginated/chunked loading: reading sessions and words are fetched by book ID chunks.
+* session calculations: filler filtering, Curiosity/Fluid/Listening classification, pages read, minutes by mode.
+* saved-word calculations: saved words, unique words, active days from words.
+* streak calculations: current streak, best streak, engaged days.
+* book/month calculations: books finished this month, book-type page movement.
+* chart data shaping: time-by-mode pie, book-type pie, palette assignment.
+* mood/rhythm derived values: monthly mood selection and average pages per engaged day.
+* helper functions: formatting, chunking, book type labels, word identity, page count logic.
+* visual JSX still in `page.tsx`: outer page shell and one small two-column layout wrapper around rhythm/mood.
+* component composition: the render wires page-owned derived values into extracted visual components.
+* legacy or suspicious code: no obvious visual extraction target remains.
+
+The remaining 600 lines are mostly behavior/calculation/data loading rather than easy presentational JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `MonthlyRhythmMoodGrid`
+
+What JSX it owns:
+
+* the small two-column wrapper around `MonthlyRhythmSection` and `MonthlyMoodSection`.
+
+Why it is safe:
+
+* it is visual-only.
+
+Risk level:
+
+* Low.
+
+Do now or defer:
+
+* Defer. It is too small to improve readability meaningfully.
+
+#### `MonthlyStatsPageShell`
+
+What JSX it owns:
+
+* outer `main` max-width wrapper.
+
+Why it is safe:
+
+* visual-only.
+
+Risk level:
+
+* Low.
+
+Do now or defer:
+
+* Defer. It would not reduce meaningful complexity.
+
+No further low-risk visual extraction is needed before marking this pass complete.
+
+### 5. Prop Basket / Over-Extraction Check
+
+The extracted components are not too prop-heavy.
+
+* `MonthlyStatsPageHeader` and `MonthlyStatsErrorBanner` are simple.
+* `MonthlyTopStatsGrid` receives a compact list of stat pairs and loading state.
+* `MonthlyChartsSection` has several props, but they are chart-ready values and formatter callbacks, which is acceptable for this visual pass.
+* `MonthlyRhythmSection` and `MonthlyMoodSection` receive display-ready labels and do not own calculations.
+* `PieChart`, `MonthlyChartPanel`, `MonthlyStatCard`, and `MonthlySmallMetricCard` are clean page-local UI pieces.
+
+Keep these components page-local for now. Shared stats components can be considered later across all stats pages, but that should be a separate pass.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to move or blur:
+
+* Supabase auth/session lookup
+* current-user scoping
+* `user_books` loading
+* joined `books` normalization
+* paginated/chunked session loading
+* paginated/chunked saved-word loading
+* filler-session filtering
+* month-boundary behavior
+* streak calculation
+* page movement calculation
+* Listening sessions not counting pages
+* Curiosity/Fluid/Listening classification
+* saved-word and unique-word calculations
+* books-finished-this-month calculation
+* book-type aggregation
+* chart color meanings
+
+No suspicious behavior-boundary issue was found during this audit.
+
+### 7. Architecture Deferred List
+
+Keep these deferred for later:
+
+* shared types: useful later, but not needed for the completed visual pass.
+* Supabase DAO/query helpers: chunked loading and pagination should move only with careful tests.
+* controller/load orchestration: current-user and no-data behavior should stay stable until an architecture pass.
+* monthly stats service: medium-risk because it owns month boundaries, streaks, page movement, mode classification, and unique word counts.
+* formatting helpers: small enough to stay local until service/component boundaries are clearer.
+* chart data helpers: should move only if a shared stats view-model pattern emerges.
+* shared stats UI components: possible later after more stats pages settle.
+
+### 8. Browser Smoke Test Suggestions
+
+Suggested manual smoke test checklist:
+
+* logged-in user can open Monthly Stats.
+* logged-out or invalid access behavior still works.
+* user with no books gets an acceptable empty stats display.
+* monthly sessions load for the current user's books only.
+* monthly saved words load for the current user's books only.
+* top stat cards show plausible values.
+* current/best streak values display correctly.
+* Reading Time chart renders.
+* Book Mix chart renders.
+* Monthly Rhythm panel renders.
+* Monthly Mood panel changes appropriately with activity shape.
+* mobile-ish check for header, stat grid, charts, rhythm, and mood sections.
+
+Do not run browser tests unless explicitly requested.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+The first visual pass is complete. Further work should be second-pass architecture planning around data loading, monthly calculation helpers, date/month boundary logic, and possible shared stats components.
 

@@ -400,6 +400,178 @@ Leave all data loading, access checks, helper functions, and derived stats in `p
 * Extracted `BookStatsLoadingState`
 * Extracted `BookStatsErrorState`
 * Extracted `StatCard`
-* Extracted `StatsSection`
+* Extracted and applied `StatsSection`
 * Extracted `BookStatsHeader`
 * Extracted `DifficultyNeighborhoodPanel`
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status:
+
+`Visual pass done / good stopping point`
+
+The first visual pass has now reached a good stopping point. The major presentational pieces have been extracted:
+
+* `BookStatsLoadingState`
+* `BookStatsErrorState`
+* `StatCard`
+* `StatsSection`
+* `BookStatsHeader`
+* `DifficultyNeighborhoodPanel`
+
+The repeated stat-section shell pattern is now handled by `StatsSection` for:
+
+* `Progress Snapshot`
+* `Time by Mode`
+* `Pace`
+* `Vocabulary`
+
+The remaining page code is mostly access checks, Supabase loading, session/word-count loading, difficulty comparison logic, and stats calculations. Further extraction would be behavior-aware architecture work, not low-risk visual thinning.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/books/[userBookId]/stats/page.tsx | 788 | 655 | -133 |`
+
+### 2. Readability Check
+
+The page is easier to scan than before. Loading/error states, the header, the difficulty comparison panel, stat cards, and stat-section wrappers are now named components.
+
+The render now reads as a concise composition:
+
+* `StatsSection` for Progress Snapshot
+* `StatsSection` for Time by Mode
+* `StatsSection` for Pace
+* `StatsSection` for Vocabulary
+
+No remaining area feels visually overwhelming. The page is still moderately long because the calculations and access/data loading remain in `page.tsx`, which is intentional for this pass.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly in these buckets:
+
+* access / ownership checks: signed-in user, viewer profile, owner access, linked-teacher access, and super-teacher access.
+* linked-teacher / super-teacher checks: access to private book stats is guarded before stats are shown.
+* Supabase loading: target `user_books` row, reading sessions, saved-word count, and comparison books.
+* book/context loading: joined `books` metadata and owner context.
+* reading-session loading: sessions for the current `userBookId`.
+* word-count loading: private saved-word count for the current book.
+* difficulty comparison loading: owner user's other rated books of the same type.
+* stats calculations: minutes by mode, pages read, days engaged, pace, words/page, difficulty comparison.
+* UI state: loading, access checked, access message, error message, loaded rows.
+* derived values: real sessions, page-tracked sessions, timed sessions, mode groupings, labels, totals, pace values.
+* helper functions: minutes formatting, book type labels, status labels, difficulty labels, neighborhood calculation.
+* visual JSX still in `page.tsx`: page shell and high-level component composition.
+* component composition: the render wires derived stats into extracted presentational components.
+* legacy or suspicious code: no obvious stale visual extraction target remains after applying `StatsSection`.
+
+The remaining 655 lines are mostly behavior/data/calculation logic rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `BookStatsPageShell`
+
+What JSX it owns:
+
+* outer `main` and max-width wrapper.
+
+Why it is safe:
+
+* visual-only wrapper.
+
+Risk level:
+
+* Low.
+
+Do now or defer:
+
+* Defer. It would not improve readability enough to justify another component.
+
+#### `BookStatsSummaryGrid`
+
+What JSX it owns:
+
+* groups of `StatCard` values per stats category.
+
+Why it is not ideal:
+
+* it would need many stats values and conditionals, creating prop-basket pressure.
+
+Risk level:
+
+* Medium.
+
+Do now or defer:
+
+* Defer. Keep calculations and stat-card choices in `page.tsx`.
+
+No remaining low-risk visual extraction is necessary before marking this pass complete.
+
+### 5. Prop Basket / Over-Extraction Check
+
+The extracted components are healthy:
+
+* `BookStatsLoadingState` and `BookStatsErrorState` are simple.
+* `StatCard` has a clean display API.
+* `StatsSection` now handles repeated stat-section wrappers with a small `title`/`children` API.
+* `BookStatsHeader` owns book context and navigation presentation without owning routing decisions.
+* `DifficultyNeighborhoodPanel` receives derived values but does not calculate them.
+
+No component appears too prop-heavy. The only caution is to avoid extracting whole stat groups into large components until the derived stats are shaped into a deliberate view model.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to move or blur:
+
+* access checks
+* owner/private book checks
+* linked-teacher checks
+* super-teacher checks
+* Supabase queries
+* reading-session loading
+* saved-word count loading
+* difficulty comparison loading
+* stats calculations
+* vocabulary count behavior
+* navigation to Book Hub / Vocab List
+
+No suspicious behavior-boundary issue was found during this audit.
+
+### 7. Architecture Deferred List
+
+Keep these deferred for later:
+
+* shared types: useful later, but not needed for this visual pass.
+* helper functions: move only with a clear stats service/formatters plan.
+* access helpers: centralize with other private book routes later.
+* services/DAOs/controllers: data loading is stable and should not move during visual cleanup.
+* reading-session stats helpers: medium-risk because they define progress and pace numbers.
+* difficulty comparison helper: keep page-owned until the reader-fit/difficulty model is stable.
+* saved-word count service: simple now, but should align with broader book stats architecture later.
+* shared stats UI components: possible later, but keep these page-local for now.
+
+### 8. Browser Smoke Test Suggestions
+
+Suggested manual smoke test checklist:
+
+* owner can open their own Book Stats page.
+* unauthorized user is blocked from another user's private Book Stats page.
+* linked teacher/super-teacher access still works if intended.
+* Book Hub navigation works.
+* Vocab List navigation works.
+* difficulty neighborhood panel displays correctly.
+* Progress Snapshot stats display correctly.
+* Time by Mode appears only when tracked minutes exist.
+* Pace appears only when page/time data exists.
+* Vocabulary stats show saved-word count and words/page when available.
+* empty/low-data states still look acceptable.
+* mobile-ish check for header, stat cards, and conditional sections.
+
+Do not run browser tests unless explicitly requested.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+The first visual pass is complete. Further work should be second-pass architecture planning around access helpers, data loading, reading-session calculations, and difficulty comparison logic.

@@ -569,3 +569,197 @@ loadDictionaryExtras() calls /api/jisho once per kanji character, which could be
 meaningChoices.findIndex((m) => m === item.meaning) may miss matches if meanings differ by whitespace/case.
 The non-teacher “Something seems off?” button currently only shows an alert. It does not create a report.
 CollocationsPanel is page-local but contains its own Supabase behavior; later it may deserve a separate file/component pass.
+
+## Visual Pass Wrap-Up Audit
+
+### 1. Visual Pass Status
+
+Final status:
+
+`Visual pass done / good stopping point`
+
+The first visual pass has reached a good stopping point. The recommended low-risk presentational sections from the original map have been extracted:
+
+* `WordDetailLoadingState`
+* `WordDetailNeedsSignInState`
+* `WordDetailErrorState`
+* `WordDetailHeader`
+* `WordDictionaryInfoSection`
+* `WordKanjiInfoPanel`
+* `RelatedKanjiWordsPanel`
+* `WordSeenInSection`
+* `WordDetailTeacherPhraseSection`
+* `WordDetailReportIssueLink`
+* `WordDetailFooterActions`
+
+The remaining code is mostly access checks, Supabase loading, dictionary/kanji lookup behavior, seen-in/count behavior, and the teacher collocation workflow. The teacher collocation area is not a safe visual-only target because it contains its own load/add/delete behavior.
+
+Updated tracker row:
+
+`- [x] Visual pass done / good stopping point | app/(protected)/books/[userBookId]/words/[wordId]/page.tsx | 884 | 711 | -173 |`
+
+### 2. Readability Check
+
+The page is much easier to scan than before. The render now reads as a small set of named sections:
+
+* header/navigation context
+* dictionary/kanji information
+* seen-in history
+* teacher phrase/collocation area
+* report issue link
+* footer actions
+
+The extracted components help readability because most repeated card/list markup is no longer inline in `page.tsx`.
+
+The remaining page sections are understandable. The main area that still feels behavior-heavy is `CollocationsPanel`, but that is because it includes real teacher save/delete logic rather than purely visual JSX.
+
+### 3. Remaining Code Classification
+
+Remaining code is mostly in these buckets:
+
+* access / ownership checks: auth user lookup, `user_books` lookup, owner check, super-teacher check, linked-teacher check.
+* linked-teacher / super-teacher checks: access to another user’s saved word is guarded before the page data is shown.
+* Supabase loading: profile, book context, saved word, seen instances, collocations inside `CollocationsPanel`.
+* book/context loading: book title, cover, owner user ID, and route context.
+* saved-word detail loading: selected `user_book_words` row and meaning choices.
+* dictionary/kanji lookup behavior: `kanjiapi.dev` fetches and `/api/jisho` calls.
+* seen-in/count behavior: repeats in the current book, total lookup count, and cross-book instances.
+* teacher collocation behavior: local collocation state plus load/add/delete Supabase writes.
+* report behavior: non-teacher report link currently shows an alert only.
+* UI state: loading, sign-in needed, error message, dictionary loading, role, word/book data.
+* derived values: normalized JLPT, chapter display, teacher role flag, meaning choice lookups.
+* helper functions: string normalization, JLPT/chapter formatting, collocation normalization, unique kanji extraction.
+* visual JSX still in `page.tsx`: page shell, high-level component composition, and `CollocationsPanel`.
+* component composition: the render now mostly wires page-owned data into extracted visual components.
+* legacy or suspicious code: `isTeacher` only checks `role === "teacher"`; super-teacher collocation access may need a deliberate product decision.
+
+The remaining 711 lines are mostly behavior/data logic rather than easy visual JSX.
+
+### 4. Visual Chunks Still Worth Extracting?
+
+#### `CollocationsPanel`
+
+What JSX it owns:
+
+* teacher useful-phrases/collocations list
+* collocation input fields
+* add/delete buttons
+
+Why it is safe or not safe:
+
+* not safe as a first-pass visual-only extraction because it owns Supabase loading, insert, delete, local form state, and auth checks.
+
+Risk level:
+
+* Medium-high.
+
+Do now or defer:
+
+* Defer. Move only during a teacher-collocation behavior cleanup or second-pass component/controller split.
+
+#### `WordDetailMainShell`
+
+What JSX it owns:
+
+* outer `main` and max-width wrapper.
+
+Why it is safe:
+
+* visual-only wrapper.
+
+Risk level:
+
+* Low.
+
+Do now or defer:
+
+* Defer. It would not meaningfully improve readability.
+
+#### `WordDetailDictionaryExtras`
+
+What JSX it owns:
+
+* `WordKanjiInfoPanel` and `RelatedKanjiWordsPanel` inside `WordDictionaryInfoSection`.
+
+Why it is not ideal:
+
+* the current composition is already clear, and bundling the panels together would mainly hide useful structure.
+
+Risk level:
+
+* Low-medium.
+
+Do now or defer:
+
+* Defer.
+
+### 5. Prop Basket / Over-Extraction Check
+
+The extracted components do not appear too prop-heavy.
+
+* Loading/error/sign-in states are small and clean.
+* `WordDetailHeader` has a focused routing/context API.
+* `WordDictionaryInfoSection`, `WordKanjiInfoPanel`, and `RelatedKanjiWordsPanel` split the dictionary area clearly.
+* `WordSeenInSection` receives several display props, but it owns a real visual section and does not take over data loading.
+* `WordDetailTeacherPhraseSection` is a good wrapper because it leaves `CollocationsPanel` behavior in place.
+
+These components should stay page-local for now. Nothing needs to be promoted to shared components yet.
+
+### 6. Behavior Boundary Check
+
+The visual pass does not appear to move or blur:
+
+* access checks
+* owner/private book checks
+* linked-teacher checks
+* super-teacher access checks
+* Supabase queries
+* saved-word loading
+* book context loading
+* dictionary/kanji API behavior
+* seen-in/count behavior
+* teacher collocation load/add/delete behavior
+* private saved-word data boundaries
+* navigation to Book Hub / Vocab List / browser back
+
+No suspicious behavior-boundary issue was found during this wrap-up audit. The only product question to revisit later is whether super-teachers should see the teacher collocation panel.
+
+### 7. Architecture Deferred List
+
+Keep these deferred for later:
+
+* shared types: useful later, but not needed for the completed visual pass.
+* helper functions: should move only with a clear feature-local utility/service destination.
+* access helpers: this route uses owner, linked-teacher, and super-teacher checks; centralize with other private book routes later.
+* services/DAOs/controllers: data loading is stable and should not move during visual cleanup.
+* dictionary/kanji lookup service: external/API behavior should be extracted only with careful testing.
+* seen-in/count helper: cross-book counting should remain page-owned until privacy/access helpers are centralized.
+* collocation service/component split: needed later if teacher phrase workflows grow.
+* report issue flow: current alert-only behavior needs product design before implementation.
+
+### 8. Browser Smoke Test Suggestions
+
+Suggested manual smoke test checklist:
+
+* owner can open their own saved-word detail page.
+* unauthorized user is blocked from another user's private saved-word detail page.
+* linked teacher/super-teacher access still works if intended.
+* word surface, reading, JLPT, and common badge display correctly.
+* kanji metadata loads or shows an acceptable empty state.
+* related kanji words load or show an acceptable empty state.
+* seen-in counts and saved instances display correctly.
+* Book Hub navigation works.
+* Vocab List navigation works.
+* browser back/footer back works.
+* refresh action reloads the page data.
+* teacher collocation add/delete works if visible.
+* non-teacher report link still shows the current placeholder alert.
+* mobile-ish check for header, dictionary card, seen-in section, and footer actions.
+
+Do not run browser tests unless explicitly requested.
+
+### 9. Final Recommendation
+
+Stop visual thinning here.
+
+The page has reached a good visual stopping point. Any next work should be second-pass architecture or behavior cleanup, especially around access helper centralization, dictionary lookup extraction, seen-in counting, teacher collocations, and the placeholder report flow.

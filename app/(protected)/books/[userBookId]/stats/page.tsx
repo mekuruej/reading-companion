@@ -546,133 +546,109 @@ export default function BookStatsPage() {
                     ratingText={difficultyText(row.rating_difficulty)}
                 />
 
-                <section className="space-y-3">
-                    <h2 className="text-lg font-black text-stone-950">
-                        Progress Snapshot
-                    </h2>
-
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <StatCard label="Status" value={statusLabel(row)} />
-                        <StatCard
-                            label="Pages Read"
-                            value={pagesRead || "—"}
-                            note="Page-tracked sessions only"
-                        />
-                        <StatCard
-                            label="Days Engaged"
-                            value={daysEngaged ?? "—"}
-                            note="Reading or listening dates"
-                        />
-                        <StatCard label="Last Engaged" value={lastEngaged ?? "—"} />
-                    </div>
-                </section>
+                <StatsSection title="Progress Snapshot">
+                    <StatCard label="Status" value={statusLabel(row)} />
+                    <StatCard
+                        label="Pages Read"
+                        value={pagesRead || "—"}
+                        note="Page-tracked sessions only"
+                    />
+                    <StatCard
+                        label="Days Engaged"
+                        value={daysEngaged ?? "—"}
+                        note="Reading or listening dates"
+                    />
+                    <StatCard label="Last Engaged" value={lastEngaged ?? "—"} />
+                </StatsSection>
 
                 {totalTrackedMinutes > 0 && (
-                    <section className="space-y-3">
-                        <h2 className="text-lg font-black text-stone-950">
-                            Time by Mode
-                        </h2>
-
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {curiosityMinutes > 0 && (
-                                <StatCard
-                                    label="Curiosity Reading"
-                                    value={formatMinutes(curiosityMinutes)}
-                                    note="Intensive reading"
-                                />
-                            )}
-
-                            {fluidMinutes > 0 && (
-                                <StatCard
-                                    label="Fluid Reading"
-                                    value={formatMinutes(fluidMinutes)}
-                                    note="Saved support + just reading"
-                                />
-                            )}
-
-                            {listeningMinutes > 0 && (
-                                <StatCard
-                                    label="Listening"
-                                    value={formatMinutes(listeningMinutes)}
-                                    note="Ear training"
-                                />
-                            )}
-
+                    <StatsSection title="Time by Mode">
+                        {curiosityMinutes > 0 && (
                             <StatCard
-                                label="Total Logged Time"
-                                value={formatMinutes(totalTrackedMinutes)}
-                                note="Reading and listening only"
+                                label="Curiosity Reading"
+                                value={formatMinutes(curiosityMinutes)}
+                                note="Intensive reading"
                             />
-                        </div>
-                    </section>
+                        )}
+
+                        {fluidMinutes > 0 && (
+                            <StatCard
+                                label="Fluid Reading"
+                                value={formatMinutes(fluidMinutes)}
+                                note="Saved support + just reading"
+                            />
+                        )}
+
+                        {listeningMinutes > 0 && (
+                            <StatCard
+                                label="Listening"
+                                value={formatMinutes(listeningMinutes)}
+                                note="Ear training"
+                            />
+                        )}
+
+                        <StatCard
+                            label="Total Logged Time"
+                            value={formatMinutes(totalTrackedMinutes)}
+                            note="Reading and listening only"
+                        />
+                    </StatsSection>
                 )}
 
                 {(overallMinPerPage != null ||
                     pagesPerHour != null ||
                     curiosityPageStats != null ||
                     fluidPageStats != null) && (
-                        <section className="space-y-3">
-                            <h2 className="text-lg font-black text-stone-950">
-                                Pace
-                            </h2>
+                        <StatsSection title="Pace">
+                            {overallMinPerPage != null && (
+                                <StatCard
+                                    label="Overall Min/Page"
+                                    value={overallMinPerPage.toFixed(2)}
+                                    note="Page-tracked timed sessions"
+                                />
+                            )}
 
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {overallMinPerPage != null && (
-                                    <StatCard
-                                        label="Overall Min/Page"
-                                        value={overallMinPerPage.toFixed(2)}
-                                        note="Page-tracked timed sessions"
-                                    />
-                                )}
+                            {pagesPerHour != null && (
+                                <StatCard
+                                    label="Pages/Hour"
+                                    value={pagesPerHour.toFixed(1)}
+                                    note="Based on page-tracked time"
+                                />
+                            )}
 
-                                {pagesPerHour != null && (
-                                    <StatCard
-                                        label="Pages/Hour"
-                                        value={pagesPerHour.toFixed(1)}
-                                        note="Based on page-tracked time"
-                                    />
-                                )}
+                            {curiosityPageStats != null && (
+                                <StatCard
+                                    label="Curiosity Min/Page"
+                                    value={curiosityPageStats.toFixed(2)}
+                                    note="Intensive pace"
+                                />
+                            )}
 
-                                {curiosityPageStats != null && (
-                                    <StatCard
-                                        label="Curiosity Min/Page"
-                                        value={curiosityPageStats.toFixed(2)}
-                                        note="Intensive pace"
-                                    />
-                                )}
-
-                                {fluidPageStats != null && (
-                                    <StatCard
-                                        label="Fluid Min/Page"
-                                        value={fluidPageStats.toFixed(2)}
-                                        note="Extensive pace"
-                                    />
-                                )}
-                            </div>
-                        </section>
+                            {fluidPageStats != null && (
+                                <StatCard
+                                    label="Fluid Min/Page"
+                                    value={fluidPageStats.toFixed(2)}
+                                    note="Extensive pace"
+                                />
+                            )}
+                        </StatsSection>
                     )}
 
-                <section className="space-y-3">
-                    <h2 className="text-lg font-black text-stone-950">
-                        Vocabulary
-                    </h2>
+                <StatsSection title="Vocabulary">
+                    <StatCard
+                        label="Words Saved"
+                        value={wordCount ?? "—"}
+                        note="Saved words from this book"
+                    />
 
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {pagesRead > 0 && wordCount != null && (
                         <StatCard
-                            label="Words Saved"
-                            value={wordCount ?? "—"}
-                            note="Saved words from this book"
+                            label="Words/Page"
+                            value={(wordCount / pagesRead).toFixed(2)}
+                            note="Based on page-tracked progress"
                         />
-
-                        {pagesRead > 0 && wordCount != null && (
-                            <StatCard
-                                label="Words/Page"
-                                value={(wordCount / pagesRead).toFixed(2)}
-                                note="Based on page-tracked progress"
-                            />
-                        )}
-                    </div>
-                </section>
+                    )}
+                </StatsSection>
             </div>
         </main>
     );
