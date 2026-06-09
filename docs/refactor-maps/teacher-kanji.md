@@ -693,3 +693,14 @@ This page is ready for a small first-pass visual extraction, but only at the saf
 Start with tiny states/header/cards/empty state. Then reassess before touching filters, queue list, or editor panels.
 
 No behavior cleanup is required before extracting tiny presentational shells, but behavior should be smoke-tested before extracting the queue table or editor components because the page now merges old global flags with learner `kanji_map_reports`.
+
+### Finished
+
+* Extracted `TeacherKanjiHeader`
+* Extracted `TeacherKanjiLoadingState`
+* Extracted `TeacherKanjiAccessState`
+* Extracted `TeacherKanjiMessageBanner`
+* Extracted `TeacherKanjiSummaryCards`
+* Extracted `TeacherKanjiEmptyState`
+* Extracted `TeacherKanjiFilterBar`
+* Extracted `TeacherKanjiBulkActionBar`
