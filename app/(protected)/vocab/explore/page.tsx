@@ -490,21 +490,11 @@ export default function WordHistorySearchPage() {
             normalizeJlpt={normalizeJlpt}
           />
 
-          <section className="mt-6 w-full rounded-2xl border bg-white p-6 shadow-sm">
-            <div className="mb-4 text-lg font-semibold">Seen in</div>
-
-            {seenInstances.length === 0 ? (
-              <div className="text-sm text-gray-500">No saved instances found yet.</div>
-            ) : (
-              <div className="space-y-2">
-                <SeenInstancesPanel
-                  instances={seenInstances}
-                  getMeaningChoices={asStringArray}
-                  chapterDisplay={chapterDisplay}
-                />
-              </div>
-            )}
-          </section>
+          <SeenInstancesPanel
+            instances={seenInstances}
+            getMeaningChoices={asStringArray}
+            chapterDisplay={chapterDisplay}
+          />
         </>
       ) : null}
 
