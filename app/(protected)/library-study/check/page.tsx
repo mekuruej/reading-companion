@@ -106,6 +106,7 @@ type LibraryWordSummaryRow = {
   jlpt: string | null;
   total_encounter_count: number | null;
   check_ready_encounter_count: number | null;
+  last_seen_at: string | null;
   sample_user_book_word_id: string | null;
   sample_user_book_id: string | null;
   sample_book_title: string | null;
@@ -141,6 +142,7 @@ type StudyCard = {
   studyIdentityKey: string;
   progress: LibraryWordProgressRow | null;
   definitionNumber: number | null;
+  lastEncounteredAt: string | null;
 };
 
 type MeaningReviewItem = {
@@ -195,6 +197,7 @@ const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
 const PRE_READING_WAIT_RECHECK_DAYS = 90;
+const YELLOW_READINESS_COOLDOWN_DAYS = 90;
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   red_stages: 1,
@@ -338,6 +341,21 @@ function definitionLabel(card: StudyCard | null | undefined) {
   if (progressDefinition) return `Def #${progressDefinition}`;
   if (card?.definitionNumber != null) return `Def #${card.definitionNumber}`;
   return "";
+}
+
+function latestWordCreatedAt(words: UserBookWordRow[]) {
+  return words.reduce<string | null>((latest, word) => {
+    if (!word.created_at) return latest;
+    if (!latest) return word.created_at;
+
+    const latestTime = new Date(latest).getTime();
+    const wordTime = new Date(word.created_at).getTime();
+
+    if (Number.isNaN(wordTime)) return latest;
+    if (Number.isNaN(latestTime)) return word.created_at;
+
+    return wordTime > latestTime ? word.created_at : latest;
+  }, null);
 }
 
 async function loadAllLibraryCheckWords(userBookIds: string[]) {
@@ -563,6 +581,7 @@ function makeClaimStudyCard(
     studyIdentityKey: key,
     progress,
     definitionNumber: null,
+    lastEncounteredAt: claim.updated_at ?? claim.created_at ?? null,
   };
 }
 
@@ -671,6 +690,15 @@ function isInitialGateSlotDue(card: StudyCard, now = new Date()) {
   return dayNumber % recheckDays === releaseOffset;
 }
 
+function isInitialYellowReadinessSlotDue(card: StudyCard, now = new Date()) {
+  const dayNumber = appDayNumber(now);
+  const releaseOffset =
+    hashString(`${card.studyIdentityKey}::initial-yellow-readiness-slot`) %
+    YELLOW_READINESS_COOLDOWN_DAYS;
+
+  return dayNumber % YELLOW_READINESS_COOLDOWN_DAYS === releaseOffset;
+}
+
 function lastStudiedTime(card: StudyCard) {
   const value = card.progress?.last_studied_at;
   if (!value) return 0;
@@ -738,7 +766,25 @@ function isBackToRedSupportCard(card: StudyCard) {
   );
 }
 
+function isYellowReadinessCard(card: StudyCard) {
+  return card.activeGate === "readiness" && card.colorStatus.color === "yellow";
+}
+
+function isYellowReadinessCooldownDue(card: StudyCard, now = new Date()) {
+  const anchorDate = card.lastEncounteredAt ?? card.progress?.last_studied_at;
+
+  if (!anchorDate) {
+    return isInitialYellowReadinessSlotDue(card, now);
+  }
+
+  return daysSinceIso(anchorDate, now) >= YELLOW_READINESS_COOLDOWN_DAYS;
+}
+
 function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
+  if (isYellowReadinessCard(card)) {
+    return isYellowReadinessCooldownDue(card, now);
+  }
+
   if (isBackToRedSupportCard(card)) {
     return daysSinceIso(card.progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
   }
@@ -759,6 +805,9 @@ function isCardAvailableForLibraryCheck(
 
   if (!jlptMatch) return false;
   if (!includeLibraryCheckCard(card.colorStatus)) return false;
+  if (isYellowReadinessCard(card) && !isYellowReadinessCooldownDue(card)) {
+    return false;
+  }
 
   // Used by "Check Again Today" so the button really means:
   // "give me cards even if I already checked them today / they are not due yet."
@@ -1820,6 +1869,7 @@ export default function LibraryStudyPage() {
               jlpt,
               total_encounter_count,
               check_ready_encounter_count,
+              last_seen_at,
               sample_user_book_word_id,
               sample_user_book_id,
               sample_book_title,
@@ -1936,6 +1986,7 @@ export default function LibraryStudyPage() {
                 studyIdentityKey: summary.study_identity_key,
                 progress,
                 definitionNumber: definitionNumberByWordId.get(summary.sample_user_book_word_id) ?? null,
+                lastEncounteredAt: summary.last_seen_at ?? null,
               };
             })
             .filter((card): card is StudyCard => Boolean(card));
@@ -2036,6 +2087,7 @@ export default function LibraryStudyPage() {
             const meta = metaById.get(representative.user_book_id);
             const surface = representative.surface!.trim();
             const reading = representative.reading!.trim();
+            const lastEncounteredAt = latestWordCreatedAt(group);
             const progress = progressWithWordSkyClaim(
               user.id,
               key,
@@ -2080,6 +2132,7 @@ export default function LibraryStudyPage() {
               studyIdentityKey: key,
               progress,
               definitionNumber: definitionNumberFromIndex(representative.meaning_choice_index),
+              lastEncounteredAt,
             };
           })
           .filter((card): card is StudyCard => Boolean(card));
