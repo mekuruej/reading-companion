@@ -16,6 +16,9 @@ import TeacherKanjiBulkActionBar from "./components/TeacherKanjiBulkActionBar";
 import TeacherKanjiStatusBadge from "./components/TeacherKanjiStatusBadge";
 import TeacherKanjiRowCounts from "./components/TeacherKanjiRowCounts";
 import TeacherKanjiWordCell from "./components/TeacherKanjiWordCell";
+import TeacherKanjiStudentCell from "./components/TeacherKanjiStudentCell";
+import TeacherKanjiBookCell from "./components/TeacherKanjiBookCell";
+import TeacherKanjiQueueActions from "./components/TeacherKanjiQueueActions";
 
 const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 const BULK_OPEN_LIMIT = 10;
@@ -1514,12 +1517,10 @@ export default function TeacherKanjiPage() {
                       <Fragment key={item.userBookWordId}>
                         <tr className="align-top">
                           <td className="px-4 py-4">
-                            <div className="font-semibold text-stone-900">
-                              {item.studentName}
-                            </div>
-                            {item.username ? (
-                              <div className="text-xs text-stone-500">@{item.username}</div>
-                            ) : null}
+                            <TeacherKanjiStudentCell
+                              studentName={item.studentName}
+                              username={item.username}
+                            />
                           </td>
 
                           <td className="px-4 py-4">
@@ -1556,44 +1557,15 @@ export default function TeacherKanjiPage() {
                           </td>
 
                           <td className="px-4 py-4">
-                            <div className="flex flex-col items-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => void openKanjiEditor(item)}
-                                disabled={preparingId === item.userBookWordId}
-                                className="rounded-xl border border-stone-900 bg-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black disabled:opacity-50"
-                              >
-                                {preparingId === item.userBookWordId
-                                  ? "Opening…"
-                                  : editorOpenByWordId[item.userBookWordId]
-                                    ? "Editor open above"
-                                    : "Open editor"}
-                              </button>
-
-                              {item.flaggedMapRowCount > 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void clearKanjiFlag(item)}
-                                  disabled={ignoringId === item.userBookWordId}
-                                  className="rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                                >
-                                  {ignoringId === item.userBookWordId
-                                    ? "Clearing…"
-                                    : "Clear flag only"}
-                                </button>
-                              ) : null}
-
-                              <button
-                                type="button"
-                                onClick={() => void ignoreWord(item)}
-                                disabled={ignoringId === item.userBookWordId}
-                                className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-500 hover:bg-stone-50 disabled:opacity-50"
-                              >
-                                {ignoringId === item.userBookWordId
-                                  ? "Removing…"
-                                  : "Exclude from kanji readings"}
-                              </button>
-                            </div>
+                            <TeacherKanjiQueueActions
+                              isPreparing={preparingId === item.userBookWordId}
+                              isEditorOpen={!!editorOpenByWordId[item.userBookWordId]}
+                              isIgnoring={ignoringId === item.userBookWordId}
+                              flaggedMapRowCount={item.flaggedMapRowCount}
+                              onOpenEditor={() => void openKanjiEditor(item)}
+                              onClearFlag={() => void clearKanjiFlag(item)}
+                              onExclude={() => void ignoreWord(item)}
+                            />
                           </td>
                         </tr>
 
