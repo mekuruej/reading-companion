@@ -8,6 +8,9 @@ import { supabase } from "@/lib/supabaseClient";
 import TeacherKanjiHeader from "./components/TeacherKanjiHeader";
 import TeacherKanjiAccessState from "./components/TeacherKanjiAccessState";
 import TeacherKanjiLoadingState from "./components/TeacherKanjiLoadingState";
+import TeacherKanjiMessageBanner from "./components/TeacherKanjiMessageBanner";
+import TeacherKanjiSummaryCards from "./components/TeacherKanjiSummaryCards";
+import TeacherKanjiEmptyState from "./components/TeacherKanjiEmptyState";
 
 const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 const BULK_OPEN_LIMIT = 10;
@@ -1256,49 +1259,11 @@ export default function TeacherKanjiPage() {
         <TeacherKanjiAccessState />
       ) : (
         <>
-          {error ? (
-            <section className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              {error}
-            </section>
-          ) : null}
-          {saveMessage ? (
-            <section className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-              {saveMessage}
-            </section>
-          ) : null}
+          <TeacherKanjiMessageBanner type="error" message={error} />
+          <TeacherKanjiMessageBanner type="success" message={saveMessage} />
 
 
-          <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
-              <p className="text-xs text-indigo-700">Total tracked</p>
-              <p className="mt-1 text-2xl font-black text-indigo-950">{summary.total}</p>
-            </div>
-
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm">
-              <p className="text-xs text-red-700">Flagged</p>
-              <p className="mt-1 text-2xl font-black text-red-900">{summary.flagged}</p>
-            </div>
-
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-              <p className="text-xs text-sky-700">Needs reading</p>
-              <p className="mt-1 text-2xl font-black text-sky-950">{summary.needsReading}</p>
-            </div>
-
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-              <p className="text-xs text-amber-700">Needs work</p>
-              <p className="mt-1 text-2xl font-black text-amber-900">{summary.needsWork}</p>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-              <p className="text-xs text-emerald-700">Complete</p>
-              <p className="mt-1 text-2xl font-black text-emerald-900">{summary.complete}</p>
-            </div>
-
-            <div className="rounded-2xl border border-stone-200 bg-stone-100 p-4 shadow-sm">
-              <p className="text-xs text-stone-600">Excluded</p>
-              <p className="mt-1 text-2xl font-black text-stone-800">{summary.excluded}</p>
-            </div>
-          </section>
+          <TeacherKanjiSummaryCards summary={summary} />
 
           <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
             <div className="grid gap-3 md:grid-cols-3">
@@ -1593,13 +1558,7 @@ export default function TeacherKanjiPage() {
 
           <section className="mt-6 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
             {filteredItems.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-lg font-black text-stone-900">Queue is clear.</p>
-                <p className="mt-2 text-sm text-stone-500">
-                  New kanji enrichment items will appear here when saved words need cache
-                  rows, kanji rows, or reading details.
-                </p>
-              </div>
+              <TeacherKanjiEmptyState />
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-stone-200 text-sm">
