@@ -11,6 +11,7 @@ import TeacherKanjiLoadingState from "./components/TeacherKanjiLoadingState";
 import TeacherKanjiMessageBanner from "./components/TeacherKanjiMessageBanner";
 import TeacherKanjiSummaryCards from "./components/TeacherKanjiSummaryCards";
 import TeacherKanjiEmptyState from "./components/TeacherKanjiEmptyState";
+import TeacherKanjiFilterBar from "./components/TeacherKanjiFilterBar";
 
 const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 const BULK_OPEN_LIMIT = 10;
@@ -1266,62 +1267,16 @@ export default function TeacherKanjiPage() {
           <TeacherKanjiSummaryCards summary={summary} />
 
           <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="text-sm">
-                <span className="mb-1 block text-xs font-semibold text-stone-500">
-                  Student
-                </span>
-                <select
-                  value={studentFilter}
-                  onChange={(event) => setStudentFilter(event.target.value)}
-                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="all">All students</option>
-                  {studentOptions.map(([id, name]) => (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="text-sm">
-                <span className="mb-1 block text-xs font-semibold text-stone-500">
-                  Book
-                </span>
-                <select
-                  value={bookFilter}
-                  onChange={(event) => setBookFilter(event.target.value)}
-                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="all">All books</option>
-                  {bookOptions.map(([id, title]) => (
-                    <option key={id} value={id}>
-                      {title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="text-sm">
-                <span className="mb-1 block text-xs font-semibold text-stone-500">
-                  Status
-                </span>
-                <select
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="active">Needs attention</option>
-                  <option value="all">All</option>
-                  <option value="flagged_review">Flagged</option>
-                  <option value="needs_reading">Needs reading</option>
-                  <option value="needs_work">Needs work</option>
-                  <option value="complete">Complete</option>
-                  <option value="excluded">Excluded</option>
-                </select>
-              </label>
-            </div>
+            <TeacherKanjiFilterBar
+              studentFilter={studentFilter}
+              bookFilter={bookFilter}
+              statusFilter={statusFilter}
+              studentOptions={studentOptions}
+              bookOptions={bookOptions}
+              onStudentFilterChange={setStudentFilter}
+              onBookFilterChange={setBookFilter}
+              onStatusFilterChange={(value) => setStatusFilter(value as StatusFilter)}
+            />
 
             <div className="mt-4 flex flex-col gap-2 border-t border-stone-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
