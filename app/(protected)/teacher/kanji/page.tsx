@@ -12,6 +12,10 @@ import TeacherKanjiMessageBanner from "./components/TeacherKanjiMessageBanner";
 import TeacherKanjiSummaryCards from "./components/TeacherKanjiSummaryCards";
 import TeacherKanjiEmptyState from "./components/TeacherKanjiEmptyState";
 import TeacherKanjiFilterBar from "./components/TeacherKanjiFilterBar";
+import TeacherKanjiBulkActionBar from "./components/TeacherKanjiBulkActionBar";
+import TeacherKanjiStatusBadge from "./components/TeacherKanjiStatusBadge";
+import TeacherKanjiRowCounts from "./components/TeacherKanjiRowCounts";
+import TeacherKanjiWordCell from "./components/TeacherKanjiWordCell";
 
 const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 const BULK_OPEN_LIMIT = 10;
@@ -1278,38 +1282,15 @@ export default function TeacherKanjiPage() {
               onStatusFilterChange={(value) => setStatusFilter(value as StatusFilter)}
             />
 
-            <div className="mt-4 flex flex-col gap-2 border-t border-stone-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-stone-900">Bulk open</p>
-                <p className="mt-1 text-xs text-stone-500">
-                  Prepare rows and open editors for the first {BULK_OPEN_LIMIT} visible items that need attention.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => void openFirstVisibleBatch()}
-                  disabled={bulkOpening || bulkSaving || bulkOpenItems.length === 0}
-                  className="rounded-2xl border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {bulkOpening
-                    ? "Opening batch…"
-                    : `Open first ${bulkOpenItems.length || BULK_OPEN_LIMIT}`}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => void saveAllOpenEditors()}
-                  disabled={bulkSaving || openEditorItems.length === 0}
-                  className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {bulkSaving
-                    ? "Saving all…"
-                    : `Save all open ${openEditorItems.length ? `(${openEditorItems.length})` : ""}`}
-                </button>
-              </div>
-            </div>
+            <TeacherKanjiBulkActionBar
+              bulkOpenLimit={BULK_OPEN_LIMIT}
+              bulkOpenCount={bulkOpenItems.length}
+              openEditorCount={openEditorItems.length}
+              bulkOpening={bulkOpening}
+              bulkSaving={bulkSaving}
+              onOpenBatch={() => void openFirstVisibleBatch()}
+              onSaveAll={() => void saveAllOpenEditors()}
+            />
           </section>
 
           {openEditorItems.length > 0 ? (
@@ -1548,53 +1529,30 @@ export default function TeacherKanjiPage() {
                           </td>
 
                           <td className="px-4 py-4">
-                            <div className="text-2xl font-medium leading-tight text-stone-900 md:text-3xl">
-                              {item.surface}
-                            </div>
-
-                            {item.reading ? (
-                              <>
-                                <div className="mt-1 text-base text-stone-500 md:text-lg">
-                                  {item.reading}
-                                </div>
-
-                                <div className="mt-1 text-sm font-semibold tracking-wide text-stone-400 md:text-base">
-                                  {hiraToKata(item.reading)}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="mt-1 text-base text-stone-500 md:text-lg">—</div>
-                            )}
-
-                            <div className="mt-1 text-xs text-stone-400">
-                              cache: {item.vocabularyCacheId ?? "none"}
-                            </div>
+                            <TeacherKanjiWordCell
+                              surface={item.surface}
+                              reading={item.reading}
+                              katakanaReading={hiraToKata(item.reading)}
+                              vocabularyCacheId={item.vocabularyCacheId}
+                            />
                           </td>
 
                           <td className="px-4 py-4">
-                            <span
-                              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(
-                                item.status
-                              )}`}
-                              title={statusDetailLabel(item.status)}
-                            >
-                              {statusLabel(item.status)}
-                            </span>
-                            <div className="mt-1 text-xs text-stone-400">
-                              {statusDetailLabel(item.status)}
-                            </div>
+                            <TeacherKanjiStatusBadge
+                              label={statusLabel(item.status)}
+                              detail={statusDetailLabel(item.status)}
+                              toneClassName={statusTone(item.status)}
+                            />
                           </td>
 
-                          <td className="px-4 py-4 text-xs text-stone-600">
-                            <div>Kanji: {item.kanjiCount}</div>
-                            <div>Rows: {item.mapRowCount}</div>
-                            <div>Complete: {item.completePositionCount}</div>
-                            <div>Incomplete: {item.incompleteRowCount}</div>
-                            {item.flaggedMapRowCount > 0 ? (
-                              <div className="font-semibold text-red-700">
-                                Flagged: {item.flaggedMapRowCount}
-                              </div>
-                            ) : null}
+                          <td className="px-4 py-4">
+                            <TeacherKanjiRowCounts
+                              kanjiCount={item.kanjiCount}
+                              mapRowCount={item.mapRowCount}
+                              completePositionCount={item.completePositionCount}
+                              incompleteRowCount={item.incompleteRowCount}
+                              flaggedMapRowCount={item.flaggedMapRowCount}
+                            />
                           </td>
 
                           <td className="px-4 py-4">
