@@ -3,9 +3,11 @@
 
 "use client";
 
-import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import TeacherKanjiHeader from "./components/TeacherKanjiHeader";
+import TeacherKanjiAccessState from "./components/TeacherKanjiAccessState";
+import TeacherKanjiLoadingState from "./components/TeacherKanjiLoadingState";
 
 const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 const BULK_OPEN_LIMIT = 10;
@@ -932,8 +934,7 @@ export default function TeacherKanjiPage() {
     if (bulkOpenItems.length === 0) return;
 
     const ok = window.confirm(
-      `Open editors for the first ${bulkOpenItems.length} visible item${
-        bulkOpenItems.length === 1 ? "" : "s"
+      `Open editors for the first ${bulkOpenItems.length} visible item${bulkOpenItems.length === 1 ? "" : "s"
       } that need attention?`
     );
 
@@ -1247,40 +1248,12 @@ export default function TeacherKanjiPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-              Teacher Workbench
-            </p>
-
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">
-              Kanji Enrichment Queue
-            </h1>
-
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-              Review saved vocabulary that needs kanji-reading enrichment. Work through
-              students and books from one teacher page instead of jumping between Book Hubs.
-            </p>
-          </div>
-
-          <Link
-            href="/teacher"
-            className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-          >
-            ← Teacher Home
-          </Link>
-        </div>
-      </section>
+      <TeacherKanjiHeader homeHref="/teacher" />
 
       {loading ? (
-        <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500 shadow-sm">
-          Loading kanji queue…
-        </section>
+        <TeacherKanjiLoadingState />
       ) : !canAccess ? (
-        <section className="mt-6 rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadow-sm">
-          This page is only available to teachers.
-        </section>
+        <TeacherKanjiAccessState />
       ) : (
         <>
           {error ? (
