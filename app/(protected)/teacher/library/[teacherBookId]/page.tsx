@@ -18,6 +18,7 @@ import TeacherPrepStepHeader from "./components/TeacherPrepStepHeader";
 import TeacherPrepSavedItemsHeader from "./components/TeacherPrepSavedItemsHeader";
 import TeacherPrepDoneState from "./components/TeacherPrepDoneState";
 import TeacherPrepPastePanel from "./components/TeacherPrepPastePanel";
+import TeacherPrepBulkFieldsPanel from "./components/TeacherPrepBulkFieldsPanel";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type PrepStep = "paste" | "definitions" | "details" | "done";
@@ -787,41 +788,16 @@ export default function TeacherBookPrepPage() {
                   </button>
                 </div>
 
-                <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <h3 className="text-base font-black text-stone-900">Apply fields</h3>
-                  <div className="mt-3 grid gap-3 md:grid-cols-3">
-                    {[
-                      ["page", bulkPageNumber, setBulkPageNumber, "Page"],
-                      ["chapterNumber", bulkChapterNumber, setBulkChapterNumber, "Chapter #"],
-                      ["chapterName", bulkChapterName, setBulkChapterName, chapterNameLabel],
-                    ].map(([field, value, setter, label]) => (
-                      <label key={field as string} className="text-sm">
-                        <span className="mb-1 block text-xs text-gray-500">{label as string}</span>
-                        <input
-                          value={value as string}
-                          onChange={(event) => (setter as (value: string) => void)(event.target.value)}
-                          className="w-full rounded border p-2 text-sm"
-                        />
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => applyBulkField(field as any, value as string, "blank")}
-                            className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-700"
-                          >
-                            Fill blanks
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => applyBulkField(field as any, value as string, "all")}
-                            className="rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-semibold text-stone-700"
-                          >
-                            Apply all
-                          </button>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </section>
+                <TeacherPrepBulkFieldsPanel
+                  pageNumber={bulkPageNumber}
+                  onPageNumberChange={setBulkPageNumber}
+                  chapterNumber={bulkChapterNumber}
+                  onChapterNumberChange={setBulkChapterNumber}
+                  chapterName={bulkChapterName}
+                  onChapterNameChange={setBulkChapterName}
+                  chapterNameLabel={chapterNameLabel}
+                  onApplyField={applyBulkField}
+                />
 
                 <ul className="space-y-3">
                   {drafts.map((draft, index) => (
