@@ -11,6 +11,9 @@ import TeacherStudentsErrorBanner from "./components/TeacherStudentsErrorBanner"
 import TeacherStudentsHeader from "./components/TeacherStudentsHeader";
 import TeacherStudentsLoadingState from "./components/TeacherStudentsLoadingState";
 import TeacherStudentsSummaryCards from "./components/TeacherStudentsSummaryCards";
+import TeacherStudentsEmptyState from "./components/TeacherStudentsEmptyState";
+import TeacherStudentsFuturePanels from "./components/TeacherStudentsFuturePanels";
+import TeacherStudentsSearchPanel from "./components/TeacherStudentsSearchPanel";
 
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
 type StudentRelationshipStatus = "future" | "current" | "past" | "archived";
@@ -1473,44 +1476,25 @@ export default function TeacherStudentsPage() {
                         </div>
 
                         {students.length === 0 ? (
-                            <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center">
-                                <p className="text-lg font-black text-stone-900">No linked students yet.</p>
-                                <p className="mt-2 text-sm text-stone-500">
-                                    Students linked to your teacher account will appear here.
-                                </p>
-                            </div>
+                            <TeacherStudentsEmptyState
+                                title="No linked students yet."
+                                description="Students linked to your teacher account will appear here."
+                            />
                         ) : (
                             <div className="space-y-8">
-                                <div className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
-                                    <label className="grid gap-2 text-sm font-semibold text-stone-700">
-                                        Search students
-                                        <input
-                                            value={studentSearch}
-                                            onChange={(event) => setStudentSearch(event.target.value)}
-                                            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base font-normal text-stone-900 outline-none transition focus:border-stone-400"
-                                            placeholder="Search name, username, level, lesson day, or current book"
-                                        />
-                                    </label>
-                                    {studentSearch.trim() ? (
-                                        <p className="mt-2 text-xs font-medium text-stone-500">
-                                            Showing {filteredStudents.length} of {students.length} students.
-                                        </p>
-                                    ) : null}
-                                </div>
+                                <TeacherStudentsSearchPanel
+                                    value={studentSearch}
+                                    onChange={setStudentSearch}
+                                    filteredCount={filteredStudents.length}
+                                    totalCount={students.length}
+                                />
 
                                 {filteredStudents.length === 0 ? (
-                                    <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center">
-                                        <p className="text-lg font-black text-stone-900">
-                                            No students match that search.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => setStudentSearch("")}
-                                            className="mt-4 rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-                                        >
-                                            Clear search
-                                        </button>
-                                    </div>
+                                    <TeacherStudentsEmptyState
+                                        title="No students match that search."
+                                        actionLabel="Clear search"
+                                        onAction={() => setStudentSearch("")}
+                                    />
                                 ) : null}
 
                                 {filteredStudents.length > 0 ? ([
@@ -1576,30 +1560,7 @@ export default function TeacherStudentsPage() {
                         )}
                     </section>
 
-                    <section className="mt-10 grid gap-4 md:grid-cols-3">
-                        <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-base font-black text-stone-900">Lesson Notes</h2>
-                            <p className="mt-2 text-sm leading-6 text-stone-600">
-                                Later, each student can have dated lesson notes, things you reviewed,
-                                what they struggled with, and next steps.
-                            </p>
-                        </div>
-
-                        <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-base font-black text-stone-900">Assigned Books</h2>
-                            <p className="mt-2 text-sm leading-6 text-stone-600">
-                                Track books assigned from trial prep, teacher prep, or book club prep.
-                            </p>
-                        </div>
-
-                        <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-base font-black text-stone-900">Student Stats</h2>
-                            <p className="mt-2 text-sm leading-6 text-stone-600">
-                                Eventually show library stats, reading activity, saved words, and study
-                                patterns for each learner.
-                            </p>
-                        </div>
-                    </section>
+                    <TeacherStudentsFuturePanels />
                 </>
             )}
         </main>
