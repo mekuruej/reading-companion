@@ -775,3 +775,22 @@ No assignment behavior cleanup is needed before visual extraction because assign
 Suggested updated tracker row after map creation:
 
 `- [ ] Refactor map ready / visual pass not started | app/(protected)/teacher/library/[teacherBookId]/page.tsx | 1320 | 1320 | 0 |`
+
+### Finished 
+
+* Extracted `TeacherLibraryBookHeader`
+* Extracted `TeacherLibraryBookLoadingState`
+* Extracted `TeacherLibraryBookAccessState`
+* Extracted `TeacherLibraryBookMessageBanner`
+* Extracted `TeacherLibraryBookContextCard`
+* Extracted `TeacherLibraryBookEmptyState`
+* Extracted `TeacherPrepStepHeader`
+* Extracted `TeacherPrepSavedItemsHeader`
+* Extracted `TeacherPrepDoneState`
+* Extracted `TeacherPrepPastePanel`
+* Extracted `TeacherPrepBulkFieldsPanel`
+* Extracted `TeacherPrepPrimaryActionBar`
+
+The first visual pass is complete. The page now has a calmer Bulk Add-style structure with shell, context, message, step header, paste panel, bulk fields, saved item controls, done state, and empty states extracted into named presentational components.
+
+The draft definition cards, details draft rows, saved prep item table, and saved item edit panel are intentionally deferred because they carry controlled form state, save/edit/delete behavior, expand/collapse behavior, and page/chapter/story-name rules.

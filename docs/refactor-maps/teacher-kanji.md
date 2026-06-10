@@ -694,6 +694,10 @@ Start with tiny states/header/cards/empty state. Then reassess before touching f
 
 No behavior cleanup is required before extracting tiny presentational shells, but behavior should be smoke-tested before extracting the queue table or editor components because the page now merges old global flags with learner `kanji_map_reports`.
 
+Current status:
+
+Visual pass done / good stopping point
+
 Finished:
 
 * Extracted `TeacherKanjiHeader`
@@ -710,12 +714,12 @@ Finished:
 * Extracted `TeacherKanjiStudentCell`
 * Extracted `TeacherKanjiBookCell`
 * Extracted `TeacherKanjiQueueActions`
+* Extracted `TeacherKanjiQueueItem`
 
+Stopping point:
 
-Current stopping point:
-
-Safe shell extraction and small queue-row display extraction are complete. Pause before extracting the open editor panel, editor cards, or editor row forms because those areas are behavior-heavy and tied to global kanji-map updates and learner report resolution.
+The first visual pass is complete. The remaining open editor panel, editor cards, and editor row forms are intentionally deferred because they are behavior-heavy and tied to global kanji-map updates, learner report resolution, bulk save behavior, and exclude/clear actions.
 
 Current tracker row:
 
-Visual pass started / safe shell + queue row display extracted | `app/(protected)/teacher/kanji/page.tsx` | 1766 | 1583 | -183
+Visual pass done / good stopping point | `app/(protected)/teacher/kanji/page.tsx` | 1766 | NEW_COUNT | -CHANGE

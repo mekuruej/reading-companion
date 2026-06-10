@@ -164,3 +164,11 @@ Preferred identity order remains:
 2. `surface + reading`
 3. surface/kanji only as a fallback when no reading exists
 
+Character Study
+  ├─ Kanji
+  ├─ Radicals / Components
+  └─ Kana
+       ├─ Hiragana recognition
+       ├─ Katakana recognition
+       ├─ Hiragana ↔ Katakana matching
+       └─ Similar kana practice

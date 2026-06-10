@@ -639,3 +639,42 @@ Do not start with the task modal. Do not move relationship loading, task creatio
 Suggested updated tracker row after map creation:
 
 `- [ ] Refactor map ready / visual pass not started | app/(protected)/teacher/students/page.tsx | 1685 | 1685 | 0 |`
+
+## Current Status
+
+Visual pass done / good stopping point
+
+Current tracker row:
+
+`Visual pass done / good stopping point | app/(protected)/teacher/students/page.tsx | 1685 | 1521 | -164`
+
+## Finished Extractions
+
+* Extracted `TeacherStudentsHeader`
+* Extracted `TeacherStudentsLoadingState`
+* Extracted `TeacherStudentsAccessState`
+* Extracted `TeacherStudentsErrorBanner`
+* Extracted `TeacherStudentsSummaryCards`
+* Extracted `TeacherStudentsSearchPanel`
+* Extracted `TeacherStudentsEmptyState`
+* Extracted `TeacherStudentsFuturePanels`
+* Extracted `TeacherStudentsListHeader`
+* Extracted `TeacherStudentGroupSection`
+* Extracted `TeacherStudentGroupsPanel`
+
+## Stopping Point
+
+The first visual pass is complete. The page now has a calmer Bulk Add-style structure where safe visual shell, summary, search, empty-state, future-panel, and student-group display sections have been moved into named presentational components.
+
+The remaining large pieces are intentionally deferred:
+
+* `StudentCardArticle`
+* learning task modal
+* task form fields
+* active task list
+* archive/restore behavior
+* Supabase loading and mutation logic
+* teacher/student relationship logic
+* page-local helper functions and types
+
+These should stay in `page.tsx` for now because they are tied to teacher/student access boundaries, task creation and cancellation, archive/restore actions, and page-local relationship/status helpers.
