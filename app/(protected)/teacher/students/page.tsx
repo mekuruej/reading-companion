@@ -14,6 +14,8 @@ import TeacherStudentsSummaryCards from "./components/TeacherStudentsSummaryCard
 import TeacherStudentsEmptyState from "./components/TeacherStudentsEmptyState";
 import TeacherStudentsFuturePanels from "./components/TeacherStudentsFuturePanels";
 import TeacherStudentsSearchPanel from "./components/TeacherStudentsSearchPanel";
+import TeacherStudentGroupsPanel from "./components/TeacherStudentGroupsPanel";
+import TeacherStudentsListHeader from "./components/TeacherStudentsListHeader";
 
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
 type StudentRelationshipStatus = "future" | "current" | "past" | "archived";
@@ -1468,12 +1470,7 @@ export default function TeacherStudentsPage() {
                     ) : null}
 
                     <section className="mt-8">
-                        <div className="mb-3">
-                            <h2 className="text-lg font-black text-stone-900">Student List</h2>
-                            <p className="mt-1 text-sm text-stone-500">
-                                View a student’s library, assign books, and check their reading setup from one place.
-                            </p>
-                        </div>
+                        <TeacherStudentsListHeader />
 
                         {students.length === 0 ? (
                             <TeacherStudentsEmptyState
@@ -1497,65 +1494,21 @@ export default function TeacherStudentsPage() {
                                     />
                                 ) : null}
 
-                                {filteredStudents.length > 0 ? ([
-                                    {
-                                        key: "future",
-                                        title: "Future Students",
-                                        detail: "Trial, prep, and upcoming learners.",
-                                        items: groupedStudents.future,
-                                    },
-                                    {
-                                        key: "current",
-                                        title: "Current Students",
-                                        detail: "Learners you are actively working with now.",
-                                        items: groupedStudents.current,
-                                    },
-                                    {
-                                        key: "past",
-                                        title: "Past Students",
-                                        detail: "Expired or former active relationships.",
-                                        items: groupedStudents.past,
-                                    },
-                                    {
-                                        key: "archived",
-                                        title: "Archived Students",
-                                        detail: "Hidden from active teacher lists and alerts. Restore when needed.",
-                                        items: groupedStudents.archived,
-                                    },
-                                ] as const).map((group) => (
-                                    <div key={group.key}>
-                                        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                                            <div>
-                                                <h3 className="text-base font-black text-stone-900">
-                                                    {group.title}
-                                                </h3>
-                                                <p className="text-sm text-stone-500">{group.detail}</p>
-                                            </div>
-                                            <span className="text-sm font-semibold text-stone-400">
-                                                {group.items.length}
-                                            </span>
-                                        </div>
-
-                                        {group.items.length === 0 ? (
-                                            <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-sm text-stone-500">
-                                                No {group.title.toLowerCase()} yet.
-                                            </div>
-                                        ) : (
-                                            <div className="grid gap-4 md:grid-cols-2">
-                                                {group.items.map((student) => (
-                                                    <StudentCardArticle
-                                                        key={student.id}
-                                                        student={student}
-                                                        onCreateTask={openTaskModal}
-                                                        onArchive={archiveStudent}
-                                                        onRestore={restoreStudent}
-                                                        isUpdatingArchive={updatingArchiveStudentId === student.id}
-                                                    />
-                                                ))}
-                                            </div>
+                                {filteredStudents.length > 0 ? (
+                                    <TeacherStudentGroupsPanel
+                                        groupedStudents={groupedStudents}
+                                        renderStudent={(student) => (
+                                            <StudentCardArticle
+                                                key={student.id}
+                                                student={student}
+                                                onCreateTask={openTaskModal}
+                                                onArchive={archiveStudent}
+                                                onRestore={restoreStudent}
+                                                isUpdatingArchive={updatingArchiveStudentId === student.id}
+                                            />
                                         )}
-                                    </div>
-                                )) : null}
+                                    />
+                                ) : null}
                             </div>
                         )}
                     </section>
