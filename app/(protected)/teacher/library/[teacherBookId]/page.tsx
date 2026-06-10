@@ -5,7 +5,6 @@
 
 "use client";
 
-import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -13,6 +12,9 @@ import TeacherLibraryBookAccessState from "./components/TeacherLibraryBookAccess
 import TeacherLibraryBookHeader from "./components/TeacherLibraryBookHeader";
 import TeacherLibraryBookLoadingState from "./components/TeacherLibraryBookLoadingState";
 import TeacherLibraryBookMessageBanner from "./components/TeacherLibraryBookMessageBanner";
+import TeacherLibraryBookContextCard from "./components/TeacherLibraryBookContextCard";
+import TeacherLibraryBookEmptyState from "./components/TeacherLibraryBookEmptyState";
+import TeacherPrepStepHeader from "./components/TeacherPrepStepHeader";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type PrepStep = "paste" | "definitions" | "details" | "done";
@@ -621,48 +623,12 @@ export default function TeacherBookPrepPage() {
           <TeacherLibraryBookAccessState message={message} />
         ) : (
           <>
-            <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-              <div className="flex min-w-0 items-center gap-4">
-                {book?.cover_url ? (
-                  <img
-                    src={book.cover_url}
-                    alt=""
-                    className="h-20 w-14 shrink-0 rounded-md object-cover shadow-sm"
-                  />
-                ) : (
-                  <div className="h-20 w-14 shrink-0 rounded-md bg-stone-200" />
-                )}
-
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-wide text-stone-500">For teaching book</p>
-                  <div className="truncate text-base font-semibold text-stone-900">
-                    {book?.title ?? "Untitled book"}
-                  </div>
-                  {book?.author ? (
-                    <p className="truncate text-sm text-stone-500">{book.author}</p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 sm:justify-end">
-                {step === "done" ? (
-                  <button
-                    type="button"
-                    onClick={resetForMore}
-                    className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
-                  >
-                    Add More Items
-                  </button>
-                ) : null}
-
-                <Link
-                  href={`/teacher/library/${teacherBookId}/follow`}
-                  className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-                >
-                  Follow-Along
-                </Link>
-              </div>
-            </div>
+            <TeacherLibraryBookContextCard
+              book={book}
+              teacherBookId={teacherBookId}
+              showAddMore={step === "done"}
+              onAddMore={resetForMore}
+            />
 
             <TeacherLibraryBookMessageBanner message={message} />
 
@@ -723,18 +689,12 @@ export default function TeacherBookPrepPage() {
 
             {step === "definitions" ? (
               <>
-                <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-                    Step 2
-                  </p>
-                  <h2 className="mt-1 text-xl font-black text-stone-900">
-                    Check definitions and support fields
-                  </h2>
-                  <p className="mt-1 text-sm text-stone-500">
-                    Choose dictionary definitions where useful, then add teacher notes,
-                    explanations, and translations.
-                  </p>
-                </section>
+                <TeacherPrepStepHeader
+                  className="mb-4"
+                  stepLabel="Step 2"
+                  title="Check definitions and support fields"
+                  description="Choose dictionary definitions where useful, then add teacher notes, explanations, and translations."
+                />
 
                 <div className="mb-4">
                   <button
@@ -847,17 +807,12 @@ export default function TeacherBookPrepPage() {
 
             {step === "details" ? (
               <>
-                <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-                    Step 3
-                  </p>
-                  <h2 className="mt-1 text-xl font-black text-stone-900">
-                    Add page and chapter info
-                  </h2>
-                  <p className="mt-1 text-sm text-stone-500">
-                    Match regular Bulk Add rhythm: apply shared location details or edit each row.
-                  </p>
-                </section>
+                <TeacherPrepStepHeader
+                  className="mb-4"
+                  stepLabel="Step 3"
+                  title="Add page and chapter info"
+                  description="Match regular Bulk Add rhythm: apply shared location details or edit each row."
+                />
 
                 <div className="mb-4">
                   <button
@@ -1014,13 +969,9 @@ export default function TeacherBookPrepPage() {
               </div>
 
               {savedItems.length === 0 ? (
-                <div className="mt-3 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
-                  No prep items yet.
-                </div>
+                <TeacherLibraryBookEmptyState message="No prep items yet." />
               ) : visibleSavedItems.length === 0 ? (
-                <div className="mt-3 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
-                  No prep items match those filters.
-                </div>
+                <TeacherLibraryBookEmptyState message="No prep items match those filters." />
               ) : (
                 <div className="mt-3 overflow-x-auto rounded border bg-white">
                   <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
