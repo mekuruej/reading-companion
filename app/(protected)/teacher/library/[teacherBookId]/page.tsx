@@ -19,6 +19,7 @@ import TeacherPrepSavedItemsHeader from "./components/TeacherPrepSavedItemsHeade
 import TeacherPrepDoneState from "./components/TeacherPrepDoneState";
 import TeacherPrepPastePanel from "./components/TeacherPrepPastePanel";
 import TeacherPrepBulkFieldsPanel from "./components/TeacherPrepBulkFieldsPanel";
+import TeacherPrepPrimaryActionBar from "./components/TeacherPrepPrimaryActionBar";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type PrepStep = "paste" | "definitions" | "details" | "done";
@@ -659,15 +660,10 @@ export default function TeacherBookPrepPage() {
                   description="Choose dictionary definitions where useful, then add teacher notes, explanations, and translations."
                 />
 
-                <div className="mb-4">
-                  <button
-                    type="button"
-                    onClick={handleSaveDefinitions}
-                    className="w-full rounded-2xl border border-emerald-700 bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800"
-                  >
-                    Save Definitions
-                  </button>
-                </div>
+                <TeacherPrepPrimaryActionBar
+                  label="Save Definitions"
+                  onClick={handleSaveDefinitions}
+                />
 
                 <ul className="space-y-3">
                   {drafts.map((draft, index) => (
@@ -777,16 +773,12 @@ export default function TeacherBookPrepPage() {
                   description="Match regular Bulk Add rhythm: apply shared location details or edit each row."
                 />
 
-                <div className="mb-4">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveAll()}
-                    disabled={isSaving}
-                    className="w-full rounded-2xl border border-emerald-700 bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
-                  >
-                    {isSaving ? "Saving..." : "Save All"}
-                  </button>
-                </div>
+                <TeacherPrepPrimaryActionBar
+                  label="Save All"
+                  loadingLabel="Saving..."
+                  isLoading={isSaving}
+                  onClick={() => void handleSaveAll()}
+                />
 
                 <TeacherPrepBulkFieldsPanel
                   pageNumber={bulkPageNumber}
