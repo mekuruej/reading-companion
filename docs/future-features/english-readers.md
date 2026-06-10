@@ -49,59 +49,9 @@ The deeper distinction can remain in the data design and teacher workflow.
 
 ## Base Form vs Encountered Form
 
-Future vocabulary should separate the stable study entry from the exact form seen in the book.
+English Readers will need the broader reading-support vocabulary model because learners may encounter forms such as `looked after`, `gave up`, or `was running`, while the reusable vocabulary entry should remain `look after`, `give up`, or `run`.
 
-Current app behavior:
-
-- `user_book_words.surface` is still used throughout the app.
-- Add Word often stores the selected dictionary/basic form in `surface`.
-- Do not rename or repurpose `surface` until the app has been migrated carefully.
-
-Database prep already added optional fields on `user_book_words`:
-
-- `encountered_surface`: exact form the reader saw or typed from the book.
-- `base_form`: dictionary/lemma/canonical form used as the main study entry.
-- `lookup_surface`: text used for dictionary/API lookup.
-- language/support fields such as `target_language_code`, `support_language_code`, `item_type`, `part_of_speech`, `pronunciation`, `difficulty_system`, `difficulty_level`, and `support_note`.
-
-Recommended future rule:
-
-- The actual vocabulary entry should display and study the base form.
-- The encountered form should be shown as context when useful.
-- Existing `surface` should stay compatible and continue behaving like the current base/study form until a careful migration is complete.
-
-Examples:
-
-- Base form: `読む`
-- Encountered form: `読まなかった`
-- Form note later: `negative past`
-
-Or:
-
-- Base form: `look after`
-- Encountered form: `looked after`
-- Form note later: `past tense`
-
-This matters for English readers because learners may encounter forms such as `looked after`, `gave up`, or `was running`, while the reusable vocabulary entry should remain `look after`, `give up`, or `run`.
-
-## Future Add Word Migration Path
-
-Do not fix the whole Add Word save flow in one large pass. That area is delicate.
-
-Safe order:
-
-1. Keep `surface` unchanged as the current compatibility field.
-2. Update Add Word to preserve the original typed/book form in `encountered_surface`.
-3. Save the selected dictionary/basic form into `base_form`.
-4. Save the actual dictionary/API query into `lookup_surface`.
-5. Continue writing `surface` as the base/study form until all dependent pages are migrated.
-6. Gradually update display surfaces to show `base_form ?? surface` as the main word and `encountered_surface` as a small context line only when it differs.
-7. Later update identity logic toward `vocabulary_cache_id`, then `base_form + reading`, then `surface + reading` fallback.
-
-Future UI idea:
-
-- Let the teacher or learner label the encountered form, such as `past tense`, `negative past`, `potential`, `passive`, `te-form`, or `phrasal verb past`.
-- This can live in a later dedicated field or structured form table. For now, `support_note` can hold lightweight context if needed.
+For the broader vocabulary model behind this feature, including base forms, encountered forms, lookup forms, and teacher-built dictionary entries, see `reading-support-vocabulary-model.md`.
 
 ## Lesson Mode vs Home Mode
 
