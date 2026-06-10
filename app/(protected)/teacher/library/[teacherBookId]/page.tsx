@@ -15,6 +15,7 @@ import TeacherLibraryBookMessageBanner from "./components/TeacherLibraryBookMess
 import TeacherLibraryBookContextCard from "./components/TeacherLibraryBookContextCard";
 import TeacherLibraryBookEmptyState from "./components/TeacherLibraryBookEmptyState";
 import TeacherPrepStepHeader from "./components/TeacherPrepStepHeader";
+import TeacherPrepSavedItemsHeader from "./components/TeacherPrepSavedItemsHeader";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type PrepStep = "paste" | "definitions" | "details" | "done";
@@ -922,51 +923,15 @@ export default function TeacherBookPrepPage() {
             ) : null}
 
             <section className="mt-8">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h2 className="text-xl font-black text-stone-900">Saved prep items</h2>
-                  {savedItems.length > 0 ? (
-                    <p className="mt-1 text-sm text-stone-500">
-                      Showing {visibleSavedItems.length} of {savedItems.length} prep item
-                      {savedItems.length === 1 ? "" : "s"}.
-                    </p>
-                  ) : null}
-                </div>
-
-                {savedItems.length > 0 ? (
-                  <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_140px]">
-                    <label className="text-sm">
-                      <span className="mb-1 block text-xs font-semibold text-stone-500">
-                        Search
-                      </span>
-                      <input
-                        value={savedSearch}
-                        onChange={(event) => setSavedSearch(event.target.value)}
-                        placeholder="Word, reading, meaning, note..."
-                        className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                      />
-                    </label>
-
-                    <label className="text-sm">
-                      <span className="mb-1 block text-xs font-semibold text-stone-500">
-                        Page
-                      </span>
-                      <select
-                        value={savedPageFilter}
-                        onChange={(event) => setSavedPageFilter(event.target.value)}
-                        className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                      >
-                        <option value="all">All pages</option>
-                        {savedPageOptions.map((page) => (
-                          <option key={page} value={String(page)}>
-                            Page {page}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                ) : null}
-              </div>
+              <TeacherPrepSavedItemsHeader
+                savedCount={savedItems.length}
+                visibleCount={visibleSavedItems.length}
+                search={savedSearch}
+                onSearchChange={setSavedSearch}
+                pageFilter={savedPageFilter}
+                onPageFilterChange={setSavedPageFilter}
+                pageOptions={savedPageOptions}
+              />
 
               {savedItems.length === 0 ? (
                 <TeacherLibraryBookEmptyState message="No prep items yet." />
