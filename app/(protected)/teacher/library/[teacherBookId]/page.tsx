@@ -9,6 +9,10 @@ import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import TeacherLibraryBookAccessState from "./components/TeacherLibraryBookAccessState";
+import TeacherLibraryBookHeader from "./components/TeacherLibraryBookHeader";
+import TeacherLibraryBookLoadingState from "./components/TeacherLibraryBookLoadingState";
+import TeacherLibraryBookMessageBanner from "./components/TeacherLibraryBookMessageBanner";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type PrepStep = "paste" | "definitions" | "details" | "done";
@@ -604,30 +608,17 @@ export default function TeacherBookPrepPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
-        <div className="flex flex-wrap gap-3">
-          <Link href="/teacher/library" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-            &larr; Teacher Library
-          </Link>
-          {teacherBook ? (
-            <Link
-              href={`/teacher/library/${teacherBookId}/follow`}
-              className="text-sm font-semibold text-stone-500 hover:text-stone-900"
-            >
-              Follow-Along
-            </Link>
-          ) : null}
-        </div>
+        <TeacherLibraryBookHeader
+          teacherBookId={teacherBookId}
+          showFollowLink={!!teacherBook}
+        />
 
         <h1 className="mt-4 text-2xl font-semibold text-stone-900">Prep Add</h1>
 
         {loading ? (
-          <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
-            Loading teacher book...
-          </section>
+          <TeacherLibraryBookLoadingState />
         ) : !canAccess || !teacherBook ? (
-          <section className="mt-6 rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-            {message || "Teacher access is required."}
-          </section>
+          <TeacherLibraryBookAccessState message={message} />
         ) : (
           <>
             <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
@@ -673,11 +664,7 @@ export default function TeacherBookPrepPage() {
               </div>
             </div>
 
-            {message ? (
-              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {message}
-              </div>
-            ) : null}
+            <TeacherLibraryBookMessageBanner message={message} />
 
             {step === "paste" ? (
               <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
