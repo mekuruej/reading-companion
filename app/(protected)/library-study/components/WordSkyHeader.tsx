@@ -13,11 +13,16 @@ export default function WordSkyHeader({
     <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
       <div>
         <h1 className="text-2xl font-semibold">Word Sky</h1>
-
         <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
-          Pick words you think you can read. These words can automatically move into
-          Ability Check and Library Practice, but encountering words through your
-          reading is still the ideal path.
+          Pick words you can already read and move them into your Ability Check.
+          <br />
+          These words will also appear in Library Practice, where you can
+          <br />
+          strengthen your reading and understanding as you move toward mastery.
+          <br />
+          <br />
+          But remember: leveling up words naturally through your reading is still the
+          ideal path!
         </p>
       </div>
 

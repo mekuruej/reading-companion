@@ -37,11 +37,11 @@ const studyTools = [
     className: "border-indigo-200 bg-indigo-50 text-indigo-950",
   },
   {
-    title: "Kanji Readings",
-    href: "/library-study/kanji",
-    eyebrow: "Kanji study",
+    title: "Character Study",
+    href: "/library-study/characters",
+    eyebrow: "Kana and kanji",
     description:
-      "Practice kanji readings from saved vocabulary. More global kanji tools can live here later.",
+      "Practice kana basics and kanji readings from saved vocabulary.",
     className: "border-amber-200 bg-amber-50 text-amber-950",
   },
   {

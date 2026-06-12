@@ -34,7 +34,7 @@ export default function KanjiStudyModeSelector({
           ) : null}
         </div>
 
-        <span className="shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-black text-slate-700 group-open:hidden">
+        <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 shadow-sm group-open:hidden">
           Change
         </span>
         <span className="hidden shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-black text-slate-700 group-open:inline-flex">

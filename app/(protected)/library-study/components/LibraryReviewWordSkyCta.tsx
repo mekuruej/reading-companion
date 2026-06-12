@@ -14,11 +14,11 @@ export default function LibraryReviewWordSkyCta({
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-sky-950">
-            Want more easy review words?
+            Want more words in your Ability Check?
           </div>
 
           <div className="text-xs leading-5 text-slate-500">
-            Use Word Sky to add easier words to your study pool.
+            Use Word Sky to add words you can read to your study pool.
           </div>
         </div>
 
