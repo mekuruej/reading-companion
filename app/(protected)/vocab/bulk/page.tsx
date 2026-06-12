@@ -188,15 +188,15 @@ export default function BulkVocabPage() {
           .from("user_books")
           .select(
             `
-            id,
-            books:book_id (
-              title,
-              cover_url
-            )
-          `
+    id,
+    user_id,
+    books:book_id (
+      title,
+      cover_url
+    )
+  `
           )
           .eq("id", userBookId)
-          .eq("user_id", user.id)
           .maybeSingle();
 
         if (error) throw error;
@@ -204,6 +204,42 @@ export default function BulkVocabPage() {
         if (!data) {
           if (!cancelled) {
             setMessage("❌ You do not have access to add words to this book.");
+          }
+          return;
+        }
+
+        const { data: profileRow, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        const isOwner = data.user_id === user.id;
+        const isSuperTeacher = profileRow?.role === "super_teacher";
+
+        let isLinkedTeacher = false;
+
+        if (!isOwner && !isSuperTeacher) {
+          const { data: teacherStudentRow, error: teacherStudentError } = await supabase
+            .from("teacher_students")
+            .select("teacher_id")
+            .eq("teacher_id", user.id)
+            .eq("student_id", data.user_id)
+            .maybeSingle();
+
+          if (teacherStudentError) throw teacherStudentError;
+
+          isLinkedTeacher = Boolean(teacherStudentRow);
+        }
+
+        const canManageBook = isOwner || isSuperTeacher || isLinkedTeacher;
+
+        if (!canManageBook) {
+          if (!cancelled) {
+            setMessage("❌ You do not have access to add words to this book.");
+            setAuthorizedUserBookId(null);
           }
           return;
         }
