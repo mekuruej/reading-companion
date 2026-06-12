@@ -429,3 +429,23 @@ Teacher pages should be mapped again after the Teacher Hub cleanup, because some
 * Do not move access checks, Supabase queries, save/update/delete logic, helper functions, services, DAOs, controllers, or page-local types during first-pass visual extraction.
 * Prefer low-risk JSX/presentational components first.
 * Stop when the remaining page code is mostly behavior, data loading, validation, or access logic.
+
+### `/vocab/bulk` teacher access update
+
+Finished:
+
+* Found that the recent `authorizedUserBookId` security fix made Bulk Add owner-only.
+* Updated the authorization flow so Bulk Add now allows:
+  * the book owner
+  * `super_teacher`
+  * a linked teacher through `teacher_students`
+* Kept the safe pattern:
+  * raw URL `userBookId`
+  * verify access
+  * set `authorizedUserBookId`
+  * use `authorizedUserBookId` for private reads/writes
+* Confirmed teacher Bulk Add to a student account works.
+
+Decision:
+
+`/vocab/bulk` remains protected, but now supports the intended teacher-managed student vocabulary workflow.
