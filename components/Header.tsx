@@ -197,17 +197,6 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/library"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowLibraryMenu(false)}
-                  >
-                    Library Hub
-                  </Link>
-
-                  <Link
                     href="/library/book-hubs"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/book-hubs"
                       ? "bg-stone-100 font-medium text-stone-900"
@@ -221,8 +210,8 @@ export default function Header() {
                   <Link
                     href="/library/vocab-list-index"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
@@ -268,16 +257,6 @@ export default function Header() {
               {showStudyMenu ? (
                 <div className="absolute right-0 z-50 mt-2 hidden min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
                   <Link
-                    href="/library-study"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowStudyMenu(false)}
-                  >
-                    Study Hub
-                  </Link>
-                  <Link
                     href="/library-study/check"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/check"
                       ? "bg-stone-100 font-medium text-stone-900"
@@ -310,14 +289,16 @@ export default function Header() {
                     Book Flashcards
                   </Link>
                   <Link
-                    href="/library-study/kanji"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/kanji"
+                    href="/library-study/characters"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/characters" ||
+                      pathname === "/library-study/kana" ||
+                      pathname === "/library-study/kanji"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Kanji Study
+                    Character Study
                   </Link>
                   <Link
                     href="/library-study/word-sky"
