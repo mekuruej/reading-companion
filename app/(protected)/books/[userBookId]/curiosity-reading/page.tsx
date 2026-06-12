@@ -19,6 +19,10 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import {
+  addChapterNameOption,
+  normalizeChapterNameOptions,
+} from "@/lib/chapterNameOptions";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import CuriosityPageHeader from "../components/CuriosityPageHeader";
 import CuriosityStatusMessage from "../components/CuriosityStatusMessage";
@@ -269,6 +273,7 @@ export default function CuriosityReadingPage() {
 
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
+  const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
   const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
     Record<string, LibraryStudyWordColorInfo>
   >({});
@@ -506,6 +511,40 @@ export default function CuriosityReadingPage() {
   }, [quickPreview?.surface, userBookId]);
 
   useEffect(() => {
+    if (!userBookId || !canAccessBook) {
+      setChapterNameOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadChapterNameOptions() {
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .select("chapter_name")
+        .eq("user_book_id", userBookId)
+        .not("chapter_name", "is", null);
+
+      if (error) {
+        console.error("Error loading chapter name options:", error);
+        return;
+      }
+
+      if (!cancelled) {
+        setChapterNameOptions(
+          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
+        );
+      }
+    }
+
+    void loadChapterNameOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userBookId, canAccessBook]);
+
+  useEffect(() => {
     quickWordInputRef.current?.focus();
   }, []);
 
@@ -716,8 +755,8 @@ export default function CuriosityReadingPage() {
     }, 150);
   }
 
-  async function pullQuickWord() {
-    const word = quickPreview.surface.trim();
+  async function pullQuickWord(wordOverride?: string) {
+    const word = (wordOverride ?? quickPreview.surface).trim();
     if (!word) return;
 
     setQuickLoading(true);
@@ -933,6 +972,7 @@ export default function CuriosityReadingPage() {
       };
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, newItem));
+      setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
       setSavedQuickNotice(`Saved: ${newItem.surface}`);
       setMessage("");
     } else {
@@ -972,6 +1012,7 @@ export default function CuriosityReadingPage() {
       };
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, updatedItem));
+      setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
       setSavedQuickNotice(`Saved: ${updatedItem.surface}`);
       setMessage("");
     }
@@ -1142,6 +1183,28 @@ export default function CuriosityReadingPage() {
     );
   }
 
+  function searchScratchWord() {
+    const nextWord = scratchWord.trim();
+
+    if (!nextWord) {
+      return;
+    }
+
+    setQuickPreview((prev) => ({
+      ...prev,
+      surface: nextWord,
+      cacheSurface: "",
+    }));
+
+    closeAndClearWordHelp();
+    setSavedQuickNotice("");
+    if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+
+    void pullQuickWord(nextWord);
+
+    window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
@@ -1255,20 +1318,10 @@ export default function CuriosityReadingPage() {
                 if (event.key === "Enter") {
                   event.preventDefault();
                   event.stopPropagation();
+                  searchScratchWord();
                 }
               }}
-              onUseScratchWord={() => {
-                const nextWord = scratchWord.trim();
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  surface: nextWord,
-                  cacheSurface: nextWord ? prev.cacheSurface : "",
-                }));
-                closeAndClearWordHelp();
-                setSavedQuickNotice("");
-                if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-                window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
-              }}
+              onUseScratchWord={searchScratchWord}
               onPickKanji={(kanji) => {
                 setScratchWord((prev) => `${prev}${kanji}`);
               }}
@@ -1299,7 +1352,9 @@ export default function CuriosityReadingPage() {
 
             <CuriosityWordDetailFields
               quickPreview={quickPreview}
+              chapterNameOptions={chapterNameOptions}
               hideKanjiInReadingSupport={hideKanjiInReadingSupport}
+              isEditing={quickPreview.id != null}
               savedQuickNotice={savedQuickNotice}
               quickWordFieldsRef={quickWordFieldsRef}
               onReadingChange={(value) =>
@@ -1418,8 +1473,8 @@ export default function CuriosityReadingPage() {
               </details>
             ) : null}
           </CuriosityRecentSessionWords>
-      </CuriosityAddEditWordCard>
-    </div>
+        </CuriosityAddEditWordCard>
+      </div>
     </main >
   );
 }

@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 
 type CuriosityWordDetailPreview = {
   surface: string;
@@ -15,7 +16,9 @@ type CuriosityWordDetailPreview = {
 
 type CuriosityWordDetailFieldsProps = {
   quickPreview: CuriosityWordDetailPreview;
+  chapterNameOptions: string[];
   hideKanjiInReadingSupport: boolean;
+  isEditing: boolean;
   savedQuickNotice: string;
   quickWordFieldsRef: RefObject<HTMLDivElement | null>;
   onReadingChange: (value: string) => void;
@@ -32,7 +35,9 @@ type CuriosityWordDetailFieldsProps = {
 
 export default function CuriosityWordDetailFields({
   quickPreview,
+  chapterNameOptions,
   hideKanjiInReadingSupport,
+  isEditing,
   savedQuickNotice,
   quickWordFieldsRef,
   onReadingChange,
@@ -143,17 +148,11 @@ export default function CuriosityWordDetailFields({
           />
         </label>
 
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-stone-700">
-            Chapter name
-          </span>
-          <input
-            value={quickPreview.chapterName}
-            onChange={(event) => onChapterNameChange(event.target.value)}
-            placeholder="Chapter name"
-            className="w-full rounded border bg-white px-3 py-2 text-sm"
-          />
-        </label>
+        <ChapterNameCombobox
+          value={quickPreview.chapterName}
+          onChange={onChapterNameChange}
+          chapterOptions={chapterNameOptions}
+        />
       </div>
 
       <label className="flex items-center gap-2 text-sm text-stone-700">
@@ -172,7 +171,7 @@ export default function CuriosityWordDetailFields({
           disabled={!quickPreview.surface.trim()}
           className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
         >
-          Save Word
+          {isEditing ? "Update Word" : "Save Word"}
         </button>
 
         <button

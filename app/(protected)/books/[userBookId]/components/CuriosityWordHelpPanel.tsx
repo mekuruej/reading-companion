@@ -40,7 +40,7 @@ export default function CuriosityWordHelpPanel({
             Build a word
           </label>
           <p className="mt-1 text-xs text-stone-500">
-            Try pieces here first. Nothing will search until you use it.
+            Try pieces here first. Search when you are ready to look it up.
           </p>
 
           <div className="mt-2 flex flex-col gap-2 sm:flex-row">
@@ -58,7 +58,7 @@ export default function CuriosityWordHelpPanel({
               onClick={onUseScratchWord}
               className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
             >
-              Use this word
+              Search this word
             </button>
           </div>
         </div>

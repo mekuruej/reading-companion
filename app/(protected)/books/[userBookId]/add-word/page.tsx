@@ -19,6 +19,10 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import {
+  addChapterNameOption,
+  normalizeChapterNameOptions,
+} from "@/lib/chapterNameOptions";
 import AddWordPageHeader from "../components/AddWordPageHeader";
 import AddWordStatusMessage from "../components/AddWordStatusMessage";
 import AddWordBookContextCard from "../components/AddWordBookContextCard";
@@ -217,6 +221,7 @@ export default function AddWordPage() {
   const [pageNumber, setPageNumber] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterName, setChapterName] = useState("");
+  const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
@@ -381,6 +386,40 @@ export default function AddWordPage() {
   }, [userBookId]);
 
   useEffect(() => {
+    if (!userBookId || !canAccessBook) {
+      setChapterNameOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadChapterNameOptions() {
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .select("chapter_name")
+        .eq("user_book_id", userBookId)
+        .not("chapter_name", "is", null);
+
+      if (error) {
+        console.error("Error loading chapter name options:", error);
+        return;
+      }
+
+      if (!cancelled) {
+        setChapterNameOptions(
+          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
+        );
+      }
+    }
+
+    void loadChapterNameOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userBookId, canAccessBook]);
+
+  useEffect(() => {
     if (!userBookId) return;
 
     const hasAnyChapterInfo = chapterNumber.trim() || chapterName.trim();
@@ -540,11 +579,11 @@ export default function AddWordPage() {
     }, 150);
   }
 
-  async function handleLookup() {
+  async function handleLookup(wordOverride?: string) {
     setMessage("");
     setSavedNotice("");
 
-    const cleanWord = word.trim();
+    const cleanWord = (wordOverride ?? word).trim();
     if (!cleanWord) {
       setMessage("❌ Enter a word first.");
       return;
@@ -605,6 +644,23 @@ export default function AddWordPage() {
     } finally {
       setLookupLoading(false);
     }
+  }
+
+  function searchScratchWord() {
+    const nextWord = scratchWord.trim();
+
+    if (!nextWord) {
+      return;
+    }
+
+    setWord(nextWord);
+    closeAndClearWordHelp();
+    setSavedNotice("");
+    if (lookupCandidates.length > 0) setLookupCandidates([]);
+
+    void handleLookup(nextWord);
+
+    window.requestAnimationFrame(() => wordInputRef.current?.focus());
   }
 
   async function getNextPageOrder(
@@ -917,6 +973,10 @@ export default function AddWordPage() {
           pageOrder: insertedRow.page_order ?? null,
         };
 
+        setChapterNameOptions((current) =>
+          addChapterNameOption(current, insertedRow.chapter_name)
+        );
+
         setSessionWords((prev) => [
           newSessionWord,
           ...prev.filter((item) => item.id !== newSessionWord.id),
@@ -966,6 +1026,10 @@ export default function AddWordPage() {
           hideKanjiInReadingSupport: !!updatedRow.hide_kanji_in_reading_support,
           pageOrder: updatedRow.page_order ?? null,
         };
+
+        setChapterNameOptions((current) =>
+          addChapterNameOption(current, updatedRow.chapter_name)
+        );
 
         setSessionWords((prev) => [
           updatedSessionWord,
@@ -1115,16 +1179,10 @@ export default function AddWordPage() {
                 if (event.key === "Enter") {
                   event.preventDefault();
                   event.stopPropagation();
+                  searchScratchWord();
                 }
               }}
-              onUseScratchWord={() => {
-                const nextWord = scratchWord.trim();
-                setWord(nextWord);
-                closeAndClearWordHelp();
-                setSavedNotice("");
-                if (lookupCandidates.length > 0) setLookupCandidates([]);
-                window.requestAnimationFrame(() => wordInputRef.current?.focus());
-              }}
+              onUseScratchWord={searchScratchWord}
               onPickKanji={(kanji) => {
                 setScratchWord((prev) => `${prev}${kanji}`);
               }}
@@ -1161,8 +1219,10 @@ export default function AddWordPage() {
               pageNumber={pageNumber}
               chapterNumber={chapterNumber}
               chapterName={chapterName}
+              chapterNameOptions={chapterNameOptions}
               hideKanjiInReadingSupport={hideKanjiInReadingSupport}
               saving={saving}
+              isEditing={editingSessionWordId != null}
               word={word}
               savedNotice={savedNotice}
               onReadingChange={setReading}

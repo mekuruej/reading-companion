@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 
 type AddWordDetailFieldsProps = {
   wordFieldsRef: RefObject<HTMLDivElement | null>;
@@ -10,8 +11,10 @@ type AddWordDetailFieldsProps = {
   pageNumber: string;
   chapterNumber: string;
   chapterName: string;
+  chapterNameOptions: string[];
   hideKanjiInReadingSupport: boolean;
   saving: boolean;
+  isEditing: boolean;
   word: string;
   savedNotice: string;
   onReadingChange: (value: string) => void;
@@ -36,8 +39,10 @@ export default function AddWordDetailFields({
   pageNumber,
   chapterNumber,
   chapterName,
+  chapterNameOptions,
   hideKanjiInReadingSupport,
   saving,
+  isEditing,
   word,
   savedNotice,
   onReadingChange,
@@ -151,17 +156,12 @@ export default function AddWordDetailFields({
           />
         </label>
 
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-stone-700">
-            Chapter name
-          </span>
-          <input
-            value={chapterName}
-            onChange={(event) => onChapterNameChange(event.target.value)}
-            placeholder="Chapter name"
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
-        </label>
+        <ChapterNameCombobox
+          value={chapterName}
+          onChange={onChapterNameChange}
+          chapterOptions={chapterNameOptions}
+          inputClassName="w-full rounded border px-3 py-2 text-sm"
+        />
       </div>
 
       <label className="flex items-start gap-2 text-sm text-stone-700">
@@ -180,7 +180,13 @@ export default function AddWordDetailFields({
           disabled={saving || !word.trim()}
           className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save Word"}
+          {saving
+            ? isEditing
+              ? "Updating..."
+              : "Saving..."
+            : isEditing
+              ? "Update Word"
+              : "Save Word"}
         </button>
 
         <button
