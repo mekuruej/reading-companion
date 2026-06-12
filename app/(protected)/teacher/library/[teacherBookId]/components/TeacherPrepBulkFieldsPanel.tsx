@@ -1,3 +1,5 @@
+import ChapterNameCombobox from "@/components/ChapterNameCombobox";
+
 type BulkFieldName = "page" | "chapterNumber" | "chapterName";
 type BulkApplyMode = "blank" | "all";
 
@@ -9,6 +11,7 @@ type TeacherPrepBulkFieldsPanelProps = {
   chapterName: string;
   onChapterNameChange: (value: string) => void;
   chapterNameLabel: string;
+  chapterNameOptions: string[];
   onApplyField: (
     field: BulkFieldName,
     value: string,
@@ -67,6 +70,7 @@ export default function TeacherPrepBulkFieldsPanel({
   chapterName,
   onChapterNameChange,
   chapterNameLabel,
+  chapterNameOptions,
   onApplyField,
 }: TeacherPrepBulkFieldsPanelProps) {
   return (
@@ -90,13 +94,34 @@ export default function TeacherPrepBulkFieldsPanel({
           onApplyField={onApplyField}
         />
 
-        <BulkFieldInput
-          label={chapterNameLabel}
-          value={chapterName}
-          onChange={onChapterNameChange}
-          field="chapterName"
-          onApplyField={onApplyField}
-        />
+        <label className="text-sm">
+          <ChapterNameCombobox
+            label={chapterNameLabel}
+            value={chapterName}
+            onChange={onChapterNameChange}
+            chapterOptions={chapterNameOptions}
+            labelClassName="mb-1 block text-xs text-gray-500"
+            inputClassName="w-full rounded border p-2 text-sm"
+          />
+
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => onApplyField("chapterName", chapterName, "blank")}
+              className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-700"
+            >
+              Fill blanks
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onApplyField("chapterName", chapterName, "all")}
+              className="rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-semibold text-stone-700"
+            >
+              Apply all
+            </button>
+          </div>
+        </label>
       </div>
     </section>
   );
