@@ -620,7 +620,7 @@ export default function TeacherBookPrepPage() {
           showFollowLink={!!teacherBook}
         />
 
-        <h1 className="mt-4 text-2xl font-semibold text-stone-900">Prep Add</h1>
+       
 
         {loading ? (
           <TeacherLibraryBookLoadingState />
