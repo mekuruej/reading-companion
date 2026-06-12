@@ -16,6 +16,7 @@ const BOOK_TYPE_OPTIONS = [
     { value: "middle_grade", label: "Middle grade" },
     { value: "young_adult", label: "Young adult" },
     { value: "novel", label: "Novel" },
+    { value: "short_story", label: "Short Story" },
     { value: "manga", label: "Manga" },
     { value: "graded_reader", label: "Graded reader" },
     { value: "textbook", label: "Textbook" },
@@ -79,6 +80,10 @@ type BookRequestRow = {
 
 function cleanText(value: string) {
     return value.trim() || null;
+}
+
+function normalizeName(value: string) {
+    return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function metadataSourceLabel(value: IsbnLookupPreview["metadata_source"]) {
@@ -368,6 +373,23 @@ export default function TeacherAddBookPage() {
         setPublisherReading(data.publisher_reading ?? "");
         setPublisherImageUrl(data.publisher_image_url ?? "");
         setSelectedPublisherId(data.publisher_id ?? null);
+        setPublisherEnglishName("");
+        if (data.publisher_id) {
+            const { data: publisherRecord, error: publisherError } = await supabase
+                .from("publishers")
+                .select("name_ja, name_en, reading, logo_url")
+                .eq("id", data.publisher_id)
+                .maybeSingle();
+
+            if (publisherError) {
+                console.warn("Could not load linked publisher record:", publisherError);
+            } else if (publisherRecord) {
+                setPublisher(publisherRecord.name_ja ?? data.publisher ?? "");
+                setPublisherEnglishName(publisherRecord.name_en ?? "");
+                setPublisherReading(publisherRecord.reading ?? data.publisher_reading ?? "");
+                setPublisherImageUrl(publisherRecord.logo_url ?? data.publisher_image_url ?? "");
+            }
+        }
 
         setPublishedDate(data.published_date ?? "");
         setPageCount(data.page_count == null ? "" : String(data.page_count));
@@ -380,6 +402,56 @@ export default function TeacherAddBookPage() {
         setRequireSharedTranslatorRecord(false);
         setRequireSharedIllustratorRecord(false);
         setRequireSharedPublisherRecord(false);
+    }
+
+    async function upsertPublisherRecord() {
+        const cleanedName = publisher.trim().replace(/\s+/g, " ");
+        if (!cleanedName) return null;
+
+        const payload = {
+            name_ja: cleanedName,
+            name_en: cleanText(publisherEnglishName),
+            reading: cleanText(publisherReading),
+            logo_url: cleanText(publisherImageUrl),
+        };
+
+        if (selectedPublisherId) {
+            const { data, error } = await supabase
+                .from("publishers")
+                .update(payload)
+                .eq("id", selectedPublisherId)
+                .select("id, name_ja")
+                .single();
+
+            if (error) {
+                console.warn("Could not update linked publisher record:", error);
+                return { id: selectedPublisherId, name_ja: cleanedName };
+            }
+
+            return data;
+        }
+
+        const { data, error } = await supabase
+            .from("publishers")
+            .upsert(
+                {
+                    ...payload,
+                    normalized_name: normalizeName(cleanedName),
+                },
+                {
+                    onConflict: "normalized_name",
+                    ignoreDuplicates: false,
+                }
+            )
+            .select("id, name_ja")
+            .single();
+
+        if (error) {
+            console.warn("Could not upsert publisher record:", error);
+            return null;
+        }
+
+        return data;
     }
 
     async function loadBookRequest(id: string) {
@@ -712,6 +784,8 @@ export default function TeacherAddBookPage() {
         setSaving(true);
 
         try {
+            const publisherRecord = await upsertPublisherRecord();
+
             const { error } = await supabase
                 .from("books")
                 .update({
@@ -733,8 +807,8 @@ export default function TeacherAddBookPage() {
                     illustrator_reading: cleanText(illustratorReading),
                     illustrator_image_url: cleanText(illustratorImageUrl),
 
-                    publisher: cleanText(publisher),
-                    publisher_id: selectedPublisherId,
+                    publisher: publisherRecord?.name_ja ?? cleanText(publisher),
+                    publisher_id: publisherRecord?.id ?? null,
                     publisher_reading: cleanText(publisherReading),
                     publisher_image_url: cleanText(publisherImageUrl),
 

@@ -3856,7 +3856,7 @@ export default function BookHubPage() {
           code: error.code,
           raw: error,
         });
-        return null;
+        return { id: selectedPublisherId, name_ja: cleanedName };
       }
 
       return data;
