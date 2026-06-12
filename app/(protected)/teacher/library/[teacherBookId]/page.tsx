@@ -8,6 +8,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import ChapterNameCombobox from "@/components/ChapterNameCombobox";
+import { normalizeChapterNameOptions } from "@/lib/chapterNameOptions";
 import TeacherLibraryBookAccessState from "./components/TeacherLibraryBookAccessState";
 import TeacherLibraryBookHeader from "./components/TeacherLibraryBookHeader";
 import TeacherLibraryBookLoadingState from "./components/TeacherLibraryBookLoadingState";
@@ -251,6 +253,15 @@ export default function TeacherBookPrepPage() {
       )
     ).sort((a, b) => a - b);
   }, [savedItems]);
+
+  const chapterNameOptions = useMemo(() => {
+    return normalizeChapterNameOptions([
+      ...savedItems.map((item) => item.chapter_name),
+      ...drafts.map((draft) => draft.chapterName),
+      editDraft?.chapterName,
+      bulkChapterName,
+    ]);
+  }, [bulkChapterName, drafts, editDraft?.chapterName, savedItems]);
 
   const visibleSavedItems = useMemo(() => {
     const query = savedSearch.trim().toLowerCase();
@@ -788,6 +799,7 @@ export default function TeacherBookPrepPage() {
                   chapterName={bulkChapterName}
                   onChapterNameChange={setBulkChapterName}
                   chapterNameLabel={chapterNameLabel}
+                  chapterNameOptions={chapterNameOptions}
                   onApplyField={applyBulkField}
                 />
 
@@ -816,14 +828,14 @@ export default function TeacherBookPrepPage() {
                             className="w-full rounded border p-2 text-sm"
                           />
                         </label>
-                        <label className="text-sm">
-                          <span className="mb-1 block text-xs text-gray-500">{chapterNameLabel}</span>
-                          <input
-                            value={draft.chapterName}
-                            onChange={(event) => updateDraft(index, { chapterName: event.target.value })}
-                            className="w-full rounded border p-2 text-sm"
-                          />
-                        </label>
+                        <ChapterNameCombobox
+                          value={draft.chapterName}
+                          onChange={(value) => updateDraft(index, { chapterName: value })}
+                          chapterOptions={chapterNameOptions}
+                          label={chapterNameLabel}
+                          labelClassName="mb-1 block text-xs text-gray-500"
+                          inputClassName="w-full rounded border p-2 text-sm"
+                        />
                       </div>
                     </li>
                   ))}
@@ -1105,14 +1117,14 @@ export default function TeacherBookPrepPage() {
                       className="w-full rounded border p-2 text-sm"
                     />
                   </label>
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs text-gray-500">{chapterNameLabel}</span>
-                    <input
-                      value={editDraft.chapterName}
-                      onChange={(event) => updateEditDraft({ chapterName: event.target.value })}
-                      className="w-full rounded border p-2 text-sm"
-                    />
-                  </label>
+                  <ChapterNameCombobox
+                    value={editDraft.chapterName}
+                    onChange={(value) => updateEditDraft({ chapterName: value })}
+                    chapterOptions={chapterNameOptions}
+                    label={chapterNameLabel}
+                    labelClassName="mb-1 block text-xs text-gray-500"
+                    inputClassName="w-full rounded border p-2 text-sm"
+                  />
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
