@@ -61,7 +61,6 @@ export default function ProfileSettingsPage() {
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("Japanese");
   const [level, setLevel] = useState("");
-  const [existingRole, setExistingRole] = useState<ProfileRole | null>(null);
 
   const [publicNameChoice, setPublicNameChoice] = useState<"display_name" | "username">(
     "display_name"
@@ -94,7 +93,7 @@ export default function ProfileSettingsPage() {
       const [profileResult, publicResult] = await Promise.all([
         supabase
           .from("profiles")
-          .select("display_name, username, native_language, target_language, role, level")
+          .select("display_name, username, native_language, target_language, level")
           .eq("id", user.id)
           .maybeSingle(),
         supabase
@@ -140,7 +139,6 @@ export default function ProfileSettingsPage() {
 
       setTargetLanguage(profile?.target_language ?? "Japanese");
       setLevel(profile?.level ?? "");
-      setExistingRole((profile?.role as ProfileRole | null) ?? null);
 
       setPublicNameChoice(publicRow?.public_name_choice ?? "display_name");
       setPublicLevel(publicRow?.jlpt_level_public ?? "None");
@@ -267,7 +265,6 @@ export default function ProfileSettingsPage() {
           native_language: selectedNativeLanguage,
           target_language: targetLanguage.trim(),
           level: level.trim(),
-          role: existingRole ?? "member",
         },
         { onConflict: "id" }
       ),
