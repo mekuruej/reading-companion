@@ -1,3 +1,5 @@
+import ChapterNameCombobox from "@/components/ChapterNameCombobox";
+
 type BulkDetailEditItemProps = {
   surface: string;
   reading: string;
@@ -5,6 +7,7 @@ type BulkDetailEditItemProps = {
   page: string;
   chapterNumber: string;
   chapterName: string;
+  chapterNameOptions: string[];
   hideKanjiInReadingSupport: boolean;
   onPageChange: (value: string) => void;
   onChapterNumberChange: (value: string) => void;
@@ -19,6 +22,7 @@ export default function BulkDetailEditItem({
   page,
   chapterNumber,
   chapterName,
+  chapterNameOptions,
   hideKanjiInReadingSupport,
   onPageChange,
   onChapterNumberChange,
@@ -55,16 +59,14 @@ export default function BulkDetailEditItem({
           />
         </div>
 
-        <div>
-          <div className="mb-1 text-xs text-gray-500">Chapter Name</div>
-          <input
-            type="text"
-            placeholder="Chapter name"
-            value={chapterName}
-            onChange={(e) => onChapterNameChange(e.target.value)}
-            className="w-full rounded border p-2 text-sm"
-          />
-        </div>
+        <ChapterNameCombobox
+          value={chapterName}
+          onChange={onChapterNameChange}
+          chapterOptions={chapterNameOptions}
+          label="Chapter Name"
+          labelClassName="mb-1 block text-xs text-gray-500"
+          inputClassName="w-full rounded border p-2 text-sm"
+        />
       </div>
 
       <label className="mt-3 flex items-start gap-2 text-sm text-stone-700">

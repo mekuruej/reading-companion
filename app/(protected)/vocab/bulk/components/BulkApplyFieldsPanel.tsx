@@ -1,7 +1,10 @@
+import ChapterNameCombobox from "@/components/ChapterNameCombobox";
+
 type BulkApplyFieldsPanelProps = {
   bulkPageNumber: string;
   bulkChapterNumber: string;
   bulkChapterName: string;
+  chapterNameOptions: string[];
   recentAction: string | null;
   onBulkPageNumberChange: (value: string) => void;
   onBulkChapterNumberChange: (value: string) => void;
@@ -18,6 +21,7 @@ export default function BulkApplyFieldsPanel({
   bulkPageNumber,
   bulkChapterNumber,
   bulkChapterName,
+  chapterNameOptions,
   recentAction,
   onBulkPageNumberChange,
   onBulkChapterNumberChange,
@@ -74,12 +78,14 @@ export default function BulkApplyFieldsPanel({
 
         <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
           <div className="text-sm font-medium text-gray-700">Chapter name</div>
-          <input
-            type="text"
+          <ChapterNameCombobox
             value={bulkChapterName}
-            onChange={(e) => onBulkChapterNameChange(e.target.value)}
+            onChange={onBulkChapterNameChange}
+            chapterOptions={chapterNameOptions}
+            label=""
             placeholder="e.g. Summer Festival"
-            className="rounded border p-2"
+            helperText=""
+            inputClassName="rounded border p-2"
           />
           <button
             type="button"

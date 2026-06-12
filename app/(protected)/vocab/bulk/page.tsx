@@ -5,6 +5,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  normalizeChapterNameOptions,
+} from "@/lib/chapterNameOptions";
 import BulkMessageBanner from "./components/BulkMessageBanner";
 import SaveBar from "./components/SaveBar";
 import BulkDonePanel from "./components/BulkDonePanel";
@@ -130,6 +133,7 @@ export default function BulkVocabPage() {
   const [bulkPageNumber, setBulkPageNumber] = useState("");
   const [bulkChapterNumber, setBulkChapterNumber] = useState("");
   const [bulkChapterName, setBulkChapterName] = useState("");
+  const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
 
   const [bulkPageList, setBulkPageList] = useState("");
   const [bulkChapterNumberList, setBulkChapterNumberList] = useState("");
@@ -286,6 +290,40 @@ export default function BulkVocabPage() {
       })
     );
   }, [bulkChapterNumber, bulkChapterName, authorizedUserBookId]);
+
+  useEffect(() => {
+    if (!authorizedUserBookId) {
+      setChapterNameOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadChapterNameOptions() {
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .select("chapter_name")
+        .eq("user_book_id", authorizedUserBookId)
+        .not("chapter_name", "is", null);
+
+      if (error) {
+        console.error("Error loading chapter name options:", error);
+        return;
+      }
+
+      if (!cancelled) {
+        setChapterNameOptions(
+          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
+        );
+      }
+    }
+
+    void loadChapterNameOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authorizedUserBookId]);
 
   // -------------------------------------------------------------
   // Helpers
@@ -675,6 +713,12 @@ export default function BulkVocabPage() {
 
       if (error) throw error;
 
+      setChapterNameOptions((current) =>
+        normalizeChapterNameOptions([
+          ...current,
+          ...items.map((item) => item.chapterName?.trim() || null),
+        ])
+      );
       setStep("done");
       setMessage(`✅ Saved ${payload.length} words!`);
     } catch (err: any) {
@@ -822,6 +866,7 @@ export default function BulkVocabPage() {
               bulkPageNumber={bulkPageNumber}
               bulkChapterNumber={bulkChapterNumber}
               bulkChapterName={bulkChapterName}
+              chapterNameOptions={chapterNameOptions}
               recentAction={recentAction}
               onBulkPageNumberChange={setBulkPageNumber}
               onBulkChapterNumberChange={setBulkChapterNumber}
@@ -850,6 +895,7 @@ export default function BulkVocabPage() {
                   page={i.page}
                   chapterNumber={i.chapterNumber}
                   chapterName={i.chapterName}
+                  chapterNameOptions={chapterNameOptions}
                   hideKanjiInReadingSupport={i.hideKanjiInReadingSupport}
                   onPageChange={(value) => updateItem(idx, "page", value)}
                   onChapterNumberChange={(value) => updateItem(idx, "chapterNumber", value)}
