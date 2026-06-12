@@ -2441,7 +2441,7 @@ export default function BooksPage() {
 
   function learningTaskAction(task: LearningTaskRow) {
     if (task.task_type === "kanji_reading_practice") {
-      return { href: "/library-study/kanji", label: "Open Kanji Reading" };
+      return { href: "/library-study/characters", label: "Open Character Study" };
     }
 
     if (!task.user_book_id) return null;
