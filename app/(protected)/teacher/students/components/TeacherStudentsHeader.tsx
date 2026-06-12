@@ -22,13 +22,6 @@ export default function TeacherStudentsHeader() {
 
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/teacher/assign"
-            className="rounded-2xl border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black"
-          >
-            Assigned prep books
-          </Link>
-
-          <Link
             href="/teacher"
             className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
           >

@@ -3,23 +3,23 @@ import TeacherStudentGroupSection from "./TeacherStudentGroupSection";
 
 const STUDENT_GROUPS = [
   {
-    key: "future",
-    title: "Future Students",
-    detail: "Trial, prep, and upcoming learners.",
-  },
-  {
     key: "current",
-    title: "Current Students",
+    label: "Current",
     detail: "Learners you are actively working with now.",
   },
   {
+    key: "future",
+    label: "Future",
+    detail: "Trial, prep, and upcoming learners.",
+  },
+  {
     key: "past",
-    title: "Past Students",
+    label: "Past",
     detail: "Expired or former active relationships.",
   },
   {
     key: "archived",
-    title: "Archived Students",
+    label: "Archived",
     detail: "Hidden from active teacher lists and alerts. Restore when needed.",
   },
 ] as const;
@@ -28,21 +28,34 @@ type StudentGroupKey = (typeof STUDENT_GROUPS)[number]["key"];
 
 type TeacherStudentGroupsPanelProps<T> = {
   groupedStudents: Record<StudentGroupKey, readonly T[]>;
+  openGroups: Record<StudentGroupKey, boolean>;
+  hiddenGroups?: readonly StudentGroupKey[];
+  nounLabel?: string;
+  groupNounLabel?: string;
+  onToggleGroup: (group: StudentGroupKey) => void;
   renderStudent: (student: T) => ReactNode;
 };
 
 export default function TeacherStudentGroupsPanel<T>({
   groupedStudents,
+  openGroups,
+  hiddenGroups = [],
+  nounLabel = "student",
+  groupNounLabel = "Students",
+  onToggleGroup,
   renderStudent,
 }: TeacherStudentGroupsPanelProps<T>) {
   return (
     <>
-      {STUDENT_GROUPS.map((group) => (
+      {STUDENT_GROUPS.filter((group) => !hiddenGroups.includes(group.key)).map((group) => (
         <TeacherStudentGroupSection
           key={group.key}
-          title={group.title}
+          title={`${group.label} ${groupNounLabel}`}
           detail={group.detail}
           items={groupedStudents[group.key]}
+          isOpen={openGroups[group.key]}
+          nounLabel={nounLabel}
+          onToggle={() => onToggleGroup(group.key)}
           renderStudent={renderStudent}
         />
       ))}

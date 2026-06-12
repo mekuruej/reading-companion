@@ -19,6 +19,7 @@ import TeacherStudentsListHeader from "./components/TeacherStudentsListHeader";
 
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
 type StudentRelationshipStatus = "future" | "current" | "past" | "archived";
+type StudentGroupKey = StudentRelationshipStatus;
 
 type StudentProfile = {
     id: string;
@@ -380,7 +381,7 @@ function StudentCardArticle({
                     </div>
                 ) : null}
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                     {student.username ? (
                         <Link
                             href={`/users/${student.username}/books`}
@@ -415,11 +416,28 @@ function StudentCardArticle({
                         </button>
                     )}
 
+                    {student.currentBookId ? (
+                        <Link
+                            href={`/vocab/bulk?userBookId=${student.currentBookId}`}
+                            className="rounded-2xl border border-amber-600 bg-amber-50 px-4 py-3 text-center text-base font-semibold text-amber-800 hover:bg-amber-100"
+                        >
+                            Add Words
+                        </Link>
+                    ) : (
+                        <button
+                            type="button"
+                            disabled
+                            className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
+                        >
+                            No Add Words
+                        </button>
+                    )}
+
                     <button
                         type="button"
                         onClick={() => onCreateTask(student)}
                         disabled={isArchived}
-                        className="rounded-2xl border border-sky-700 bg-sky-700 px-4 py-3 text-base font-semibold text-white hover:bg-sky-800"
+                        className="rounded-2xl border border-sky-700 bg-sky-700 px-4 py-3 text-base font-semibold text-white hover:bg-sky-800 disabled:opacity-50"
                     >
                         Assign Task
                     </button>
@@ -452,9 +470,18 @@ function StudentCardArticle({
 export default function TeacherStudentsPage() {
     const [loading, setLoading] = useState(true);
     const [canAccess, setCanAccess] = useState(false);
+    const [viewerIsSuperTeacher, setViewerIsSuperTeacher] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [students, setStudents] = useState<StudentCard[]>([]);
     const [studentSearch, setStudentSearch] = useState("");
+    const [myStudentsOpen, setMyStudentsOpen] = useState(true);
+    const [otherUsersOpen, setOtherUsersOpen] = useState(false);
+    const [myOpenGroups, setMyOpenGroups] = useState<Record<StudentGroupKey, boolean>>({
+        current: true,
+        future: false,
+        past: false,
+        archived: false,
+    });
     const [taskBooksByStudentId, setTaskBooksByStudentId] = useState<
         Record<string, TaskBookOption[]>
     >({});
@@ -521,6 +548,7 @@ export default function TeacherStudentsPage() {
 
             if (!user) {
                 setCanAccess(false);
+                setViewerIsSuperTeacher(false);
                 setCurrentUserId(null);
                 setStudents([]);
                 setError("Please sign in.");
@@ -541,8 +569,10 @@ export default function TeacherStudentsPage() {
                 meProfile?.role === "teacher" ||
                 meProfile?.role === "super_teacher" ||
                 !!meProfile?.is_super_teacher;
+            const isSuperTeacher = meProfile?.role === "super_teacher" || !!meProfile?.is_super_teacher;
 
             setCanAccess(isTeacher);
+            setViewerIsSuperTeacher(isSuperTeacher);
 
             if (!isTeacher) {
                 setStudents([]);
@@ -556,7 +586,7 @@ export default function TeacherStudentsPage() {
             const archiveReasonByStudentId = new Map<string, string>();
             const studentsWithActiveTeacherLink = new Set<string>();
 
-            if (meProfile?.role === "super_teacher" || meProfile?.is_super_teacher) {
+            if (isSuperTeacher) {
                 const { data: links, error: linksError } = await supabase
                     .from("teacher_students")
                     .select("*");
@@ -1122,19 +1152,17 @@ export default function TeacherStudentsPage() {
     }
 
     const summary = useMemo(() => {
-        const activeStudents = students.filter((student) => student.relationshipStatus !== "archived");
+        const linkedStudents = students.filter((student) => Boolean(student.teacherStudentTeacherId));
+        const activeStudents = linkedStudents.filter((student) => student.relationshipStatus !== "archived");
 
         return {
+            totalUsers: students.length,
             totalStudents: activeStudents.length,
-            futureStudents: activeStudents.filter((student) => student.relationshipStatus === "future").length,
             currentStudents: activeStudents.filter((student) => student.relationshipStatus === "current").length,
-            pastStudents: activeStudents.filter((student) => student.relationshipStatus === "past").length,
-            archivedStudents: students.filter((student) => student.relationshipStatus === "archived").length,
+            pastStudents:
+                activeStudents.filter((student) => student.relationshipStatus === "past").length +
+                linkedStudents.filter((student) => student.relationshipStatus === "archived").length,
             activeReaders: activeStudents.filter((student) => !!student.currentBookId).length,
-            assignedPrepBooks: activeStudents.reduce(
-                (total, student) => total + student.assignedPrepCount,
-                0
-            ),
             withRecentActivity: activeStudents.filter((student) => !!student.lastEngagedAt).length,
         };
     }, [students]);
@@ -1160,14 +1188,32 @@ export default function TeacherStudentsPage() {
         });
     }, [studentSearch, students]);
 
+    const myFilteredStudents = useMemo(() => {
+        return filteredStudents.filter((student) => Boolean(student.teacherStudentTeacherId));
+    }, [filteredStudents]);
+
+    const otherFilteredUsers = useMemo(() => {
+        return filteredStudents.filter((student) => !student.teacherStudentTeacherId);
+    }, [filteredStudents]);
+
     const groupedStudents = useMemo(() => {
         return {
-            future: filteredStudents.filter((student) => student.relationshipStatus === "future"),
-            current: filteredStudents.filter((student) => student.relationshipStatus === "current"),
-            past: filteredStudents.filter((student) => student.relationshipStatus === "past"),
-            archived: filteredStudents.filter((student) => student.relationshipStatus === "archived"),
+            future: myFilteredStudents.filter((student) => student.relationshipStatus === "future"),
+            current: myFilteredStudents.filter((student) => student.relationshipStatus === "current"),
+            past: myFilteredStudents.filter((student) => student.relationshipStatus === "past"),
+            archived: myFilteredStudents.filter((student) => student.relationshipStatus === "archived"),
         };
-    }, [filteredStudents]);
+    }, [myFilteredStudents]);
+
+    function toggleMyGroup(group: StudentGroupKey) {
+        setMyOpenGroups((current) => ({
+            ...current,
+            [group]: !current[group],
+        }));
+    }
+
+    const searchSingularNounLabel = viewerIsSuperTeacher ? "account" : "student";
+    const searchPluralNounLabel = viewerIsSuperTeacher ? "accounts" : "students";
 
     const activeTasksForModalStudent = useMemo(() => {
         if (!taskModalStudent) return [];
@@ -1186,7 +1232,10 @@ export default function TeacherStudentsPage() {
                 <>
                     <TeacherStudentsErrorBanner message={error} />
 
-                    <TeacherStudentsSummaryCards summary={summary} />
+                    <TeacherStudentsSummaryCards
+                        summary={summary}
+                        showTotalUsers={viewerIsSuperTeacher}
+                    />
 
                     {taskModalStudent ? (
                         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-stone-950/40 px-4 py-8">
@@ -1484,30 +1533,143 @@ export default function TeacherStudentsPage() {
                                     onChange={setStudentSearch}
                                     filteredCount={filteredStudents.length}
                                     totalCount={students.length}
+                                    singularNounLabel={searchSingularNounLabel}
+                                    pluralNounLabel={searchPluralNounLabel}
                                 />
 
                                 {filteredStudents.length === 0 ? (
                                     <TeacherStudentsEmptyState
-                                        title="No students match that search."
+                                        title={`No ${searchPluralNounLabel} match that search.`}
                                         actionLabel="Clear search"
                                         onAction={() => setStudentSearch("")}
                                     />
                                 ) : null}
 
                                 {filteredStudents.length > 0 ? (
-                                    <TeacherStudentGroupsPanel
-                                        groupedStudents={groupedStudents}
-                                        renderStudent={(student) => (
-                                            <StudentCardArticle
-                                                key={student.id}
-                                                student={student}
-                                                onCreateTask={openTaskModal}
-                                                onArchive={archiveStudent}
-                                                onRestore={restoreStudent}
-                                                isUpdatingArchive={updatingArchiveStudentId === student.id}
-                                            />
-                                        )}
-                                    />
+                                    <div className="space-y-10">
+                                        {myFilteredStudents.length > 0 ? (
+                                            <section className="space-y-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMyStudentsOpen((current) => !current)}
+                                                    className="flex w-full flex-col gap-2 rounded-3xl border border-stone-200 bg-white p-4 text-left shadow-sm transition hover:bg-stone-50 sm:flex-row sm:items-center sm:justify-between"
+                                                    aria-expanded={myStudentsOpen}
+                                                >
+                                                    <div>
+                                                        <h2 className="text-2xl font-black text-stone-900">
+                                                            <span className="mr-2 text-stone-400">
+                                                                {myStudentsOpen ? "▾" : "▸"}
+                                                            </span>
+                                                            My Students
+                                                        </h2>
+                                                        <p className="mt-1 text-sm text-stone-600">
+                                                            Learners linked to your teacher account.
+                                                        </p>
+                                                    </div>
+
+                                                    <span className="text-sm font-semibold text-stone-400">
+                                                        {myFilteredStudents.length} student{myFilteredStudents.length === 1 ? "" : "s"}
+                                                    </span>
+                                                </button>
+
+                                                {myStudentsOpen ? (
+                                                    <TeacherStudentGroupsPanel
+                                                        groupedStudents={groupedStudents}
+                                                        openGroups={myOpenGroups}
+                                                        hiddenGroups={["future"]}
+                                                        onToggleGroup={toggleMyGroup}
+                                                        renderStudent={(student) => (
+                                                            <StudentCardArticle
+                                                                key={student.id}
+                                                                student={student}
+                                                                onCreateTask={openTaskModal}
+                                                                onArchive={archiveStudent}
+                                                                onRestore={restoreStudent}
+                                                                isUpdatingArchive={updatingArchiveStudentId === student.id}
+                                                            />
+                                                        )}
+                                                    />
+                                                ) : null}
+                                            </section>
+                                        ) : null}
+
+                                        {otherFilteredUsers.length > 0 ? (
+                                            <section className="space-y-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setOtherUsersOpen((current) => !current)}
+                                                    className="flex w-full flex-col gap-2 rounded-3xl border border-stone-200 bg-white p-4 text-left shadow-sm transition hover:bg-stone-50 sm:flex-row sm:items-center sm:justify-between"
+                                                    aria-expanded={otherUsersOpen}
+                                                >
+                                                    <div>
+                                                        <h2 className="text-2xl font-black text-stone-900">
+                                                            <span className="mr-2 text-stone-400">
+                                                                {otherUsersOpen ? "▾" : "▸"}
+                                                            </span>
+                                                            Other Users
+                                                        </h2>
+                                                        <p className="mt-1 text-sm text-stone-600">
+                                                            Visible because you are a super teacher, but not linked as your students.
+                                                        </p>
+                                                    </div>
+
+                                                    <span className="text-sm font-semibold text-stone-400">
+                                                        {otherFilteredUsers.length} user{otherFilteredUsers.length === 1 ? "" : "s"}
+                                                    </span>
+                                                </button>
+
+                                                {otherUsersOpen ? (
+                                                    <div className="space-y-6">
+                                                        <div className="grid gap-3 md:grid-cols-2">
+                                                            <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-3">
+                                                                <p className="text-sm font-bold text-stone-700">Blocked users</p>
+                                                                <p className="mt-1 text-xs leading-5 text-stone-500">
+                                                                    Placeholder for future account access controls.
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-3">
+                                                                <p className="text-sm font-bold text-stone-700">Privacy requests</p>
+                                                                <p className="mt-1 text-xs leading-5 text-stone-500">
+                                                                    Placeholder for future email or account removal workflows.
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                                                <div>
+                                                                    <h3 className="text-base font-black text-stone-900">
+                                                                        Unlinked accounts
+                                                                    </h3>
+                                                                    <p className="text-sm text-stone-500">
+                                                                        Accounts visible to super teachers, but not connected to your teacher list.
+                                                                    </p>
+                                                                </div>
+
+                                                                <span className="text-sm font-semibold text-stone-400">
+                                                                    {otherFilteredUsers.length} user{otherFilteredUsers.length === 1 ? "" : "s"}
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="grid gap-4">
+                                                                {otherFilteredUsers.map((student) => (
+                                                                    <StudentCardArticle
+                                                                        key={student.id}
+                                                                        student={student}
+                                                                        onCreateTask={openTaskModal}
+                                                                        onArchive={archiveStudent}
+                                                                        onRestore={restoreStudent}
+                                                                        isUpdatingArchive={updatingArchiveStudentId === student.id}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : null}
+                                            </section>
+                                        ) : null}
+                                    </div>
                                 ) : null}
                             </div>
                         )}
