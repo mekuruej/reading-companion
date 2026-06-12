@@ -449,3 +449,45 @@ Finished:
 Decision:
 
 `/vocab/bulk` remains protected, but now supports the intended teacher-managed student vocabulary workflow.
+
+### `/vocab`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only queries `user_books` where `user_id = user.id`.
+* Confirmed it does not accept a `userId` or `userBookId` from search params.
+* Confirmed it only lists the current user’s own vocabulary/book list entry points.
+
+Decision:
+
+`/vocab` passed the non-book route access audit with no code changes.
+
+### `/community/profile`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only loads the current user’s own `profiles` row with `profiles.id = user.id`.
+* Confirmed it only loads the current user’s own `user_public_profile` row with `user_public_profile.user_id = user.id`.
+* Confirmed the page does not accept `userId`, `username`, or `userBookId` from route/search params.
+* Confirmed the page does not update profile data directly.
+
+Decision:
+
+`/community/profile` passed the non-book route access audit with no code changes.
+
+### `/community/profile/settings`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only loads the current user’s own `profiles` row with `profiles.id = user.id`.
+* Confirmed it only loads the current user’s own `user_public_profile` row with `user_public_profile.user_id = user.id`.
+* Confirmed profile saves write to `profiles.id = user.id` and `user_public_profile.user_id = user.id`.
+* Removed `role` from the client-side profile settings upsert payload.
+* Removed the old `existingRole` preserve/write behavior from the profile settings page.
+
+Decision:
+
+`/community/profile/settings` remains a self-profile edit page. Users can update reader/profile fields, but app roles remain outside the normal profile settings save flow.
