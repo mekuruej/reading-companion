@@ -13,6 +13,7 @@ import { TeacherBookAddMessageBanner } from "./components/TeacherBookAddMessageB
 import { TeacherBookInfoSectionHeader } from "./components/TeacherBookInfoSectionHeader";
 import { TeacherBookRequestPanel } from "./components/TeacherBookRequestPanel";
 import { TeacherBookIsbnPreviewCard } from "./components/TeacherBookIsbnPreviewCard";
+import { TeacherBookAddHelpCard } from "./components/TeacherBookAddHelpCard";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -877,13 +878,7 @@ export default function TeacherAddBookPage() {
                         {bookRequest ? "Manual Book Entry" : "Find or Create Book"}
                     </h2>
 
-                    {bookRequest ? (
-                        <div className="mt-3 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm leading-6 text-stone-700">
-                            <span className="font-black text-stone-900">Manual entry:</span>{" "}
-                            1. Research the real title. 2. Type the title below. 3. Add ISBN only if you have it.
-                            4. Create the global book. 5. Fill in the shared Book Info details.
-                        </div>
-                    ) : null}
+                    {bookRequest ? <TeacherBookAddHelpCard /> : null}
 
                     <div className="mt-5 grid gap-5 md:grid-cols-2">
                         <div>
