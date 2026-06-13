@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BookInfoTab from "../../../books/[userBookId]/components/BookInfoTab";
+import { TeacherBookAddLoadingState } from "./components/TeacherBookAddLoadingState";
+import { TeacherBookAddAccessState } from "./components/TeacherBookAddAccessState";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -841,19 +843,11 @@ export default function TeacherAddBookPage() {
     }
 
     if (loading) {
-        return (
-            <main className="p-6">
-                <p>Loading...</p>
-            </main>
-        );
+        return <TeacherBookAddLoadingState />;
     }
 
     if (!canAccess) {
-        return (
-            <main className="p-6">
-                <p>{message}</p>
-            </main>
-        );
+        return <TeacherBookAddAccessState message={message} />;
     }
 
     const showFindOrCreatePanel = !currentBookId || !!bookRequest;
@@ -926,195 +920,195 @@ export default function TeacherAddBookPage() {
             ) : null}
 
             {showFindOrCreatePanel ? (
-            <section className="mt-8 rounded-3xl border border-stone-500 bg-stone-100 p-5">
-                <h2 className="text-lg font-black text-stone-900">
-                    {bookRequest ? "Manual Book Entry" : "Find or Create Book"}
-                </h2>
+                <section className="mt-8 rounded-3xl border border-stone-500 bg-stone-100 p-5">
+                    <h2 className="text-lg font-black text-stone-900">
+                        {bookRequest ? "Manual Book Entry" : "Find or Create Book"}
+                    </h2>
 
-                {bookRequest ? (
-                    <div className="mt-3 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm leading-6 text-stone-700">
-                        <span className="font-black text-stone-900">Manual entry:</span>{" "}
-                        1. Research the real title. 2. Type the title below. 3. Add ISBN only if you have it.
-                        4. Create the global book. 5. Fill in the shared Book Info details.
+                    {bookRequest ? (
+                        <div className="mt-3 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm leading-6 text-stone-700">
+                            <span className="font-black text-stone-900">Manual entry:</span>{" "}
+                            1. Research the real title. 2. Type the title below. 3. Add ISBN only if you have it.
+                            4. Create the global book. 5. Fill in the shared Book Info details.
+                        </div>
+                    ) : null}
+
+                    <div className="mt-5 grid gap-5 md:grid-cols-2">
+                        <div>
+                            <label className="mb-1 block text-sm font-semibold">Title *</label>
+                            <input
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder={
+                                    bookRequest
+                                        ? "Enter the researched book title"
+                                        : "Book title"
+                                }
+                                className="w-full rounded-xl border border-slate-500 px-4 py-3"
+                            />
+                            {bookRequest && requestTitleNeedsManualResearch(bookRequest) ? (
+                                <p className="mt-2 text-xs font-medium text-amber-800">
+                                    The request only gave an ISBN, so the real title needs to be entered here.
+                                </p>
+                            ) : null}
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-sm font-semibold">
+                                ISBN-13{" "}
+                                <span className="font-normal text-stone-500">
+                                    {bookRequest ? "(optional for manual entry)" : "*(Hyphens are okay.)"}
+                                </span>
+                            </label>
+                            <input
+                                value={isbn13}
+                                onChange={(e) => {
+                                    setIsbn13(e.target.value);
+                                    setIsbnLookupError("");
+                                    setIsbnLookupPreview(null);
+                                }}
+                                className="w-full rounded-xl border border-slate-500 px-4 py-3"
+                            />
+                        </div>
                     </div>
-                ) : null}
 
-                <div className="mt-5 grid gap-5 md:grid-cols-2">
-                    <div>
-                        <label className="mb-1 block text-sm font-semibold">Title *</label>
-                        <input
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder={
-                                bookRequest
-                                    ? "Enter the researched book title"
-                                    : "Book title"
-                            }
-                            className="w-full rounded-xl border border-slate-500 px-4 py-3"
-                        />
-                        {bookRequest && requestTitleNeedsManualResearch(bookRequest) ? (
-                            <p className="mt-2 text-xs font-medium text-amber-800">
-                                The request only gave an ISBN, so the real title needs to be entered here.
-                            </p>
-                        ) : null}
+                    <div className="mt-5 flex flex-wrap gap-3">
+                        <button
+                            onClick={lookupIsbnPreview}
+                            disabled={isbnLookupLoading || !isbn13.trim()}
+                            type="button"
+                            className="rounded-2xl border border-sky-300 bg-white px-5 py-3 font-semibold text-sky-900 hover:bg-sky-50 disabled:opacity-50"
+                        >
+                            {isbnLookupLoading ? "Looking up..." : "Look up ISBN"}
+                        </button>
+
+                        <button
+                            onClick={createOrLoadByIsbn}
+                            disabled={saving}
+                            className="rounded-2xl bg-stone-900 px-5 py-3 font-semibold text-white hover:bg-black disabled:opacity-50"
+                        >
+                            {saving
+                                ? "Working..."
+                                : bookRequest
+                                    ? "Create Manual Book Entry"
+                                    : "Create / Load by ISBN"}
+                        </button>
+
+                        <button
+                            onClick={clearForm}
+                            type="button"
+                            className="rounded-2xl border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-700 hover:bg-stone-50"
+                        >
+                            Clear
+                        </button>
                     </div>
 
-                    <div>
-                        <label className="mb-1 block text-sm font-semibold">
-                            ISBN-13{" "}
-                            <span className="font-normal text-stone-500">
-                                {bookRequest ? "(optional for manual entry)" : "*(Hyphens are okay.)"}
-                            </span>
-                        </label>
-                        <input
-                            value={isbn13}
-                            onChange={(e) => {
-                                setIsbn13(e.target.value);
-                                setIsbnLookupError("");
-                                setIsbnLookupPreview(null);
-                            }}
-                            className="w-full rounded-xl border border-slate-500 px-4 py-3"
-                        />
-                    </div>
-                </div>
+                    {isbnLookupError ? (
+                        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {isbnLookupError}
+                        </div>
+                    ) : null}
 
-                <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                        onClick={lookupIsbnPreview}
-                        disabled={isbnLookupLoading || !isbn13.trim()}
-                        type="button"
-                        className="rounded-2xl border border-sky-300 bg-white px-5 py-3 font-semibold text-sky-900 hover:bg-sky-50 disabled:opacity-50"
-                    >
-                        {isbnLookupLoading ? "Looking up..." : "Look up ISBN"}
-                    </button>
-
-                    <button
-                        onClick={createOrLoadByIsbn}
-                        disabled={saving}
-                        className="rounded-2xl bg-stone-900 px-5 py-3 font-semibold text-white hover:bg-black disabled:opacity-50"
-                    >
-                        {saving
-                            ? "Working..."
-                            : bookRequest
-                                ? "Create Manual Book Entry"
-                                : "Create / Load by ISBN"}
-                    </button>
-
-                    <button
-                        onClick={clearForm}
-                        type="button"
-                        className="rounded-2xl border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-700 hover:bg-stone-50"
-                    >
-                        Clear
-                    </button>
-                </div>
-
-                {isbnLookupError ? (
-                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {isbnLookupError}
-                    </div>
-                ) : null}
-
-                {isbnLookupPreview ? (
-                    <div className="mt-5 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
-                        {isbnLookupPreview.found_existing_book ? (
-                            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-                                This ISBN already exists in the global library. Do not create a duplicate.
-                            </div>
-                        ) : (
-                            <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-                                Metadata preview only. Nothing has been saved to Mekuru yet.
-                            </div>
-                        )}
-
-                        <div className="grid gap-4 md:grid-cols-[120px_minmax(0,1fr)]">
-                            {isbnLookupPreview.cover_url ? (
-                                <img
-                                    src={isbnLookupPreview.cover_url}
-                                    alt=""
-                                    className="h-40 w-28 rounded-xl object-cover shadow-sm"
-                                />
+                    {isbnLookupPreview ? (
+                        <div className="mt-5 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
+                            {isbnLookupPreview.found_existing_book ? (
+                                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                                    This ISBN already exists in the global library. Do not create a duplicate.
+                                </div>
                             ) : (
-                                <div className="flex h-40 w-28 items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-xs text-stone-500">
-                                    No cover
+                                <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                                    Metadata preview only. Nothing has been saved to Mekuru yet.
                                 </div>
                             )}
 
-                            <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
-                                    ISBN Lookup Preview
-                                </div>
-                                <h3 className="mt-1 text-xl font-black text-stone-950">
-                                    {isbnLookupPreview.title ?? "Untitled book"}
-                                </h3>
-                                <p className="mt-1 text-sm text-stone-600">
-                                    {isbnLookupPreview.author_display ?? "Author unknown"}
-                                </p>
+                            <div className="grid gap-4 md:grid-cols-[120px_minmax(0,1fr)]">
+                                {isbnLookupPreview.cover_url ? (
+                                    <img
+                                        src={isbnLookupPreview.cover_url}
+                                        alt=""
+                                        className="h-40 w-28 rounded-xl object-cover shadow-sm"
+                                    />
+                                ) : (
+                                    <div className="flex h-40 w-28 items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-xs text-stone-500">
+                                        No cover
+                                    </div>
+                                )}
 
-                                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                                    <div>
-                                        <dt className="font-semibold text-stone-500">Publisher</dt>
-                                        <dd className="text-stone-900">
-                                            {isbnLookupPreview.publisher ?? "—"}
-                                        </dd>
+                                <div className="min-w-0">
+                                    <div className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
+                                        ISBN Lookup Preview
                                     </div>
-                                    <div>
-                                        <dt className="font-semibold text-stone-500">Published date</dt>
-                                        <dd className="text-stone-900">
-                                            {isbnLookupPreview.published_date ?? "—"}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="font-semibold text-stone-500">ISBN-13</dt>
-                                        <dd className="text-stone-900">{isbnLookupPreview.isbn13}</dd>
-                                    </div>
-                                    <div>
-                                        <dt className="font-semibold text-stone-500">Metadata source</dt>
-                                        <dd className="text-stone-900">
-                                            {metadataSourceLabel(isbnLookupPreview.metadata_source)}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="font-semibold text-stone-500">Existing book</dt>
-                                        <dd className="text-stone-900">
-                                            {isbnLookupPreview.found_existing_book
-                                                ? `Yes (${isbnLookupPreview.existing_book_id ?? "ID unavailable"})`
-                                                : "No"}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt className="font-semibold text-stone-500">Needs review</dt>
-                                        <dd className="text-stone-900">
-                                            {isbnLookupPreview.needs_review ? "Yes" : "No"}
-                                        </dd>
-                                    </div>
-                                </dl>
+                                    <h3 className="mt-1 text-xl font-black text-stone-950">
+                                        {isbnLookupPreview.title ?? "Untitled book"}
+                                    </h3>
+                                    <p className="mt-1 text-sm text-stone-600">
+                                        {isbnLookupPreview.author_display ?? "Author unknown"}
+                                    </p>
 
-                                <div className="mt-5 flex flex-wrap gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={createOrLoadFromIsbnPreview}
-                                        disabled={saving}
-                                        className="rounded-2xl bg-sky-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:opacity-50"
-                                    >
-                                        {saving
-                                            ? "Working..."
-                                            : isbnLookupPreview.found_existing_book
-                                                ? "Load existing global book"
-                                                : "Create global book from this metadata"}
-                                    </button>
-
-                                    {!isbnLookupPreview.title ? (
-                                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                                            This preview has no title, so it needs manual/admin review before creating.
+                                    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                                        <div>
+                                            <dt className="font-semibold text-stone-500">Publisher</dt>
+                                            <dd className="text-stone-900">
+                                                {isbnLookupPreview.publisher ?? "—"}
+                                            </dd>
                                         </div>
-                                    ) : null}
+                                        <div>
+                                            <dt className="font-semibold text-stone-500">Published date</dt>
+                                            <dd className="text-stone-900">
+                                                {isbnLookupPreview.published_date ?? "—"}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="font-semibold text-stone-500">ISBN-13</dt>
+                                            <dd className="text-stone-900">{isbnLookupPreview.isbn13}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="font-semibold text-stone-500">Metadata source</dt>
+                                            <dd className="text-stone-900">
+                                                {metadataSourceLabel(isbnLookupPreview.metadata_source)}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="font-semibold text-stone-500">Existing book</dt>
+                                            <dd className="text-stone-900">
+                                                {isbnLookupPreview.found_existing_book
+                                                    ? `Yes (${isbnLookupPreview.existing_book_id ?? "ID unavailable"})`
+                                                    : "No"}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="font-semibold text-stone-500">Needs review</dt>
+                                            <dd className="text-stone-900">
+                                                {isbnLookupPreview.needs_review ? "Yes" : "No"}
+                                            </dd>
+                                        </div>
+                                    </dl>
+
+                                    <div className="mt-5 flex flex-wrap gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={createOrLoadFromIsbnPreview}
+                                            disabled={saving}
+                                            className="rounded-2xl bg-sky-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:opacity-50"
+                                        >
+                                            {saving
+                                                ? "Working..."
+                                                : isbnLookupPreview.found_existing_book
+                                                    ? "Load existing global book"
+                                                    : "Create global book from this metadata"}
+                                        </button>
+
+                                        {!isbnLookupPreview.title ? (
+                                            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                                This preview has no title, so it needs manual/admin review before creating.
+                                            </div>
+                                        ) : null}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                ) : null}
-            </section>
+                    ) : null}
+                </section>
             ) : null}
 
             {currentBookId && currentBook ? (
