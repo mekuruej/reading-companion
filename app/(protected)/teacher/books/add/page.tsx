@@ -16,6 +16,7 @@ import { TeacherBookIsbnPreviewCard } from "./components/TeacherBookIsbnPreviewC
 import { TeacherBookAddHelpCard } from "./components/TeacherBookAddHelpCard";
 import { TeacherBookFindCreateActions } from "./components/TeacherBookFindCreateActions";
 import { TeacherBookFindCreateFields } from "./components/TeacherBookFindCreateFields";
+import { TeacherBookFindCreatePanel } from "./components/TeacherBookFindCreatePanel";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -910,11 +911,7 @@ export default function TeacherAddBookPage() {
             ) : null}
 
             {showFindOrCreatePanel ? (
-                <section className="mt-8 rounded-3xl border border-stone-500 bg-stone-100 p-5">
-                    <h2 className="text-lg font-black text-stone-900">
-                        {bookRequest ? "Manual Book Entry" : "Find or Create Book"}
-                    </h2>
-
+                <TeacherBookFindCreatePanel>
                     {bookRequest ? <TeacherBookAddHelpCard /> : null}
 
                     <TeacherBookFindCreateFields
@@ -949,7 +946,7 @@ export default function TeacherAddBookPage() {
                             onCreateOrLoad={createOrLoadFromIsbnPreview}
                         />
                     ) : null}
-                </section>
+                </TeacherBookFindCreatePanel>
             ) : null}
 
             {currentBookId && currentBook ? (
