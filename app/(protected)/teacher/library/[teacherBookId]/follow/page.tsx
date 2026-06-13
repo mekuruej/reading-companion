@@ -16,6 +16,7 @@ import { TeacherFollowAlongAccessState } from "./components/TeacherFollowAlongAc
 import { TeacherFollowAlongHeader } from "./components/TeacherFollowAlongHeader";
 import { TeacherFollowAlongBookBar } from "./components/TeacherFollowAlongBookBar";
 import { TeacherFollowAlongEmptyPageState } from "./components/TeacherFollowAlongEmptyPageState";
+import { TeacherFollowAlongReaderHeader } from "./components/TeacherFollowAlongReaderHeader";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type SupportMode = "full" | "reading" | "meaning";
@@ -274,31 +275,17 @@ export default function TeacherFollowAlongPage() {
         <ReadAlongReaderShell
           scrollAreaRef={scrollAreaRef}
           header={
-            <>
-              <ReadAlongPageNavigator
-                pageIndex={pageIndex}
-                pageCount={pages.length}
-                jumpPageInput={jumpPageInput}
-                onJumpPageInputChange={setJumpPageInput}
-                onJumpToPage={jumpToPage}
-                onPrevious={goPrev}
-                onNext={goNext}
-              />
-
-              <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
-                <div className="order-2 text-sm text-stone-500 sm:order-1">
-                  {currentPage
-                    ? `${currentPage.items.length} prep item${currentPage.items.length === 1 ? "" : "s"}`
-                    : "No prep items yet"}
-                </div>
-                <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">
-                  {currentPage?.label ?? "Teacher Follow-Along"}
-                </div>
-                <div className="order-3 text-sm text-stone-500 sm:text-right">
-                  Tap items to follow along.
-                </div>
-              </div>
-            </>
+            <TeacherFollowAlongReaderHeader
+              pageIndex={pageIndex}
+              pageCount={pages.length}
+              jumpPageInput={jumpPageInput}
+              currentPageLabel={currentPage?.label ?? "Teacher Follow-Along"}
+              currentPageItemCount={currentPage?.items.length ?? null}
+              onJumpPageInputChange={setJumpPageInput}
+              onJumpToPage={jumpToPage}
+              onPrevious={goPrev}
+              onNext={goNext}
+            />
           }
         >
           {!currentPage || currentPage.items.length === 0 ? (
