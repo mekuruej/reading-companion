@@ -15,6 +15,7 @@ import { TeacherFollowAlongLoadingState } from "./components/TeacherFollowAlongL
 import { TeacherFollowAlongAccessState } from "./components/TeacherFollowAlongAccessState";
 import { TeacherFollowAlongHeader } from "./components/TeacherFollowAlongHeader";
 import { TeacherFollowAlongBookBar } from "./components/TeacherFollowAlongBookBar";
+import { TeacherFollowAlongEmptyPageState } from "./components/TeacherFollowAlongEmptyPageState";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type SupportMode = "full" | "reading" | "meaning";
@@ -301,9 +302,7 @@ export default function TeacherFollowAlongPage() {
           }
         >
           {!currentPage || currentPage.items.length === 0 ? (
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 text-center text-sm text-stone-500">
-              No teacher prep items for this page yet.
-            </div>
+            <TeacherFollowAlongEmptyPageState />
           ) : (
             <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
               {currentPage.items.map((item, index) => {
