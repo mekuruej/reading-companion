@@ -4,7 +4,38 @@ No-code refactor/status map for:
 
 `app/(protected)/community/stats/page.tsx`
 
-Current size: about 536 lines.
+Original size: about 536 lines.
+
+Current observed size after visual extraction pass: 426 lines.
+
+Current status: `Visual pass done / good stopping point`.
+
+The first safe presentational extraction pass has been completed. The page now imports local stats components from:
+
+`app/(protected)/community/stats/components/`
+
+Extracted components:
+* `CommunityStatsHeader`
+* `StatsErrorBanner`
+* `MonthlyStatMiniCard`
+* `MonthlySnapshotCard`
+* `ColorSnapshotMiniCard`
+* `ColorSnapshotCard`
+* `StatsNavCard`
+* `StatsExploreSection`
+
+Data loading, current-user ownership scoping, monthly snapshot calculations, color total loading, helper functions, page-local types, and `statCards` navigation data remain in `page.tsx`, which matches the intended first-pass boundary.
+
+Remaining cleanup candidates:
+* `Link` is still imported in `page.tsx`, but navigation is now rendered through extracted components.
+* `supabase.auth.getSession()` runs in two separate effects. This is behaviorally fine, but could be consolidated later with care.
+* `monthStartYmd()` and `monthStartDate()` calculate the current month start in different formats.
+* `SessionRow.minutes_read` is selected but not used in the hub snapshot.
+* `WordRow.user_book_id` is selected but not used after filtering by owned book IDs.
+* `statCards` has two cards tagged `Snapshot details`, which is not wrong but may be generic.
+* If no session user is found, the page silently shows zeroed snapshots. This appears consistent with protected routing, but should be remembered.
+
+These are behavior-aware cleanup candidates, not first-pass visual extraction work.
 
 ## Current Page Purpose
 
@@ -203,7 +234,9 @@ Current render sections:
 * Explore more stats heading
 * stats navigation card grid
 
-## Recommended First-Pass Visual Extractions
+## First-Pass Visual Extractions
+
+Status: completed.
 
 Only extract presentational UI. Keep data loading, stats calculations, navigation data, helpers, and page-local types in `page.tsx`.
 
@@ -447,20 +480,20 @@ Do not remove anything yet.
 * `statCards` includes two cards tagged `Snapshot details`. This is fine, but those tags may be better clarified later if the hub card language is revised.
 * The page has no explicit full-access gate. That appears consistent with the protected user stats area, but should not be changed during visual extraction.
 
-## Recommended First Pass
+## Completed First Pass
 
-Suggested safest order:
+Completed extraction order:
 
-1. Extract `CommunityStatsHeader`.
-2. Extract `StatsErrorBanner`.
-3. Extract `MonthlyStatMiniCard`.
-4. Extract `MonthlySnapshotCard`.
-5. Extract `ColorSnapshotMiniCard`.
-6. Extract `ColorSnapshotCard`.
-7. Extract `StatsNavCard`.
-8. Extract `StatsExploreSection`.
+1. Extracted `CommunityStatsHeader`.
+2. Extracted `StatsErrorBanner`.
+3. Extracted `MonthlyStatMiniCard`.
+4. Extracted `MonthlySnapshotCard`.
+5. Extracted `ColorSnapshotMiniCard`.
+6. Extracted `ColorSnapshotCard`.
+7. Extracted `StatsNavCard`.
+8. Extracted `StatsExploreSection`.
 
-Stop there for the first visual pass.
+Good stopping point reached for the first visual pass.
 
 Do not move:
 * Supabase session loading
@@ -475,11 +508,6 @@ Do not move:
 
 After the visual pass, the page can be revisited for small cleanup of duplicate session loading and unused selected fields, but that should be a separate behavior-aware cleanup pass.
 
-* Extracted `CommunityStatsHeader`
-* Extracted `StatsErrorBanner`
-* Extracted `MonthlyStatMiniCard`
-* Extracted `MonthlySnapshotCard`
-* Extracted `ColorSnapshotMiniCard`
-* Extracted `ColorSnapshotCard`
-* Extracted `StatsNavCard`
-* Extracted `StatsExploreSection`
+## Current Tracker Row
+
+`- [x] Visual pass done / good stopping point | app/(protected)/community/stats/page.tsx | 536 | 426 | -110 |`

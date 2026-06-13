@@ -4,7 +4,39 @@ No-code refactor/status map for:
 
 `app/(protected)/discovery/page.tsx`
 
-Current size: about 538 lines.
+Original size: about 542 lines.
+
+Current observed size after visual extraction pass: 463 lines.
+
+Current status: `Visual pass done / good stopping point`.
+
+The first safe presentational extraction pass has been completed. The page now imports local discovery components from:
+
+`app/(protected)/discovery/components/`
+
+Extracted components:
+* `DiscoveryHubHeader`
+* `DiscoveryErrorBanner`
+* `DiscoveryCardGrid`
+* `DiscoveryPreviewState`
+* `DiscoveryPreviewBookCard`
+* `DiscoveryPreviewSection`
+
+The `DiscoveryNavCard` work appears to be owned internally by the card grid/component layer rather than directly by `page.tsx`.
+
+Data loading, anonymous public signal mapping, grouping/filtering/sorting, route choices, helper functions, and page-local display types remain in `page.tsx`, which is the intended first-pass boundary.
+
+Remaining cleanup candidates:
+* `Link` is still imported in `page.tsx`, but navigation is now rendered through extracted components.
+* `SortMode`, `sortMode`, `setSortMode`, `bookTypeFilter`, `setBookTypeFilter`, `readerLevelFilter`, and `setReaderLevelFilter` remain even though the hub does not render visible controls for them.
+* `bookTypeOptions` and `readerLevelOptions` are derived but not rendered.
+* `profileLevelsByUserId` is always reset to `{}`.
+* `effectiveReaderLevel` still supports profile fallback even though mapped public signal rows set `user_id: null`.
+* `bookSignalSentence` appears unused.
+* `PublicRecommendationSignalRow.reader_advice` is selected but not displayed on this hub preview.
+* The preview calculates average entertainment and difficulty ratings, but currently displays latest-signal difficulty only.
+
+These are behavior-aware cleanup candidates, not first-pass visual extraction work.
 
 ## Current Page Purpose
 
@@ -207,7 +239,9 @@ Current render sections:
 * preview card title, author/type, reader level
 * preview card difficulty rating
 
-## Recommended First-Pass Visual Extractions
+## First-Pass Visual Extractions
+
+Status: completed.
 
 Only extract presentational UI. Keep data loading, derivation, navigation data, helpers, and page-local types in `page.tsx`.
 
@@ -478,19 +512,18 @@ Do not remove anything yet.
 * `PublicRecommendationSignalRow.reader_advice` is loaded but not shown on the hub preview. This may be intentional because advice belongs on the full Find Your Next Book page.
 * The preview currently shows latest-signal difficulty only. It calculates average entertainment and average difficulty, but the hub preview does not display those averages.
 
-## Recommended First Pass
+## Completed First Pass
 
-Suggested safest order:
+Completed extraction order:
 
-1. Extract `DiscoveryHubHeader`.
-2. Extract `DiscoveryErrorBanner`.
-3. Extract `DiscoveryNavCard`.
-4. Extract `DiscoveryCardGrid`.
-5. Extract `DiscoveryPreviewState`.
-6. Extract `DiscoveryPreviewBookCard`.
-7. Extract `DiscoveryPreviewSection`.
+1. Extracted `DiscoveryHubHeader`.
+2. Extracted `DiscoveryErrorBanner`.
+3. Extracted `DiscoveryCardGrid`.
+4. Extracted `DiscoveryPreviewState`.
+5. Extracted `DiscoveryPreviewBookCard`.
+6. Extracted `DiscoveryPreviewSection`.
 
-Stop there for the first visual pass.
+Good stopping point reached for the first visual pass.
 
 Do not move:
 * anonymous signal loading
@@ -502,10 +535,6 @@ Do not move:
 
 After the visual pass, the page can be revisited for cleanup of unused filter/profile remnants, but that should be a separate behavior-aware cleanup pass.
 
-* Extracted `DiscoveryHubHeader`
-* Extracted `DiscoveryErrorBanner`
-* Extracted `DiscoveryNavCard`
-* Extracted `DiscoveryCardGrid`
-* Extracted `DiscoveryPreviewState`
-* Extracted `DiscoveryPreviewBookCard`
-* Extracted `DiscoveryPreviewSection`
+## Current Tracker Row
+
+`- [x] Visual pass done / good stopping point | app/(protected)/discovery/page.tsx | 542 | 463 | -79 |`

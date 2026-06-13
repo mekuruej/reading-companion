@@ -4,7 +4,30 @@ No-code refactor/status map for:
 
 `app/(protected)/books/add/page.tsx`
 
-Current size: about 703 lines.
+Original size: about 703 lines.
+
+Current size after visual extraction pass: about 506 lines.
+
+Current status: `Visual pass mostly done / architecture deferred`.
+
+The first safe presentational extraction pass has been completed. The page now imports local visual components from:
+
+`app/(protected)/books/add/components/`
+
+Extracted components:
+* `AddBookLookupCard`
+* `AddBookMessagePanel`
+* `AddBookLibraryNotice`
+* `LookupBookPreviewCard`
+* `AddBookDestinationPanel`
+* `AddBookActionRow`
+
+Data loading, access/role checks, ISBN lookup behavior, add-by-ISBN calls, request behavior, helper functions, and page-local types remain in `page.tsx`, which matches the intended first-pass boundary.
+
+Remaining visual polish:
+* `AddBookMessagePanel` still treats every `error` message as red. This includes the success-style request confirmation message from `handleRequestBook`. A small future UI cleanup should split lookup/add failures from request-sent success messaging, or add a tone prop.
+
+Architecture work is intentionally deferred.
 
 ## Current Page Purpose
 
@@ -234,7 +257,9 @@ Current render order:
 * add/open global review button
 * cancel button
 
-## Recommended First-Pass Visual Extractions
+## First-Pass Visual Extractions
+
+Status: completed.
 
 Only extract presentational JSX. Keep all access, data loading, API calls, request behavior, helpers, and handlers in `page.tsx`.
 
@@ -456,15 +481,19 @@ Do not remove anything yet.
 * `isNewToMekuru` checks both `source` and `metadata_source` fields. This matches the flexible lookup shape, but should simplify after response shape stabilization.
 * Teacher destination defaults use the first option when switching modes. If there are no linked students/users, `destinationUserId` becomes empty and the add handler blocks safely.
 
-## Recommended First Pass
+## Completed First Pass
 
-1. Extract `AddBookLookupCard`.
-2. Extract `AddBookMessagePanel`.
-3. Extract `AddBookLibraryNotice`.
-4. Extract `LookupBookPreviewCard`.
-5. Extract `AddBookActionRow`.
-6. Extract `AddBookDestinationPanel` last.
+1. Extracted `AddBookLookupCard`.
+2. Extracted `AddBookMessagePanel`.
+3. Extracted `AddBookLibraryNotice`.
+4. Extracted `LookupBookPreviewCard`.
+5. Extracted `AddBookActionRow`.
+6. Extracted `AddBookDestinationPanel`.
 
-Stop there for the first pass.
+Good stopping point reached for the first pass.
 
 Leave access, Supabase queries, ISBN lookup, add-by-ISBN calls, request behavior, helpers, and derived values in `page.tsx`.
+
+## Current Tracker Row
+
+`- [x] Visual pass mostly done / architecture deferred | app/(protected)/books/add/page.tsx | 703 | 506 | -197 |`
