@@ -14,6 +14,7 @@ import ReadAlongReaderShell from "../../../../books/[userBookId]/readalong/compo
 import ReadAlongSupportModeTabs from "../../../../books/[userBookId]/readalong/components/ReadAlongSupportModeTabs";
 import { TeacherFollowAlongLoadingState } from "./components/TeacherFollowAlongLoadingState";
 import { TeacherFollowAlongAccessState } from "./components/TeacherFollowAlongAccessState";
+import { TeacherFollowAlongHeader } from "./components/TeacherFollowAlongHeader";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type SupportMode = "full" | "reading" | "meaning";
@@ -260,15 +261,7 @@ export default function TeacherFollowAlongPage() {
   return (
     <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
       <div className="mx-auto max-w-4xl space-y-4">
-        <header>
-          <h1 className="text-2xl font-semibold text-stone-900">
-            Teacher Follow-Along
-          </h1>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-stone-600">
-            Use your prepared words, phrases, grammar notes, sentence translations,
-            and teaching notes as light support during a lesson.
-          </p>
-        </header>
+        <TeacherFollowAlongHeader />
 
         <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
           <Link
