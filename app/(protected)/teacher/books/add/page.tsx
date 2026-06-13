@@ -10,6 +10,7 @@ import { TeacherBookAddLoadingState } from "./components/TeacherBookAddLoadingSt
 import { TeacherBookAddAccessState } from "./components/TeacherBookAddAccessState";
 import { TeacherBookAddHeader } from "./components/TeacherBookAddHeader";
 import { TeacherBookAddMessageBanner } from "./components/TeacherBookAddMessageBanner";
+import { TeacherBookInfoSectionHeader } from "./components/TeacherBookInfoSectionHeader";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -1109,27 +1110,7 @@ export default function TeacherAddBookPage() {
 
             {currentBookId && currentBook ? (
                 <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <h2 className="text-lg font-black text-stone-900">
-                                Shared Book Info
-                            </h2>
-                            <p className="mt-1 text-sm text-stone-500">
-                                This uses the same editing surface as the Book Hub Book Info tab.
-                            </p>
-                        </div>
-
-                        {missingFields.length > 0 ? (
-                            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                                <span className="font-bold">Missing:</span>{" "}
-                                {missingFields.join(", ")}
-                            </div>
-                        ) : (
-                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                                Core info complete
-                            </div>
-                        )}
-                    </div>
+                    <TeacherBookInfoSectionHeader missingFields={missingFields} />
 
                     <BookInfoTab
                         book={currentBook as any}
