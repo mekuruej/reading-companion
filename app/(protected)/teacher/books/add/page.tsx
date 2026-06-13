@@ -11,6 +11,7 @@ import { TeacherBookAddAccessState } from "./components/TeacherBookAddAccessStat
 import { TeacherBookAddHeader } from "./components/TeacherBookAddHeader";
 import { TeacherBookAddMessageBanner } from "./components/TeacherBookAddMessageBanner";
 import { TeacherBookInfoSectionHeader } from "./components/TeacherBookInfoSectionHeader";
+import { TeacherBookRequestPanel } from "./components/TeacherBookRequestPanel";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -18,11 +19,11 @@ const BOOK_TYPE_OPTIONS = [
     { value: "early_reader", label: "Early reader" },
     { value: "chapter_book", label: "Chapter book" },
     { value: "middle_grade", label: "Middle grade" },
-    { value: "young_adult", label: "Young adult" },
+    { value: "ya", label: "YA" },
     { value: "novel", label: "Novel" },
     { value: "short_story", label: "Short Story" },
     { value: "manga", label: "Manga" },
-    { value: "graded_reader", label: "Graded reader" },
+    { value: "nonfiction", label: "Nonfiction" },
     { value: "textbook", label: "Textbook" },
     { value: "other", label: "Other" },
 ];
@@ -856,64 +857,17 @@ export default function TeacherAddBookPage() {
 
     return (
         <main className="mx-auto max-w-4xl p-6">
-            <TeacherBookAddHeader isEditing={isEditMode} />
-
-            <h1 className="mt-4 text-3xl font-black text-stone-900">
-                {isEditMode || currentBookId ? "Edit Global Book" : "Add Global Book"}
-            </h1>
-
-            <p className="mt-2 text-stone-600">
-                Create or update a shared catalog book. This does not add the book to a
-                student library.
-            </p>
+            <TeacherBookAddHeader isEditing={isEditMode || !!currentBookId} />
 
             {bookRequest ? (
-                <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-                        Pending Book Request
-                    </p>
-                    <h2 className="mt-2 text-xl font-black text-stone-900">
-                        This request needs manual book entry.
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-stone-700">
-                        Mekuru could not find enough metadata automatically. Research the
-                        book from any clue below. ISBN is helpful when available, but it is
-                        not required for manual entry.
-                    </p>
-
-                    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                        <div>
-                            <dt className="font-semibold text-stone-600">Requested title</dt>
-                            <dd className="text-stone-900">{bookRequest.title || "—"}</dd>
-                        </div>
-                        <div>
-                            <dt className="font-semibold text-stone-600">Author</dt>
-                            <dd className="text-stone-900">{bookRequest.author || "—"}</dd>
-                        </div>
-                        <div>
-                            <dt className="font-semibold text-stone-600">ISBN</dt>
-                            <dd className="text-stone-900">{bookRequest.isbn13 || "—"}</dd>
-                        </div>
-                        <div>
-                            <dt className="font-semibold text-stone-600">Status</dt>
-                            <dd className="text-stone-900">{bookRequest.status || "pending"}</dd>
-                        </div>
-                    </dl>
-
-                    <div className="mt-5 border-t border-amber-200 pt-4">
-                        <button
-                            type="button"
-                            onClick={rejectBookRequest}
-                            disabled={saving}
-                            className="rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                        >
-                            {saving ? "Updating..." : "Reject Request"}
-                        </button>
-                        <p className="mt-2 text-xs leading-5 text-amber-800">
-                            Use this if this request should not become a global book. Mekuru will keep the request history.
-                        </p>
-                    </div>
-                </section>
+                <TeacherBookRequestPanel
+                    title={bookRequest.title}
+                    author={bookRequest.author}
+                    isbn13={bookRequest.isbn13}
+                    status={bookRequest.status}
+                    saving={saving}
+                    onReject={rejectBookRequest}
+                />
             ) : null}
 
             {showFindOrCreatePanel ? (
