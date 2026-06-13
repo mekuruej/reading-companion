@@ -3,12 +3,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BookInfoTab from "../../../books/[userBookId]/components/BookInfoTab";
 import { TeacherBookAddLoadingState } from "./components/TeacherBookAddLoadingState";
 import { TeacherBookAddAccessState } from "./components/TeacherBookAddAccessState";
+import { TeacherBookAddHeader } from "./components/TeacherBookAddHeader";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -854,12 +854,7 @@ export default function TeacherAddBookPage() {
 
     return (
         <main className="mx-auto max-w-4xl p-6">
-            <Link
-                href="/teacher/books"
-                className="text-sm font-medium text-stone-600 underline"
-            >
-                ← Books Needing My Attention
-            </Link>
+            <TeacherBookAddHeader isEditing={isEditMode} />
 
             <h1 className="mt-4 text-3xl font-black text-stone-900">
                 {isEditMode || currentBookId ? "Edit Global Book" : "Add Global Book"}
