@@ -18,6 +18,7 @@ import { TeacherBookFindCreateActions } from "./components/TeacherBookFindCreate
 import { TeacherBookFindCreateFields } from "./components/TeacherBookFindCreateFields";
 import { TeacherBookFindCreatePanel } from "./components/TeacherBookFindCreatePanel";
 import { TeacherBookInfoSection } from "./components/TeacherBookInfoSection";
+import { TeacherBookAddPageShell } from "./components/TeacherBookAddPageShell";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -897,7 +898,7 @@ export default function TeacherAddBookPage() {
     const showFindOrCreatePanel = !currentBookId || !!bookRequest;
 
     return (
-        <main className="mx-auto max-w-4xl p-6">
+        <TeacherBookAddPageShell>
             <TeacherBookAddHeader isEditing={isEditMode || !!currentBookId} />
 
             {bookRequest ? (
@@ -1045,7 +1046,7 @@ export default function TeacherAddBookPage() {
             ) : null}
 
             <TeacherBookAddMessageBanner message={message} tone={messageTone(message)} />
-        </main>
+        </TeacherBookAddPageShell>
     );
 }
 
