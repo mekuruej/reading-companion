@@ -15,6 +15,7 @@ import { TeacherBookRequestPanel } from "./components/TeacherBookRequestPanel";
 import { TeacherBookIsbnPreviewCard } from "./components/TeacherBookIsbnPreviewCard";
 import { TeacherBookAddHelpCard } from "./components/TeacherBookAddHelpCard";
 import { TeacherBookFindCreateActions } from "./components/TeacherBookFindCreateActions";
+import { TeacherBookFindCreateFields } from "./components/TeacherBookFindCreateFields";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -114,6 +115,39 @@ function metadataSourceLabel(value: IsbnLookupPreview["metadata_source"]) {
 
 function bookTypeLabel(value: string | null | undefined) {
     return BOOK_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? "—";
+}
+
+function messageTone(message: string): "neutral" | "success" | "error" {
+    if (!message) return "neutral";
+
+    const lowerMessage = message.toLowerCase();
+
+    if (
+        lowerMessage.includes("failed") ||
+        lowerMessage.includes("could not") ||
+        lowerMessage.includes("please enter") ||
+        lowerMessage.includes("required") ||
+        lowerMessage.includes("not found") ||
+        lowerMessage.includes("error") ||
+        lowerMessage.includes("violates")
+    ) {
+        return "error";
+    }
+
+    if (
+        lowerMessage.includes("saved") ||
+        lowerMessage.includes("created") ||
+        lowerMessage.includes("loaded") ||
+        lowerMessage.includes("marked as rejected")
+    ) {
+        return "success";
+    }
+
+    return "neutral";
+}
+
+function isErrorMessage(message: string) {
+    return messageTone(message) === "error";
 }
 
 function linksToText(links: any): string {
@@ -883,44 +917,18 @@ export default function TeacherAddBookPage() {
 
                     {bookRequest ? <TeacherBookAddHelpCard /> : null}
 
-                    <div className="mt-5 grid gap-5 md:grid-cols-2">
-                        <div>
-                            <label className="mb-1 block text-sm font-semibold">Title *</label>
-                            <input
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder={
-                                    bookRequest
-                                        ? "Enter the researched book title"
-                                        : "Book title"
-                                }
-                                className="w-full rounded-xl border border-slate-500 px-4 py-3"
-                            />
-                            {bookRequest && requestTitleNeedsManualResearch(bookRequest) ? (
-                                <p className="mt-2 text-xs font-medium text-amber-800">
-                                    The request only gave an ISBN, so the real title needs to be entered here.
-                                </p>
-                            ) : null}
-                        </div>
-
-                        <div>
-                            <label className="mb-1 block text-sm font-semibold">
-                                ISBN-13{" "}
-                                <span className="font-normal text-stone-500">
-                                    {bookRequest ? "(optional for manual entry)" : "*(Hyphens are okay.)"}
-                                </span>
-                            </label>
-                            <input
-                                value={isbn13}
-                                onChange={(e) => {
-                                    setIsbn13(e.target.value);
-                                    setIsbnLookupError("");
-                                    setIsbnLookupPreview(null);
-                                }}
-                                className="w-full rounded-xl border border-slate-500 px-4 py-3"
-                            />
-                        </div>
-                    </div>
+                    <TeacherBookFindCreateFields
+                        title={title}
+                        isbn13={isbn13}
+                        isBookRequest={Boolean(bookRequest)}
+                        titleNeedsManualResearch={requestTitleNeedsManualResearch(bookRequest)}
+                        onTitleChange={setTitle}
+                        onIsbn13Change={(value) => {
+                            setIsbn13(value);
+                            setIsbnLookupError("");
+                            setIsbnLookupPreview(null);
+                        }}
+                    />
 
                     <TeacherBookFindCreateActions
                         isbnLookupLoading={isbnLookupLoading}
@@ -956,7 +964,7 @@ export default function TeacherAddBookPage() {
                         isEditingLinks={editingPanel === "bookInfoLinks"}
                         isEditingMyCopy={false}
                         saving={saving}
-                        errorMessage={message || null}
+                        errorMessage={isErrorMessage(message) ? message : null}
                         canCreateSharedRecords={false}
                         onEditBookInfo={() => setEditingPanel("bookInfoDetails")}
                         onEditPeople={() => setEditingPanel("bookInfoPeople")}
@@ -1039,7 +1047,7 @@ export default function TeacherAddBookPage() {
                 </section>
             ) : null}
 
-            <TeacherBookAddMessageBanner message={message} />
+            <TeacherBookAddMessageBanner message={message} tone={messageTone(message)} />
         </main>
     );
 }
