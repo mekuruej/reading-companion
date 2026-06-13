@@ -17,6 +17,7 @@ import { TeacherBookAddHelpCard } from "./components/TeacherBookAddHelpCard";
 import { TeacherBookFindCreateActions } from "./components/TeacherBookFindCreateActions";
 import { TeacherBookFindCreateFields } from "./components/TeacherBookFindCreateFields";
 import { TeacherBookFindCreatePanel } from "./components/TeacherBookFindCreatePanel";
+import { TeacherBookInfoSection } from "./components/TeacherBookInfoSection";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -950,8 +951,7 @@ export default function TeacherAddBookPage() {
             ) : null}
 
             {currentBookId && currentBook ? (
-                <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                    <TeacherBookInfoSectionHeader missingFields={missingFields} />
+                <TeacherBookInfoSection missingFields={missingFields}>
 
                     <BookInfoTab
                         book={currentBook as any}
@@ -1041,7 +1041,7 @@ export default function TeacherAddBookPage() {
                         Detail={Detail}
                         PersonRow={PersonRow}
                     />
-                </section>
+                </TeacherBookInfoSection>
             ) : null}
 
             <TeacherBookAddMessageBanner message={message} tone={messageTone(message)} />
