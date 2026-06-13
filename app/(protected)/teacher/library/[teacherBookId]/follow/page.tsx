@@ -13,6 +13,7 @@ import ReadAlongPageNavigator from "../../../../books/[userBookId]/readalong/com
 import ReadAlongReaderShell from "../../../../books/[userBookId]/readalong/components/ReadAlongReaderShell";
 import ReadAlongSupportModeTabs from "../../../../books/[userBookId]/readalong/components/ReadAlongSupportModeTabs";
 import { TeacherFollowAlongLoadingState } from "./components/TeacherFollowAlongLoadingState";
+import { TeacherFollowAlongAccessState } from "./components/TeacherFollowAlongAccessState";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type SupportMode = "full" | "reading" | "meaning";
@@ -253,13 +254,7 @@ export default function TeacherFollowAlongPage() {
   }
 
   if (!canAccess || !teacherBook) {
-    return (
-      <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadow-sm">
-          {message || "Teacher access is required."}
-        </div>
-      </main>
-    );
+    return <TeacherFollowAlongAccessState message={message} />;
   }
 
   return (
@@ -367,8 +362,8 @@ export default function TeacherFollowAlongPage() {
                     key={item.id}
                     onClick={() => setFadedThroughIndex(index)}
                     className={`relative cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
-                        ? "border-stone-200 bg-stone-50 opacity-35"
-                        : "border-stone-200 bg-white hover:bg-stone-50"
+                      ? "border-stone-200 bg-stone-50 opacity-35"
+                      : "border-stone-200 bg-white hover:bg-stone-50"
                       }`}
                   >
                     <div className="mb-2 flex flex-wrap gap-2">
