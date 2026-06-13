@@ -9,6 +9,7 @@ import BookInfoTab from "../../../books/[userBookId]/components/BookInfoTab";
 import { TeacherBookAddLoadingState } from "./components/TeacherBookAddLoadingState";
 import { TeacherBookAddAccessState } from "./components/TeacherBookAddAccessState";
 import { TeacherBookAddHeader } from "./components/TeacherBookAddHeader";
+import { TeacherBookAddMessageBanner } from "./components/TeacherBookAddMessageBanner";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -1221,11 +1222,7 @@ export default function TeacherAddBookPage() {
                 </section>
             ) : null}
 
-            {message ? (
-                <p className="mt-5 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
-                    {message}
-                </p>
-            ) : null}
+            <TeacherBookAddMessageBanner message={message} />
         </main>
     );
 }
