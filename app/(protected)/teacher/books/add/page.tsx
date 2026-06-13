@@ -14,6 +14,7 @@ import { TeacherBookInfoSectionHeader } from "./components/TeacherBookInfoSectio
 import { TeacherBookRequestPanel } from "./components/TeacherBookRequestPanel";
 import { TeacherBookIsbnPreviewCard } from "./components/TeacherBookIsbnPreviewCard";
 import { TeacherBookAddHelpCard } from "./components/TeacherBookAddHelpCard";
+import { TeacherBookFindCreateActions } from "./components/TeacherBookFindCreateActions";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -26,6 +27,8 @@ const BOOK_TYPE_OPTIONS = [
     { value: "short_story", label: "Short Story" },
     { value: "manga", label: "Manga" },
     { value: "nonfiction", label: "Nonfiction" },
+    { value: "essay", label: "Essay" },
+    { value: "memoir", label: "Memoir" },
     { value: "textbook", label: "Textbook" },
     { value: "other", label: "Other" },
 ];
@@ -919,42 +922,16 @@ export default function TeacherAddBookPage() {
                         </div>
                     </div>
 
-                    <div className="mt-5 flex flex-wrap gap-3">
-                        <button
-                            onClick={lookupIsbnPreview}
-                            disabled={isbnLookupLoading || !isbn13.trim()}
-                            type="button"
-                            className="rounded-2xl border border-sky-300 bg-white px-5 py-3 font-semibold text-sky-900 hover:bg-sky-50 disabled:opacity-50"
-                        >
-                            {isbnLookupLoading ? "Looking up..." : "Look up ISBN"}
-                        </button>
-
-                        <button
-                            onClick={createOrLoadByIsbn}
-                            disabled={saving}
-                            className="rounded-2xl bg-stone-900 px-5 py-3 font-semibold text-white hover:bg-black disabled:opacity-50"
-                        >
-                            {saving
-                                ? "Working..."
-                                : bookRequest
-                                    ? "Create Manual Book Entry"
-                                    : "Create / Load by ISBN"}
-                        </button>
-
-                        <button
-                            onClick={clearForm}
-                            type="button"
-                            className="rounded-2xl border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-700 hover:bg-stone-50"
-                        >
-                            Clear
-                        </button>
-                    </div>
-
-                    {isbnLookupError ? (
-                        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {isbnLookupError}
-                        </div>
-                    ) : null}
+                    <TeacherBookFindCreateActions
+                        isbnLookupLoading={isbnLookupLoading}
+                        hasIsbnValue={Boolean(isbn13.trim())}
+                        saving={saving}
+                        isBookRequest={Boolean(bookRequest)}
+                        isbnLookupError={isbnLookupError}
+                        onLookupIsbn={lookupIsbnPreview}
+                        onCreateOrLoad={createOrLoadByIsbn}
+                        onClear={clearForm}
+                    />
 
                     {isbnLookupPreview ? (
                         <TeacherBookIsbnPreviewCard
