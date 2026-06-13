@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabaseClient";
 import ReadAlongPageNavigator from "../../../../books/[userBookId]/readalong/components/ReadAlongPageNavigator";
 import ReadAlongReaderShell from "../../../../books/[userBookId]/readalong/components/ReadAlongReaderShell";
 import ReadAlongSupportModeTabs from "../../../../books/[userBookId]/readalong/components/ReadAlongSupportModeTabs";
+import { TeacherFollowAlongLoadingState } from "./components/TeacherFollowAlongLoadingState";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
 type SupportMode = "full" | "reading" | "meaning";
@@ -248,13 +249,7 @@ export default function TeacherFollowAlongPage() {
   const book = firstBook(teacherBook?.books ?? null);
 
   if (loading) {
-    return (
-      <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500 shadow-sm">
-          Loading follow-along support...
-        </div>
-      </main>
-    );
+    return <TeacherFollowAlongLoadingState />;
   }
 
   if (!canAccess || !teacherBook) {
@@ -371,11 +366,10 @@ export default function TeacherFollowAlongPage() {
                   <article
                     key={item.id}
                     onClick={() => setFadedThroughIndex(index)}
-                    className={`relative cursor-pointer rounded-2xl border px-4 py-3 transition ${
-                      isFaded
+                    className={`relative cursor-pointer rounded-2xl border px-4 py-3 transition ${isFaded
                         ? "border-stone-200 bg-stone-50 opacity-35"
                         : "border-stone-200 bg-white hover:bg-stone-50"
-                    }`}
+                      }`}
                   >
                     <div className="mb-2 flex flex-wrap gap-2">
                       <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${itemTypeTone(item.item_type)}`}>
