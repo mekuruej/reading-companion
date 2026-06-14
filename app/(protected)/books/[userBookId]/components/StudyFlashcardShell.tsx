@@ -17,13 +17,12 @@ export default function StudyFlashcardShell({
       className="
         relative
         flex
-        min-h-[30vh] w-full max-w-2xl
+        min-h-72 w-[90vw] max-w-xl
         cursor-pointer select-none
         items-center justify-center
         rounded-2xl border border-slate-500
-        bg-white p-6 text-center
+        bg-white p-8 text-center
         shadow-2xl
-        sm:min-h-[36vh]
       "
     >
       {children}

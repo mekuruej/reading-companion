@@ -25,6 +25,8 @@ import KanjiAnswerStyleSelector from "../components/KanjiAnswerStyleSelector";
 import KanjiStudyTypingAnswer from "../components/KanjiStudyTypingAnswer";
 import KanjiStudyNoCardsState from "../components/KanjiStudyNoCardsState";
 
+const KANJI_AUTO_ADVANCE_MS = 3000;
+
 type UserBookWordRow = {
   id: string;
   user_book_id: string;
@@ -737,7 +739,7 @@ export default function KanjiReadingStudyPage() {
 
     const timer = window.setTimeout(() => {
       nextCard();
-    }, 4000);
+    }, KANJI_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [checked, inRecallFlow, autoAdvancePaused]);
@@ -748,7 +750,7 @@ export default function KanjiReadingStudyPage() {
 
     const timer = window.setTimeout(() => {
       nextCard();
-    }, 4000);
+    }, KANJI_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [recallRevealed, recallResult, recallMatchedWord, autoAdvancePaused]);

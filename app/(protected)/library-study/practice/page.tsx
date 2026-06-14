@@ -174,6 +174,7 @@ type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
 type PracticeRevealStep = "word" | "reading" | "meaning";
 type PracticeStudyMode = "reveal" | "typing";
 type PracticeTypingStep = "reading" | "meaning";
+type PracticeTypingAdvance = "meaning" | "next";
 type PracticeColorFilter =
   | "all"
   | "red"
@@ -192,6 +193,7 @@ const REGULAR_GATE_RECHECK_WINDOW_DAYS = 3;
 const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
+const LIBRARY_REVIEW_AUTO_ADVANCE_MS = 3000;
 
 function nextPracticeStudyMode(mode: PracticeStudyMode): PracticeStudyMode {
   return mode === "reveal" ? "typing" : "reveal";
@@ -582,7 +584,7 @@ function makeClaimStudyCard(
 function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base =
-    "relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border bg-white p-6 text-center shadow-2xl transition-colors sm:min-h-[36vh]";
+    "relative flex min-h-72 w-[90vw] max-w-xl items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl transition-colors";
 
   if (color === "green") return `${base} border-emerald-100`;
   if (color === "blue") return `${base} border-sky-100`;
@@ -972,6 +974,9 @@ function LibraryPracticePanel({
     label: string;
   }>(null);
   const [typingMissedStep, setTypingMissedStep] = useState<PracticeTypingStep | null>(null);
+  const [autoAdvancePaused, setAutoAdvancePaused] = useState(false);
+  const [pendingTypingAdvance, setPendingTypingAdvance] =
+    useState<PracticeTypingAdvance | null>(null);
   const typingPracticeInputRef = useRef<HTMLInputElement | null>(null);
 
   function focusTypingPracticeInput() {
@@ -988,6 +993,8 @@ function LibraryPracticePanel({
     setTypingInput("");
     setTypingFeedback(null);
     setTypingMissedStep(null);
+    setAutoAdvancePaused(false);
+    setPendingTypingAdvance(null);
   }, [card?.id, practiceMode]);
 
   useEffect(() => {
@@ -998,6 +1005,33 @@ function LibraryPracticePanel({
 
     return () => window.clearTimeout(timer);
   }, [card?.id, practiceMode, typingFeedback, typingStep]);
+
+  useEffect(() => {
+    if (!pendingTypingAdvance) return;
+    if (autoAdvancePaused) return;
+
+    const timer = window.setTimeout(() => {
+      if (pendingTypingAdvance === "meaning") {
+        setTypingStep("meaning");
+        setTypingInput("");
+        setTypingFeedback(null);
+        setTypingMissedStep(null);
+        setPendingTypingAdvance(null);
+        focusTypingPracticeInput();
+        return;
+      }
+
+      setTypingStep("reading");
+      setTypingInput("");
+      setTypingFeedback(null);
+      setTypingMissedStep(null);
+      setPendingTypingAdvance(null);
+      onNext();
+      focusTypingPracticeInput();
+    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingTypingAdvance, autoAdvancePaused, onNext]);
 
   if (!card) {
     return <LibraryPracticeNoCardsState />;
@@ -1028,14 +1062,7 @@ function LibraryPracticePanel({
       }
 
       setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
-
-      window.setTimeout(() => {
-        setTypingStep("meaning");
-        setTypingInput("");
-        setTypingFeedback(null);
-        setTypingMissedStep(null);
-        focusTypingPracticeInput();
-      }, 4000);
+      setPendingTypingAdvance("meaning");
       return;
     }
 
@@ -1055,24 +1082,16 @@ function LibraryPracticePanel({
       onMeaningAnswered(card, userAnswer, correctAnswer, true);
     }
     setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
-
-    window.setTimeout(() => {
-      setTypingStep("reading");
-      setTypingInput("");
-      setTypingFeedback(null);
-      setTypingMissedStep(null);
-      onNext();
-      focusTypingPracticeInput();
-    }, 4000);
+    setPendingTypingAdvance("next");
   }
 
   return (
-    <div className="w-full max-w-2xl space-y-2">
+    <div className="w-full max-w-xl space-y-2">
       {practiceMode === "reveal" ? (
         <button
           type="button"
           onClick={onAdvance}
-          className="relative flex min-h-[30vh] w-full max-w-2xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[36vh]"
+          className="relative flex min-h-72 w-[90vw] max-w-xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300"
         >
           <LibraryPracticeCardBadges
             modeLabel="Review"
@@ -1115,7 +1134,7 @@ function LibraryPracticePanel({
         </button>
       ) : (
 
-        <div className="relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[36vh]">
+        <div className="relative flex min-h-72 w-[90vw] max-w-xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl">
           <LibraryPracticeCardBadges
             modeLabel="Typing Practice"
             jlpt={card.jlpt}
@@ -1180,7 +1199,9 @@ function LibraryPracticePanel({
                   </div>
                   <p className="mt-2 text-xs font-medium text-slate-500">
                     {typingFeedback.ok
-                      ? "Next card comes automatically."
+                      ? pendingTypingAdvance === "meaning"
+                        ? "Meaning check comes automatically."
+                        : "Next card comes automatically."
                       : typingStep === "reading"
                         ? "Retype the reading once to continue."
                         : "Type one meaning word once to continue."}
@@ -1195,6 +1216,23 @@ function LibraryPracticePanel({
                   Show answer
                 </button>
               )}
+
+              {pendingTypingAdvance ? (
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAutoAdvancePaused((current) => !current)}
+                    className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    {autoAdvancePaused ? "Resume" : "Pause"}
+                  </button>
+                  <p className="text-xs text-slate-400">
+                    {autoAdvancePaused
+                      ? "Paused. Take your time with this card."
+                      : "Next step comes automatically."}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -2102,7 +2140,7 @@ export default function LibraryStudyPage() {
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, 4000);
+    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [checked]);
@@ -2112,7 +2150,7 @@ export default function LibraryStudyPage() {
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, 4000);
+    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [firstStepChecked]);
@@ -2122,7 +2160,7 @@ export default function LibraryStudyPage() {
 
     const timer = window.setTimeout(() => {
       movePastCurrentCard();
-    }, 4000);
+    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [secondStepChecked]);

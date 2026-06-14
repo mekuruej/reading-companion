@@ -37,6 +37,8 @@ import StudyCompleteState from "../components/StudyCompleteState";
 import StudyFullAccessLockedState from "../components/StudyFullAccessLockedState";
 import StudyFlashcardShell from "../components/StudyFlashcardShell";
 
+const FLASHCARD_AUTO_ADVANCE_MS = 3000;
+
 type StudySet =
   | "READING"
   | "READING_MC"
@@ -297,6 +299,7 @@ export default function BookFlashcardsPage() {
   );
   const [typeRevealIndex, setTypeRevealIndex] = useState(0);
   const [readyForNextCard, setReadyForNextCard] = useState(false);
+  const [autoAdvancePaused, setAutoAdvancePaused] = useState(false);
   const [lastTypedResult, setLastTypedResult] = useState<
     "revealed" | "correct" | "wrong" | null
   >(null);
@@ -1160,13 +1163,25 @@ export default function BookFlashcardsPage() {
       studySet !== "FROM_READING_MEANING_MC"
     ) return;
     if (!mcAnswered || !mcWasCorrect) return;
+    if (autoAdvancePaused) return;
 
     const timer = window.setTimeout(() => {
       goToNextWord("correct");
-    }, 4000);
+    }, FLASHCARD_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect]);
+  }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect, autoAdvancePaused]);
+
+  useEffect(() => {
+    if (!readyForNextCard) return;
+    if (autoAdvancePaused) return;
+
+    const timer = window.setTimeout(() => {
+      goToNextWord(lastTypedResult ?? "revealed");
+    }, FLASHCARD_AUTO_ADVANCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [readyForNextCard, lastTypedResult, autoAdvancePaused]);
 
   async function logStudyEvent(result: "revealed" | "correct" | "wrong") {
     if (!canAccessBook || !canUseStudyFlashcards) {
@@ -1372,7 +1387,6 @@ export default function BookFlashcardsPage() {
 
     const userAnsRaw = typedInput.trim();
     const userAns = kataToHira(userAnsRaw);
-    const firstAnswerResult = lastTypedResult === "wrong" ? "wrong" : "correct";
 
     if (studySet === "READING") {
       const correctReading = card.reading ?? "";
@@ -1386,10 +1400,7 @@ export default function BookFlashcardsPage() {
       if (ok) {
         setTypedFeedback({ ok: true, message: "You got it!" });
         setLastTypedResult("correct");
-
-        window.setTimeout(() => {
-          goToNextWord(firstAnswerResult);
-        }, 4000);
+        setReadyForNextCard(true);
 
         return;
       }
@@ -1415,11 +1426,7 @@ export default function BookFlashcardsPage() {
         });
         setTypeRevealIndex(steps.length - 1);
         setLastTypedResult("correct");
-        setReadyForNextCard(false);
-
-        window.setTimeout(() => {
-          goToNextWord(firstAnswerResult);
-        }, 4000);
+        setReadyForNextCard(true);
 
         return;
       }
@@ -1446,11 +1453,7 @@ export default function BookFlashcardsPage() {
         });
         setTypeRevealIndex(steps.length - 1);
         setLastTypedResult("correct");
-        setReadyForNextCard(false);
-
-        window.setTimeout(() => {
-          goToNextWord(firstAnswerResult);
-        }, 4000);
+        setReadyForNextCard(true);
 
         return;
       }
@@ -1556,9 +1559,8 @@ export default function BookFlashcardsPage() {
 
     setCorrectionFeedback(null);
     setCorrectionFeedback("Good. Moving to the next card...");
-    window.setTimeout(() => {
-      void goToNextWord("wrong");
-    }, 4000);
+    setLastTypedResult("wrong");
+    setReadyForNextCard(true);
   }
 
   function flip() {
@@ -2136,7 +2138,12 @@ export default function BookFlashcardsPage() {
                   : "Tap again for the next word"
           }
           canGoPrevious={filteredCards.length > 1}
+          showAutoAdvancePause={
+            readyForNextCard || Boolean(isMultipleChoiceMode && mcAnswered && mcWasCorrect)
+          }
+          autoAdvancePaused={autoAdvancePaused}
           onPrevious={prevCardReveal}
+          onToggleAutoAdvancePaused={() => setAutoAdvancePaused((prev) => !prev)}
         />
 
         <StudyBottomNavigation
