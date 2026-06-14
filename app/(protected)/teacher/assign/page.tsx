@@ -20,6 +20,7 @@ import { TeacherPrepShelfHeader } from "./components/TeacherPrepShelfHeader";
 import { TeacherAssignLearnerFields } from "./components/TeacherAssignLearnerFields";
 import { TeacherAssignBookPicker } from "./components/TeacherAssignBookPicker";
 import { TeacherAssignSelectedBookHelper } from "./components/TeacherAssignSelectedBookHelper";
+import { TeacherPrepShelfItemCard } from "./components/TeacherPrepShelfItemCard";
 
 type ProfileRow = {
   id: string;
@@ -532,65 +533,18 @@ export default function AssignBookPage() {
             {prepItems.map((item) => {
               const book = getPrepBook(item.books);
               return (
-                <article
+                <TeacherPrepShelfItemCard
                   key={item.id}
-                  style={{
-                    border: "1px solid rgba(0,0,0,0.12)",
-                    borderRadius: 16,
-                    padding: 14,
-                    background: "rgba(255,255,255,0.8)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 850 }}>{book?.title ?? "Untitled"}</div>
-                    <div style={{ marginTop: 4, color: "#78716c", fontSize: 13 }}>
-                      {item.learner_id
-                        ? profileNameById.get(item.learner_id) ?? item.learner_id
-                        : prospectiveLearnerLabel(item.notes)}{" "}
-                      · {item.status}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {book ? (
-                      <Link
-                        href={`/teacher/books/add?bookId=${book.id}`}
-                        style={{
-                          border: "1px solid rgba(0,0,0,0.18)",
-                          borderRadius: 12,
-                          padding: "8px 12px",
-                          textDecoration: "none",
-                          color: "#292524",
-                          background: "white",
-                          fontWeight: 750,
-                        }}
-                      >
-                        Edit book info
-                      </Link>
-                    ) : null}
-
-                    <button
-                      type="button"
-                      onClick={() => removePrepItem(item.id)}
-                      style={{
-                        border: "1px solid rgba(185,28,28,0.28)",
-                        borderRadius: 12,
-                        padding: "8px 12px",
-                        color: "#991b1b",
-                        background: "rgba(254,242,242,0.9)",
-                        fontWeight: 750,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Remove from Prep Shelf
-                    </button>
-                  </div>
-                </article>
+                  itemId={item.id}
+                  book={book}
+                  learnerLabel={
+                    item.learner_id
+                      ? profileNameById.get(item.learner_id) ?? item.learner_id
+                      : prospectiveLearnerLabel(item.notes)
+                  }
+                  status={item.status}
+                  onRemove={removePrepItem}
+                />
               );
             })}
           </div>
