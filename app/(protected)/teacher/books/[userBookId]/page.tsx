@@ -13,6 +13,7 @@ import { TeacherBookReviewHero } from "./components/TeacherBookReviewHero";
 import { TeacherBookReviewMessage } from "./components/TeacherBookReviewMessage";
 import { TeacherBookReviewSavedSnapshot } from "./components/TeacherBookReviewSavedSnapshot";
 import { TeacherBookReviewSaveBar } from "./components/TeacherBookReviewSaveBar";
+import { SuitableLevelSelector } from "./components/SuitableLevelSelector";
 
 type ProfileRole = "teacher" | "member" | "student";
 
@@ -372,51 +373,12 @@ export default function TeacherBookReviewPage() {
                     languageLearningLabel={languageLearningLabel}
                 />
 
-                <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                    <div className="mb-4">
-                        <h2 className="text-lg font-black text-stone-900">Suitable Level</h2>
-                        <p className="mt-1 text-sm text-stone-500">
-                            Pick the level that feels suitable with guidance, not necessarily the level where the book becomes easy.
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        {suitableLevelOptions.map((option) => {
-                            const isSelected = recommendedLevel === option.value;
-
-                            return (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => setRecommendedLevel(option.value)}
-                                    className={`w-full rounded-2xl border px-4 py-3 text-left transition ${isSelected
-                                        ? "border-stone-900 bg-stone-100 shadow-sm"
-                                        : "border-stone-200 bg-white hover:bg-stone-50"
-                                        }`}
-                                >
-                                    <div className="text-sm font-semibold text-stone-900">
-                                        {option.title} · {option.plain} ({option.cefr} · {option.jlpt})
-                                    </div>
-                                    <div className="mt-1 text-sm leading-6 text-stone-600">{option.feel}</div>
-                                </button>
-                            );
-                        })}
-
-                        <button
-                            type="button"
-                            onClick={() => setRecommendedLevel("")}
-                            className="rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50"
-                        >
-                            Clear level
-                        </button>
-                    </div>
-
-                    {selectedLevelInfo ? (
-                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                            Selected: {selectedLevelInfo.title} · {selectedLevelInfo.plain}
-                        </div>
-                    ) : null}
-                </section>
+                <SuitableLevelSelector
+                    value={recommendedLevel}
+                    options={suitableLevelOptions}
+                    selectedOption={selectedLevelInfo}
+                    onChange={setRecommendedLevel}
+                />
 
                 <section className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
