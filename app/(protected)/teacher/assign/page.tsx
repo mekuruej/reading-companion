@@ -24,6 +24,7 @@ import { TeacherPrepShelfSection } from "./components/TeacherPrepShelfSection";
 import { TeacherAssignPageShell } from "./components/TeacherAssignPageShell";
 import { TeacherAssignFieldBlock } from "./components/TeacherAssignFieldBlock";
 import { TeacherPrepShelfList } from "./components/TeacherPrepShelfList";
+import { TeacherAssignActionPanel } from "./components/TeacherAssignActionPanel";
 
 type ProfileRow = {
   id: string;
@@ -508,14 +509,10 @@ export default function AssignBookPage() {
           missingInfo={selectedBookMissingInfo}
         />
 
-        <TeacherAssignModeExplanation actionMode={actionMode} />
-
-        <TeacherAssignPrimaryActionButton
+        <TeacherAssignActionPanel
           actionMode={actionMode}
           onPrimaryAction={handlePrimaryAction}
         />
-
-        <TeacherAssignLearningTasksNote />
       </TeacherAssignFormCard>
 
       <section style={{ marginTop: 24 }}>
