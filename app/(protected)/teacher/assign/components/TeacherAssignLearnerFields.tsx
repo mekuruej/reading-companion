@@ -33,77 +33,52 @@ export function TeacherAssignLearnerFields({
   onProspectiveLearnerNameChange,
   onProspectiveLearnerContactChange,
 }: TeacherAssignLearnerFieldsProps) {
-  if (actionMode === "add_to_library") {
-    return (
-      <>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span style={{ fontWeight: 800 }}>Learner</span>
-          <select
-            value={studentId}
-            onChange={(event) => onStudentChange(event.target.value)}
-            style={{
-              padding: 10,
-              borderRadius: 12,
-              border: "1px solid rgba(0,0,0,0.18)",
-              background: "white",
-            }}
-          >
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {labelProfile(profile)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div style={{ color: "#57534e", fontSize: 13, lineHeight: 1.5 }}>
-          This will add the selected book directly to the learner’s library.
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
-      <div style={{ display: "grid", gap: 10 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span style={{ fontWeight: 800 }}>Future learner name</span>
+      {actionMode === "add_to_library" ? (
+        <select
+          value={studentId}
+          onChange={(event) => onStudentChange(event.target.value)}
+        >
+          {profiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {labelProfile(profile)}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
           <input
             value={prospectiveLearnerName}
             onChange={(event) =>
               onProspectiveLearnerNameChange(event.target.value)
             }
-            placeholder="Example: Trial student, Mina, Book club group..."
+            placeholder="Future learner name"
             style={{
-              padding: 10,
-              borderRadius: 12,
               border: "1px solid rgba(0,0,0,0.18)",
-              background: "white",
+              borderRadius: 12,
+              padding: "10px 12px",
             }}
           />
-        </label>
-
-        <label style={{ display: "grid", gap: 6 }}>
-          <span style={{ fontWeight: 800 }}>Contact / note</span>
           <input
             value={prospectiveLearnerContact}
             onChange={(event) =>
               onProspectiveLearnerContactChange(event.target.value)
             }
-            placeholder="Email, note, class, or reminder"
+            placeholder="Email or note, optional"
             style={{
-              padding: 10,
-              borderRadius: 12,
               border: "1px solid rgba(0,0,0,0.18)",
-              background: "white",
+              borderRadius: 12,
+              padding: "10px 12px",
             }}
           />
-        </label>
-      </div>
+        </div>
+      )}
 
-      <div style={{ color: "#57534e", fontSize: 13, lineHeight: 1.5 }}>
-        This saves a teacher-only prep shelf item. It does not create anything in a
-        learner’s library yet.
+      <div style={{ opacity: 0.65, fontSize: 12 }}>
+        {actionMode === "prep_future"
+          ? "This keeps the prep item on your shelf only. You can connect it to a real learner later."
+          : "This creates a visible row in the selected learner’s library."}
       </div>
     </>
   );
