@@ -1160,14 +1160,32 @@ export default function CuriosityReadingPage() {
       return;
     }
 
+    const { data: currentBookStatus, error: currentBookStatusError } = await supabase
+      .from("user_books")
+      .select("started_at")
+      .eq("id", userBookId)
+      .maybeSingle();
+
+    if (currentBookStatusError) {
+      console.error("Error loading user_books status after reading session:", currentBookStatusError);
+    }
+
+    const bookStatusUpdate: {
+      status: "reading";
+      started_at?: string;
+    } = {
+      status: "reading",
+    };
+
+    // Logging a reading session should only backfill the book's start date.
+    // It should not overwrite an existing Started date in the Book Status box.
+    if (!currentBookStatus?.started_at) {
+      bookStatusUpdate.started_at = readOn;
+    }
+
     const { error: updateError } = await supabase
       .from("user_books")
-      .update({
-        status: "reading",
-        started_at: readOn,
-        finished_at: null,
-        dnf_at: null,
-      })
+      .update(bookStatusUpdate)
       .eq("id", userBookId);
 
     if (updateError) {
