@@ -6,6 +6,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { ReadingFitSignalCard } from "./components/ReadingFitSignalCard";
+import { TeacherReadingFitEmptyState } from "./components/TeacherReadingFitEmptyState";
+import { TeacherReadingFitHeader } from "./components/TeacherReadingFitHeader";
+import { TeacherReadingFitLoadingState } from "./components/TeacherReadingFitLoadingState";
+import { TeacherReadingFitMessage } from "./components/TeacherReadingFitMessage";
+import { TeacherReadingFitSummaryGrid } from "./components/TeacherReadingFitSummaryGrid";
 
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
 
@@ -332,30 +338,8 @@ export default function TeacherReadingFitPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-              Teacher Portal
-            </p>
-
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
-              Teacher Review Index
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
-              Finished books missing learner reflection signals. Use this index to find
-              books that still need reader level, ease rating, or entertainment rating.
-              Teacher placement ratings can move here later.
-            </p>
-          </div>
-
-          <Link
-            href="/teacher"
-            className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-          >
-            ← Teacher Home
-          </Link>
-        </div>
+        <TeacherReadingFitHeader />
+        <TeacherReadingFitSummaryGrid summary={summary} />
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -393,21 +377,13 @@ export default function TeacherReadingFitPage() {
         </div>
       </section>
 
-      {errorMessage ? (
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
-      ) : null}
+      <TeacherReadingFitMessage message={errorMessage} />
 
       <section className="mt-6">
         {loading ? (
-          <div className="rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500 shadow-sm">
-            Loading reading-fit queue…
-          </div>
+          <TeacherReadingFitLoadingState />
         ) : items.length === 0 ? (
-          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-800 shadow-sm">
-            All finished books have the learner reflection signals this index is checking.
-          </div>
+          <TeacherReadingFitEmptyState />
         ) : (
           <div className="grid gap-4">
             {items.map((item) => (
@@ -450,53 +426,33 @@ export default function TeacherReadingFitPage() {
                     </h2>
 
                     <div className="mt-4 grid gap-2 md:grid-cols-3">
-                      <div
-                        className={`rounded-2xl border px-4 py-3 text-sm ${item.missingReaderLevel
-                          ? "border-amber-200 bg-amber-50 text-amber-800"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          }`}
-                      >
-                        <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                          Reader Level
-                        </div>
-                        <div className="mt-1 font-semibold">
-                          {item.readerLevel || "Missing"}
-                        </div>
-                      </div>
+                      <ReadingFitSignalCard
+                        title="Reader Level"
+                        isMissing={item.missingReaderLevel}
+                        value={item.readerLevel || "Missing"}
+                      />
 
-                      <div
-                        className={`rounded-2xl border px-4 py-3 text-sm ${item.missingDifficulty
-                          ? "border-amber-200 bg-amber-50 text-amber-800"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          }`}
-                      >
-                        <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                          Difficulty Rating
-                        </div>
-                        <div className="mt-1 font-semibold">
-                          {item.ratingDifficulty != null
+                      <ReadingFitSignalCard
+                        title="Difficulty Rating"
+                        isMissing={item.missingDifficulty}
+                        value={
+                          item.ratingDifficulty != null
                             ? `${formatRating(item.ratingDifficulty)}/5 · ${difficultyLabel(
                               item.ratingDifficulty
                             )}`
-                            : "Missing"}
-                        </div>
-                      </div>
+                            : "Missing"
+                        }
+                      />
 
-                      <div
-                        className={`rounded-2xl border px-4 py-3 text-sm ${item.missingEntertainment
-                          ? "border-amber-200 bg-amber-50 text-amber-800"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          }`}
-                      >
-                        <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                          Entertainment Rating
-                        </div>
-                        <div className="mt-1 font-semibold">
-                          {item.ratingEntertainment != null
+                      <ReadingFitSignalCard
+                        title="Entertainment Rating"
+                        isMissing={item.missingEntertainment}
+                        value={
+                          item.ratingEntertainment != null
                             ? `${formatRating(item.ratingEntertainment)}/5`
-                            : "Missing"}
-                        </div>
-                      </div>
+                            : "Missing"
+                        }
+                      />
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
