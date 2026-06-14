@@ -48,12 +48,15 @@ type BookRow = {
     book_type: string | null;
     trigger_warnings: string | null;
     author: string | null;
+    author_english_name: string | null;
     author_reading: string | null;
     author_image_url: string | null;
     translator: string | null;
+    translator_english_name: string | null;
     translator_reading: string | null;
     translator_image_url: string | null;
     illustrator: string | null;
+    illustrator_english_name: string | null;
     illustrator_reading: string | null;
     illustrator_image_url: string | null;
     publisher: string | null;
@@ -370,12 +373,15 @@ export default function TeacherAddBookPage() {
         book_type,
         trigger_warnings,
         author,
+        author_english_name,
         author_reading,
         author_image_url,
         translator,
+        translator_english_name,
         translator_reading,
         translator_image_url,
         illustrator,
+        illustrator_english_name,
         illustrator_reading,
         illustrator_image_url,
         publisher,
@@ -405,14 +411,17 @@ export default function TeacherAddBookPage() {
         setBookType(data.book_type ?? "");
 
         setAuthor(data.author ?? "");
+        setAuthorEnglishName(data.author_english_name ?? "");
         setAuthorReading(data.author_reading ?? "");
         setAuthorImageUrl(data.author_image_url ?? "");
 
         setTranslator(data.translator ?? "");
+        setTranslatorEnglishName(data.translator_english_name ?? "");
         setTranslatorReading(data.translator_reading ?? "");
         setTranslatorImageUrl(data.translator_image_url ?? "");
 
         setIllustrator(data.illustrator ?? "");
+        setIllustratorEnglishName(data.illustrator_english_name ?? "");
         setIllustratorReading(data.illustrator_reading ?? "");
         setIllustratorImageUrl(data.illustrator_image_url ?? "");
 
@@ -461,6 +470,7 @@ export default function TeacherAddBookPage() {
             reading: cleanText(publisherReading),
             logo_url: cleanText(publisherImageUrl),
         };
+        const normalized = normalizeName(cleanedName);
 
         if (selectedPublisherId) {
             const { data, error } = await supabase
@@ -483,7 +493,7 @@ export default function TeacherAddBookPage() {
             .upsert(
                 {
                     ...payload,
-                    normalized_name: normalizeName(cleanedName),
+                    normalized_name: normalized,
                 },
                 {
                     onConflict: "normalized_name",
@@ -494,7 +504,21 @@ export default function TeacherAddBookPage() {
             .single();
 
         if (error) {
-            console.warn("Could not upsert publisher record:", error);
+            const fallback = await supabase
+                .from("publishers")
+                .select("id, name_ja")
+                .eq("normalized_name", normalized)
+                .maybeSingle();
+
+            if (fallback.data) return fallback.data;
+
+            console.warn("Could not upsert publisher record; saving book publisher text only:", {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+                fallbackMessage: fallback.error?.message,
+            });
             return null;
         }
 
@@ -843,14 +867,17 @@ export default function TeacherAddBookPage() {
                     book_type: cleanText(bookType),
 
                     author: cleanText(author),
+                    author_english_name: cleanText(authorEnglishName),
                     author_reading: cleanText(authorReading),
                     author_image_url: cleanText(authorImageUrl),
 
                     translator: cleanText(translator),
+                    translator_english_name: cleanText(translatorEnglishName),
                     translator_reading: cleanText(translatorReading),
                     translator_image_url: cleanText(translatorImageUrl),
 
                     illustrator: cleanText(illustrator),
+                    illustrator_english_name: cleanText(illustratorEnglishName),
                     illustrator_reading: cleanText(illustratorReading),
                     illustrator_image_url: cleanText(illustratorImageUrl),
 

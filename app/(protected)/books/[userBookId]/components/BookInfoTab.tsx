@@ -11,8 +11,11 @@ type Book = {
   title: string;
   title_reading: string | null;
   author: string | null;
+  author_english_name: string | null;
   translator: string | null;
+  translator_english_name: string | null;
   illustrator: string | null;
+  illustrator_english_name: string | null;
   publisher_id?: string | null;
   cover_url: string | null;
   genre: string | null;
@@ -61,6 +64,7 @@ type PersonRecord = {
 type BookAuthorRecord = {
   id: string;
   author: string | null;
+  author_english_name?: string | null;
   author_reading: string | null;
   author_image_url: string | null;
 };
@@ -487,7 +491,7 @@ export default function BookInfoTab({
 
       const bookAuthorRes = await supabase
         .from("books")
-        .select("id, author, author_reading, author_image_url")
+        .select("id, author, author_english_name, author_reading, author_image_url")
         .ilike("author", ilikePattern(cleaned))
         .limit(8);
 
@@ -539,7 +543,7 @@ export default function BookInfoTab({
 
           setAuthorContributorMatches(contributorPeople);
 
-          const bookMatches = dedupeById(
+          const rawBookMatches = dedupeById(
             ((bookAuthorRes.data ?? []) as BookAuthorRecord[]).filter(
               (item): item is BookAuthorRecord =>
                 !!item.author &&
@@ -553,6 +557,46 @@ export default function BookInfoTab({
           )
             .sort((a, b) => (a.author ?? "").localeCompare(b.author ?? ""))
             .slice(0, 8);
+
+          let bookMatches = rawBookMatches;
+
+          if (rawBookMatches.length > 0) {
+            const { data: linkedContributors, error: linkedContributorError } = await supabase
+              .from("book_contributors")
+              .select(
+                "book_id, people!inner(name_ja, name_en, reading, image_url)"
+              )
+              .eq("role", "author")
+              .in("book_id", rawBookMatches.map((match) => match.id));
+
+            if (linkedContributorError) {
+              console.warn("Could not hydrate existing book author matches:", linkedContributorError);
+            } else {
+              const contributorByBookId = new Map<string, PersonRecord>();
+
+              for (const item of (linkedContributors ?? []) as ContributorAuthorRecord[]) {
+                const person = Array.isArray(item.people)
+                  ? item.people[0]
+                  : item.people;
+
+                if (person) contributorByBookId.set(item.book_id, person);
+              }
+
+              bookMatches = rawBookMatches.map((match) => {
+                const person = contributorByBookId.get(match.id);
+
+                if (!person) return match;
+
+                return {
+                  ...match,
+                  author: person.name_ja ?? match.author,
+                  author_english_name: person.name_en ?? null,
+                  author_reading: person.reading ?? match.author_reading,
+                  author_image_url: person.image_url ?? match.author_image_url,
+                };
+              });
+            }
+          }
 
           setAuthorBookMatches(bookMatches);
         }
@@ -734,7 +778,7 @@ export default function BookInfoTab({
     setRequireSharedAuthorRecord(false);
     setAuthorSearch(match.author ?? "");
     setAuthorName(match.author ?? "");
-    setAuthorEnglishName("");
+    setAuthorEnglishName(match.author_english_name ?? "");
     setAuthorReading(match.author_reading ?? "");
     setAuthorImg(match.author_image_url ?? "");
     setAuthorResults([]);
@@ -1092,7 +1136,7 @@ export default function BookInfoTab({
                       >
                         <div className="font-medium text-stone-900">{match.author}</div>
                         <div className="text-xs text-stone-600">
-                          {match.author_reading || "—"}
+                          {match.author_english_name || "—"} · {match.author_reading || "—"}
                         </div>
                       </button>
                     ))}
