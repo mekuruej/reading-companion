@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { TeacherAssignLoadingState } from "./components/TeacherAssignLoadingState";
 import { TeacherAssignSimpleState } from "./components/TeacherAssignSimpleState";
 import { TeacherAssignHeader } from "./components/TeacherAssignHeader";
+import { TeacherAssignMessageBanner } from "./components/TeacherAssignMessageBanner";
 
 type ProfileRow = {
   id: string;
@@ -450,34 +451,10 @@ export default function AssignBookPage() {
     <main style={{ padding: 24, maxWidth: 980, margin: "0 auto" }}>
       <TeacherAssignHeader isSuperTeacher={isSuperTeacher} />
 
-      {errorMsg ? (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid rgba(200,0,0,0.35)",
-            background: "rgba(200,0,0,0.06)",
-          }}
-        >
-          <b>Error:</b> {errorMsg}
-        </div>
-      ) : null}
-
-      {successMsg ? (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid rgba(0,140,0,0.35)",
-            background: "rgba(0,140,0,0.06)",
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {successMsg}
-        </div>
-      ) : null}
+      <TeacherAssignMessageBanner
+        errorMsg={errorMsg}
+        successMsg={successMsg}
+      />
 
       <div
         style={{
