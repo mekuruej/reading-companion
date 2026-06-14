@@ -212,6 +212,17 @@ function isActiveStatus(status: QueueStatus) {
   return status !== "complete" && status !== "excluded";
 }
 
+function itemMatchesStatusFilter(item: QueueItem, statusFilter: StatusFilter) {
+  if (statusFilter === "active") return isActiveStatus(item.status);
+  if (statusFilter === "flagged_review") return item.status === "flagged_review";
+  if (statusFilter === "needs_reading") return isNeedsReadingStatus(item.status);
+  if (statusFilter === "needs_work") return isNeedsWorkStatus(item.status);
+  if (statusFilter === "complete") return item.status === "complete";
+  if (statusFilter === "excluded") return item.status === "excluded";
+  if (statusFilter !== "all") return false;
+  return true;
+}
+
 function effectiveReadingType(row: Pick<KanjiMapRow, "reading_type" | "base_reading" | "realized_reading">) {
   if (row.reading_type) return row.reading_type;
   return row.base_reading?.trim() && row.realized_reading?.trim() ? "on" : null;
@@ -745,29 +756,26 @@ export default function TeacherKanjiPage() {
 
     for (const item of queueItems) {
       if (!item.userBookId) continue;
+      if (studentFilter !== "all" && item.userId !== studentFilter) continue;
+      if (!itemMatchesStatusFilter(item, statusFilter)) continue;
       map.set(item.userBookId, item.bookTitle);
     }
 
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [queueItems]);
+  }, [queueItems, studentFilter, statusFilter]);
+
+  useEffect(() => {
+    if (bookFilter === "all") return;
+    if (bookOptions.some(([id]) => id === bookFilter)) return;
+    setBookFilter("all");
+  }, [bookFilter, bookOptions]);
 
   const filteredItems = useMemo(() => {
     return queueItems.filter((item) => {
       if (studentFilter !== "all" && item.userId !== studentFilter) return false;
       if (bookFilter !== "all" && item.userBookId !== bookFilter) return false;
 
-      if (statusFilter === "active") {
-        return isActiveStatus(item.status);
-      }
-
-      if (statusFilter === "flagged_review") return item.status === "flagged_review";
-      if (statusFilter === "needs_reading") return isNeedsReadingStatus(item.status);
-      if (statusFilter === "needs_work") return isNeedsWorkStatus(item.status);
-      if (statusFilter === "complete") return item.status === "complete";
-      if (statusFilter === "excluded") return item.status === "excluded";
-      if (statusFilter !== "all") return false;
-
-      return true;
+      return itemMatchesStatusFilter(item, statusFilter);
     });
   }, [queueItems, studentFilter, bookFilter, statusFilter]);
 
