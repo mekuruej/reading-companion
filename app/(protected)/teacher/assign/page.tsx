@@ -12,6 +12,8 @@ import { TeacherAssignHeader } from "./components/TeacherAssignHeader";
 import { TeacherAssignMessageBanner } from "./components/TeacherAssignMessageBanner";
 import { TeacherAssignModeToggle } from "./components/TeacherAssignModeToggle";
 import { TeacherAssignModeExplanation } from "./components/TeacherAssignModeExplanation";
+import { TeacherAssignLearningTasksNote } from "./components/TeacherAssignLearningTasksNote";
+import { TeacherAssignPrimaryActionButton } from "./components/TeacherAssignPrimaryActionButton";
 
 type ProfileRow = {
   id: string;
@@ -592,24 +594,12 @@ export default function AssignBookPage() {
 
         <TeacherAssignModeExplanation actionMode={actionMode} />
 
-        <button
-          onClick={handlePrimaryAction}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 12,
-            border: "1px solid rgba(0,0,0,0.22)",
-            background: "rgba(0,0,0,0.06)",
-            fontWeight: 850,
-            cursor: "pointer",
-          }}
-        >
-          {actionMode === "add_to_library" ? "Add to Learner Library" : "Add to Prep Shelf"}
-        </button>
+        <TeacherAssignPrimaryActionButton
+          actionMode={actionMode}
+          onPrimaryAction={handlePrimaryAction}
+        />
 
-        <div style={{ opacity: 0.7, fontSize: 13 }}>
-          Learning tasks stay separate. After a book is visible in a learner’s library,
-          create the learner’s next action from Teacher → Students.
-        </div>
+        <TeacherAssignLearningTasksNote />
       </div>
 
       <section style={{ marginTop: 24 }}>
