@@ -42,8 +42,11 @@ type Book = {
   title: string;
   title_reading: string | null;
   author: string | null;
+  author_english_name: string | null;
   translator: string | null;
+  translator_english_name: string | null;
   illustrator: string | null;
+  illustrator_english_name: string | null;
   publisher_id?: string | null;
   cover_url: string | null;
   genre: string | null;
@@ -3395,8 +3398,11 @@ export default function BookHubPage() {
           title,
           title_reading,
           author,
+          author_english_name,
           translator,
+          translator_english_name,
           illustrator,
+          illustrator_english_name,
           cover_url,
           genre,
           book_type,
@@ -3543,11 +3549,11 @@ export default function BookHubPage() {
     setAuthorName(b?.author ?? "");
     setTranslatorName(b?.translator ?? "");
     setIllustratorName(b?.illustrator ?? "");
+    setAuthorEnglishName(b?.author_english_name ?? "");
+    setTranslatorEnglishName(b?.translator_english_name ?? "");
+    setIllustratorEnglishName(b?.illustrator_english_name ?? "");
     setPublisherName(b?.publisher ?? "");
     setPublisherReading(b?.publisher_reading ?? "");
-    setAuthorEnglishName("");
-    setTranslatorEnglishName("");
-    setIllustratorEnglishName("");
     setPublisherEnglishName("");
     setSelectedAuthorId(null);
     setSelectedTranslatorId(null);
@@ -3722,11 +3728,11 @@ export default function BookHubPage() {
     setAuthorName(b?.author ?? "");
     setTranslatorName(b?.translator ?? "");
     setIllustratorName(b?.illustrator ?? "");
+    setAuthorEnglishName(b?.author_english_name ?? "");
+    setTranslatorEnglishName(b?.translator_english_name ?? "");
+    setIllustratorEnglishName(b?.illustrator_english_name ?? "");
     setPublisherName(b?.publisher ?? "");
     setPublisherReading(b?.publisher_reading ?? "");
-    setAuthorEnglishName("");
-    setTranslatorEnglishName("");
-    setIllustratorEnglishName("");
     setPublisherEnglishName("");
     setSelectedAuthorId(null);
     setSelectedTranslatorId(null);
@@ -3883,7 +3889,21 @@ export default function BookHubPage() {
       .single();
 
     if (error) {
-      console.error("Error upserting publisher:", error);
+      const fallback = await supabase
+        .from("publishers")
+        .select("id, name_ja")
+        .eq("normalized_name", normalized)
+        .maybeSingle();
+
+      if (fallback.data) return fallback.data;
+
+      console.warn("Could not upsert publisher record; saving book publisher text only:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        fallbackMessage: fallback.error?.message,
+      });
       return null;
     }
 
@@ -4297,8 +4317,11 @@ export default function BookHubPage() {
 
     const bookUpdatePayload = {
       author: authorName || null,
+      author_english_name: authorEnglishName || null,
       translator: translatorName || null,
+      translator_english_name: translatorEnglishName || null,
       illustrator: illustratorName || null,
+      illustrator_english_name: illustratorEnglishName || null,
       publisher: publisherRecord?.name_ja ?? (publisherName || null),
       publisher_id: publisherRecord?.id ?? null,
       published_date: publishedDate || null,
