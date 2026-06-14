@@ -17,6 +17,7 @@ import { TeacherAssignPrimaryActionButton } from "./components/TeacherAssignPrim
 import { TeacherPrepShelfEmptyState } from "./components/TeacherPrepShelfEmptyState";
 import { TeacherAssignFormCard } from "./components/TeacherAssignFormCard";
 import { TeacherPrepShelfHeader } from "./components/TeacherPrepShelfHeader";
+import { TeacherAssignLearnerFields } from "./components/TeacherAssignLearnerFields";
 
 type ProfileRow = {
   id: string;
@@ -474,39 +475,17 @@ export default function AssignBookPage() {
             {actionMode === "add_to_library" ? "Existing learner" : "Future learner"}
           </div>
 
-          {actionMode === "add_to_library" ? (
-            <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-              {selectableProfiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {labelProfile(p)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div style={{ display: "grid", gap: 8 }}>
-              <input
-                value={prospectiveLearnerName}
-                onChange={(e) => setProspectiveLearnerName(e.target.value)}
-                placeholder="Future learner name"
-                style={{
-                  border: "1px solid rgba(0,0,0,0.18)",
-                  borderRadius: 12,
-                  padding: "10px 12px",
-                }}
-              />
-              <input
-                value={prospectiveLearnerContact}
-                onChange={(e) => setProspectiveLearnerContact(e.target.value)}
-                placeholder="Email or note, optional"
-                style={{
-                  border: "1px solid rgba(0,0,0,0.18)",
-                  borderRadius: 12,
-                  padding: "10px 12px",
-                }}
-              />
-            </div>
-          )}
-
+          <TeacherAssignLearnerFields
+            actionMode={actionMode}
+            studentId={studentId}
+            profiles={selectableProfiles}
+            prospectiveLearnerName={prospectiveLearnerName}
+            prospectiveLearnerContact={prospectiveLearnerContact}
+            labelProfile={labelProfile}
+            onStudentChange={setStudentId}
+            onProspectiveLearnerNameChange={setProspectiveLearnerName}
+            onProspectiveLearnerContactChange={setProspectiveLearnerContact}
+          />
           <div style={{ opacity: 0.65, fontSize: 12 }}>
             {actionMode === "prep_future"
               ? "This keeps the prep item on your shelf only. You can connect it to a real learner later."
