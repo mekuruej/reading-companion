@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { TeacherAssignLoadingState } from "./components/TeacherAssignLoadingState";
 
 type ProfileRow = {
   id: string;
@@ -391,8 +392,7 @@ export default function AssignBookPage() {
       const chosenBook = books.find((b) => b.id === bookId);
 
       setSuccessMsg(
-        `Added "${chosenBook?.title ?? "Untitled"}" to ${
-          chosenStudent ? labelProfile(chosenStudent) : "learner"
+        `Added "${chosenBook?.title ?? "Untitled"}" to ${chosenStudent ? labelProfile(chosenStudent) : "learner"
         }.\nuser_books.id: ${data.id}`
       );
     } catch (e: any) {
@@ -429,11 +429,7 @@ export default function AssignBookPage() {
   }
 
   if (loading) {
-    return (
-      <main style={{ padding: 24 }}>
-        <p>Loading…</p>
-      </main>
-    );
+    return <TeacherAssignLoadingState />;
   }
 
   if (needsSignIn) {
@@ -809,4 +805,4 @@ export default function AssignBookPage() {
     </main>
   );
 }
- 
+
