@@ -12,7 +12,7 @@ The current priority is finishing the visual component extraction for the Kanji 
 
 Related docs:
 * `docs/refactor-maps/library-kanji.md`
-* `docs/refactor-maps/kanji-study-card-identity-bug.md`
+* `docs/bug-notes/library-kanji-card-identity.md`
 
 ## Main Direction
 

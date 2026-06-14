@@ -705,7 +705,7 @@ Do not remove anything yet.
 
 * `canAccessKanjiPractice = true` makes the locked/full-access branch unreachable.
 * `selectOneCardPerSourceWordForDay`, today event loading, `studiedTodayWords`, and `markCardStudiedToday()` use surface/source-word identity. This may collapse same-surface/different-reading entries such as `市【いち】` and `市【し】`.
-* The dedicated note for that issue is `docs/refactor-maps/kanji-study-card-identity-bug.md`.
+* The dedicated note for that issue is `docs/bug-notes/library-kanji-card-identity.md`.
 * `splitKunyomiPromptReading()` appears possibly unused and should be verified before removal.
 * `endedEarly` appears present, but may not currently be set to `true`.
 * `strokeCount`, `radical`, and `radicalName` are rendered defensively, but currently appear to be built as `null`.
@@ -716,7 +716,7 @@ Do not remove anything yet.
 The first visual extraction pass is complete.
 
 Next safe behavioral fix to consider:
-* address the card identity bug documented in `kanji-study-card-identity-bug.md`
+* address the card identity bug documented in `library-kanji-card-identity.md`
 
 Future feature direction:
 * see `docs/future-features/kanji-study-modes.md` for the core reading mode roadmap
