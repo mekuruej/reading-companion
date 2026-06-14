@@ -18,6 +18,7 @@ import { TeacherPrepShelfEmptyState } from "./components/TeacherPrepShelfEmptySt
 import { TeacherAssignFormCard } from "./components/TeacherAssignFormCard";
 import { TeacherPrepShelfHeader } from "./components/TeacherPrepShelfHeader";
 import { TeacherAssignLearnerFields } from "./components/TeacherAssignLearnerFields";
+import { TeacherAssignBookPicker } from "./components/TeacherAssignBookPicker";
 
 type ProfileRow = {
   id: string;
@@ -495,29 +496,14 @@ export default function AssignBookPage() {
 
         <label style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 800 }}>Book</div>
-          <input
-            value={bookSearch}
-            onChange={(e) => setBookSearch(e.target.value)}
-            placeholder="Search title, author, ISBN, publisher, or book type"
-            style={{
-              border: "1px solid rgba(0,0,0,0.18)",
-              borderRadius: 12,
-              padding: "10px 12px",
-            }}
+          <TeacherAssignBookPicker
+            bookSearch={bookSearch}
+            bookId={bookId}
+            booksCount={books.length}
+            filteredBooks={filteredBooks}
+            onBookSearchChange={setBookSearch}
+            onBookChange={setBookId}
           />
-          <select value={bookId} onChange={(e) => setBookId(e.target.value)}>
-            {filteredBooks.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.title ?? "Untitled"}
-                {b.author ? ` — ${b.author}` : ""}
-              </option>
-            ))}
-          </select>
-          <div style={{ opacity: 0.65, fontSize: 12 }}>
-            {filteredBooks.length === books.length
-              ? `${books.length} books available.`
-              : `${filteredBooks.length} of ${books.length} books match.`}
-          </div>
         </label>
 
         {selectedBook ? (
