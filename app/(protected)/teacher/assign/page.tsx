@@ -14,7 +14,6 @@ import { TeacherAssignModeToggle } from "./components/TeacherAssignModeToggle";
 import { TeacherAssignModeExplanation } from "./components/TeacherAssignModeExplanation";
 import { TeacherAssignLearningTasksNote } from "./components/TeacherAssignLearningTasksNote";
 import { TeacherAssignPrimaryActionButton } from "./components/TeacherAssignPrimaryActionButton";
-import { TeacherPrepShelfEmptyState } from "./components/TeacherPrepShelfEmptyState";
 import { TeacherAssignFormCard } from "./components/TeacherAssignFormCard";
 import { TeacherPrepShelfHeader } from "./components/TeacherPrepShelfHeader";
 import { TeacherAssignLearnerFields } from "./components/TeacherAssignLearnerFields";
@@ -24,6 +23,7 @@ import { TeacherPrepShelfItemCard } from "./components/TeacherPrepShelfItemCard"
 import { TeacherPrepShelfSection } from "./components/TeacherPrepShelfSection";
 import { TeacherAssignPageShell } from "./components/TeacherAssignPageShell";
 import { TeacherAssignFieldBlock } from "./components/TeacherAssignFieldBlock";
+import { TeacherPrepShelfList } from "./components/TeacherPrepShelfList";
 
 type ProfileRow = {
   id: string;
@@ -520,30 +520,13 @@ export default function AssignBookPage() {
 
       <section style={{ marginTop: 24 }}>
         <TeacherPrepShelfSection>
-          {prepItems.length === 0 ? (
-            <TeacherPrepShelfEmptyState />
-          ) : (
-            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-              {prepItems.map((item) => {
-                const book = getPrepBook(item.books);
-
-                return (
-                  <TeacherPrepShelfItemCard
-                    key={item.id}
-                    itemId={item.id}
-                    book={book}
-                    learnerLabel={
-                      item.learner_id
-                        ? profileNameById.get(item.learner_id) ?? item.learner_id
-                        : prospectiveLearnerLabel(item.notes)
-                    }
-                    status={item.status}
-                    onRemove={removePrepItem}
-                  />
-                );
-              })}
-            </div>
-          )}
+          <TeacherPrepShelfList
+            items={prepItems}
+            profileNameById={profileNameById}
+            getPrepBook={getPrepBook}
+            prospectiveLearnerLabel={prospectiveLearnerLabel}
+            onRemovePrepItem={removePrepItem}
+          />
         </TeacherPrepShelfSection>
       </section>
     </TeacherAssignPageShell>
