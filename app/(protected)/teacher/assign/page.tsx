@@ -23,6 +23,7 @@ import { TeacherAssignSelectedBookHelper } from "./components/TeacherAssignSelec
 import { TeacherPrepShelfItemCard } from "./components/TeacherPrepShelfItemCard";
 import { TeacherPrepShelfSection } from "./components/TeacherPrepShelfSection";
 import { TeacherAssignPageShell } from "./components/TeacherAssignPageShell";
+import { TeacherAssignFieldBlock } from "./components/TeacherAssignFieldBlock";
 
 type ProfileRow = {
   id: string;
@@ -475,11 +476,9 @@ export default function AssignBookPage() {
           onChangeMode={setActionMode}
         />
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <div style={{ fontWeight: 800 }}>
-            {actionMode === "add_to_library" ? "Existing learner" : "Future learner"}
-          </div>
-
+        <TeacherAssignFieldBlock
+          label={actionMode === "add_to_library" ? "Existing learner" : "Future learner"}
+        >
           <TeacherAssignLearnerFields
             actionMode={actionMode}
             studentId={studentId}
@@ -491,15 +490,9 @@ export default function AssignBookPage() {
             onProspectiveLearnerNameChange={setProspectiveLearnerName}
             onProspectiveLearnerContactChange={setProspectiveLearnerContact}
           />
-          <div style={{ opacity: 0.65, fontSize: 12 }}>
-            {actionMode === "prep_future"
-              ? "This keeps the prep item on your shelf only. You can connect it to a real learner later."
-              : "This creates a visible row in the selected learner’s library."}
-          </div>
-        </label>
+        </TeacherAssignFieldBlock>
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <div style={{ fontWeight: 800 }}>Book</div>
+        <TeacherAssignFieldBlock label="Book">
           <TeacherAssignBookPicker
             bookSearch={bookSearch}
             bookId={bookId}
@@ -508,7 +501,7 @@ export default function AssignBookPage() {
             onBookSearchChange={setBookSearch}
             onBookChange={setBookId}
           />
-        </label>
+        </TeacherAssignFieldBlock>
 
         <TeacherAssignSelectedBookHelper
           selectedBook={selectedBook}
