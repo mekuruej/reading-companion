@@ -14,6 +14,7 @@ import { TeacherAssignModeToggle } from "./components/TeacherAssignModeToggle";
 import { TeacherAssignModeExplanation } from "./components/TeacherAssignModeExplanation";
 import { TeacherAssignLearningTasksNote } from "./components/TeacherAssignLearningTasksNote";
 import { TeacherAssignPrimaryActionButton } from "./components/TeacherAssignPrimaryActionButton";
+import { TeacherPrepShelfEmptyState } from "./components/TeacherPrepShelfEmptyState";
 
 type ProfileRow = {
   id: string;
@@ -609,18 +610,7 @@ export default function AssignBookPage() {
         </p>
 
         {prepItems.length === 0 ? (
-          <div
-            style={{
-              marginTop: 12,
-              border: "1px dashed rgba(0,0,0,0.18)",
-              borderRadius: 14,
-              padding: 18,
-              color: "#78716c",
-              background: "rgba(255,255,255,0.55)",
-            }}
-          >
-            No prep books yet.
-          </div>
+          <TeacherPrepShelfEmptyState />
         ) : (
           <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
             {prepItems.map((item) => {
