@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { TeacherAssignLoadingState } from "./components/TeacherAssignLoadingState";
+import { TeacherAssignSimpleState } from "./components/TeacherAssignSimpleState";
 
 type ProfileRow = {
   id: string;
@@ -433,18 +434,14 @@ export default function AssignBookPage() {
   }
 
   if (needsSignIn) {
-    return (
-      <main style={{ padding: 24 }}>
-        <p>You need to sign in first.</p>
-      </main>
-    );
+    return <TeacherAssignSimpleState message="You need to sign in first." />;
   }
 
   if (!canAccess) {
     return (
-      <main style={{ padding: 24 }}>
-        <p>{errorMsg ?? "Teacher access is required."}</p>
-      </main>
+      <TeacherAssignSimpleState
+        message={errorMsg ?? "Teacher access is required."}
+      />
     );
   }
 
