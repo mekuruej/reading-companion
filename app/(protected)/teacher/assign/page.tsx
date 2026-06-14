@@ -15,6 +15,7 @@ import { TeacherAssignModeExplanation } from "./components/TeacherAssignModeExpl
 import { TeacherAssignLearningTasksNote } from "./components/TeacherAssignLearningTasksNote";
 import { TeacherAssignPrimaryActionButton } from "./components/TeacherAssignPrimaryActionButton";
 import { TeacherPrepShelfEmptyState } from "./components/TeacherPrepShelfEmptyState";
+import { TeacherAssignFormCard } from "./components/TeacherAssignFormCard";
 
 type ProfileRow = {
   id: string;
@@ -461,17 +462,7 @@ export default function AssignBookPage() {
         successMsg={successMsg}
       />
 
-      <div
-        style={{
-          marginTop: 18,
-          padding: 16,
-          borderRadius: 14,
-          border: "1px solid rgba(0,0,0,0.12)",
-          background: "rgba(255,255,255,0.7)",
-          display: "grid",
-          gap: 14,
-        }}
-      >
+      <TeacherAssignFormCard>
         <TeacherAssignModeToggle
           actionMode={actionMode}
           onChangeMode={setActionMode}
@@ -601,7 +592,7 @@ export default function AssignBookPage() {
         />
 
         <TeacherAssignLearningTasksNote />
-      </div>
+      </TeacherAssignFormCard>
 
       <section style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 22, fontWeight: 900 }}>My Prep Shelf</h2>
