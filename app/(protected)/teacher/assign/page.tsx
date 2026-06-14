@@ -22,6 +22,7 @@ import { TeacherAssignBookPicker } from "./components/TeacherAssignBookPicker";
 import { TeacherAssignSelectedBookHelper } from "./components/TeacherAssignSelectedBookHelper";
 import { TeacherPrepShelfItemCard } from "./components/TeacherPrepShelfItemCard";
 import { TeacherPrepShelfSection } from "./components/TeacherPrepShelfSection";
+import { TeacherAssignPageShell } from "./components/TeacherAssignPageShell";
 
 type ProfileRow = {
   id: string;
@@ -460,7 +461,7 @@ export default function AssignBookPage() {
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 980, margin: "0 auto" }}>
+    <TeacherAssignPageShell>
       <TeacherAssignHeader isSuperTeacher={isSuperTeacher} />
 
       <TeacherAssignMessageBanner
@@ -552,7 +553,7 @@ export default function AssignBookPage() {
           )}
         </TeacherPrepShelfSection>
       </section>
-    </main>
+    </TeacherAssignPageShell>
   );
 }
 
