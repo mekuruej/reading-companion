@@ -2,7 +2,7 @@
 //
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import KanjiComponentLookup from "@/components/KanjiComponentLookup";
@@ -22,6 +22,7 @@ import {
 import {
   addChapterNameOption,
   normalizeChapterNameOptions,
+  sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import CuriosityPageHeader from "../components/CuriosityPageHeader";
@@ -274,11 +275,17 @@ export default function CuriosityReadingPage() {
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
   const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
+  const [chapterNumberByName, setChapterNumberByName] = useState<Record<string, string>>({});
   const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
     Record<string, LibraryStudyWordColorInfo>
   >({});
   const [quickLookupCandidates, setQuickLookupCandidates] = useState<QuickLookupCandidate[]>([]);
   const [savedQuickNotice, setSavedQuickNotice] = useState("");
+
+  const sortedChapterNameOptions = useMemo(
+    () => sortChapterNameOptionsByNumber(chapterNameOptions, chapterNumberByName),
+    [chapterNameOptions, chapterNumberByName]
+  );
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
   const quickWordFieldsRef = useRef<HTMLDivElement | null>(null);
@@ -489,6 +496,17 @@ export default function CuriosityReadingPage() {
     if (quickPreview.id) return;
 
     const savedMeta = getSavedQuickMeta();
+    if (savedMeta.chapterName) {
+      setChapterNameOptions((current) =>
+        normalizeChapterNameOptions([...current, savedMeta.chapterName])
+      );
+    }
+    if (savedMeta.chapterName && savedMeta.chapterNumber) {
+      setChapterNumberByName((current) => ({
+        ...current,
+        [savedMeta.chapterName.trim()]: savedMeta.chapterNumber,
+      }));
+    }
 
     setQuickPreview((prev) => {
       if (!prev) return prev;
@@ -513,6 +531,7 @@ export default function CuriosityReadingPage() {
   useEffect(() => {
     if (!userBookId || !canAccessBook) {
       setChapterNameOptions([]);
+      setChapterNumberByName({});
       return;
     }
 
@@ -521,9 +540,10 @@ export default function CuriosityReadingPage() {
     async function loadChapterNameOptions() {
       const { data, error } = await supabase
         .from("user_book_words")
-        .select("chapter_name")
+        .select("chapter_name, chapter_number, created_at")
         .eq("user_book_id", userBookId)
-        .not("chapter_name", "is", null);
+        .not("chapter_name", "is", null)
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error loading chapter name options:", error);
@@ -531,9 +551,20 @@ export default function CuriosityReadingPage() {
       }
 
       if (!cancelled) {
-        setChapterNameOptions(
-          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
+        const numberMap: Record<string, string> = {};
+        for (const row of data ?? []) {
+          const name = String(row.chapter_name ?? "").trim();
+          if (!name || numberMap[name] || row.chapter_number == null) continue;
+          numberMap[name] = String(row.chapter_number);
+        }
+
+        setChapterNameOptions((current) =>
+          normalizeChapterNameOptions([
+            ...current,
+            ...(data ?? []).map((row) => row.chapter_name),
+          ])
         );
+        setChapterNumberByName((current) => ({ ...numberMap, ...current }));
       }
     }
 
@@ -973,6 +1004,12 @@ export default function CuriosityReadingPage() {
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, newItem));
       setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
+      if (data.chapter_name && data.chapter_number != null) {
+        setChapterNumberByName((current) => ({
+          ...current,
+          [String(data.chapter_name).trim()]: String(data.chapter_number),
+        }));
+      }
       setSavedQuickNotice(`Saved: ${newItem.surface}`);
       setMessage("");
     } else {
@@ -1013,6 +1050,12 @@ export default function CuriosityReadingPage() {
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, updatedItem));
       setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
+      if (data.chapter_name && data.chapter_number != null) {
+        setChapterNumberByName((current) => ({
+          ...current,
+          [String(data.chapter_name).trim()]: String(data.chapter_number),
+        }));
+      }
       setSavedQuickNotice(`Saved: ${updatedItem.surface}`);
       setMessage("");
     }
@@ -1318,7 +1361,6 @@ export default function CuriosityReadingPage() {
                 if (event.key === "Enter") {
                   event.preventDefault();
                   event.stopPropagation();
-                  searchScratchWord();
                 }
               }}
               onUseScratchWord={searchScratchWord}
@@ -1352,7 +1394,7 @@ export default function CuriosityReadingPage() {
 
             <CuriosityWordDetailFields
               quickPreview={quickPreview}
-              chapterNameOptions={chapterNameOptions}
+              chapterNameOptions={sortedChapterNameOptions}
               hideKanjiInReadingSupport={hideKanjiInReadingSupport}
               isEditing={quickPreview.id != null}
               savedQuickNotice={savedQuickNotice}
@@ -1389,7 +1431,14 @@ export default function CuriosityReadingPage() {
                 setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
               }
               onChapterNameChange={(value) =>
-                setQuickPreview((prev) => ({ ...prev, chapterName: value }))
+                setQuickPreview((prev) => {
+                  const knownChapterNumber = chapterNumberByName[value.trim()];
+                  return {
+                    ...prev,
+                    chapterName: value,
+                    chapterNumber: knownChapterNumber || prev.chapterNumber,
+                  };
+                })
               }
               onHideKanjiChange={setHideKanjiInReadingSupport}
               onSaveWord={() => void saveQuickWord()}

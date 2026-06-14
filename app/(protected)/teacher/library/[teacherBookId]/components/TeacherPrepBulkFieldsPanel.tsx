@@ -86,14 +86,6 @@ export default function TeacherPrepBulkFieldsPanel({
           onApplyField={onApplyField}
         />
 
-        <BulkFieldInput
-          label="Chapter #"
-          value={chapterNumber}
-          onChange={onChapterNumberChange}
-          field="chapterNumber"
-          onApplyField={onApplyField}
-        />
-
         <label className="text-sm">
           <ChapterNameCombobox
             label={chapterNameLabel}
@@ -122,6 +114,14 @@ export default function TeacherPrepBulkFieldsPanel({
             </button>
           </div>
         </label>
+
+        <BulkFieldInput
+          label="Chapter #"
+          value={chapterNumber}
+          onChange={onChapterNumberChange}
+          field="chapterNumber"
+          onApplyField={onApplyField}
+        />
       </div>
     </section>
   );

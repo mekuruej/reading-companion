@@ -48,6 +48,16 @@ export default function BulkDetailEditItem({
           />
         </div>
 
+        <ChapterNameCombobox
+          value={chapterName}
+          onChange={onChapterNameChange}
+          chapterOptions={chapterNameOptions}
+          label="Chapter Name"
+          labelClassName="mb-1 block text-xs text-gray-500"
+          inputClassName="w-full rounded border p-2 text-sm"
+          showSavedChapterSelect
+        />
+
         <div>
           <div className="mb-1 text-xs text-gray-500">Chapter #</div>
           <input
@@ -58,15 +68,6 @@ export default function BulkDetailEditItem({
             className="w-full rounded border p-2 text-sm"
           />
         </div>
-
-        <ChapterNameCombobox
-          value={chapterName}
-          onChange={onChapterNameChange}
-          chapterOptions={chapterNameOptions}
-          label="Chapter Name"
-          labelClassName="mb-1 block text-xs text-gray-500"
-          inputClassName="w-full rounded border p-2 text-sm"
-        />
       </div>
 
       <label className="mt-3 flex items-start gap-2 text-sm text-stone-700">

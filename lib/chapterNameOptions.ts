@@ -16,3 +16,25 @@ export function normalizeChapterNameOptions(values: Array<string | null | undefi
 export function addChapterNameOption(options: string[], value: string | null | undefined) {
   return normalizeChapterNameOptions([...options, value]);
 }
+
+export function sortChapterNameOptionsByNumber(
+  options: string[],
+  chapterNumberByName: Record<string, string>
+) {
+  return [...options].sort((a, b) => {
+    const aNumber = Number.parseFloat(chapterNumberByName[a.trim()] ?? "");
+    const bNumber = Number.parseFloat(chapterNumberByName[b.trim()] ?? "");
+    const aHasNumber = Number.isFinite(aNumber);
+    const bHasNumber = Number.isFinite(bNumber);
+
+    if (aHasNumber && bHasNumber && aNumber !== bNumber) {
+      return aNumber - bNumber;
+    }
+
+    if (aHasNumber !== bHasNumber) {
+      return aHasNumber ? -1 : 1;
+    }
+
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+}

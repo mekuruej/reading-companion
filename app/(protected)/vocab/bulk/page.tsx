@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
   normalizeChapterNameOptions,
+  sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
 import BulkMessageBanner from "./components/BulkMessageBanner";
 import SaveBar from "./components/SaveBar";
@@ -134,10 +135,16 @@ export default function BulkVocabPage() {
   const [bulkChapterNumber, setBulkChapterNumber] = useState("");
   const [bulkChapterName, setBulkChapterName] = useState("");
   const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
+  const [chapterNumberByName, setChapterNumberByName] = useState<Record<string, string>>({});
 
   const [bulkPageList, setBulkPageList] = useState("");
   const [bulkChapterNumberList, setBulkChapterNumberList] = useState("");
   const [bulkChapterNameList, setBulkChapterNameList] = useState("");
+
+  const sortedChapterNameOptions = useMemo(
+    () => sortChapterNameOptionsByNumber(chapterNameOptions, chapterNumberByName),
+    [chapterNameOptions, chapterNumberByName]
+  );
 
   const [rawInput, setRawInput] = useState("");
   const [items, setItems] = useState<BulkItem[]>([]);
@@ -261,6 +268,17 @@ export default function BulkVocabPage() {
             const { number, name } = JSON.parse(saved);
             setBulkChapterNumber(number || "");
             setBulkChapterName(name || "");
+            if (name) {
+              setChapterNameOptions((current) =>
+                normalizeChapterNameOptions([...current, name])
+              );
+            }
+            if (name && number) {
+              setChapterNumberByName((current) => ({
+                ...current,
+                [String(name).trim()]: String(number),
+              }));
+            }
           } catch { }
         }
       } catch (error: any) {
@@ -294,6 +312,7 @@ export default function BulkVocabPage() {
   useEffect(() => {
     if (!authorizedUserBookId) {
       setChapterNameOptions([]);
+      setChapterNumberByName({});
       return;
     }
 
@@ -302,9 +321,10 @@ export default function BulkVocabPage() {
     async function loadChapterNameOptions() {
       const { data, error } = await supabase
         .from("user_book_words")
-        .select("chapter_name")
+        .select("chapter_name, chapter_number, created_at")
         .eq("user_book_id", authorizedUserBookId)
-        .not("chapter_name", "is", null);
+        .not("chapter_name", "is", null)
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error loading chapter name options:", error);
@@ -312,9 +332,20 @@ export default function BulkVocabPage() {
       }
 
       if (!cancelled) {
-        setChapterNameOptions(
-          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
+        const numberMap: Record<string, string> = {};
+        for (const row of data ?? []) {
+          const name = String(row.chapter_name ?? "").trim();
+          if (!name || numberMap[name] || row.chapter_number == null) continue;
+          numberMap[name] = String(row.chapter_number);
+        }
+
+        setChapterNameOptions((current) =>
+          normalizeChapterNameOptions([
+            ...current,
+            ...(data ?? []).map((row) => row.chapter_name),
+          ])
         );
+        setChapterNumberByName((current) => ({ ...numberMap, ...current }));
       }
     }
 
@@ -340,6 +371,40 @@ export default function BulkVocabPage() {
       copy[index] = { ...copy[index], [field]: value };
       return copy;
     });
+  }
+
+  function updateBulkChapterName(value: string) {
+    const knownChapterNumber = chapterNumberByName[value.trim()];
+    setBulkChapterName(value);
+    if (knownChapterNumber) {
+      setBulkChapterNumber(knownChapterNumber);
+    }
+  }
+
+  function updateItemChapterName(index: number, value: string) {
+    const knownChapterNumber = chapterNumberByName[value.trim()];
+    setItems((prev) => {
+      const copy = [...prev];
+      copy[index] = {
+        ...copy[index],
+        chapterName: value,
+        chapterNumber: knownChapterNumber || copy[index].chapterNumber,
+      };
+      return copy;
+    });
+  }
+
+  function deleteItem(index: number) {
+    const nextItems = items.filter((_, itemIndex) => itemIndex !== index);
+    setItems(nextItems);
+
+    if (nextItems.length === 0) {
+      setStep("paste");
+      setMessage("All draft words were removed. Paste a new list to continue.");
+      return;
+    }
+
+    setMessage(`Removed draft word ${index + 1}.`);
   }
 
   function chooseMeaning(index: number, rawValue: string) {
@@ -383,6 +448,9 @@ export default function BulkVocabPage() {
 
     let changed = 0;
 
+    const pairedChapterNumber =
+      field === "chapterName" ? chapterNumberByName[trimmed] : "";
+
     const nextItems = items.map((item) => {
       const currentValue = (item[field] ?? "").toString().trim();
       const shouldUpdate = mode === "all" || currentValue === "";
@@ -393,6 +461,9 @@ export default function BulkVocabPage() {
       return {
         ...item,
         [field]: value,
+        ...(field === "chapterName" && pairedChapterNumber
+          ? { chapterNumber: pairedChapterNumber }
+          : {}),
       };
     });
 
@@ -719,6 +790,15 @@ export default function BulkVocabPage() {
           ...items.map((item) => item.chapterName?.trim() || null),
         ])
       );
+      setChapterNumberByName((current) => {
+        const next = { ...current };
+        for (const item of items) {
+          const name = item.chapterName.trim();
+          const number = item.chapterNumber.trim();
+          if (name && number) next[name] = number;
+        }
+        return next;
+      });
       setStep("done");
       setMessage(`✅ Saved ${payload.length} words!`);
     } catch (err: any) {
@@ -837,6 +917,7 @@ export default function BulkVocabPage() {
                   onReadingChange={(value) => updateItem(idx, "reading", value)}
                   onMeaningChoiceChange={(value) => chooseMeaning(idx, value)}
                   onMeaningChange={(value) => updateItem(idx, "meaning", value)}
+                  onDelete={() => deleteItem(idx)}
                 />
               ))}
             </ul>
@@ -866,11 +947,11 @@ export default function BulkVocabPage() {
               bulkPageNumber={bulkPageNumber}
               bulkChapterNumber={bulkChapterNumber}
               bulkChapterName={bulkChapterName}
-              chapterNameOptions={chapterNameOptions}
+              chapterNameOptions={sortedChapterNameOptions}
               recentAction={recentAction}
               onBulkPageNumberChange={setBulkPageNumber}
               onBulkChapterNumberChange={setBulkChapterNumber}
-              onBulkChapterNameChange={setBulkChapterName}
+              onBulkChapterNameChange={updateBulkChapterName}
               onApplyBulkField={applyBulkField}
             />
 
@@ -895,11 +976,11 @@ export default function BulkVocabPage() {
                   page={i.page}
                   chapterNumber={i.chapterNumber}
                   chapterName={i.chapterName}
-                  chapterNameOptions={chapterNameOptions}
+                  chapterNameOptions={sortedChapterNameOptions}
                   hideKanjiInReadingSupport={i.hideKanjiInReadingSupport}
                   onPageChange={(value) => updateItem(idx, "page", value)}
                   onChapterNumberChange={(value) => updateItem(idx, "chapterNumber", value)}
-                  onChapterNameChange={(value) => updateItem(idx, "chapterName", value)}
+                  onChapterNameChange={(value) => updateItemChapterName(idx, value)}
                   onHideKanjiInReadingSupportChange={(checked) =>
                     updateItem(idx, "hideKanjiInReadingSupport", checked)
                   }

@@ -52,6 +52,34 @@ export default function BulkApplyFieldsPanel({
         </div>
 
         <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
+          <div className="text-sm font-medium text-gray-700">Chapter name</div>
+          <ChapterNameCombobox
+            value={bulkChapterName}
+            onChange={onBulkChapterNameChange}
+            chapterOptions={chapterNameOptions}
+            label=""
+            placeholder="e.g. Summer Festival"
+            helperText=""
+            inputClassName="rounded border p-2"
+            showSavedChapterSelect
+          />
+          <button
+            type="button"
+            onClick={() =>
+              onApplyBulkField(
+                "chapterName",
+                bulkChapterName,
+                "all",
+                "chapter-name-all"
+              )
+            }
+            className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+          >
+            {recentAction === "chapter-name-all" ? "Added!" : "Apply to all"}
+          </button>
+        </div>
+
+        <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
           <div className="text-sm font-medium text-gray-700">Chapter number</div>
           <input
             type="number"
@@ -73,33 +101,6 @@ export default function BulkApplyFieldsPanel({
             className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
           >
             {recentAction === "chapter-number-all" ? "Added!" : "Apply to all"}
-          </button>
-        </div>
-
-        <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
-          <div className="text-sm font-medium text-gray-700">Chapter name</div>
-          <ChapterNameCombobox
-            value={bulkChapterName}
-            onChange={onBulkChapterNameChange}
-            chapterOptions={chapterNameOptions}
-            label=""
-            placeholder="e.g. Summer Festival"
-            helperText=""
-            inputClassName="rounded border p-2"
-          />
-          <button
-            type="button"
-            onClick={() =>
-              onApplyBulkField(
-                "chapterName",
-                bulkChapterName,
-                "all",
-                "chapter-name-all"
-              )
-            }
-            className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
-          >
-            {recentAction === "chapter-name-all" ? "Added!" : "Apply to all"}
           </button>
         </div>
       </div>

@@ -144,6 +144,13 @@ export default function AddWordDetailFields({
           />
         </label>
 
+        <ChapterNameCombobox
+          value={chapterName}
+          onChange={onChapterNameChange}
+          chapterOptions={chapterNameOptions}
+          inputClassName="w-full rounded border px-3 py-2 text-sm"
+        />
+
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-stone-700">
             Chapter number
@@ -155,13 +162,6 @@ export default function AddWordDetailFields({
             className="w-full rounded border px-3 py-2 text-sm"
           />
         </label>
-
-        <ChapterNameCombobox
-          value={chapterName}
-          onChange={onChapterNameChange}
-          chapterOptions={chapterNameOptions}
-          inputClassName="w-full rounded border px-3 py-2 text-sm"
-        />
       </div>
 
       <label className="flex items-start gap-2 text-sm text-stone-700">

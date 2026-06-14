@@ -7,6 +7,7 @@ type BulkDefinitionReviewItemProps = {
   onReadingChange: (value: string) => void;
   onMeaningChoiceChange: (value: string) => void;
   onMeaningChange: (value: string) => void;
+  onDelete: () => void;
 };
 
 export default function BulkDefinitionReviewItem({
@@ -18,10 +19,20 @@ export default function BulkDefinitionReviewItem({
   onReadingChange,
   onMeaningChoiceChange,
   onMeaningChange,
+  onDelete,
 }: BulkDefinitionReviewItemProps) {
   return (
     <li className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 text-lg font-semibold">{surface}</div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-lg font-semibold">{surface}</div>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+        >
+          Delete
+        </button>
+      </div>
 
       <div className="grid gap-3">
         <div>

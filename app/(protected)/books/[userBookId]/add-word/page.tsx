@@ -22,6 +22,7 @@ import {
 import {
   addChapterNameOption,
   normalizeChapterNameOptions,
+  sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
 import AddWordPageHeader from "../components/AddWordPageHeader";
 import AddWordStatusMessage from "../components/AddWordStatusMessage";
@@ -222,6 +223,7 @@ export default function AddWordPage() {
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterName, setChapterName] = useState("");
   const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
+  const [chapterNumberByName, setChapterNumberByName] = useState<Record<string, string>>({});
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
@@ -232,6 +234,11 @@ export default function AddWordPage() {
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
   const [superToolSaving, setSuperToolSaving] = useState<"cache" | "wordSky" | null>(null);
   const [superToolMessage, setSuperToolMessage] = useState("");
+
+  const sortedChapterNameOptions = useMemo(
+    () => sortChapterNameOptionsByNumber(chapterNameOptions, chapterNumberByName),
+    [chapterNameOptions, chapterNumberByName]
+  );
   const [message, setMessage] = useState("");
   const [lookupCandidates, setLookupCandidates] = useState<JishoCandidate[]>([]);
   const [savedNotice, setSavedNotice] = useState("");
@@ -284,6 +291,17 @@ export default function AddWordPage() {
         const parsed = JSON.parse(saved);
         setChapterNumber(parsed?.number || "");
         setChapterName(parsed?.name || "");
+        if (parsed?.name) {
+          setChapterNameOptions((current) =>
+            normalizeChapterNameOptions([...current, parsed.name])
+          );
+        }
+        if (parsed?.name && parsed?.number) {
+          setChapterNumberByName((current) => ({
+            ...current,
+            [String(parsed.name).trim()]: String(parsed.number),
+          }));
+        }
       } catch { }
     }
 
@@ -388,6 +406,7 @@ export default function AddWordPage() {
   useEffect(() => {
     if (!userBookId || !canAccessBook) {
       setChapterNameOptions([]);
+      setChapterNumberByName({});
       return;
     }
 
@@ -396,9 +415,10 @@ export default function AddWordPage() {
     async function loadChapterNameOptions() {
       const { data, error } = await supabase
         .from("user_book_words")
-        .select("chapter_name")
+        .select("chapter_name, chapter_number, created_at")
         .eq("user_book_id", userBookId)
-        .not("chapter_name", "is", null);
+        .not("chapter_name", "is", null)
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error loading chapter name options:", error);
@@ -406,9 +426,20 @@ export default function AddWordPage() {
       }
 
       if (!cancelled) {
-        setChapterNameOptions(
-          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
+        const numberMap: Record<string, string> = {};
+        for (const row of data ?? []) {
+          const name = String(row.chapter_name ?? "").trim();
+          if (!name || numberMap[name] || row.chapter_number == null) continue;
+          numberMap[name] = String(row.chapter_number);
+        }
+
+        setChapterNameOptions((current) =>
+          normalizeChapterNameOptions([
+            ...current,
+            ...(data ?? []).map((row) => row.chapter_name),
+          ])
         );
+        setChapterNumberByName((current) => ({ ...numberMap, ...current }));
       }
     }
 
@@ -434,6 +465,16 @@ export default function AddWordPage() {
       })
     );
   }, [chapterNumber, chapterName, userBookId]);
+
+  function updateChapterName(value: string) {
+    const nextName = value;
+    const knownChapterNumber = chapterNumberByName[nextName.trim()];
+
+    setChapterName(nextName);
+    if (knownChapterNumber) {
+      setChapterNumber(knownChapterNumber);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -976,6 +1017,12 @@ export default function AddWordPage() {
         setChapterNameOptions((current) =>
           addChapterNameOption(current, insertedRow.chapter_name)
         );
+        if (insertedRow.chapter_name && insertedRow.chapter_number != null) {
+          setChapterNumberByName((current) => ({
+            ...current,
+            [String(insertedRow.chapter_name).trim()]: String(insertedRow.chapter_number),
+          }));
+        }
 
         setSessionWords((prev) => [
           newSessionWord,
@@ -1030,6 +1077,12 @@ export default function AddWordPage() {
         setChapterNameOptions((current) =>
           addChapterNameOption(current, updatedRow.chapter_name)
         );
+        if (updatedRow.chapter_name && updatedRow.chapter_number != null) {
+          setChapterNumberByName((current) => ({
+            ...current,
+            [String(updatedRow.chapter_name).trim()]: String(updatedRow.chapter_number),
+          }));
+        }
 
         setSessionWords((prev) => [
           updatedSessionWord,
@@ -1179,7 +1232,6 @@ export default function AddWordPage() {
                 if (event.key === "Enter") {
                   event.preventDefault();
                   event.stopPropagation();
-                  searchScratchWord();
                 }
               }}
               onUseScratchWord={searchScratchWord}
@@ -1219,7 +1271,7 @@ export default function AddWordPage() {
               pageNumber={pageNumber}
               chapterNumber={chapterNumber}
               chapterName={chapterName}
-              chapterNameOptions={chapterNameOptions}
+              chapterNameOptions={sortedChapterNameOptions}
               hideKanjiInReadingSupport={hideKanjiInReadingSupport}
               saving={saving}
               isEditing={editingSessionWordId != null}
@@ -1240,7 +1292,7 @@ export default function AddWordPage() {
               }}
               onPageNumberChange={setPageNumber}
               onChapterNumberChange={setChapterNumber}
-              onChapterNameChange={setChapterName}
+              onChapterNameChange={updateChapterName}
               onHideKanjiChange={setHideKanjiInReadingSupport}
               onSaveWord={() => void handleSave()}
               onClearWordFields={() => clearForm(true)}

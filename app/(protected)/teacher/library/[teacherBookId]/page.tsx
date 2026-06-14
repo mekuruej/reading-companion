@@ -9,7 +9,10 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
-import { normalizeChapterNameOptions } from "@/lib/chapterNameOptions";
+import {
+  normalizeChapterNameOptions,
+  sortChapterNameOptionsByNumber,
+} from "@/lib/chapterNameOptions";
 import TeacherLibraryBookAccessState from "./components/TeacherLibraryBookAccessState";
 import TeacherLibraryBookHeader from "./components/TeacherLibraryBookHeader";
 import TeacherLibraryBookLoadingState from "./components/TeacherLibraryBookLoadingState";
@@ -49,6 +52,7 @@ type TeacherBookItem = {
   meaning: string | null;
   vocabulary_cache_id?: number | null;
   page_number: number | null;
+  page_order?: number | null;
   chapter_number?: number | null;
   chapter_name: string | null;
   teacher_note: string | null;
@@ -230,6 +234,7 @@ export default function TeacherBookPrepPage() {
   const [drafts, setDrafts] = useState<PrepItemDraft[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [refreshingDraftIndex, setRefreshingDraftIndex] = useState<number | null>(null);
 
   const [bulkPageNumber, setBulkPageNumber] = useState("");
   const [bulkChapterNumber, setBulkChapterNumber] = useState("");
@@ -262,6 +267,39 @@ export default function TeacherBookPrepPage() {
       bulkChapterName,
     ]);
   }, [bulkChapterName, drafts, editDraft?.chapterName, savedItems]);
+
+  const chapterNumberByName = useMemo(() => {
+    const map: Record<string, string> = {};
+
+    for (const item of savedItems) {
+      const name = String(item.chapter_name ?? "").trim();
+      if (!name || map[name] || item.chapter_number == null) continue;
+      map[name] = String(item.chapter_number);
+    }
+
+    for (const draft of drafts) {
+      const name = draft.chapterName.trim();
+      if (!name || map[name] || !draft.chapterNumber.trim()) continue;
+      map[name] = draft.chapterNumber.trim();
+    }
+
+    if (editDraft?.chapterName.trim() && editDraft.chapterNumber.trim()) {
+      const name = editDraft.chapterName.trim();
+      if (!map[name]) map[name] = editDraft.chapterNumber.trim();
+    }
+
+    if (bulkChapterName.trim() && bulkChapterNumber.trim()) {
+      const name = bulkChapterName.trim();
+      if (!map[name]) map[name] = bulkChapterNumber.trim();
+    }
+
+    return map;
+  }, [bulkChapterName, bulkChapterNumber, drafts, editDraft, savedItems]);
+
+  const sortedChapterNameOptions = useMemo(
+    () => sortChapterNameOptionsByNumber(chapterNameOptions, chapterNumberByName),
+    [chapterNameOptions, chapterNumberByName]
+  );
 
   const visibleSavedItems = useMemo(() => {
     const query = savedSearch.trim().toLowerCase();
@@ -343,10 +381,11 @@ export default function TeacherBookPrepPage() {
       const { data: itemRows, error: itemsError } = await supabase
         .from("teacher_book_items")
         .select(
-          "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
+          "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
         )
         .eq("teacher_book_id", teacherBookId)
         .order("page_number", { ascending: true, nullsFirst: false })
+        .order("page_order", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true });
 
       if (itemsError) throw itemsError;
@@ -370,6 +409,116 @@ export default function TeacherBookPrepPage() {
       next[index] = { ...next[index], ...patch };
       return next;
     });
+  }
+
+  function updateDraftChapterName(index: number, value: string) {
+    const knownChapterNumber = chapterNumberByName[value.trim()];
+    updateDraft(index, {
+      chapterName: value,
+      ...(knownChapterNumber ? { chapterNumber: knownChapterNumber } : {}),
+    });
+  }
+
+  function updateBulkChapterName(value: string) {
+    const knownChapterNumber = chapterNumberByName[value.trim()];
+    setBulkChapterName(value);
+    if (knownChapterNumber) {
+      setBulkChapterNumber(knownChapterNumber);
+    }
+  }
+
+  function updateEditDraftChapterName(value: string) {
+    const knownChapterNumber = chapterNumberByName[value.trim()];
+    updateEditDraft({
+      chapterName: value,
+      ...(knownChapterNumber ? { chapterNumber: knownChapterNumber } : {}),
+    });
+  }
+
+  function moveDraft(index: number, direction: "up" | "down") {
+    const nextIndex = direction === "up" ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= drafts.length) return;
+
+    const nextDrafts = [...drafts];
+    const [draft] = nextDrafts.splice(index, 1);
+    nextDrafts.splice(nextIndex, 0, draft);
+    setDrafts(nextDrafts);
+  }
+
+  function deleteDraft(index: number) {
+    const nextDrafts = drafts.filter((_, draftIndex) => draftIndex !== index);
+    setDrafts(nextDrafts);
+
+    if (nextDrafts.length === 0) {
+      setStep("paste");
+      setMessage("All draft items were removed. Paste a new list to continue.");
+      return;
+    }
+
+    setMessage(`Removed draft item ${index + 1}.`);
+  }
+
+  async function refreshDraftLookup(index: number) {
+    const draft = drafts[index];
+    if (!draft) return;
+
+    const surface = draft.surfaceText.trim();
+    if (!surface) {
+      setMessage("Enter a word or phrase before searching again.");
+      return;
+    }
+
+    if (!["word", "phrase"].includes(draft.itemType)) {
+      setMessage("Jisho search is only used for word and phrase rows.");
+      return;
+    }
+
+    setRefreshingDraftIndex(index);
+    setMessage(`Searching again for ${surface}...`);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(`/api/jisho?keyword=${encodeURIComponent(surface)}`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      });
+
+      if (!response.ok) {
+        throw new Error("Jisho lookup failed.");
+      }
+
+      const data = await response.json();
+      const entry = data?.data?.[0];
+
+      if (!entry) {
+        updateDraft(index, {
+          meaningChoices: [],
+          meaningChoiceIndex: null,
+          vocabularyCacheId: null,
+        });
+        setMessage(`No Jisho result found for ${surface}. You can still edit it manually.`);
+        return;
+      }
+
+      const choices = extractMeaningChoices(entry);
+      updateDraft(index, {
+        reading: entry.japanese?.[0]?.reading || "",
+        meaningChoices: choices,
+        meaningChoiceIndex: choices.length ? 0 : null,
+        meaning: choices[0] || "",
+        vocabularyCacheId: null,
+      });
+      setMessage(`Updated dictionary choices for ${surface}.`);
+    } catch (error: any) {
+      console.error("Teacher prep draft lookup error:", error);
+      setMessage(error?.message ?? "Could not search that draft item.");
+    } finally {
+      setRefreshingDraftIndex(null);
+    }
   }
 
   function chooseMeaning(index: number, rawValue: string) {
@@ -464,13 +613,21 @@ export default function TeacherBookPrepPage() {
       return;
     }
 
+    const knownChapterNumber =
+      field === "chapterName" ? chapterNumberByName[trimmed] : "";
     let changed = 0;
     setDrafts((prev) =>
       prev.map((draft) => {
         const current = draft[field].trim();
         if (mode === "blank" && current) return draft;
         changed += 1;
-        return { ...draft, [field]: value };
+        return {
+          ...draft,
+          [field]: value,
+          ...(field === "chapterName" && knownChapterNumber
+            ? { chapterNumber: knownChapterNumber }
+            : {}),
+        };
       })
     );
 
@@ -495,6 +652,7 @@ export default function TeacherBookPrepPage() {
           meaning: cleanNullable(draft.meaning),
           vocabulary_cache_id: draft.vocabularyCacheId,
           page_number: toNullableInt(draft.page),
+          page_order: payload.length + 1,
           chapter_number: toNullableInt(draft.chapterNumber),
           chapter_name: cleanNullable(draft.chapterName),
           teacher_note: cleanNullable(draft.teacherNote),
@@ -680,21 +838,73 @@ export default function TeacherBookPrepPage() {
                   {drafts.map((draft, index) => (
                     <li key={`${draft.surfaceText}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-lg font-semibold">{draft.surfaceText}</div>
-                        <select
-                          value={draft.itemType}
-                          onChange={(event) => updateDraft(index, { itemType: event.target.value as ItemType })}
-                          className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-                        >
-                          {itemTypes.map((type) => (
-                            <option key={type} value={type}>
-                              {itemTypeLabel(type)}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => moveDraft(index, "up")}
+                            disabled={index === 0}
+                            className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:opacity-40"
+                          >
+                            Move up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveDraft(index, "down")}
+                            disabled={index === drafts.length - 1}
+                            className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:opacity-40"
+                          >
+                            Move down
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteDraft(index)}
+                            className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void refreshDraftLookup(index)}
+                            disabled={
+                              refreshingDraftIndex === index ||
+                              !draft.surfaceText.trim() ||
+                              !["word", "phrase"].includes(draft.itemType)
+                            }
+                            className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-40"
+                          >
+                            {refreshingDraftIndex === index ? "Searching..." : "Search again"}
+                          </button>
+                          <select
+                            value={draft.itemType}
+                            onChange={(event) => updateDraft(index, { itemType: event.target.value as ItemType })}
+                            className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                          >
+                            {itemTypes.map((type) => (
+                              <option key={type} value={type}>
+                                {itemTypeLabel(type)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-3">
+                        <label className="text-sm md:col-span-3">
+                          <span className="mb-1 block text-xs text-gray-500">Word / item</span>
+                          <input
+                            value={draft.surfaceText}
+                            onChange={(event) =>
+                              updateDraft(index, {
+                                surfaceText: event.target.value,
+                                vocabularyCacheId: null,
+                              })
+                            }
+                            className="w-full rounded border p-2 text-sm"
+                          />
+                        </label>
+
                         <label className="text-sm">
                           <span className="mb-1 block text-xs text-gray-500">Reading</span>
                           <input
@@ -797,18 +1007,47 @@ export default function TeacherBookPrepPage() {
                   chapterNumber={bulkChapterNumber}
                   onChapterNumberChange={setBulkChapterNumber}
                   chapterName={bulkChapterName}
-                  onChapterNameChange={setBulkChapterName}
+                  onChapterNameChange={updateBulkChapterName}
                   chapterNameLabel={chapterNameLabel}
-                  chapterNameOptions={chapterNameOptions}
+                  chapterNameOptions={sortedChapterNameOptions}
                   onApplyField={applyBulkField}
                 />
 
                 <ul className="space-y-3">
                   {drafts.map((draft, index) => (
                     <li key={`${draft.surfaceText}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="mb-2 text-lg font-semibold">{draft.surfaceText}</div>
-                      <div className="mb-2 text-sm text-gray-600">
-                        {itemTypeLabel(draft.itemType)} · {draft.reading || "—"} · {draft.meaning || "—"}
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-lg font-semibold">{draft.surfaceText}</div>
+                          <div className="mt-1 text-sm text-gray-600">
+                            {itemTypeLabel(draft.itemType)} · {draft.reading || "—"} · {draft.meaning || "—"}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => moveDraft(index, "up")}
+                            disabled={index === 0}
+                            className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:opacity-40"
+                          >
+                            Move up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveDraft(index, "down")}
+                            disabled={index === drafts.length - 1}
+                            className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:opacity-40"
+                          >
+                            Move down
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteDraft(index)}
+                            className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-3">
@@ -820,6 +1059,14 @@ export default function TeacherBookPrepPage() {
                             className="w-full rounded border p-2 text-sm"
                           />
                         </label>
+                        <ChapterNameCombobox
+                          value={draft.chapterName}
+                          onChange={(value) => updateDraftChapterName(index, value)}
+                          chapterOptions={sortedChapterNameOptions}
+                          label={chapterNameLabel}
+                          labelClassName="mb-1 block text-xs text-gray-500"
+                          inputClassName="w-full rounded border p-2 text-sm"
+                        />
                         <label className="text-sm">
                           <span className="mb-1 block text-xs text-gray-500">Chapter #</span>
                           <input
@@ -828,14 +1075,6 @@ export default function TeacherBookPrepPage() {
                             className="w-full rounded border p-2 text-sm"
                           />
                         </label>
-                        <ChapterNameCombobox
-                          value={draft.chapterName}
-                          onChange={(value) => updateDraft(index, { chapterName: value })}
-                          chapterOptions={chapterNameOptions}
-                          label={chapterNameLabel}
-                          labelClassName="mb-1 block text-xs text-gray-500"
-                          inputClassName="w-full rounded border p-2 text-sm"
-                        />
                       </div>
                     </li>
                   ))}
@@ -1109,6 +1348,14 @@ export default function TeacherBookPrepPage() {
                       className="w-full rounded border p-2 text-sm"
                     />
                   </label>
+                  <ChapterNameCombobox
+                    value={editDraft.chapterName}
+                    onChange={updateEditDraftChapterName}
+                    chapterOptions={sortedChapterNameOptions}
+                    label={chapterNameLabel}
+                    labelClassName="mb-1 block text-xs text-gray-500"
+                    inputClassName="w-full rounded border p-2 text-sm"
+                  />
                   <label className="text-sm">
                     <span className="mb-1 block text-xs text-gray-500">Chapter #</span>
                     <input
@@ -1117,14 +1364,6 @@ export default function TeacherBookPrepPage() {
                       className="w-full rounded border p-2 text-sm"
                     />
                   </label>
-                  <ChapterNameCombobox
-                    value={editDraft.chapterName}
-                    onChange={(value) => updateEditDraft({ chapterName: value })}
-                    chapterOptions={chapterNameOptions}
-                    label={chapterNameLabel}
-                    labelClassName="mb-1 block text-xs text-gray-500"
-                    inputClassName="w-full rounded border p-2 text-sm"
-                  />
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
