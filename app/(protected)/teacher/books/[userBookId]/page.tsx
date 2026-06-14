@@ -10,6 +10,7 @@ import { TeacherBookReviewLoadingState } from "./components/TeacherBookReviewLoa
 import { TeacherBookReviewAccessState } from "./components/TeacherBookReviewAccessState";
 import { TeacherBookReviewNav } from "./components/TeacherBookReviewNav";
 import { TeacherBookReviewHero } from "./components/TeacherBookReviewHero";
+import { TeacherBookReviewMessage } from "./components/TeacherBookReviewMessage";
 
 type ProfileRole = "teacher" | "member" | "student";
 
@@ -353,17 +354,10 @@ export default function TeacherBookReviewPage() {
 
                 <TeacherBookReviewHero book={book} />
 
-                {errorMessage ? (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {errorMessage}
-                    </div>
-                ) : null}
-
-                {saveMessage ? (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                        {saveMessage}
-                    </div>
-                ) : null}
+                <TeacherBookReviewMessage
+                    errorMessage={errorMessage}
+                    saveMessage={saveMessage}
+                />
 
                 <section className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
                     <div className="mb-4">
