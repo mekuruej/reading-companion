@@ -21,6 +21,7 @@ import { TeacherAssignLearnerFields } from "./components/TeacherAssignLearnerFie
 import { TeacherAssignBookPicker } from "./components/TeacherAssignBookPicker";
 import { TeacherAssignSelectedBookHelper } from "./components/TeacherAssignSelectedBookHelper";
 import { TeacherPrepShelfItemCard } from "./components/TeacherPrepShelfItemCard";
+import { TeacherPrepShelfSection } from "./components/TeacherPrepShelfSection";
 
 type ProfileRow = {
   id: string;
@@ -524,31 +525,32 @@ export default function AssignBookPage() {
       </TeacherAssignFormCard>
 
       <section style={{ marginTop: 24 }}>
-        <TeacherPrepShelfHeader />
+        <TeacherPrepShelfSection>
+          {prepItems.length === 0 ? (
+            <TeacherPrepShelfEmptyState />
+          ) : (
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              {prepItems.map((item) => {
+                const book = getPrepBook(item.books);
 
-        {prepItems.length === 0 ? (
-          <TeacherPrepShelfEmptyState />
-        ) : (
-          <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-            {prepItems.map((item) => {
-              const book = getPrepBook(item.books);
-              return (
-                <TeacherPrepShelfItemCard
-                  key={item.id}
-                  itemId={item.id}
-                  book={book}
-                  learnerLabel={
-                    item.learner_id
-                      ? profileNameById.get(item.learner_id) ?? item.learner_id
-                      : prospectiveLearnerLabel(item.notes)
-                  }
-                  status={item.status}
-                  onRemove={removePrepItem}
-                />
-              );
-            })}
-          </div>
-        )}
+                return (
+                  <TeacherPrepShelfItemCard
+                    key={item.id}
+                    itemId={item.id}
+                    book={book}
+                    learnerLabel={
+                      item.learner_id
+                        ? profileNameById.get(item.learner_id) ?? item.learner_id
+                        : prospectiveLearnerLabel(item.notes)
+                    }
+                    status={item.status}
+                    onRemove={removePrepItem}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </TeacherPrepShelfSection>
       </section>
     </main>
   );
