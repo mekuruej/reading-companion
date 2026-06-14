@@ -16,6 +16,8 @@ import { KanaStudyFeedbackPanel } from "./components/KanaStudyFeedbackPanel";
 import { KanaStudyHeader } from "./components/KanaStudyHeader";
 import { KanaStudyPrompt } from "./components/KanaStudyPrompt";
 
+const KANA_AUTO_ADVANCE_MS = 3000;
+
 function isSameKanaItem(a: KanaItem, b: KanaItem): boolean {
     return (
         a.hiragana === b.hiragana &&
@@ -397,7 +399,7 @@ export default function KanaStudyPage() {
             setCardIndex((current) => Math.min(current + 1, deck.length));
             setSelectedChoice(null);
             setAutoAdvancePaused(false);
-        }, 2000);
+        }, KANA_AUTO_ADVANCE_MS);
 
         return () => window.clearTimeout(timer);
     }, [isAnswered, autoAdvancePaused, deck.length]);
