@@ -33,7 +33,7 @@ export default function TeacherPrepPastePanel<T extends string>({
       </h2>
       <p className="mt-1 text-sm text-stone-500">
         Enter one item per line. Use word/phrase for dictionary lookup; grammar,
-        sentence, and note can be filled manually in the next step.
+        sentence, translation, and note can be filled manually in the next step.
       </p>
 
       <form onSubmit={onSubmit} className="mt-4 space-y-3">

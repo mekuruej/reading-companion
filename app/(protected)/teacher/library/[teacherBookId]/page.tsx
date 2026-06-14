@@ -26,7 +26,7 @@ import TeacherPrepPastePanel from "./components/TeacherPrepPastePanel";
 import TeacherPrepBulkFieldsPanel from "./components/TeacherPrepBulkFieldsPanel";
 import TeacherPrepPrimaryActionBar from "./components/TeacherPrepPrimaryActionBar";
 
-type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
+type ItemType = "word" | "phrase" | "grammar" | "sentence" | "translation" | "note";
 type PrepStep = "paste" | "definitions" | "details" | "done";
 
 type BookMeta = {
@@ -58,6 +58,7 @@ type TeacherBookItem = {
   teacher_note: string | null;
   explanation: string | null;
   translation: string | null;
+  support_url?: string | null;
   created_at: string | null;
 };
 
@@ -75,6 +76,7 @@ type PrepItemDraft = {
   teacherNote: string;
   explanation: string;
   translation: string;
+  supportUrl: string;
 };
 
 type SavedItemEditDraft = {
@@ -88,9 +90,10 @@ type SavedItemEditDraft = {
   teacherNote: string;
   explanation: string;
   translation: string;
+  supportUrl: string;
 };
 
-const itemTypes: ItemType[] = ["word", "phrase", "grammar", "sentence", "note"];
+const itemTypes: ItemType[] = ["word", "phrase", "grammar", "sentence", "translation", "note"];
 
 function isTeacherRole(profile: any) {
   return (
@@ -161,6 +164,13 @@ function compactText(value: string | null | undefined) {
   return cleaned || "—";
 }
 
+function combinedTeacherNote(item: Pick<TeacherBookItem, "teacher_note" | "explanation">) {
+  return [item.teacher_note, item.explanation]
+    .map((value) => (value ?? "").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function chapterDisplay(item: TeacherBookItem) {
   const numberPart = item.chapter_number == null ? "" : `Ch ${item.chapter_number}`;
   const namePart = (item.chapter_name ?? "").trim();
@@ -177,6 +187,7 @@ function savedItemSearchText(item: TeacherBookItem) {
     item.teacher_note,
     item.explanation,
     item.translation,
+    item.support_url,
     item.chapter_name,
     item.chapter_number == null ? "" : String(item.chapter_number),
     item.page_number == null ? "" : String(item.page_number),
@@ -194,9 +205,10 @@ function editDraftFromItem(item: TeacherBookItem): SavedItemEditDraft {
     page: item.page_number == null ? "" : String(item.page_number),
     chapterNumber: item.chapter_number == null ? "" : String(item.chapter_number),
     chapterName: item.chapter_name ?? "",
-    teacherNote: item.teacher_note ?? "",
+    teacherNote: combinedTeacherNote(item),
     explanation: item.explanation ?? "",
     translation: item.translation ?? "",
+    supportUrl: item.support_url ?? "",
   };
 }
 
@@ -215,6 +227,7 @@ function blankDraft(surfaceText: string, defaultType: ItemType): PrepItemDraft {
     teacherNote: "",
     explanation: "",
     translation: "",
+    supportUrl: "",
   };
 }
 
@@ -381,7 +394,7 @@ export default function TeacherBookPrepPage() {
       const { data: itemRows, error: itemsError } = await supabase
         .from("teacher_book_items")
         .select(
-          "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
+          "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, support_url, created_at"
         )
         .eq("teacher_book_id", teacherBookId)
         .order("page_number", { ascending: true, nullsFirst: false })
@@ -656,8 +669,9 @@ export default function TeacherBookPrepPage() {
           chapter_number: toNullableInt(draft.chapterNumber),
           chapter_name: cleanNullable(draft.chapterName),
           teacher_note: cleanNullable(draft.teacherNote),
-          explanation: cleanNullable(draft.explanation),
+          explanation: null,
           translation: cleanNullable(draft.translation),
+          support_url: cleanNullable(draft.supportUrl),
         });
       }
 
@@ -723,8 +737,9 @@ export default function TeacherBookPrepPage() {
         chapter_number: toNullableInt(editDraft.chapterNumber),
         chapter_name: cleanNullable(editDraft.chapterName),
         teacher_note: cleanNullable(editDraft.teacherNote),
-        explanation: cleanNullable(editDraft.explanation),
+        explanation: null,
         translation: cleanNullable(editDraft.translation),
+        support_url: cleanNullable(editDraft.supportUrl),
       };
 
       const { error } = await supabase
@@ -826,7 +841,7 @@ export default function TeacherBookPrepPage() {
                   className="mb-4"
                   stepLabel="Step 2"
                   title="Check definitions and support fields"
-                  description="Choose dictionary definitions where useful, then add teacher notes, explanations, and translations."
+                  description="Choose dictionary definitions where useful, then add teacher notes or a reference link."
                 />
 
                 <TeacherPrepPrimaryActionBar
@@ -893,7 +908,7 @@ export default function TeacherBookPrepPage() {
                       <div className="grid gap-3 md:grid-cols-3">
                         <label className="text-sm md:col-span-3">
                           <span className="mb-1 block text-xs text-gray-500">Word / item</span>
-                          <input
+                          <textarea
                             value={draft.surfaceText}
                             onChange={(event) =>
                               updateDraft(index, {
@@ -901,6 +916,7 @@ export default function TeacherBookPrepPage() {
                                 vocabularyCacheId: null,
                               })
                             }
+                            rows={2}
                             className="w-full rounded border p-2 text-sm"
                           />
                         </label>
@@ -941,8 +957,8 @@ export default function TeacherBookPrepPage() {
                       </div>
 
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
-                        <label className="text-sm">
-                          <span className="mb-1 block text-xs text-gray-500">Teacher note</span>
+                        <label className="text-sm md:col-span-2">
+                          <span className="mb-1 block text-xs text-gray-500">Teacher notes</span>
                           <textarea
                             value={draft.teacherNote}
                             onChange={(event) => updateDraft(index, { teacherNote: event.target.value })}
@@ -951,21 +967,12 @@ export default function TeacherBookPrepPage() {
                           />
                         </label>
                         <label className="text-sm">
-                          <span className="mb-1 block text-xs text-gray-500">Explanation</span>
-                          <textarea
-                            value={draft.explanation}
-                            onChange={(event) => updateDraft(index, { explanation: event.target.value })}
-                            rows={4}
+                          <span className="mb-1 block text-xs text-gray-500">Reference link</span>
+                          <input
+                            value={draft.supportUrl}
+                            onChange={(event) => updateDraft(index, { supportUrl: event.target.value })}
                             className="w-full rounded border bg-white p-2 text-sm"
-                          />
-                        </label>
-                        <label className="text-sm">
-                          <span className="mb-1 block text-xs text-gray-500">Translation</span>
-                          <textarea
-                            value={draft.translation}
-                            onChange={(event) => updateDraft(index, { translation: event.target.value })}
-                            rows={4}
-                            className="w-full rounded border bg-white p-2 text-sm"
+                            placeholder="https://..."
                           />
                         </label>
                       </div>
@@ -1198,26 +1205,37 @@ export default function TeacherBookPrepPage() {
                             {isExpanded ? (
                               <tr>
                                 <td colSpan={7} className="border-t border-stone-100 bg-stone-50 p-3">
-                                  <div className="grid gap-3 text-sm md:grid-cols-3">
-                                    <div>
+                                  <div className="grid gap-3 text-sm md:grid-cols-2">
+                                    <div className="md:col-span-2">
                                       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                                        Teacher note
+                                        Teacher notes
                                       </div>
                                       <div className="mt-1 whitespace-pre-wrap leading-6 text-stone-700">
-                                        {compactText(item.teacher_note)}
+                                        {compactText(combinedTeacherNote(item))}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                                        Explanation
+                                        Reference link
                                       </div>
-                                      <div className="mt-1 whitespace-pre-wrap leading-6 text-stone-700">
-                                        {compactText(item.explanation)}
+                                      <div className="mt-1 leading-6 text-stone-700">
+                                        {item.support_url?.trim() ? (
+                                          <a
+                                            href={item.support_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="font-semibold text-blue-700 underline"
+                                          >
+                                            {item.support_url}
+                                          </a>
+                                        ) : (
+                                          "—"
+                                        )}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                                        Translation
+                                        Legacy translation
                                       </div>
                                       <div className="mt-1 whitespace-pre-wrap leading-6 text-stone-700">
                                         {compactText(item.translation)}
@@ -1282,9 +1300,10 @@ export default function TeacherBookPrepPage() {
 
                   <label className="text-sm">
                     <span className="mb-1 block text-xs text-gray-500">Word / item</span>
-                    <input
+                    <textarea
                       value={editDraft.surfaceText}
                       onChange={(event) => updateEditDraft({ surfaceText: event.target.value })}
+                      rows={2}
                       className="w-full rounded border p-2 text-sm"
                     />
                   </label>
@@ -1310,8 +1329,8 @@ export default function TeacherBookPrepPage() {
                     />
                   </label>
 
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs text-gray-500">Teacher note</span>
+                  <label className="text-sm md:col-span-2">
+                    <span className="mb-1 block text-xs text-gray-500">Teacher notes</span>
                     <textarea
                       value={editDraft.teacherNote}
                       onChange={(event) => updateEditDraft({ teacherNote: event.target.value })}
@@ -1320,21 +1339,12 @@ export default function TeacherBookPrepPage() {
                     />
                   </label>
                   <label className="text-sm">
-                    <span className="mb-1 block text-xs text-gray-500">Explanation</span>
-                    <textarea
-                      value={editDraft.explanation}
-                      onChange={(event) => updateEditDraft({ explanation: event.target.value })}
-                      rows={4}
+                    <span className="mb-1 block text-xs text-gray-500">Reference link</span>
+                    <input
+                      value={editDraft.supportUrl}
+                      onChange={(event) => updateEditDraft({ supportUrl: event.target.value })}
                       className="w-full rounded border bg-white p-2 text-sm"
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs text-gray-500">Translation</span>
-                    <textarea
-                      value={editDraft.translation}
-                      onChange={(event) => updateEditDraft({ translation: event.target.value })}
-                      rows={4}
-                      className="w-full rounded border bg-white p-2 text-sm"
+                      placeholder="https://..."
                     />
                   </label>
                 </div>
