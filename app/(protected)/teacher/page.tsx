@@ -3,9 +3,11 @@
 
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { TeacherHubCardGrid } from "./components/TeacherHubCardGrid";
+import { TeacherHubHeader } from "./components/TeacherHubHeader";
+import { TeacherHubTodaySection } from "./components/TeacherHubTodaySection";
 
 type TeacherHubCard = {
   title: string;
@@ -109,12 +111,6 @@ function missingGlobalBookFields(book: GlobalBookRow) {
   return missing;
 }
 
-function formatAlertCount(count: number) {
-  if (count <= 0) return "None";
-  if (count > 99) return "99+";
-  return String(count);
-}
-
 function hasKanji(value: string) {
   return /[\p{Script=Han}]/u.test(value);
 }
@@ -166,75 +162,6 @@ function isActiveKanjiQueueStatus(params: {
   ).length;
 
   return completePositions.size < kanjiCount || incompleteRowCount > 0;
-}
-
-function TeacherHubCardGrid({ cards }: { cards: TeacherHubCard[] }) {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {cards.map((card) => (
-        <Link key={card.title} href={card.href}>
-          <div className="h-full rounded-3xl border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-              {card.eyebrow}
-            </p>
-
-            <h2 className="mt-3 text-xl font-black text-stone-900">{card.title}</h2>
-
-            <p className="mt-3 text-sm leading-6 text-stone-600">{card.description}</p>
-
-            <p className="mt-4 text-sm font-semibold text-stone-900">Open →</p>
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function TeacherAlertList({
-  alerts,
-  emptyText,
-}: {
-  alerts: TeacherAlertSummary[];
-  emptyText: string;
-}) {
-  if (alerts.length === 0) {
-    return <p className="mt-3 text-sm leading-6 text-stone-600">{emptyText}</p>;
-  }
-
-  return (
-    <div className="mt-4 space-y-3">
-      {alerts.map((alert) => (
-        <div
-          key={alert.title}
-          className={`flex items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm ${
-            alert.href ? "transition hover:-translate-y-0.5 hover:shadow-md" : ""
-          }`}
-        >
-          <div>
-            <h4 className="text-sm font-black text-stone-900">{alert.title}</h4>
-            <p className="mt-1 text-sm leading-5 text-stone-600">{alert.description}</p>
-            {alert.href ? (
-              <Link
-                href={alert.href}
-                className="mt-2 inline-flex text-sm font-semibold text-stone-900 hover:text-stone-600"
-              >
-                Open →
-              </Link>
-            ) : null}
-          </div>
-          <span
-            className={`shrink-0 rounded-full px-3 py-1 text-sm font-black ${
-              alert.count > 0
-                ? "bg-amber-100 text-amber-900"
-                : "bg-stone-100 text-stone-500"
-            }`}
-          >
-            {alert.placeholder ? "Soon" : formatAlertCount(alert.count)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 export default function TeacherHubPage() {
@@ -499,79 +426,18 @@ export default function TeacherHubPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-          Teacher Portal
-        </p>
-
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
-          Teacher Hub
-        </h1>
-
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-          Start with lesson prep, review what needs attention, or keep global teacher-side data tidy.
-        </p>
-      </section>
+      <TeacherHubHeader />
 
       <section className="mt-8">
         <TeacherHubCardGrid cards={teacherHubCards} />
       </section>
 
-      <section className="mt-8">
-        <div className="mb-3">
-          <h2 className="text-lg font-black text-stone-900">Today</h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Future alerts should answer two questions: what do my learners need, and what does the app need from me?
-          </p>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-              Learner / Lesson Alerts
-            </p>
-            <h3 className="mt-2 text-xl font-black text-stone-900">
-              What do I need to do for my learners?
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              After each lesson, remember to add new words, notes, or prep items while they are still fresh.
-            </p>
-            <p className="mt-3 text-sm leading-6 text-stone-600">
-              Upcoming lessons, assignment follow-up, and prep reminders can be added here later.
-            </p>
-
-            {alertsLoading ? (
-              <p className="mt-4 text-sm text-stone-500">Loading learner alerts...</p>
-            ) : (
-              <TeacherAlertList
-                alerts={learnerAlerts}
-                emptyText="No learner alerts are shown right now."
-              />
-            )}
-          </div>
-
-          <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-              App / Upkeep Alerts
-            </p>
-            <h3 className="mt-2 text-xl font-black text-stone-900">
-              What does the app or global data need from me?
-            </h3>
-            {alertsLoading ? (
-              <p className="mt-4 text-sm text-stone-500">Loading upkeep alerts...</p>
-            ) : isSuperTeacher ? (
-              <TeacherAlertList
-                alerts={upkeepAlerts}
-                emptyText="No app upkeep alerts are waiting right now."
-              />
-            ) : (
-              <p className="mt-2 text-sm leading-6 text-stone-600">
-                No app upkeep alerts are shown for your role right now. Learner and lesson follow-up will stay separate from global maintenance work.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
+      <TeacherHubTodaySection
+        alertsLoading={alertsLoading}
+        isSuperTeacher={isSuperTeacher}
+        learnerAlerts={learnerAlerts}
+        upkeepAlerts={upkeepAlerts}
+      />
     </main>
   );
 }
