@@ -10,6 +10,7 @@ import { TeacherAssignLoadingState } from "./components/TeacherAssignLoadingStat
 import { TeacherAssignSimpleState } from "./components/TeacherAssignSimpleState";
 import { TeacherAssignHeader } from "./components/TeacherAssignHeader";
 import { TeacherAssignMessageBanner } from "./components/TeacherAssignMessageBanner";
+import { TeacherAssignModeToggle } from "./components/TeacherAssignModeToggle";
 
 type ProfileRow = {
   id: string;
@@ -467,49 +468,10 @@ export default function AssignBookPage() {
           gap: 14,
         }}
       >
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => setActionMode("add_to_library")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 14,
-              border:
-                actionMode === "add_to_library"
-                  ? "1px solid rgba(20,83,45,0.75)"
-                  : "1px solid rgba(0,0,0,0.16)",
-              background:
-                actionMode === "add_to_library"
-                  ? "rgba(220,252,231,0.9)"
-                  : "rgba(255,255,255,0.85)",
-              fontWeight: 850,
-              cursor: "pointer",
-            }}
-          >
-            Add to Learner Library
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActionMode("prep_future")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 14,
-              border:
-                actionMode === "prep_future"
-                  ? "1px solid rgba(146,64,14,0.75)"
-                  : "1px solid rgba(0,0,0,0.16)",
-              background:
-                actionMode === "prep_future"
-                  ? "rgba(254,243,199,0.9)"
-                  : "rgba(255,255,255,0.85)",
-              fontWeight: 850,
-              cursor: "pointer",
-            }}
-          >
-            Prep for Future Learner
-          </button>
-        </div>
+        <TeacherAssignModeToggle
+          actionMode={actionMode}
+          onChangeMode={setActionMode}
+        />
 
         <label style={{ display: "grid", gap: 6 }}>
           <div style={{ fontWeight: 800 }}>
