@@ -4,15 +4,51 @@ No-code refactor/status map for:
 
 `app/(protected)/teacher/kanji/page.tsx`
 
-Current observed size: 1766 lines.
+Original observed size before visual extraction: 1766 lines.
 
-Current tracker row is stale:
+Current observed size after visual extraction: 1552 lines.
 
-`- [ ] Skip for now | app/(protected)/teacher/kanji/page.tsx | 1670 | 1670 | 0 |`
+Current status: `Visual pass mostly done / editor architecture deferred`.
 
-Recommended updated tracker row for now:
+The safe shell/table visual pass has been completed. The page now imports page-local teacher kanji components from:
 
-`- [ ] Skip for now | app/(protected)/teacher/kanji/page.tsx | 1766 | 1766 | 0 |`
+`app/(protected)/teacher/kanji/components/`
+
+Extracted components:
+* `TeacherKanjiHeader`
+* `TeacherKanjiLoadingState`
+* `TeacherKanjiAccessState`
+* `TeacherKanjiMessageBanner`
+* `TeacherKanjiSummaryCards`
+* `TeacherKanjiEmptyState`
+* `TeacherKanjiFilterBar`
+* `TeacherKanjiBulkActionBar`
+* `TeacherKanjiStatusBadge`
+* `TeacherKanjiRowCounts`
+* `TeacherKanjiWordCell`
+* `TeacherKanjiStudentCell`
+* `TeacherKanjiBookCell`
+* `TeacherKanjiQueueActions`
+* `TeacherKanjiQueueItem`
+
+Data loading, access checks, queue merge behavior, global kanji-map mutations, learner report resolution/dismissal, helper functions, page-local types, and open editor state remain in `page.tsx`.
+
+The remaining large inline UI is the open-editor panel and editor row form. That is intentionally deferred because it is tightly coupled to global `vocabulary_kanji_map` updates, learner report status changes, bulk save behavior, exclude/clear actions, and local editor-row sync behavior.
+
+Current tracker row:
+
+`- [x] ⭐️Visual pass mostly done / editor architecture deferred | app/(protected)/teacher/kanji/page.tsx | 1766 | 1552 | -214 |`
+
+Remaining cleanup candidates:
+* `TeacherKanjiStatusBadge`, `TeacherKanjiRowCounts`, `TeacherKanjiWordCell`, `TeacherKanjiStudentCell`, `TeacherKanjiBookCell`, and `TeacherKanjiQueueActions` are imported by `page.tsx` but are not used directly there. They appear to be queue-item subcomponents and may only need to be imported by `TeacherKanjiQueueItem`.
+* The open editor panel remains inline and is the largest visual block left in the page.
+* The open editor panel uses direct `setEditorOpenByWordId` calls in JSX for close/close-all behavior.
+* `KANJI_ENRICHMENT_TEST_START` hard-codes the queue start date and can hide older words.
+* Old global flags and learner `kanji_map_reports` intentionally overlap in the queue. This is important but easy to break.
+* Clearing/saving/dismissing report statuses happens at the vocabulary-cache level, not a single visible report-row level.
+* Copy says "Flagged from Kanji Study", but queue items can represent old global flags, learner reports, and shared-bank cache-only items.
+
+These are behavior-aware cleanup candidates, not remaining safe visual extraction work.
 
 ## Current Page Purpose
 
@@ -612,25 +648,23 @@ Do not remove yet.
 * Saving resolves reports for every map row in the same vocabulary cache.
 * Copy says "Flagged from Kanji Study"; queue can include learner reports and old global flags, so wording may need future refinement.
 
-## Recommended First Pass
+## Completed Visual Pass
 
-Recommended practical first visual pass:
+Completed extraction order:
 
-1. Extract `TeacherKanjiHeader`.
-2. Extract `TeacherKanjiLoadingState`.
-3. Extract `TeacherKanjiAccessState`.
-4. Extract `TeacherKanjiMessageBanner`.
-5. Extract `TeacherKanjiSummaryCards`.
-6. Extract `TeacherKanjiEmptyState`.
+1. Extracted `TeacherKanjiHeader`.
+2. Extracted `TeacherKanjiLoadingState`.
+3. Extracted `TeacherKanjiAccessState`.
+4. Extracted `TeacherKanjiMessageBanner`.
+5. Extracted `TeacherKanjiSummaryCards`.
+6. Extracted `TeacherKanjiEmptyState`.
+7. Extracted `TeacherKanjiFilterBar`.
+8. Extracted `TeacherKanjiBulkActionBar`.
+9. Extracted queue display subcomponents through `TeacherKanjiQueueItem`.
 
-Stop there and reassess.
+Good stopping point reached for safe shell/table visual extraction.
 
-Then, if the page still feels visually noisy and behavior smoke tests pass:
-
-7. Extract `TeacherKanjiFilterBar`.
-8. Extract `TeacherKanjiBulkActionBar`.
-
-Pause before extracting queue table/editor components unless there is a specific UI reason. The queue table and editor panel are behavior-heavy and can quickly create a large prop basket.
+Pause before extracting the open editor panel/editor cards/editor row forms unless there is a specific UI reason and enough smoke-test coverage. The editor surface is behavior-heavy and can quickly create a large prop basket.
 
 ## Architecture Deferred
 
@@ -696,7 +730,7 @@ No behavior cleanup is required before extracting tiny presentational shells, bu
 
 Current status:
 
-Visual pass done / good stopping point
+Visual pass mostly done / editor architecture deferred
 
 Finished:
 
@@ -722,4 +756,4 @@ The first visual pass is complete. The remaining open editor panel, editor cards
 
 Current tracker row:
 
-Visual pass done / good stopping point | `app/(protected)/teacher/kanji/page.tsx` | 1766 | NEW_COUNT | -CHANGE
+`- [x] ⭐️Visual pass mostly done / editor architecture deferred | app/(protected)/teacher/kanji/page.tsx | 1766 | 1552 | -214 |`

@@ -6,9 +6,13 @@ No-code refactor/status map for:
 
 Current tracker row:
 
-`- [ ] Not started | app/(protected)/teacher/library/[teacherBookId]/page.tsx | 904 | 904 | 0 |`
+`- [x] Visual pass done / good stopping point | app/(protected)/teacher/library/[teacherBookId]/page.tsx | 1320 | 1157 | -163 |`
 
-Current observed size: about 1320 lines.
+Current observed size after the visual pass: 1157 lines.
+
+Current status: `Visual pass done / good stopping point`.
+
+Audit note, 2026-06-13: the previous tracker row was close but slightly stale at 1145 lines. The current page is 1157 lines. The original 1320-line count still matches the pre-extraction map closely enough to keep as the tracker baseline.
 
 ## Current Page Purpose
 
@@ -766,17 +770,17 @@ Manual checklist for later implementation work:
 
 ## Final Recommendation
 
-This page is ready for a small first-pass visual extraction, but only around tiny states/header/book context/message/empty/step-header components.
+The first visual pass has reached a good stopping point. The safe presentational pieces have already been extracted, and the remaining inline JSX is mostly coupled to teacher prep item state and mutations.
 
-Do not start with the draft cards, saved table, or edit panel. Those are behavior-heavy and should wait until teacher prep item behavior is either stable enough for a focused visual extraction or ready for second-pass architecture planning.
+Do not do another broad visual thinning pass just to reduce line count. The next extraction, if any, should be a focused second pass around one clearly bounded area such as the saved-items display table, after confirming the edit/delete/expand behavior can remain fully owned by `page.tsx`.
 
-No assignment behavior cleanup is needed before visual extraction because assignment is not present here. The main behavior cleanup to consider later is clarifying teacher-book ownership access, Jisho/cache behavior, and the future boundary between teacher prep items and student-facing support.
+No assignment behavior cleanup is needed because assignment is not present here. The main behavior cleanup to consider later is clarifying teacher-book ownership access, Jisho/cache behavior, and the future boundary between teacher prep items and student-facing support.
 
-Suggested updated tracker row after map creation:
+Suggested current tracker row:
 
-`- [ ] Refactor map ready / visual pass not started | app/(protected)/teacher/library/[teacherBookId]/page.tsx | 1320 | 1320 | 0 |`
+`- [x] Visual pass done / good stopping point | app/(protected)/teacher/library/[teacherBookId]/page.tsx | 1320 | 1157 | -163 |`
 
-### Finished 
+### Finished Extractions
 
 * Extracted `TeacherLibraryBookHeader`
 * Extracted `TeacherLibraryBookLoadingState`
@@ -794,3 +798,75 @@ Suggested updated tracker row after map creation:
 The first visual pass is complete. The page now has a calmer Bulk Add-style structure with shell, context, message, step header, paste panel, bulk fields, saved item controls, done state, and empty states extracted into named presentational components.
 
 The draft definition cards, details draft rows, saved prep item table, and saved item edit panel are intentionally deferred because they carry controlled form state, save/edit/delete behavior, expand/collapse behavior, and page/chapter/story-name rules.
+
+## Post-Visual Audit
+
+Current observed line count:
+
+`app/(protected)/teacher/library/[teacherBookId]/page.tsx`: 1157 lines.
+
+This differs from the tracker row's 1145-line current count by +12 lines.
+
+### Current Extracted Components
+
+Current route-local components:
+
+* `TeacherLibraryBookHeader`
+* `TeacherLibraryBookLoadingState`
+* `TeacherLibraryBookAccessState`
+* `TeacherLibraryBookMessageBanner`
+* `TeacherLibraryBookContextCard`
+* `TeacherLibraryBookEmptyState`
+* `TeacherPrepStepHeader`
+* `TeacherPrepSavedItemsHeader`
+* `TeacherPrepDoneState`
+* `TeacherPrepPastePanel`
+* `TeacherPrepBulkFieldsPanel`
+* `TeacherPrepPrimaryActionBar`
+
+These extracted component files total about 483 lines. They cover the safe visual shell, route context, state banners, paste step, bulk detail fields, saved-items header controls, done state, and primary action rows.
+
+### Current Data And Risk Check
+
+The page still creates, updates, and deletes teacher-owned data in `teacher_book_items`.
+
+It loads:
+
+* the signed-in user and profile
+* one teacher-owned `teacher_books` row by route param
+* joined shared/global `books` metadata
+* saved `teacher_book_items` rows for the current teacher book
+
+It does not load linked student data, create student-owned `user_books`, create `user_book_words`, write sessions, write stats, or update study progress.
+
+Access boundaries remain represented in the map: teacher/super-teacher profile checks, teacher-owned book loading, teacher prep item ownership by `teacher_book_id`, and the distinction between teacher prep and learner vocabulary are all called out.
+
+### Current Readiness
+
+Safe to consider only as tiny second-pass visual work:
+
+* a saved item table shell or saved item row display component
+* a draft definition card, if all updates are passed in as callbacks
+* a draft details row, if chapter/page behavior stays in `page.tsx`
+
+Maybe later:
+
+* the saved item edit panel
+* a shared prep item field group
+* a shared chapter/page field block
+
+Do not touch yet:
+
+* Supabase auth/profile checks
+* teacher book loading
+* teacher prep item insert/update/delete behavior
+* Jisho lookup and dictionary-choice behavior
+* page/chapter/story-name rules
+* edit panel scroll behavior
+* saved item search/filter derived values
+
+### Stop Point
+
+Keep this page at `Visual pass done / good stopping point`.
+
+The current page is not as small as the stale tracker row says, but the visual pass did land. Further work should be treated as a second-pass architecture or behavior-aware component extraction, not a continuation of the first visual pass.
