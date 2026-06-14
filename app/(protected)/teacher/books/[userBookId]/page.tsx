@@ -14,6 +14,7 @@ import { TeacherBookReviewMessage } from "./components/TeacherBookReviewMessage"
 import { TeacherBookReviewSavedSnapshot } from "./components/TeacherBookReviewSavedSnapshot";
 import { TeacherBookReviewSaveBar } from "./components/TeacherBookReviewSaveBar";
 import { SuitableLevelSelector } from "./components/SuitableLevelSelector";
+import { TeacherRatingSelector } from "./components/TeacherRatingSelector";
 
 type ProfileRole = "teacher" | "member" | "student";
 
@@ -380,79 +381,15 @@ export default function TeacherBookReviewPage() {
                     onChange={setRecommendedLevel}
                 />
 
-                <section className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                        <h2 className="text-lg font-black text-stone-900">Use With Students</h2>
-                        <p className="mt-1 text-sm text-stone-500">
-                            Teaching fit, not reading level alone.
-                        </p>
-
-                        <div className="mt-4 space-y-2">
-                            {studentUseOptions.map(([value, label]) => {
-                                const isSelected = Number(teacherStudentUseRating) === value;
-
-                                return (
-                                    <button
-                                        key={value}
-                                        type="button"
-                                        onClick={() => setTeacherStudentUseRating(String(value))}
-                                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${isSelected
-                                            ? "border-amber-500 bg-amber-50 shadow-sm"
-                                            : "border-stone-200 bg-white hover:bg-stone-50"
-                                            }`}
-                                    >
-                                        <div className="font-medium text-amber-600">{stars5(value)}</div>
-                                        <div className="mt-1 text-sm text-stone-700">{label}</div>
-                                    </button>
-                                );
-                            })}
-
-                            <button
-                                type="button"
-                                onClick={() => setTeacherStudentUseRating("")}
-                                className="rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50"
-                            >
-                                Clear rating
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                        <h2 className="text-lg font-black text-stone-900">Language Learning Potential</h2>
-                        <p className="mt-1 text-sm text-stone-500">
-                            Vocabulary, grammar, patterns, nuance, and discussion value.
-                        </p>
-
-                        <div className="mt-4 space-y-2">
-                            {languageLearningOptions.map(([value, label]) => {
-                                const isSelected = Number(ratingRecommend) === value;
-
-                                return (
-                                    <button
-                                        key={value}
-                                        type="button"
-                                        onClick={() => setRatingRecommend(String(value))}
-                                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${isSelected
-                                            ? "border-amber-500 bg-amber-50 shadow-sm"
-                                            : "border-stone-200 bg-white hover:bg-stone-50"
-                                            }`}
-                                    >
-                                        <div className="font-medium text-amber-600">{stars5(value)}</div>
-                                        <div className="mt-1 text-sm text-stone-700">{label}</div>
-                                    </button>
-                                );
-                            })}
-
-                            <button
-                                type="button"
-                                onClick={() => setRatingRecommend("")}
-                                className="rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50"
-                            >
-                                Clear rating
-                            </button>
-                        </div>
-                    </div>
-                </section>
+                <TeacherRatingSelector
+                    title="Language Learning Potential"
+                    description="How much useful language-learning value does this book have?"
+                    value={ratingRecommend}
+                    options={languageLearningOptions}
+                    label={languageLearningLabel(clampRating5(ratingRecommend))}
+                    stars5={stars5}
+                    onChange={setRatingRecommend}
+                />
 
                 <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
                     <h2 className="text-lg font-black text-stone-900">Teacher Notes</h2>
