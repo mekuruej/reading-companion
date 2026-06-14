@@ -19,6 +19,7 @@ import { TeacherAssignFormCard } from "./components/TeacherAssignFormCard";
 import { TeacherPrepShelfHeader } from "./components/TeacherPrepShelfHeader";
 import { TeacherAssignLearnerFields } from "./components/TeacherAssignLearnerFields";
 import { TeacherAssignBookPicker } from "./components/TeacherAssignBookPicker";
+import { TeacherAssignSelectedBookHelper } from "./components/TeacherAssignSelectedBookHelper";
 
 type ProfileRow = {
   id: string;
@@ -506,49 +507,10 @@ export default function AssignBookPage() {
           />
         </label>
 
-        {selectedBook ? (
-          <div
-            style={{
-              border: "1px solid rgba(0,0,0,0.12)",
-              borderRadius: 14,
-              padding: 14,
-              background: "rgba(255,255,255,0.75)",
-              display: "flex",
-              gap: 14,
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 850 }}>Book info helper</div>
-              {selectedBookMissingInfo.length > 0 ? (
-                <div style={{ marginTop: 4, color: "#92400e", fontSize: 13 }}>
-                  Missing: {selectedBookMissingInfo.join(", ")}
-                </div>
-              ) : (
-                <div style={{ marginTop: 4, color: "#166534", fontSize: 13 }}>
-                  Core book info looks filled in.
-                </div>
-              )}
-            </div>
-
-            <Link
-              href={`/teacher/books/add?bookId=${selectedBook.id}`}
-              style={{
-                border: "1px solid rgba(0,0,0,0.18)",
-                borderRadius: 12,
-                padding: "8px 12px",
-                textDecoration: "none",
-                color: "#292524",
-                background: "white",
-                fontWeight: 750,
-              }}
-            >
-              Edit book info
-            </Link>
-          </div>
-        ) : null}
+        <TeacherAssignSelectedBookHelper
+          selectedBook={selectedBook}
+          missingInfo={selectedBookMissingInfo}
+        />
 
         <TeacherAssignModeExplanation actionMode={actionMode} />
 
