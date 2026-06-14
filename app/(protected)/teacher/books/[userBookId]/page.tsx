@@ -12,6 +12,7 @@ import { TeacherBookReviewNav } from "./components/TeacherBookReviewNav";
 import { TeacherBookReviewHero } from "./components/TeacherBookReviewHero";
 import { TeacherBookReviewMessage } from "./components/TeacherBookReviewMessage";
 import { TeacherBookReviewSavedSnapshot } from "./components/TeacherBookReviewSavedSnapshot";
+import { TeacherBookReviewSaveBar } from "./components/TeacherBookReviewSaveBar";
 
 type ProfileRole = "teacher" | "member" | "student";
 
@@ -506,16 +507,10 @@ export default function TeacherBookReviewPage() {
                     />
                 </section>
 
-                <div className="sticky bottom-4 flex justify-end">
-                    <button
-                        type="button"
-                        onClick={saveTeacherReview}
-                        disabled={saving}
-                        className="rounded-2xl bg-stone-900 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-black disabled:opacity-50"
-                    >
-                        {saving ? "Saving..." : "Save Teacher Review"}
-                    </button>
-                </div>
+                <TeacherBookReviewSaveBar
+                    saving={saving}
+                    onSave={saveTeacherReview}
+                />
             </div>
         </main>
     );
