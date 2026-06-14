@@ -9,6 +9,12 @@ import {
     type KanaItem,
 } from "@/lib/japanese/kana";
 import KanjiStudyModeSelector from "../components/KanjiStudyModeSelector";
+import { KanaStudyCharacterSetSelector } from "./components/KanaStudyCharacterSetSelector";
+import { KanaStudyCompletionPanel } from "./components/KanaStudyCompletionPanel";
+import { KanaStudyCurrentCardSummary } from "./components/KanaStudyCurrentCardSummary";
+import { KanaStudyFeedbackPanel } from "./components/KanaStudyFeedbackPanel";
+import { KanaStudyHeader } from "./components/KanaStudyHeader";
+import { KanaStudyPrompt } from "./components/KanaStudyPrompt";
 
 function isSameKanaItem(a: KanaItem, b: KanaItem): boolean {
     return (
@@ -181,7 +187,7 @@ const PRONUNCIATION_MEMORY_CUES: Record<string, string> = {
     mo: "mow 🌾",
     ya: "ya(cht) ⛵",
     yu: "you 👉",
-    yo: "yo-yo 🪀",
+    yo: "yo(-yo) 🪀",
     ra: "ra(men) 🍜",
     ri: "ri(ng) 💍",
     ru: "ru(by) 💎",
@@ -443,21 +449,7 @@ export default function KanaStudyPage() {
 
     return (
         <main className="flex min-h-screen flex-col items-center bg-slate-100 px-6 py-4 text-slate-900">
-            <div className="mb-2 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                <div className="flex items-center justify-center gap-3">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-3xl shadow-sm">
-                        あ
-                    </div>
-
-                    <h1 className="text-center text-2xl font-semibold text-slate-950">
-                        Hiragana & Katakana Study
-                    </h1>
-                </div>
-            </div>
-
-            <p className="mt-2 w-full max-w-3xl text-center text-sm font-semibold text-slate-600">
-                Choose your study mode and character sets before studying.
-            </p>
+            <KanaStudyHeader />
 
             <KanjiStudyModeSelector
                 value={studyMode}
@@ -465,248 +457,79 @@ export default function KanaStudyPage() {
                 onChange={(value) => handleModeChange(value as StudyMode)}
             />
 
-            <details className="group mt-4 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <h2 className="text-sm font-black uppercase tracking-wide text-slate-950">
-                            Character Set
-                        </h2>
-                        <p className="mt-1 truncate text-sm font-semibold text-slate-700">
-                            {kanaSetSummary}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                            Basic kana are always included. Add voiced marks or combo kana when ready.
-                        </p>
-                    </div>
-
-                    <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 shadow-sm group-open:hidden">
-                        Change
-                    </span>
-                    <span className="hidden shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-black text-slate-700 group-open:inline-flex">
-                        Close
-                    </span>
-                </summary>
-
-                <div className="mt-4 grid items-start gap-2 border-t border-slate-200 pt-4 sm:grid-cols-3">
-                    <div className="flex flex-col items-start justify-start rounded-2xl border border-slate-950 bg-slate-950 px-3 py-3 text-left text-white shadow-sm">
-                        <div className="space-y-1">
-                            <div className="text-sm font-black">Basic Kana</div>
-                            <div className="text-sm font-semibold leading-5 text-slate-200">
-                                あ、か、さ...
-                            </div>
-                        </div>
-                        <div className="mt-1 text-[11px] font-semibold text-slate-300">
-                            五十音（ごじゅうおん）
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={() =>
-                            handleKanaSetChange({
-                                includeDakuten: !includeDakuten,
-                                includeYoon,
-                            })
-                        }
-                        className={`flex flex-col items-start justify-start rounded-2xl border px-3 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${includeDakuten
-                            ? "border-slate-950 bg-slate-950 text-white shadow-md"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-                            }`}
-                    >
-                        <div className="space-y-2">
-                            <div>
-                                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                    <span className="text-sm font-black">Dakuten</span>
-                                    <span className={`text-sm font-semibold leading-5 ${includeDakuten ? "text-slate-200" : "text-slate-500"}`}>
-                                        が、ざ、だ、ば...
-                                    </span>
-                                </div>
-                                <div className={`mt-0.5 text-[11px] font-semibold ${includeDakuten ? "text-slate-300" : "text-slate-500"}`}>
-                                    濁点（だくてん）
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                    <span className="text-sm font-black">Handakuten</span>
-                                    <span className={`text-sm font-semibold leading-5 ${includeDakuten ? "text-slate-200" : "text-slate-500"}`}>
-                                        ぱ、ぴ、ぷ...
-                                    </span>
-                                </div>
-                                <div className={`mt-0.5 text-[11px] font-semibold ${includeDakuten ? "text-slate-300" : "text-slate-500"}`}>
-                                    半濁点（はんだくてん）
-                                </div>
-                            </div>
-                        </div>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() =>
-                            handleKanaSetChange({
-                                includeDakuten,
-                                includeYoon: !includeYoon,
-                            })
-                        }
-                        className={`flex flex-col items-start justify-start rounded-2xl border px-3 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${includeYoon
-                            ? "border-slate-950 bg-slate-950 text-white shadow-md"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-                            }`}
-                    >
-                        <div className="space-y-1">
-                            <div className="text-sm font-black">Combo Sounds</div>
-                            <div className={`text-sm font-semibold leading-5 ${includeYoon ? "text-slate-200" : "text-slate-500"}`}>
-                                きゃ、しゅ、りょ...
-                            </div>
-                        </div>
-                        <div className={`mt-1 text-[11px] font-semibold ${includeYoon ? "text-slate-300" : "text-slate-500"}`}>
-                            拗音（ようおん）
-                        </div>
-                    </button>
-                </div>
-            </details>
+            <KanaStudyCharacterSetSelector
+                kanaSetSummary={kanaSetSummary}
+                includeDakuten={includeDakuten}
+                includeYoon={includeYoon}
+                onChange={handleKanaSetChange}
+            />
 
             {isComplete ? (
-                <section className="mt-6 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-                    <h2 className="text-2xl font-semibold text-slate-950">
-                        Set complete
-                    </h2>
-                    <p className="mt-3 text-slate-700">
-                        You reviewed every character in this mode and character set.
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">
-                        Score: {correctCount} / {answeredCount}
-                    </p>
-
-                    <div className="mt-6 flex flex-wrap justify-center gap-3">
-                        <button
-                            type="button"
-                            onClick={handleStudySetAgain}
-                            className="rounded bg-gray-700 px-4 py-2 text-white transition hover:bg-gray-800"
-                        >
-                            Do set again
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={handleNextMode}
-                            className="rounded border border-slate-300 bg-white px-4 py-2 text-slate-700 transition hover:bg-slate-50"
-                        >
-                            Next mode
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => router.push("/library-study")}
-                            className="rounded bg-gray-200 px-4 py-2 text-slate-800 transition hover:bg-gray-300"
-                        >
-                            Back to Library Study
-                        </button>
-                    </div>
-                </section>
+                <KanaStudyCompletionPanel
+                    correctCount={correctCount}
+                    answeredCount={answeredCount}
+                    onStudySetAgain={handleStudySetAgain}
+                    onNextMode={handleNextMode}
+                    onBackToLibraryStudy={() => router.push("/library-study")}
+                />
             ) : card ? (
                 <>
-            <section className="mt-4 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                        <h2 className="text-sm font-black uppercase tracking-wide text-slate-950">
-                            Current Card
-                        </h2>
-                        <p className="mt-1 text-sm font-semibold text-slate-700">
-                            {selectedMode?.label}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">{card.promptLabel}</p>
-                    </div>
+                    <KanaStudyCurrentCardSummary
+                        modeLabel={selectedMode?.label}
+                        promptLabel={card.promptLabel}
+                        cardNumber={cardIndex + 1}
+                        cardCount={deck.length}
+                        correctCount={correctCount}
+                        answeredCount={answeredCount}
+                    />
 
-                    <div className="shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700">
-                        Card: {cardIndex + 1} / {deck.length}
-                        <span className="ml-3 text-slate-400">
-                            Score: {correctCount} / {answeredCount}
-                        </span>
-                    </div>
-                </div>
-            </section>
+                    <section className="relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl">
+                        <div className="flex w-full flex-col items-center justify-center gap-6">
+                            <KanaStudyPrompt
+                                promptLabel={card.promptLabel}
+                                prompt={card.prompt}
+                            />
 
-            <section className="relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl">
-                <div className="flex w-full flex-col items-center justify-center gap-6">
-                    <div className="flex w-full flex-col items-center gap-1">
-                        <div className="text-xs uppercase tracking-wide text-slate-500">
-                            {card.promptLabel}
-                        </div>
+                            <div className="grid w-full max-w-sm grid-cols-2 gap-3">
+                                {card.choices.map((choice, index) => {
+                                    const isSelectedChoice = selectedChoice === choice;
+                                    const isCorrectChoice = choice === card.answer;
 
-                        {/* Kana learners often need larger character shapes than kanji-study answer text,
-                        so this page intentionally keeps the prompt and choices oversized. */}
-                        <div className="text-6xl font-bold leading-none text-slate-950 sm:text-7xl">
-                            {card.prompt}
-                        </div>
-                    </div>
+                                    let choiceClass = "border-slate-200 bg-white hover:bg-gray-50";
 
-                    <div className="grid w-full max-w-sm grid-cols-2 gap-3">
-                        {card.choices.map((choice, index) => {
-                            const isSelectedChoice = selectedChoice === choice;
-                            const isCorrectChoice = choice === card.answer;
+                                    if (isAnswered && isCorrectChoice) {
+                                        choiceClass = "border-green-400 bg-green-100";
+                                    } else if (isAnswered && isSelectedChoice && !isCorrectChoice) {
+                                        choiceClass = "border-red-400 bg-red-100";
+                                    }
 
-                            let choiceClass = "border-slate-200 bg-white hover:bg-gray-50";
-
-                            if (isAnswered && isCorrectChoice) {
-                                choiceClass = "border-green-400 bg-green-100";
-                            } else if (isAnswered && isSelectedChoice && !isCorrectChoice) {
-                                choiceClass = "border-red-400 bg-red-100";
-                            }
-
-                            return (
-                                <button
-                                    key={`${choice}-${index}`}
-                                    type="button"
-                                    onClick={() => handleChoice(choice)}
-                                    disabled={isAnswered}
-                                    className={`w-full rounded border px-4 py-4 text-2xl font-bold transition disabled:cursor-default sm:text-3xl ${choiceClass}`}
-                                >
-                                    {choice}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {isAnswered ? (
-                        <div className="mt-2 w-full max-w-sm text-center text-sm">
-                            <p className={isCorrect ? "text-green-700" : "text-red-700"}>
-                                {isCorrect ? "Correct!" : "Not quite."}
-                            </p>
-                            <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
-                                <div className="text-3xl font-semibold text-slate-950">
-                                    {card.answer}
-                                </div>
-                                <div className="mt-2 text-xl font-semibold text-slate-700">
-                                    {card.item.romaji} = 👂 {pronunciationHintForRomaji(card.item.romaji)}
-                                </div>
+                                    return (
+                                        <button
+                                            key={`${choice}-${index}`}
+                                            type="button"
+                                            onClick={() => handleChoice(choice)}
+                                            disabled={isAnswered}
+                                            className={`w-full rounded border px-4 py-4 text-2xl font-bold transition disabled:cursor-default sm:text-3xl ${choiceClass}`}
+                                        >
+                                            {choice}
+                                        </button>
+                                    );
+                                })}
                             </div>
 
-                            <div className="mt-3 flex flex-col items-center gap-2">
-                                <div className="flex flex-wrap justify-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setAutoAdvancePaused((current) => !current)}
-                                        className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
-                                    >
-                                        {autoAdvancePaused ? "Resume" : "Pause"}
-                                    </button>
-
-                                </div>
-
-                                <p className="text-xs text-slate-400">
-                                    {autoAdvancePaused
-                                        ? "Paused. Take your time with this kana."
-                                        : "Next card comes automatically."}
-                                </p>
-                            </div>
+                            <KanaStudyFeedbackPanel
+                                isAnswered={isAnswered}
+                                isCorrect={isCorrect}
+                                answer={card.answer}
+                                romaji={card.item.romaji}
+                                pronunciationHint={pronunciationHintForRomaji(card.item.romaji)}
+                                autoAdvancePaused={autoAdvancePaused}
+                                onToggleAutoAdvancePaused={() =>
+                                    setAutoAdvancePaused((current) => !current)
+                                }
+                            />
                         </div>
-                    ) : (
-                        <p className="text-sm text-slate-500">
-                            Choose the best answer to check this card.
-                        </p>
-                    )}
-                </div>
-            </section>
+                    </section>
                 </>
             ) : null}
         </main>
