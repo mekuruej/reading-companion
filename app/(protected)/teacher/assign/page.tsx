@@ -16,6 +16,7 @@ import { TeacherAssignLearningTasksNote } from "./components/TeacherAssignLearni
 import { TeacherAssignPrimaryActionButton } from "./components/TeacherAssignPrimaryActionButton";
 import { TeacherPrepShelfEmptyState } from "./components/TeacherPrepShelfEmptyState";
 import { TeacherAssignFormCard } from "./components/TeacherAssignFormCard";
+import { TeacherPrepShelfHeader } from "./components/TeacherPrepShelfHeader";
 
 type ProfileRow = {
   id: string;
@@ -595,10 +596,7 @@ export default function AssignBookPage() {
       </TeacherAssignFormCard>
 
       <section style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 900 }}>My Prep Shelf</h2>
-        <p style={{ marginTop: 6, color: "#57534e", fontSize: 14 }}>
-          Books here are not learner-visible yet.
-        </p>
+        <TeacherPrepShelfHeader />
 
         {prepItems.length === 0 ? (
           <TeacherPrepShelfEmptyState />
