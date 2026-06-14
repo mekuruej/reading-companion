@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { TeacherBookReviewLoadingState } from "./components/TeacherBookReviewLoadingState";
 import { TeacherBookReviewAccessState } from "./components/TeacherBookReviewAccessState";
+import { TeacherBookReviewNav } from "./components/TeacherBookReviewNav";
 
 type ProfileRole = "teacher" | "member" | "student";
 
@@ -342,23 +343,12 @@ export default function TeacherBookReviewPage() {
     return (
         <main className="min-h-screen bg-stone-50 p-6">
             <div className="mx-auto max-w-5xl space-y-5">
-                <div className="flex flex-wrap gap-3">
-                    <button
-                        type="button"
-                        onClick={() => router.push("/teacher")}
-                        className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-800"
-                    >
-                        ← Teacher Portal
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-                        className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-800"
-                    >
-                        Back to Book Hub
-                    </button>
-                </div>
+                <TeacherBookReviewNav
+                    onBackToTeacherPortal={() => router.push("/teacher")}
+                    onBackToBookHub={() =>
+                        router.push(`/books/${encodeURIComponent(userBookId)}`)
+                    }
+                />
 
                 <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
                     <div className="grid gap-6 p-6 md:grid-cols-[120px_minmax(0,1fr)] md:p-8">
