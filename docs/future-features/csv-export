@@ -1,0 +1,28 @@
+## Future Feature: Chapter-Based CSV Export for Vocab List
+
+Later, add CSV export to the book-specific Vocab List page.
+
+The first version should be CSV only, not PDF. Students should be able to choose a chapter from the current book’s saved vocabulary, then download a CSV for that chapter.
+
+Suggested export options:
+
+* All chapters
+* Each chapter found in the saved vocab rows
+* No chapter, if any words do not have chapter data
+
+The export should use vocab rows already loaded on the page and should not add a new API route for the first pass. It should not change Supabase queries, ownership checks, RLS assumptions, save/delete behavior, or vocab loading behavior.
+
+Suggested CSV columns:
+
+* Book Title
+* Chapter
+* Page
+* Surface
+* Reading
+* Meaning
+* JLPT
+* Common
+* Hidden in Reading Support
+* Created At
+
+PDF export can stay deferred as a future polish feature.
