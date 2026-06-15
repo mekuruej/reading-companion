@@ -2420,6 +2420,7 @@ export default function BooksPage() {
   const showSuperTeacherKanjiReminder =
     viewingUserId === meId &&
     (myRole === "super_teacher" || isSuperTeacher) &&
+    (kanjiEnrichmentAlerts.length > 0 || bookRequests.length > 0) &&
     !superTeacherKanjiReminderHidden;
   const showLearningTasks =
     (viewingUserId === meId || isViewingStudentLibrary) &&
@@ -2538,7 +2539,7 @@ export default function BooksPage() {
         {showSuperTeacherKanjiReminder ? (
           <LibraryReminderBanner
             tone="violet"
-            title="Kanji enrichment reminder"
+            title="Needs Attention"
             actions={
               <>
                 <button
@@ -2546,11 +2547,11 @@ export default function BooksPage() {
                   onClick={() => {
                     hideSuperTeacherKanjiReminderForToday();
                     setSuperTeacherKanjiReminderHidden(true);
-                    router.push("/teacher/kanji");
+                    router.push("/teacher/needs-attention");
                   }}
                   className="rounded-xl bg-violet-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800"
                 >
-                  Open Kanji Queue
+                  Open Needs Attention
                 </button>
 
                 <button
@@ -2567,8 +2568,8 @@ export default function BooksPage() {
             }
           >
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              A little kanji cleanup keeps the shared Kanji Reading Study bank
-              healthier.
+              Something in the teacher review workspace is waiting, such as
+              book requests, missing book details, or kanji cleanup.
             </p>
           </LibraryReminderBanner>
         ) : null}
