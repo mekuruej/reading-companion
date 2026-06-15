@@ -1,4 +1,4 @@
-type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
+type ItemType = "word" | "phrase" | "grammar" | "sentence" | "translation" | "note";
 type SupportMode = "full" | "reading" | "meaning";
 
 type TeacherFollowAlongPrepItem = {
@@ -11,6 +11,7 @@ type TeacherFollowAlongPrepItem = {
   teacher_note: string | null;
   explanation: string | null;
   translation: string | null;
+  support_url?: string | null;
 };
 
 type TeacherFollowAlongPrepItemCardProps = {
@@ -34,6 +35,8 @@ function itemTypeTone(value: ItemType) {
       return "border-violet-200 bg-violet-50 text-violet-800";
     case "sentence":
       return "border-amber-200 bg-amber-50 text-amber-900";
+    case "translation":
+      return "border-teal-200 bg-teal-50 text-teal-800";
     case "note":
       return "border-stone-200 bg-stone-50 text-stone-700";
     default:
@@ -113,6 +116,18 @@ export function TeacherFollowAlongPrepItemCard({
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
             {item.teacher_note}
           </p>
+        ) : null}
+
+        {item.support_url?.trim() ? (
+          <a
+            href={item.support_url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+            className="mt-3 inline-flex max-w-full items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 underline-offset-2 hover:bg-sky-100 hover:underline"
+          >
+            <span className="truncate">{item.support_url}</span>
+          </a>
         ) : null}
       </div>
     </article>

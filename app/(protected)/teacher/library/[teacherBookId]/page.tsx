@@ -164,6 +164,34 @@ function compactText(value: string | null | undefined) {
   return cleaned || "—";
 }
 
+function readableSupabaseError(error: any) {
+  if (!error) return "Unknown error";
+  if (typeof error === "string") return error;
+
+  return (
+    error.message ||
+    error.details ||
+    error.hint ||
+    error.code ||
+    JSON.stringify(error)
+  );
+}
+
+function isMissingOptionalTeacherBookItemColumn(error: any) {
+  const text = readableSupabaseError(error).toLowerCase();
+  return (
+    text.includes("page_order") ||
+    text.includes("support_url") ||
+    text.includes("column") ||
+    error?.code === "42703"
+  );
+}
+
+function withoutOptionalTeacherBookItemColumns<T extends Record<string, any>>(row: T) {
+  const { page_order: _pageOrder, support_url: _supportUrl, ...baseRow } = row;
+  return baseRow;
+}
+
 function combinedTeacherNote(item: Pick<TeacherBookItem, "teacher_note" | "explanation">) {
   return [item.teacher_note, item.explanation]
     .map((value) => (value ?? "").trim())
@@ -327,6 +355,30 @@ export default function TeacherBookPrepPage() {
   }, [savedItems, savedSearch, savedPageFilter]);
 
   useEffect(() => {
+    setCanAccess(false);
+    setTeacherBook(null);
+    setSavedItems([]);
+    setMessage("");
+    setStep("paste");
+    setDefaultItemType("word");
+    setRawInput("");
+    setDrafts([]);
+    setIsPreviewing(false);
+    setIsSaving(false);
+    setRefreshingDraftIndex(null);
+    setBulkPageNumber("");
+    setBulkChapterNumber("");
+    setBulkChapterName("");
+    setEditingItemId(null);
+    setEditDraft(null);
+    setEditSaving(false);
+    setDeletingItemId(null);
+    setExpandedItemIds(new Set());
+    setSavedSearch("");
+    setSavedPageFilter("all");
+  }, [teacherBookId]);
+
+  useEffect(() => {
     void loadTeacherBook();
   }, [teacherBookId]);
 
@@ -401,14 +453,35 @@ export default function TeacherBookPrepPage() {
         .order("page_order", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true });
 
-      if (itemsError) throw itemsError;
+      let loadedItems: Partial<TeacherBookItem>[] = itemRows ?? [];
+
+      if (itemsError) {
+        if (!isMissingOptionalTeacherBookItemColumn(itemsError)) throw itemsError;
+
+        console.warn(
+          "Teacher prep optional column missing; retrying with the base teacher_book_items columns:",
+          readableSupabaseError(itemsError)
+        );
+
+        const { data: fallbackRows, error: fallbackError } = await supabase
+          .from("teacher_book_items")
+          .select(
+            "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
+          )
+          .eq("teacher_book_id", teacherBookId)
+          .order("page_number", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true });
+
+        if (fallbackError) throw fallbackError;
+        loadedItems = fallbackRows ?? [];
+      }
 
       setCanAccess(true);
       setTeacherBook(teacherBookRow as TeacherBookRow);
-      setSavedItems((itemRows ?? []) as TeacherBookItem[]);
+      setSavedItems(loadedItems as TeacherBookItem[]);
     } catch (error: any) {
-      console.error("Error loading teacher book prep:", error);
-      setMessage(error?.message ?? "Could not load teacher book prep.");
+      console.error("Error loading teacher book prep:", readableSupabaseError(error), error);
+      setMessage(readableSupabaseError(error) || "Could not load teacher book prep.");
       setTeacherBook(null);
       setSavedItems([]);
     } finally {
@@ -655,8 +728,22 @@ export default function TeacherBookPrepPage() {
 
     try {
       const payload = [];
+      const existingMaxPageOrder = savedItems.reduce((maxOrder, item) => {
+        const pageOrder = Number(item.page_order);
+        return Number.isFinite(pageOrder) ? Math.max(maxOrder, pageOrder) : maxOrder;
+      }, 0);
 
       for (const draft of drafts) {
+        const pageValue = draft.page.trim() || bulkPageNumber.trim();
+        const chapterNameValue = draft.chapterName.trim() || bulkChapterName.trim();
+        const knownChapterNumber =
+          chapterNameValue ? chapterNumberByName[chapterNameValue] : "";
+        const chapterNumberValue =
+          draft.chapterNumber.trim() ||
+          bulkChapterNumber.trim() ||
+          knownChapterNumber ||
+          "";
+
         payload.push({
           teacher_book_id: teacherBookId,
           item_type: draft.itemType,
@@ -664,10 +751,10 @@ export default function TeacherBookPrepPage() {
           reading: cleanNullable(draft.reading),
           meaning: cleanNullable(draft.meaning),
           vocabulary_cache_id: draft.vocabularyCacheId,
-          page_number: toNullableInt(draft.page),
-          page_order: payload.length + 1,
-          chapter_number: toNullableInt(draft.chapterNumber),
-          chapter_name: cleanNullable(draft.chapterName),
+          page_number: toNullableInt(pageValue),
+          page_order: existingMaxPageOrder + payload.length + 1,
+          chapter_number: toNullableInt(chapterNumberValue),
+          chapter_name: cleanNullable(chapterNameValue),
           teacher_note: cleanNullable(draft.teacherNote),
           explanation: null,
           translation: cleanNullable(draft.translation),
@@ -676,7 +763,21 @@ export default function TeacherBookPrepPage() {
       }
 
       const { error } = await supabase.from("teacher_book_items").insert(payload);
-      if (error) throw error;
+      if (error) {
+        if (!isMissingOptionalTeacherBookItemColumn(error)) throw error;
+
+        console.warn(
+          "Teacher prep optional column missing during insert; retrying with base columns:",
+          readableSupabaseError(error)
+        );
+
+        const fallbackPayload = payload.map(withoutOptionalTeacherBookItemColumns);
+        const { error: fallbackError } = await supabase
+          .from("teacher_book_items")
+          .insert(fallbackPayload);
+
+        if (fallbackError) throw fallbackError;
+      }
 
       setStep("done");
       setMessage(`Saved ${payload.length} teacher prep item${payload.length === 1 ? "" : "s"}.`);
@@ -748,7 +849,22 @@ export default function TeacherBookPrepPage() {
         .eq("id", editingItemId)
         .eq("teacher_book_id", teacherBookId);
 
-      if (error) throw error;
+      if (error) {
+        if (!isMissingOptionalTeacherBookItemColumn(error)) throw error;
+
+        console.warn(
+          "Teacher prep optional column missing during update; retrying with base columns:",
+          readableSupabaseError(error)
+        );
+
+        const { error: fallbackError } = await supabase
+          .from("teacher_book_items")
+          .update(withoutOptionalTeacherBookItemColumns(payload))
+          .eq("id", editingItemId)
+          .eq("teacher_book_id", teacherBookId);
+
+        if (fallbackError) throw fallbackError;
+      }
 
       setEditingItemId(null);
       setEditDraft(null);
@@ -789,6 +905,52 @@ export default function TeacherBookPrepPage() {
       setMessage(error?.message ?? "Could not delete prep item.");
     } finally {
       setDeletingItemId(null);
+    }
+  }
+
+  async function moveSavedItem(itemId: string, direction: "up" | "down") {
+    const visibleIndex = visibleSavedItems.findIndex((item) => item.id === itemId);
+    const nextVisibleIndex = direction === "up" ? visibleIndex - 1 : visibleIndex + 1;
+    if (visibleIndex < 0 || nextVisibleIndex < 0 || nextVisibleIndex >= visibleSavedItems.length) {
+      return;
+    }
+
+    const swapWithId = visibleSavedItems[nextVisibleIndex].id;
+    const currentIndex = savedItems.findIndex((item) => item.id === itemId);
+    const swapIndex = savedItems.findIndex((item) => item.id === swapWithId);
+    if (currentIndex < 0 || swapIndex < 0) return;
+
+    const reordered = [...savedItems];
+    const [movedItem] = reordered.splice(currentIndex, 1);
+    reordered.splice(swapIndex, 0, movedItem);
+
+    const orderedItems = reordered.map((item, index) => ({
+      ...item,
+      page_order: index + 1,
+    }));
+
+    setMessage("Saving reading order...");
+
+    try {
+      const updates = orderedItems
+        .filter((item) => item.page_order !== savedItems.find((saved) => saved.id === item.id)?.page_order)
+        .map((item) =>
+          supabase
+            .from("teacher_book_items")
+            .update({ page_order: item.page_order })
+            .eq("id", item.id)
+            .eq("teacher_book_id", teacherBookId)
+        );
+
+      const results = await Promise.all(updates);
+      const updateError = results.find((result) => result.error)?.error;
+      if (updateError) throw updateError;
+
+      setSavedItems(orderedItems);
+      setMessage("Reading order updated.");
+    } catch (error: any) {
+      console.error("Error updating teacher prep order:", readableSupabaseError(error), error);
+      setMessage(readableSupabaseError(error) || "Could not update reading order.");
     }
   }
 
@@ -1119,9 +1281,12 @@ export default function TeacherBookPrepPage() {
                 <TeacherLibraryBookEmptyState message="No prep items match those filters." />
               ) : (
                 <div className="mt-3 overflow-x-auto rounded border bg-white">
-                  <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
+                  <table className="w-full min-w-[840px] border-separate border-spacing-0 text-sm">
                     <thead className="bg-gray-50">
                       <tr className="text-left">
+                        <th className="w-20 p-2 text-xs font-semibold text-stone-600">
+                          Order
+                        </th>
                         <th className="w-24 p-2 text-xs font-semibold text-stone-600">
                           Type
                         </th>
@@ -1147,11 +1312,40 @@ export default function TeacherBookPrepPage() {
                     </thead>
 
                     <tbody>
-                      {visibleSavedItems.map((item) => {
+                      {visibleSavedItems.map((item, visibleIndex) => {
                         const isExpanded = expandedItemIds.has(item.id);
                         return (
                           <Fragment key={item.id}>
                             <tr className="border-t align-top">
+                              <td className="border-t border-stone-100 p-2">
+                                <div className="flex items-center gap-1">
+                                  <span
+                                    aria-hidden="true"
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-200 bg-stone-50 text-sm font-black leading-none text-stone-500"
+                                    title="Drag-style order handle"
+                                  >
+                                    ☰
+                                  </span>
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => void moveSavedItem(item.id, "up")}
+                                      disabled={visibleIndex === 0}
+                                      className="rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+                                    >
+                                      Up
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void moveSavedItem(item.id, "down")}
+                                      disabled={visibleIndex === visibleSavedItems.length - 1}
+                                      className="rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+                                    >
+                                      Down
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
                               <td className="border-t border-stone-100 p-2">
                                 <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
                                   {itemTypeLabel(item.item_type)}
@@ -1204,7 +1398,7 @@ export default function TeacherBookPrepPage() {
 
                             {isExpanded ? (
                               <tr>
-                                <td colSpan={7} className="border-t border-stone-100 bg-stone-50 p-3">
+                                <td colSpan={8} className="border-t border-stone-100 bg-stone-50 p-3">
                                   <div className="grid gap-3 text-sm md:grid-cols-2">
                                     <div className="md:col-span-2">
                                       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">

@@ -19,7 +19,7 @@ import { TeacherFollowAlongEmptyPageState } from "./components/TeacherFollowAlon
 import { TeacherFollowAlongReaderHeader } from "./components/TeacherFollowAlongReaderHeader";
 import { TeacherFollowAlongPrepItemCard } from "./components/TeacherFollowAlongPrepItemCard";
 
-type ItemType = "word" | "phrase" | "grammar" | "sentence" | "note";
+type ItemType = "word" | "phrase" | "grammar" | "sentence" | "translation" | "note";
 type SupportMode = "full" | "reading" | "meaning";
 
 type BookMeta = {
@@ -42,11 +42,14 @@ type TeacherBookItem = {
   reading: string | null;
   meaning: string | null;
   page_number: number | null;
+  page_order?: number | null;
   chapter_number?: number | null;
   chapter_name: string | null;
   teacher_note: string | null;
   explanation: string | null;
   translation: string | null;
+  support_url?: string | null;
+  created_at?: string | null;
 };
 
 type PageChunk = {
@@ -75,6 +78,46 @@ function chunkArray<T>(arr: T[], size: number) {
     out.push(arr.slice(i, i + size));
   }
   return out;
+}
+
+function readableSupabaseError(error: any) {
+  if (!error) return "Unknown error";
+  if (typeof error === "string") return error;
+
+  return (
+    error.message ||
+    error.details ||
+    error.hint ||
+    error.code ||
+    JSON.stringify(error)
+  );
+}
+
+function isMissingOptionalTeacherBookItemColumn(error: any) {
+  const text = readableSupabaseError(error).toLowerCase();
+  return (
+    text.includes("page_order") ||
+    text.includes("support_url") ||
+    text.includes("column") ||
+    error?.code === "42703"
+  );
+}
+
+function sortTeacherBookItemsForFollowAlong(items: TeacherBookItem[]) {
+  return [...items].sort((a, b) => {
+    const aPage = a.page_number ?? Number.MAX_SAFE_INTEGER;
+    const bPage = b.page_number ?? Number.MAX_SAFE_INTEGER;
+    if (aPage !== bPage) return aPage - bPage;
+
+    const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = b.page_order ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    const created = String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+    if (created !== 0) return created;
+
+    return a.id.localeCompare(b.id);
+  });
 }
 
 export default function TeacherFollowAlongPage() {
@@ -153,28 +196,51 @@ export default function TeacherFollowAlongPage() {
       const { data: itemRows, error: itemsError } = await supabase
         .from("teacher_book_items")
         .select(
-          "id, item_type, surface_text, reading, meaning, page_number, chapter_number, chapter_name, teacher_note, explanation, translation"
+          "id, item_type, surface_text, reading, meaning, page_number, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, support_url, created_at"
         )
         .eq("teacher_book_id", teacherBookId)
         .order("page_number", { ascending: true, nullsFirst: false })
+        .order("page_order", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true });
 
-      if (itemsError) throw itemsError;
+      let loadedItems: Partial<TeacherBookItem>[] = itemRows ?? [];
+
+      if (itemsError) {
+        if (!isMissingOptionalTeacherBookItemColumn(itemsError)) throw itemsError;
+
+        console.warn(
+          "Teacher follow-along optional column missing; retrying with base teacher_book_items columns:",
+          readableSupabaseError(itemsError)
+        );
+
+        const { data: fallbackRows, error: fallbackError } = await supabase
+          .from("teacher_book_items")
+          .select(
+            "id, item_type, surface_text, reading, meaning, page_number, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
+          )
+          .eq("teacher_book_id", teacherBookId)
+          .order("page_number", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true });
+
+        if (fallbackError) throw fallbackError;
+        loadedItems = fallbackRows ?? [];
+      }
 
       setCanAccess(true);
       setTeacherBook(teacherBookRow as TeacherBookRow);
-      setItems((itemRows ?? []) as TeacherBookItem[]);
+      setItems(sortTeacherBookItemsForFollowAlong(loadedItems as TeacherBookItem[]));
     } catch (error: any) {
-      console.error("Error loading teacher follow-along:", error);
+      console.error("Error loading teacher follow-along:", readableSupabaseError(error), error);
       setCanAccess(false);
-      setMessage(error?.message ?? "Could not load follow-along page.");
+      setMessage(readableSupabaseError(error) || "Could not load follow-along page.");
     } finally {
       setLoading(false);
     }
   }
 
   const pages = useMemo<PageChunk[]>(() => {
-    const numberedItems = items.filter((item) => item.page_number != null);
+    const orderedItems = sortTeacherBookItemsForFollowAlong(items);
+    const numberedItems = orderedItems.filter((item) => item.page_number != null);
 
     if (numberedItems.length > 0) {
       const grouped = new Map<number, TeacherBookItem[]>();
@@ -194,7 +260,7 @@ export default function TeacherFollowAlongPage() {
         }));
     }
 
-    return chunkArray(items, 8).map((chunk, index) => ({
+    return chunkArray(orderedItems, 8).map((chunk, index) => ({
       label: `Section ${index + 1}`,
       items: chunk,
       pageNumber: null,
