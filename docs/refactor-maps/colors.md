@@ -4,6 +4,8 @@
 
 `app/(protected)/community/stats/colors/page.tsx` is the detailed Reading Colors stats page for the signed-in reader.
 
+Current observed size: 331 lines as of 2026-06-15.
+
 It helps the user understand:
 * current all-time word counts in each Reading Color
 * how those current totals compare with a snapshot from the same day of the previous month
@@ -288,3 +290,42 @@ A future status of `Visual pass done / architecture deferred` should mean the sa
 - [✔️] Extracted `LimboSupportCard`.
 - [✔️] Extracted `ReadingColorSupportSection`.
 - [✔️] Extracted `ColorMovementInfoSection`.
+
+## Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/community/stats/colors/page.tsx`: 331 lines
+
+Extracted visual components:
+
+* `ReadingColorsHeader`
+* `ReadingColorsErrorBanner`
+* `ColorDeltaPill`
+* `ColorGuideStepCard`
+* `ColorGuideGroupLabel`
+* `ReadingColorsGuide`
+* `ReadingColorTotalsGrid`
+* `SupportLoopCard`
+* `LimboSupportCard`
+* `ReadingColorSupportSection`
+* `ColorMovementInfoSection`
+
+Suggested components intentionally left in the page:
+
+* No major visual sections remain page-local.
+* Display row shaping and helper functions remain page-local.
+
+Risk-boundary check:
+
+The page still owns Supabase session lookup, current-user scoping, `fetchLibraryStudyColorBreakdown` calls, previous-month comparison logic, empty-total fallbacks, color/limbo value helpers, display row shaping, and all state. No extraction appears to have moved private user data loading, stats rules, or color-stage semantics into visual components.
+
+Current status:
+
+Visual pass done. Good stopping point. Architecture deferred.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass done / good stopping point / architecture deferred | `app/(protected)/community/stats/colors/page.tsx` | 642 | 331 | -311 |
+```

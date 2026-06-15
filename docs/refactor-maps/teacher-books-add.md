@@ -6,9 +6,9 @@ No-code refactor/status map for:
 
 Current tracker row:
 
-`- [ ] Not started | app/(protected)/teacher/books/add/page.tsx | 933 | 933 | 0 |`
+`- [x] ⭐️Visual pass checkpoint | app/(protected)/teacher/books/add/page.tsx | 1288 | 1198 | -90 |`
 
-Current observed size: about 1288 lines.
+Current observed size: 1198 lines as of 2026-06-15.
 
 ## Current Page Purpose
 
@@ -618,7 +618,7 @@ Suggested extraction order:
 
 Do not remove anything yet.
 
-* The tracker row is stale. The page is currently about 1288 lines, not 933.
+* The old tracker row is stale. The page was previously tracked as 933 lines, then 1288 -> 1171, but the current observed count is 1198 lines.
 * This page is named under `/teacher/books/add`, but it is really a global shared catalog add/edit page, not a teacher-library or student-library add page.
 * There is no linked-student selection even though teacher add-book workflows may eventually need student/library assignment.
 * There is no `user_books` insert here, which matches the current copy but may surprise someone expecting "add book" to mean "add to a library."
@@ -629,7 +629,7 @@ Do not remove anything yet.
 * `saveBookInfo` requires a valid ISBN-13 even after manual book-request creation allows ISBN to be omitted. This may make no-ISBN manual entries difficult to finish.
 * `BookInfoTab` is imported from the Book Hub component folder and receives a very large prop set. This is practical reuse, but it tightly couples this page to Book Hub editing conventions.
 * `canCreateSharedRecords={false}` is passed to `BookInfoTab`, while several selected/require shared person record states are still passed. This may be necessary for the component contract, but some of that state may be inert here.
-* `authorEnglishName`, `translatorEnglishName`, `illustratorEnglishName`, and `publisherEnglishName` are edited in `PersonRow`, but the save payload in this file does not appear to update English-name columns. Confirm whether the shared `BookInfoTab` uses these values elsewhere or whether these are currently display-only/inert.
+* Older audit notes said English-name fields were edited but not saved. The current page now includes English-name fields in the shared book row shape and save payload, so that note appears resolved. Keep watching publisher/person upsert behavior separately because it touches shared catalog records.
 * The back link copy says `Books Needing My Attention`; under the newer Teacher Hub structure this may belong under Needs Attention or General Upkeep depending on the final taxonomy.
 * The page does not mention Global Book Entry in the route/copy, although that may be the clearer conceptual home.
 
@@ -701,6 +701,45 @@ Start with loading/access/header/message and the shared book info section header
 
 No teacher/student behavior cleanup is required before tiny visual extraction, because this page currently does not handle linked students or `user_books`. The bigger cleanup should be product/architecture clarification: whether this route remains the global catalog entry tool, whether manual no-ISBN shared book creation stays here, and how imported/requested books should be marked for review.
 
-Suggested updated tracker row after map creation:
+## Current Refactor Audit, 2026-06-15
 
-`- [ ] Refactor map ready / visual pass not started | app/(protected)/teacher/books/add/page.tsx | 1288 | 1288 | 0 |`
+Current observed line count:
+
+* `app/(protected)/teacher/books/add/page.tsx`: 1198 lines
+
+This differs from the latest tracker row supplied by the user, which listed 1171 lines.
+
+Extracted visual components:
+
+* `TeacherBookAddLoadingState`
+* `TeacherBookAddAccessState`
+* `TeacherBookAddHeader`
+* `TeacherBookAddMessageBanner`
+* `TeacherBookInfoSectionHeader`
+* `TeacherBookRequestPanel`
+* `TeacherBookIsbnPreviewCard`
+* `TeacherBookAddHelpCard`
+* `TeacherBookFindCreateActions`
+* `TeacherBookFindCreateFields`
+* `TeacherBookFindCreatePanel`
+* `TeacherBookInfoSection`
+* `TeacherBookAddPageShell`
+
+Suggested components intentionally left in the page:
+
+* `TeacherBookInfoTabWrapper` remains deferred. The page still wires `BookInfoTab` directly because the prop set carries shared-catalog edit state, person/publisher state, save/cancel handlers, and editing-panel behavior.
+* `Detail` and `PersonRow` remain page-local helper components for the shared `BookInfoTab` contract.
+
+Risk-boundary check:
+
+The page still owns teacher/super-teacher access checks, signed-out redirects, Supabase `books` load/create/update behavior, pending `book_requests` loading/review/reject behavior, ISBN lookup through `/api/books/lookup-isbn`, duplicate global-book checks, publisher/person field state, missing-field calculation, route replacement, and `BookInfoTab` save/cancel wiring. No extraction appears to have moved shared-catalog mutation behavior, teacher access behavior, or request resolution behavior into a visual component.
+
+Current status:
+
+Visual pass checkpoint. Good stopping point for now. Architecture deferred.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass checkpoint / good stopping point / architecture deferred | `app/(protected)/teacher/books/add/page.tsx` | 1288 | 1198 | -90 |
+```

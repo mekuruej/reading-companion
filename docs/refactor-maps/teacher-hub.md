@@ -4,7 +4,7 @@ No-code refactor map for:
 
 `app/(protected)/teacher/page.tsx`
 
-Current observed size: 577 lines.
+Current observed size: 443 lines as of 2026-06-15.
 
 This is a planning document only. Do not refactor the page from this map without a separate implementation pass.
 
@@ -436,11 +436,47 @@ After visual extraction, manually test:
 ## 12. Current Tracker Row
 
 ```md
-- [ ] | Map ready / visual pass not started | `app/(protected)/teacher/page.tsx` | 577 | 577 | 0 |
+- [x] | Visual pass complete / good stopping point / architecture deferred | `app/(protected)/teacher/page.tsx` | 577 | 443 | -134 |
 ```
 
-After a safe visual pass, update to:
+## 13. Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/teacher/page.tsx`: 443 lines
+
+Extracted visual components:
+
+* `TeacherHubHeader`
+* `TeacherHubCardGrid`
+* `TeacherAlertList`
+* `TeacherAlertPanel`
+* `TeacherHubTodaySection`
+
+The extracted pieces match the suggested first visual pass. `TeacherAlertList` and `TeacherAlertPanel` live under `app/(protected)/teacher/components/` and are used by `TeacherHubTodaySection`.
+
+Intentionally left in the page:
+
+* Supabase Auth lookup
+* profile role and `is_super_teacher` lookup
+* linked-student loading
+* teacher/self alert scope construction
+* reading-fit review count logic
+* pending book request count logic
+* missing book info criteria
+* flagged vocabulary count logic
+* kanji queue count logic
+* helper functions that encode queue/business rules
+* derived learner/upkeep alert arrays
+
+Risk-boundary check:
+
+The page still owns the permission-sensitive and behavior-heavy alert-count logic from this map. No extraction appears to have moved Supabase queries, teacher/student relationship logic, global upkeep visibility rules, or kanji queue derivation into a visual component.
+
+Current status:
+
+Visual pass complete. This is a good stopping point. Any next pass should be an architecture/data-loading pass, not more visual thinning.
 
 ```md
-- [x] | Visual pass complete | `app/(protected)/teacher/page.tsx` | 577 | NEW_LINE_COUNT | LINES_REMOVED |
+- [x] | Visual pass complete / good stopping point / architecture deferred | `app/(protected)/teacher/page.tsx` | 577 | 443 | -134 |
 ```

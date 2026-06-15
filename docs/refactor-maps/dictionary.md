@@ -4,7 +4,7 @@ No-code refactor/status map for:
 
 `app/(protected)/discovery/dictionary/page.tsx`
 
-Current size: about 468 lines.
+Current observed size: 352 lines as of 2026-06-15.
 
 ## Current Page Purpose
 
@@ -551,3 +551,41 @@ Do not move:
 * types
 
 After the visual pass, the page can be revisited for API-boundary cleanup, repeated session loading, and extra-lookup throttling/caching. Those should be separate behavior-aware passes.
+
+## Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/discovery/dictionary/page.tsx`: 352 lines
+
+Extracted visual components:
+
+* `DictionaryHeader`
+* `DictionaryErrorMessage`
+* `DictionarySearchForm`
+* `DictionaryMeaningsList`
+* `DictionaryEntryBadges`
+* `DictionaryKanjiInfoPanel`
+* `DictionaryRelatedKanjiWordsPanel`
+* `DictionaryWordHistoryLink`
+* `DictionaryResultCard`
+
+Suggested components intentionally left in the page:
+
+* `DictionaryResultsList`
+
+The page still maps results directly and renders `DictionaryResultCard` inside the page. This is acceptable because the mapping also wires per-result status, extras, and helper-derived values.
+
+Risk-boundary check:
+
+The page still owns `/api/jisho` calls, direct `kanjiapi.dev` calls, Supabase session/user loading, user learning settings query, user library summary query, dictionary result mapping, kanji extras loading, search-param initialization, search behavior, and helper functions. No extraction appears to have moved API calls, personal library status loading, or search behavior into visual components.
+
+Current status:
+
+Visual pass mostly done. Good stopping point. Architecture/API-boundary cleanup deferred.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass mostly done / good stopping point / architecture deferred | `app/(protected)/discovery/dictionary/page.tsx` | 468 | 352 | -116 |
+```

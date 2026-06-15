@@ -4,7 +4,7 @@ No-code refactor/status map for:
 
 `app/(protected)/discovery/find-books/page.tsx`
 
-Current size: about 618 lines.
+Current observed size: 386 lines as of 2026-06-15.
 
 ## Current Page Purpose
 
@@ -536,3 +536,41 @@ Leave Supabase queries, anonymous/shared signal logic, current-user library matc
 * Extracted `FindBooksFilterPanel`
 * Extracted `ReaderSignalCard`
 * Extracted `BookRecommendationCard`
+
+## Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/discovery/find-books/page.tsx`: 386 lines
+
+Extracted visual components:
+
+* `FindBooksPageHeader`
+* `FindBooksErrorBanner`
+* `FindBooksResultsState`
+* `RatingStars`
+* `CompactRatingPill`
+* `FindBooksFilterPanel`
+* `ReaderSignalCard`
+* `BookRecommendationCard`
+
+These match the recommended first visual pass.
+
+Suggested components intentionally left in the page:
+
+* No major suggested visual components remain page-local.
+* Helper functions and grouping/filter/sort derivations remain page-local.
+
+Risk-boundary check:
+
+The page still owns Supabase reads from `public_book_recommendation_signals`, the current-viewer `user_books` matching query, anonymous signal grouping, average calculations, advice truncation, filter/sort logic, and privacy-sensitive Book Hub link selection. No extraction appears to have moved private/current-user matching or public-signal logic into visual components.
+
+Current status:
+
+Visual pass mostly done. Good stopping point. Architecture deferred.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass mostly done / good stopping point / architecture deferred | `app/(protected)/discovery/find-books/page.tsx` | 618 | 386 | -232 |
+```

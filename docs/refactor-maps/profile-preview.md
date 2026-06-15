@@ -4,7 +4,7 @@ No-code refactor/status map for:
 
 `app/(protected)/community/profile/preview/page.tsx`
 
-Current size: about 418 lines.
+Current observed size: 280 lines as of 2026-06-15.
 
 ## Current Page Purpose
 
@@ -444,3 +444,40 @@ Do not move:
 * helper functions
 * page-local types
 * route links
+
+## Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/community/profile/preview/page.tsx`: 280 lines
+
+Extracted visual components:
+
+* `ProfilePreviewErrorState`
+* `ProfilePreviewHeader`
+* `ProfilePreviewStatsGrid`
+* `ProfilePreviewAbilityColors`
+* `ProfilePreviewBio`
+* `ProfilePreviewCurrentBooks`
+* `ProfilePreviewDetailsGrid`
+* `ProfilePreviewActions`
+
+Suggested components intentionally left in the page:
+
+* `ProfilePreviewCard`
+
+The full-card wrapper was not extracted. This is acceptable because the page is already small and the remaining wrapper keeps the privacy-sensitive derived display values close to the data that produces them.
+
+Risk-boundary check:
+
+The page still owns Supabase auth, current-user profile loading, `user_public_profile` loading, current reading preview loading, color totals loading, derived display-name/privacy choices, and route links. No extraction appears to have moved current-user ownership assumptions or public/private display decisions into a data-owning component.
+
+Current status:
+
+Visual pass mostly done. Good stopping point. Architecture deferred.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass mostly done / good stopping point / architecture deferred | `app/(protected)/community/profile/preview/page.tsx` | 418 | 280 | -138 |
+```

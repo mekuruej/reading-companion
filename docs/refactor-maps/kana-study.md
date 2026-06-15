@@ -4,7 +4,7 @@ No-code refactor map for:
 
 `app/(protected)/library-study/kana/page.tsx`
 
-Current observed size: 668 lines.
+Current observed size: 539 lines as of 2026-06-15.
 
 This is a planning document only. Do not refactor the page from this map without a separate implementation pass.
 
@@ -171,3 +171,52 @@ Keep all static data imports, answer logic, deck creation, same-family choice po
 Do not "clean up" kana behavior while extracting components. The memory cues are still product-copy-sensitive, so keep cue logic easy to inspect.
 
 After each extraction, the page should compile and behave exactly the same. Manual checks should include all study modes, Basic only, Dakuten on/off, Yoon on/off, one-pass completion, Do set again, Next mode, Back to Library Study, correct/wrong feedback, memory cue display, pause/resume, and 3-second auto-advance.
+
+## 8. Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/library-study/kana/page.tsx`: 539 lines
+
+Extracted visual components:
+
+* `KanaStudyHeader`
+* `KanaStudyCurrentCardSummary`
+* `KanaStudyCompletionPanel`
+* `KanaStudyPrompt`
+* `KanaStudyFeedbackPanel`
+* `KanaStudyCharacterSetSelector`
+
+These cover the recommended first pass plus the low-medium character-set selector. The components receive values/callbacks and do not own deck creation, answer logic, scoring, or persistence.
+
+Suggested components intentionally left in the page:
+
+* `KanaStudyChoiceGrid`
+* `KanaStudyCardFrame`
+* `kanaStudyHelpers.ts`
+
+The choice buttons and card frame are still rendered inside the page. This is acceptable because choice rendering is close to selected/correct/wrong state and the page is already much smaller.
+
+Risk-boundary check:
+
+The page still owns:
+
+* static imports from `lib/japanese/kana.ts`
+* study mode definitions and mixed-mode behavior
+* same-family answer pool logic
+* deck creation and one-pass completion behavior
+* score and selected-answer state
+* 3-second auto-advance and pause behavior
+* completion actions and navigation
+
+No extraction appears to have moved quiz behavior or introduced Supabase/persistence.
+
+Current status:
+
+Visual pass complete. Good stopping point. A later pass can optionally extract the choice grid/card frame, but the useful next work is likely product/behavior polish rather than architecture.
+
+Suggested tracker row:
+
+```md
+- [x] | Visual pass complete / good stopping point | `app/(protected)/library-study/kana/page.tsx` | 668 | 539 | -129 |
+```

@@ -4,7 +4,7 @@ No-code refactor map for:
 
 `app/dashboard/page.tsx`
 
-Current size: about 636 lines.
+Current observed size: 394 lines as of 2026-06-15.
 
 ## Current Page Purpose
 
@@ -467,3 +467,41 @@ Leave auth/session/profile setup checks, Supabase queries, redirects, warm-up id
 * Extracted `DashboardWarmupPanel`
 * Extracted `SignedInDashboardCard`
 * Extracted `SignedOutLoginSection`
+
+## Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/dashboard/page.tsx`: 394 lines
+
+Extracted visual components:
+
+* `DashboardBackground`
+* `DashboardLoadingCard`
+* `DashboardBackButton`
+* `ReaderRoleCard`
+* `ReaderRolesSection`
+* `DashboardWarmupPanel`
+* `SignedInDashboardCard`
+* `SignedOutLoginSection`
+
+These match the recommended first visual pass.
+
+Suggested components intentionally left in the page:
+
+* No major suggested visual components remain page-local.
+* Auth/session/profile/warm-up helpers remain page-local.
+
+Risk-boundary check:
+
+The page still owns Supabase auth/session handling, OAuth callback exchange, profile setup readiness checks, redirects, Word Sky pool loading, warm-up daily selection, claim loading, claim insert/delete behavior, and navigation callbacks. No extraction appears to have moved auth/profile routing or warm-up claim writes into visual components.
+
+Current status:
+
+Visual pass mostly done. Good stopping point. Architecture deferred.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass mostly done / good stopping point / architecture deferred | `app/dashboard/page.tsx` | 636 | 394 | -242 |
+```

@@ -4,7 +4,7 @@ No-code refactor/status map for:
 
 `app/(protected)/community/profile/settings/page.tsx`
 
-Current size: about 541 lines.
+Current observed size: 366 lines as of 2026-06-15.
 
 ## Current Page Purpose
 
@@ -468,3 +468,40 @@ Do not move:
 * role preservation
 * redirect/refresh behavior
 * `MekuruReadingLevelGuide` behavior
+
+## Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/community/profile/settings/page.tsx`: 366 lines
+
+Extracted visual components:
+
+* `ProfileSettingsLoadingState`
+* `ProfileSettingsMessage`
+* `ProfileSettingsSectionLabel`
+* `ProfileSettingsCoreCard`
+* `ProfileSettingsPublicCard`
+* `FavoriteGenreEditor`
+* `ProfileSettingsSaveBar`
+
+These match the recommended first visual pass.
+
+Suggested components intentionally left in the page:
+
+* No major suggested visual components remain page-local.
+* `MekuruReadingLevelGuide` remains an imported shared component, with selection state owned by the page.
+
+Risk-boundary check:
+
+The page still owns Supabase Auth loading, profile/public-profile queries, all form state, username/native-language/level validation, favorite genre normalization, role preservation, `profiles` upsert, `user_public_profile` upsert, redirect, and router refresh. No extraction appears to have moved save behavior, validation, or profile ownership logic into visual components.
+
+Current status:
+
+Visual pass mostly done. Good stopping point. Architecture deferred.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass mostly done / good stopping point / architecture deferred | `app/(protected)/community/profile/settings/page.tsx` | 541 | 366 | -175 |
+```

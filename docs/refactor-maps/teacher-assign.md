@@ -4,7 +4,7 @@ No-code refactor/status map for:
 
 `app/(protected)/teacher/assign/page.tsx`
 
-Current size: 812 lines.
+Current observed size: 532 lines as of 2026-06-15.
 
 ## Current Page Purpose
 
@@ -644,4 +644,68 @@ Defer anything that moves:
 
 Suggested updated tracker row:
 
-`- [ ] Refactor map ready / visual pass not started | app/(protected)/teacher/assign/page.tsx | 812 | 812 | 0 |`
+`- [x] Visual pass complete / good stopping point / architecture deferred | app/(protected)/teacher/assign/page.tsx | 812 | 532 | -280 |`
+
+## Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/teacher/assign/page.tsx`: 532 lines
+
+Extracted visual components:
+
+* `TeacherAssignPageShell`
+* `TeacherAssignLoadingState`
+* `TeacherAssignSimpleState`
+* `TeacherAssignHeader`
+* `TeacherAssignMessageBanner`
+* `TeacherAssignModeToggle`
+* `TeacherAssignModeExplanation`
+* `TeacherAssignLearningTasksNote`
+* `TeacherAssignFormCard`
+* `TeacherAssignFieldBlock`
+* `TeacherAssignLearnerFields`
+* `TeacherAssignBookPicker`
+* `TeacherAssignSelectedBookHelper`
+* `TeacherAssignPrimaryActionButton`
+* `TeacherAssignActionPanel`
+* `TeacherPrepShelfHeader`
+* `TeacherPrepShelfSection`
+* `TeacherPrepShelfList`
+* `TeacherPrepShelfItemCard`
+* `TeacherPrepShelfEmptyState`
+
+This covers the first visual pass and much of the safe repeated UI around the prep shelf.
+
+Suggested components intentionally left in the page:
+
+* No major visual shell/list components remain page-local.
+* Page-local helpers remain in the page, including profile labels, prep-book normalization, missing-book metadata checks, book search text, and prospective learner label parsing.
+
+Risk-boundary check:
+
+The page still owns:
+
+* Supabase Auth and profile access checks
+* teacher/super-teacher branching
+* linked-student loading
+* broad super-teacher profile loading
+* shared/global book loading
+* `teacher_book_prep_items` loading
+* `handlePrimaryAction`
+* student-owned `user_books` creation
+* teacher-owned `teacher_book_prep_items` creation
+* prep shelf delete behavior
+* duplicate handling and success/error message state
+
+No extraction appears to have moved assignment/prep mutations, access checks, or teacher/student relationship logic into visual components.
+
+Current status:
+
+Visual pass complete. Good stopping point. Needs architecture pass later if assignment, teacher prep shelf, and future learner prep become separate workflows.
+
+Updated tracker row:
+
+```md
+- [x] | Visual pass complete / good stopping point / architecture deferred | `app/(protected)/teacher/assign/page.tsx` | 812 | 532 | -280 |
+```

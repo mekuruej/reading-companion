@@ -4,7 +4,7 @@ No-code refactor map for:
 
 `app/(protected)/teacher/reading-fit/page.tsx`
 
-Current observed size: 535 lines.
+Current observed size: 491 lines as of 2026-06-15.
 
 This is a planning document only. Do not refactor the page from this map without a separate implementation pass.
 
@@ -141,3 +141,54 @@ First pass should be visual thinning only. Keep all data fetching, access checks
 Do not change the criteria for which books appear in the queue. Do not change the teacher/student visibility model. Do not change where Book Hub or Teacher Review links point.
 
 After each extraction, the page should compile and behave exactly the same. Manual checks should include signed-out state, non-teacher access, linked-student visibility, empty linked-student state, queue counts, item cards, Book Hub links, Teacher Review links, and Mark as Reviewed behavior.
+
+## 8. Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/teacher/reading-fit/page.tsx`: 491 lines
+
+Extracted visual components:
+
+* `TeacherReadingFitHeader`
+* `TeacherReadingFitSummaryGrid`
+* `TeacherReadingFitMessage`
+* `TeacherReadingFitLoadingState`
+* `TeacherReadingFitEmptyState`
+* `ReadingFitSignalCard`
+
+These match the recommended first safe visual pass.
+
+Suggested components intentionally left in the page:
+
+* `TeacherReadingFitQueueItemCard`
+* `TeacherReadingFitQueueList`
+
+Keeping the item card in the page is intentional for now because it contains the Book Hub link, Teacher Review link, and Mark as Reviewed action. The page remains easy enough to audit, and the mutation boundary is still obvious.
+
+Risk-boundary check:
+
+The page still owns:
+
+* Supabase Auth and profile access checks
+* teacher/super-teacher permission checks
+* linked-student loading and filtering
+* profile loading for linked students
+* `user_books` query and finished-book filtering
+* missing-signal criteria
+* summary count derivation
+* `markAsReviewed`
+* `teacher_review_cleared_at` update behavior
+* per-row clearing state
+
+No extraction appears to have moved access checks, queue derivation, linked-student relationship logic, or mutation behavior out of the page.
+
+Current status:
+
+Good stopping point. Needs small follow-up only if you want to extract `TeacherReadingFitQueueItemCard`; otherwise this can wait for a later architecture pass around teacher review/rating queues.
+
+Suggested tracker row:
+
+```md
+- [x] | Visual pass done / good stopping point / queue item deferred | `app/(protected)/teacher/reading-fit/page.tsx` | 535 | 491 | -44 |
+```

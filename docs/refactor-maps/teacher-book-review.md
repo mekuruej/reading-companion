@@ -4,7 +4,7 @@ No-code refactor map for:
 
 `app/(protected)/teacher/books/[userBookId]/page.tsx`
 
-Current observed size: 645 lines.
+Current observed size: 406 lines as of 2026-06-15.
 
 This is a planning document only. Do not refactor the page from this map without a separate implementation pass.
 
@@ -155,3 +155,55 @@ First pass should be visual thinning only. Keep all data fetching, access checks
 Do not change saved review semantics while extracting components. Do not alter level/rating labels, `teacher_review_cleared_at` behavior, private note behavior, or navigation targets.
 
 After each extraction, the page should compile and behave exactly the same. Manual checks should include signed-out state, non-teacher access, loading an existing review, no-row state, changing suitable level, clearing level, changing both ratings, clearing ratings, editing notes, saving, save message display, and return links.
+
+## 8. Current Refactor Audit, 2026-06-15
+
+Current observed line count:
+
+* `app/(protected)/teacher/books/[userBookId]/page.tsx`: 406 lines
+
+Extracted visual components:
+
+* `TeacherBookReviewLoadingState`
+* `TeacherBookReviewAccessState`
+* `TeacherBookReviewNav`
+* `TeacherBookReviewHero`
+* `TeacherBookReviewMessage`
+* `TeacherBookReviewSavedSnapshot`
+* `TeacherBookReviewSaveBar`
+
+Also extracted from the optional second visual pass:
+
+* `SuitableLevelSelector`
+* `TeacherRatingSelector`
+* `TeacherNotesCard`
+
+Suggested components intentionally left in the page:
+
+* No major suggested visual components remain page-local.
+* Display helpers and option constants remain page-local, which keeps review semantics easy to audit.
+
+Risk-boundary check:
+
+The page still owns:
+
+* Supabase Auth and profile access checks
+* route param handling
+* `user_books` loading and joined book metadata loading
+* form initialization
+* `clampRating5` and display-label helpers
+* `saveTeacherReview`
+* `teacher_review_cleared_at` reset behavior
+* navigation side effects
+
+The extracted controlled form components render UI and call page-owned setters/handlers. No extraction appears to have moved Supabase queries or save behavior out of the page.
+
+Current status:
+
+Visual pass complete. Good stopping point. Needs architecture pass later only if teacher review grows into a broader shared review/rating system.
+
+Suggested tracker row:
+
+```md
+- [x] | Visual pass complete / good stopping point / architecture deferred | `app/(protected)/teacher/books/[userBookId]/page.tsx` | 645 | 406 | -239 |
+```
