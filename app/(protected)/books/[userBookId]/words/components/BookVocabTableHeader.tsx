@@ -5,7 +5,7 @@ type BookVocabTableHeaderProps = {
 };
 
 // Static table header for the book vocabulary list.
-// page.tsx still owns the row rendering, drag/drop behavior, and word actions.
+// page.tsx still owns the row rendering, reorder behavior, and word actions.
 export default function BookVocabTableHeader({
   headerStickyStyle,
 }: BookVocabTableHeaderProps) {
@@ -15,7 +15,7 @@ export default function BookVocabTableHeader({
         <th
           className="sticky z-20 w-10 bg-gray-50 p-2"
           style={headerStickyStyle}
-          title="Drag to reorder within the same page"
+          title="Move words up or down within the same chapter/page"
         >
           ↕
         </th>

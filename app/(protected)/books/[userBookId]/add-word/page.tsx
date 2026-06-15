@@ -433,13 +433,10 @@ export default function AddWordPage() {
           numberMap[name] = String(row.chapter_number);
         }
 
-        setChapterNameOptions((current) =>
-          normalizeChapterNameOptions([
-            ...current,
-            ...(data ?? []).map((row) => row.chapter_name),
-          ])
+        setChapterNameOptions(
+          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
         );
-        setChapterNumberByName((current) => ({ ...numberMap, ...current }));
+        setChapterNumberByName(numberMap);
       }
     }
 

@@ -2,7 +2,7 @@ type BookVocabReorderHintProps = {
   reordering: boolean;
 };
 
-// Small status hint for drag-and-drop reading order.
+// Small status hint for reading-order changes.
 // The page keeps the actual reorder state and save behavior; this component only displays the current hint.
 export default function BookVocabReorderHint({
   reordering,
@@ -15,7 +15,7 @@ export default function BookVocabReorderHint({
 
   return (
     <p className="mb-2 text-sm text-stone-500">
-      Drag words by ☰ to adjust their reading order.
+      Use Up and Down to adjust reading order within the same chapter/page.
     </p>
   );
 }

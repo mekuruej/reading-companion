@@ -265,8 +265,6 @@ export default function BookWordsPage() {
   const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
   const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number | null>(0);
   const [editHideKanjiInReadingSupport, setEditHideKanjiInReadingSupport] = useState(false);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
 
   function sameOrderGroup(a: WordRow, b: WordRow) {
@@ -287,21 +285,26 @@ export default function BookWordsPage() {
     });
   }
 
-  async function moveWordInGroup(draggedId: string, targetId: string) {
-    if (draggedId === targetId) return;
+  function wordOrderPosition(word: WordRow) {
+    const group = sortWithinGroup(words.filter((w) => sameOrderGroup(w, word)));
+    const index = group.findIndex((w) => w.id === word.id);
 
-    const dragged = words.find((w) => w.id === draggedId);
-    const target = words.find((w) => w.id === targetId);
+    return {
+      index,
+      canMoveUp: index > 0,
+      canMoveDown: index >= 0 && index < group.length - 1,
+    };
+  }
 
-    if (!dragged || !target) return;
-    if (!sameOrderGroup(dragged, target)) return;
+  async function moveWordInGroup(wordId: string, direction: "up" | "down") {
+    const word = words.find((w) => w.id === wordId);
+    if (!word) return;
 
-    const group = sortWithinGroup(words.filter((w) => sameOrderGroup(w, dragged)));
+    const group = sortWithinGroup(words.filter((w) => sameOrderGroup(w, word)));
+    const fromIndex = group.findIndex((w) => w.id === wordId);
+    const toIndex = direction === "up" ? fromIndex - 1 : fromIndex + 1;
 
-    const fromIndex = group.findIndex((w) => w.id === draggedId);
-    const toIndex = group.findIndex((w) => w.id === targetId);
-
-    if (fromIndex === -1 || toIndex === -1) return;
+    if (fromIndex === -1 || toIndex < 0 || toIndex >= group.length) return;
 
     const reordered = [...group];
     const [moved] = reordered.splice(fromIndex, 1);
@@ -1071,6 +1074,7 @@ export default function BookWordsPage() {
           const progress = libraryProgressByKey[identityKey];
           const sharedColorInfo =
             libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
+          const orderPosition = wordOrderPosition(w);
 
           const status = computeLibraryStudyColorStatus({
             encounterCount: globalEncounterCount,
@@ -1097,37 +1101,21 @@ export default function BookWordsPage() {
               status={status}
               showBadgeNumbers={learningSettings.show_badge_numbers}
               encounterCount={globalEncounterCount}
-              isDragging={draggingId === w.id}
-              isDropTarget={dropTargetId === w.id}
-              onDragStart={() => {
-                setDraggingId(w.id);
-                setDropTargetId(null);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (draggingId && draggingId !== w.id) {
-                  setDropTargetId(w.id);
-                }
-              }}
-              onDrop={async (e) => {
-                e.preventDefault();
-
+              canMoveUp={orderPosition.canMoveUp}
+              canMoveDown={orderPosition.canMoveDown}
+              onMoveUp={async () => {
                 const scrollY = window.scrollY;
-
-                if (draggingId && draggingId !== w.id) {
-                  await moveWordInGroup(draggingId, w.id);
-                }
-
-                setDraggingId(null);
-                setDropTargetId(null);
-
+                await moveWordInGroup(w.id, "up");
                 requestAnimationFrame(() => {
                   window.scrollTo({ top: scrollY });
                 });
               }}
-              onDragEnd={() => {
-                setDraggingId(null);
-                setDropTargetId(null);
+              onMoveDown={async () => {
+                const scrollY = window.scrollY;
+                await moveWordInGroup(w.id, "down");
+                requestAnimationFrame(() => {
+                  window.scrollTo({ top: scrollY });
+                });
               }}
               onOpen={() =>
                 router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)

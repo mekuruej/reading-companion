@@ -115,6 +115,11 @@ type BulkItem = {
 
 type BulkStep = "paste" | "definitions" | "details" | "done";
 
+type LastSavedWordContext = {
+  surface: string;
+  page: string;
+};
+
 // -------------------------------------------------------------
 // Main Component
 // -------------------------------------------------------------
@@ -136,6 +141,8 @@ export default function BulkVocabPage() {
   const [bulkChapterName, setBulkChapterName] = useState("");
   const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
   const [chapterNumberByName, setChapterNumberByName] = useState<Record<string, string>>({});
+  const [lastSavedWordContext, setLastSavedWordContext] =
+    useState<LastSavedWordContext | null>(null);
 
   const [bulkPageList, setBulkPageList] = useState("");
   const [bulkChapterNumberList, setBulkChapterNumberList] = useState("");
@@ -145,6 +152,18 @@ export default function BulkVocabPage() {
     () => sortChapterNameOptionsByNumber(chapterNameOptions, chapterNumberByName),
     [chapterNameOptions, chapterNumberByName]
   );
+
+  const bulkProgressLine = useMemo(() => {
+    const parts = [];
+    const currentPage = bulkPageNumber.trim() || lastSavedWordContext?.page || "";
+
+    if (currentPage) parts.push(`On page ${currentPage}`);
+    if (lastSavedWordContext?.surface) {
+      parts.push(`Last saved word: ${lastSavedWordContext.surface}`);
+    }
+
+    return parts.join(" · ");
+  }, [bulkPageNumber, lastSavedWordContext]);
 
   const [rawInput, setRawInput] = useState("");
   const [items, setItems] = useState<BulkItem[]>([]);
@@ -339,13 +358,10 @@ export default function BulkVocabPage() {
           numberMap[name] = String(row.chapter_number);
         }
 
-        setChapterNameOptions((current) =>
-          normalizeChapterNameOptions([
-            ...current,
-            ...(data ?? []).map((row) => row.chapter_name),
-          ])
+        setChapterNameOptions(
+          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
         );
-        setChapterNumberByName((current) => ({ ...numberMap, ...current }));
+        setChapterNumberByName(numberMap);
       }
     }
 
@@ -356,9 +372,47 @@ export default function BulkVocabPage() {
     };
   }, [authorizedUserBookId]);
 
+  useEffect(() => {
+    if (!authorizedUserBookId) {
+      setLastSavedWordContext(null);
+      return;
+    }
+
+    void loadLastSavedWordContext();
+  }, [authorizedUserBookId]);
+
   // -------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------
+  async function loadLastSavedWordContext() {
+    if (!authorizedUserBookId) {
+      setLastSavedWordContext(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .select("surface, page_number, created_at")
+      .eq("user_book_id", authorizedUserBookId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("Error loading latest bulk saved word:", error);
+      return;
+    }
+
+    const latest = data?.[0] ?? null;
+    setLastSavedWordContext(
+      latest?.surface
+        ? {
+            surface: latest.surface,
+            page: latest.page_number != null ? String(latest.page_number) : "",
+          }
+        : null
+    );
+  }
+
   function flashAction(actionKey: string) {
     setRecentAction(actionKey);
     window.setTimeout(() => {
@@ -800,6 +854,16 @@ export default function BulkVocabPage() {
         return next;
       });
       setStep("done");
+      const lastSavedPayload = payload[payload.length - 1];
+      if (lastSavedPayload?.surface) {
+        setLastSavedWordContext({
+          surface: lastSavedPayload.surface,
+          page:
+            lastSavedPayload.page_number != null
+              ? String(lastSavedPayload.page_number)
+              : "",
+        });
+      }
       setMessage(`✅ Saved ${payload.length} words!`);
     } catch (err: any) {
       console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
@@ -845,6 +909,11 @@ export default function BulkVocabPage() {
                 <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
                   {bookTitle}
                 </div>
+                {bulkProgressLine ? (
+                  <p className="mt-1 text-sm font-medium text-stone-500">
+                    {bulkProgressLine}
+                  </p>
+                ) : null}
               </div>
             </button>
 

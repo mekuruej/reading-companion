@@ -1,4 +1,4 @@
-import type { ComponentProps, DragEvent } from "react";
+import type { ComponentProps } from "react";
 
 import BookVocabActionsCell from "./BookVocabActionsCell";
 import BookVocabChapterCell from "./BookVocabChapterCell";
@@ -32,13 +32,10 @@ type BookVocabRowProps = {
   showBadgeNumbers: boolean;
   encounterCount: number;
 
-  isDragging: boolean;
-  isDropTarget: boolean;
-
-  onDragStart: () => void;
-  onDragOver: (event: DragEvent<HTMLTableRowElement>) => void;
-  onDrop: (event: DragEvent<HTMLTableRowElement>) => void | Promise<void>;
-  onDragEnd: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void | Promise<void>;
+  onMoveDown: () => void | Promise<void>;
 
   onOpen: () => void;
   onEdit: () => void;
@@ -48,7 +45,7 @@ type BookVocabRowProps = {
 };
 
 // Visual row for one saved vocabulary word.
-// page.tsx still owns row calculations, drag/drop behavior, routing,
+// page.tsx still owns row calculations, reorder behavior, routing,
 // and database-changing actions. This component only renders the prepared row.
 export default function BookVocabRow({
   hidden,
@@ -63,12 +60,10 @@ export default function BookVocabRow({
   status,
   showBadgeNumbers,
   encounterCount,
-  isDragging,
-  isDropTarget,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   onOpen,
   onEdit,
   onHide,
@@ -76,21 +71,35 @@ export default function BookVocabRow({
   onDelete,
 }: BookVocabRowProps) {
   return (
-    <tr
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-      className={`border-t ${hidden ? "bg-gray-50 text-gray-400" : ""} ${
-        isDropTarget ? "bg-blue-50" : ""
-      } ${isDragging ? "opacity-50" : ""}`}
-    >
-      <td
-        className="cursor-grab select-none p-2 text-center text-gray-400"
-        title="Drag to reorder within this page"
-      >
-        ☰
+    <tr className={`border-t ${hidden ? "bg-gray-50 text-gray-400" : ""}`}>
+      <td className="p-2">
+        <div className="flex items-center justify-center gap-1">
+          <span
+            aria-hidden="true"
+            className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-200 bg-stone-50 text-sm font-black leading-none text-stone-500"
+            title="Reading order"
+          >
+            ☰
+          </span>
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => void onMoveUp()}
+              disabled={!canMoveUp}
+              className="rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+            >
+              Up
+            </button>
+            <button
+              type="button"
+              onClick={() => void onMoveDown()}
+              disabled={!canMoveDown}
+              className="rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+            >
+              Down
+            </button>
+          </div>
+        </div>
       </td>
 
       <BookVocabRepeatCountCell repeatCount={repeatCount} />

@@ -52,6 +52,7 @@ export default function ChapterNameCombobox({
         <div className="flex gap-2">
           <input
             id={inputId}
+            name={`${inputId}-chapter-name`}
             value={value}
             onChange={(event) => {
               onChange(event.target.value);
@@ -64,6 +65,10 @@ export default function ChapterNameCombobox({
             }}
             placeholder={placeholder}
             disabled={disabled}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
             className={inputClassName}
           />
           {hasOptions ? (

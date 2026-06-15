@@ -1,6 +1,7 @@
 type CuriosityBookContextCardProps = {
   bookTitle: string;
   bookCover: string;
+  contextLine?: string;
   onOpenBookHub: () => void;
   onOpenVocabList: () => void;
 };
@@ -8,6 +9,7 @@ type CuriosityBookContextCardProps = {
 export default function CuriosityBookContextCard({
   bookTitle,
   bookCover,
+  contextLine,
   onOpenBookHub,
   onOpenVocabList,
 }: CuriosityBookContextCardProps) {
@@ -34,6 +36,11 @@ export default function CuriosityBookContextCard({
           <div className="truncate text-base font-semibold text-stone-900 hover:text-stone-700">
             {bookTitle}
           </div>
+          {contextLine ? (
+            <p className="mt-1 text-sm font-medium text-stone-500">
+              {contextLine}
+            </p>
+          ) : null}
         </div>
       </button>
 

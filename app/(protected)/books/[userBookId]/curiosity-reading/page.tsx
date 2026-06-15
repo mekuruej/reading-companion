@@ -86,6 +86,11 @@ type QuickLookupCandidate = {
   isCustomMeaning: boolean;
 };
 
+type LastSavedWordContext = {
+  surface: string;
+  page: string;
+};
+
 function makeBlankQuickPreview(meta = { page: "", chapterNumber: "", chapterName: "" }): QuickPreview {
   return {
     id: null,
@@ -281,11 +286,25 @@ export default function CuriosityReadingPage() {
   >({});
   const [quickLookupCandidates, setQuickLookupCandidates] = useState<QuickLookupCandidate[]>([]);
   const [savedQuickNotice, setSavedQuickNotice] = useState("");
+  const [lastSavedWordContext, setLastSavedWordContext] =
+    useState<LastSavedWordContext | null>(null);
 
   const sortedChapterNameOptions = useMemo(
     () => sortChapterNameOptionsByNumber(chapterNameOptions, chapterNumberByName),
     [chapterNameOptions, chapterNumberByName]
   );
+
+  const curiosityProgressLine = useMemo(() => {
+    const parts = [];
+    const currentPage = quickPreview.page.trim() || lastSavedWordContext?.page || "";
+
+    if (currentPage) parts.push(`On page ${currentPage}`);
+    if (lastSavedWordContext?.surface) {
+      parts.push(`Last saved word: ${lastSavedWordContext.surface}`);
+    }
+
+    return parts.join(" · ");
+  }, [quickPreview.page, lastSavedWordContext]);
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
   const quickWordFieldsRef = useRef<HTMLDivElement | null>(null);
@@ -558,13 +577,10 @@ export default function CuriosityReadingPage() {
           numberMap[name] = String(row.chapter_number);
         }
 
-        setChapterNameOptions((current) =>
-          normalizeChapterNameOptions([
-            ...current,
-            ...(data ?? []).map((row) => row.chapter_name),
-          ])
+        setChapterNameOptions(
+          normalizeChapterNameOptions((data ?? []).map((row) => row.chapter_name))
         );
-        setChapterNumberByName((current) => ({ ...numberMap, ...current }));
+        setChapterNumberByName(numberMap);
       }
     }
 
@@ -573,6 +589,15 @@ export default function CuriosityReadingPage() {
     return () => {
       cancelled = true;
     };
+  }, [userBookId, canAccessBook]);
+
+  useEffect(() => {
+    if (!userBookId || !canAccessBook) {
+      setLastSavedWordContext(null);
+      return;
+    }
+
+    void loadLastSavedWordContext();
   }, [userBookId, canAccessBook]);
 
   useEffect(() => {
@@ -710,6 +735,35 @@ export default function CuriosityReadingPage() {
     } catch {
       // ignore
     }
+  }
+
+  async function loadLastSavedWordContext() {
+    if (!userBookId) {
+      setLastSavedWordContext(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .select("surface, page_number, created_at")
+      .eq("user_book_id", userBookId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("Error loading latest curiosity saved word:", error);
+      return;
+    }
+
+    const latest = data?.[0] ?? null;
+    setLastSavedWordContext(
+      latest?.surface
+        ? {
+            surface: latest.surface,
+            page: latest.page_number != null ? String(latest.page_number) : "",
+          }
+        : null
+    );
   }
 
   function clearQuickWordFields(options: { preserveSavedNotice?: boolean } = {}) {
@@ -1011,6 +1065,10 @@ export default function CuriosityReadingPage() {
         }));
       }
       setSavedQuickNotice(`Saved: ${newItem.surface}`);
+      setLastSavedWordContext({
+        surface: newItem.surface,
+        page: newItem.page,
+      });
       setMessage("");
     } else {
       const { data, error } = await supabase
@@ -1057,6 +1115,10 @@ export default function CuriosityReadingPage() {
         }));
       }
       setSavedQuickNotice(`Saved: ${updatedItem.surface}`);
+      setLastSavedWordContext({
+        surface: updatedItem.surface,
+        page: updatedItem.page,
+      });
       setMessage("");
     }
 
@@ -1084,6 +1146,7 @@ export default function CuriosityReadingPage() {
     }
 
     setQuickSessionWords((prev) => prev.filter((item) => item.id !== id));
+    void loadLastSavedWordContext();
 
     if (quickPreview.id === id) {
       clearQuickWordFields();
@@ -1275,6 +1338,7 @@ export default function CuriosityReadingPage() {
             <CuriosityBookContextCard
               bookTitle={bookTitle}
               bookCover={bookCover}
+              contextLine={curiosityProgressLine}
               onOpenBookHub={() => {
                 router.push(`/books/${encodeURIComponent(userBookId)}`);
               }}
