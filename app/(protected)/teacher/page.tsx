@@ -86,11 +86,11 @@ const teacherHubCards: TeacherHubCard[] = [
       "Review book requests, kanji reports, missing book info, and other cleanup queues.",
   },
   {
-    title: "General Upkeep",
-    href: "/teacher/general-upkeep",
-    eyebrow: "Maintain",
+    title: "Teacher Books",
+    href: "/teacher/books",
+    eyebrow: "Books",
     description:
-      "Handle global word data, Word Sky candidates, cleanup, and admin-ish teacher tools.",
+      "Open the teacher book review queue, requests, flags, and shared catalog cleanup.",
   },
 ];
 
