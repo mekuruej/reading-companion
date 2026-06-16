@@ -24,19 +24,19 @@ import {
   normalizeChapterNameOptions,
   sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
-import AddWordPageHeader from "../components/AddWordPageHeader";
-import AddWordStatusMessage from "../components/AddWordStatusMessage";
-import AddWordBookContextCard from "../components/AddWordBookContextCard";
-import AddWordFullAccessRequired from "../components/AddWordFullAccessRequired";
-import AddWordDictionaryChoices from "../components/AddWordDictionaryChoices";
-import AddWordRecentSessionWordCard from "../components/AddWordRecentSessionWordCard";
-import AddWordRecentSessionWords from "../components/AddWordRecentSessionWords";
-import AddWordQuickSearchForm from "../components/AddWordQuickSearchForm";
-import AddWordHelpPanel from "../components/AddWordHelpPanel";
-import AddWordDetailFields from "../components/AddWordDetailFields";
-import AddWordSuperTeacherTools from "../components/AddWordSuperTeacherTools";
-import AddWordFormShell from "../components/AddWordFormShell";
-import AddWordAddEditCard from "../components/AddWordAddEditCard";
+import AddWordPageHeader from "./components/AddWordPageHeader";
+import AddWordStatusMessage from "./components/AddWordStatusMessage";
+import AddWordBookContextCard from "./components/AddWordBookContextCard";
+import AddWordFullAccessRequired from "./components/AddWordFullAccessRequired";
+import AddWordDictionaryChoices from "./components/AddWordDictionaryChoices";
+import AddWordRecentSessionWordCard from "./components/AddWordRecentSessionWordCard";
+import AddWordRecentSessionWords from "./components/AddWordRecentSessionWords";
+import AddWordQuickSearchForm from "./components/AddWordQuickSearchForm";
+import AddWordHelpPanel from "./components/AddWordHelpPanel";
+import AddWordDetailFields from "./components/AddWordDetailFields";
+import AddWordSuperTeacherTools from "./components/AddWordSuperTeacherTools";
+import AddWordFormShell from "./components/AddWordFormShell";
+import AddWordAddEditCard from "./components/AddWordAddEditCard";
 
 type JishoChoice = {
   surface: string;
