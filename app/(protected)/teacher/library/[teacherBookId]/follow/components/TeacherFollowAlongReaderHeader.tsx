@@ -1,4 +1,4 @@
-import ReadAlongPageNavigator from "../../../../../books/[userBookId]/readalong/components/ReadAlongPageNavigator";
+import ReadAlongPageNavigator from "../../../../../books/[userBookId]/_shared/readalong/ReadAlongPageNavigator";
 
 type TeacherFollowAlongReaderHeaderProps = {
   pageIndex: number;

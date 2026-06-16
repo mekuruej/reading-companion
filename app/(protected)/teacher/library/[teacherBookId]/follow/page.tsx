@@ -8,9 +8,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import ReadAlongPageNavigator from "../../../../books/[userBookId]/readalong/components/ReadAlongPageNavigator";
-import ReadAlongReaderShell from "../../../../books/[userBookId]/readalong/components/ReadAlongReaderShell";
-import ReadAlongSupportModeTabs from "../../../../books/[userBookId]/readalong/components/ReadAlongSupportModeTabs";
+import ReadAlongPageNavigator from "../../../../books/[userBookId]/_shared/readalong/ReadAlongPageNavigator";
+import ReadAlongReaderShell from "../../../../books/[userBookId]/_shared/readalong/ReadAlongReaderShell";
+import ReadAlongSupportModeTabs from "../../../../books/[userBookId]/_shared/readalong/ReadAlongSupportModeTabs";
 import { TeacherFollowAlongLoadingState } from "./components/TeacherFollowAlongLoadingState";
 import { TeacherFollowAlongAccessState } from "./components/TeacherFollowAlongAccessState";
 import { TeacherFollowAlongHeader } from "./components/TeacherFollowAlongHeader";

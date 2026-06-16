@@ -16,12 +16,12 @@ import ReadAlongLoadingState from "./components/ReadAlongLoadingState";
 import ReadAlongPageHeader from "./components/ReadAlongPageHeader";
 import ReadAlongBookContextCard from "./components/ReadAlongBookContextCard";
 import ReadAlongEmptyState from "./components/ReadAlongEmptyState";
-import ReadAlongSupportModeTabs from "./components/ReadAlongSupportModeTabs";
+import ReadAlongSupportModeTabs from "../_shared/readalong/ReadAlongSupportModeTabs";
 import ReadAlongCurrentPageSummary from "./components/ReadAlongCurrentPageSummary";
-import ReadAlongPageNavigator from "./components/ReadAlongPageNavigator";
+import ReadAlongPageNavigator from "../_shared/readalong/ReadAlongPageNavigator";
 import ReadAlongChapterSelector from "./components/ReadAlongChapterSelector";
 import ReadAlongTimerPanel from "./components/ReadAlongTimerPanel";
-import ReadAlongReaderShell from "./components/ReadAlongReaderShell";
+import ReadAlongReaderShell from "../_shared/readalong/ReadAlongReaderShell";
 import ReadAlongWordList from "./components/ReadAlongWordList";
 import ReadAlongAccessDeniedState from "./components/ReadAlongAccessDeniedState";
 import {
