@@ -11,12 +11,12 @@ import {
   canUseFullAccessFeature,
   getFullAccessRequiredCopy,
 } from "@/lib/access/requireFullAccess";
-import BookInfoTab from "./components/BookInfoTab";
-import ReadingTab from "./components/ReadingTab";
-import RatingTab from "./components/RatingTab";
+import BookInfoTab from "./components/tabs/BookInfoTab";
+import ReadingTab from "./components/tabs/ReadingTab";
+import RatingTab from "./components/tabs/RatingTab";
 import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
-import StoryTab from "./components/StoryTab";
-import VocabTab from "./components/VocabTab";
+import StoryTab from "./components/tabs/StoryTab";
+import VocabTab from "./components/tabs/VocabTab";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";

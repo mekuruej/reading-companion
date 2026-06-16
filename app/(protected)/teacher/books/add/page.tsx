@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import BookInfoTab from "../../../books/[userBookId]/components/BookInfoTab";
+import BookInfoTab from "../../../books/[userBookId]/components/tabs/BookInfoTab";
 import { TeacherBookAddLoadingState } from "./components/TeacherBookAddLoadingState";
 import { TeacherBookAddAccessState } from "./components/TeacherBookAddAccessState";
 import { TeacherBookAddHeader } from "./components/TeacherBookAddHeader";
