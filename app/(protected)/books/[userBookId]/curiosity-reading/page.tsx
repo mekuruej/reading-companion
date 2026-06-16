@@ -25,20 +25,20 @@ import {
   sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
-import CuriosityPageHeader from "../components/CuriosityPageHeader";
-import CuriosityStatusMessage from "../components/CuriosityStatusMessage";
-import CuriosityBookContextCard from "../components/CuriosityBookContextCard";
-import CuriosityDictionaryChoices from "../components/CuriosityDictionaryChoices";
-import CuriosityRecentSessionWordCard from "../components/CuriosityRecentSessionWordCard";
-import CuriosityRecentSessionWords from "../components/CuriosityRecentSessionWords";
-import CuriosityFullAccessRequired from "../components/CuriosityFullAccessRequired";
-import CuriosityTimerPanel from "../components/CuriosityTimerPanel";
-import CuriosityQuickSearchRow from "../components/CuriosityQuickSearchRow";
-import CuriosityWordHelpPanel from "../components/CuriosityWordHelpPanel";
-import CuriosityQuickErrorMessage from "../components/CuriosityQuickErrorMessage";
-import CuriosityWordDetailFields from "../components/CuriosityWordDetailFields";
-import CuriosityAddEditWordFormShell from "../components/CuriosityAddEditWordFormShell";
-import CuriosityAddEditWordCard from "../components/CuriosityAddEditWordCard";
+import CuriosityPageHeader from "./components/CuriosityPageHeader";
+import CuriosityStatusMessage from "./components/CuriosityStatusMessage";
+import CuriosityBookContextCard from "./components/CuriosityBookContextCard";
+import CuriosityDictionaryChoices from "./components/CuriosityDictionaryChoices";
+import CuriosityRecentSessionWordCard from "./components/CuriosityRecentSessionWordCard";
+import CuriosityRecentSessionWords from "./components/CuriosityRecentSessionWords";
+import CuriosityFullAccessRequired from "./components/CuriosityFullAccessRequired";
+import CuriosityTimerPanel from "./components/CuriosityTimerPanel";
+import CuriosityQuickSearchRow from "./components/CuriosityQuickSearchRow";
+import CuriosityWordHelpPanel from "./components/CuriosityWordHelpPanel";
+import CuriosityQuickErrorMessage from "./components/CuriosityQuickErrorMessage";
+import CuriosityWordDetailFields from "./components/CuriosityWordDetailFields";
+import CuriosityAddEditWordFormShell from "./components/CuriosityAddEditWordFormShell";
+import CuriosityAddEditWordCard from "./components/CuriosityAddEditWordCard";
 
 type QuickPreview = {
   id: string | null;
