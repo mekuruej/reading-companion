@@ -11,13 +11,13 @@ import {
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
-import WordSkyLoadingState from "../components/WordSkyLoadingState";
-import WordSkyHeader from "../components/WordSkyHeader";
-import WordSkyMessageBanner from "../components/WordSkyMessageBanner";
-import WordSkyScene from "../components/WordSkyScene";
-import WordSkyBubble from "../components/WordSkyBubble";
-import WordSkySelectedPanel from "../components/WordSkySelectedPanel";
-import WordSkyEmptySelectionPanel from "../components/WordSkyEmptySelectionPanel";
+import WordSkyLoadingState from "./components/WordSkyLoadingState";
+import WordSkyHeader from "./components/WordSkyHeader";
+import WordSkyMessageBanner from "./components/WordSkyMessageBanner";
+import WordSkyScene from "./components/WordSkyScene";
+import WordSkyBubble from "./components/WordSkyBubble";
+import WordSkySelectedPanel from "./components/WordSkySelectedPanel";
+import WordSkyEmptySelectionPanel from "./components/WordSkyEmptySelectionPanel";
 
 type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;

@@ -19,20 +19,20 @@ import {
 } from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
-import LibraryReviewIntroCard from "../components/LibraryReviewIntroCard";
-import LibraryReviewWordSkyCta from "../components/LibraryReviewWordSkyCta";
-import LibraryReviewProgressCard from "../components/LibraryReviewProgressCard";
-import LibraryPracticeFilterPanel from "../components/LibraryPracticeFilterPanel";
-import LibraryPracticeCompleteCard from "../components/LibraryPracticeCompleteCard";
-import LibraryReviewEmptyState from "../components/LibraryReviewEmptyState";
-import LibraryReviewLoadingState from "../components/LibraryReviewLoadingState";
-import LibraryReviewNeedsSignInState from "../components/LibraryReviewNeedsSignInState";
-import LibraryReviewErrorState from "../components/LibraryReviewErrorState";
-import LibraryReviewFullAccessLockedState from "../components/LibraryReviewFullAccessLockedState";
-import LibraryReviewPageHeader from "../components/LibraryReviewPageHeader";
-import PracticeMeaningReviewScreen from "../components/PracticeMeaningReviewScreen";
-import LibraryPracticeCardBadges from "../components/LibraryPracticeCardBadges";
-import LibraryPracticeNoCardsState from "../components/LibraryPracticeNoCardsState";
+import LibraryReviewIntroCard from "./components/LibraryReviewIntroCard";
+import LibraryReviewWordSkyCta from "./components/LibraryReviewWordSkyCta";
+import LibraryReviewProgressCard from "./components/LibraryReviewProgressCard";
+import LibraryPracticeFilterPanel from "./components/LibraryPracticeFilterPanel";
+import LibraryPracticeCompleteCard from "./components/LibraryPracticeCompleteCard";
+import LibraryReviewEmptyState from "./components/LibraryReviewEmptyState";
+import LibraryReviewLoadingState from "./components/LibraryReviewLoadingState";
+import LibraryReviewNeedsSignInState from "./components/LibraryReviewNeedsSignInState";
+import LibraryReviewErrorState from "./components/LibraryReviewErrorState";
+import LibraryReviewFullAccessLockedState from "./components/LibraryReviewFullAccessLockedState";
+import LibraryReviewPageHeader from "./components/LibraryReviewPageHeader";
+import PracticeMeaningReviewScreen from "./components/PracticeMeaningReviewScreen";
+import LibraryPracticeCardBadges from "./components/LibraryPracticeCardBadges";
+import LibraryPracticeNoCardsState from "./components/LibraryPracticeNoCardsState";
 
 type UserBookJoinRow = {
   id: string;

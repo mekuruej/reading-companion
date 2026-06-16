@@ -491,3 +491,14 @@ Finished:
 Decision:
 
 `/community/profile/settings` remains a self-profile edit page. Users can update reader/profile fields, but app roles remain outside the normal profile settings save flow.
+
+## Visual Component Pass #1 Status
+
+- [x] Refactor maps created
+- [x] Visual components extracted
+- [x] Audit pass completed
+- [x] Local smoke test passed
+- [x] Production smoke test passed
+- [x] Architecture cleanup intentionally deferred
+
+Visual Component Pass #1 complete. Remaining large files are considered architecture/state/data-flow work, not visual thinning work.

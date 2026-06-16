@@ -124,9 +124,8 @@ export default function DashboardPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [warmupWords, setWarmupWords] = useState<WarmupWord[]>(
-    FALLBACK_WARMUP_WORDS.slice(0, WARMUP_WORD_COUNT)
-  );
+  const [warmupWords, setWarmupWords] = useState<WarmupWord[]>([]);
+  const [warmupLoading, setWarmupLoading] = useState(true);
   const [warmupClaimKeys, setWarmupClaimKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -226,11 +225,13 @@ export default function DashboardPage() {
 
     async function loadWarmupWordsAndClaims() {
       if (!userId) {
-        setWarmupWords(FALLBACK_WARMUP_WORDS.slice(0, WARMUP_WORD_COUNT));
+        setWarmupWords([]);
         setWarmupClaimKeys(new Set());
+        setWarmupLoading(false);
         return;
       }
 
+      setWarmupLoading(true);
       let words = dailyWarmupWords(FALLBACK_WARMUP_WORDS, userId);
 
       const { data: poolData, error: poolError } = await supabase.rpc("get_word_sky_pool", {
@@ -266,11 +267,15 @@ export default function DashboardPage() {
 
       if (error) {
         console.warn("Dashboard warm-up claims did not load:", error);
+        setWarmupWords(words);
+        setWarmupClaimKeys(new Set());
+        setWarmupLoading(false);
         return;
       }
 
       setWarmupWords(words);
       setWarmupClaimKeys(new Set((data ?? []).map((row) => row.study_identity_key)));
+      setWarmupLoading(false);
     }
 
     void loadWarmupWordsAndClaims();
@@ -343,12 +348,20 @@ export default function DashboardPage() {
           </section>
         ) : isLoggedIn ? (
           <SignedInDashboardCard onOpenLibrary={() => router.push("/books")}>
-            <DashboardWarmupPanel
-              words={warmupWords}
-              claimedKeys={warmupClaimKeys}
-              getKey={(word) => studyIdentityKey(word.surface, word.reading)}
-              onToggleWord={claimWarmupWord}
-            />
+            {warmupLoading ? (
+              <div className="relative mt-4 flex h-44 items-center justify-center overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50">
+                <p className="text-sm font-medium text-sky-800">
+                  Loading your Word Sky...
+                </p>
+              </div>
+            ) : (
+              <DashboardWarmupPanel
+                words={warmupWords}
+                claimedKeys={warmupClaimKeys}
+                getKey={(word) => studyIdentityKey(word.surface, word.reading)}
+                onToggleWord={claimWarmupWord}
+              />
+            )}
           </SignedInDashboardCard>
         ) : (
           <>
