@@ -19,23 +19,23 @@ import {
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
-import StudyBookHeader from "../components/StudyBookHeader";
-import StudyProgressPanel from "../components/StudyProgressPanel";
-import Row from "../components/StudyCardFieldRow";
-import StudyCardBadges from "../components/StudyCardBadges";
-import StudyBottomNavigation from "../components/StudyBottomNavigation";
-import StudyInstructionNav from "../components/StudyInstructionNav";
-import StudyFilterPanel from "../components/StudyFilterPanel";
-import StudyModePanel from "../components/StudyModePanel";
+import StudyBookHeader from "./components/StudyBookHeader";
+import StudyProgressPanel from "./components/StudyProgressPanel";
+import Row from "./components/StudyCardFieldRow";
+import StudyCardBadges from "./components/StudyCardBadges";
+import StudyBottomNavigation from "./components/StudyBottomNavigation";
+import StudyInstructionNav from "./components/StudyInstructionNav";
+import StudyFilterPanel from "./components/StudyFilterPanel";
+import StudyModePanel from "./components/StudyModePanel";
 import MultipleChoiceAnswerPanel from "../components/MultipleChoiceAnswerPanel";
 import TypingAnswerPanel from "../components/TypingAnswerPanel";
-import StudyLoadingState from "../components/StudyLoadingState";
-import StudyNeedsSignInState from "../components/StudyNeedsSignInState";
-import StudyErrorState from "../components/StudyErrorState";
-import StudyEmptyState from "../components/StudyEmptyState";
-import StudyCompleteState from "../components/StudyCompleteState";
-import StudyFullAccessLockedState from "../components/StudyFullAccessLockedState";
-import StudyFlashcardShell from "../components/StudyFlashcardShell";
+import StudyLoadingState from "./components/StudyLoadingState";
+import StudyNeedsSignInState from "./components/StudyNeedsSignInState";
+import StudyErrorState from "./components/StudyErrorState";
+import StudyEmptyState from "./components/StudyEmptyState";
+import StudyCompleteState from "./components/StudyCompleteState";
+import StudyFullAccessLockedState from "./components/StudyFullAccessLockedState";
+import StudyFlashcardShell from "./components/StudyFlashcardShell";
 
 const FLASHCARD_AUTO_ADVANCE_MS = 3000;
 
