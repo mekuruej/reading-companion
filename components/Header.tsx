@@ -541,14 +541,14 @@ export default function Header() {
                     </Link>
 
                     <Link
-                      href="/teacher/books"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/teacher/books")
+                      href="/teacher/library"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/teacher/library")
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
                         }`}
                       onClick={() => setShowTeacherMenu(false)}
                     >
-                      Teacher Books
+                      Teacher Library
                     </Link>
 
                     <Link

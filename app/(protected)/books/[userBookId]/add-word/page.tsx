@@ -67,6 +67,11 @@ type SessionWord = {
   pageOrder: number | null;
 };
 
+type LastSavedWordContext = {
+  surface: string;
+  page: string;
+};
+
 function normalizeJlpt(val: string): string {
   if (!val) return "NON-JLPT";
   const v = val.toUpperCase();
@@ -242,6 +247,8 @@ export default function AddWordPage() {
   const [message, setMessage] = useState("");
   const [lookupCandidates, setLookupCandidates] = useState<JishoCandidate[]>([]);
   const [savedNotice, setSavedNotice] = useState("");
+  const [lastSavedWordContext, setLastSavedWordContext] =
+    useState<LastSavedWordContext | null>(null);
 
   const [editingSessionWordId, setEditingSessionWordId] = useState<string | null>(null);
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
@@ -258,6 +265,18 @@ export default function AddWordPage() {
   }
   const wordFieldsRef = useRef<HTMLDivElement | null>(null);
   const isSuperTeacher = superTeacherRole === "super_teacher" || profileIsSuperTeacher;
+
+  const addWordProgressLine = useMemo(() => {
+    const parts = [];
+    const currentPage = pageNumber.trim() || lastSavedWordContext?.page || "";
+
+    if (currentPage) parts.push(`On page ${currentPage}`);
+    if (lastSavedWordContext?.surface) {
+      parts.push(`Last saved word: ${lastSavedWordContext.surface}`);
+    }
+
+    return parts.join(" · ");
+  }, [pageNumber, lastSavedWordContext]);
 
   async function canAccessUserBook(
     authedUserId: string,
@@ -448,6 +467,15 @@ export default function AddWordPage() {
   }, [userBookId, canAccessBook]);
 
   useEffect(() => {
+    if (!userBookId || !canAccessBook) {
+      setLastSavedWordContext(null);
+      return;
+    }
+
+    void loadLastSavedWordContext();
+  }, [userBookId, canAccessBook]);
+
+  useEffect(() => {
     if (!userBookId) return;
 
     const hasAnyChapterInfo = chapterNumber.trim() || chapterName.trim();
@@ -471,6 +499,35 @@ export default function AddWordPage() {
     if (knownChapterNumber) {
       setChapterNumber(knownChapterNumber);
     }
+  }
+
+  async function loadLastSavedWordContext() {
+    if (!userBookId) {
+      setLastSavedWordContext(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_words")
+      .select("surface, page_number, created_at")
+      .eq("user_book_id", userBookId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("Error loading latest add-word saved word:", error);
+      return;
+    }
+
+    const latest = data?.[0] ?? null;
+    setLastSavedWordContext(
+      latest?.surface
+        ? {
+            surface: latest.surface,
+            page: latest.page_number != null ? String(latest.page_number) : "",
+          }
+        : null
+    );
   }
 
   useEffect(() => {
@@ -1025,6 +1082,10 @@ export default function AddWordPage() {
           newSessionWord,
           ...prev.filter((item) => item.id !== newSessionWord.id),
         ]);
+        setLastSavedWordContext({
+          surface: newSessionWord.surface,
+          page: newSessionWord.pageNumber,
+        });
         setSavedNotice(`Saved: ${finalSurface}`);
         setMessage("");
       } else {
@@ -1085,6 +1146,10 @@ export default function AddWordPage() {
           updatedSessionWord,
           ...prev.filter((item) => item.id !== updatedSessionWord.id),
         ]);
+        setLastSavedWordContext({
+          surface: updatedSessionWord.surface,
+          page: updatedSessionWord.pageNumber,
+        });
         setSavedNotice(`Saved: ${finalSurface}`);
         setMessage("");
       }
@@ -1117,6 +1182,7 @@ export default function AddWordPage() {
     }
 
     setSessionWords((prev) => prev.filter((item) => item.id !== id));
+    void loadLastSavedWordContext();
 
     if (editingSessionWordId === id) {
       clearForm(true);
@@ -1175,6 +1241,7 @@ export default function AddWordPage() {
           <AddWordBookContextCard
             bookTitle={bookTitle}
             bookCover={bookCover}
+            contextLine={addWordProgressLine}
             onOpenBookHub={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
             onOpenVocabList={() =>
               router.push(`/books/${encodeURIComponent(userBookId)}/words`)
