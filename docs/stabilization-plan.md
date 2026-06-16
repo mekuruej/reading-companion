@@ -502,3 +502,13 @@ Decision:
 - [x] Architecture cleanup intentionally deferred
 
 Visual Component Pass #1 complete. Remaining large files are considered architecture/state/data-flow work, not visual thinning work.
+
+## Component Organization Cleanup
+
+- [x] Priority 1: Split `books/[userBookId]/components/` by feature/page family
+- [x] Priority 2: Split mixed `library-study/components/` into page-local folders
+- [x] Priority 3: Move shared read-along components into `_shared/readalong/`
+- [x] Priority 4: Remove unused stale root components
+
+Status:
+Component organization cleanup complete. Remaining shared folders are intentional route-level or app-level shared component homes.
