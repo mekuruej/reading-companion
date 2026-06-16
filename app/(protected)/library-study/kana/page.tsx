@@ -8,7 +8,7 @@ import {
     YOON_KANA,
     type KanaItem,
 } from "@/lib/japanese/kana";
-import KanjiStudyModeSelector from "../components/KanjiStudyModeSelector";
+import KanaStudyModeSelector from "./components/KanaStudyModeSelector";
 import { KanaStudyCharacterSetSelector } from "./components/KanaStudyCharacterSetSelector";
 import { KanaStudyCompletionPanel } from "./components/KanaStudyCompletionPanel";
 import { KanaStudyCurrentCardSummary } from "./components/KanaStudyCurrentCardSummary";
@@ -453,7 +453,7 @@ export default function KanaStudyPage() {
         <main className="flex min-h-screen flex-col items-center bg-slate-100 px-6 py-4 text-slate-900">
             <KanaStudyHeader />
 
-            <KanjiStudyModeSelector
+            <KanaStudyModeSelector
                 value={studyMode}
                 options={STUDY_MODES}
                 onChange={(value) => handleModeChange(value as StudyMode)}

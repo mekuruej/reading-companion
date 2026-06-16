@@ -15,13 +15,13 @@ import KanjiStudyNotice from "./components/KanjiStudyNotice";
 import KanjiStudyCompleteState from "./components/KanjiStudyCompleteState";
 import KanjiStudyBottomControls from "./components/KanjiStudyBottomControls";
 import KanjiStudyPreviewLockedState from "./components/KanjiStudyPreviewLockedState";
-import KanjiRecallPanel from "../components/KanjiRecallPanel";
+import KanjiRecallPanel from "./components/KanjiRecallPanel";
 import KanjiStudyOptionList from "./components/KanjiStudyOptionList";
 import KanjiStudyFeedbackPanel from "./components/KanjiStudyFeedbackPanel";
 import KanjiStudyCardFrame from "./components/KanjiStudyCardFrame";
 import KanjiStudyPrompt from "./components/KanjiStudyPrompt";
-import KanjiStudyModeSelector from "../components/KanjiStudyModeSelector";
-import KanjiAnswerStyleSelector from "../components/KanjiAnswerStyleSelector";
+import KanjiStudyModeSelector from "./components/KanjiStudyModeSelector";
+import KanjiAnswerStyleSelector from "./components/KanjiAnswerStyleSelector";
 import KanjiStudyTypingAnswer from "./components/KanjiStudyTypingAnswer";
 import KanjiStudyNoCardsState from "./components/KanjiStudyNoCardsState";
 
