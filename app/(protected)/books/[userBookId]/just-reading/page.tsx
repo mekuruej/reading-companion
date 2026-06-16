@@ -1,7 +1,7 @@
 // Fluid Reading - Just Reading
 //
 
-import SimpleTimedSessionPage from "../components/SimpleTimedSessionPage";
+import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 
 export default function JustReadingPage() {
     return (
