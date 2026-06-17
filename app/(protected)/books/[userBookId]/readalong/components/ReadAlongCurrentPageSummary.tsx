@@ -25,7 +25,7 @@ export default function ReadAlongCurrentPageSummary({
       </div>
 
       <div className="order-3 text-sm text-stone-500 sm:text-right">
-        Tap the words to follow along with the book.
+        Tap words as you see them in your book.
       </div>
     </div>
   );

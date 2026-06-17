@@ -8,11 +8,11 @@ export default function ReadAlongPageHeader() {
         Fluid Reading with Saved Word Support
       </h1>
 
-      <p className="mt-1 max-w-4xl text-sm leading-6 text-stone-600">
-        Use this for a quicker, smoother reading experience while you read with
-        your saved words as light support. New lookups can wait — this page is
-        for keeping your reading momentum.
-      </p>
+      <div className="mt-1 max-w-4xl space-y-1 text-sm leading-6 text-stone-600">
+        <p>These are words you saved from this book.</p>
+        <p>Read your own book, then tap each word here when it appears on the page.</p>
+        <p>Each tap moves you through your saved word list.</p>
+      </div>
     </header>
   );
 }
