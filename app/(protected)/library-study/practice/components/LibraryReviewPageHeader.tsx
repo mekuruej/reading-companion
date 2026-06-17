@@ -3,7 +3,7 @@ type LibraryReviewPageHeaderProps = {
 };
 
 export default function LibraryReviewPageHeader({
-  title = "Library Review",
+  title = "Saved Words Review",
 }: LibraryReviewPageHeaderProps) {
   return (
     <div className="mb-3 flex w-full max-w-3xl flex-col items-center justify-center gap-2 text-center">

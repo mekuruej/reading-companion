@@ -38,13 +38,13 @@ type ClaimRow = {
 };
 
 export const LIBRARY_STUDY_COLOR_ORDER: LibraryStudyColor[] = [
-  "red",
-  "orange",
-  "yellow",
-  "grey",
-  "green",
-  "blue",
   "purple",
+  "blue",
+  "green",
+  "yellow",
+  "orange",
+  "red",
+  "grey",
 ];
 
 export function emptyLibraryStudyColorTotals(): LibraryStudyColorTotals {

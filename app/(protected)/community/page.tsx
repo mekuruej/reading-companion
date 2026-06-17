@@ -24,6 +24,9 @@ type LibraryWordProgressRow = {
   last_studied_at: string | null;
 };
 
+const SHOW_COMMUNITY_STUDY_SNAPSHOT = false;
+const COMMUNITY_SNAPSHOT_DAYS = 30;
+
 const mySpaceCards = [
   {
     title: "My Profile",
@@ -59,24 +62,18 @@ function formatAverage(value: number | null) {
   return value.toFixed(1);
 }
 
-function ymdLocal(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+function recentCommunitySnapshotRange(days: number) {
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
 
-function yesterdayRange() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(today);
-  start.setDate(today.getDate() - 1);
-  const end = new Date(today);
+  const start = new Date(end);
+  start.setDate(end.getDate() - days + 1);
+  start.setHours(0, 0, 0, 0);
 
   return {
     start,
     end,
-    label: ymdLocal(start),
+    label: `past ${days} days`,
   };
 }
 
@@ -160,9 +157,16 @@ export default function CommunityHubPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [wordSummaries, setWordSummaries] = useState<LibraryWordSummaryRow[]>([]);
-  const [wordProgressRows, setWordProgressRows] = useState<LibraryWordProgressRow[]>([]);
+  const [wordProgressRows, setWordProgressRows] = useState<LibraryWordProgressRow[]>(
+    []
+  );
 
   useEffect(() => {
+    if (!SHOW_COMMUNITY_STUDY_SNAPSHOT) {
+      setLoading(false);
+      return;
+    }
+
     let alive = true;
 
     async function loadCommunitySnapshot() {
@@ -206,7 +210,10 @@ export default function CommunityHubPage() {
     };
   }, []);
 
-  const yesterday = useMemo(() => yesterdayRange(), []);
+  const communitySnapshotRange = useMemo(
+    () => recentCommunitySnapshotRange(COMMUNITY_SNAPSHOT_DAYS),
+    []
+  );
 
   const dailyStudyStats = useMemo(() => {
     const activeUsers = new Set<string>();
@@ -219,7 +226,15 @@ export default function CommunityHubPage() {
 
     for (const row of wordSummaries) {
       if (!row.user_id || !row.study_identity_key) continue;
-      if (!isInRange(row.first_seen_at, yesterday.start, yesterday.end)) continue;
+      if (
+        !isInRange(
+          row.first_seen_at,
+          communitySnapshotRange.start,
+          communitySnapshotRange.end
+        )
+      ) {
+        continue;
+      }
 
       const key = `${row.user_id}::${row.study_identity_key}`;
       if (seenNewWords.has(key)) continue;
@@ -232,25 +247,42 @@ export default function CommunityHubPage() {
     for (const row of wordProgressRows) {
       if (!row.user_id || !row.study_identity_key) continue;
 
-      const hadDailyStudy = isInRange(
+      const hadRecentStudy = isInRange(
         row.last_studied_at,
-        yesterday.start,
-        yesterday.end
+        communitySnapshotRange.start,
+        communitySnapshotRange.end
       );
-      if (!hadDailyStudy) continue;
+      if (!hadRecentStudy) continue;
 
-      const masteredYesterday =
-        isInRange(row.mastered_at, yesterday.start, yesterday.end) ||
+      const masteredInRange =
+        isInRange(
+          row.mastered_at,
+          communitySnapshotRange.start,
+          communitySnapshotRange.end
+        ) ||
         (row.mastered && !row.mastered_at);
+
       const forgottenCount =
-        (isInRange(row.reading_gate_failed_at, yesterday.start, yesterday.end) ? 1 : 0) +
-        (isInRange(row.meaning_gate_failed_at, yesterday.start, yesterday.end) ? 1 : 0);
+        (isInRange(
+          row.reading_gate_failed_at,
+          communitySnapshotRange.start,
+          communitySnapshotRange.end
+        )
+          ? 1
+          : 0) +
+        (isInRange(
+          row.meaning_gate_failed_at,
+          communitySnapshotRange.start,
+          communitySnapshotRange.end
+        )
+          ? 1
+          : 0);
 
       activeUsers.add(row.user_id);
 
       if (forgottenCount > 0) {
         incrementCount(forgottenByUser, row.user_id, forgottenCount);
-      } else if (masteredYesterday) {
+      } else if (masteredInRange) {
         incrementCount(masteredByUser, row.user_id);
       } else if (row.meaning_gate_status === "passed") {
         incrementCount(passedMeaningByUser, row.user_id);
@@ -260,6 +292,7 @@ export default function CommunityHubPage() {
     }
 
     const activeUserCount = activeUsers.size;
+
     return {
       activeUserCount,
       averageNewWords: averageCount(newWordsByUser, activeUserCount),
@@ -268,7 +301,7 @@ export default function CommunityHubPage() {
       averageMastered: averageCount(masteredByUser, activeUserCount),
       averageForgotten: averageCount(forgottenByUser, activeUserCount),
     };
-  }, [wordSummaries, wordProgressRows, yesterday]);
+  }, [wordSummaries, wordProgressRows, communitySnapshotRange]);
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -283,8 +316,8 @@ export default function CommunityHubPage() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            A small community snapshot: reading color movement, shared spaces, and a quiet pulse
-            of how the study library is growing.
+            Your community space for reader profiles, personal stats, and future
+            shared reading tools.
           </p>
         </div>
 
@@ -309,63 +342,73 @@ export default function CommunityHubPage() {
           </div>
         </section>
 
-        <section className="mb-8 rounded-[2rem] border border-sky-200 bg-sky-50/80 p-5 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-700">
-                Community Snapshot
+        {SHOW_COMMUNITY_STUDY_SNAPSHOT ? (
+          <section className="mb-8 rounded-[2rem] border border-sky-200 bg-sky-50/80 p-5 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-700">
+                  Library Study Averages
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">
+                  Recent Library Study progress.
+                </h2>
+              </div>
+
+              <p className="text-xs text-slate-500">
+                {loading
+                  ? "Loading..."
+                  : `Anonymous averages from ${
+                      dailyStudyStats.activeUserCount
+                    } active reader${
+                      dailyStudyStats.activeUserCount === 1 ? "" : "s"
+                    } in the ${communitySnapshotRange.label}.`}
               </p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">
-                Yesterday's color movement.
-              </h2>
             </div>
-            <p className="text-xs text-slate-500">
-              {loading
-                ? "Loading..."
-                : `Anonymous daily averages from ${dailyStudyStats.activeUserCount} active reader${dailyStudyStats.activeUserCount === 1 ? "" : "s"} on ${yesterday.label}.`}
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <StatPill
+                label="Avg Mastered"
+                value={loading ? "…" : formatAverage(dailyStudyStats.averageMastered)}
+                detail="Mastered"
+                tone="border-purple-200 bg-white text-purple-950"
+              />
+              <StatPill
+                label="Avg Passed Meaning"
+                value={
+                  loading ? "…" : formatAverage(dailyStudyStats.averagePassedMeaning)
+                }
+                detail="Passed meaning"
+                tone="border-sky-200 bg-white text-sky-950"
+              />
+              <StatPill
+                label="Avg Passed Reading"
+                value={
+                  loading ? "…" : formatAverage(dailyStudyStats.averagePassedReading)
+                }
+                detail="Passed reading"
+                tone="border-emerald-200 bg-white text-emerald-950"
+              />
+              <StatPill
+                label="Avg New Words"
+                value={loading ? "…" : formatAverage(dailyStudyStats.averageNewWords)}
+                detail="New"
+                tone="border-red-200 bg-white text-red-950"
+              />
+              <StatPill
+                label="Avg Back to Support"
+                value={loading ? "…" : formatAverage(dailyStudyStats.averageForgotten)}
+                detail="Needs another look"
+                tone="border-slate-300 bg-white text-slate-950"
+              />
+            </div>
+
+            <p className="mt-4 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm leading-6 text-slate-600">
+              No private notes, reviews, quotes, or vocabulary lists are shown here.
+              These are anonymous averages from recent Library Study activity.
+              Community averages will stay hidden until enough readers have activity.
             </p>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <StatPill
-              label="Avg New Words"
-              value={loading ? "…" : formatAverage(dailyStudyStats.averageNewWords)}
-              detail="New"
-              tone="border-red-200 bg-white text-red-950"
-            />
-            <StatPill
-              label="Avg Green"
-              value={loading ? "…" : formatAverage(dailyStudyStats.averagePassedReading)}
-              detail="Passed reading"
-              tone="border-emerald-200 bg-white text-emerald-950"
-            />
-            <StatPill
-              label="Avg Blue"
-              value={loading ? "…" : formatAverage(dailyStudyStats.averagePassedMeaning)}
-              detail="Passed meaning"
-              tone="border-sky-200 bg-white text-sky-950"
-            />
-            <StatPill
-              label="Avg Purple"
-              value={loading ? "…" : formatAverage(dailyStudyStats.averageMastered)}
-              detail="Mastered"
-              tone="border-purple-200 bg-white text-purple-950"
-            />
-            <StatPill
-              label="Avg Forgotten"
-              value={loading ? "…" : formatAverage(dailyStudyStats.averageForgotten)}
-              detail="Back to support"
-              tone="border-slate-300 bg-white text-slate-950"
-            />
-          </div>
-
-          <p className="mt-4 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm leading-6 text-slate-600">
-            No private notes, reviews, quotes, or vocabulary lists are shown here.
-            These are anonymous averages from yesterday's Library Study activity. A studied
-            word is counted once in its strongest color bucket, with forgotten words counted
-            separately.
-          </p>
-        </section>
+          </section>
+        ) : null}
 
         <section>
           <div className="mb-3">

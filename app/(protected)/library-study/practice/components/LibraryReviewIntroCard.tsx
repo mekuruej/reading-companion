@@ -4,8 +4,8 @@ type LibraryReviewIntroCardProps = {
 };
 
 export default function LibraryReviewIntroCard({
-  title = "Library Review",
-  description = "Review your existing words freely. Review does not move colors.",
+  title = "Saved Words Review",
+  description = "Practice all saved words across your books. This review does not change word colors.",
 }: LibraryReviewIntroCardProps) {
   return (
     <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

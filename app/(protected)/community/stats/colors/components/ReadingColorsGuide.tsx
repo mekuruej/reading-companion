@@ -78,50 +78,17 @@ export default function ReadingColorsGuide({
         <div className="mt-6 space-y-6 rounded-2xl border border-white/80 bg-white/80 p-4">
           <div>
             <ColorGuideGroupLabel
-              title="Based on encounters"
-              detail="Red, orange, and yellow come from real reading encounters, not quiz answers. After yellow, you can decide to repeat these three levels if you are not ready for the Reading Gate."
-            />
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <ColorGuideStepCard
-                stageLabel={colorLabel("red")}
-                stageClassName={stagePill("red")}
-                title="Early encounter support"
-                detail="You have started meeting this word in real reading, but it is still too new for Ability Check."
-                note="If a word feels far above your level, Mekuru can give it more time."
-              />
-
-              <ColorGuideStepCard
-                stageLabel={colorLabel("orange")}
-                stageClassName={stagePill("orange")}
-                title="Repeated encounter support"
-                detail="The word is showing up again, but Mekuru is still gathering reading support before testing it."
-                note="Encounters keep building quietly in the background."
-              />
-
-              <ColorGuideStepCard
-                stageLabel={colorLabel("yellow")}
-                stageClassName={stagePill("yellow")}
-                title="Ready for gate checks"
-                detail="Yellow means the word has enough encounter support to ask whether it is ready for Ability Check."
-                note="Yellow is the readiness checkpoint before the Reading Gate."
-              />
-            </div>
-          </div>
-
-          <div>
-            <ColorGuideGroupLabel
               title="Based on ability"
-              detail="Green, blue, purple, and Limbo come from Ability Check results."
+              detail="Purple, blue, green, and Limbo come from Ability Check results."
             />
 
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <ColorGuideStepCard
-                stageLabel={colorLabel("green")}
-                stageClassName={stagePill("green")}
-                title="Reading Gate"
-                detail="The word is ready for a reading question in Ability Check."
-                note="Pass this gate to move toward meaning."
+                stageLabel={colorLabel("purple")}
+                stageClassName={stagePill("purple")}
+                title="Mastered"
+                detail="The word has cleared the major study gates and is no longer demanding regular attention."
+                note="Purple cards return only occasionally."
               />
 
               <ColorGuideStepCard
@@ -133,11 +100,11 @@ export default function ReadingColorsGuide({
               />
 
               <ColorGuideStepCard
-                stageLabel={colorLabel("purple")}
-                stageClassName={stagePill("purple")}
-                title="Mastered"
-                detail="The word has cleared the major study gates and is no longer demanding regular attention."
-                note="Purple cards return only occasionally."
+                stageLabel={colorLabel("green")}
+                stageClassName={stagePill("green")}
+                title="Reading Gate"
+                detail="The word is ready for a reading question in Ability Check."
+                note="Pass this gate to move toward meaning."
               />
 
               <ColorGuideStepCard
@@ -146,6 +113,39 @@ export default function ReadingColorsGuide({
                 title="Limbo: between gates"
                 detail="Limbo only appears after a word has entered the gate path: between Green and Blue, or between Blue and Purple."
                 note="Choosing Not yet after Yellow repeats Red, Orange, and Yellow instead."
+              />
+            </div>
+          </div>
+
+          <div>
+            <ColorGuideGroupLabel
+              title="Based on encounters"
+              detail="Yellow, orange, and red come from real reading encounters, not quiz answers. After yellow, you can decide to repeat these three levels if you are not ready for the Reading Gate."
+            />
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <ColorGuideStepCard
+                stageLabel={colorLabel("yellow")}
+                stageClassName={stagePill("yellow")}
+                title="Ready for gate checks"
+                detail="Yellow means the word has enough encounter support to ask whether it is ready for Ability Check."
+                note="Yellow is the readiness checkpoint before the Reading Gate."
+              />
+
+              <ColorGuideStepCard
+                stageLabel={colorLabel("orange")}
+                stageClassName={stagePill("orange")}
+                title="Repeated encounter support"
+                detail="The word is showing up again, but Mekuru is still gathering reading support before testing it."
+                note="Encounters keep building quietly in the background."
+              />
+
+              <ColorGuideStepCard
+                stageLabel={colorLabel("red")}
+                stageClassName={stagePill("red")}
+                title="Early encounter support"
+                detail="You have started meeting this word in real reading, but it is still too new for Ability Check."
+                note="If a word feels far above your level, Mekuru can give it more time."
               />
             </div>
           </div>

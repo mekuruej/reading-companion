@@ -68,7 +68,7 @@ export default function AbilityCheckCardShell({
       {hasCard ? (
         <div className="absolute bottom-3 right-3 flex flex-wrap justify-end gap-1.5 sm:bottom-4 sm:right-4 sm:gap-2">
           <div className={readChipClassName}>
-            Read {encounterCount}x
+            Saved {encounterCount}x
           </div>
         </div>
       ) : null}

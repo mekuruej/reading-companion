@@ -38,12 +38,12 @@ export default function LibraryPracticeFilterPanel({
           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
         >
           <option value="all">All Colors</option>
-          <option value="red">Red</option>
-          <option value="orange">Orange</option>
-          <option value="yellow">Yellow</option>
-          <option value="green">Green</option>
-          <option value="blue">Blue</option>
           <option value="purple">Purple (Mastered Words)</option>
+          <option value="blue">Blue</option>
+          <option value="green">Green</option>
+          <option value="yellow">Yellow</option>
+          <option value="orange">Orange</option>
+          <option value="red">Red</option>
           <option value="grey">Limbo</option>
           <option value="katakana">Katakana</option>
         </select>
@@ -52,11 +52,10 @@ export default function LibraryPracticeFilterPanel({
           <button
             type="button"
             onClick={() => onPracticeStudyModeChange("reveal")}
-            className={`rounded-lg px-4 py-2 transition ${
-              practiceStudyMode === "reveal"
+            className={`rounded-lg px-4 py-2 transition ${practiceStudyMode === "reveal"
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             Reveal
           </button>
@@ -64,11 +63,10 @@ export default function LibraryPracticeFilterPanel({
           <button
             type="button"
             onClick={() => onPracticeStudyModeChange("typing")}
-            className={`rounded-lg px-4 py-2 transition ${
-              practiceStudyMode === "typing"
+            className={`rounded-lg px-4 py-2 transition ${practiceStudyMode === "typing"
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             Typing
           </button>

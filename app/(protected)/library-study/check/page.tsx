@@ -338,8 +338,16 @@ function definitionNumberFromIndex(index: number | null | undefined) {
 
 function definitionLabel(card: StudyCard | null | undefined) {
   const progressDefinition = card?.progress?.definition_key?.trim();
-  if (progressDefinition) return `Def #${progressDefinition}`;
-  if (card?.definitionNumber != null) return `Def #${card.definitionNumber}`;
+  if (progressDefinition) {
+    return progressDefinition === "1"
+      ? "Primary definition"
+      : `Definition ${progressDefinition}`;
+  }
+  if (card?.definitionNumber != null) {
+    return card.definitionNumber === 1
+      ? "Primary definition"
+      : `Definition ${card.definitionNumber}`;
+  }
   return "";
 }
 
@@ -1261,7 +1269,7 @@ function LibraryPracticePanel({
 
           <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
             <div className={libraryStudyChipClass(card.colorStatus)}>
-              Read {card.encounterCount}x
+              Saved {card.encounterCount}x
             </div>
           </div>
 
@@ -1323,7 +1331,7 @@ function LibraryPracticePanel({
 
           <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
             <div className={libraryStudyChipClass(card.colorStatus)}>
-              Read {card.encounterCount}x
+              Saved {card.encounterCount}x
             </div>
           </div>
 

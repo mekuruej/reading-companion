@@ -409,8 +409,16 @@ function definitionNumberFromIndex(index: number | null | undefined) {
 
 function definitionLabel(card: StudyCard | null | undefined) {
   const progressDefinition = card?.progress?.definition_key?.trim();
-  if (progressDefinition) return `Def #${progressDefinition}`;
-  if (card?.definitionNumber != null) return `Def #${card.definitionNumber}`;
+  if (progressDefinition) {
+    return progressDefinition === "1"
+      ? "Primary definition"
+      : `Definition ${progressDefinition}`;
+  }
+  if (card?.definitionNumber != null) {
+    return card.definitionNumber === 1
+      ? "Primary definition"
+      : `Definition ${card.definitionNumber}`;
+  }
   return "";
 }
 
@@ -1326,9 +1334,23 @@ function LibraryPracticePanel({
       </div>
 
       <p className="text-center text-xs leading-5 text-slate-500">
-        {practiceMode === "reveal"
-          ? "First tap reveals the reading, Second tap reveals the meaning, Third tap moves to the next card. Library Review does not affect colors."
-          : "Reading checks automatically. Purple review can move forgotten words back to the right gate."}
+        {practiceMode === "reveal" ? (
+          <>
+            Tap once to check the reading.
+            <br />
+            Tap again to check the meaning.
+            <br />
+            Tap a third time to move to the next card.
+            <br />
+            Library Review does not change your word colors.
+          </>
+        ) : (
+          <>
+            Reading answers are checked automatically.
+            <br />
+            Purple review can move forgotten words back into practice.
+          </>
+        )}
       </p>
     </div>
   );
@@ -1478,6 +1500,7 @@ export default function LibraryStudyPage() {
   const [fullAccessLocked, setFullAccessLocked] = useState(false);
 
   const [allCards, setAllCards] = useState<StudyCard[]>([]);
+  const [libraryReviewCards, setLibraryReviewCards] = useState<StudyCard[]>([]);
   const [deck, setDeck] = useState<StudyCard[]>([]);
   const [index, setIndex] = useState(0);
   const [practiceDeck, setPracticeDeck] = useState<StudyCard[]>([]);
@@ -1548,10 +1571,10 @@ export default function LibraryStudyPage() {
   }, [allCards, dailyCheckPlan, seenTodayIds]);
 
   const practiceFilteredCards = useMemo(() => {
-    return allCards.filter((card) =>
+    return libraryReviewCards.filter((card) =>
       isCardAvailableForLibraryPractice(card, selectedJlpt, practiceColorFilter)
     );
-  }, [allCards, selectedJlpt, practiceColorFilter]);
+  }, [libraryReviewCards, selectedJlpt, practiceColorFilter]);
 
   const availableCountBySetupLevel = useMemo(() => {
     const counts: Record<DailyCheckLevel, number> = {
@@ -1738,6 +1761,7 @@ export default function LibraryStudyPage() {
 
         if (!canUseLibraryReviewNow) {
           setAllCards([]);
+          setLibraryReviewCards([]);
           setDeck([]);
           setPracticeDeck([]);
           setFullAccessLocked(true);
@@ -1763,7 +1787,9 @@ export default function LibraryStudyPage() {
 
         if (userBookIds.length === 0) {
           setAllCards([]);
+          setLibraryReviewCards([]);
           setDeck([]);
+          setPracticeDeck([]);
           setLoading(false);
           return;
         }
@@ -1834,6 +1860,23 @@ export default function LibraryStudyPage() {
           if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
         }
 
+        const reviewWords = await loadAllLibraryCheckWords(userBookIds);
+
+        const reviewGroupedWords = new Map<string, UserBookWordRow[]>();
+
+        for (const row of reviewWords) {
+          const surface = row.surface?.trim() ?? "";
+          const reading = row.reading?.trim() ?? "";
+          const meaning = row.meaning?.trim() ?? "";
+          const key = studyIdentityKey(surface, reading);
+
+          if (!surface || !reading || !meaning || !key) continue;
+
+          const group = reviewGroupedWords.get(key) ?? [];
+          group.push(row);
+          reviewGroupedWords.set(key, group);
+        }
+
         if (!summaryErr && summaryRows && summaryRows.length > 0) {
           const definitionNumberByWordId = new Map<string, number>();
           const sampleWordIds = uniqueStrings(
@@ -1862,6 +1905,7 @@ export default function LibraryStudyPage() {
 
           const studyKeys = uniqueStrings([
             ...summaryRows.map((row) => row.study_identity_key).filter(Boolean),
+            ...Array.from(reviewGroupedWords.keys()),
             ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
           ]);
 
@@ -1942,7 +1986,70 @@ export default function LibraryStudyPage() {
             .filter((card): card is StudyCard => Boolean(card));
           const allStudyCards = [...cards, ...claimCards];
 
+          const reviewCards: StudyCard[] = Array.from(reviewGroupedWords.entries())
+            .map(([key, group]) => {
+              const representative = group[0];
+              const meta = metaById.get(representative.user_book_id);
+              const surface = representative.surface!.trim();
+              const reading = representative.reading!.trim();
+              const progress = progressWithWordSkyClaim(
+                user.id,
+                key,
+                surface,
+                reading,
+                progressByKey.get(key) ?? null,
+                claimByKey.get(key)
+              );
+
+              if (
+                colorSettings.skip_katakana_library_check &&
+                isKatakanaOnly(representative.surface)
+              ) {
+                return null;
+              }
+
+              const colorStatus = computeLibraryStudyColorStatus({
+                encounterCount: group.length,
+                settings: colorSettings,
+                readingGate: progress?.reading_gate_status ?? "not_started",
+                meaningGate: progress?.meaning_gate_status ?? "not_started",
+                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+                preReadingSupportCycle: preReadingSupportCycle(progress),
+                mastered: progress?.mastered ?? false,
+              });
+
+              return {
+                id: representative.id,
+                userBookId: representative.user_book_id,
+                bookTitle: meta?.title ?? "Untitled",
+                bookCoverUrl: meta?.cover_url ?? null,
+                surface,
+                reading,
+                meaning: representative.meaning!.trim(),
+                jlpt: representative.jlpt ?? null,
+                encounterCount: group.length,
+                encounterIds: group.map((word) => word.id),
+                colorStatus,
+                activeGate: pickLibraryCheckGate(colorStatus, key),
+                studyIdentityKey: key,
+                progress,
+                definitionNumber: definitionNumberFromIndex(
+                  representative.meaning_choice_index
+                ),
+              };
+            })
+            .filter((card): card is StudyCard => Boolean(card));
+
+          const reviewCardKeys = new Set(reviewCards.map((card) => card.studyIdentityKey));
+          const reviewClaimCards = claimRows
+            .filter((claim) => !reviewCardKeys.has(claim.study_identity_key))
+            .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
+            .filter((card): card is StudyCard => Boolean(card));
+          const allReviewCards = [...reviewCards, ...reviewClaimCards];
+
           setAllCards(allStudyCards);
+          setLibraryReviewCards(allReviewCards);
           setDebugInfo({
             threshold: encounterThreshold,
             rawRows: summaryRows.length,
@@ -2085,6 +2192,7 @@ export default function LibraryStudyPage() {
         const allStudyCards = [...cards, ...claimCards];
 
         setAllCards(allStudyCards);
+        setLibraryReviewCards(allStudyCards);
         setDebugInfo({
           threshold: encounterThreshold,
           rawRows: words?.length ?? 0,

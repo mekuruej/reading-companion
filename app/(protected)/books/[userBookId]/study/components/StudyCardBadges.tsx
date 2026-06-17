@@ -10,6 +10,10 @@ type StudyCardBadgesProps = {
   totalCount: number;
 };
 
+function getDefinitionLabel(index: number) {
+  return index === 0 ? "Primary definition" : `Definition ${index + 1}`;
+}
+
 export default function StudyCardBadges({
   jlpt,
   colorStatus,
@@ -30,13 +34,13 @@ export default function StudyCardBadges({
 
       <div className="absolute bottom-3 left-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
         <div className="text-xs font-medium leading-none">
-          Def #{meaningChoiceIndex + 1}
+          {getDefinitionLabel(meaningChoiceIndex)}
         </div>
       </div>
 
       <div className="absolute bottom-3 right-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
         <div className="text-xs font-medium leading-none">
-          Read {totalCount}x
+          Saved {totalCount}x
         </div>
       </div>
     </>

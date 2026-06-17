@@ -58,7 +58,7 @@ export default function LibraryPracticeCardBadges({
 
       <div className="absolute bottom-4 right-4 flex flex-wrap justify-end gap-2">
         <div className={readChipClassName}>
-          Read {encounterCount}x
+          Saved {encounterCount}x
         </div>
       </div>
     </>

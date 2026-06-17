@@ -275,7 +275,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Library Review
+                    Saved Words Review
                   </Link>
 
                   <Link
@@ -286,7 +286,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Book Flashcards
+                    Book Specific Flashcards
                   </Link>
                   <Link
                     href="/library-study/characters"

@@ -218,12 +218,12 @@ function shuffledCandidatePool(card: Flashcard, pool: Flashcard[]) {
 
 const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1", "NON-JLPT"] as const;
 const LIBRARY_COLOR_FILTERS: LibraryStudyColor[] = [
-  "red",
-  "orange",
-  "yellow",
-  "green",
-  "blue",
   "purple",
+  "blue",
+  "green",
+  "yellow",
+  "orange",
+  "red",
   "grey",
 ];
 const STUDY_MODE_ORDER: StudySet[] = [
