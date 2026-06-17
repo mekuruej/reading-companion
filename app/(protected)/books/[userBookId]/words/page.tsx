@@ -43,6 +43,7 @@ import {
   type LibraryStudyColorStatus,
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
+import { BookVocabBackToTopButton } from "./components/BookVocabBackToTopButton";
 
 const DEFAULT_LEARNING_SETTINGS = {
   red_stages: 1,
@@ -1221,6 +1222,7 @@ export default function BookWordsPage() {
 
         {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
       </BookVocabTableShell>
+      <BookVocabBackToTopButton />
     </main >
   );
 }
