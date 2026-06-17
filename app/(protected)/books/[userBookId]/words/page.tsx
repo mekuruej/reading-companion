@@ -18,6 +18,7 @@ import BookVocabReorderHint from "./components/BookVocabReorderHint";
 import BookVocabEmptyRow from "./components/BookVocabEmptyRow";
 import BookVocabContextCard from "./components/BookVocabContextCard";
 import BookVocabFilterPanel from "./components/BookVocabFilterPanel";
+import BookVocabCsvExportPanel from "./components/BookVocabCsvExportPanel";
 import BookVocabTableShell from "./components/BookVocabTableShell";
 import BookVocabActionsCell from "./components/BookVocabActionsCell";
 import BookVocabEditModalShell from "./components/BookVocabEditModalShell";
@@ -214,6 +215,53 @@ function studyIdentityKey(surface: string | null | undefined, reading: string | 
   const normalizedReading = normalizeKana(reading);
   if (!normalizedSurface) return "";
   return `${normalizedSurface}||${normalizedReading}`;
+}
+
+
+function csvCell(value: unknown) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function commonCsvLabel(value: boolean | null | undefined) {
+  if (value == null) return "";
+  return value ? "yes" : "no";
+}
+
+function chapterCsvLabel(w: WordRow) {
+  const num = w.chapter_number;
+  const name = (w.chapter_name ?? "").trim();
+
+  if (num != null && name) return `Chapter ${num}: ${name}`;
+  if (num != null) return `Chapter ${num}`;
+  return name;
+}
+
+function safeCsvFilenamePart(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, "-")
+      .replace(/\s+/g, "-")
+      .slice(0, 80) || "vocab-list"
+  );
+}
+
+function downloadCsv(filename: string, rows: unknown[][]) {
+  const csvBody = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob([`\ufeff${csvBody}`], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export default function BookWordsPage() {
@@ -910,6 +958,43 @@ export default function BookWordsPage() {
     });
   }, [filtered]);
 
+  function handleExportVocabCsv(exportChapter: string) {
+    const exportWords = words.filter((word) => {
+      if (exportChapter === "all") return true;
+      return chapterKey(word) === exportChapter;
+    });
+
+    if (exportWords.length === 0) {
+      window.alert("There are no words to export for that chapter yet.");
+      return;
+    }
+
+    const selectedChapterLabel =
+      exportChapter === "all"
+        ? "all-chapters"
+        : chapterOptions.find((option) => option.value === exportChapter)?.label ?? "chapter";
+
+    const rows = [
+      ["Surface", "Reading", "Meaning", "Def #", "Chapter", "Page", "JLPT", "Common"],
+      ...exportWords.map((word) => [
+        word.surface,
+        word.reading ?? "",
+        word.meaning ?? "",
+        word.meaning_choice_index == null ? "" : word.meaning_choice_index + 1,
+        chapterCsvLabel(word),
+        word.page_number ?? "",
+        word.jlpt ?? "",
+        commonCsvLabel(word.is_common),
+      ]),
+    ];
+
+    const filename = `${safeCsvFilenamePart(bookTitle)}-${safeCsvFilenamePart(
+      selectedChapterLabel
+    )}-vocab.csv`;
+
+    downloadCsv(filename, rows);
+  }
+
   const headerStickyStyle = { top: "0px" };
 
   if (loading) {
@@ -1060,6 +1145,12 @@ export default function BookWordsPage() {
             onQueryChange={setQuery}
             onShowHiddenChange={setShowHidden}
             onChapterFilterChange={setChapterFilter}
+          />
+
+          <BookVocabCsvExportPanel
+            chapterOptions={chapterOptions}
+            wordCount={words.length}
+            onExportCsv={handleExportVocabCsv}
           />
         </div>
       </div>

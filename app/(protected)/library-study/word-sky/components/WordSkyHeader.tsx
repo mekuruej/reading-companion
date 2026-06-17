@@ -14,9 +14,9 @@ export default function WordSkyHeader({
       <div>
         <h1 className="text-2xl font-semibold">Word Sky</h1>
         <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
-          Pick words you can already read and move them into your Ability Check.
+          Pick words you can already read and change them to green.
           <br />
-          These words will also appear in Library Practice, where you can
+          These words will start to appear in your Ability Check and Library Practice, where you can
           <br />
           strengthen your reading and understanding as you move toward mastery.
           <br />

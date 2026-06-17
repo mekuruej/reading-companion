@@ -187,6 +187,7 @@ type PracticeColorFilter =
   | "katakana";
 
 const STORAGE_KEY = "library-study-seen-by-date";
+const LIBRARY_PRACTICE_LAST_FIRST_CARD_KEY = "library-practice-last-first-card";
 const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
 const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
 const REGULAR_GATE_RECHECK_WINDOW_DAYS = 3;
@@ -306,6 +307,52 @@ function shuffleArray<T>(arr: T[]) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function rememberFirstPracticeCard(cards: StudyCard[]) {
+  if (typeof window === "undefined" || !cards[0]) return;
+
+  try {
+    window.localStorage.setItem(
+      LIBRARY_PRACTICE_LAST_FIRST_CARD_KEY,
+      cards[0].id
+    );
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
+function avoidRepeatingFirstPracticeCard(cards: StudyCard[]) {
+  if (typeof window === "undefined" || cards.length <= 1) return cards;
+
+  try {
+    const lastFirstCardId = window.localStorage.getItem(
+      LIBRARY_PRACTICE_LAST_FIRST_CARD_KEY
+    );
+
+    if (!lastFirstCardId || cards[0]?.id !== lastFirstCardId) {
+      return cards;
+    }
+
+    const replacementIndex = cards.findIndex(
+      (card, index) => index > 0 && card.id !== lastFirstCardId
+    );
+
+    if (replacementIndex <= 0) return cards;
+
+    const nextCards = [...cards];
+    const [replacementCard] = nextCards.splice(replacementIndex, 1);
+    nextCards.unshift(replacementCard);
+    return nextCards;
+  } catch {
+    return cards;
+  }
+}
+
+function buildShuffledPracticeDeck(cards: StudyCard[]) {
+  const deck = avoidRepeatingFirstPracticeCard(shuffleArray(cards));
+  rememberFirstPracticeCard(deck);
+  return deck;
 }
 
 function normalizeText(value: string) {
@@ -1280,7 +1327,7 @@ function LibraryPracticePanel({
 
       <p className="text-center text-xs leading-5 text-slate-500">
         {practiceMode === "reveal"
-          ? "Tap the card to reveal. Review does not move colors."
+          ? "First tap reveals the reading, Second tap reveals the meaning, Third tap moves to the next card. Library Review does not affect colors."
           : "Reading checks automatically. Purple review can move forgotten words back to the right gate."}
       </p>
     </div>
@@ -2113,7 +2160,7 @@ export default function LibraryStudyPage() {
   }, [allCards, dailyCheckPlan, activeTodayKey]);
 
   useEffect(() => {
-    setPracticeDeck(shuffleArray(practiceFilteredCards));
+    setPracticeDeck(buildShuffledPracticeDeck(practiceFilteredCards));
     setPracticeIndex(0);
     setPracticeRevealStep("word");
     setPracticeFinished(false);
@@ -2350,7 +2397,7 @@ export default function LibraryStudyPage() {
   }
 
   function shufflePracticeDeck() {
-    setPracticeDeck(shuffleArray(practiceFilteredCards));
+    setPracticeDeck(buildShuffledPracticeDeck(practiceFilteredCards));
     setPracticeIndex(0);
     setPracticeFinished(false);
     resetPracticeReveal();

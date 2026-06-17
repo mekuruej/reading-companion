@@ -80,6 +80,10 @@ function chunkArray<T>(arr: T[], size: number) {
   return out;
 }
 
+function easeInOutQuad(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
 function readableSupabaseError(error: any) {
   if (!error) return "Unknown error";
   if (typeof error === "string") return error;
@@ -125,6 +129,8 @@ export default function TeacherFollowAlongPage() {
   const teacherBookId = params.teacherBookId;
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrollAnimationFrame = useRef<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [canAccess, setCanAccess] = useState(false);
@@ -277,8 +283,21 @@ export default function TeacherFollowAlongPage() {
 
   useEffect(() => {
     setFadedThroughIndex(-1);
+    if (scrollAnimationFrame.current) {
+      cancelAnimationFrame(scrollAnimationFrame.current);
+      scrollAnimationFrame.current = null;
+    }
+
     if (scrollAreaRef.current) scrollAreaRef.current.scrollTop = 0;
   }, [pageIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollAnimationFrame.current) {
+        cancelAnimationFrame(scrollAnimationFrame.current);
+      }
+    };
+  }, []);
 
   function jumpToPage(pageNumber: number) {
     const matchIndex = pages.findIndex((page) => page.pageNumber === pageNumber);
@@ -294,6 +313,51 @@ export default function TeacherFollowAlongPage() {
 
   function goNext() {
     setPageIndex((prev) => Math.min(pages.length - 1, prev + 1));
+  }
+
+  function animateScrollTo(container: HTMLDivElement, top: number, duration = 420) {
+    if (scrollAnimationFrame.current) {
+      cancelAnimationFrame(scrollAnimationFrame.current);
+    }
+
+    const startTop = container.scrollTop;
+    const distance = top - startTop;
+    const startTimeForAnimation = performance.now();
+
+    const step = (now: number) => {
+      const elapsedTime = now - startTimeForAnimation;
+      const progress = Math.min(elapsedTime / duration, 1);
+      const eased = easeInOutQuad(progress);
+
+      container.scrollTop = startTop + distance * eased;
+
+      if (progress < 1) {
+        scrollAnimationFrame.current = requestAnimationFrame(step);
+      } else {
+        scrollAnimationFrame.current = null;
+      }
+    };
+
+    scrollAnimationFrame.current = requestAnimationFrame(step);
+  }
+
+  function handleProgressTap(index: number, itemId: string) {
+    setFadedThroughIndex(index);
+
+    const container = scrollAreaRef.current;
+    const nextItem = currentPage?.items[index + 1];
+    const target =
+      (nextItem ? itemRefs.current[nextItem.id] : null) ?? itemRefs.current[itemId];
+
+    if (!container || !target) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const targetTopWithinScroll =
+      targetRect.top - containerRect.top + container.scrollTop;
+    const desiredTop = Math.max(0, targetTopWithinScroll - 104);
+
+    animateScrollTo(container, desiredTop, 800);
   }
 
   const book = firstBook(teacherBook?.books ?? null);
@@ -339,13 +403,19 @@ export default function TeacherFollowAlongPage() {
           ) : (
             <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
               {currentPage.items.map((item, index) => (
-                <TeacherFollowAlongPrepItemCard
+                <div
                   key={item.id}
-                  item={item}
-                  supportMode={supportMode}
-                  isFaded={index <= fadedThroughIndex}
-                  onSelect={() => setFadedThroughIndex(index)}
-                />
+                  ref={(element) => {
+                    itemRefs.current[item.id] = element;
+                  }}
+                >
+                  <TeacherFollowAlongPrepItemCard
+                    item={item}
+                    supportMode={supportMode}
+                    isFaded={index <= fadedThroughIndex}
+                    onSelect={() => handleProgressTap(index, item.id)}
+                  />
+                </div>
               ))}
             </div>
           )}

@@ -79,7 +79,7 @@ export default function BookVocabTableHeader({
           Page
         </th>
         <th
-          className="sticky z-20 w-25 bg-gray-50 p-2"
+          className="sticky z-20 w-36 bg-gray-50 p-2"
           style={headerStickyStyle}
         >
           Actions
