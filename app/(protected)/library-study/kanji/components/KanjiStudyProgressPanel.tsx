@@ -1,46 +1,51 @@
 type KanjiStudyProgressPanelProps = {
   current: number;
   total: number;
-  levelFilter: string;
-  onLevelFilterChange: (value: string) => void;
   summaryText?: string;
+  answerModeLabel?: string;
+  levelSummaryLabel?: string;
 };
 
 export default function KanjiStudyProgressPanel({
   current,
   total,
-  levelFilter,
-  onLevelFilterChange,
   summaryText,
+  answerModeLabel,
+  levelSummaryLabel,
 }: KanjiStudyProgressPanelProps) {
+  const studyingNowLabel = [
+    summaryText || "Kanji Reading Study",
+    answerModeLabel,
+    levelSummaryLabel,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
   return (
-    <>
-      <p className="text-sm text-gray-500">
-        Card {current}/{total}
-      </p>
+    <div className="mt-4 w-full max-w-3xl">
+      <section className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Studying Now
+            </p>
 
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm">
-        <span className="font-medium text-stone-700">Level:</span>
-
-        <select
-          value={levelFilter}
-          onChange={(event) => onLevelFilterChange(event.target.value)}
-          className="rounded border bg-white px-3 py-2 text-sm text-stone-800"
-        >
-          <option value="beginner">Beginner: N5/N4</option>
-          <option value="n3">Lower Intermediate: N3</option>
-          <option value="n2">Upper Intermediate: N2</option>
-          <option value="advanced">Advanced: N1</option>
-          <option value="unlabeled">Unlabeled</option>
-          <option value="all">All levels</option>
-        </select>
-
-        {summaryText ? (
-          <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-            {summaryText}
+            <p className="mt-1 truncate text-lg font-bold text-slate-950">
+              {studyingNowLabel}
+            </p>
           </div>
-        ) : null}
-      </div>
-    </>
+
+          <div className="shrink-0 text-right">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Session progress
+            </p>
+
+            <p className="mt-1 text-2xl font-bold text-slate-950">
+              {current} / {total}
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }

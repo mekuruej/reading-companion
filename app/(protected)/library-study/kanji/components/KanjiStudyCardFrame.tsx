@@ -43,7 +43,7 @@ export default function KanjiStudyCardFrame({
 
   return (
     <div
-      className={`relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl ${
+      className={`relative mt-6 flex min-h-[28rem] w-full max-w-3xl select-none items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl sm:min-h-[32rem] ${
         flaggedForReview ? "border-red-400 bg-red-50/30" : "border-slate-500"
       }`}
       onClick={onCardClick}

@@ -1,19 +1,61 @@
 type KanjiStudyHeaderProps = {
   title?: string;
+  onOpenLibrary?: () => void;
+  onOpenCharacterStudy?: () => void;
 };
 
-export default function KanjiStudyHeader({
+export function KanjiStudyHeader({
   title = "Kanji Reading Study",
+  onOpenLibrary,
+  onOpenCharacterStudy,
 }: KanjiStudyHeaderProps) {
   return (
-    <div className="flex items-center justify-center gap-3">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-3xl shadow-sm">
-        漢
+    <div className="mb-4 mt-4 flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+      <div className="flex min-w-0 items-center gap-4 rounded-xl text-left">
+        <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-stone-50 text-[2.6rem] font-bold leading-none text-stone-900 shadow-sm">
+          漢
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wide text-stone-500">
+            Character study
+          </p>
+
+          <h1 className="truncate text-base font-semibold text-stone-900">
+            {title}
+          </h1>
+
+          <p className="mt-1 text-sm font-medium text-stone-500">
+            Practice kanji readings from your saved words.
+          </p>
+        </div>
       </div>
 
-      <h1 className="text-center text-2xl font-semibold text-slate-950">
-        {title}
-      </h1>
+      {onOpenLibrary || onOpenCharacterStudy ? (
+        <div className="flex flex-wrap gap-2 sm:mr-10 sm:justify-end">
+          {onOpenCharacterStudy ? (
+            <button
+              type="button"
+              onClick={onOpenCharacterStudy}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Character Study
+            </button>
+          ) : null}
+
+          {onOpenLibrary ? (
+            <button
+              type="button"
+              onClick={onOpenLibrary}
+              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+            >
+              Library
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
+
+export default KanjiStudyHeader;

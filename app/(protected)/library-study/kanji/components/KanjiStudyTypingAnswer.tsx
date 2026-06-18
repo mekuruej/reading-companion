@@ -30,6 +30,10 @@ export default function KanjiStudyTypingAnswer({
         onSubmit();
       }}
     >
+      <p className="text-center text-xs text-gray-500">
+        <span className="inline sm:whitespace-nowrap">Kana is best; </span>
+        <span className="inline sm:whitespace-nowrap">Hepburn romaji also works.</span>
+      </p>
       <input
         ref={inputRef}
         value={value}

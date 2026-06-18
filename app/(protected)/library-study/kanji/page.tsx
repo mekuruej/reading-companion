@@ -21,10 +21,12 @@ import KanjiStudyFeedbackPanel from "./components/KanjiStudyFeedbackPanel";
 import KanjiStudyCardFrame from "./components/KanjiStudyCardFrame";
 import KanjiStudyPrompt from "./components/KanjiStudyPrompt";
 import KanjiStudyModeSelector from "./components/KanjiStudyModeSelector";
-import KanjiAnswerStyleSelector from "./components/KanjiAnswerStyleSelector";
 import KanjiStudyTypingAnswer from "./components/KanjiStudyTypingAnswer";
 import KanjiStudyNoCardsState from "./components/KanjiStudyNoCardsState";
-
+import KanjiStudyFilterPanel, {
+  KANJI_LEVEL_FILTER_VALUES,
+  type KanjiLevelFilter,
+} from "./components/KanjiStudyFilterPanel";
 const KANJI_AUTO_ADVANCE_MS = 3000;
 
 type UserBookWordRow = {
@@ -88,7 +90,7 @@ type QuizCard = {
 type RecallResult = "correct" | "wrong" | "shown" | "unverified" | null;
 type RecallMode = "wordForKanji" | "kanjiForReading";
 type CardQuestionMode = "readingChoice" | "kanjiChoice";
-type LevelFilter = "beginner" | "n3" | "n2" | "advanced" | "unlabeled" | "all";
+type LevelFilter = KanjiLevelFilter;
 type KanjiAnswerStyle = "multipleChoice" | "typing";
 type KanjiStudyMode =
   | "kunyomiToKanji"
@@ -137,17 +139,60 @@ function normalizeJlpt(value: string | null | undefined) {
   return "NON-JLPT";
 }
 
-function matchesLevelFilter(jlpt: string | null | undefined, level: LevelFilter) {
-  const normalized = normalizeJlpt(jlpt);
+function normalizeKanjiLevel(jlpt: string | null | undefined): LevelFilter {
+  const normalized = (jlpt ?? "").trim().toUpperCase();
 
-  if (level === "all") return true;
-  if (level === "beginner") return normalized === "N5" || normalized === "N4";
-  if (level === "n3") return normalized === "N3";
-  if (level === "n2") return normalized === "N2";
-  if (level === "advanced") return normalized === "N1";
-  if (level === "unlabeled") return normalized === "NON-JLPT";
+  if (
+    normalized === "N5" ||
+    normalized === "N4" ||
+    normalized === "N3" ||
+    normalized === "N2" ||
+    normalized === "N1"
+  ) {
+    return normalized;
+  }
 
-  return true;
+  return "unlabeled";
+}
+
+function matchesLevelFilters(
+  jlpt: string | null | undefined,
+  selectedLevels: LevelFilter[]
+) {
+  if (
+    selectedLevels.length === 0 ||
+    selectedLevels.length === KANJI_LEVEL_FILTER_VALUES.length
+  ) {
+    return true;
+  }
+
+  return selectedLevels.includes(normalizeKanjiLevel(jlpt));
+}
+
+function kanjiLevelSummaryLabel(selectedLevels: LevelFilter[]) {
+  if (
+    selectedLevels.length === 0 ||
+    selectedLevels.length === KANJI_LEVEL_FILTER_VALUES.length
+  ) {
+    return "All levels";
+  }
+
+  if (selectedLevels.length === 1) {
+    const level = selectedLevels[0];
+
+    if (level === "N5") return "Beginner: N5";
+    if (level === "N4") return "Upper Beginner: N4";
+    if (level === "N3") return "Lower Intermediate: N3";
+    if (level === "N2") return "Upper Intermediate: N2";
+    if (level === "N1") return "Advanced: N1";
+    return "Unlabeled";
+  }
+
+  return KANJI_LEVEL_FILTER_VALUES.filter((level) =>
+    selectedLevels.includes(level)
+  )
+    .map((level) => (level === "unlabeled" ? "Unlabeled" : level))
+    .join(" + ");
 }
 
 function readingTypeForStudyMode(mode: KanjiStudyMode): QuizCard["readingType"] {
@@ -165,6 +210,13 @@ function studyModeSummary(mode: KanjiStudyMode) {
   if (mode === "kanjiToKunyomi") return "Kanji to kunyomi";
   if (mode === "onyomiToKanji") return "Onyomi to kanji";
   return "Kanji to onyomi";
+}
+
+function studyModeDescription(mode: KanjiStudyMode) {
+  return (
+    KANJI_STUDY_MODE_OPTIONS.find((option) => option.value === mode)
+      ?.description ?? studyModeSummary(mode)
+  );
 }
 
 function correctAnswerForCard(card: QuizCard, mode: KanjiStudyMode) {
@@ -243,6 +295,196 @@ function normalizeReading(s: string) {
 
 function normalizeReadingAnswer(s: string) {
   return normalizeReading(kataToHira(s));
+}
+
+const ROMAJI_TO_HIRAGANA_MAP: Record<string, string> = {
+  kya: "きゃ",
+  kyu: "きゅ",
+  kyo: "きょ",
+  gya: "ぎゃ",
+  gyu: "ぎゅ",
+  gyo: "ぎょ",
+  sha: "しゃ",
+  shu: "しゅ",
+  sho: "しょ",
+  ja: "じゃ",
+  ju: "じゅ",
+  jo: "じょ",
+  jya: "じゃ",
+  jyu: "じゅ",
+  jyo: "じょ",
+  cha: "ちゃ",
+  chu: "ちゅ",
+  cho: "ちょ",
+  nya: "にゃ",
+  nyu: "にゅ",
+  nyo: "にょ",
+  hya: "ひゃ",
+  hyu: "ひゅ",
+  hyo: "ひょ",
+  bya: "びゃ",
+  byu: "びゅ",
+  byo: "びょ",
+  pya: "ぴゃ",
+  pyu: "ぴゅ",
+  pyo: "ぴょ",
+  mya: "みゃ",
+  myu: "みゅ",
+  myo: "みょ",
+  rya: "りゃ",
+  ryu: "りゅ",
+  ryo: "りょ",
+
+  shi: "し",
+  chi: "ち",
+  tsu: "つ",
+  fu: "ふ",
+  ji: "じ",
+
+  ka: "か",
+  ki: "き",
+  ku: "く",
+  ke: "け",
+  ko: "こ",
+  ga: "が",
+  gi: "ぎ",
+  gu: "ぐ",
+  ge: "げ",
+  go: "ご",
+
+  sa: "さ",
+  si: "し",
+  su: "す",
+  se: "せ",
+  so: "そ",
+  za: "ざ",
+  zi: "じ",
+  zu: "ず",
+  ze: "ぜ",
+  zo: "ぞ",
+
+  ta: "た",
+  ti: "ち",
+  tu: "つ",
+  te: "て",
+  to: "と",
+  da: "だ",
+  di: "ぢ",
+  du: "づ",
+  de: "で",
+  do: "ど",
+
+  na: "な",
+  ni: "に",
+  nu: "ぬ",
+  ne: "ね",
+  no: "の",
+
+  ha: "は",
+  hi: "ひ",
+  hu: "ふ",
+  he: "へ",
+  ho: "ほ",
+  ba: "ば",
+  bi: "び",
+  bu: "ぶ",
+  be: "べ",
+  bo: "ぼ",
+  pa: "ぱ",
+  pi: "ぴ",
+  pu: "ぷ",
+  pe: "ぺ",
+  po: "ぽ",
+
+  ma: "ま",
+  mi: "み",
+  mu: "む",
+  me: "め",
+  mo: "も",
+
+  ya: "や",
+  yu: "ゆ",
+  yo: "よ",
+
+  ra: "ら",
+  ri: "り",
+  ru: "る",
+  re: "れ",
+  ro: "ろ",
+
+  wa: "わ",
+  wo: "を",
+
+  a: "あ",
+  i: "い",
+  u: "う",
+  e: "え",
+  o: "お",
+  n: "ん",
+};
+
+function romajiToHiragana(value: string) {
+  let input = value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/ō/g, "ou")
+    .replace(/ū/g, "uu")
+    .replace(/ā/g, "aa")
+    .replace(/ī/g, "ii")
+    .replace(/ē/g, "ei");
+
+  let output = "";
+
+  while (input.length > 0) {
+    const doubleConsonant = input.match(/^([bcdfghjklmpqrstvwxyz])\1/);
+
+    if (doubleConsonant && doubleConsonant[1] !== "n") {
+      output += "っ";
+      input = input.slice(1);
+      continue;
+    }
+
+    if (input.startsWith("nn")) {
+      output += "ん";
+      input = input.slice(2);
+      continue;
+    }
+
+    if (input.startsWith("n") && !/^[aeiouy]/.test(input.slice(1, 2))) {
+      output += "ん";
+      input = input.slice(1);
+      continue;
+    }
+
+    const chunk =
+      input.slice(0, 3) in ROMAJI_TO_HIRAGANA_MAP
+        ? input.slice(0, 3)
+        : input.slice(0, 2) in ROMAJI_TO_HIRAGANA_MAP
+          ? input.slice(0, 2)
+          : input.slice(0, 1);
+
+    const kana = ROMAJI_TO_HIRAGANA_MAP[chunk];
+
+    if (!kana) {
+      output += chunk;
+      input = input.slice(chunk.length);
+      continue;
+    }
+
+    output += kana;
+    input = input.slice(chunk.length);
+  }
+
+  return output;
+}
+
+function readingAnswerMatches(input: string, correctAnswer: string) {
+  if (normalizeReadingAnswer(input) === normalizeReadingAnswer(correctAnswer)) {
+    return true;
+  }
+
+  return normalizeReadingAnswer(romajiToHiragana(input)) === normalizeReadingAnswer(correctAnswer);
 }
 
 function normalizeWord(s: string) {
@@ -428,7 +670,7 @@ export default function KanjiReadingStudyPage() {
 
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [levelFilter, setLevelFilter] = useState<LevelFilter>("beginner");
+  const [levelFilters, setLevelFilters] = useState<LevelFilter[]>(["N5", "N4"]);
   const [studyMode, setStudyMode] = useState<KanjiStudyMode>("kanjiToOnyomi");
 
   const canAccessKanjiPractice = true;
@@ -441,9 +683,9 @@ export default function KanjiReadingStudyPage() {
         card.readingType === readingType &&
         !!card.reading &&
         !!card.kanji &&
-        matchesLevelFilter(card.jlpt, levelFilter)
+        matchesLevelFilters(card.jlpt, levelFilters)
     );
-  }, [baseCards, levelFilter, studyMode]);
+  }, [baseCards, levelFilters, studyMode]);
 
   useEffect(() => {
     buildDeckFromCards(filteredBaseCards);
@@ -931,7 +1173,7 @@ export default function KanjiReadingStudyPage() {
     if (!answer) return;
 
     const displayedCorrect = correctAnswerForCard(card, studyMode);
-    const ok = normalizeReadingAnswer(answer) === normalizeReadingAnswer(displayedCorrect);
+    const ok = readingAnswerMatches(answer, displayedCorrect);
 
     setSelected(answer);
     setChecked({ ok, correct: displayedCorrect });
@@ -1050,6 +1292,22 @@ export default function KanjiReadingStudyPage() {
     router.push("/library");
   }
 
+  function handleToggleLevelFilter(level: LevelFilter) {
+    setLevelFilters((current) =>
+      current.includes(level)
+        ? current.filter((selectedLevel) => selectedLevel !== level)
+        : [...current, level]
+    );
+  }
+
+  function handleSelectAllLevelFilters() {
+    setLevelFilters([...KANJI_LEVEL_FILTER_VALUES]);
+  }
+
+  function handleClearLevelFilters() {
+    setLevelFilters([]);
+  }
+
   if (loading) {
     return <KanjiStudyLoadingState />;
   }
@@ -1105,30 +1363,36 @@ export default function KanjiReadingStudyPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-6 py-4">
-      <div className="mb-2 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <KanjiStudyHeader />
-      </div>
+      <KanjiStudyHeader
+        onOpenCharacterStudy={() => router.push("/library-study")}
+        onOpenLibrary={() => router.push("/library")}
+      />
+
+      <div className="mb-4 w-full max-w-3xl space-y-0"></div>
+      <KanjiStudyFilterPanel
+        selectedLevels={levelFilters}
+        onToggleLevel={handleToggleLevelFilter}
+        onSelectAll={handleSelectAllLevelFilters}
+        onClear={handleClearLevelFilters}
+      />
 
       <KanjiStudyModeSelector
         value={studyMode}
         options={KANJI_STUDY_MODE_OPTIONS}
         onChange={(value) => setStudyMode(value as KanjiStudyMode)}
+        showAnswerStyle={cardQuestionMode === "readingChoice" && !noCardsForCurrentMode}
+        answerStyle={effectiveAnswerStyle}
+        onAnswerStyleChange={setAnswerStyle}
       />
 
+      <div className="mb-5 w-full max-w-3xl"></div>
       <KanjiStudyProgressPanel
         current={index + 1}
         total={deck.length}
-        levelFilter={levelFilter}
-        onLevelFilterChange={(value) => setLevelFilter(value as LevelFilter)}
         summaryText={studyModeSummary(studyMode)}
+        answerModeLabel={effectiveAnswerStyle === "typing" ? "Typing" : "Multiple Choice"}
+        levelSummaryLabel={kanjiLevelSummaryLabel(levelFilters)}
       />
-
-      {cardQuestionMode === "readingChoice" && !noCardsForCurrentMode ? (
-        <KanjiAnswerStyleSelector
-          value={effectiveAnswerStyle}
-          onChange={setAnswerStyle}
-        />
-      ) : null}
 
       <KanjiStudyNotice notice={notice} />
 
