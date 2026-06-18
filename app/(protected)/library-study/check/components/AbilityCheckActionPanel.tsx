@@ -18,7 +18,7 @@ export default function AbilityCheckActionPanel({
   onFlagCurrentCard,
 }: AbilityCheckActionPanelProps) {
   return (
-    <div className="mt-2 w-full max-w-2xl space-y-2">
+    <div className="mt-2 w-full max-w-3xl space-y-2">
       <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:justify-between">
           <div className="flex min-w-0 flex-1 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
