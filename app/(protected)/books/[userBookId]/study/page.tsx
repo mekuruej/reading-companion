@@ -23,7 +23,6 @@ import StudyBookHeader from "./components/StudyBookHeader";
 import StudyProgressPanel from "./components/StudyProgressPanel";
 import Row from "./components/StudyCardFieldRow";
 import StudyCardBadges from "./components/StudyCardBadges";
-import StudyBottomNavigation from "./components/StudyBottomNavigation";
 import StudyInstructionNav from "./components/StudyInstructionNav";
 import StudyFilterPanel from "./components/StudyFilterPanel";
 import StudyModePanel from "./components/StudyModePanel";
@@ -241,6 +240,81 @@ function getNextStudySet(studySet: StudySet) {
   const currentIndex = STUDY_MODE_ORDER.indexOf(studySet);
   const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % STUDY_MODE_ORDER.length : 0;
   return STUDY_MODE_ORDER[nextIndex];
+}
+
+function bookFlashcardColorName(color: LibraryStudyColor) {
+  if (color === "grey") return "Limbo";
+  return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
+function bookFlashcardColorFilterLabel(colors: LibraryStudyColor[]) {
+  if (colors.length === 0 || colors.length === LIBRARY_COLOR_FILTERS.length) {
+    return "All Colors";
+  }
+
+  const orderedColors = LIBRARY_COLOR_FILTERS.filter((color) =>
+    colors.includes(color)
+  );
+
+  if (orderedColors.length === 1) {
+    return `${bookFlashcardColorName(orderedColors[0])} words`;
+  }
+
+  if (orderedColors.length <= 3) {
+    return `${orderedColors.map(bookFlashcardColorName).join(" + ")} words`;
+  }
+
+  return `${orderedColors.length} Colors`;
+}
+
+function bookFlashcardJlptFilterLabel(levels: string[]) {
+  if (levels.length === 0 || levels.length === JLPT_LEVELS.length) {
+    return "All levels";
+  }
+
+  const orderedLevels = JLPT_LEVELS.filter((level) => levels.includes(level));
+
+  return orderedLevels
+    .map((level) => (level === "NON-JLPT" ? "Unlabeled" : level))
+    .join(" + ");
+}
+
+function bookFlashcardChapterFilterLabel(
+  chapterFilter: string,
+  chapterOptions: { value: string; label: string }[]
+) {
+  if (chapterFilter === "all") return "All Chapters";
+
+  return (
+    chapterOptions.find((option) => option.value === chapterFilter)?.label ??
+    "Selected chapter"
+  );
+}
+
+function buildBookFlashcardsStudyingNowLabel({
+  studySet,
+  jlptSelected,
+  colorSelected,
+  chapterFilter,
+  chapterOptions,
+  repeatsOnly,
+}: {
+  studySet: StudySet;
+  jlptSelected: string[];
+  colorSelected: LibraryStudyColor[];
+  chapterFilter: string;
+  chapterOptions: { value: string; label: string }[];
+  repeatsOnly: boolean;
+}) {
+  return [
+    studySetLabel(studySet),
+    bookFlashcardColorFilterLabel(colorSelected),
+    bookFlashcardJlptFilterLabel(jlptSelected),
+    bookFlashcardChapterFilterLabel(chapterFilter, chapterOptions),
+    repeatsOnly ? "Repeats only" : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
 }
 
 export default function BookFlashcardsPage() {
@@ -1754,6 +1828,14 @@ export default function BookFlashcardsPage() {
     setRepeatsOnly(false);
   };
 
+  const openBookHub = () => {
+    router.push(`/books/${encodeURIComponent(userBookId)}`);
+  };
+
+  const openVocabList = () => {
+    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+  };
+
   const restartCurrentFilteredSet = () => {
     const newOrder = shuffleArray(filteredCards.map((_, i) => i));
     setSessionOrder(newOrder);
@@ -1805,9 +1887,14 @@ export default function BookFlashcardsPage() {
   if (filteredCards.length === 0) {
     return (
       <main className="min-h-screen flex flex-col items-center gap-3 px-4 py-4 bg-slate-100 sm:px-6">
-        <StudyBookHeader bookTitle={bookTitle} bookCover={bookCover} />
+        <StudyBookHeader
+          bookTitle={bookTitle}
+          bookCover={bookCover}
+          onOpenBookHub={openBookHub}
+          onOpenVocabList={openVocabList}
+        />
 
-        <div className="w-full max-w-2xl">{filterControls}</div>
+        <div className="w-full max-w-3xl">{filterControls}</div>
 
         <StudyEmptyState onClearFilters={clearFilters} />
       </main>
@@ -1841,21 +1928,61 @@ export default function BookFlashcardsPage() {
     ? computeLibraryStudyColorStatus({ encounterCount: card.totalCount })
     : null;
 
+  const bookFlashcardsStudyingNowLabel = buildBookFlashcardsStudyingNowLabel({
+    studySet,
+    jlptSelected,
+    colorSelected,
+    chapterFilter,
+    chapterOptions,
+    repeatsOnly,
+  });
+
+  const sessionTotal = sessionOrder.length || filteredCards.length;
+  const sessionCurrent =
+    sessionTotal > 0 ? Math.min(sessionIndex + 1, sessionTotal) : 0;
+
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-4 bg-slate-100 sm:px-6">
-      <StudyBookHeader bookTitle={bookTitle} bookCover={bookCover} />
+      <StudyBookHeader
+        bookTitle={bookTitle}
+        bookCover={bookCover}
+        onOpenBookHub={openBookHub}
+        onOpenVocabList={openVocabList}
+      />
 
-      <div className="mb-2 w-full max-w-2xl space-y-2">
+      <div className="mb-7 w-full max-w-3xl space-y-0">
         {filterControls}
-        <StudyProgressPanel
-          currentNumber={Math.min(sessionIndex + 1, Math.max(sessionOrder.length, 1))}
-          totalNumber={studyOnceMode ? sessionOrder.length : filteredCards.length}
-          cardsLeft={Math.max(
-            (studyOnceMode ? sessionOrder.length : filteredCards.length) - sessionIndex,
-            0
-          )}
-        />
 
+        <StudyModePanel
+          studySet={studySet}
+          modeOptions={[
+            { value: "READING", label: studySetLabel("READING") },
+            { value: "MEANING", label: studySetLabel("MEANING") },
+            {
+              value: "FROM_READING_MEANING",
+              label: studySetLabel("FROM_READING_MEANING"),
+            },
+            { value: "divider-1", label: "──────────", disabled: true },
+            { value: "READING_MC", label: studySetLabel("READING_MC") },
+            { value: "MEANING_MC", label: studySetLabel("MEANING_MC") },
+            { value: "FROM_READING_MC", label: studySetLabel("FROM_READING_MC") },
+            {
+              value: "FROM_READING_MEANING_MC",
+              label: studySetLabel("FROM_READING_MEANING_MC"),
+            },
+            { value: "divider-2", label: "──────────", disabled: true },
+            { value: "COMPLETE", label: studySetLabel("COMPLETE") },
+          ]}
+          onStudySetChange={(value) => setStudySet(value as StudySet)}
+        />
+      </div>
+
+      <div className="mb-7 w-full max-w-3xl">
+        <StudyProgressPanel
+          currentNumber={sessionCurrent}
+          totalNumber={sessionTotal}
+          studyingNowLabel={bookFlashcardsStudyingNowLabel}
+        />
       </div>
 
       <StudyFlashcardShell
@@ -2066,91 +2193,6 @@ export default function BookFlashcardsPage() {
           ) : null}
         </div>
       </StudyFlashcardShell>
-
-      <div className="mt-2 w-full max-w-2xl space-y-2">
-        <StudyModePanel
-          studySet={studySet}
-          modeOptions={[
-            { value: "READING", label: studySetLabel("READING") },
-            { value: "MEANING", label: studySetLabel("MEANING") },
-            {
-              value: "FROM_READING_MEANING",
-              label: studySetLabel("FROM_READING_MEANING"),
-            },
-            { value: "divider-1", label: "──────────", disabled: true },
-            { value: "READING_MC", label: studySetLabel("READING_MC") },
-            { value: "MEANING_MC", label: studySetLabel("MEANING_MC") },
-            { value: "FROM_READING_MC", label: studySetLabel("FROM_READING_MC") },
-            {
-              value: "FROM_READING_MEANING_MC",
-              label: studySetLabel("FROM_READING_MEANING_MC"),
-            },
-            { value: "divider-2", label: "──────────", disabled: true },
-            { value: "COMPLETE", label: studySetLabel("COMPLETE") },
-          ]}
-          modeHelpText={
-            studySet === "READING"
-              ? "Show word + meaning → type the reading"
-              : studySet === "MEANING"
-                ? "Show word + reading → type the meaning"
-                : studySet === "FROM_READING_MEANING"
-                  ? "Show reading → type the meaning"
-                  : studySet === "READING_MC"
-                    ? "Show word + meaning → choose the reading"
-                    : studySet === "MEANING_MC"
-                      ? "Show word + reading → choose the meaning"
-                      : studySet === "FROM_READING_MC"
-                        ? "Show reading + meaning → choose the kanji"
-                        : studySet === "FROM_READING_MEANING_MC"
-                          ? "Show reading → choose the meaning"
-                          : "Tap and reveal only — no typing"
-          }
-          hasCard={!!card}
-          onStudySetChange={(value) => setStudySet(value as StudySet)}
-          onFlagCurrentCard={() => {
-            if (!card) return;
-            void flagCardForReview(card.id);
-          }}
-          onHideCurrentCard={() => {
-            if (!card) return;
-            void hideCardPermanently(card.id);
-          }}
-        />
-
-        <StudyInstructionNav
-          instructionText={
-            isMultipleChoiceMode
-              ? mcAnswered
-                ? mcWasCorrect
-                  ? "Moving to next card..."
-                  : "Type the correct answer once. Then the next card comes automatically."
-                : studySet === "READING_MC"
-                  ? "Choose the correct reading"
-                  : studySet === "MEANING_MC"
-                    ? "Choose the correct meaning"
-                    : studySet === "FROM_READING_MC"
-                      ? "Choose the correct kanji"
-                      : "Choose the correct meaning"
-              : typeModeEnabled
-                ? "Press Enter to check."
-                : stepIndex === 0
-                  ? "Tap once to reveal"
-                  : "Tap again for the next word"
-          }
-          canGoPrevious={filteredCards.length > 1}
-          showAutoAdvancePause={
-            readyForNextCard || Boolean(isMultipleChoiceMode && mcAnswered && mcWasCorrect)
-          }
-          autoAdvancePaused={autoAdvancePaused}
-          onPrevious={prevCardReveal}
-          onToggleAutoAdvancePaused={() => setAutoAdvancePaused((prev) => !prev)}
-        />
-
-        <StudyBottomNavigation
-          onGoToVocabList={() => router.push(`/books/${userBookId}/words`)}
-          onGoToBookHub={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-        />
-      </div>
     </main>
   );
 }

@@ -1,4 +1,8 @@
-type StudyModeOption = {
+"use client";
+
+import { useState } from "react";
+
+type ModeOption = {
   value: string;
   label: string;
   disabled?: boolean;
@@ -6,80 +10,118 @@ type StudyModeOption = {
 
 type StudyModePanelProps = {
   studySet: string;
-  modeOptions: StudyModeOption[];
-  modeHelpText: string;
-  hasCard: boolean;
+  modeOptions: ModeOption[];
   onStudySetChange: (value: string) => void;
-  onFlagCurrentCard: () => void;
-  onHideCurrentCard: () => void;
 };
+
+function descriptionForMode(value: string, fallback: string) {
+  if (value === "READING") {
+    return "Show the word and meaning, then type the reading.";
+  }
+
+  if (value === "MEANING") {
+    return "Show the word and reading, then type the meaning.";
+  }
+
+  if (value === "FROM_READING_MEANING") {
+    return "Show the reading, then type the meaning.";
+  }
+
+  if (value === "READING_MC") {
+    return "Show the word and meaning, then choose the reading.";
+  }
+
+  if (value === "MEANING_MC") {
+    return "Show the word and reading, then choose the meaning.";
+  }
+
+  if (value === "FROM_READING_MC") {
+    return "Show the reading and meaning, then choose the word.";
+  }
+
+  if (value === "FROM_READING_MEANING_MC") {
+    return "Show the reading, then choose the meaning.";
+  }
+
+  if (value === "COMPLETE") {
+    return "Reveal the word, reading, and meaning step by step.";
+  }
+
+  return fallback;
+}
 
 export default function StudyModePanel({
   studySet,
   modeOptions,
-  modeHelpText,
-  hasCard,
   onStudySetChange,
-  onFlagCurrentCard,
-  onHideCurrentCard,
 }: StudyModePanelProps) {
+  const [open, setOpen] = useState(false);
+
+  const selectedMode =
+    modeOptions.find((option) => option.value === studySet) ??
+    modeOptions.find((option) => !option.disabled);
+
+  const activeOptions = modeOptions.filter((option) => !option.disabled);
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
-            Study Mode
-          </div>
+    <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+        Study Mode · Step 2
+      </p>
 
-          <div className="flex flex-wrap gap-2">
-            <select
-              value={studySet}
-              onChange={(event) => onStudySetChange(event.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-            >
-              {modeOptions.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                  disabled={option.disabled}
-                >
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="mt-1 flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-black text-slate-950">
+          {selectedMode?.label ?? "Choose a study mode"}
+        </h2>
 
-          <p className="mt-3 text-sm leading-6 text-gray-600">
-            {modeHelpText}
-          </p>
-        </div>
-
-        <div className="space-y-2 md:w-[220px]">
-          <button
-            type="button"
-            onClick={onFlagCurrentCard}
-            disabled={!hasCard}
-            className="w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
-          >
-            <div className="leading-tight">Flag</div>
-            <div className="text-[10px] font-normal text-amber-700">
-              Problem card
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={onHideCurrentCard}
-            disabled={!hasCard}
-            className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-200 disabled:opacity-50"
-          >
-            <div className="leading-tight">Hide</div>
-            <div className="text-[10px] font-normal text-slate-500">
-              I know this word
-            </div>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="ml-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-100 sm:ml-4"
+        >
+          {open ? "Close" : "Change"}
+        </button>
       </div>
-    </div>
+
+      {open ? (
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
+            Choose mode
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {activeOptions.map((option) => {
+              const selected = option.value === studySet;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onStudySetChange(option.value);
+                    setOpen(false);
+                  }}
+                  className={`rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
+                    selected
+                      ? "border-slate-950 bg-slate-950 text-white"
+                      : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-400 hover:bg-white"
+                  }`}
+                >
+                  <p className="text-sm font-black">{option.label}</p>
+
+                  <p
+                    className={`mt-1 text-sm leading-5 ${
+                      selected ? "text-slate-200" : "text-slate-500"
+                    }`}
+                  >
+                    {descriptionForMode(option.value, option.label)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
