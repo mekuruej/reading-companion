@@ -16,7 +16,7 @@ import { KanaStudyFeedbackPanel } from "./components/KanaStudyFeedbackPanel";
 import { KanaStudyHeader } from "./components/KanaStudyHeader";
 import { KanaStudyPrompt } from "./components/KanaStudyPrompt";
 
-const KANA_AUTO_ADVANCE_MS = 3000;
+const KANA_AUTO_ADVANCE_MS = 2000;
 
 function isSameKanaItem(a: KanaItem, b: KanaItem): boolean {
     return (
@@ -57,6 +57,7 @@ type StudyCard = {
 };
 
 type KanaSetOptions = {
+    includeBasic: boolean;
     includeDakuten: boolean;
     includeYoon: boolean;
 };
@@ -103,8 +104,9 @@ const MIXED_MODES: Exclude<StudyMode, "mixed">[] = [
 ];
 
 const DEFAULT_KANA_SET: KanaSetOptions = {
-    includeDakuten: true,
-    includeYoon: true,
+    includeBasic: true,
+    includeDakuten: false,
+    includeYoon: false,
 };
 
 function shuffleArray<T>(items: readonly T[]): T[] {
@@ -143,9 +145,13 @@ function resolveConcreteMode(mode: StudyMode): Exclude<StudyMode, "mixed"> {
     return mode;
 }
 
-function buildKanaPool({ includeDakuten, includeYoon }: KanaSetOptions): KanaItem[] {
+function buildKanaPool({
+    includeBasic,
+    includeDakuten,
+    includeYoon,
+}: KanaSetOptions): KanaItem[] {
     return [
-        ...BASIC_KANA,
+        ...(includeBasic ? BASIC_KANA : []),
         ...(includeDakuten ? DAKUTEN_KANA : []),
         ...(includeYoon ? YOON_KANA : []),
     ];
@@ -356,11 +362,12 @@ function nextStudyMode(mode: StudyMode): StudyMode {
 export default function KanaStudyPage() {
     const router = useRouter();
     const [studyMode, setStudyMode] = useState<StudyMode>("hiragana-to-katakana");
+    const [includeBasic, setIncludeBasic] = useState(DEFAULT_KANA_SET.includeBasic);
     const [includeDakuten, setIncludeDakuten] = useState(DEFAULT_KANA_SET.includeDakuten);
     const [includeYoon, setIncludeYoon] = useState(DEFAULT_KANA_SET.includeYoon);
     const activeKanaPool = useMemo(
-        () => buildKanaPool({ includeDakuten, includeYoon }),
-        [includeDakuten, includeYoon]
+        () => buildKanaPool({ includeBasic, includeDakuten, includeYoon }),
+        [includeBasic, includeDakuten, includeYoon]
     );
     const [deck, setDeck] = useState<StudyCard[]>(() =>
         createStudyDeck(
@@ -383,13 +390,14 @@ export default function KanaStudyPage() {
     const isComplete = cardIndex >= deck.length;
     const isAnswered = selectedChoice !== null;
     const isCorrect = !!card && selectedChoice === card.answer;
-    const kanaSetSummary = [
-        "Basic Kana",
-        includeDakuten ? "Dakuten & Handakuten" : null,
-        includeYoon ? "Combo Sounds" : null,
-    ]
-        .filter(Boolean)
-        .join(" + ");
+    const kanaSetSummary =
+        [
+            includeBasic ? "Basic Kana" : null,
+            includeDakuten ? "Dakuten & Handakuten" : null,
+            includeYoon ? "Combo Sounds" : null,
+        ]
+            .filter(Boolean)
+            .join(" + ") || "Choose a kana set";
 
     useEffect(() => {
         if (!isAnswered) return;
@@ -421,6 +429,11 @@ export default function KanaStudyPage() {
     function handleKanaSetChange(nextOptions: KanaSetOptions) {
         const nextKanaPool = buildKanaPool(nextOptions);
 
+        if (nextKanaPool.length === 0) {
+            return;
+        }
+
+        setIncludeBasic(nextOptions.includeBasic);
         setIncludeDakuten(nextOptions.includeDakuten);
         setIncludeYoon(nextOptions.includeYoon);
         resetDeck(studyMode, nextKanaPool);
@@ -451,20 +464,26 @@ export default function KanaStudyPage() {
 
     return (
         <main className="flex min-h-screen flex-col items-center bg-slate-100 px-6 py-4 text-slate-900">
-            <KanaStudyHeader />
-
-            <KanaStudyModeSelector
-                value={studyMode}
-                options={STUDY_MODES}
-                onChange={(value) => handleModeChange(value as StudyMode)}
+            <KanaStudyHeader
+                onOpenCharacterStudy={() => router.push("/library-study")}
+                onOpenLibrary={() => router.push("/library")}
             />
 
-            <KanaStudyCharacterSetSelector
-                kanaSetSummary={kanaSetSummary}
-                includeDakuten={includeDakuten}
-                includeYoon={includeYoon}
-                onChange={handleKanaSetChange}
-            />
+            <div className="mb-4 w-full max-w-3xl space-y-0">
+                <KanaStudyCharacterSetSelector
+                    kanaSetSummary={kanaSetSummary}
+                    includeBasic={includeBasic}
+                    includeDakuten={includeDakuten}
+                    includeYoon={includeYoon}
+                    onChange={handleKanaSetChange}
+                />
+
+                <KanaStudyModeSelector
+                    value={studyMode}
+                    options={STUDY_MODES}
+                    onChange={(value) => handleModeChange(value as StudyMode)}
+                />
+            </div>
 
             {isComplete ? (
                 <KanaStudyCompletionPanel
@@ -476,16 +495,18 @@ export default function KanaStudyPage() {
                 />
             ) : card ? (
                 <>
-                    <KanaStudyCurrentCardSummary
-                        modeLabel={selectedMode?.label}
-                        promptLabel={card.promptLabel}
-                        cardNumber={cardIndex + 1}
-                        cardCount={deck.length}
-                        correctCount={correctCount}
-                        answeredCount={answeredCount}
-                    />
+                    <div className="mb-5 w-full max-w-3xl">
+                        <KanaStudyCurrentCardSummary
+                            modeLabel={selectedMode?.description ?? "Choose the best answer."}
+                            promptLabel={card.promptLabel}
+                            cardNumber={cardIndex + 1}
+                            cardCount={deck.length}
+                            correctCount={correctCount}
+                            answeredCount={answeredCount}
+                        />
+                    </div>
 
-                    <section className="relative mt-6 flex min-h-72 w-[90vw] max-w-xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl">
+                    <section className="relative flex min-h-[28rem] w-full max-w-3xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl sm:min-h-[32rem]">
                         <div className="flex w-full flex-col items-center justify-center gap-6">
                             <KanaStudyPrompt
                                 promptLabel={card.promptLabel}
