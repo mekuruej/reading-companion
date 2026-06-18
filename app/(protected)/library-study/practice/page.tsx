@@ -19,7 +19,6 @@ import {
 } from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
-import LibraryReviewIntroCard from "./components/LibraryReviewIntroCard";
 import LibraryReviewWordSkyCta from "./components/LibraryReviewWordSkyCta";
 import LibraryReviewProgressCard from "./components/LibraryReviewProgressCard";
 import LibraryPracticeFilterPanel from "./components/LibraryPracticeFilterPanel";
@@ -33,6 +32,7 @@ import LibraryReviewPageHeader from "./components/LibraryReviewPageHeader";
 import PracticeMeaningReviewScreen from "./components/PracticeMeaningReviewScreen";
 import LibraryPracticeCardBadges from "./components/LibraryPracticeCardBadges";
 import LibraryPracticeNoCardsState from "./components/LibraryPracticeNoCardsState";
+import LibraryPracticeModeSelector from "./components/LibraryPracticeModeSelector";
 
 type UserBookJoinRow = {
   id: string;
@@ -639,7 +639,7 @@ function makeClaimStudyCard(
 function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base =
-    "relative flex min-h-72 w-[90vw] max-w-xl items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl transition-colors";
+    "relative flex min-h-[28rem] w-full max-w-3xl items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl transition-colors sm:min-h-[32rem]";
 
   if (color === "green") return `${base} border-emerald-100`;
   if (color === "blue") return `${base} border-sky-100`;
@@ -845,10 +845,16 @@ function totalDailyCheckPoolCountForLevel(
 
 function isCardAvailableForLibraryPractice(
   card: StudyCard,
-  selectedJlpt: string,
+  selectedJlptLevels: string[],
   colorFilter: PracticeColorFilter
 ) {
-  const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
+  const allLevelsSelected =
+    selectedJlptLevels.length === 0 ||
+    selectedJlptLevels.length === LIBRARY_PRACTICE_JLPT_LEVELS.length;
+
+  const jlptMatch =
+    allLevelsSelected || selectedJlptLevels.includes(normalizeJlpt(card.jlpt));
+
   if (!jlptMatch) return false;
 
   if (colorFilter === "all") return true;
@@ -1002,6 +1008,7 @@ function LibraryPracticePanel({
   onTypingMissed,
   meaningReviewCount,
   onReviewMeanings,
+  onOpenWordSky,
 }: {
   card: StudyCard | undefined;
   total: number;
@@ -1020,6 +1027,7 @@ function LibraryPracticePanel({
   onTypingMissed: (card: StudyCard, gate: "reading" | "meaning") => void;
   meaningReviewCount: number;
   onReviewMeanings: () => void;
+  onOpenWordSky: () => void;
 }) {
   const [typingStep, setTypingStep] = useState<PracticeTypingStep>("reading");
   const [typingInput, setTypingInput] = useState("");
@@ -1141,12 +1149,12 @@ function LibraryPracticePanel({
   }
 
   return (
-    <div className="w-full max-w-xl space-y-2">
+    <div className="w-full max-w-3xl space-y-2">
       {practiceMode === "reveal" ? (
         <button
           type="button"
           onClick={onAdvance}
-          className="relative flex min-h-72 w-[90vw] max-w-xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300"
+          className="relative flex min-h-[28rem] w-full max-w-3xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[32rem]"
         >
           <LibraryPracticeCardBadges
             modeLabel="Review"
@@ -1189,7 +1197,7 @@ function LibraryPracticePanel({
         </button>
       ) : (
 
-        <div className="relative flex min-h-72 w-[90vw] max-w-xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl">
+        <div className="relative flex min-h-[28rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl sm:min-h-[32rem]">
           <LibraryPracticeCardBadges
             modeLabel="Typing Practice"
             jlpt={card.jlpt}
@@ -1333,25 +1341,7 @@ function LibraryPracticePanel({
         </button>
       </div>
 
-      <p className="text-center text-xs leading-5 text-slate-500">
-        {practiceMode === "reveal" ? (
-          <>
-            Tap once to check the reading.
-            <br />
-            Tap again to check the meaning.
-            <br />
-            Tap a third time to move to the next card.
-            <br />
-            Library Review does not change your word colors.
-          </>
-        ) : (
-          <>
-            Reading answers are checked automatically.
-            <br />
-            Purple review can move forgotten words back into practice.
-          </>
-        )}
-      </p>
+      <LibraryReviewWordSkyCta onOpenWordSky={onOpenWordSky} />
     </div>
   );
 }
@@ -1484,6 +1474,60 @@ function clearSeenForToday() {
   }
 }
 
+function practiceColorFilterLabel(filter: PracticeColorFilter) {
+  if (filter === "all") return "All Colors";
+  if (filter === "grey") return "Limbo words";
+  if (filter === "katakana") return "Katakana words";
+
+  return `${filter.charAt(0).toUpperCase() + filter.slice(1)} words`;
+}
+
+function jlptFilterLabel(levels: string[]) {
+  if (
+    levels.length === 0 ||
+    levels.length === LIBRARY_PRACTICE_JLPT_LEVELS.length
+  ) {
+    return "All levels";
+  }
+
+  const orderedLevels = LIBRARY_PRACTICE_JLPT_LEVELS.filter((level) =>
+    levels.includes(level)
+  );
+
+  return orderedLevels
+    .map((level) => (level === "NON-JLPT" ? "Unlabeled" : level))
+    .join(" + ");
+}
+
+const LIBRARY_PRACTICE_JLPT_LEVELS = [
+  "N5",
+  "N4",
+  "N3",
+  "N2",
+  "N1",
+  "NON-JLPT",
+] as const;
+
+function libraryReviewStudyingNowLabel({
+  colorFilter,
+  jlptLevels,
+  mode,
+}: {
+  colorFilter: PracticeColorFilter;
+  jlptLevels: string[];
+  mode: PracticeStudyMode;
+}) {
+  const colorLabel = practiceColorFilterLabel(colorFilter);
+  const levelLabel = jlptFilterLabel(jlptLevels);
+  const modeLabel = practiceStudyModeLabel(mode);
+
+  if (colorFilter === "all" && levelLabel === "All levels") {
+    return `${colorLabel} • ${modeLabel}`;
+  }
+
+  return `${colorLabel} • ${levelLabel} • ${modeLabel}`;
+}
+
 export default function LibraryStudyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1511,7 +1555,7 @@ export default function LibraryStudyPage() {
   const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
   const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("practice");
-  const [selectedJlpt, setSelectedJlpt] = useState("all");
+  const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
   const [dailyCheckPlan, setDailyCheckPlan] = useState<DailyCheckPlan | null>(null);
   const [setupLevels, setSetupLevels] = useState<DailyCheckLevel[]>([]);
   const [setupDailyLimit, setSetupDailyLimit] = useState<DailyCheckLimit>(20);
@@ -1539,6 +1583,12 @@ export default function LibraryStudyPage() {
   const [forceCheckAgainToday, setForceCheckAgainToday] = useState(false);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
+
+  const libraryReviewStudyingNowLabelText = libraryReviewStudyingNowLabel({
+    colorFilter: practiceColorFilter,
+    jlptLevels: selectedJlptLevels,
+    mode: practiceStudyMode,
+  });
 
   useEffect(() => {
     const requestedColor = searchParams.get("color");
@@ -1572,9 +1622,13 @@ export default function LibraryStudyPage() {
 
   const practiceFilteredCards = useMemo(() => {
     return libraryReviewCards.filter((card) =>
-      isCardAvailableForLibraryPractice(card, selectedJlpt, practiceColorFilter)
+      isCardAvailableForLibraryPractice(
+        card,
+        selectedJlptLevels,
+        practiceColorFilter
+      )
     );
-  }, [libraryReviewCards, selectedJlpt, practiceColorFilter]);
+  }, [libraryReviewCards, selectedJlptLevels, practiceColorFilter]);
 
   const availableCountBySetupLevel = useMemo(() => {
     const counts: Record<DailyCheckLevel, number> = {
@@ -2419,7 +2473,7 @@ export default function LibraryStudyPage() {
 
   function restartDeck() {
     const nextDeckSource = allCards.filter((card) =>
-      isCardAvailableForLibraryCheck(card, selectedJlpt, seenTodayIds, {
+      isCardAvailableForLibraryCheck(card, "all", seenTodayIds, {
         ignoreTiming: forceCheckAgainToday,
       })
     );
@@ -2441,7 +2495,7 @@ export default function LibraryStudyPage() {
     setDeck(
       shuffleArray(
         allCards.filter((card) =>
-          isCardAvailableForLibraryCheck(card, selectedJlpt, clearedSeenIds, {
+          isCardAvailableForLibraryCheck(card, "all", clearedSeenIds, {
             ignoreTiming: true,
           })
         )
@@ -3102,27 +3156,38 @@ export default function LibraryStudyPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
-      <LibraryReviewPageHeader />
+      <LibraryReviewPageHeader onOpenLibrary={() => router.push("/library")} />
 
-      <div className="mb-2 w-full max-w-3xl space-y-2">
-        <LibraryReviewIntroCard />
-        <LibraryReviewWordSkyCta
-          onOpenWordSky={() => router.push("/library-study/word-sky")}
-        />
-        <LibraryReviewProgressCard
-          current={practiceDeck.length > 0 ? practiceIndex + 1 : 0}
-          total={practiceDeck.length}
-        />
-
+      <div className="mb-3 w-full max-w-3xl space-y-0">
         <LibraryPracticeFilterPanel
-          selectedJlpt={selectedJlpt}
+          jlptLevels={LIBRARY_PRACTICE_JLPT_LEVELS}
+          selectedJlptLevels={selectedJlptLevels}
           practiceColorFilter={practiceColorFilter}
-          practiceStudyMode={practiceStudyMode}
-          onJlptChange={setSelectedJlpt}
+          onToggleJlpt={(level) =>
+            setSelectedJlptLevels((current) =>
+              current.includes(level)
+                ? current.filter((selectedLevel) => selectedLevel !== level)
+                : [...current, level]
+            )
+          }
+          onSelectAllJlpt={() => setSelectedJlptLevels([...LIBRARY_PRACTICE_JLPT_LEVELS])}
+          onClearJlpt={() => setSelectedJlptLevels([])}
           onColorFilterChange={(value) =>
             setPracticeColorFilter(value as PracticeColorFilter)
           }
-          onPracticeStudyModeChange={setPracticeStudyMode}
+        />
+
+        <LibraryPracticeModeSelector
+          value={practiceStudyMode}
+          onChange={setPracticeStudyMode}
+        />
+      </div>
+
+      <div className="mb-7 w-full max-w-3xl">
+        <LibraryReviewProgressCard
+          current={practiceDeck.length > 0 ? practiceIndex + 1 : 0}
+          total={practiceDeck.length}
+          studyingNowLabel={libraryReviewStudyingNowLabelText}
         />
       </div>
 
@@ -3147,6 +3212,7 @@ export default function LibraryStudyPage() {
           onTypingMissed={handlePracticeTypingMiss}
           meaningReviewCount={meaningReviewItems.length}
           onReviewMeanings={() => setShowPracticeMeaningReview(true)}
+          onOpenWordSky={() => router.push("/library-study/word-sky")}
         />
       )}
     </main>

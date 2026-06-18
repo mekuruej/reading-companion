@@ -1,32 +1,34 @@
 type LibraryReviewProgressCardProps = {
   current: number;
   total: number;
+  studyingNowLabel: string;
 };
 
 export default function LibraryReviewProgressCard({
   current,
   total,
+  studyingNowLabel,
 }: LibraryReviewProgressCardProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500">
-            Review Progress
+    <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Studying Now
           </p>
 
-          <p className="text-base font-semibold text-slate-800">
-            Card {current}/{total}
+          <p className="mt-1 truncate text-lg font-bold text-slate-950">
+            {studyingNowLabel}
           </p>
         </div>
 
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-gray-500">
-            Review Pool
+        <div className="shrink-0 text-right">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Session progress
           </p>
 
-          <p className="text-base font-semibold text-slate-800">
-            {total}
+          <p className="mt-1 text-2xl font-bold text-slate-950">
+            {current} / {total}
           </p>
         </div>
       </div>
