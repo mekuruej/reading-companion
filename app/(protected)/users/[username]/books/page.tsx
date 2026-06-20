@@ -353,7 +353,9 @@ function isAbilityCheckCardInDailyPool(
   const sampleId = summary.sample_user_book_word_id ?? "";
 
   if (!surface || !reading || !meaning || !sampleId) return false;
-  if (seenTodayIds.has(sampleId)) return false;
+  if (seenTodayIds.has(sampleId) || seenTodayIds.has(summary.study_identity_key)) {
+    return false;
+  }
   if (settings.skip_katakana_library_check && isKatakanaOnly(surface)) return false;
 
   const colorStatus = computeLibraryStudyColorStatus({
@@ -2120,10 +2122,19 @@ export default function BooksPage() {
   }, [viewingUserId, meId, isTeacher]);
 
   useEffect(() => {
-    setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
-    setAbilityCheckReminderCompleted(abilityCheckCompletedToday());
+    const hiddenToday = abilityCheckReminderHiddenToday();
+    const completedToday = abilityCheckCompletedToday();
 
-    if (!viewingUserId || !meId || viewingUserId !== meId) {
+    setAbilityCheckReminderHidden(hiddenToday);
+    setAbilityCheckReminderCompleted(completedToday);
+
+    if (
+      !viewingUserId ||
+      !meId ||
+      viewingUserId !== meId ||
+      hiddenToday ||
+      completedToday
+    ) {
       setAbilityCheckReminderCount(0);
       return;
     }
@@ -2134,34 +2145,45 @@ export default function BooksPage() {
   useEffect(() => {
     function refreshAbilityCheckReminderDay(options: { refreshCount?: boolean } = {}) {
       const todayKey = getTodayKey();
+      const hiddenToday = abilityCheckReminderHiddenToday();
+      const completedToday = abilityCheckCompletedToday();
+
       setAbilityCheckReminderDayKey((previous) =>
         previous === todayKey ? previous : todayKey
       );
-      setAbilityCheckReminderHidden(abilityCheckReminderHiddenToday());
-      setAbilityCheckReminderCompleted(abilityCheckCompletedToday());
+
+      setAbilityCheckReminderHidden(hiddenToday);
+      setAbilityCheckReminderCompleted(completedToday);
       setSuperTeacherKanjiReminderHidden(superTeacherKanjiReminderHiddenToday());
+
+      if (hiddenToday || completedToday) {
+        setAbilityCheckReminderCount(0);
+        return;
+      }
 
       if (options.refreshCount && viewingUserId && meId && viewingUserId === meId) {
         void loadAbilityCheckReminder(viewingUserId);
       }
     }
 
-    function refreshAfterReturn() {
-      if (document.visibilityState === "hidden") return;
+    refreshAbilityCheckReminderDay();
+
+    function handleFocus() {
       refreshAbilityCheckReminderDay({ refreshCount: true });
     }
 
-    refreshAbilityCheckReminderDay({ refreshCount: true });
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        refreshAbilityCheckReminderDay({ refreshCount: true });
+      }
+    }
 
-    const interval = window.setInterval(() => refreshAbilityCheckReminderDay(), 60_000);
-
-    window.addEventListener("focus", refreshAfterReturn);
-    document.addEventListener("visibilitychange", refreshAfterReturn);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshAfterReturn);
-      document.removeEventListener("visibilitychange", refreshAfterReturn);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [viewingUserId, meId]);
 
