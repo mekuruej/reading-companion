@@ -1,0 +1,424 @@
+# Access Audit Work Plan
+
+## Current Goal
+
+Separate these two ideas clearly:
+
+1. **Can the user enter Mekuru?**
+2. **Can the user use full learning features?**
+
+Mekuru already mostly has this model, but the route wiring is uneven.
+
+---
+
+# Completed Work
+
+## 1. Fix outer app access gate
+
+### Status
+
+Done.
+
+### File
+
+`app/(protected)/AppAccessGate.tsx`
+
+### What changed
+
+`AppAccessGate` now selects:
+
+* `role`
+* `is_super_teacher`
+* `app_access_type`
+* `app_access_expires_at`
+
+### Why
+
+A user with `is_super_teacher = true` could previously be blocked by the outer protected-route gate before inner pages had a chance to recognize them.
+
+### Result
+
+Teacher/admin/super-teacher users can enter protected Mekuru routes correctly.
+
+This only answers:
+
+> Can this person enter Mekuru?
+
+It does not automatically unlock paid/full learning features.
+
+---
+
+## 2. Add product-language feature helpers
+
+### Status
+
+Done.
+
+### File
+
+`lib/access/featureAccess.ts`
+
+### What changed
+
+Added grouped helper names:
+
+* `canUseFreeStudy`
+* `canUseBookTracking`
+* `canUseReadingTimers`
+* `canUseVocabularyStudy`
+* `canUseBookStudy`
+* `canUseAdvancedStudy`
+* `canSeeVocabularyColors`
+* `canUseTeacherTools`
+* `canUseAdminTools`
+
+### Why
+
+The old helpers were mostly page/action names. The new helpers describe product buckets.
+
+### Result
+
+No major route behavior changed yet. The app now has clearer access language for future gates.
+
+---
+
+## 3. Gate Bulk Add vocabulary
+
+### Status
+
+Done.
+
+### File
+
+`app/(protected)/books/[userBookId]/vocab/bulk/page.tsx`
+
+### What changed
+
+Bulk Add now checks:
+
+* book relationship permission
+* vocabulary-saving feature permission
+
+### Required access
+
+Uses:
+
+`featureAccess.canSaveVocabulary`
+
+### Why
+
+Bulk Add writes to `user_book_words`, so it should require vocabulary-saving access.
+
+### Result
+
+Expected behavior:
+
+* Free learner using own book: blocked
+* Full/trial learner using own book: allowed
+* Linked teacher: allowed
+* Super teacher/admin: allowed
+* Random user: blocked by existing book access checks
+
+---
+
+## 4. Gate Word Sky
+
+### Status
+
+Done.
+
+### File
+
+`app/(protected)/library-study/word-sky/page.tsx`
+
+### What changed
+
+Word Sky now checks access before loading personal vocabulary/progress data.
+
+### Required access
+
+Uses:
+
+`featureAccess.canUseAdvancedStudy`
+
+### Why
+
+Word Sky loads and writes saved-vocabulary-related data:
+
+* `user_library_word_summaries`
+* `user_library_word_progress`
+* `user_library_word_claims`
+
+### Result
+
+Free users see a friendly locked page.
+
+Full/trial/teacher/admin users can use Word Sky.
+
+---
+
+## 5. Add Library Review access key
+
+### Status
+
+Done.
+
+### File
+
+`lib/access/requireFullAccess.ts`
+
+### What changed
+
+Added a new full-access feature key:
+
+`library_review`
+
+### Why
+
+Library Review was previously piggybacking on:
+
+`ability_check`
+
+That worked technically, but the language was unclear.
+
+### Result
+
+Now:
+
+* Library Review uses `library_review`
+* Ability Check uses `ability_check`
+
+Access behavior is still the same for now.
+
+---
+
+## 6. Update Library Review page
+
+### Status
+
+Done.
+
+### File
+
+`app/(protected)/library-study/practice/page.tsx`
+
+### What changed
+
+Changed Library Review / Practice access checks from:
+
+`ability_check`
+
+to:
+
+`library_review`
+
+### Result
+
+Library Review now uses its own access key.
+
+Ability Check remains separate.
+
+---
+
+## 7. Update feature-access testing page
+
+### Status
+
+Done.
+
+### File
+
+`app/(protected)/teacher/testing/feature-access/page.tsx`
+
+### What changed
+
+Added `library_review` to the feature-access testing/debug page.
+
+### Result
+
+The testing page now reflects the current access keys.
+
+---
+
+# Current Completed Chunk
+
+This access pass has completed:
+
+* AppAccessGate recognizes `is_super_teacher`
+* `featureAccess.ts` has grouped product-language helpers
+* Bulk Add requires `canSaveVocabulary`
+* Word Sky requires `canUseAdvancedStudy`
+* Library Review has its own `library_review` key
+* Ability Check still uses `ability_check`
+* Feature-access testing page includes `library_review`
+
+---
+
+# Next Work
+
+## 8. Split Book Hub access
+
+### Status
+
+Not started.
+
+### Goal
+
+Keep the Book Hub open for free users, but separate free reading-life tools from full-access learning tools.
+
+### Free Book Hub areas
+
+Free users should be able to use:
+
+* Book Info
+* Reading Reflection
+* Just Reading timer
+* Listening timer
+* Basic book tracking
+* Finished / DNF / Want to Read / Currently Reading
+* Reading-life snapshots
+
+### Full-access Book Hub areas
+
+Full/trial/current students should be able to use:
+
+* Vocab Tools
+* Story Notes
+* Vocabulary stats
+* Study stats
+* Flashcard actions
+* Saved-word support
+* Curiosity Reading links
+* Fluid Reading with saved-word support
+
+### Notes
+
+This should be done carefully because the Book Hub likely mixes many UI sections in one file.
+
+---
+
+## 9. Split Book Stats access
+
+### Status
+
+Not started.
+
+### Goal
+
+Separate reading-life stats from vocabulary/study stats.
+
+### Free stats
+
+Free users can see:
+
+* Pages read
+* Days read
+* Finished books
+* Reading sessions
+* Listening sessions
+* Average pages per session
+
+### Full-access stats
+
+Full-access users can see:
+
+* Saved word counts
+* Vocabulary color stats
+* Study progress
+* Flashcard progress
+* Ability Check progress
+* Saved-word analytics
+
+---
+
+## 10. Decide Kanji Study final access bucket
+
+### Status
+
+Not started.
+
+### Current recommendation
+
+Keep Kana Study and Kanji Study free.
+
+### Suggested model
+
+* Kana Study: free
+* Kanji Study: free
+* Sample flashcards: free/demo
+* Saved-word context: read-only for free users if it already exists
+* New saved-vocabulary progress actions: full access only
+
+### Remaining question
+
+Kanji Study uses some saved-word context, so decide whether that context should remain visible to free users after downgrade.
+
+---
+
+## 11. Decide old saved vocabulary visibility
+
+### Status
+
+Not started.
+
+### Current recommendation
+
+Old saved vocabulary should remain visible read-only after downgrade.
+
+### Free users should not be able to:
+
+* Save new vocabulary
+* Use Bulk Add
+* Use Curiosity Reading
+* Use saved-word Fluid Reading
+* Run Library Review
+* Run Ability Check
+* Use Word Sky
+* Change study progress
+
+### Useful helper
+
+`canSeeVocabularyColors`
+
+This should eventually separate viewing old status from actively changing study progress.
+
+---
+
+## 12. Add test scenarios
+
+### Status
+
+Not started.
+
+### Goal
+
+Test the access model across realistic user types.
+
+### Test users/scenarios
+
+* Free user
+* Expired trial user
+* Active trial user
+* Paid/full user
+* Book-club/current student user
+* Teacher
+* Linked teacher
+* Admin
+* Super teacher via `role`
+* Super teacher via `is_super_teacher`
+
+### Main rule to verify
+
+Entering Mekuru is not the same as using full learning features.
+
+---
+
+# Suggested Next Step
+
+Stop the current access chunk here and commit it.
+
+Next session should start with:
+
+`Book Hub access split`
+
+Before editing, inspect the Book Hub page and map which sections are free reading-life tools and which sections are full-access learning tools.
