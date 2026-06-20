@@ -160,7 +160,7 @@ function buildKanaPool({
 const PRONUNCIATION_MEMORY_CUES: Record<string, string> = {
     a: "ah 😮",
     i: "ee(l) 🪱",
-    u: "ooze 🫧",
+    u: "oo(ze) 🫧",
     e: "e(gg) 🥚",
     o: "o(cean) 🌊",
     ka: "ca(r) 🚗",
@@ -465,7 +465,7 @@ export default function KanaStudyPage() {
     return (
         <main className="flex min-h-screen flex-col items-center bg-slate-100 px-6 py-4 text-slate-900">
             <KanaStudyHeader
-                onOpenCharacterStudy={() => router.push("/library-study")}
+                onOpenCharacterStudy={() => router.push("/library-study/characters")}
                 onOpenLibrary={() => router.push("/library")}
             />
 

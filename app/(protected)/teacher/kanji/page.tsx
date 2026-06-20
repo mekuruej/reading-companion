@@ -246,7 +246,12 @@ function getQueueStatus(params: {
   const flaggedMapRowCount = mapRows.filter((row) => row.flagged_for_review).length;
   const excludedMapRowCount = mapRows.filter((row) => row.excluded_from_kanji_practice).length;
 
-  if (params.ignored || (mapRows.length > 0 && excludedMapRowCount === mapRows.length)) {
+  if (
+    params.ignored ||
+    (mapRows.length > 0 &&
+      excludedMapRowCount === mapRows.length &&
+      flaggedMapRowCount === 0)
+  ) {
     return {
       status: "excluded",
       kanjiCount,
@@ -532,6 +537,7 @@ export default function TeacherKanjiPage() {
       const [
         { data: oldFlaggedRows, error: oldFlaggedRowsError },
         { data: reportRows, error: reportRowsError },
+        { data: wordSkyImportRows, error: wordSkyImportRowsError },
       ] = await Promise.all([
         supabase
           .from("vocabulary_kanji_map")
@@ -546,10 +552,21 @@ export default function TeacherKanjiPage() {
           .select("id, vocabulary_kanji_map_id, created_at, status")
           .in("status", ["open", "reviewing"])
           .limit(1000),
+
+        supabase
+          .from("vocabulary_kanji_map")
+          .select(
+            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+          )
+          .eq("excluded_from_kanji_practice", true)
+          .eq("reading_type", "other")
+          .eq("flagged_for_review", false)
+          .limit(1000),
       ]);
 
       if (oldFlaggedRowsError) throw oldFlaggedRowsError;
       if (reportRowsError) throw reportRowsError;
+      if (wordSkyImportRowsError) throw wordSkyImportRowsError;
 
       const reportByKanjiMapId = new Map<number, { created_at: string | null }>();
 
@@ -604,6 +621,16 @@ export default function TeacherKanjiPage() {
 
       for (const row of reportedMapRows) {
         flaggedRowsById.set(Number(row.id), row);
+      }
+
+      for (const row of (wordSkyImportRows ?? []) as KanjiMapRow[]) {
+        flaggedRowsById.set(Number(row.id), {
+          ...row,
+          // Treat Word Sky imports as teacher-review queue items,
+          // but keep the database row unflagged until the teacher edits/approves it.
+          flagged_for_review: true,
+          flagged_at: row.flagged_at ?? null,
+        });
       }
 
       const flaggedRows = Array.from(flaggedRowsById.values());
@@ -690,13 +717,20 @@ export default function TeacherKanjiPage() {
           mapRows,
         });
 
+        const isWordSkyImport = mapRows.some(
+          (row) =>
+            row.excluded_from_kanji_practice === true &&
+            row.reading_type === "other" &&
+            row.flagged_for_review === true
+        );
+
         nextItems.push({
           userBookWordId: `cache:${cacheId}`,
           userBookId: "",
           userId: "",
           studentName: "Shared kanji bank",
           username: null,
-          bookTitle: "Flagged from Kanji Study",
+          bookTitle: isWordSkyImport ? "Imported from Word Sky" : "Flagged from Kanji Study",
           surface,
           reading: String(cacheRow?.reading ?? ""),
           vocabularyCacheId: cacheId,
@@ -1041,9 +1075,15 @@ export default function TeacherKanjiPage() {
       const { error: saveError } = await supabase
         .from("vocabulary_kanji_map")
         .update({
-          reading_type: row.reading_type ?? "on",
+          reading_type:
+            row.reading_type === "on" || row.reading_type === "kun"
+              ? row.reading_type
+              : null,
           base_reading: row.base_reading,
           realized_reading: row.realized_reading,
+          excluded_from_kanji_practice: false,
+          flagged_for_review: false,
+          flagged_at: null,
         })
         .eq("id", row.id);
 

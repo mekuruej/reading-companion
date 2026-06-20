@@ -140,7 +140,10 @@ function normalizeJlpt(value: string | null | undefined) {
 }
 
 function normalizeKanjiLevel(jlpt: string | null | undefined): LevelFilter {
-  const normalized = (jlpt ?? "").trim().toUpperCase();
+  const normalized = (jlpt ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/^JLPT[-_\s]?/, "");
 
   if (
     normalized === "N5" ||
@@ -150,6 +153,16 @@ function normalizeKanjiLevel(jlpt: string | null | undefined): LevelFilter {
     normalized === "N1"
   ) {
     return normalized;
+  }
+
+  if (
+    normalized === "5" ||
+    normalized === "4" ||
+    normalized === "3" ||
+    normalized === "2" ||
+    normalized === "1"
+  ) {
+    return `N${normalized}` as LevelFilter;
   }
 
   return "unlabeled";
@@ -670,7 +683,9 @@ export default function KanjiReadingStudyPage() {
 
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [levelFilters, setLevelFilters] = useState<LevelFilter[]>(["N5", "N4"]);
+  const [levelFilters, setLevelFilters] = useState<LevelFilter[]>(
+    [...KANJI_LEVEL_FILTER_VALUES]
+  );
   const [studyMode, setStudyMode] = useState<KanjiStudyMode>("kanjiToOnyomi");
 
   const canAccessKanjiPractice = true;
@@ -1092,12 +1107,9 @@ export default function KanjiReadingStudyPage() {
       return;
     }
 
-    const dateKey = localDateKey();
-    const oneCardPerWord = selectOneCardPerSourceWordForDay(cards, dateKey);
+    const studyCards = shuffleArray(cards);
 
-    const dailyKanjiCards = shuffleArray(selectOneCardPerKanji(oneCardPerWord));
-
-    const onePassDeck = dailyKanjiCards.map((c, i) => ({
+    const onePassDeck = studyCards.map((c, i) => ({
       ...c,
       key: `${c.key}-deck-once-${i}`,
     }));
@@ -1288,8 +1300,17 @@ export default function KanjiReadingStudyPage() {
     setEndedEarly(false);
   }
 
-  function finishForToday() {
-    router.push("/library");
+  function shuffleCurrentDeck() {
+    if (deck.length <= 1) {
+      setNotice("Not enough cards to shuffle");
+      return;
+    }
+
+    setDeck((currentDeck) => shuffleArray(currentDeck));
+    setIndex(0);
+    resetCardState();
+    setEndedEarly(false);
+    setNotice("Shuffled cards");
   }
 
   function handleToggleLevelFilter(level: LevelFilter) {
@@ -1364,7 +1385,7 @@ export default function KanjiReadingStudyPage() {
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-6 py-4">
       <KanjiStudyHeader
-        onOpenCharacterStudy={() => router.push("/library-study")}
+        onOpenCharacterStudy={() => router.push("/library-study/characters")}
         onOpenLibrary={() => router.push("/library")}
       />
 
@@ -1510,7 +1531,7 @@ export default function KanjiReadingStudyPage() {
           <KanjiStudyBottomControls
             canGoPrevious={index > 0}
             onPrevious={previousCard}
-            onFinish={finishForToday}
+            onShuffle={shuffleCurrentDeck}
             onFlag={() => {
               if (card) void flagKanjiCardForReview(card);
             }}

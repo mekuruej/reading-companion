@@ -45,7 +45,7 @@ export default function AppAccessGate({ children }: Props) {
 
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("role, app_access_type, app_access_expires_at")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", session.user.id)
           .maybeSingle();
 
@@ -74,6 +74,20 @@ export default function AppAccessGate({ children }: Props) {
             setRedirectingTo("/community/profile/setup");
             setChecking(false);
             router.replace("/community/profile/setup");
+          }
+          return;
+        }
+
+        const isPrivilegedAppUser =
+          profile.role === "teacher" ||
+          profile.role === "admin" ||
+          profile.role === "super_teacher" ||
+          profile.is_super_teacher === true;
+
+        if (isPrivilegedAppUser) {
+          if (!cancelled) {
+            setAllowed(true);
+            setChecking(false);
           }
           return;
         }
