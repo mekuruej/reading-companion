@@ -416,6 +416,9 @@ export default function BookFlashcardsPage() {
   const [defError, setDefError] = useState<string | null>(null);
   const [showDefPicker, setShowDefPicker] = useState(false);
 
+  const [flaggedCardIds, setFlaggedCardIds] = useState<Set<string>>(() => new Set());
+  const [flaggingCardId, setFlaggingCardId] = useState<string | null>(null);
+
   async function canAccessUserBook(
     authedUserId: string,
     ownerUserId: string,
@@ -1397,14 +1400,13 @@ export default function BookFlashcardsPage() {
   async function flagCardForReview(cardId: string) {
     if (!canAccessBook || !canUseStudyFlashcards) {
       console.warn("Cannot flag card without access to this flashcard set.");
-      return;
+      return false;
     }
 
     const { error } = await supabase
       .from("user_book_words")
       .update({
         flagged_for_review: true,
-        excluded_from_flashcards: true,
         flagged_by_user_id: meId || null,
         flagged_at: new Date().toISOString(),
       })
@@ -1412,12 +1414,47 @@ export default function BookFlashcardsPage() {
 
     if (error) {
       console.error("Error flagging card for review:", error);
-      return;
+      return false;
     }
 
-    setCards((prev) => prev.filter((c) => c.id !== cardId));
-    setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
-    setLibraryCards((prev) => prev.filter((c) => c.id !== cardId));
+    return true;
+  }
+
+  async function handleFlagCurrentBookFlashcard() {
+    if (!card || flaggedCardIds.has(card.id) || flaggingCardId === card.id) return;
+
+    setFlaggingCardId(card.id);
+
+    try {
+      const ok = await flagCardForReview(card.id);
+
+      if (ok) {
+        setFlaggedCardIds((current) => {
+          const next = new Set(current);
+          next.add(card.id);
+          return next;
+        });
+      }
+    } finally {
+      setFlaggingCardId(null);
+    }
+  }
+
+  function shuffleBookFlashcardDeck() {
+    if (filteredCards.length <= 1) return;
+
+    setSessionOrder(shuffleArray(filteredCards.map((_, i) => i)));
+    setSessionIndex(0);
+    setStepIndex(0);
+    setTypedInput("");
+    setTypedFeedback(null);
+    setReadyForNextCard(false);
+    setLastTypedResult(null);
+    setMcSelected(null);
+    setMcAnswered(false);
+    setMcWasCorrect(null);
+    setCorrectionInput("");
+    setCorrectionFeedback(null);
   }
 
   async function hideCardPermanently(cardId: string) {
@@ -2193,6 +2230,64 @@ export default function BookFlashcardsPage() {
           ) : null}
         </div>
       </StudyFlashcardShell>
+
+      <section className="mt-4 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-sm">
+        <div className="grid gap-2 sm:grid-cols-4">
+          <button
+            type="button"
+            onClick={goToPrevWord}
+            disabled={sessionTotal <= 1}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${sessionTotal > 1
+                ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+              }`}
+          >
+            ← Previous
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (card) void skipCardForToday(card.id);
+            }}
+            disabled={!card || sessionTotal <= 1}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${card && sessionTotal > 1
+                ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+              }`}
+          >
+            Skip
+          </button>
+
+          <button
+            type="button"
+            onClick={shuffleBookFlashcardDeck}
+            disabled={sessionTotal <= 1}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${sessionTotal > 1
+                ? "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+              }`}
+          >
+            Shuffle
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleFlagCurrentBookFlashcard()}
+            disabled={!card || (card ? flaggedCardIds.has(card.id) : false) || flaggingCardId === card?.id}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${card && flaggedCardIds.has(card.id)
+                ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              } disabled:opacity-80`}
+          >
+            {card && flaggedCardIds.has(card.id)
+              ? "Flagged ✓"
+              : flaggingCardId === card?.id
+                ? "Flagging..."
+                : "Flag card"}
+          </button>
+        </div>
+      </section>
     </main>
   );
 }

@@ -1391,8 +1391,6 @@ function LibraryPracticePanel({
           </div>
         ) : null}
       </section>
-
-      <LibraryReviewWordSkyCta onOpenWordSky={onOpenWordSky} />
     </div>
   );
 }
