@@ -49,6 +49,17 @@ export type FeatureAccess = {
   canUseBookStatsSnapshots: boolean;
   canUseGlobalReadingStats: boolean;
 
+  // Product-language grouped helpers
+  canUseFreeStudy: boolean;
+  canUseBookTracking: boolean;
+  canUseReadingTimers: boolean;
+  canUseVocabularyStudy: boolean;
+  canUseBookStudy: boolean;
+  canUseAdvancedStudy: boolean;
+  canSeeVocabularyColors: boolean;
+  canUseTeacherTools: boolean;
+  canUseAdminTools: boolean;
+
   // Discovery/community features
   canUseDiscoveryHub: boolean;
   canUseFindNextBook: boolean;
@@ -71,7 +82,7 @@ export type FeatureAccess = {
 };
 
 export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
-  const isAdmin = input.role === "super_teacher";
+  const isAdmin = input.role === "super_teacher" || input.role === "admin";
   const isTeacher = input.role === "teacher" || isAdmin;
 
   // Keep super_teacher as the technical role for now.
@@ -122,6 +133,18 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
     canUseListeningTimer: true,
     canUseBookStatsSnapshots: true,
     canUseGlobalReadingStats: true,
+
+    // Product-language grouped helpers.
+    // These are aliases for now so route behavior does not change yet.
+    canUseFreeStudy: true,
+    canUseBookTracking: true,
+    canUseReadingTimers: true,
+    canUseVocabularyStudy: hasFullAccess,
+    canUseBookStudy: hasFullAccess,
+    canUseAdvancedStudy: hasFullAccess,
+    canSeeVocabularyColors: hasFullAccess,
+    canUseTeacherTools: isTeacher,
+    canUseAdminTools: isAdmin,
 
     // Discovery/community features.
     // Find Your Next Book should stay true only if/when it reads from a safe
