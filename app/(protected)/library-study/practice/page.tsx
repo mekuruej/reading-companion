@@ -1004,6 +1004,7 @@ function LibraryPracticePanel({
   onNext,
   onPrevious,
   onShuffle,
+  onFlagCard,
   onMeaningAnswered,
   onTypingMissed,
   meaningReviewCount,
@@ -1018,6 +1019,7 @@ function LibraryPracticePanel({
   onNext: () => void;
   onPrevious: () => void;
   onShuffle: () => void;
+  onFlagCard: () => Promise<boolean> | boolean;
   onMeaningAnswered: (
     card: StudyCard,
     userAnswer: string,
@@ -1041,6 +1043,8 @@ function LibraryPracticePanel({
   const [pendingTypingAdvance, setPendingTypingAdvance] =
     useState<PracticeTypingAdvance | null>(null);
   const typingPracticeInputRef = useRef<HTMLInputElement | null>(null);
+  const [flaggedCardKeys, setFlaggedCardKeys] = useState<Set<string>>(() => new Set());
+  const [flaggingCard, setFlaggingCard] = useState(false);
 
   function focusTypingPracticeInput() {
     for (const delay of [0, 80, 220]) {
@@ -1103,6 +1107,28 @@ function LibraryPracticePanel({
   const showReading = revealStep === "reading" || revealStep === "meaning";
   const showMeaning = revealStep === "meaning";
   const typingLabel = typingStep === "reading" ? "Reading" : "Meaning";
+
+  const currentCardWasFlagged = flaggedCardKeys.has(card.studyIdentityKey);
+
+  async function handleFlagCardClick() {
+    if (currentCardWasFlagged || flaggingCard) return;
+
+    setFlaggingCard(true);
+
+    try {
+      const ok = await onFlagCard();
+
+      if (ok) {
+        setFlaggedCardKeys((current) => {
+          const next = new Set(current);
+          next.add(card.studyIdentityKey);
+          return next;
+        });
+      }
+    } finally {
+      setFlaggingCard(false);
+    }
+  }
 
   function submitTypingPractice() {
     if (!typingInput.trim()) return;
@@ -1301,45 +1327,70 @@ function LibraryPracticePanel({
         </div>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        <button
-          type="button"
-          onClick={onPrevious}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-          disabled={total <= 1}
-        >
-          Previous
-        </button>
-
-        {practiceMode === "typing" ? (
+      <section className="mt-4 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-sm">
+        <div className="grid gap-2 sm:grid-cols-4">
           <button
             type="button"
-            onClick={onReviewMeanings}
-            disabled={meaningReviewCount === 0}
-            className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-950 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={onPrevious}
+            disabled={total <= 1}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${total > 1
+              ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+              }`}
           >
-            Review meanings and finish{meaningReviewCount ? ` (${meaningReviewCount})` : ""}
+            ← Previous
           </button>
+
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={total <= 1}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${total > 1
+              ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+              }`}
+          >
+            Skip
+          </button>
+
+          <button
+            type="button"
+            onClick={onShuffle}
+            disabled={total <= 1}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${total > 1
+              ? "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+              : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+              }`}
+          >
+            Shuffle
+          </button>
+
+          <button
+            type="button"
+            onClick={handleFlagCardClick}
+            disabled={currentCardWasFlagged || flaggingCard}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${currentCardWasFlagged
+              ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              } disabled:opacity-80`}
+          >
+            {currentCardWasFlagged ? "Flagged ✓" : flaggingCard ? "Flagging..." : "Flag card"}
+          </button>
+        </div>
+
+        {practiceMode === "typing" ? (
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              onClick={onReviewMeanings}
+              disabled={meaningReviewCount === 0}
+              className="rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-xs font-semibold text-violet-950 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Review meanings and finish{meaningReviewCount ? ` (${meaningReviewCount})` : ""}
+            </button>
+          </div>
         ) : null}
-
-        <button
-          type="button"
-          onClick={onNext}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-          disabled={total <= 1}
-        >
-          Skip
-        </button>
-
-        <button
-          type="button"
-          onClick={onShuffle}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-          disabled={total <= 1}
-        >
-          Shuffle
-        </button>
-      </div>
+      </section>
 
       <LibraryReviewWordSkyCta onOpenWordSky={onOpenWordSky} />
     </div>
@@ -1808,7 +1859,7 @@ export default function LibraryStudyPage() {
 
         const canUseLibraryReviewNow = canUseFullAccessFeature(
           featureAccess,
-          "ability_check"
+          "library_review"
         );
 
         setCanUseLibraryReview(canUseLibraryReviewNow);
@@ -3099,6 +3150,36 @@ export default function LibraryStudyPage() {
     setNotice("Card hidden from study.");
   }
 
+  async function flagPracticeCard(cardToFlag: StudyCard) {
+    if (!canUseLibraryReview) return false;
+
+    if (isClaimCardId(cardToFlag.id)) {
+      setNotice("Thanks — Word Sky claim flagging is not wired yet.");
+      return false;
+    }
+
+    const idsToFlag =
+      cardToFlag.encounterIds.length > 0 ? cardToFlag.encounterIds : [cardToFlag.id];
+
+    const { error } = await supabase
+      .from("user_book_words")
+      .update({
+        flagged_for_review: true,
+        flagged_by_user_id: currentUserId,
+        flagged_at: new Date().toISOString(),
+      })
+      .in("id", idsToFlag);
+
+    if (error) {
+      console.error("Error flagging Library Review card:", error);
+      alert(`Could not flag card.\n${error.message}`);
+      return false;
+    }
+
+    setNotice("Thanks — this card was flagged for review.");
+    return true;
+  }
+
   if (loading) {
     return <LibraryReviewLoadingState />;
   }
@@ -3112,7 +3193,7 @@ export default function LibraryStudyPage() {
   }
 
   if (fullAccessLocked) {
-    const copy = getFullAccessRequiredCopy("ability_check");
+    const copy = getFullAccessRequiredCopy("library_review");
 
     return (
       <LibraryReviewFullAccessLockedState
@@ -3208,6 +3289,10 @@ export default function LibraryStudyPage() {
           onNext={goToNextPracticeCard}
           onPrevious={goToPreviousPracticeCard}
           onShuffle={shufflePracticeDeck}
+          onFlagCard={() => {
+            if (!practiceCard) return false;
+            return flagPracticeCard(practiceCard);
+          }}
           onMeaningAnswered={queuePracticeMeaningReview}
           onTypingMissed={handlePracticeTypingMiss}
           meaningReviewCount={meaningReviewItems.length}
