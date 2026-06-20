@@ -65,6 +65,11 @@ const FULL_ACCESS_FEATURES: {
             note: "Library-wide saved-word color/gate checks.",
         },
         {
+            key: "library_review",
+            label: "Library Review",
+            note: "Library-wide saved-word review.",
+        },
+        {
             key: "vocab_tools",
             label: "Vocab Tools",
             note: "Book vocabulary tools tab.",
