@@ -16,7 +16,12 @@ type AttentionCard = {
   disabled?: boolean;
 };
 
-type AttentionCountKey = "books" | "missingBooks" | "kanji" | "readingFit";
+type AttentionCountKey =
+  | "books"
+  | "missingBooks"
+  | "kanji"
+  | "readingFit"
+  | "wordReports";
 
 type AttentionCounts = Record<AttentionCountKey, number>;
 
@@ -87,6 +92,13 @@ const attentionCards: AttentionCard[] = [
     eyebrow: "Kanji",
     description: "Review kanji reports, flagged kanji readings, and enrichment queues.",
     countKey: "kanji",
+  },
+  {
+    title: "Word Reports / Vocab Fixes",
+    href: "/teacher/words",
+    eyebrow: "Vocabulary",
+    description: "Review flagged saved-word cards, readings, meanings, and vocabulary support issues.",
+    countKey: "wordReports",
   },
   {
     title: "Reading Fit Review",
@@ -188,11 +200,10 @@ function AttentionCardGrid({
         const count = card.countKey ? counts[card.countKey] : null;
         const cardContent = (
           <div
-            className={`h-full rounded-3xl border p-5 shadow-sm transition ${
-              card.disabled
-                ? "border-stone-200 bg-stone-50 text-stone-500"
-                : "border-stone-200 bg-white hover:-translate-y-0.5 hover:shadow-md"
-            }`}
+            className={`h-full rounded-3xl border p-5 shadow-sm transition ${card.disabled
+              ? "border-stone-200 bg-stone-50 text-stone-500"
+              : "border-stone-200 bg-white hover:-translate-y-0.5 hover:shadow-md"
+              }`}
           >
             <div className="flex items-start justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
@@ -236,6 +247,7 @@ export default function TeacherNeedsAttentionPage() {
     missingBooks: 0,
     kanji: 0,
     readingFit: 0,
+    wordReports: 0,
   });
 
   useEffect(() => {
@@ -344,6 +356,7 @@ export default function TeacherNeedsAttentionPage() {
           books: 0,
           missingBooks: 0,
           kanji: 0,
+          wordReports: 0,
           readingFit: readingFitCount,
         };
 
@@ -352,6 +365,7 @@ export default function TeacherNeedsAttentionPage() {
             { count: pendingBookRequestCount },
             { count: manualBookFlagCount },
             { data: globalBooks },
+            { count: flaggedWordReportCount },
           ] = await Promise.all([
             supabase
               .from("book_requests")
@@ -367,6 +381,10 @@ export default function TeacherNeedsAttentionPage() {
               .select(
                 "title, isbn13, cover_url, book_type, author, publisher, published_date, page_count"
               ),
+            supabase
+              .from("user_book_words")
+              .select("id", { count: "exact", head: true })
+              .eq("flagged_for_review", true),
           ]);
 
           const missingBookInfoCount = ((globalBooks ?? []) as GlobalBookRow[]).filter(
@@ -453,6 +471,7 @@ export default function TeacherNeedsAttentionPage() {
             books: (pendingBookRequestCount ?? 0) + (manualBookFlagCount ?? 0),
             missingBooks: missingBookInfoCount,
             kanji: activeKanjiQueueCount,
+            wordReports: flaggedWordReportCount ?? 0,
           };
         }
 
