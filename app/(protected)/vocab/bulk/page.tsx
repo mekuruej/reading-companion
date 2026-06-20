@@ -4,6 +4,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { supabase } from "@/lib/supabaseClient";
 import {
   normalizeChapterNameOptions,
@@ -18,6 +20,7 @@ import BulkColumnPastePanel from "./components/BulkColumnPastePanel";
 import BulkApplyFieldsPanel from "./components/BulkApplyFieldsPanel";
 import BulkDefinitionReviewItem from "./components/BulkDefinitionReviewItem";
 import BulkDetailEditItem from "./components/BulkDetailEditItem";
+
 
 // -------------------------------------------------------------
 // Helpers
@@ -240,14 +243,18 @@ export default function BulkVocabPage() {
 
         const { data: profileRow, error: profileError } = await supabase
           .from("profiles")
-          .select("role")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", user.id)
           .maybeSingle();
 
         if (profileError) throw profileError;
 
+        const roleForAccess = profileRow?.is_super_teacher
+          ? "super_teacher"
+          : profileRow?.role;
+
         const isOwner = data.user_id === user.id;
-        const isSuperTeacher = profileRow?.role === "super_teacher";
+        const isSuperTeacher = roleForAccess === "super_teacher";
 
         let isLinkedTeacher = false;
 
@@ -269,7 +276,26 @@ export default function BulkVocabPage() {
         if (!canManageBook) {
           if (!cancelled) {
             setMessage("❌ You do not have access to add words to this book.");
-            setAuthorizedUserBookId(null);
+            setAuthorizedUserBookId("");
+          }
+          return;
+        }
+
+        const appStatus = getAppAccessStatus({
+          role: roleForAccess,
+          app_access_type: profileRow?.app_access_type ?? null,
+          app_access_expires_at: profileRow?.app_access_expires_at ?? null,
+        });
+
+        const featureAccess = getFeatureAccess({
+          role: roleForAccess,
+          hasFullAccess: appStatus.hasFullAccess,
+        });
+
+        if (!featureAccess.canSaveVocabulary) {
+          if (!cancelled) {
+            setMessage("❌ Bulk vocabulary saving is available with full learning access.");
+            setAuthorizedUserBookId("");
           }
           return;
         }
@@ -406,9 +432,9 @@ export default function BulkVocabPage() {
     setLastSavedWordContext(
       latest?.surface
         ? {
-            surface: latest.surface,
-            page: latest.page_number != null ? String(latest.page_number) : "",
-          }
+          surface: latest.surface,
+          page: latest.page_number != null ? String(latest.page_number) : "",
+        }
         : null
     );
   }

@@ -4,6 +4,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
 import {
   computeLibraryStudyColorStatus,
   type LibraryStudyColor,
@@ -251,6 +253,7 @@ export default function WordSkyPage() {
   const [libraryColors, setLibraryColors] = useState<Record<string, LibraryStudyColor>>({});
   const [selectedWord, setSelectedWord] = useState<SkyWord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [canUseWordSky, setCanUseWordSky] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
@@ -266,6 +269,7 @@ export default function WordSkyPage() {
     async function load() {
       setLoading(true);
       setMessage("");
+      setCanUseWordSky(false);
 
       try {
         const {
@@ -279,7 +283,40 @@ export default function WordSkyPage() {
           return;
         }
 
+        const { data: profileRow, error: profileError } = await supabase
+          .from("profiles")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        const roleForAccess = profileRow?.is_super_teacher
+          ? "super_teacher"
+          : profileRow?.role;
+
+        const appStatus = getAppAccessStatus({
+          role: roleForAccess,
+          app_access_type: profileRow?.app_access_type ?? null,
+          app_access_expires_at: profileRow?.app_access_expires_at ?? null,
+        });
+
+        const featureAccess = getFeatureAccess({
+          role: roleForAccess,
+          hasFullAccess: appStatus.hasFullAccess,
+        });
+
+        if (!featureAccess.canUseAdvancedStudy) {
+          if (!cancelled) {
+            setMessage("Word Sky is available with full learning access.");
+            setUserId(null);
+            setCanUseWordSky(false);
+          }
+          return;
+        }
+
         setUserId(user.id);
+        setCanUseWordSky(true);
 
         const [
           { data: poolData, error: poolError },
@@ -534,7 +571,7 @@ export default function WordSkyPage() {
   }, [wordPool, selectedWord]);
 
   async function saveClaim(word: SkyWord, color: ClaimedColor) {
-    if (!userId) return;
+    if (!userId || !canUseWordSky) return;
 
     const key = studyIdentityKey(word.surface, word.reading);
     setSavingKey(key);
@@ -580,7 +617,7 @@ export default function WordSkyPage() {
   }
 
   async function clearClaim(word: SkyWord) {
-    if (!userId) return;
+    if (!userId || !canUseWordSky) return;
 
     const key = studyIdentityKey(word.surface, word.reading);
     setSavingKey(key);
@@ -609,6 +646,39 @@ export default function WordSkyPage() {
 
   if (loading) {
     return <WordSkyLoadingState />;
+  }
+
+  if (!canUseWordSky) {
+    return (
+      <main className="min-h-screen bg-[#eef5fb] px-4 py-5 text-slate-900 sm:px-6">
+        <div className="mx-auto flex max-w-3xl flex-col gap-4">
+          <button
+            type="button"
+            onClick={() => router.push("/library-study")}
+            className="w-fit rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            ← Back to Library Study
+          </button>
+
+          <section className="rounded-3xl border border-white/80 bg-white/85 p-6 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+              Advanced Study
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">Word Sky</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Word Sky is available with full learning access. It uses your saved vocabulary,
+              reading-color progress, and Word Sky claims, so it is part of the advanced study tools.
+            </p>
+
+            {message ? (
+              <p className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                {message}
+              </p>
+            ) : null}
+          </section>
+        </div>
+      </main>
+    );
   }
 
   return (
