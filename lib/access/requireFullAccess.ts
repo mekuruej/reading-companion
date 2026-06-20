@@ -14,6 +14,7 @@ export type FullAccessFeature =
   | "vocabulary_list"
   | "study_flashcards"
   | "ability_check"
+  | "library_review"
   | "vocab_tools"
   | "story_notes"
   | "vocabulary_stats"
@@ -26,6 +27,7 @@ const FULL_ACCESS_FEATURE_LABELS: Record<FullAccessFeature, string> = {
   vocabulary_list: "Vocabulary List",
   study_flashcards: "Study Flashcards",
   ability_check: "Ability Check",
+  library_review: "Library Review",
   vocab_tools: "Vocab Tools",
   story_notes: "Story Notes",
   vocabulary_stats: "vocabulary stats",
@@ -54,6 +56,9 @@ export function canUseFullAccessFeature(
 
     case "ability_check":
       return featureAccess.canUseAbilityCheck;
+
+    case "library_review":
+      return featureAccess.canUseAdvancedStudy;
 
     case "vocab_tools":
       return featureAccess.canUseVocabTools;
