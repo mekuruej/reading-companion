@@ -39,7 +39,7 @@ export function KanaStudyHeader({
               onClick={onOpenCharacterStudy}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
-              Character Study
+              Basic Study
             </button>
           ) : null}
 

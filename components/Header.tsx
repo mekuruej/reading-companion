@@ -255,60 +255,44 @@ export default function Header() {
               </button>
 
               {showStudyMenu ? (
-                <div className="absolute right-0 z-50 mt-2 hidden min-w-[240px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
+                <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
                   <Link
-                    href="/library-study/check"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/check"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
+                    href="/library-study"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Ability Check (Due Cards)
+                    Study Home
                   </Link>
 
-                  <Link
-                    href="/library-study/practice"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/practice"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowStudyMenu(false)}
-                  >
-                    Saved Words Review
-                  </Link>
-
-                  <Link
-                    href="/library-study/book-flashcards"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/book-flashcards"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowStudyMenu(false)}
-                  >
-                    Book Specific Flashcards
-                  </Link>
                   <Link
                     href="/library-study/characters"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/characters" ||
-                      pathname === "/library-study/kana" ||
-                      pathname === "/library-study/kanji"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
+                        pathname === "/library-study/kana" ||
+                        pathname === "/library-study/kanji"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Character Study
+                    Basic Study
                   </Link>
+
                   <Link
-                    href="/library-study/word-sky"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/word-sky"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
+                    href="/library-study/advanced"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
+                        pathname === "/library-study/book-flashcards" ||
+                        pathname === "/library-study/check" ||
+                        pathname === "/library-study/practice" ||
+                        pathname === "/library-study/word-sky"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Word Sky
+                    Advanced Study
                   </Link>
                 </div>
               ) : null}

@@ -3,54 +3,22 @@
 
 import Link from "next/link";
 
-const studyTools = [
+const studyPaths = [
   {
-    title: "Ability Check",
-    href: "/library-study/check",
-    eyebrow: "Daily check",
+    title: "Basic Study",
+    href: "/library-study/characters",
+    eyebrow: "Start here",
     description:
-      "A once-a-day check for words that are ready to move by reading or meaning ability.",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-950",
-  },
-  {
-    title: "Library Review",
-    href: "/library-study/practice",
-    eyebrow: "Review only",
-    description:
-      "Review your existing words freely. Review does not move colors.",
+      "Practice kana, kanji readings, and eventually a small demo flashcard set. Good for simple, low-pressure study.",
     className: "border-sky-200 bg-sky-50 text-sky-950",
   },
   {
-    title: "久しぶり Review",
-    href: "/library-study/practice?color=purple",
-    eyebrow: "Mastered words",
+    title: "Advanced Study",
+    href: "/library-study/advanced",
+    eyebrow: "Vocabulary growth cycle",
     description:
-      "Lightly revisit Purple words every now and then without moving normal Ability Check.",
-    className: "border-violet-200 bg-violet-50 text-violet-950",
-  },
-  {
-    title: "Book Flashcards",
-    href: "/library-study/book-flashcards",
-    eyebrow: "Book-based study",
-    description:
-      "Study words from individual books when you want a focused book session.",
+      "Use Mekuru’s full saved-word cycle: save words from books, study them, follow colors, check ability, and notice them again while reading.",
     className: "border-indigo-200 bg-indigo-50 text-indigo-950",
-  },
-  {
-    title: "Character Study",
-    href: "/library-study/characters",
-    eyebrow: "Kana and kanji",
-    description:
-      "Practice kana basics and kanji readings from saved vocabulary.",
-    className: "border-amber-200 bg-amber-50 text-amber-950",
-  },
-  {
-    title: "Word Sky",
-    href: "/library-study/word-sky",
-    eyebrow: "Add words",
-    description:
-      "Add easier words to your study pool when Ability Check does not have enough cards.",
-    className: "border-slate-200 bg-white text-slate-900",
   },
 ];
 
@@ -58,7 +26,7 @@ export default function StudyToolsPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 text-center">
+        <div className="mb-8 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
             Mekuru Study
           </p>
@@ -68,29 +36,27 @@ export default function StudyToolsPage() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Choose how you want to study today:
-          </p>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Check your ability, review freely, focus on a book, or add easier words to your pool.
+            Choose a study path. Basic Study is for simple foundation practice.
+            Advanced Study is for Mekuru’s full vocabulary growth cycle.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {studyTools.map((tool) => (
+        <div className="grid gap-5 md:grid-cols-2">
+          {studyPaths.map((path) => (
             <Link
-              key={tool.href}
-              href={tool.href}
-              className={`group rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tool.className}`}
+              key={path.href}
+              href={path.href}
+              className={`group rounded-3xl border p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${path.className}`}
             >
               <div className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                {tool.eyebrow}
+                {path.eyebrow}
               </div>
 
               <div className="mt-3 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-black">{tool.title}</h2>
+                  <h2 className="text-2xl font-black">{path.title}</h2>
                   <p className="mt-2 text-sm leading-6 opacity-80">
-                    {tool.description}
+                    {path.description}
                   </p>
                 </div>
 
@@ -100,6 +66,21 @@ export default function StudyToolsPage() {
               </div>
             </Link>
           ))}
+        </div>
+
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-white/75 p-5 text-center shadow-sm">
+          <p className="text-sm font-semibold text-slate-700">
+            Not sure where to go?
+          </p>
+
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Start with Basic Study for character practice and simple study tools.
+          </p>
+
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Choose Advanced Study if you are working with saved words from your
+            books. Advanced Study uses Mekuru’s full-access saved-word tools.
+          </p>
         </div>
       </div>
     </main>
