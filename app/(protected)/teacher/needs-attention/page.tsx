@@ -21,7 +21,8 @@ type AttentionCountKey =
   | "missingBooks"
   | "kanji"
   | "readingFit"
-  | "wordReports";
+  | "wordReports"
+  | "teacherRatings";
 
 type AttentionCounts = Record<AttentionCountKey, number>;
 
@@ -48,6 +49,15 @@ type ReadingFitCountUserBookRow = {
 type ReadingFitCountProfileRow = {
   id: string;
   level: string | null;
+};
+
+type TeacherRatingCountUserBookRow = {
+  finished_at: string | null;
+  dnf_at: string | null;
+  notes: string | null;
+  recommended_level: string | null;
+  teacher_student_use_rating: number | null;
+  rating_recommend: number | null;
 };
 
 type KanjiCountWordRow = {
@@ -106,6 +116,13 @@ const attentionCards: AttentionCard[] = [
     eyebrow: "Reading fit",
     description: "Review finished books missing learner reflection or placement signals.",
     countKey: "readingFit",
+  },
+  {
+    title: "Teacher Ratings",
+    href: "/teacher/ratings",
+    eyebrow: "Lesson fit",
+    description: "Rate finished or stopped books so useful lesson books are easier to find later.",
+    countKey: "teacherRatings",
   },
   {
     title: "Student Follow-up",
@@ -248,6 +265,7 @@ export default function TeacherNeedsAttentionPage() {
     kanji: 0,
     readingFit: 0,
     wordReports: 0,
+    teacherRatings: 0,
   });
 
   useEffect(() => {
@@ -321,7 +339,11 @@ export default function TeacherNeedsAttentionPage() {
           ])
         );
 
-        const [{ data: readingFitProfiles }, { data: readingFitRows }] = await Promise.all([
+        const [
+          { data: readingFitProfiles },
+          { data: readingFitRows },
+          { data: teacherRatingRows },
+        ] = await Promise.all([
           supabase.from("profiles").select("id, level").in("id", studentIds),
           supabase
             .from("user_books")
@@ -331,6 +353,10 @@ export default function TeacherNeedsAttentionPage() {
             .in("user_id", studentIds)
             .not("finished_at", "is", null)
             .is("teacher_review_cleared_at", null),
+          supabase
+            .from("user_books")
+            .select("finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
+            .in("user_id", studentIds),
         ]);
 
         const readerLevelByUserId = new Map(
@@ -352,12 +378,26 @@ export default function TeacherNeedsAttentionPage() {
           }
         ).length;
 
+        const teacherRatingCount = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
+          (item) => {
+            const isFinishedOrDnf = !!item.finished_at || !!item.dnf_at;
+            const hasTeacherReview =
+              !!String(item.recommended_level ?? "").trim() ||
+              item.teacher_student_use_rating != null ||
+              item.rating_recommend != null ||
+              !!String(item.notes ?? "").trim();
+
+            return isFinishedOrDnf && !hasTeacherReview;
+          }
+        ).length;
+
         let nextCounts: AttentionCounts = {
           books: 0,
           missingBooks: 0,
           kanji: 0,
           wordReports: 0,
           readingFit: readingFitCount,
+          teacherRatings: teacherRatingCount,
         };
 
         if (isSuperTeacher) {

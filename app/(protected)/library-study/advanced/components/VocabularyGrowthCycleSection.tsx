@@ -2,29 +2,35 @@ const cycleSteps = [
     {
         title: "Read books",
         description: "Meet words naturally inside real books.",
+        href: "/books",
     },
     {
         title: "Save words",
         description: "Save the words you want support with while reading.",
+        href: "/library/curiosity-reading-index",
     },
     {
         title: "Book Flashcards",
         description:
             "Study saved words from one book when you want a focused session.",
+        href: "/library-study/book-flashcards",
     },
     {
         title: "Saved Words Review",
         description: "Review saved words across books without moving colors.",
+        href: "/library-study/practice",
     },
     {
         title: "Ability Check",
         description:
             "Check whether words are ready to move forward by reading or meaning ability.",
+        href: "/library-study/check",
     },
     {
         title: "Notice again",
         description:
             "Return to your books and wait for that golden recognition moment.",
+        href: "/books",
     },
 ];
 
@@ -174,7 +180,12 @@ export default function VocabularyGrowthCycleSection() {
                             opacity="0.72"
                         />
 
-                        <g>
+                        <a
+                            href="/books"
+                            aria-label="Open your library to read books"
+                            className="cursor-pointer"
+                        >
+                            <g>
                             <rect
                                 x="320"
                                 y="25"
@@ -204,9 +215,15 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Read
                             </text>
-                        </g>
+                            </g>
+                        </a>
 
-                        <g>
+                        <a
+                            href="/library/curiosity-reading-index"
+                            aria-label="Open your library to save words from a book"
+                            className="cursor-pointer"
+                        >
+                            <g>
                             <rect
                                 x="675"
                                 y="245"
@@ -236,9 +253,15 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Remember
                             </text>
-                        </g>
+                            </g>
+                        </a>
 
-                        <g>
+                        <a
+                            href="/library-study/book-flashcards"
+                            aria-label="Open Book Flashcards"
+                            className="cursor-pointer"
+                        >
+                            <g>
                             <rect
                                 x="635"
                                 y="425"
@@ -268,9 +291,15 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Focus
                             </text>
-                        </g>
+                            </g>
+                        </a>
 
-                        <g>
+                        <a
+                            href="/library-study/practice"
+                            aria-label="Open Saved Words Review"
+                            className="cursor-pointer"
+                        >
+                            <g>
                             <rect
                                 x="315"
                                 y="515"
@@ -300,9 +329,15 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Encounter
                             </text>
-                        </g>
+                            </g>
+                        </a>
 
-                        <g>
+                        <a
+                            href="/library-study/check"
+                            aria-label="Open Ability Check"
+                            className="cursor-pointer"
+                        >
+                            <g>
                             <rect
                                 x="25"
                                 y="405"
@@ -332,9 +367,15 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Check
                             </text>
-                        </g>
+                            </g>
+                        </a>
 
-                        <g>
+                        <a
+                            href="/books"
+                            aria-label="Open your library and notice words again"
+                            className="cursor-pointer"
+                        >
+                            <g>
                             <rect
                                 x="25"
                                 y="105"
@@ -364,9 +405,15 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Recognize
                             </text>
-                        </g>
+                            </g>
+                        </a>
 
-                        <g>
+                        <a
+                            href="/library-study/word-sky"
+                            aria-label="Open Word Sky"
+                            className="cursor-pointer"
+                        >
+                            <g>
                             <path
                                 d="M682 38 C692 12 732 6 760 22 C781 0 829 8 841 40 C875 42 899 66 893 98 C890 128 864 146 832 141 L704 141 C672 141 649 119 655 90 C658 70 669 50 682 38 Z"
                                 fill="#f0f9ff"
@@ -392,7 +439,8 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Optional extra words
                             </text>
-                        </g>
+                            </g>
+                        </a>
                         <path
                             d="M852 140 C885 178 875 224 832 252"
                             fill="none"
@@ -489,9 +537,10 @@ export default function VocabularyGrowthCycleSection() {
 
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                     {cycleSteps.map((step, index) => (
-                        <div
+                        <a
                             key={step.title}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            href={step.href}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white hover:shadow-sm"
                         >
                             <div className="flex items-center gap-3">
                                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
@@ -505,20 +554,34 @@ export default function VocabularyGrowthCycleSection() {
                             <p className="mt-3 text-sm leading-6 text-slate-600">
                                 {step.description}
                             </p>
-                        </div>
+                        </a>
                     ))}
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sky-950">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                        Word Sky
-                    </p>
-                    <h3 className="mt-2 text-lg font-black">Optional extra words</h3>
-                    <p className="mt-2 text-sm leading-6 opacity-85">
-                        Word Sky is a fun extra tool for leveling up useful words you may
-                        not save from your books, so they can eventually become ready for
-                        Ability Check too.
-                    </p>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sky-950">
+                        <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
+                            Word Sky
+                        </p>
+                        <h3 className="mt-2 text-lg font-black">Optional extra words</h3>
+                        <p className="mt-2 text-sm leading-6 opacity-85">
+                            Word Sky is a fun extra tool for leveling up useful words you may
+                            not save from your books, so they can eventually become ready for
+                            Ability Check too.
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                        <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
+                            Recognition Colors
+                        </p>
+                        <h3 className="mt-2 text-lg font-black">Ebb and flow</h3>
+                        <p className="mt-2 text-sm leading-6 opacity-85">
+                            Words are assigned colors depending on encounters and skill.
+                            These colors are constantly ebbing and flowing to match your
+                            relationship with that word.
+                        </p>
+                    </div>
                 </div>
             </div>
         </details>

@@ -40,7 +40,7 @@ export function TeacherBookFindCreateFields({
                 <label className="mb-1 block text-sm font-semibold">
                     ISBN-13{" "}
                     <span className="font-normal text-stone-500">
-                        {isBookRequest ? "(optional for manual entry)" : "*(Hyphens are okay.)"}
+                        (optional for manual entry; hyphens are okay)
                     </span>
                 </label>
                 <input

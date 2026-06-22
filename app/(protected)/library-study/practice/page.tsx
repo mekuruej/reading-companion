@@ -99,6 +99,7 @@ type LibraryWordSummaryRow = {
   jlpt: string | null;
   total_encounter_count: number | null;
   check_ready_encounter_count: number | null;
+  hidden_encounter_count: number | null;
   sample_user_book_word_id: string | null;
   sample_user_book_id: string | null;
   sample_book_title: string | null;
@@ -449,6 +450,73 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
   }
 
   return allRows;
+}
+
+async function loadAllLibraryWordSummaries(userId: string) {
+  const allRows: LibraryWordSummaryRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("user_library_word_summaries")
+      .select(
+        `
+          study_identity_key,
+          surface,
+          reading,
+          meaning,
+          jlpt,
+          total_encounter_count,
+          check_ready_encounter_count,
+          hidden_encounter_count,
+          sample_user_book_word_id,
+          sample_user_book_id,
+          sample_book_title,
+          sample_book_cover_url
+        `
+      )
+      .eq("user_id", userId)
+      .order("total_encounter_count", { ascending: false })
+      .range(from, to)
+      .returns<LibraryWordSummaryRow[]>();
+
+    if (error) throw error;
+
+    allRows.push(...(data ?? []));
+
+    if (!data || data.length < LIBRARY_CHECK_WORD_PAGE_SIZE) {
+      break;
+    }
+
+    from += LIBRARY_CHECK_WORD_PAGE_SIZE;
+  }
+
+  return allRows;
+}
+
+async function loadDefinitionNumbersByWordId(wordIds: string[]) {
+  const definitionNumberByWordId = new Map<string, number>();
+  const uniqueWordIds = uniqueStrings(wordIds);
+
+  for (let i = 0; i < uniqueWordIds.length; i += LIBRARY_PROGRESS_KEY_BATCH_SIZE) {
+    const batch = uniqueWordIds.slice(i, i + LIBRARY_PROGRESS_KEY_BATCH_SIZE);
+    const { data: sampleWords, error: sampleWordsErr } = await supabase
+      .from("user_book_words")
+      .select("id, meaning_choice_index")
+      .in("id", batch);
+
+    if (sampleWordsErr) throw sampleWordsErr;
+
+    for (const word of sampleWords ?? []) {
+      const definitionNumber = definitionNumberFromIndex((word as any).meaning_choice_index);
+      if (definitionNumber != null) {
+        definitionNumberByWordId.set((word as any).id, definitionNumber);
+      }
+    }
+  }
+
+  return definitionNumberByWordId;
 }
 
 async function loadLibraryWordClaims(userId: string) {
@@ -1934,28 +2002,15 @@ export default function LibraryStudyPage() {
           metaById.set(row.id, getBookMeta(row));
         }
 
-        const { data: summaryRows, error: summaryErr } = await supabase
-          .from("user_library_word_summaries")
-          .select(
-            `
-              study_identity_key,
-              surface,
-              reading,
-              meaning,
-              jlpt,
-              total_encounter_count,
-              check_ready_encounter_count,
-              sample_user_book_word_id,
-              sample_user_book_id,
-              sample_book_title,
-              sample_book_cover_url
-            `
-          )
-          .eq("user_id", user.id)
-          .gt("check_ready_encounter_count", 0)
-          .order("total_encounter_count", { ascending: false })
-          .limit(500)
-          .returns<LibraryWordSummaryRow[]>();
+        let allSummaryRows: LibraryWordSummaryRow[] = [];
+        let summaryLoadError: unknown = null;
+
+        try {
+          allSummaryRows = await loadAllLibraryWordSummaries(user.id);
+        } catch (summaryErr) {
+          summaryLoadError = summaryErr;
+          console.warn("Library word summaries are not available yet:", summaryErr);
+        }
 
         const claimRows = await loadLibraryWordClaims(user.id);
         const claimByKey = new Map<string, LibraryWordClaimRow>();
@@ -1963,52 +2018,28 @@ export default function LibraryStudyPage() {
           if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
         }
 
-        const reviewWords = await loadAllLibraryCheckWords(userBookIds);
-
-        const reviewGroupedWords = new Map<string, UserBookWordRow[]>();
-
-        for (const row of reviewWords) {
-          const surface = row.surface?.trim() ?? "";
-          const reading = row.reading?.trim() ?? "";
-          const meaning = row.meaning?.trim() ?? "";
-          const key = studyIdentityKey(surface, reading);
-
-          if (!surface || !reading || !meaning || !key) continue;
-
-          const group = reviewGroupedWords.get(key) ?? [];
-          group.push(row);
-          reviewGroupedWords.set(key, group);
-        }
-
-        if (!summaryErr && summaryRows && summaryRows.length > 0) {
-          const definitionNumberByWordId = new Map<string, number>();
+        if (allSummaryRows.length > 0) {
+          const visibleSummaryRows = allSummaryRows
+            .filter((row) => (row.total_encounter_count ?? 0) > (row.hidden_encounter_count ?? 0));
+          const summaryRows = visibleSummaryRows
+            .filter((row) => (row.check_ready_encounter_count ?? 0) > 0);
+          const abilitySummaryRows = summaryRows.slice(0, 500);
+          let definitionNumberByWordId = new Map<string, number>();
           const sampleWordIds = uniqueStrings(
-            summaryRows.map((row) => row.sample_user_book_word_id).filter(Boolean)
+            visibleSummaryRows.map((row) => row.sample_user_book_word_id).filter(Boolean)
           );
 
           if (sampleWordIds.length > 0) {
-            const { data: sampleWords, error: sampleWordsErr } = await supabase
-              .from("user_book_words")
-              .select("id, meaning_choice_index")
-              .in("id", sampleWordIds);
-
-            if (sampleWordsErr) {
+            try {
+              definitionNumberByWordId = await loadDefinitionNumbersByWordId(sampleWordIds);
+            } catch (sampleWordsErr) {
               console.warn("Could not load definition numbers for Library Practice:", sampleWordsErr);
-            } else {
-              for (const word of sampleWords ?? []) {
-                const definitionNumber = definitionNumberFromIndex(
-                  (word as any).meaning_choice_index
-                );
-                if (definitionNumber != null) {
-                  definitionNumberByWordId.set((word as any).id, definitionNumber);
-                }
-              }
             }
           }
 
           const studyKeys = uniqueStrings([
-            ...summaryRows.map((row) => row.study_identity_key).filter(Boolean),
-            ...Array.from(reviewGroupedWords.keys()),
+            ...abilitySummaryRows.map((row) => row.study_identity_key).filter(Boolean),
+            ...allSummaryRows.map((row) => row.study_identity_key).filter(Boolean),
             ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
           ]);
 
@@ -2028,7 +2059,7 @@ export default function LibraryStudyPage() {
             }
           }
 
-          const cards: StudyCard[] = summaryRows
+          const cards: StudyCard[] = abilitySummaryRows
             .map((summary) => {
               const surface = (summary.surface ?? "").trim();
               const reading = (summary.reading ?? "").trim();
@@ -2089,30 +2120,31 @@ export default function LibraryStudyPage() {
             .filter((card): card is StudyCard => Boolean(card));
           const allStudyCards = [...cards, ...claimCards];
 
-          const reviewCards: StudyCard[] = Array.from(reviewGroupedWords.entries())
-            .map(([key, group]) => {
-              const representative = group[0];
-              const meta = metaById.get(representative.user_book_id);
-              const surface = representative.surface!.trim();
-              const reading = representative.reading!.trim();
+          const reviewCards: StudyCard[] = visibleSummaryRows
+            .map((summary) => {
+              const surface = (summary.surface ?? "").trim();
+              const reading = (summary.reading ?? "").trim();
+              const meaning = (summary.meaning ?? "").trim();
+              const encounterCount = summary.total_encounter_count ?? 0;
               const progress = progressWithWordSkyClaim(
                 user.id,
-                key,
+                summary.study_identity_key,
                 surface,
                 reading,
-                progressByKey.get(key) ?? null,
-                claimByKey.get(key)
+                progressByKey.get(summary.study_identity_key) ?? null,
+                claimByKey.get(summary.study_identity_key)
               );
 
-              if (
-                colorSettings.skip_katakana_library_check &&
-                isKatakanaOnly(representative.surface)
-              ) {
+              if (!surface || !reading || !meaning || !summary.sample_user_book_word_id) {
+                return null;
+              }
+
+              if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
                 return null;
               }
 
               const colorStatus = computeLibraryStudyColorStatus({
-                encounterCount: group.length,
+                encounterCount,
                 settings: colorSettings,
                 readingGate: progress?.reading_gate_status ?? "not_started",
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
@@ -2123,23 +2155,21 @@ export default function LibraryStudyPage() {
               });
 
               return {
-                id: representative.id,
-                userBookId: representative.user_book_id,
-                bookTitle: meta?.title ?? "Untitled",
-                bookCoverUrl: meta?.cover_url ?? null,
+                id: summary.sample_user_book_word_id,
+                userBookId: summary.sample_user_book_id ?? "",
+                bookTitle: summary.sample_book_title ?? "Untitled",
+                bookCoverUrl: summary.sample_book_cover_url ?? null,
                 surface,
                 reading,
-                meaning: representative.meaning!.trim(),
-                jlpt: representative.jlpt ?? null,
-                encounterCount: group.length,
-                encounterIds: group.map((word) => word.id),
+                meaning,
+                jlpt: summary.jlpt ?? null,
+                encounterCount,
+                encounterIds: [summary.sample_user_book_word_id],
                 colorStatus,
-                activeGate: pickLibraryCheckGate(colorStatus, key),
-                studyIdentityKey: key,
+                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
+                studyIdentityKey: summary.study_identity_key,
                 progress,
-                definitionNumber: definitionNumberFromIndex(
-                  representative.meaning_choice_index
-                ),
+                definitionNumber: definitionNumberByWordId.get(summary.sample_user_book_word_id) ?? null,
               };
             })
             .filter((card): card is StudyCard => Boolean(card));
@@ -2155,11 +2185,11 @@ export default function LibraryStudyPage() {
           setLibraryReviewCards(allReviewCards);
           setDebugInfo({
             threshold: encounterThreshold,
-            rawRows: summaryRows.length,
-            completeGroups: summaryRows.length,
+            rawRows: allSummaryRows.length,
+            completeGroups: visibleSummaryRows.length,
             eligibleCards: allStudyCards.length,
-            filteredCards: allStudyCards.length,
-            topCompleteGroups: summaryRows.slice(0, 8).map((summary) => {
+            filteredCards: allReviewCards.length,
+            topCompleteGroups: visibleSummaryRows.slice(0, 8).map((summary) => {
               const surface = summary.surface?.trim() ?? "";
               const reading = summary.reading?.trim() ?? "";
               const progress = progressWithWordSkyClaim(
@@ -2193,8 +2223,8 @@ export default function LibraryStudyPage() {
           return;
         }
 
-        if (summaryErr) {
-          console.warn("Library word summaries are not available yet:", summaryErr);
+        if (summaryLoadError) {
+          console.warn("Falling back to saved-word rows for Library Practice:", summaryLoadError);
         }
 
         const words = await loadAllLibraryCheckWords(userBookIds);

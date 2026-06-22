@@ -3,6 +3,9 @@ type BookHubStatusPanelProps = {
   startedAt: string;
   finishedAt: string;
   dnfAt: string;
+  dnfReason: string;
+  dnfNote: string;
+  wouldRetry: string;
 
   showStartButton: boolean;
   showFinishDnfButtons: boolean;
@@ -28,11 +31,48 @@ type BookHubStatusPanelProps = {
   onRemoveFromLibrary: () => void;
 };
 
+function dnfReasonLabel(value: string) {
+  switch (value) {
+    case "too_difficult_right_now":
+      return "Too difficult right now";
+    case "wrong_timing_mood":
+      return "Wrong timing or mood";
+    case "too_much_unknown_vocabulary":
+      return "Too much unknown vocabulary";
+    case "too_dense_slow":
+      return "Too dense or slow";
+    case "lost_interest":
+      return "Lost interest";
+    case "did_not_like_it":
+      return "Did not like it";
+    case "other":
+      return "Other";
+    default:
+      return "";
+  }
+}
+
+function wouldRetryLabel(value: string) {
+  switch (value) {
+    case "yes":
+      return "Yes";
+    case "maybe":
+      return "Maybe later";
+    case "no":
+      return "No";
+    default:
+      return "";
+  }
+}
+
 export default function BookHubStatusPanel({
   statusLabel,
   startedAt,
   finishedAt,
   dnfAt,
+  dnfReason,
+  dnfNote,
+  wouldRetry,
   showStartButton,
   showFinishDnfButtons,
   showReflectionPrompt,
@@ -72,6 +112,27 @@ export default function BookHubStatusPanel({
           <span className="font-medium">DNF:</span> {dnfAt || "—"}
         </div>
       </div>
+
+      {dnfAt && (dnfReason || dnfNote || wouldRetry) ? (
+        <div className="mt-3 rounded-2xl border border-violet-100 bg-white/70 p-3 text-sm text-stone-700">
+          <div className="font-semibold text-stone-900">DNF details</div>
+          {dnfReason ? (
+            <div className="mt-2">
+              <span className="font-medium">Reason:</span> {dnfReasonLabel(dnfReason)}
+            </div>
+          ) : null}
+          {wouldRetry ? (
+            <div className="mt-1">
+              <span className="font-medium">Try again:</span> {wouldRetryLabel(wouldRetry)}
+            </div>
+          ) : null}
+          {dnfNote ? (
+            <div className="mt-1">
+              <span className="font-medium">Note:</span> {dnfNote}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {showStartButton ? (

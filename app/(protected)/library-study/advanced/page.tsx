@@ -82,6 +82,8 @@ export default function AdvancedStudyPage() {
                     </p>
                 </div>
 
+                <VocabularyGrowthCycleSection />
+
                 <details className="group mt-6 rounded-3xl border border-sky-200 bg-white p-6 text-slate-900 shadow-sm">
                     <summary className="cursor-pointer list-none">
                         <div className="flex items-center justify-between gap-4">
@@ -293,8 +295,6 @@ export default function AdvancedStudyPage() {
                         </p>
                     </div>
                 </details>
-
-                <VocabularyGrowthCycleSection />
 
                 <section className="mt-6">
                     <div className="mb-4">

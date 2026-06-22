@@ -13,10 +13,31 @@ type UserBook = {
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
+  dnf_reason: string | null;
+  dnf_note: string | null;
+  would_retry: string | null;
   format_type: string | null;
   progress_mode: string | null;
   show_page_numbers: boolean | null;
 };
+
+const DNF_REASON_OPTIONS = [
+  { value: "", label: "Choose a reason" },
+  { value: "too_difficult_right_now", label: "Too difficult right now" },
+  { value: "wrong_timing_mood", label: "Wrong timing or mood" },
+  { value: "too_much_unknown_vocabulary", label: "Too much unknown vocabulary" },
+  { value: "too_dense_slow", label: "Too dense or slow" },
+  { value: "lost_interest", label: "Lost interest" },
+  { value: "did_not_like_it", label: "Did not like it" },
+  { value: "other", label: "Other" },
+];
+
+const WOULD_RETRY_OPTIONS = [
+  { value: "", label: "Choose retry intent" },
+  { value: "yes", label: "Yes, I want to try again" },
+  { value: "maybe", label: "Maybe later" },
+  { value: "no", label: "No, probably not" },
+];
 
 type ReadingSession = {
   id: string;
@@ -48,6 +69,12 @@ type ReadingTabProps = {
   setFinishedAt: (value: string) => void;
   dnfAt: string;
   setDnfAt: (value: string) => void;
+  dnfReason: string;
+  setDnfReason: (value: string) => void;
+  dnfNote: string;
+  setDnfNote: (value: string) => void;
+  wouldRetry: string;
+  setWouldRetry: (value: string) => void;
   started: Date | null;
   finished: Date | null;
 
@@ -109,6 +136,12 @@ export default function ReadingTab({
   setFinishedAt,
   dnfAt,
   setDnfAt,
+  dnfReason,
+  setDnfReason,
+  dnfNote,
+  setDnfNote,
+  wouldRetry,
+  setWouldRetry,
   canFillBeginningPages,
   fillBeginningPages,
 
@@ -214,6 +247,69 @@ export default function ReadingTab({
             setInputValue={setDnfAt}
           />
         </div>
+
+        {(isEditingDates || dnfAt) ? (
+          <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-4">
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-stone-900">DNF reason</p>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                This helps separate “not right now” from “not for me.”
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
+                  Reason
+                </span>
+                <select
+                  value={dnfReason}
+                  onChange={(event) => setDnfReason(event.target.value)}
+                  disabled={!isEditingDates}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 disabled:bg-stone-100 disabled:text-stone-500"
+                >
+                  {DNF_REASON_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
+                  Try again?
+                </span>
+                <select
+                  value={wouldRetry}
+                  onChange={(event) => setWouldRetry(event.target.value)}
+                  disabled={!isEditingDates}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 disabled:bg-stone-100 disabled:text-stone-500"
+                >
+                  {WOULD_RETRY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="mt-3 block">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
+                Note
+              </span>
+              <textarea
+                value={dnfNote}
+                onChange={(event) => setDnfNote(event.target.value)}
+                disabled={!isEditingDates}
+                rows={3}
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm leading-6 text-stone-900 disabled:bg-stone-100 disabled:text-stone-500"
+                placeholder="Optional note about why you stopped."
+              />
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">

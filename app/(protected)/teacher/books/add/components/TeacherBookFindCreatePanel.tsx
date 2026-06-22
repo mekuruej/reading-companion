@@ -13,8 +13,9 @@ export function TeacherBookFindCreatePanel({
                 Find or create global book
             </h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-                Use ISBN lookup when possible. If the lookup fails, you can still create
-                a manual global book and fill in the details below.
+                Use ISBN lookup when possible. For web books, school readers, JSL materials,
+                or picture-book sites without ISBNs, leave ISBN blank and create a manual
+                global book.
             </p>
 
             {children}

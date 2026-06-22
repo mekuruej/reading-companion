@@ -352,9 +352,7 @@ export default function TeacherBookReviewPage() {
             <div className="mx-auto max-w-5xl space-y-5">
                 <TeacherBookReviewNav
                     onBackToTeacherPortal={() => router.push("/teacher")}
-                    onBackToBookHub={() =>
-                        router.push(`/books/${encodeURIComponent(userBookId)}`)
-                    }
+                    onBackToTeacherRatings={() => router.push("/teacher/ratings")}
                 />
 
                 <TeacherBookReviewHero book={book} />

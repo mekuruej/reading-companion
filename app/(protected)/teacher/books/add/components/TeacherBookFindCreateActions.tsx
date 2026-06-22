@@ -40,7 +40,9 @@ export function TeacherBookFindCreateActions({
                         ? "Working..."
                         : isBookRequest
                             ? "Create Manual Book Entry"
-                            : "Create / Load by ISBN"}
+                            : hasIsbnValue
+                                ? "Create / Load by ISBN"
+                                : "Create Manual Book Entry"}
                 </button>
 
                 <button

@@ -79,6 +79,9 @@ type UserBook = {
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
+  dnf_reason: string | null;
+  dnf_note: string | null;
+  would_retry: string | null;
   notes: string | null;
   my_review: string | null;
   reader_advice: string | null;
@@ -662,6 +665,9 @@ export default function BookHubPage() {
   const [startedAt, setStartedAt] = useState<string>("");
   const [finishedAt, setFinishedAt] = useState<string>("");
   const [dnfAt, setDnfAt] = useState<string>("");
+  const [dnfReason, setDnfReason] = useState<string>("");
+  const [dnfNote, setDnfNote] = useState<string>("");
+  const [wouldRetry, setWouldRetry] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [myReview, setMyReview] = useState<string>("");
   const [readerAdvice, setReaderAdvice] = useState<string>("");
@@ -1248,6 +1254,9 @@ export default function BookHubPage() {
     const started_at = startedAt.trim() ? startedAt.trim() : null;
     const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
     const dnf_at = dnfAt.trim() ? dnfAt.trim() : null;
+    const nextDnfReason = dnf_at && dnfReason.trim() ? dnfReason.trim() : null;
+    const nextDnfNote = dnf_at && dnfNote.trim() ? dnfNote.trim() : null;
+    const nextWouldRetry = dnf_at && wouldRetry.trim() ? wouldRetry.trim() : null;
 
     const status =
       dnf_at ? "did_not_finish" :
@@ -1262,6 +1271,9 @@ export default function BookHubPage() {
         started_at,
         finished_at,
         dnf_at,
+        dnf_reason: nextDnfReason,
+        dnf_note: nextDnfNote,
+        would_retry: nextWouldRetry,
       })
       .eq("id", row.id);
 
@@ -1278,9 +1290,15 @@ export default function BookHubPage() {
           started_at,
           finished_at,
           dnf_at,
+          dnf_reason: nextDnfReason,
+          dnf_note: nextDnfNote,
+          would_retry: nextWouldRetry,
         }
         : prev
     );
+    setDnfReason(nextDnfReason ?? "");
+    setDnfNote(nextDnfNote ?? "");
+    setWouldRetry(nextWouldRetry ?? "");
   }
 
   async function saveSettingItem(item: SettingItem) {
@@ -3010,6 +3028,9 @@ export default function BookHubPage() {
     const started_at = nextStartedAt.trim() ? nextStartedAt.trim() : null;
     const finished_at = nextFinishedAt.trim() ? nextFinishedAt.trim() : null;
     const dnf_at = nextDnfAt.trim() ? nextDnfAt.trim() : null;
+    const nextDnfReason = dnf_at && dnfReason.trim() ? dnfReason.trim() : null;
+    const nextDnfNote = dnf_at && dnfNote.trim() ? dnfNote.trim() : null;
+    const nextWouldRetry = dnf_at && wouldRetry.trim() ? wouldRetry.trim() : null;
 
     const status =
       dnf_at ? "did_not_finish" :
@@ -3024,6 +3045,9 @@ export default function BookHubPage() {
         started_at,
         finished_at,
         dnf_at,
+        dnf_reason: nextDnfReason,
+        dnf_note: nextDnfNote,
+        would_retry: nextWouldRetry,
       })
       .eq("id", row.id);
 
@@ -3036,6 +3060,9 @@ export default function BookHubPage() {
     setStartedAt(started_at ?? "");
     setFinishedAt(finished_at ?? "");
     setDnfAt(dnf_at ?? "");
+    setDnfReason(nextDnfReason ?? "");
+    setDnfNote(nextDnfNote ?? "");
+    setWouldRetry(nextWouldRetry ?? "");
 
     setRow((prev) =>
       prev
@@ -3044,6 +3071,9 @@ export default function BookHubPage() {
           started_at,
           finished_at,
           dnf_at,
+          dnf_reason: nextDnfReason,
+          dnf_note: nextDnfNote,
+          would_retry: nextWouldRetry,
         }
         : prev
     );
@@ -3374,6 +3404,9 @@ export default function BookHubPage() {
         started_at,
         finished_at,
         dnf_at,
+        dnf_reason,
+        dnf_note,
+        would_retry,
         notes,
         my_review,
         reader_advice,
@@ -3519,6 +3552,9 @@ export default function BookHubPage() {
     setStartedAt(r.started_at ? formatYmd(new Date(r.started_at)) : "");
     setFinishedAt(r.finished_at ? formatYmd(new Date(r.finished_at)) : "");
     setDnfAt(r.dnf_at ? formatYmd(new Date(r.dnf_at)) : "");
+    setDnfReason(r.dnf_reason ?? "");
+    setDnfNote(r.dnf_note ?? "");
+    setWouldRetry(r.would_retry ?? "");
     setNotes(r.notes ?? "");
     setMyReview(r.my_review ?? "");
     setReaderAdvice(r.reader_advice ?? "");
@@ -3697,6 +3733,9 @@ export default function BookHubPage() {
     setStartedAt(row.started_at ? formatYmd(new Date(row.started_at)) : "");
     setFinishedAt(row.finished_at ? formatYmd(new Date(row.finished_at)) : "");
     setDnfAt(row.dnf_at ? formatYmd(new Date(row.dnf_at)) : "");
+    setDnfReason(row.dnf_reason ?? "");
+    setDnfNote(row.dnf_note ?? "");
+    setWouldRetry(row.would_retry ?? "");
     setNotes(row.notes ?? "");
     setMyReview(row.my_review ?? "");
     setReaderAdvice(row.reader_advice ?? "");
@@ -4265,6 +4304,9 @@ export default function BookHubPage() {
     const started_at = startedAt.trim() ? startedAt.trim() : null;
     const finished_at = finishedAt.trim() ? finishedAt.trim() : null;
     const dnf_at = dnfAt.trim() ? dnfAt.trim() : null;
+    const nextDnfReason = dnf_at && dnfReason.trim() ? dnfReason.trim() : null;
+    const nextDnfNote = dnf_at && dnfNote.trim() ? dnfNote.trim() : null;
+    const nextWouldRetry = dnf_at && wouldRetry.trim() ? wouldRetry.trim() : null;
 
     const status =
       dnf_at ? "did_not_finish" :
@@ -4298,6 +4340,9 @@ export default function BookHubPage() {
         started_at,
         finished_at,
         dnf_at,
+        dnf_reason: nextDnfReason,
+        dnf_note: nextDnfNote,
+        would_retry: nextWouldRetry,
         notes: notes || null,
         my_review: myReview || null,
         reader_advice: readerAdvice.trim().slice(0, 160) || null,
@@ -5097,6 +5142,9 @@ export default function BookHubPage() {
                 startedAt={startedAt}
                 finishedAt={finishedAt}
                 dnfAt={dnfAt}
+                dnfReason={dnfReason}
+                dnfNote={dnfNote}
+                wouldRetry={wouldRetry}
                 showStartButton={showBookHubStartButton}
                 showFinishDnfButtons={showBookHubFinishDnfButtons}
                 showReflectionPrompt={showBookHubReflectionPrompt}
@@ -5332,6 +5380,12 @@ export default function BookHubPage() {
                     setFinishedAt={setFinishedAt}
                     dnfAt={dnfAt}
                     setDnfAt={setDnfAt}
+                    dnfReason={dnfReason}
+                    setDnfReason={setDnfReason}
+                    dnfNote={dnfNote}
+                    setDnfNote={setDnfNote}
+                    wouldRetry={wouldRetry}
+                    setWouldRetry={setWouldRetry}
                     started={started}
                     finished={finished}
                     sessionDate={sessionDate}

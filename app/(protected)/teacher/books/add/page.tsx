@@ -302,7 +302,6 @@ export default function TeacherAddBookPage() {
     const missingFields = useMemo(() => {
         const missing: string[] = [];
 
-        if (!isbn13.trim()) missing.push("ISBN-13");
         if (!coverUrl.trim()) missing.push("Cover");
         if (!bookType.trim()) missing.push("Book type");
         if (!author.trim()) missing.push("Author");
@@ -311,7 +310,7 @@ export default function TeacherAddBookPage() {
         if (!pageCount.trim()) missing.push("Page count");
 
         return missing;
-    }, [isbn13, coverUrl, bookType, author, publisher, publishedDate, pageCount]);
+    }, [coverUrl, bookType, author, publisher, publishedDate, pageCount]);
 
     useEffect(() => {
         async function load() {
@@ -839,8 +838,8 @@ export default function TeacherAddBookPage() {
 
         const cleanIsbn13 = isbn13.replace(/[^0-9Xx]/g, "");
 
-        if (cleanIsbn13.length !== 13) {
-            setMessage("Please enter a valid ISBN-13. Hyphens are okay.");
+        if (cleanIsbn13 && cleanIsbn13.length !== 13) {
+            setMessage("Please enter a valid ISBN-13, or leave ISBN blank for a no-ISBN manual entry.");
             return;
         }
 
@@ -862,7 +861,7 @@ export default function TeacherAddBookPage() {
                 .update({
                     title: title.trim(),
                     isbn: cleanText(isbn),
-                    isbn13: cleanIsbn13,
+                    isbn13: cleanIsbn13 || null,
                     cover_url: cleanText(coverUrl),
                     book_type: cleanText(bookType),
 

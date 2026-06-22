@@ -44,6 +44,15 @@ type ReadingFitCountUserBookRow = {
   teacher_review_cleared_at: string | null;
 };
 
+type TeacherRatingCountUserBookRow = {
+  finished_at: string | null;
+  dnf_at: string | null;
+  notes: string | null;
+  recommended_level: string | null;
+  teacher_student_use_rating: number | null;
+  rating_recommend: number | null;
+};
+
 type ReadingFitCountProfileRow = {
   id: string;
   level: string | null;
@@ -91,6 +100,20 @@ const teacherHubCards: TeacherHubCard[] = [
     eyebrow: "Books",
     description:
       "Open the teacher book review queue, requests, flags, and shared catalog cleanup.",
+  },
+  {
+    title: "General Upkeep",
+    href: "/teacher/general-upkeep",
+    eyebrow: "Maintain",
+    description:
+      "Open global cleanup tools and admin maintenance areas that do not belong to learner follow-up.",
+  },
+  {
+    title: "Teacher Ratings",
+    href: "/teacher/ratings",
+    eyebrow: "Plan",
+    description:
+      "Compare lesson-fit ratings and teacher notes to find useful books again.",
   },
 ];
 
@@ -221,6 +244,7 @@ export default function TeacherHubPage() {
         const [
           { data: readingFitProfiles },
           { data: readingFitRows },
+          { data: teacherRatingRows },
         ] = await Promise.all([
           supabase
             .from("profiles")
@@ -232,6 +256,10 @@ export default function TeacherHubPage() {
             .in("user_id", studentIds)
             .not("finished_at", "is", null)
             .is("teacher_review_cleared_at", null),
+          supabase
+            .from("user_books")
+            .select("finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
+            .in("user_id", studentIds),
         ]);
 
         const readerLevelByUserId = new Map(
@@ -253,12 +281,31 @@ export default function TeacherHubPage() {
           }
         ).length;
 
+        const teacherRatingCount = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
+          (item) => {
+            const isFinishedOrDnf = !!item.finished_at || !!item.dnf_at;
+            const hasTeacherReview =
+              !!String(item.recommended_level ?? "").trim() ||
+              item.teacher_student_use_rating != null ||
+              item.rating_recommend != null ||
+              !!String(item.notes ?? "").trim();
+
+            return isFinishedOrDnf && !hasTeacherReview;
+          }
+        ).length;
+
         const nextLearnerAlerts: TeacherAlertSummary[] = [
           {
             title: "Reading Reflection Reviews",
             href: "/teacher/reading-fit",
             count: readingFitCount ?? 0,
             description: "Finished books waiting for teacher review or reflection cleanup.",
+          },
+          {
+            title: "Teacher Ratings Needed",
+            href: "/teacher/ratings",
+            count: teacherRatingCount ?? 0,
+            description: "Finished or DNF books waiting for lesson-fit ratings and teacher notes.",
           },
           {
             title: "Lesson Vocabulary Reminder",

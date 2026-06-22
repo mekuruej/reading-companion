@@ -1,11 +1,11 @@
 type TeacherBookReviewNavProps = {
     onBackToTeacherPortal: () => void;
-    onBackToBookHub: () => void;
+    onBackToTeacherRatings: () => void;
 };
 
 export function TeacherBookReviewNav({
     onBackToTeacherPortal,
-    onBackToBookHub,
+    onBackToTeacherRatings,
 }: TeacherBookReviewNavProps) {
     return (
         <div className="flex flex-wrap gap-3">
@@ -19,10 +19,10 @@ export function TeacherBookReviewNav({
 
             <button
                 type="button"
-                onClick={onBackToBookHub}
+                onClick={onBackToTeacherRatings}
                 className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-800"
             >
-                Back to Book Hub
+                Back to Teacher Ratings
             </button>
         </div>
     );
