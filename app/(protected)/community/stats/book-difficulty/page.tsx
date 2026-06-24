@@ -4,13 +4,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import StatCard from "./components/StatCard";
-import SectionBand from "./components/SectionBand";
-import BarStrip from "./components/BarStrip";
-import PieChart from "./components/PieChart";
 import DifficultyTimeRangeSelector from "./components/DifficultyTimeRangeSelector";
 import BookDifficultyHeader from "./components/BookDifficultyHeader";
-import ReaderFitTable from "./components/ReaderFitTable";
+import BookDifficultyDistributionPanels from "./components/BookDifficultyDistributionPanels";
+import BookDifficultyMetricGrid from "./components/BookDifficultyMetricGrid";
+import {
+  BookDifficultyErrorBanner,
+  BookDifficultyLoadingPanel,
+} from "./components/BookDifficultyStatePanels";
+
 
 type DifficultyTimeRange =
   | "all_time"
@@ -57,12 +59,6 @@ type UserBookRow = {
   teacher_student_use_rating: string | number | null;
   recommended_level: string | null;
   books: RawBook | null;
-};
-
-type PieItem = {
-  label: string;
-  value: number;
-  color: string;
 };
 
 const DIFFICULTY_TIME_FILTERS: {
@@ -639,14 +635,26 @@ export default function BookDifficultyPage() {
     );
   }, [filteredRows]);
 
+  const hardestBookItems = useMemo(
+    () =>
+      hardestBooks.map((row) => ({
+        label: row.books?.title ?? "Untitled book",
+        value: row.rating_difficulty ?? 0,
+      })),
+    [hardestBooks]
+  );
+
+  const easiestBookItems = useMemo(
+    () =>
+      easiestBooks.map((row) => ({
+        label: row.books?.title ?? "Untitled book",
+        value: row.rating_difficulty ?? 0,
+      })),
+    [easiestBooks]
+  );
+
   if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="text-sm text-slate-600">Loading book difficulty…</div>
-        </div>
-      </main>
-    );
+    return <BookDifficultyLoadingPanel />;
   }
 
   return (
@@ -657,11 +665,7 @@ export default function BookDifficultyPage() {
           pageHeaderTone={selectedTheme.pageHeader}
         />
 
-        {errorMsg ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-            {errorMsg}
-          </div>
-        ) : null}
+        <BookDifficultyErrorBanner message={errorMsg} />
 
         <DifficultyTimeRangeSelector
           filters={DIFFICULTY_TIME_FILTERS}
@@ -672,138 +676,32 @@ export default function BookDifficultyPage() {
           onSelectTimeRange={setTimeRange}
         />
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Books Tracked"
-            value={totals.totalBooks}
-            hint={`${totals.finishedBooks} finished · ${totals.dnfBooks} DNF`}
-            tone={selectedTheme.statOne}
-          />
+        <BookDifficultyMetricGrid
+          totalBooks={totals.totalBooks}
+          finishedBooks={totals.finishedBooks}
+          dnfBooks={totals.dnfBooks}
+          averageDifficulty={formatDecimal(totals.averageDifficulty)}
+          ratedDifficulty={totals.ratedDifficulty}
+          averageOverall={formatDecimal(totals.averageOverall)}
+          ratedBooks={totals.ratedBooks}
+          tone={selectedTheme}
+        />
 
-          <StatCard
-            label="Avg Difficulty"
-            value={formatDecimal(totals.averageDifficulty)}
-            hint={`${totals.ratedDifficulty} finished ratings · 1 easy / 5 hard`}
-            tone={selectedTheme.statTwo}
-          />
-
-          <StatCard
-            label="Avg Entertainment"
-            value={formatDecimal(totals.averageOverall)}
-            hint="Finished-book entertainment ratings"
-            tone={selectedTheme.statThree}
-          />
-
-          <StatCard
-            label="Rated Books"
-            value={totals.ratedBooks}
-            hint="Finished books with ease or entertainment ratings"
-            tone={selectedTheme.statFour}
-          />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
-          <SectionBand
-            eyebrow={`Book types — ${selectedTimeLabel}`}
-            title="Book types in your difficulty data"
-            description="A count-based view of the kinds of books included in this reader-fit picture."
-            tone={selectedTheme.section}
-          >
-            <PieChart
-              items={bookTypePie}
-              size={190}
-              formatPercent={formatDecimal}
-            />
-          </SectionBand>
-
-          <SectionBand
-            eyebrow={`Difficulty — ${selectedTimeLabel}`}
-            title="Difficulty ratings"
-            description="How your finished books are distributed across your own ratings. Here, 1 means easiest and 5 means hardest."
-            tone={selectedTheme.softSection}
-          >
-            <PieChart
-              items={difficultyPie}
-              size={190}
-              formatPercent={formatDecimal}
-            />
-          </SectionBand>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SectionBand
-            eyebrow={`Page count — ${selectedTimeLabel}`}
-            title="Book length"
-            description="A simple look at which length of book you prefer."
-            tone={selectedTheme.section}
-          >
-            <BarStrip
-              items={pageBucketCounts}
-              colorClass="bg-sky-500"
-              valueSuffix=" books"
-            />
-          </SectionBand>
-
-          <SectionBand
-            eyebrow={`Entertainment — ${selectedTimeLabel}`}
-            title="Entertainment rating spread"
-            description="A simple view of how your enjoyment ratings are distributed."
-            tone={selectedTheme.section}
-          >
-            <BarStrip
-              items={overallRatingCounts}
-              colorClass="bg-indigo-500"
-              valueSuffix=" books"
-            />
-          </SectionBand>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SectionBand
-            eyebrow={`Hardest — ${selectedTimeLabel}`}
-            title="Books that pushed back"
-            description="A representative mix of finished books rated 5 for difficulty. These are the books that pushed back most, relative to their book types."
-            tone={selectedTheme.section}
-          >
-            <BarStrip
-              items={hardestBooks.map((row) => ({
-                label: row.books?.title ?? "Untitled book",
-                value: row.rating_difficulty ?? 0,
-              }))}
-              colorClass="bg-red-500"
-              valueSuffix=""
-            />
-          </SectionBand>
-
-          <SectionBand
-            eyebrow={`Easiest — ${selectedTimeLabel}`}
-            title="Books that felt comfortable"
-            description="A representative mix of finished books rated 1 for difficulty. These are the books that felt most comfortable, relative to their book types."
-            tone={selectedTheme.section}
-          >
-            <BarStrip
-              items={easiestBooks.map((row) => ({
-                label: row.books?.title ?? "Untitled book",
-                value: row.rating_difficulty ?? 0,
-              }))}
-              colorClass="bg-emerald-500"
-              valueSuffix=""
-            />
-          </SectionBand>
-        </div>
-
-        <SectionBand
-          eyebrow={`Reader-fit table — ${selectedTimeLabel}`}
-          title="Difficulty and enjoyment by book"
-          description="A compact table of finished books with difficulty and entertainment ratings. Keep in mind these ratings are most useful relative to each book’s type."
-          tone={selectedTheme.section}
-        >
-          <ReaderFitTable
-            rows={readerFitRows}
-            bookTypeLabel={bookTypeLabel}
-            formatRating={formatRating}
-          />
-        </SectionBand>
+        <BookDifficultyDistributionPanels
+          selectedTimeLabel={selectedTimeLabel}
+          sectionTone={selectedTheme.section}
+          softSectionTone={selectedTheme.softSection}
+          bookTypePie={bookTypePie}
+          difficultyPie={difficultyPie}
+          pageBucketCounts={pageBucketCounts}
+          overallRatingCounts={overallRatingCounts}
+          hardestBookItems={hardestBookItems}
+          easiestBookItems={easiestBookItems}
+          readerFitRows={readerFitRows}
+          bookTypeLabel={bookTypeLabel}
+          formatRating={formatRating}
+          formatPercent={formatDecimal}
+        />
       </div>
     </main>
   );
