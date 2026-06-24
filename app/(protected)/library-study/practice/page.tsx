@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   computeLibraryStudyColorStatus,
-  getLibraryStudyEncounterStageCounts,
   type LibraryStudyGateStatus,
   type LibraryStudyColorStatus,
 } from "@/lib/libraryStudyColor";
@@ -18,8 +17,6 @@ import {
   getFullAccessRequiredCopy,
 } from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
-import { recordStudyEvent } from "@/lib/studyEvents";
-import LibraryReviewWordSkyCta from "./components/LibraryReviewWordSkyCta";
 import LibraryReviewProgressCard from "./components/LibraryReviewProgressCard";
 import LibraryPracticeFilterPanel from "./components/LibraryPracticeFilterPanel";
 import LibraryPracticeCompleteCard from "./components/LibraryPracticeCompleteCard";
@@ -146,30 +143,6 @@ type MeaningReviewItem = {
   originalOk: boolean;
 };
 
-type LibraryCheckDebug = {
-  threshold: number;
-  rawRows: number;
-  completeGroups: number;
-  eligibleCards: number;
-  filteredCards: number;
-  topCompleteGroups: {
-    surface: string;
-    reading: string;
-    encounters: number;
-    reason: string;
-  }[];
-};
-
-type StudyMode =
-  | "reading_typing"
-  | "meaning_typing"
-  | "reading_to_meaning_typing"
-  | "reading_mc"
-  | "meaning_mc"
-  | "reading_to_kanji_mc"
-  | "reading_to_meaning_mc"
-  | "complete_study";
-
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
 type PracticeRevealStep = "word" | "reading" | "meaning";
 type PracticeStudyMode = "reveal" | "typing";
@@ -186,15 +159,10 @@ type PracticeColorFilter =
   | "grey"
   | "katakana";
 
-const STORAGE_KEY = "library-study-seen-by-date";
 const LIBRARY_PRACTICE_LAST_FIRST_CARD_KEY = "library-practice-last-first-card";
-const MASTERED_MAINTENANCE_INTERVAL_DAYS = 30;
-const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
-const REGULAR_GATE_RECHECK_WINDOW_DAYS = 3;
-const MISSED_GATE_RECHECK_MIN_DAYS = 7;
-const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
 const LIBRARY_REVIEW_AUTO_ADVANCE_MS = 3000;
+const LIBRARY_CHECK_WORD_PAGE_SIZE = 1000;
 
 function nextPracticeStudyMode(mode: PracticeStudyMode): PracticeStudyMode {
   return mode === "reveal" ? "typing" : "reveal";
@@ -203,7 +171,6 @@ function nextPracticeStudyMode(mode: PracticeStudyMode): PracticeStudyMode {
 function practiceStudyModeLabel(mode: PracticeStudyMode) {
   return mode === "reveal" ? "Reveal" : "Typing";
 }
-const PRE_READING_WAIT_RECHECK_DAYS = 90;
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   red_stages: 1,
@@ -213,92 +180,6 @@ const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   skip_katakana_library_check: true,
   library_check_daily_limit: 20,
 };
-
-const LIBRARY_CHECK_WORD_PAGE_SIZE = 1000;
-
-const DAILY_CHECK_PLAN_STORAGE_KEY = "library-study-daily-check-plan-by-date";
-
-const DAILY_CHECK_JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
-const DAILY_CHECK_LEVELS = [...DAILY_CHECK_JLPT_LEVELS, "NON-JLPT"] as const;
-const DAILY_CHECK_LIMITS = [10, 20, 30, 40, 50] as const;
-
-type DailyCheckLevel = (typeof DAILY_CHECK_LEVELS)[number];
-type DailyCheckLimit = (typeof DAILY_CHECK_LIMITS)[number];
-
-type DailyCheckPlan = {
-  dateKey: string;
-  levels: DailyCheckLevel[];
-  dailyLimit: DailyCheckLimit;
-  startedAt: string;
-};
-
-function isDailyCheckLevel(value: string): value is DailyCheckLevel {
-  return (DAILY_CHECK_LEVELS as readonly string[]).includes(value);
-}
-
-function isDailyCheckLimit(value: number): value is DailyCheckLimit {
-  return (DAILY_CHECK_LIMITS as readonly number[]).includes(value);
-}
-
-function cardMatchesDailyCheckLevels(card: StudyCard, levels: DailyCheckLevel[]) {
-  if (levels.length === 0) return false;
-  return levels.includes(normalizeJlpt(card.jlpt) as DailyCheckLevel);
-}
-
-function dailyCheckLevelsLabel(levels: DailyCheckLevel[]) {
-  if (levels.length === 0) return "No levels selected";
-  return levels.join(", ");
-}
-
-function loadDailyCheckPlanForToday() {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const raw = window.localStorage.getItem(DAILY_CHECK_PLAN_STORAGE_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as Record<string, DailyCheckPlan>;
-    const todayKey = getTodayKey();
-    const plan = parsed[todayKey];
-
-    if (!plan || plan.dateKey !== todayKey) return null;
-
-    const cleanLevels = (plan.levels ?? []).filter(isDailyCheckLevel);
-    const cleanLimit = isDailyCheckLimit(Number(plan.dailyLimit))
-      ? Number(plan.dailyLimit)
-      : 20;
-
-    if (cleanLevels.length === 0) return null;
-
-    return {
-      dateKey: todayKey,
-      levels: cleanLevels,
-      dailyLimit: cleanLimit as DailyCheckLimit,
-      startedAt: plan.startedAt || new Date().toISOString(),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function saveDailyCheckPlanForToday(plan: DailyCheckPlan) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const raw = window.localStorage.getItem(DAILY_CHECK_PLAN_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Record<string, DailyCheckPlan>) : {};
-
-    window.localStorage.setItem(
-      DAILY_CHECK_PLAN_STORAGE_KEY,
-      JSON.stringify({
-        ...parsed,
-        [plan.dateKey]: plan,
-      })
-    );
-  } catch {
-    // ignore localStorage failures
-  }
-}
 
 function shuffleArray<T>(arr: T[]) {
   const copy = [...arr];
@@ -369,14 +250,6 @@ function normalizeKana(value: string) {
 
 function normalizeJlpt(value: string | null | undefined) {
   return (value ?? "NON-JLPT").toUpperCase() || "NON-JLPT";
-}
-
-function cleanDailyCheckLimit(value: number | null | undefined) {
-  if (value === 10 || value === 20 || value === 30 || value === 40 || value === 50) {
-    return value;
-  }
-
-  return 20;
 }
 
 function isKatakanaOnly(value: string | null | undefined) {
@@ -736,163 +609,10 @@ function libraryStudyColorName(status: LibraryStudyColorStatus | undefined) {
   return color.charAt(0).toUpperCase() + color.slice(1);
 }
 
-function hashString(value: string) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
 function pickLibraryCheckGate(status: LibraryStudyColorStatus, _seed: string): LibraryCheckGate {
   if (status.nextGate === "reading") return "reading";
   if (status.nextGate === "meaning") return "meaning";
   return "reading";
-}
-
-function includeLibraryCheckCard(status: LibraryStudyColorStatus) {
-  return status.eligibleForLibraryStudy || status.nextGate === "reading" || status.nextGate === "meaning";
-}
-
-function isMasteredMaintenanceDue(card: StudyCard, now = new Date()) {
-  if (card.colorStatus.color !== "purple") return true;
-
-  const lastCheck = card.progress?.last_studied_at ?? card.progress?.mastered_at;
-  if (!lastCheck) return true;
-
-  const lastCheckDate = new Date(lastCheck);
-  if (Number.isNaN(lastCheckDate.getTime())) return true;
-
-  const elapsedMs = now.getTime() - lastCheckDate.getTime();
-  return elapsedMs >= MASTERED_MAINTENANCE_INTERVAL_DAYS * 24 * 60 * 60 * 1000;
-}
-
-function daysSinceIso(value: string | null | undefined, now = new Date()) {
-  if (!value) return Number.POSITIVE_INFINITY;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
-
-  return (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
-}
-
-function missedGateRecheckDays(card: StudyCard) {
-  return (
-    MISSED_GATE_RECHECK_MIN_DAYS +
-    (hashString(`${card.studyIdentityKey}::missed-gate`) % MISSED_GATE_RECHECK_WINDOW_DAYS)
-  );
-}
-
-function isMissedGateLimboDue(card: StudyCard, now = new Date()) {
-  if (card.colorStatus.color !== "grey") return true;
-
-  if (card.colorStatus.greyReason === "pre_reading_support") {
-    return daysSinceIso(card.progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
-  }
-
-  const recheckDays = missedGateRecheckDays(card);
-
-  if (card.colorStatus.greyReason === "reading_gate_support") {
-    return daysSinceIso(card.progress?.reading_gate_failed_at, now) >= recheckDays;
-  }
-
-  if (card.colorStatus.greyReason === "meaning_gate_support") {
-    return daysSinceIso(card.progress?.meaning_gate_failed_at, now) >= recheckDays;
-  }
-
-  return true;
-}
-
-function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
-  if (card.colorStatus.color === "purple" || card.colorStatus.color === "grey") return true;
-  if (!card.progress?.last_studied_at) return true;
-
-  const recheckDays =
-    REGULAR_GATE_RECHECK_MIN_DAYS +
-    (hashString(`${card.studyIdentityKey}::regular-gate`) % REGULAR_GATE_RECHECK_WINDOW_DAYS);
-
-  return daysSinceIso(card.progress.last_studied_at, now) >= recheckDays;
-}
-
-function isCardAvailableForLibraryCheck(
-  card: StudyCard,
-  selectedJlpt: string,
-  seenTodayIds: Set<string>,
-  options: { ignoreTiming?: boolean } = {}
-) {
-  const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
-
-  if (!jlptMatch) return false;
-  if (!includeLibraryCheckCard(card.colorStatus)) return false;
-
-  // Used by "Check Again Today" so the button really means:
-  // "give me cards even if I already checked them today / they are not due yet."
-  if (options.ignoreTiming) return true;
-
-  const notSeenToday = !seenTodayIds.has(card.id);
-
-  return (
-    notSeenToday &&
-    isMasteredMaintenanceDue(card) &&
-    isMissedGateLimboDue(card) &&
-    isRegularGateRecheckDue(card)
-  );
-}
-
-function availableDailyCheckCountForLevel(
-  cards: StudyCard[],
-  level: DailyCheckLevel,
-  seenTodayIds: Set<string>
-) {
-  return cards.filter(
-    (card) =>
-      normalizeJlpt(card.jlpt) === level &&
-      isCardAvailableForLibraryCheck(card, "all", seenTodayIds)
-  ).length;
-}
-
-function buildDailyCheckDeckSource(
-  cards: StudyCard[],
-  plan: DailyCheckPlan,
-  seenTodayIds: Set<string>,
-  options: { ignoreTiming?: boolean } = {}
-) {
-  const availableCards = cards.filter((card) =>
-    isCardAvailableForLibraryCheck(card, "all", seenTodayIds, {
-      ignoreTiming: options.ignoreTiming,
-    })
-  );
-
-  const primaryCards = availableCards.filter((card) =>
-    cardMatchesDailyCheckLevels(card, plan.levels)
-  );
-
-  const primaryIds = new Set(primaryCards.map((card) => card.id));
-
-  const fillerCards = availableCards.filter((card) => !primaryIds.has(card.id));
-
-  const shuffledPrimary = shuffleArray(primaryCards);
-  const shuffledFillers = shuffleArray(fillerCards);
-
-  if (shuffledPrimary.length >= plan.dailyLimit) {
-    return shuffledPrimary.slice(0, plan.dailyLimit);
-  }
-
-  return [
-    ...shuffledPrimary,
-    ...shuffledFillers.slice(0, plan.dailyLimit - shuffledPrimary.length),
-  ];
-}
-
-function totalDailyCheckPoolCountForLevel(
-  cards: StudyCard[],
-  level: DailyCheckLevel
-) {
-  return cards.filter(
-    (card) =>
-      normalizeJlpt(card.jlpt) === level &&
-      includeLibraryCheckCard(card.colorStatus)
-  ).length;
 }
 
 function isCardAvailableForLibraryPractice(
@@ -1388,61 +1108,6 @@ function matchesAnyMeaning(input: string, fullMeaning: string) {
   return false;
 }
 
-function getTodayKey() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function loadSeenForToday() {
-  if (typeof window === "undefined") return new Set<string>();
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set<string>();
-
-    const parsed = JSON.parse(raw) as Record<string, string[]>;
-    const today = getTodayKey();
-    const todaysValues = parsed[today] ?? [];
-    return new Set(todaysValues);
-  } catch {
-    return new Set<string>();
-  }
-}
-
-function saveSeenForToday(values: Set<string>) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    const today = getTodayKey();
-
-    const cleaned: Record<string, string[]> = {};
-    cleaned[today] = Array.from(values);
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, ...cleaned }));
-  } catch {
-    // ignore localStorage failures
-  }
-}
-
-function clearSeenForToday() {
-  if (typeof window === "undefined") return;
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    const today = getTodayKey();
-    delete parsed[today];
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-  } catch {
-    // ignore localStorage failures
-  }
-}
-
 function practiceColorFilterLabel(filter: PracticeColorFilter) {
   if (filter === "all") return "All Colors";
   if (filter === "grey") return "Limbo words";
@@ -1500,55 +1165,25 @@ function libraryReviewStudyingNowLabel({
 export default function LibraryStudyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const typingInputRef = useRef<HTMLInputElement | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isTeacherUser, setIsTeacherUser] = useState(false);
-  const [learningSettings, setLearningSettings] =
-    useState<LearningSettingsRow>(DEFAULT_LEARNING_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
   const [fullAccessLocked, setFullAccessLocked] = useState(false);
 
-  const [allCards, setAllCards] = useState<StudyCard[]>([]);
   const [libraryReviewCards, setLibraryReviewCards] = useState<StudyCard[]>([]);
-  const [deck, setDeck] = useState<StudyCard[]>([]);
-  const [index, setIndex] = useState(0);
   const [practiceDeck, setPracticeDeck] = useState<StudyCard[]>([]);
   const [practiceIndex, setPracticeIndex] = useState(0);
   const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
   const [practiceFinished, setPracticeFinished] = useState(false);
   const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
-  const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
-  const [dailyCheckPlan, setDailyCheckPlan] = useState<DailyCheckPlan | null>(null);
-  const [setupLevels, setSetupLevels] = useState<DailyCheckLevel[]>([]);
-  const [setupDailyLimit, setSetupDailyLimit] = useState<DailyCheckLimit>(20);
   const [practiceColorFilter, setPracticeColorFilter] =
     useState<PracticeColorFilter>("all");
-  const [studyMode, setStudyMode] = useState<StudyMode>("reading_typing");
-
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
-  const [typingInput, setTypingInput] = useState("");
-
-  const [twoStepStage, setTwoStepStage] = useState<1 | 2>(1);
-  const [firstStepChecked, setFirstStepChecked] = useState<null | { ok: boolean; correct: string }>(
-    null
-  );
-  const [secondStepInput, setSecondStepInput] = useState("");
-  const [secondStepChecked, setSecondStepChecked] = useState<
-    null | { ok: boolean; correct: string }
-  >(null);
-
-  const [endedEarly, setEndedEarly] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
-  const [activeTodayKey, setActiveTodayKey] = useState(getTodayKey());
-  const [forceCheckAgainToday, setForceCheckAgainToday] = useState(false);
+  const [, setNotice] = useState<string | null>(null);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
 
@@ -1577,16 +1212,7 @@ export default function LibraryStudyPage() {
     }
   }, [searchParams]);
 
-  const currentCard = deck[index];
   const practiceCard = practiceDeck[practiceIndex];
-  const dailyCheckLimit =
-    dailyCheckPlan?.dailyLimit ?? cleanDailyCheckLimit(learningSettings.library_check_daily_limit);
-
-  const filteredCards = useMemo(() => {
-    if (!dailyCheckPlan) return [];
-
-    return buildDailyCheckDeckSource(allCards, dailyCheckPlan, seenTodayIds);
-  }, [allCards, dailyCheckPlan, seenTodayIds]);
 
   const practiceFilteredCards = useMemo(() => {
     return libraryReviewCards.filter((card) =>
@@ -1597,129 +1223,6 @@ export default function LibraryStudyPage() {
       )
     );
   }, [libraryReviewCards, selectedJlptLevels, practiceColorFilter]);
-
-  const availableCountBySetupLevel = useMemo(() => {
-    const counts: Record<DailyCheckLevel, number> = {
-      N5: 0,
-      N4: 0,
-      N3: 0,
-      N2: 0,
-      N1: 0,
-      "NON-JLPT": 0,
-    };
-
-    for (const level of DAILY_CHECK_LEVELS) {
-      counts[level] = availableDailyCheckCountForLevel(
-        allCards,
-        level,
-        seenTodayIds
-      );
-    }
-
-    return counts;
-  }, [allCards, seenTodayIds]);
-
-  const poolCountBySetupLevel = useMemo(() => {
-    const counts: Record<DailyCheckLevel, number> = {
-      N5: 0,
-      N4: 0,
-      N3: 0,
-      N2: 0,
-      N1: 0,
-      "NON-JLPT": 0,
-    };
-
-    for (const level of DAILY_CHECK_LEVELS) {
-      counts[level] = totalDailyCheckPoolCountForLevel(allCards, level);
-    }
-
-    return counts;
-  }, [allCards]);
-
-  useEffect(() => {
-    setDebugInfo((prev) => (prev ? { ...prev, filteredCards: filteredCards.length } : prev));
-  }, [filteredCards.length]);
-
-  const meaningOptions = useMemo(() => {
-    if (!currentCard) return [];
-
-    const distractors = uniqueByNormalized(
-      filteredCards
-        .filter((card) => card.id !== currentCard.id)
-        .map((card) => card.meaning),
-      normalizeText,
-      currentCard.meaning
-    ).slice(0, 3);
-
-    return shuffleArray([currentCard.meaning, ...distractors]);
-  }, [currentCard, filteredCards]);
-
-  const readingOptions = useMemo(() => {
-    if (!currentCard) return [];
-
-    const distractors = uniqueByNormalized(
-      filteredCards
-        .filter((card) => card.id !== currentCard.id)
-        .map((card) => card.reading),
-      normalizeKana,
-      currentCard.reading
-    ).slice(0, 3);
-
-    return shuffleArray([currentCard.reading, ...distractors]);
-  }, [currentCard, filteredCards]);
-
-  const surfaceOptions = useMemo(() => {
-    if (!currentCard) return [];
-
-    const distractors = uniqueByNormalized(
-      filteredCards
-        .filter((card) => card.id !== currentCard.id)
-        .map((card) => card.surface),
-      normalizeText,
-      currentCard.surface
-    ).slice(0, 3);
-
-    return shuffleArray([currentCard.surface, ...distractors]);
-  }, [currentCard, filteredCards]);
-
-  useEffect(() => {
-    function resetForCurrentDay() {
-      const todayKey = getTodayKey();
-
-      setActiveTodayKey((previousKey) => {
-        if (previousKey !== todayKey) {
-          const todaysPlan = loadDailyCheckPlanForToday();
-
-          setSeenTodayIds(loadSeenForToday());
-          setDailyCheckPlan(todaysPlan);
-          setForceCheckAgainToday(false);
-          setNotice(null);
-          setEndedEarly(false);
-          setIndex(0);
-          resetCardState();
-
-          return todayKey;
-        }
-
-        return previousKey;
-      });
-    }
-
-    setSeenTodayIds(loadSeenForToday());
-    setDailyCheckPlan(loadDailyCheckPlanForToday());
-    resetForCurrentDay();
-
-    const interval = window.setInterval(resetForCurrentDay, 60_000);
-
-    window.addEventListener("focus", resetForCurrentDay);
-    document.addEventListener("visibilitychange", resetForCurrentDay);
-
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", resetForCurrentDay);
-      document.removeEventListener("visibilitychange", resetForCurrentDay);
-    };
-  }, []);
 
   useEffect(() => {
     async function load() {
@@ -1757,11 +1260,6 @@ export default function LibraryStudyPage() {
         const role = ((profileRow as any)?.role ?? "member") as ProfileRole;
         const superTeacherFlag = Boolean((profileRow as any)?.is_super_teacher);
 
-        const teacherAccess =
-          role === "teacher" || role === "super_teacher" || superTeacherFlag;
-
-        setIsTeacherUser(teacherAccess);
-
         const appAccessStatus = profileRow
           ? getAppAccessStatus(profileRow)
           : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
@@ -1782,9 +1280,7 @@ export default function LibraryStudyPage() {
         setCanUseLibraryReview(canUseLibraryReviewNow);
 
         if (!canUseLibraryReviewNow) {
-          setAllCards([]);
           setLibraryReviewCards([]);
-          setDeck([]);
           setPracticeDeck([]);
           setFullAccessLocked(true);
           setLoading(false);
@@ -1808,9 +1304,7 @@ export default function LibraryStudyPage() {
         const userBookIds = (userBooks ?? []).map((row) => row.id).filter(Boolean);
 
         if (userBookIds.length === 0) {
-          setAllCards([]);
           setLibraryReviewCards([]);
-          setDeck([]);
           setPracticeDeck([]);
           setLoading(false);
           return;
@@ -1839,14 +1333,7 @@ export default function LibraryStudyPage() {
         const colorSettings = {
           ...DEFAULT_LEARNING_SETTINGS,
           ...(learningSettings ?? {}),
-          library_check_daily_limit: cleanDailyCheckLimit(
-            learningSettings?.library_check_daily_limit ??
-            DEFAULT_LEARNING_SETTINGS.library_check_daily_limit
-          ),
         };
-        const encounterThreshold = getLibraryStudyEncounterStageCounts(colorSettings).total;
-        setLearningSettings(colorSettings);
-        setSetupDailyLimit(cleanDailyCheckLimit(colorSettings.library_check_daily_limit));
 
         const metaById = new Map<string, { title: string; cover_url: string | null }>();
         for (const row of userBooks ?? []) {
@@ -1872,9 +1359,6 @@ export default function LibraryStudyPage() {
         if (allSummaryRows.length > 0) {
           const visibleSummaryRows = allSummaryRows
             .filter((row) => (row.total_encounter_count ?? 0) > (row.hidden_encounter_count ?? 0));
-          const summaryRows = visibleSummaryRows
-            .filter((row) => (row.check_ready_encounter_count ?? 0) > 0);
-          const abilitySummaryRows = summaryRows.slice(0, 500);
           let definitionNumberByWordId = new Map<string, number>();
           const sampleWordIds = uniqueStrings(
             visibleSummaryRows.map((row) => row.sample_user_book_word_id).filter(Boolean)
@@ -1889,7 +1373,6 @@ export default function LibraryStudyPage() {
           }
 
           const studyKeys = uniqueStrings([
-            ...abilitySummaryRows.map((row) => row.study_identity_key).filter(Boolean),
             ...allSummaryRows.map((row) => row.study_identity_key).filter(Boolean),
             ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
           ]);
@@ -1909,67 +1392,6 @@ export default function LibraryStudyPage() {
               );
             }
           }
-
-          const cards: StudyCard[] = abilitySummaryRows
-            .map((summary) => {
-              const surface = (summary.surface ?? "").trim();
-              const reading = (summary.reading ?? "").trim();
-              const meaning = (summary.meaning ?? "").trim();
-              const encounterCount = summary.total_encounter_count ?? 0;
-              const progress = progressWithWordSkyClaim(
-                user.id,
-                summary.study_identity_key,
-                surface,
-                reading,
-                progressByKey.get(summary.study_identity_key) ?? null,
-                claimByKey.get(summary.study_identity_key)
-              );
-
-              if (!surface || !reading || !meaning || !summary.sample_user_book_word_id) {
-                return null;
-              }
-
-              if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
-                return null;
-              }
-
-              const colorStatus = computeLibraryStudyColorStatus({
-                encounterCount,
-                settings: colorSettings,
-                readingGate: progress?.reading_gate_status ?? "not_started",
-                meaningGate: progress?.meaning_gate_status ?? "not_started",
-                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-                preReadingSupportCycle: preReadingSupportCycle(progress),
-                mastered: progress?.mastered ?? false,
-              });
-
-              return {
-                id: summary.sample_user_book_word_id,
-                userBookId: summary.sample_user_book_id ?? "",
-                bookTitle: summary.sample_book_title ?? "Untitled",
-                bookCoverUrl: summary.sample_book_cover_url ?? null,
-                surface,
-                reading,
-                meaning,
-                jlpt: summary.jlpt ?? null,
-                encounterCount,
-                encounterIds: [summary.sample_user_book_word_id],
-                colorStatus,
-                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
-                studyIdentityKey: summary.study_identity_key,
-                progress,
-                definitionNumber: definitionNumberByWordId.get(summary.sample_user_book_word_id) ?? null,
-              };
-            })
-            .filter((card): card is StudyCard => Boolean(card));
-
-          const summaryCardKeys = new Set(cards.map((card) => card.studyIdentityKey));
-          const claimCards = claimRows
-            .filter((claim) => !summaryCardKeys.has(claim.study_identity_key))
-            .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
-            .filter((card): card is StudyCard => Boolean(card));
-          const allStudyCards = [...cards, ...claimCards];
 
           const reviewCards: StudyCard[] = visibleSummaryRows
             .map((summary) => {
@@ -2032,45 +1454,7 @@ export default function LibraryStudyPage() {
             .filter((card): card is StudyCard => Boolean(card));
           const allReviewCards = [...reviewCards, ...reviewClaimCards];
 
-          setAllCards(allStudyCards);
           setLibraryReviewCards(allReviewCards);
-          setDebugInfo({
-            threshold: encounterThreshold,
-            rawRows: allSummaryRows.length,
-            completeGroups: visibleSummaryRows.length,
-            eligibleCards: allStudyCards.length,
-            filteredCards: allReviewCards.length,
-            topCompleteGroups: visibleSummaryRows.slice(0, 8).map((summary) => {
-              const surface = summary.surface?.trim() ?? "";
-              const reading = summary.reading?.trim() ?? "";
-              const progress = progressWithWordSkyClaim(
-                user.id,
-                summary.study_identity_key,
-                surface,
-                reading,
-                progressByKey.get(summary.study_identity_key) ?? null,
-                claimByKey.get(summary.study_identity_key)
-              );
-              const encounterCount = summary.total_encounter_count ?? 0;
-              const status = computeLibraryStudyColorStatus({
-                encounterCount,
-                settings: colorSettings,
-                readingGate: progress?.reading_gate_status ?? "not_started",
-                meaningGate: progress?.meaning_gate_status ?? "not_started",
-                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-                preReadingSupportCycle: preReadingSupportCycle(progress),
-                mastered: progress?.mastered ?? false,
-              });
-
-              return {
-                surface: summary.surface?.trim() ?? "",
-                reading: summary.reading?.trim() ?? "",
-                encounters: encounterCount,
-                reason: status.reason,
-              };
-            }),
-          });
           return;
         }
 
@@ -2175,46 +1559,7 @@ export default function LibraryStudyPage() {
           .filter((card): card is StudyCard => Boolean(card));
         const allStudyCards = [...cards, ...claimCards];
 
-        setAllCards(allStudyCards);
         setLibraryReviewCards(allStudyCards);
-        setDebugInfo({
-          threshold: encounterThreshold,
-          rawRows: words?.length ?? 0,
-          completeGroups: groupedWords.size,
-          eligibleCards: allStudyCards.length,
-          filteredCards: allStudyCards.length,
-          topCompleteGroups: Array.from(groupedWords.entries())
-            .map(([key, group]) => {
-              const representative = group[0];
-              const progress = progressWithWordSkyClaim(
-                user.id,
-                key,
-                representative.surface?.trim() ?? "",
-                representative.reading?.trim() ?? "",
-                progressByKey.get(key) ?? null,
-                claimByKey.get(key)
-              );
-              const status = computeLibraryStudyColorStatus({
-                encounterCount: group.length,
-                settings: colorSettings,
-                readingGate: progress?.reading_gate_status ?? "not_started",
-                meaningGate: progress?.meaning_gate_status ?? "not_started",
-                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-                preReadingSupportCycle: preReadingSupportCycle(progress),
-                mastered: progress?.mastered ?? false,
-              });
-
-              return {
-                surface: representative.surface?.trim() ?? "",
-                reading: representative.reading?.trim() ?? "",
-                encounters: group.length,
-                reason: status.reason,
-              };
-            })
-            .sort((a, b) => b.encounters - a.encounters)
-            .slice(0, 8),
-        });
       } catch (err: any) {
         console.error("Error loading Ability Check:", err);
         setErrorMsg(errorMessage(err) || "Failed to load Ability Check.");
@@ -2227,216 +1572,11 @@ export default function LibraryStudyPage() {
   }, []);
 
   useEffect(() => {
-    if (allCards.length === 0 || !dailyCheckPlan) {
-      setDeck([]);
-      setIndex(0);
-      resetCardState();
-      setEndedEarly(false);
-      return;
-    }
-
-    const nextDeckSource = buildDailyCheckDeckSource(
-      allCards,
-      dailyCheckPlan,
-      seenTodayIds
-    );
-
-    setDeck(nextDeckSource);
-    setIndex(0);
-    resetCardState();
-    setEndedEarly(false);
-
-    // Do not include seenTodayIds here.
-    // Answering cards should not rebuild the active daily deck.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allCards, dailyCheckPlan, activeTodayKey]);
-
-  useEffect(() => {
     setPracticeDeck(buildShuffledPracticeDeck(practiceFilteredCards));
     setPracticeIndex(0);
     setPracticeRevealStep("word");
     setPracticeFinished(false);
   }, [practiceFilteredCards]);
-
-  useEffect(() => {
-    if (!currentCard) return;
-    if (studyMode !== "reading_typing" && studyMode !== "meaning_typing") return;
-    if (checked || firstStepChecked || secondStepChecked) return;
-
-    const activeGate = currentCard.activeGate;
-
-    if (activeGate === "reading" && studyMode !== "reading_typing") {
-      setStudyMode("reading_typing");
-      resetCardState();
-    } else if (activeGate === "meaning" && studyMode !== "meaning_typing") {
-      setStudyMode("meaning_typing");
-      resetCardState();
-    }
-  }, [currentCard, studyMode, checked, firstStepChecked, secondStepChecked]);
-
-  useEffect(() => {
-    if (!checked) return;
-
-    const timer = window.setTimeout(() => {
-      movePastCurrentCard();
-    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [checked]);
-
-  useEffect(() => {
-    if (!firstStepChecked || firstStepChecked.ok) return;
-
-    const timer = window.setTimeout(() => {
-      movePastCurrentCard();
-    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [firstStepChecked]);
-
-  useEffect(() => {
-    if (!secondStepChecked) return;
-
-    const timer = window.setTimeout(() => {
-      movePastCurrentCard();
-    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [secondStepChecked]);
-
-  useEffect(() => {
-    const needsTypingFocus =
-      studyMode === "reading_typing" ||
-      studyMode === "meaning_typing" ||
-      studyMode === "reading_to_meaning_typing" ||
-      studyMode === "complete_study";
-
-    if (!needsTypingFocus) return;
-    if (!currentCard) return;
-
-    const timer = window.setTimeout(() => {
-      typingInputRef.current?.focus();
-      typingInputRef.current?.select();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [currentCard, index, studyMode, twoStepStage]);
-
-  function resetCardState() {
-    setSelectedAnswer(null);
-    setChecked(null);
-    setTypingInput("");
-    setTwoStepStage(1);
-    setFirstStepChecked(null);
-    setSecondStepInput("");
-    setSecondStepChecked(null);
-  }
-
-  function markCardSeen(cardId: string) {
-    setSeenTodayIds((prev) => {
-      const next = new Set(prev);
-      next.add(cardId);
-      saveSeenForToday(next);
-      return next;
-    });
-  }
-
-  function toggleSetupLevel(level: DailyCheckLevel) {
-    setSetupLevels((prev) => {
-      if (prev.includes(level)) {
-        return prev.filter((item) => item !== level);
-      }
-
-      return [...prev, level];
-    });
-  }
-
-  function toggleAllSetupLevels() {
-    setSetupLevels((prev) => {
-      const allLevelsSelected = DAILY_CHECK_LEVELS.every((level) =>
-        prev.includes(level)
-      );
-
-      if (allLevelsSelected) {
-        return [];
-      }
-
-      return [...DAILY_CHECK_LEVELS];
-    });
-  }
-
-  function startDailyCheck() {
-    if (setupLevels.length === 0) {
-      alert("Please choose at least one level for today’s Ability Check.");
-      return;
-    }
-
-    const todayKey = getTodayKey();
-
-    const plan: DailyCheckPlan = {
-      dateKey: todayKey,
-      levels: setupLevels,
-      dailyLimit: setupDailyLimit,
-      startedAt: new Date().toISOString(),
-    };
-
-    saveDailyCheckPlanForToday(plan);
-
-    setDailyCheckPlan(plan);
-    setForceCheckAgainToday(false);
-    setNotice(null);
-    setEndedEarly(false);
-    setIndex(0);
-    resetCardState();
-  }
-
-  function resetTeacherDailyCheckSetup() {
-    clearSeenForToday();
-    setSeenTodayIds(new Set());
-    setDailyCheckPlan(null);
-    setDeck([]);
-    setIndex(0);
-    setNotice(null);
-    setEndedEarly(false);
-    resetCardState();
-  }
-
-  function restartDeck() {
-    const nextDeckSource = allCards.filter((card) =>
-      isCardAvailableForLibraryCheck(card, "all", seenTodayIds, {
-        ignoreTiming: forceCheckAgainToday,
-      })
-    );
-
-    setDeck(shuffleArray(nextDeckSource).slice(0, dailyCheckLimit));
-    setIndex(0);
-    resetCardState();
-    setEndedEarly(false);
-    setNotice(null);
-  }
-
-  function studyAgainToday() {
-    clearSeenForToday();
-
-    const clearedSeenIds = new Set<string>();
-    setSeenTodayIds(clearedSeenIds);
-    setForceCheckAgainToday(true);
-
-    setDeck(
-      shuffleArray(
-        allCards.filter((card) =>
-          isCardAvailableForLibraryCheck(card, "all", clearedSeenIds, {
-            ignoreTiming: true,
-          })
-        )
-      ).slice(0, dailyCheckLimit)
-    );
-
-    setIndex(0);
-    resetCardState();
-    setEndedEarly(false);
-    setNotice("Extra check mode is on for this session. Some cards may not be due yet.");
-  }
 
   function resetPracticeReveal() {
     setPracticeRevealStep("word");
@@ -2502,35 +1642,6 @@ export default function LibraryStudyPage() {
     resetPracticeReveal();
   }
 
-  function nextCardWithoutMarkingSeen() {
-    if (index + 1 >= deck.length) {
-      setIndex(deck.length);
-      resetCardState();
-      return;
-    }
-
-    setIndex((prev) => prev + 1);
-    resetCardState();
-    setNotice(null);
-  }
-
-  function movePastCurrentCard() {
-    if (currentCard) {
-      markCardSeen(currentCard.id);
-    }
-    nextCardWithoutMarkingSeen();
-  }
-
-  function finishForToday() {
-    setEndedEarly(true);
-    setIndex(deck.length);
-    resetCardState();
-  }
-
-  function finishMeaningReview() {
-    setMeaningReviewItems([]);
-  }
-
   function finishPracticeMeaningReview() {
     setMeaningReviewItems([]);
     setShowPracticeMeaningReview(false);
@@ -2579,44 +1690,12 @@ export default function LibraryStudyPage() {
     });
   }
 
-  function canComeBackLater(card: StudyCard | undefined) {
-    return (
-      card?.colorStatus.color === "yellow" &&
-      card.colorStatus.nextGate === "reading" &&
-      card.activeGate === "reading"
-    );
-  }
-
-  function recordCurrentStudyEvent(
-    result: "correct" | "incorrect" | "skipped" | "reviewed",
-    isCorrect: boolean | null,
-    cardType: string
-  ) {
-    if (!canUseLibraryReview) return;
-    if (!currentCard) return;
-
-    void recordStudyEvent({
-      userBookId:
-        (currentCard as any).user_book_id ??
-        (currentCard as any).userBookId ??
-        null,
-      userBookWordId: isClaimCardId(currentCard.id) ? null : currentCard.id,
-      studyMode: "study_flashcards",
-      cardType,
-      result,
-      isCorrect,
-      surface: currentCard.surface,
-      reading: currentCard.reading,
-      meaning: currentCard.meaning,
-    });
-  }
-
   async function saveTypedGateProgress(
     gate: "reading" | "meaning",
     ok: boolean,
     options: { forceMeaning?: boolean; card?: StudyCard } = {}
   ) {
-    const activeCard = options.card ?? currentCard;
+    const activeCard = options.card;
     if (!canUseLibraryReview) return;
     if (!currentUserId || !activeCard) return;
 
@@ -2752,116 +1831,6 @@ export default function LibraryStudyPage() {
     // The saved progress is picked up next time, so a word cannot climb twice in one sitting.
   }
 
-  async function comeBackLaterForCurrentCard() {
-    if (!canUseLibraryReview) return;
-    if (!currentUserId || !currentCard || !canComeBackLater(currentCard)) return;
-
-    const now = new Date().toISOString();
-    const existing = currentCard.progress;
-
-    const { data, error } = await supabase
-      .from("user_library_word_progress")
-      .upsert(
-        {
-          user_id: currentUserId,
-          study_identity_key: currentCard.studyIdentityKey,
-          surface: currentCard.surface,
-          reading: currentCard.reading,
-          definition_key: "",
-          reading_gate_status: existing?.reading_gate_status ?? "not_started",
-          meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
-          held_before_reading_gate: true,
-          held_before_meaning_gate: existing?.held_before_meaning_gate ?? false,
-          mastered: existing?.mastered ?? false,
-          reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
-          meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
-          reading_gate_passed_at: existing?.reading_gate_passed_at ?? null,
-          reading_gate_failed_at: existing?.reading_gate_failed_at ?? null,
-          meaning_gate_passed_at: existing?.meaning_gate_passed_at ?? null,
-          meaning_gate_failed_at: existing?.meaning_gate_failed_at ?? null,
-          mastered_at: existing?.mastered_at ?? null,
-          last_studied_at: now,
-        },
-        { onConflict: "user_id,study_identity_key,definition_key" }
-      )
-      .select(
-        `
-          id,
-          user_id,
-          study_identity_key,
-          surface,
-          reading,
-          definition_key,
-          reading_gate_status,
-          meaning_gate_status,
-          held_before_reading_gate,
-          held_before_meaning_gate,
-          mastered,
-          reading_gate_attempts,
-          meaning_gate_attempts,
-          reading_gate_passed_at,
-          reading_gate_failed_at,
-          meaning_gate_passed_at,
-          meaning_gate_failed_at,
-          mastered_at,
-          last_studied_at
-        `
-      )
-      .single<LibraryWordProgressRow>();
-
-    if (error) {
-      console.error("Error holding Ability Check card for later:", error);
-      setNotice("Could not hold this word for later.");
-      return;
-    }
-
-    const heldProgress = data ?? {
-      ...(existing ?? {}),
-      user_id: currentUserId,
-      study_identity_key: currentCard.studyIdentityKey,
-      surface: currentCard.surface,
-      reading: currentCard.reading,
-      definition_key: "",
-      reading_gate_status: existing?.reading_gate_status ?? "not_started",
-      meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
-      held_before_reading_gate: true,
-      held_before_meaning_gate: existing?.held_before_meaning_gate ?? false,
-      mastered: existing?.mastered ?? false,
-      reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
-      meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
-      reading_gate_passed_at: existing?.reading_gate_passed_at ?? null,
-      reading_gate_failed_at: existing?.reading_gate_failed_at ?? null,
-      meaning_gate_passed_at: existing?.meaning_gate_passed_at ?? null,
-      meaning_gate_failed_at: existing?.meaning_gate_failed_at ?? null,
-      mastered_at: existing?.mastered_at ?? null,
-      last_studied_at: now,
-    } as LibraryWordProgressRow;
-
-    setAllCards((prev) =>
-      prev.map((card) =>
-        card.studyIdentityKey === currentCard.studyIdentityKey
-          ? {
-            ...card,
-            progress: heldProgress,
-            colorStatus: computeLibraryStudyColorStatus({
-              encounterCount: card.encounterCount,
-              settings: learningSettings,
-              readingGate: heldProgress.reading_gate_status,
-              meaningGate: heldProgress.meaning_gate_status,
-              heldBeforeReadingGate: true,
-              heldBeforeMeaningGate: heldProgress.held_before_meaning_gate,
-              preReadingSupportCycle: preReadingSupportCycle(heldProgress),
-              mastered: heldProgress.mastered,
-            }),
-          }
-          : card
-      )
-    );
-
-    markCardSeen(currentCard.id);
-    nextCardWithoutMarkingSeen();
-  }
-
   async function countMeaningReviewAsPassed(item: MeaningReviewItem) {
     await saveTypedGateProgress("meaning", true, { forceMeaning: true, card: item.card });
     setMeaningReviewItems((prev) => prev.filter((review) => review.id !== item.id));
@@ -2874,159 +1843,6 @@ export default function LibraryStudyPage() {
   async function countMeaningReviewAsMissed(item: MeaningReviewItem) {
     await saveTypedGateProgress("meaning", false, { forceMeaning: true, card: item.card });
     setMeaningReviewItems((prev) => prev.filter((review) => review.id !== item.id));
-  }
-
-  function checkMultipleChoice(choice: string) {
-    if (!currentCard || checked) return;
-
-    let correct = currentCard.meaning;
-    let ok = false;
-
-    if (studyMode === "reading_mc") {
-      correct = currentCard.reading;
-      ok = normalizeKana(choice) === normalizeKana(correct);
-    }
-    else if (studyMode === "meaning_mc" || studyMode === "reading_to_meaning_mc") {
-      correct = currentCard.meaning;
-      ok = normalizeText(choice) === normalizeText(correct);
-    }
-    else if (studyMode === "reading_to_kanji_mc") {
-      correct = currentCard.surface;
-      ok = normalizeText(choice) === normalizeText(correct);
-    }
-
-    setSelectedAnswer(choice);
-    if (
-      (studyMode === "meaning_mc" || studyMode === "reading_to_meaning_mc")
-    ) {
-      queueMeaningReview(currentCard, choice, correct, studyMode, ok);
-    }
-
-    setChecked({ ok, correct });
-
-    recordCurrentStudyEvent(
-      ok ? "correct" : "incorrect",
-      ok,
-      studyMode
-    );
-  }
-
-  function checkTypingSingle() {
-    if (!currentCard || checked) return;
-
-    let correct = currentCard.reading;
-    let ok = false;
-
-    if (studyMode === "reading_typing") {
-      correct = currentCard.reading;
-      ok = normalizeKana(typingInput) === normalizeKana(correct);
-    } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
-      correct = currentCard.meaning;
-      ok = matchesAnyMeaning(typingInput, correct);
-    }
-
-    if (
-      (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing")
-    ) {
-      queueMeaningReview(currentCard, typingInput.trim(), correct, studyMode, ok);
-    }
-
-    setChecked({ ok, correct });
-
-    recordCurrentStudyEvent(
-      ok ? "correct" : "incorrect",
-      ok,
-      studyMode
-    );
-
-    if (studyMode === "reading_typing") {
-      void saveTypedGateProgress("reading", ok);
-    } else if (studyMode === "meaning_typing" || studyMode === "reading_to_meaning_typing") {
-      void saveTypedGateProgress("meaning", ok);
-    }
-  }
-
-  function checkCompleteStudyStep1() {
-    if (!currentCard || firstStepChecked) return;
-
-    const ok = normalizeKana(typingInput) === normalizeKana(currentCard.reading);
-    setFirstStepChecked({ ok, correct: currentCard.reading });
-
-    recordCurrentStudyEvent(
-      ok ? "correct" : "incorrect",
-      ok,
-      "complete_study_reading_step"
-    );
-
-    void saveTypedGateProgress("reading", ok);
-
-    if (ok) {
-      setTwoStepStage(2);
-      setSecondStepInput("");
-    }
-  }
-
-  function checkCompleteStudyStep2() {
-    if (!currentCard || !firstStepChecked?.ok || secondStepChecked) return;
-
-    const ok = matchesAnyMeaning(secondStepInput, currentCard.meaning);
-    queueMeaningReview(
-      currentCard,
-      secondStepInput.trim(),
-      currentCard.meaning,
-      "complete_study_meaning_step",
-      ok
-    );
-
-    setSecondStepChecked({ ok, correct: currentCard.meaning });
-
-    recordCurrentStudyEvent(
-      ok ? "correct" : "incorrect",
-      ok,
-      "complete_study_meaning_step"
-    );
-
-    void saveTypedGateProgress("meaning", ok, { forceMeaning: true });
-  }
-
-  async function flagCurrentCard() {
-    if (!canUseLibraryReview) return;
-    if (!currentCard) return;
-
-    const ok = window.confirm("Hide this card from study?");
-    if (!ok) return;
-
-    if (isClaimCardId(currentCard.id)) {
-      const { error } = await supabase
-        .from("user_library_word_claims")
-        .delete()
-        .eq("user_id", currentUserId)
-        .eq("study_identity_key", currentCard.studyIdentityKey);
-
-      if (error) {
-        console.error("Error hiding Word Sky claim:", error);
-        alert(`Could not flag card.\n${error.message}`);
-        return;
-      }
-
-      setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
-      setNotice("Word Sky claim removed from study.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("user_book_words")
-      .update({ hidden: true })
-      .eq("id", currentCard.id);
-
-    if (error) {
-      console.error("Error hiding study card:", error);
-      alert(`Could not flag card.\n${error.message}`);
-      return;
-    }
-
-    setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
-    setNotice("Card hidden from study.");
   }
 
   async function flagPracticeCard(cardToFlag: StudyCard) {
@@ -3092,7 +1908,7 @@ export default function LibraryStudyPage() {
     );
   }
 
-  if (allCards.length === 0) {
+  if (libraryReviewCards.length === 0) {
     return (
       <LibraryReviewEmptyState
         onOpenWordSky={() => router.push("/library-study/word-sky")}
