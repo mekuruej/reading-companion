@@ -39,49 +39,14 @@ Good extraction targets:
 
 ---
 
-# Remaining Visual-Only Cleanup Targets
+# Current Visual-Only Cleanup Target
 
-## `app/(protected)/teacher/students/page.tsx`
+## `app/(protected)/library-study/practice/page.tsx`
 
-**Current lines:** 1684
-**Status:** Visual extraction incomplete
-**Risk level:** Medium
-**Safe visual pass:** Yes, with care
+**Current lines:** 3334
+**Reason parked:** Library Review source/performance logic needs to settle first.
+**Next later action:** Map Library Review logic before extracting more.
 
-### Already extracted
-
-* Header
-* Summary cards
-* Groups panel
-* Search panel
-* Group sections
-* State panels
-
-### Extract next
-
-* Add/link student modal shell
-* Add/link student form sections
-* Detailed student card internals
-* Future/other-user placeholder panels
-
-### Keep in `page.tsx`
-
-* search behavior
-* student linking behavior
-* group behavior
-* modal state
-* handlers
-* mutations
-* access checks
-
-### Done when
-
-* Modal shell and form sections are componentized.
-* Student card internals are cleaner.
-* Placeholder panels are componentized.
-* Behavior and copy are unchanged.
-
----
 
 # Parked for Later: Architecture-Heavy Refactors
 
@@ -101,11 +66,7 @@ Move these to a separate refactor map later, then delete this section from this 
 **Reason parked:** Ability Check has study logic, review branches, and answer-flow complexity.
 **Next later action:** Map study logic before extracting more.
 
-## `app/(protected)/library-study/practice/page.tsx`
 
-**Current lines:** 3334
-**Reason parked:** Library Review source/performance logic needs to settle first.
-**Next later action:** Map Library Review logic before extracting more.
 
 ## `app/(protected)/books/[userBookId]/study/page.tsx`
 
