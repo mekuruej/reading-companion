@@ -703,21 +703,6 @@ function makeClaimStudyCard(
   };
 }
 
-function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
-  const color = status?.color ?? "yellow";
-  const base =
-    "relative flex min-h-[28rem] w-full max-w-3xl items-center justify-center rounded-2xl border bg-white p-8 text-center shadow-2xl transition-colors sm:min-h-[32rem]";
-
-  if (color === "green") return `${base} border-emerald-100`;
-  if (color === "blue") return `${base} border-sky-100`;
-  if (color === "grey") return `${base} border-slate-200`;
-  if (color === "purple") return `${base} border-violet-100`;
-  if (color === "red") return `${base} border-rose-100`;
-  if (color === "orange") return `${base} border-orange-100`;
-
-  return `${base} border-amber-100`;
-}
-
 function libraryStudyChipClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base = "rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm";
@@ -928,56 +913,6 @@ function isCardAvailableForLibraryPractice(
   if (colorFilter === "katakana") return isKatakanaOnly(card.surface);
 
   return card.colorStatus.color === colorFilter;
-}
-
-function gatePromptText(card: StudyCard | undefined) {
-  if (!card) return "Library Practice";
-
-  if (card.activeGate === "meaning") {
-    return "This is a MEANING gate";
-  }
-
-  return "This is a READING gate";
-}
-
-function gatePromptClass(card: StudyCard | undefined) {
-  const base =
-    "rounded-full border px-5 py-2 text-sm font-black uppercase tracking-wide shadow-sm";
-
-  if (card?.activeGate === "meaning") {
-    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
-  }
-
-  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
-}
-
-function checkModeLabel(card: StudyCard | undefined) {
-  if (!card) return "Ability Check";
-  if (card.activeGate === "reading") return "Reading Check";
-  if (card.activeGate === "meaning") return "Meaning Check";
-  return "Ability Check";
-}
-
-function checkModeDescription(card: StudyCard | undefined) {
-  if (!card) return "Review mode does not move Library Study colors.";
-  if (card.activeGate === "reading") {
-    return "Practice the reading without moving this word.";
-  }
-  if (card.activeGate === "meaning") {
-    return "Practice the meaning without moving this word.";
-  }
-  return "Review mode does not move Library Study colors.";
-}
-
-function promptModeClass(gate: LibraryCheckGate | undefined) {
-  const base =
-    "animate-pulse rounded-3xl border px-9 py-4 text-3xl font-black uppercase tracking-[0.16em] shadow-sm";
-
-  if (gate === "meaning") {
-    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
-  }
-
-  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
 }
 
 function LibraryPracticePanel({
