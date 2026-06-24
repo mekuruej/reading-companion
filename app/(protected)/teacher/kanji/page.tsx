@@ -834,7 +834,7 @@ export default function TeacherKanjiPage() {
     return {
       total: queueItems.length,
       active: active.length,
-      flagged: queueItems.filter((item) => item.status === "flagged_review").length,
+      flagged: queueItems.reduce((count, item) => count + item.flaggedMapRowCount, 0),
       needsReading: queueItems.filter((item) => isNeedsReadingStatus(item.status)).length,
       needsWork: queueItems.filter((item) => isNeedsWorkStatus(item.status)).length,
       complete: queueItems.filter((item) => item.status === "complete").length,
