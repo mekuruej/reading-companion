@@ -5,14 +5,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import StatCard from "./components/StatCard";
-import SmallMetricCard from "./components/SmallMetricCard";
 import SectionBand from "./components/SectionBand";
-import BarStrip from "./components/BarStrip";
-import PieChart from "./components/PieChart";
 import BookCategoryFilterSelector from "./components/BookCategoryFilterSelector";
 import VocabularyHeader from "./components/VocabularyHeader";
-import RecentWordsGrid from "./components/RecentWordsGrid";
+import VocabularyCategoryPanel from "./components/VocabularyCategoryPanel";
+import VocabularyDistributionPanels from "./components/VocabularyDistributionPanels";
+import VocabularyMetricGrid from "./components/VocabularyMetricGrid";
+import VocabularyRhythmPanel from "./components/VocabularyRhythmPanel";
+import {
+  VocabularyErrorBanner,
+  VocabularyLoadingPanel,
+} from "./components/VocabularyStatePanels";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -1000,13 +1003,7 @@ export default function VocabularyGrowthPage() {
   }, [filteredWords]);
 
   if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="text-sm text-slate-600">Loading vocabulary growth…</div>
-        </div>
-      </main>
-    );
+    return <VocabularyLoadingPanel />;
   }
 
   return (
@@ -1014,450 +1011,50 @@ export default function VocabularyGrowthPage() {
       <div className="mx-auto max-w-7xl space-y-5">
         <VocabularyHeader pageHeaderTone={selectedTheme.pageHeader} />
 
-        {errorMsg ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-            {errorMsg}
-          </div>
-        ) : null}
+        <VocabularyErrorBanner message={errorMsg} />
 
-        <SectionBand
-          eyebrow={`Book category — ${selectedFilterLabel}`}
-          title={selectedFilterLabel}
-          description="Choose a broad kind of reading material. This changes the vocabulary totals, charts, study rhythm, and book examples below."
+        <VocabularyCategoryPanel
+          selectedFilterLabel={selectedFilterLabel}
           tone={selectedTheme.section}
-        >
-          <BookCategoryFilterSelector
-            filters={BOOK_CATEGORY_FILTERS}
-            value={bookCategoryFilter}
-            onChange={(value) => setBookCategoryFilter(value as BookCategoryFilter)}
-          />
+          filters={BOOK_CATEGORY_FILTERS}
+          value={bookCategoryFilter}
+          onChange={(value) => setBookCategoryFilter(value as BookCategoryFilter)}
+          bookCount={filteredVocabularyBookMetrics.length}
+        />
 
-          <p className="mt-3 text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">
-              {filteredVocabularyBookMetrics.length}
-            </span>{" "}
-            book{filteredVocabularyBookMetrics.length === 1 ? "" : "s"} with vocabulary
-            data included in this category.
-          </p>
-        </SectionBand>
+        <VocabularyMetricGrid
+          wordsSaved={vocabularyTotals.wordsSaved}
+          uniqueWords={vocabularyTotals.uniqueWords}
+          monthlyWordsSaved={vocabularyTotals.monthlyWordsSaved}
+          monthlyUniqueWords={vocabularyTotals.monthlyUniqueWords}
+          wordsPerPage={vocabularyTotals.wordsPerPage}
+          pagesRead={vocabularyTotals.pagesRead}
+          formatDecimal={formatDecimal}
+          tone={selectedTheme}
+        />
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Words Saved"
-            value={vocabularyTotals.wordsSaved}
-            hint="All-time saved vocabulary"
-            tone={selectedTheme.statOne}
-          />
-          <StatCard
-            label="Unique Words"
-            value={vocabularyTotals.uniqueWords}
-            hint="Surface + reading + meaning"
-            tone={selectedTheme.statTwo}
-          />
-          <StatCard
-            label="This Month"
-            value={vocabularyTotals.monthlyWordsSaved}
-            hint={`${vocabularyTotals.monthlyUniqueWords} unique this month`}
-            tone={selectedTheme.statThree}
-          />
-          <StatCard
-            label="Words Per Page"
-            value={
-              vocabularyTotals.wordsPerPage == null
-                ? "—"
-                : formatDecimal(vocabularyTotals.wordsPerPage)
-            }
-            hint={`${vocabularyTotals.pagesRead} pages counted`}
-            tone={selectedTheme.statFour}
-          />
-        </div>
-
-        <SectionBand
-          eyebrow="Vocabulary Rhythm"
-          title={`Saved words → study rhythm — ${selectedFilterLabel}`}
-          description={`${vocabularyRhythmWindowLabel}: which days you saved vocabulary and which days you came back to study it. This respects the book category filter above.`}
+        <VocabularyRhythmPanel
+          selectedFilterLabel={selectedFilterLabel}
+          vocabularyRhythmWindowLabel={vocabularyRhythmWindowLabel}
           tone={selectedTheme.softSection}
-        >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="rounded-full border border-violet-200 bg-white/80 px-3 py-1 text-xs font-semibold text-violet-800">
-              Showing: {vocabularyRhythmWindowLabel}
-            </div>
+          visibleActivity={visibleVocabularyRhythmActivity}
+          summary={vocabularyRhythmSummary}
+          studySignals={studySignals}
+          showFullVocabularyRhythm={showFullVocabularyRhythm}
+          formatPercent={formatPercent}
+          onToggleFullVocabularyRhythm={() => setShowFullVocabularyRhythm((prev) => !prev)}
+        />
 
-            <button
-              type="button"
-              onClick={() => setShowFullVocabularyRhythm((prev) => !prev)}
-              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              {showFullVocabularyRhythm ? "Collapse to recent 90 days" : "Show full past year"}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-[repeat(14,minmax(0,1fr))] xl:grid-cols-[repeat(28,minmax(0,1fr))]">
-            {visibleVocabularyRhythmActivity.map((item, index) => {
-              const hasSavedWords = item.words > 0;
-              const hasStudy = item.studyEvents > 0;
-              const intensity = item.words + item.studyEvents;
-              const previousItem = visibleVocabularyRhythmActivity[index - 1];
-              const startsMonth =
-                index === 0 || item.day.slice(0, 7) !== previousItem?.day.slice(0, 7);
-
-              const monthLabel = new Date(`${item.day}T00:00:00`).toLocaleString("en-US", {
-                month: "short",
-              }).toUpperCase();
-
-              const monthTextClass =
-                hasSavedWords || hasStudy ? "text-white drop-shadow-sm" : "text-slate-500";
-
-              const colorClass =
-                !hasSavedWords && !hasStudy
-                  ? "bg-slate-100"
-                  : hasSavedWords && hasStudy
-                    ? intensity < 5
-                      ? "bg-violet-300"
-                      : intensity < 12
-                        ? "bg-violet-500"
-                        : "bg-violet-700"
-                    : hasStudy
-                      ? intensity < 5
-                        ? "bg-sky-300"
-                        : intensity < 12
-                          ? "bg-sky-500"
-                          : "bg-sky-700"
-                      : intensity < 3
-                        ? "bg-amber-200"
-                        : intensity < 8
-                          ? "bg-amber-400"
-                          : "bg-amber-600";
-
-              return (
-                <div key={item.day} className="space-y-1">
-                  <div
-                    className={`relative h-10 rounded-lg border border-white/70 ${colorClass}`}
-                    title={`${item.day}: ${item.words} saved word${item.words === 1 ? "" : "s"
-                      }, ${item.studyEvents} study card${item.studyEvents === 1 ? "" : "s"
-                      }`}
-                  >
-                    {startsMonth ? (
-                      <span
-                        className={`absolute left-1 top-1 text-[8px] font-black tracking-wide ${monthTextClass}`}
-                      >
-                        {monthLabel}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-center text-[9px] text-slate-500">
-                    {item.day.slice(8)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-amber-400" />
-              Saved words
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-sky-500" />
-              Studied
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-violet-500" />
-              Saved + studied
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <SmallMetricCard
-              label="Active vocab days"
-              value={vocabularyRhythmSummary.activeVocabularyDays}
-              hint="Saved or studied"
-            />
-            <SmallMetricCard
-              label="Saved word days"
-              value={vocabularyRhythmSummary.savedWordDays}
-              hint="Words entered the system"
-            />
-            <SmallMetricCard
-              label="Study days"
-              value={vocabularyRhythmSummary.studyDays}
-              hint="Book Study or Kanji practice"
-            />
-            <SmallMetricCard
-              label="Words saved"
-              value={vocabularyRhythmSummary.wordsSaved}
-              hint={vocabularyRhythmWindowLabel}
-            />
-            <SmallMetricCard
-              label="Cards reviewed"
-              value={vocabularyRhythmSummary.studyEvents}
-              hint={vocabularyRhythmWindowLabel}
-            />
-          </div>
-
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white/70 p-4">
-            <div className="text-sm font-semibold text-slate-900">
-              Study rhythm
-            </div>
-
-            <div className="mt-2 text-sm leading-6 text-slate-600">
-              {vocabularyRhythmSummary.wordsSaved === 0 &&
-                vocabularyRhythmSummary.studyEvents === 0
-                ? "No vocabulary activity in this window yet. Save words while reading, then review a few cards to start building a rhythm."
-                : vocabularyRhythmSummary.studyEvents === 0
-                  ? `You saved ${vocabularyRhythmSummary.wordsSaved} word${vocabularyRhythmSummary.wordsSaved === 1 ? "" : "s"
-                  } in this window, but haven’t studied them yet.`
-                  : vocabularyRhythmSummary.wordsSaved === 0
-                    ? `You reviewed ${vocabularyRhythmSummary.studyEvents} card${vocabularyRhythmSummary.studyEvents === 1 ? "" : "s"
-                    } in this window, but did not save new words.`
-                    : `You saved ${vocabularyRhythmSummary.wordsSaved} word${vocabularyRhythmSummary.wordsSaved === 1 ? "" : "s"
-                    } and reviewed ${vocabularyRhythmSummary.studyEvents} card${vocabularyRhythmSummary.studyEvents === 1 ? "" : "s"
-                    } in this window. ${vocabularyRhythmSummary.overlapDays} day${vocabularyRhythmSummary.overlapDays === 1 ? "" : "s"
-                    } included both saving and studying.`}
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <SmallMetricCard
-                label="Unique words studied"
-                value={studySignals.studiedWords}
-              />
-              <SmallMetricCard
-                label="Books represented"
-                value={studySignals.studiedBooks}
-              />
-              <SmallMetricCard
-                label="Study accuracy"
-                value={formatPercent(studySignals.accuracyPercent)}
-                hint="Correct ÷ answered"
-              />
-            </div>
-
-            {studySignals.answerMixItems.length > 0 ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                {studySignals.answerMixItems.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-lg border border-slate-900/10 bg-white/85 px-3 py-2 shadow-sm"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${item.colorClass}`} />
-                      <div className="text-[11px] text-slate-500">{item.label}</div>
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-slate-900">
-                      {item.value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white/80 p-4">
-            <div className="text-sm font-semibold text-slate-900">
-              Books with sticky study words
-            </div>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Books rise here when their study cards have more missed answers.
-              This is about vocabulary/kanji friction by source book, not color movement.
-            </p>
-
-            {studySignals.bookStudyItems.length === 0 ? (
-              <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-                No book-linked study cards yet.
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {studySignals.bookStudyItems.map((book) => {
-                  const answered = book.correct + book.incorrect;
-                  const stickyPercent =
-                    answered > 0 ? Math.round((book.incorrect / answered) * 100) : null;
-
-                  return (
-                    <div
-                      key={book.userBookId}
-                      className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-slate-950">
-                            {book.title}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {book.studyTypeLabel}
-                            {book.studyTypeDetail ? ` · ${book.studyTypeDetail}` : ""}
-                          </div>
-                        </div>
-
-                        <div className="text-right text-xs text-slate-500">
-                          <div>
-                            Accuracy:{" "}
-                            <span className="font-semibold text-slate-900">
-                              {formatPercent(book.accuracyPercent)}
-                            </span>
-                          </div>
-                          <div>
-                            Still sticky:{" "}
-                            <span className="font-semibold text-slate-900">
-                              {book.incorrect}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                        <SmallMetricCard label="Cards" value={book.total} />
-                        <SmallMetricCard label="Correct" value={book.correct} />
-                        <SmallMetricCard label="Sticky" value={book.incorrect} />
-                        <SmallMetricCard
-                          label="Sticky rate"
-                          value={stickyPercent == null ? "—" : `${stickyPercent}%`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </SectionBand>
-
-        <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
-          <SectionBand
-            eyebrow="Book type"
-            title={`All-time words saved by book type — ${selectedFilterLabel}`}
-            description="A word-weighted view of which kinds of books are adding the most vocabulary to your library."
-            tone={selectedTheme.section}
-          >
-            <PieChart
-              items={wordsByBookTypePie}
-              size={190}
-              formatPercent={formatDecimal}
-            />
-          </SectionBand>
-
-          <SectionBand
-            eyebrow="Word volume"
-            title={`Vocabulary-heavy books — ${selectedFilterLabel}`}
-            description="These books have contributed the most saved words overall."
-            tone={selectedTheme.section}
-          >
-            <BarStrip
-              items={wordiestBooks.map((item) => ({
-                label: item.title,
-                value: item.wordsSaved,
-              }))}
-              colorClass="bg-violet-500"
-              valueSuffix=" words"
-            />
-          </SectionBand>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SectionBand
-            eyebrow="Density"
-            title={`Words per page — ${selectedFilterLabel}`}
-            description="This is often a better difficulty signal than raw word count because it accounts for how much you read."
-            tone={selectedTheme.section}
-          >
-            <div className="space-y-3">
-              {densestBooks.length === 0 ? (
-                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-                  No word-density data yet.
-                </div>
-              ) : (
-                densestBooks.map((item) => (
-                  <div key={item.userBookId}>
-                    <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-                      <span className="truncate text-slate-700">
-                        {item.title}
-                      </span>
-                      <span className="shrink-0 font-medium text-slate-900">
-                        {formatDecimal(item.wordsPerPage)} / page
-                      </span>
-                    </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-amber-500"
-                        style={{
-                          width: `${Math.max(
-                            6,
-                            ((item.wordsPerPage ?? 0) /
-                              Math.max(
-                                1,
-                                ...densestBooks.map(
-                                  (book) => book.wordsPerPage ?? 0
-                                )
-                              )) *
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </SectionBand>
-
-          <SectionBand
-            eyebrow="Book type table"
-            title={`Vocabulary by category — ${selectedFilterLabel}`}
-            description="A table version for comparing book categories without guessing from the chart."
-            tone={selectedTheme.section}
-          >
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2">Words</th>
-                    <th className="px-3 py-2">Pages</th>
-                    <th className="px-3 py-2">Words/page</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {vocabularyTypeMetrics.length === 0 ? (
-                    <tr>
-                      <td
-                        className="px-3 py-4 text-sm text-slate-500"
-                        colSpan={4}
-                      >
-                        No vocabulary data yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    vocabularyTypeMetrics.map((item) => (
-                      <tr key={item.bookType}>
-                        <td className="px-3 py-2 font-medium text-slate-900">
-                          {item.bookType}
-                        </td>
-                        <td className="px-3 py-2 text-slate-700">
-                          {item.wordsSaved}
-                        </td>
-                        <td className="px-3 py-2 text-slate-700">
-                          {item.pagesRead}
-                        </td>
-                        <td className="px-3 py-2 text-slate-700">
-                          {formatDecimal(item.wordsPerPage)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </SectionBand>
-        </div>
-
-        <SectionBand
-          eyebrow="Recent saves"
-          title={`Recently saved words — ${selectedFilterLabel}`}
-          description="A quick reminder of the newest words entering your reading life."
-          tone={selectedTheme.section}
-        >
-          <RecentWordsGrid words={recentWords} />
-        </SectionBand>
+          <VocabularyDistributionPanels
+            selectedFilterLabel={selectedFilterLabel}
+            sectionTone={selectedTheme.section}
+            wordsByBookTypePie={wordsByBookTypePie}
+            wordiestBooks={wordiestBooks}
+            densestBooks={densestBooks}
+            vocabularyTypeMetrics={vocabularyTypeMetrics}
+            recentWords={recentWords}
+            formatDecimal={formatDecimal}
+          />
       </div>
     </main>
   );
