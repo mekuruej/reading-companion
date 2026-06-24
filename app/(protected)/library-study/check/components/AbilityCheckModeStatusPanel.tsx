@@ -88,7 +88,7 @@ export default function AbilityCheckModeStatusPanel({
           </div>
         ) : (
           <div className="flex shrink-0 items-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">
-            Daily gate check
+            Gate check
           </div>
         )}
       </div>

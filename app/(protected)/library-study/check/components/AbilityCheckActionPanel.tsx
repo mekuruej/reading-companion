@@ -1,82 +1,59 @@
 type AbilityCheckActionPanelProps = {
-  modeLabel: string;
-  modeDescription: string;
   meaningReviewCount: number;
   canComeBackLater: boolean;
+  canRestartCurrentCard: boolean;
   onFinishForToday: () => void;
   onComeBackLater: () => void;
+  onRestartCurrentCard: () => void;
   onFlagCurrentCard: () => void;
 };
 
 export default function AbilityCheckActionPanel({
-  modeLabel,
-  modeDescription,
   meaningReviewCount,
   canComeBackLater,
+  canRestartCurrentCard,
   onFinishForToday,
   onComeBackLater,
+  onRestartCurrentCard,
   onFlagCurrentCard,
 }: AbilityCheckActionPanelProps) {
   return (
-    <div className="mt-2 w-full max-w-3xl space-y-2">
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:justify-between">
-          <div className="flex min-w-0 flex-1 items-center rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-            <div className="min-w-0">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                Check Mode
-              </div>
+    <div className="mt-4 grid w-full max-w-3xl gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <button
+        type="button"
+        onClick={onFinishForToday}
+        className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+      >
+        {meaningReviewCount > 0 ? "Finish and check meanings" : "Finish early"}
+      </button>
 
-              <div className="mt-1 text-sm font-semibold text-slate-900">
-                {modeLabel}
-              </div>
+      {canComeBackLater ? (
+        <button
+          type="button"
+          onClick={onComeBackLater}
+          className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Too hard for now
+        </button>
+      ) : null}
 
-              <p className="mt-1 truncate text-xs text-gray-600">
-                {modeDescription}
-              </p>
-            </div>
-          </div>
+      {canRestartCurrentCard ? (
+        <button
+          type="button"
+          onClick={onRestartCurrentCard}
+          className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+        >
+          Restart check
+        </button>
+      ) : null}
 
-          <div className="grid gap-2 md:w-[180px]">
-            <button
-              type="button"
-              onClick={onFinishForToday}
-              className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              <div className="leading-tight">Finish early</div>
-              <div className="text-[10px] font-normal text-slate-500">
-                {meaningReviewCount > 0
-                  ? "Review meaning answers"
-                  : "Save your place"}
-              </div>
-            </button>
-
-            {canComeBackLater ? (
-              <button
-                type="button"
-                onClick={onComeBackLater}
-                className="min-h-[74px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-              >
-                <div className="leading-tight">Too hard for now</div>
-                <div className="text-[10px] font-normal text-slate-500">
-                  Red support · 90 days
-                </div>
-              </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={onFlagCurrentCard}
-              className="min-h-[74px] w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
-            >
-              <div className="leading-tight">Flag</div>
-              <div className="text-[10px] font-normal text-amber-700">
-                Problem card
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={onFlagCurrentCard}
+        className="rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+      >
+        Flag card
+      </button>
     </div>
   );
 }

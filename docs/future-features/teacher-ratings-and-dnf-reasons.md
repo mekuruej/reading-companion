@@ -1,15 +1,50 @@
-# Future Feature: Teacher Ratings, Lesson-Fit Alerts, and DNF Reasons
+# Feature Status: Teacher Ratings, Lesson-Fit Alerts, and DNF Reasons
+
+Status: first pass implemented / future refinement remains.
+
+Implemented areas:
+
+* Teacher Ratings page in the teacher workspace.
+* Teacher Needs Attention entry for teacher ratings.
+* Individual teacher review navigation back to Teacher Ratings.
+* DNF reason, DNF note, and retry-intent fields on user books.
+* Book Hub display/edit support for DNF details.
+* Teacher Ratings cards can show DNF context.
+
+Remaining future work:
+
+* richer teacher-rating filters for lesson planning
+* better teacher-rating search/discovery surfaces
+* recommendation logic that understands DNF reasons
+* possible separate paused/come-back-later shelf or status
+* unified teacher action-needed inbox polish
 
 ## Core idea
 
-Mekuru already has a teacher review page, but teacher ratings could become more useful if they also feed teacher planning and action-needed workflows.
+Mekuru has a teacher review page and a Teacher Ratings index. Teacher ratings should continue becoming more useful for planning lessons and finding good books for future learners.
 
-This future pass should improve two related areas:
+This feature area covers two related ideas:
 
 * teacher ratings for finding good books for lessons
 * DNF / paused-book reasons so stopped books do not all mean the same thing
 
 ## Teacher ratings for lesson planning
+
+Status: first pass implemented.
+
+Current implementation:
+
+* Teacher Ratings page exists at `/teacher/ratings`.
+* Teacher Hub links to Teacher Ratings.
+* Teacher Needs Attention includes a Teacher Ratings card.
+* Individual teacher review pages return to Teacher Ratings.
+* Teacher rating cards include basic book context and DNF context when available.
+
+Future refinement:
+
+* add stronger lesson-planning filters
+* make it easier to compare reviewed books side by side
+* connect teacher ratings to teacher-only book search/discovery
 
 Teacher ratings are different from normal reader reflection reviews.
 
@@ -28,9 +63,9 @@ Teacher ratings should answer:
 * Would I teach this book again?
 * Is this a good fit for Japanese-speaking adult English learners, Japanese learners, or another learner group?
 
-## Possible teacher rating fields
+## Teacher Rating Fields
 
-The existing teacher review page could eventually include structured fields such as:
+The teacher review flow can continue to improve with structured fields such as:
 
 * lesson fit
 * discussion value
@@ -46,9 +81,11 @@ Teacher ratings should not automatically become learner-facing reviews.
 
 ## Action-needed alert
 
-It would be useful to add an action item similar to reading reflection review alerts.
+Status: first pass implemented.
 
-Possible alert:
+Teacher ratings now have a Teacher Needs Attention entry.
+
+Alert concept:
 
 `Teacher ratings needed`
 
@@ -56,7 +93,7 @@ Possible helper copy:
 
 `Rate books you have taught or prepared so they are easier to find for future lessons.`
 
-Possible action:
+Action:
 
 `Review teacher ratings`
 
@@ -69,6 +106,8 @@ Likely home:
 This should be teacher-only. It should not appear as a normal learner task.
 
 ## Where ratings should help later
+
+Status: future work.
 
 Teacher ratings should eventually help with book lookup and lesson planning in:
 
@@ -90,6 +129,22 @@ Useful future filters:
 
 ## DNF reasons and paused books
 
+Status: DNF reason first pass implemented.
+
+Current implementation:
+
+* `user_books` has `dnf_reason`, `dnf_note`, and `would_retry`.
+* Book Hub can save and display DNF details.
+* The Reading tab includes DNF reason controls.
+* Book status summary can show DNF details.
+* Teacher Ratings can surface DNF context for planning.
+
+Still future:
+
+* a separate paused status or shelf
+* recommendation logic that interprets DNF reasons
+* library shelf refinements based on DNF reason / retry intent
+
 DNF should not mean only one thing.
 
 For language reading, a learner may stop a book because:
@@ -103,15 +158,15 @@ For language reading, a learner may stop a book because:
 
 These cases should not all be treated the same in stats or recommendations.
 
-## Possible future DNF fields
+## DNF Fields
 
-Possible fields:
+Implemented first-pass fields:
 
 * `dnf_reason`
 * `dnf_note`
 * `would_retry`
 
-Possible reason options:
+Reason options:
 
 * too difficult right now
 * wrong timing / mood
@@ -121,13 +176,15 @@ Possible reason options:
 * did not like it
 * other
 
-Possible retry options:
+Retry options:
 
 * yes
 * maybe
 * no
 
 ## Paused vs. DNF
+
+Status: future work.
 
 Mekuru may eventually need a softer status than DNF.
 
@@ -147,9 +204,11 @@ Meaning:
 
 The reader is done with the book and probably does not want to continue.
 
-For a first pass, it may be simpler to keep the existing DNF status and add reason/retry fields. A separate paused status can come later if the library needs a clearer shelf.
+The first pass kept the existing DNF status and added reason/retry fields. A separate paused status can come later if the library needs a clearer shelf.
 
 ## Data and recommendation implications
+
+Status: future work.
 
 Do not throw away data from DNF books.
 
@@ -162,11 +221,11 @@ However:
 * a paused book may belong in a "come back later" list
 * teacher ratings should be separate from learner enjoyment ratings
 
-## Not for the first pass
+## Deferred Work
 
-Do not build this while stabilizing existing review flows.
+Do not treat the first pass as the final recommendation model.
 
-A future implementation should first map the existing teacher review page and current book status fields, then decide whether to add small fields or a separate review/reason table.
+Future work should map how teacher ratings, learner reflections, finished books, DNF books, and possible paused books feed discovery and recommendation signals.
 
 Keep access boundaries clear:
 

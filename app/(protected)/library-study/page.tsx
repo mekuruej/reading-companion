@@ -5,12 +5,20 @@ import Link from "next/link";
 
 const studyPaths = [
   {
-    title: "Basic Study",
+    title: "Free Study",
     href: "/library-study/characters",
     eyebrow: "Start here",
     description:
       "Practice kana, kanji readings, and eventually a small demo flashcard set. Good for simple, low-pressure study.",
     className: "border-sky-200 bg-sky-50 text-sky-950",
+  },
+  {
+    title: "Book Study",
+    href: "/library-study/book-study",
+    eyebrow: "Saved words",
+    description:
+      "Study the words you saved from your books with focused book flashcards or free saved-word review.",
+    className: "border-indigo-200 bg-indigo-50 text-indigo-950",
   },
   {
     title: "Advanced Study",
@@ -36,12 +44,13 @@ export default function StudyToolsPage() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Choose a study path. Basic Study is for simple foundation practice.
-            Advanced Study is for Mekuru’s full vocabulary growth cycle.
+            Choose a study path. Free Study is for character practice, Book
+            Study is for everyday saved-word study, and Advanced Study explains
+            Mekuru’s full vocabulary growth cycle.
           </p>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-3">
           {studyPaths.map((path) => (
             <Link
               key={path.href}
@@ -74,12 +83,12 @@ export default function StudyToolsPage() {
           </p>
 
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Start with Basic Study for character practice and simple study tools.
+            Start with Free Study for character practice and simple study tools.
           </p>
 
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Choose Advanced Study if you are working with saved words from your
-            books. Advanced Study uses Mekuru’s full-access saved-word tools.
+            Choose Book Study when you want to study saved words from your
+            books. Book Study uses Mekuru’s full-access saved-word tools.
           </p>
         </div>
       </div>

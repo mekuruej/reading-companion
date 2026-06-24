@@ -9,6 +9,7 @@ type BookHubProgressSummaryProps = {
   pagesReadLabel: string;
   wordsSavedLabel: string;
   averageMinutesPerPageLabel: string;
+  showVocabularySummary?: boolean;
 };
 
 export default function BookHubProgressSummary({
@@ -19,6 +20,7 @@ export default function BookHubProgressSummary({
   pagesReadLabel,
   wordsSavedLabel,
   averageMinutesPerPageLabel,
+  showVocabularySummary = true,
 }: BookHubProgressSummaryProps) {
   return (
     <>
@@ -53,11 +55,13 @@ export default function BookHubProgressSummary({
           caption="Page-tracked only"
         />
 
-        <BookHubStatCard
-          label="Words Saved"
-          value={wordsSavedLabel}
-          caption="Unique saved words"
-        />
+        {showVocabularySummary ? (
+          <BookHubStatCard
+            label="Words Saved"
+            value={wordsSavedLabel}
+            caption="Unique saved words"
+          />
+        ) : null}
 
         <BookHubStatCard
           label="Avg Min/Page"

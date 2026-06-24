@@ -31,7 +31,7 @@ export default function AbilityCheckCompleteState({
         </div>
 
         <h1 className="mt-4 text-2xl font-black text-slate-950">
-          {endedEarly ? "Saved your place" : "Daily Ability Check complete"}
+          {endedEarly ? "Saved your place" : "Ability Check complete"}
         </h1>
 
         {endedEarly ? (

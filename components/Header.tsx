@@ -103,7 +103,8 @@ export default function Header() {
 
   const libraryHref = username ? `/users/${username}/books` : "/books";
   const librarySectionActive =
-    pathname.startsWith("/library") ||
+    pathname === "/library" ||
+    pathname.startsWith("/library/") ||
     pathname === libraryHref ||
     pathname === "/books" ||
     pathname === "/books/add" ||
@@ -277,15 +278,26 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Basic Study
+                    Free Study
+                  </Link>
+
+                  <Link
+                    href="/library-study/book-study"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/book-study" ||
+                        pathname === "/library-study/book-flashcards" ||
+                        pathname === "/library-study/practice"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowStudyMenu(false)}
+                  >
+                    Book Study
                   </Link>
 
                   <Link
                     href="/library-study/advanced"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
-                        pathname === "/library-study/book-flashcards" ||
                         pathname === "/library-study/check" ||
-                        pathname === "/library-study/practice" ||
                         pathname === "/library-study/word-sky"
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"

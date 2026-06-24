@@ -124,24 +124,6 @@ function toNullableInt(value: string): number | null {
   return Math.trunc(n);
 }
 
-function sameGroup(
-  existing: QuickSessionWord,
-  nextChapterNum: number | null,
-  nextPageNum: number | null,
-  nextChapterName: string
-) {
-  const oldChapterNum = toNullableInt(existing.chapterNumber);
-  const oldPageNum = toNullableInt(existing.page);
-  const oldChapterName = (existing.chapterName ?? "").trim();
-  const newChapterName = (nextChapterName ?? "").trim();
-
-  return (
-    oldChapterNum === nextChapterNum &&
-    oldPageNum === nextPageNum &&
-    oldChapterName === newChapterName
-  );
-}
-
 function sortQuickSessionWords(words: QuickSessionWord[]) {
   return [...words].sort((a, b) => {
     const aChapter = toNullableInt(a.chapterNumber) ?? Number.MAX_SAFE_INTEGER;
@@ -995,17 +977,7 @@ export default function CuriosityReadingPage() {
         ? quickSessionWords.find((w) => w.id === quickPreview.id) ?? null
         : null;
 
-    let pageOrderToUse: number | null;
-
-    if (!editingExisting) {
-      pageOrderToUse = await getNextPageOrder(userBookId, chapterNum, pageNum);
-    } else if (sameGroup(editingExisting, chapterNum, pageNum, chapterNameTrimmed ?? "")) {
-      pageOrderToUse = editingExisting.pageOrder;
-    } else {
-      pageOrderToUse = await getNextPageOrder(userBookId, chapterNum, pageNum);
-    }
-
-    const payload = {
+    const basePayload = {
       user_book_id: userBookId,
       vocabulary_cache_id: vocabularyCacheId,
       surface: normalizedSurface || null,
@@ -1016,13 +988,17 @@ export default function CuriosityReadingPage() {
         ? null
         : quickPreview.selectedMeaningIndex,
       page_number: pageNum,
-      page_order: pageOrderToUse,
       chapter_number: chapterNum,
       chapter_name: chapterNameTrimmed,
       hide_kanji_in_reading_support: hideKanjiInReadingSupport,
     };
 
     if (!editingExisting) {
+      const payload = {
+        ...basePayload,
+        page_order: await getNextPageOrder(userBookId, chapterNum, pageNum),
+      };
+
       const { data, error } = await supabase
         .from("user_book_words")
         .insert(payload)
@@ -1073,7 +1049,7 @@ export default function CuriosityReadingPage() {
     } else {
       const { data, error } = await supabase
         .from("user_book_words")
-        .update(payload)
+        .update(basePayload)
         .eq("id", editingExisting.id)
         .eq("user_book_id", userBookId)
         .select(

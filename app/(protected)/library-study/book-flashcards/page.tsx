@@ -13,8 +13,8 @@ export default function BookFlashcardsIndexPage() {
       description="Choose a book to review saved vocabulary from that specific book."
       actionLabel="Book Flashcards"
       accent="stone"
-      backHref="/library-study"
-      backLabel="Back to Study Hub"
+      backHref="/library-study/book-study"
+      backLabel="Back to Book Study"
       hrefForBook={(userBookId) => `/books/${userBookId}/study`}
     />
   );

@@ -2513,7 +2513,7 @@ export default function BooksPage() {
 
         {showAbilityCheckReminder ? (
           <LibraryReminderBanner
-            title="Ability Check is ready today"
+            title="Your Ability Check is ready"
             actions={
               <>
                 {abilityCheckReminderCount > 0 ? (
@@ -2541,10 +2541,9 @@ export default function BooksPage() {
           >
             {abilityCheckReminderCount > 0 ? (
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                You have {abilityCheckReminderCount} due card
-                {abilityCheckReminderCount === 1 ? "" : "s"}. Ability Check is
-                intentionally small and spaced. For more study, use Library Review,
-                Word Sky, or book flashcards.
+                Some cards are ready for today. Ability Check is intentionally small
+                and spaced. For more study, use Library Review, Word Sky, or book
+                flashcards.
               </p>
             ) : (
               <p className="mt-1 text-sm leading-6 text-slate-600">

@@ -30,7 +30,6 @@ import AbilityCheckRestingState from "./components/AbilityCheckRestingState";
 import AbilityCheckSetupPanel from "./components/AbilityCheckSetupPanel";
 import AbilityCheckProgressCard from "./components/AbilityCheckProgressCard";
 import AbilityCheckIntroCard from "./components/AbilityCheckIntroCard";
-import AbilityCheckWordSkyCta from "./components/AbilityCheckWordSkyCta";
 import AbilityCheckPageHeader from "./components/AbilityCheckPageHeader";
 import AbilityCheckNoDueState from "./components/AbilityCheckNoDueState";
 import AbilityCheckCompleteState from "./components/AbilityCheckCompleteState";
@@ -197,7 +196,7 @@ const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
 const PRE_READING_WAIT_RECHECK_DAYS = 90;
-const YELLOW_READINESS_COOLDOWN_DAYS = 90;
+const YELLOW_READINESS_COOLDOWN_DAYS = 30;
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   red_stages: 1,
@@ -967,7 +966,7 @@ function AbilityCheckFaq() {
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <div className="font-black text-slate-900">What is Ability Check?</div>
           <p className="mt-1">
-            A short daily gate check for words that are ready to move through reading,
+            A short gate check for words that are ready to move through reading,
             meaning, and mastery.
           </p>
         </div>
@@ -2920,6 +2919,106 @@ export default function LibraryStudyPage() {
     setNotice(null);
   }
 
+  async function restartCurrentCardAtAbilityCheckStart() {
+    if (!canUseAbilityCheck) return;
+    if (!currentUserId || !currentCard || isClaimCardId(currentCard.id)) return;
+
+    const existing = currentCard.progress;
+    const now = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from("user_library_word_progress")
+      .upsert(
+        {
+          user_id: currentUserId,
+          study_identity_key: currentCard.studyIdentityKey,
+          surface: currentCard.surface,
+          reading: currentCard.reading,
+          definition_key: "",
+          reading_gate_status: "not_started",
+          meaning_gate_status: "not_started",
+          held_before_reading_gate: false,
+          held_before_meaning_gate: false,
+          mastered: false,
+          reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
+          meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
+          reading_gate_passed_at: null,
+          reading_gate_failed_at: null,
+          meaning_gate_passed_at: null,
+          meaning_gate_failed_at: null,
+          mastered_at: null,
+          last_studied_at: now,
+        },
+        { onConflict: "user_id,study_identity_key,definition_key" }
+      )
+      .select(
+        `
+        id,
+        user_id,
+        study_identity_key,
+        surface,
+        reading,
+        definition_key,
+        reading_gate_status,
+        meaning_gate_status,
+        held_before_reading_gate,
+        held_before_meaning_gate,
+        mastered,
+        reading_gate_attempts,
+        meaning_gate_attempts,
+        reading_gate_passed_at,
+        reading_gate_failed_at,
+        meaning_gate_passed_at,
+        meaning_gate_failed_at,
+        mastered_at,
+        last_studied_at
+      `
+      )
+      .single<LibraryWordProgressRow>();
+
+    if (error) {
+      console.error("Error restarting Ability Check card:", error);
+      setNotice("Could not restart this card.");
+      return;
+    }
+
+    const restartedProgress = data;
+
+    if (!restartedProgress) {
+      setNotice("Could not restart this card.");
+      return;
+    }
+
+    const updateCard = (card: StudyCard): StudyCard => {
+      if (card.studyIdentityKey !== currentCard.studyIdentityKey) return card;
+
+      const colorStatus = computeLibraryStudyColorStatus({
+        encounterCount: card.encounterCount,
+        settings: learningSettings,
+        readingGate: restartedProgress.reading_gate_status,
+        meaningGate: restartedProgress.meaning_gate_status,
+        heldBeforeReadingGate: restartedProgress.held_before_reading_gate,
+        heldBeforeMeaningGate: restartedProgress.held_before_meaning_gate,
+        readyForReadingGate: isReadyForReadingGateProgress(restartedProgress),
+        preReadingSupportCycle: preReadingSupportCycle(restartedProgress),
+        mastered: restartedProgress.mastered,
+      });
+
+      return {
+        ...card,
+        progress: restartedProgress,
+        colorStatus,
+        activeGate: pickLibraryCheckGate(colorStatus, card.studyIdentityKey),
+      };
+    };
+
+    setAllCards((prev) => prev.map(updateCard));
+    markStudyCardSeen(currentCard);
+    nextCardWithoutMarkingSeen();
+    resetCardState();
+    setNotice("Card sent back to the start of Ability Check.");
+  }
+
   async function countMeaningReviewAsPassed(item: MeaningReviewItem) {
     await saveTypedGateProgress("meaning", true, { forceMeaning: true, card: item.card });
     setMeaningReviewItems((prev) => prev.filter((review) => review.id !== item.id));
@@ -3074,7 +3173,6 @@ export default function LibraryStudyPage() {
   if (allCards.length === 0) {
     return (
       <AbilityCheckNoCardsState
-        onOpenWordSky={() => router.push("/library-study/word-sky")}
         onBackToLibrary={() => router.push("/books")}
       />
     );
@@ -3095,11 +3193,7 @@ export default function LibraryStudyPage() {
         <AbilityCheckRestingState
           dueCount={allLevelsDueCount}
           minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
-          hasPracticeCards={practiceFilteredCards.length > 0}
-          onOpenPractice={() => router.push("/library-study/practice")}
-          onOpenWordSky={() => router.push("/library-study/word-sky")}
-          onOpenPurpleReview={() => router.push("/library-study/practice?color=purple")}
-          onOpenBookFlashcards={() => router.push("/library-study/book-flashcards")}
+          onBackToLibrary={() => router.push("/books")}
         />
       );
     }
@@ -3113,14 +3207,10 @@ export default function LibraryStudyPage() {
         allLevelsSelected={allLevelsSelected}
         selectedDueCount={selectedDueCount}
         minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
-        hasPracticeCards={practiceFilteredCards.length > 0}
         faqSlot={<AbilityCheckFaq />}
         onToggleAllLevels={toggleAllSetupLevels}
         onToggleLevel={(level) => toggleSetupLevel(level as DailyCheckLevel)}
         onStartDailyCheck={startDailyCheck}
-        onOpenPractice={() => router.push("/library-study/practice")}
-        onOpenWordSky={() => router.push("/library-study/word-sky")}
-        onOpenBookFlashcards={() => router.push("/library-study/book-flashcards")}
         onBackToLibrary={() => router.push("/books")}
       />
     );
@@ -3130,11 +3220,7 @@ export default function LibraryStudyPage() {
     return (
       <AbilityCheckNoDueState
         minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
-        hasPracticeCards={practiceFilteredCards.length > 0}
-        onOpenPractice={() => router.push("/library-study/practice")}
-        onOpenWordSky={() => router.push("/library-study/word-sky")}
-        onOpenPurpleReview={() => router.push("/library-study/practice?color=purple")}
-        onOpenBookFlashcards={() => router.push("/library-study/book-flashcards")}
+        onBackToLibrary={() => router.push("/books")}
       />
     );
   }
@@ -3258,11 +3344,6 @@ export default function LibraryStudyPage() {
       <div className="mb-2 w-full max-w-3xl space-y-2">
         <AbilityCheckIntroCard
           sessionSummaryText={deck.length > 0 ? checkSessionSummaryText(deck) : ""}
-          onOpenPractice={() => router.push("/library-study/practice")}
-        />
-
-        <AbilityCheckWordSkyCta
-          onOpenWordSky={() => router.push("/library-study/word-sky")}
         />
 
         <AbilityCheckFaq />
@@ -3387,12 +3468,12 @@ export default function LibraryStudyPage() {
           </AbilityCheckCardShell>
 
           <AbilityCheckActionPanel
-            modeLabel={checkModeLabel(currentCard)}
-            modeDescription={checkModeDescription(currentCard)}
             meaningReviewCount={meaningReviewItems.length}
             canComeBackLater={canComeBackLater(currentCard)}
+            canRestartCurrentCard={currentCard ? !isClaimCardId(currentCard.id) : false}
             onFinishForToday={finishForToday}
             onComeBackLater={() => void comeBackLaterForCurrentCard("hard")}
+            onRestartCurrentCard={() => void restartCurrentCardAtAbilityCheckStart()}
             onFlagCurrentCard={() => void flagCurrentCard()}
           />
         </>

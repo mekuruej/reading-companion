@@ -866,24 +866,6 @@ export default function AddWordPage() {
     }
   }
 
-  function sameGroup(
-    existing: SessionWord,
-    nextChapterNum: number | null,
-    nextPageNum: number | null,
-    nextChapterName: string
-  ) {
-    const oldChapterNum = toNullableInt(existing.chapterNumber);
-    const oldPageNum = toNullableInt(existing.pageNumber);
-    const oldChapterName = (existing.chapterName ?? "").trim();
-    const newChapterName = (nextChapterName ?? "").trim();
-
-    return (
-      oldChapterNum === nextChapterNum &&
-      oldPageNum === nextPageNum &&
-      oldChapterName === newChapterName
-    );
-  }
-
   async function handleSave() {
     setMessage("");
 
@@ -997,17 +979,7 @@ export default function AddWordPage() {
           ? sessionWords.find((w) => w.id === editingSessionWordId) ?? null
           : null;
 
-      let pageOrderToUse: number | null;
-
-      if (!editingExisting) {
-        pageOrderToUse = await getNextPageOrder(userBookId, chapterNum, pageNum);
-      } else if (sameGroup(editingExisting, chapterNum, pageNum, chapterNameTrimmed ?? "")) {
-        pageOrderToUse = editingExisting.pageOrder;
-      } else {
-        pageOrderToUse = await getNextPageOrder(userBookId, chapterNum, pageNum);
-      }
-
-      const payload = {
+      const basePayload = {
         user_book_id: userBookId,
         vocabulary_cache_id: vocabularyCacheId,
         surface: finalSurface,
@@ -1019,7 +991,6 @@ export default function AddWordPage() {
         jlpt: normalizeJlpt(jlpt),
         is_common: !!isCommon,
         page_number: pageNum,
-        page_order: pageOrderToUse,
         chapter_number: chapterNum,
         chapter_name: chapterNameTrimmed,
         hide_kanji_in_reading_support: hideKanjiInReadingSupport,
@@ -1027,6 +998,11 @@ export default function AddWordPage() {
       };
 
       if (!editingExisting) {
+        const payload = {
+          ...basePayload,
+          page_order: await getNextPageOrder(userBookId, chapterNum, pageNum),
+        };
+
         const { data: insertedRow, error } = await supabase
           .from("user_book_words")
           .insert(payload)
@@ -1091,7 +1067,7 @@ export default function AddWordPage() {
       } else {
         const { data: updatedRow, error } = await supabase
           .from("user_book_words")
-          .update(payload)
+          .update(basePayload)
           .eq("id", editingExisting.id)
           .eq("user_book_id", userBookId)
           .select(

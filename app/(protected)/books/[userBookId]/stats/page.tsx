@@ -6,6 +6,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
 import BookStatsErrorState from "./components/BookStatsErrorState";
@@ -180,6 +183,7 @@ export default function BookStatsPage() {
     const [row, setRow] = useState<UserBook | null>(null);
     const [sessions, setSessions] = useState<ReadingSession[]>([]);
     const [wordCount, setWordCount] = useState<number | null>(null);
+    const [canSeeVocabularyStats, setCanSeeVocabularyStats] = useState(false);
     const [comparisonBooks, setComparisonBooks] = useState<ComparisonBook[]>([]);
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccessBook, setCanAccessBook] = useState(false);
@@ -196,6 +200,8 @@ export default function BookStatsPage() {
             setAccessChecked(false);
             setCanAccessBook(false);
             setAccessMessage("");
+            setCanSeeVocabularyStats(false);
+            setWordCount(null);
 
             const {
                 data: { user },
@@ -215,7 +221,7 @@ export default function BookStatsPage() {
 
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("role, is_super_teacher")
+                .select("role, is_super_teacher, app_access_type, app_access_expires_at")
                 .eq("id", user.id)
                 .maybeSingle();
 
@@ -257,6 +263,25 @@ export default function BookStatsPage() {
             const ownerUserId = loadedRow.user_id;
             const isSuperTeacher =
                 profile?.role === "super_teacher" || Boolean((profile as any)?.is_super_teacher);
+            const roleForAccess = isSuperTeacher ? "super_teacher" : profile?.role;
+
+            const appStatus = getAppAccessStatus({
+                role: roleForAccess,
+                app_access_type: (profile as any)?.app_access_type ?? null,
+                app_access_expires_at: (profile as any)?.app_access_expires_at ?? null,
+            });
+
+            const featureAccess = getFeatureAccess({
+                role: roleForAccess,
+                hasFullAccess: appStatus.hasFullAccess,
+            });
+
+            const canViewVocabularyStats = canUseFullAccessFeature(
+                featureAccess,
+                "vocabulary_stats"
+            );
+
+            setCanSeeVocabularyStats(canViewVocabularyStats);
             let canAccess =
                 ownerUserId === user.id ||
                 isSuperTeacher;
@@ -298,10 +323,13 @@ export default function BookStatsPage() {
                         .eq("user_book_id", userBookId)
                         .order("read_on", { ascending: false })
                         .order("created_at", { ascending: false }),
-                    supabase
-                        .from("user_book_words")
-                        .select("id", { count: "exact", head: true })
-                        .eq("user_book_id", userBookId),
+
+                    canViewVocabularyStats
+                        ? supabase
+                            .from("user_book_words")
+                            .select("id", { count: "exact", head: true })
+                            .eq("user_book_id", userBookId)
+                        : Promise.resolve({ count: null, error: null }),
                 ]);
 
             if (cancelled) return;
@@ -313,7 +341,9 @@ export default function BookStatsPage() {
                 setSessions((sessionData as ReadingSession[]) ?? []);
             }
 
-            if (wordCountResult.error) {
+            if (!canViewVocabularyStats) {
+                setWordCount(null);
+            } else if (wordCountResult.error) {
                 console.error("Error loading word count:", wordCountResult.error);
                 setWordCount(null);
             } else {
@@ -634,21 +664,23 @@ export default function BookStatsPage() {
                         </StatsSection>
                     )}
 
-                <StatsSection title="Vocabulary">
-                    <StatCard
-                        label="Words Saved"
-                        value={wordCount ?? "—"}
-                        note="Saved words from this book"
-                    />
-
-                    {pagesRead > 0 && wordCount != null && (
+                {canSeeVocabularyStats ? (
+                    <StatsSection title="Vocabulary">
                         <StatCard
-                            label="Words/Page"
-                            value={(wordCount / pagesRead).toFixed(2)}
-                            note="Based on page-tracked progress"
+                            label="Words Saved"
+                            value={wordCount ?? "—"}
+                            note="Saved words from this book"
                         />
-                    )}
-                </StatsSection>
+
+                        {pagesRead > 0 && wordCount != null && (
+                            <StatCard
+                                label="Words/Page"
+                                value={(wordCount / pagesRead).toFixed(2)}
+                                note="Based on page-tracked progress"
+                            />
+                        )}
+                    </StatsSection>
+                ) : null}
             </div>
         </main>
     );

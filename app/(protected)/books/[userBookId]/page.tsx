@@ -650,6 +650,7 @@ export default function BookHubPage() {
   const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
   const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
   const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
+  const [canSeeVocabularySummary, setCanSeeVocabularySummary] = useState(false);
 
   const isTeacher = myRole === "teacher";
   const isTeacherContext = isTeacher || isSuperTeacher;
@@ -1047,16 +1048,28 @@ export default function BookHubPage() {
   }, [book?.page_count, furthestPage, finished]);
 
   const savedWordsProgressCount =
-    uniqueLookupCount != null ? uniqueLookupCount : 0;
+    canSeeVocabularySummary && uniqueLookupCount != null ? uniqueLookupCount : 0;
 
-  const savedWordsProgressLabel = `${savedWordsProgressCount} word${savedWordsProgressCount === 1 ? "" : "s"
-    } saved`;
+  const savedWordsProgressLabel =
+    canSeeVocabularySummary
+      ? `${savedWordsProgressCount} word${savedWordsProgressCount === 1 ? "" : "s"} saved`
+      : "";
 
   const bookHubProgressLabel = finished
-    ? `${savedWordsProgressLabel} · 100%`
+    ? canSeeVocabularySummary
+      ? `${savedWordsProgressLabel} · 100%`
+      : "100%"
     : readingSessions.length > 0 && progressPercent != null && furthestPage != null
-      ? `${savedWordsProgressLabel} · ${progressPercent}% · On page ${furthestPage}${lastSavedWord ? ` · Last saved word: ${lastSavedWord}` : ""
-      }`
+      ? [
+        canSeeVocabularySummary ? savedWordsProgressLabel : null,
+        `${progressPercent}%`,
+        `On page ${furthestPage}`,
+        canSeeVocabularySummary && lastSavedWord
+          ? `Last saved word: ${lastSavedWord}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
       : started
         ? "In progress"
         : "Not started";
@@ -1073,7 +1086,9 @@ export default function BookHubPage() {
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
   const bookHubPagesReadLabel = totalPagesRead ? String(totalPagesRead) : "—";
   const bookHubWordsSavedLabel =
-    uniqueLookupCount != null ? String(uniqueLookupCount) : "—";
+    canSeeVocabularySummary && uniqueLookupCount != null
+      ? String(uniqueLookupCount)
+      : "—";
   const bookHubAverageMinutesPerPageLabel =
     averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
 
@@ -3329,6 +3344,7 @@ export default function BookHubPage() {
     setCanUseSavedWordReading(false);
     setCanUseStudyFlashcards(false);
     setCanUseVocabularyList(false);
+    setCanSeeVocabularySummary(false);
 
     const {
       data: { session },
@@ -3393,6 +3409,7 @@ export default function BookHubPage() {
     setCanUseVocabularyList(
       canUseFullAccessFeature(featureAccess, "vocabulary_list")
     );
+    setCanSeeVocabularySummary(featureAccess.canSeeVocabularyColors);
 
     const { data, error } = await supabase
       .from("user_books")
@@ -3615,7 +3632,12 @@ export default function BookHubPage() {
 
     await loadCommunityContributions(b?.id ?? "", user.id, b ?? undefined);
 
-    await loadUniqueLookupCount(r.id);
+    if (featureAccess.canSeeVocabularyColors) {
+      await loadUniqueLookupCount(r.id);
+    } else {
+      setUniqueLookupCount(null);
+      setLastSavedWord("");
+    }
     await loadReadingSessions(r.id);
     await loadChapterSummaries(r.id);
     await loadCharacters(r.id);
@@ -5185,6 +5207,7 @@ export default function BookHubPage() {
                 pagesReadLabel={bookHubPagesReadLabel}
                 wordsSavedLabel={bookHubWordsSavedLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
+                showVocabularySummary={canSeeVocabularySummary}
               />
 
               <BookHubActionPrompt />

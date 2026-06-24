@@ -167,7 +167,7 @@ export default function BookHubActionGrid({
                 <ActionButton
                     title="Book"
                     subtitle="Stats"
-                    description="See this book’s progress, pace, time, vocabulary, and difficulty neighborhood."
+                    description="See this book’s progress, pace, time, and reading patterns."
                     className="bg-emerald-50 hover:bg-emerald-100"
                     onClick={onBookStats}
                 />

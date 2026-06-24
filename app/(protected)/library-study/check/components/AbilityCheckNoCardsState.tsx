@@ -1,10 +1,8 @@
 type AbilityCheckNoCardsStateProps = {
-  onOpenWordSky: () => void;
   onBackToLibrary: () => void;
 };
 
 export default function AbilityCheckNoCardsState({
-  onOpenWordSky,
   onBackToLibrary,
 }: AbilityCheckNoCardsStateProps) {
   return (
@@ -15,18 +13,11 @@ export default function AbilityCheckNoCardsState({
         </p>
 
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
-          Add words from books or use Word Sky to build your check pool.
+          Read and save more words from your books. Mekuru will let you know when
+          enough cards are ready for a stricter check.
         </p>
 
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={onOpenWordSky}
-            className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-          >
-            Open Word Sky
-          </button>
-
           <button
             type="button"
             onClick={onBackToLibrary}

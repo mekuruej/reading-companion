@@ -8,14 +8,10 @@ type AbilityCheckSetupPanelProps = {
   allLevelsSelected: boolean;
   selectedDueCount: number;
   minDueCards: number;
-  hasPracticeCards: boolean;
   faqSlot: ReactNode;
   onToggleAllLevels: () => void;
   onToggleLevel: (level: string) => void;
   onStartDailyCheck: () => void;
-  onOpenPractice: () => void;
-  onOpenWordSky: () => void;
-  onOpenBookFlashcards: () => void;
   onBackToLibrary: () => void;
 };
 
@@ -27,14 +23,10 @@ export default function AbilityCheckSetupPanel({
   allLevelsSelected,
   selectedDueCount,
   minDueCards,
-  hasPracticeCards,
   faqSlot,
   onToggleAllLevels,
   onToggleLevel,
   onStartDailyCheck,
-  onOpenPractice,
-  onOpenWordSky,
-  onOpenBookFlashcards,
   onBackToLibrary,
 }: AbilityCheckSetupPanelProps) {
   return (
@@ -42,7 +34,7 @@ export default function AbilityCheckSetupPanel({
       <div className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Daily Ability Check
+            Ability Check
           </p>
 
           <h1 className="mt-2 text-3xl font-black text-slate-950">
@@ -144,15 +136,6 @@ export default function AbilityCheckSetupPanel({
           </p>
         </section>
 
-        <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-          <div>Want more study after the strict check?</div>
-
-          <div>
-            Use Library Review or book flashcards for extra practice that does not move colors.
-            Use Word Sky to add easier words to the Reading Gate.
-          </div>
-        </div>
-
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             type="button"
@@ -161,32 +144,6 @@ export default function AbilityCheckSetupPanel({
             className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:opacity-40"
           >
             {selectedDueCount > 0 ? `Start ${selectedDueCount} Card Check` : "Start Ability Check"}
-          </button>
-
-          {hasPracticeCards ? (
-            <button
-              type="button"
-              onClick={onOpenPractice}
-              className="rounded-2xl border border-sky-200 bg-green-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-            >
-              Open Library Review
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={onOpenWordSky}
-            className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-          >
-            Open Word Sky
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenBookFlashcards}
-            className="rounded-2xl border border-violet-200 bg-violet-100 px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-50"
-          >
-            Open Book Flashcards
           </button>
 
           <button
