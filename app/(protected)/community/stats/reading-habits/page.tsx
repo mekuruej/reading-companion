@@ -2,15 +2,21 @@
 
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import StatCard from "./components/StatCard";
 import SectionBand from "./components/SectionBand";
 import BarStrip from "./components/BarStrip";
 import ModeStrip from "./components/ModeStrip";
 import PieChart from "./components/PieChart";
+import StatCard from "./components/StatCard";
 import TimeRangeSelector from "./components/TimeRangeSelector";
+import ReadingHabitsHeader from "./components/ReadingHabitsHeader";
+import ReadingHabitsMetricGrid from "./components/ReadingHabitsMetricGrid";
+import ReadingRhythmPanel from "./components/ReadingRhythmPanel";
+import {
+  ReadingHabitsErrorBanner,
+  ReadingHabitsLoadingPanel,
+} from "./components/ReadingHabitsStatePanels";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 type HabitTimeRange =
@@ -29,23 +35,11 @@ type SessionRow = {
   is_filler?: boolean | null;
 };
 
-type ModeStripItem = {
-  label: string;
-  value: number;
-  width: string;
-  color: string;
-};
-
 function ymdLocal(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function monthStartYmd() {
-  const now = new Date();
-  return ymdLocal(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
 function sessionPages(row: SessionRow) {
@@ -546,16 +540,6 @@ export default function ReadingHabitsPage() {
     };
   }, [visibleReadingRhythmActivity]);
 
-  const dayMetrics = useMemo(() => {
-    return visibleReadingRhythmActivity.map((item) => ({
-      date: item.day,
-      label: item.day.slice(8),
-      minutes: item.minutes,
-      pages: item.pages,
-      sessions: item.sessions,
-    }));
-  }, [visibleReadingRhythmActivity]);
-
   const timePie = useMemo(
     () => [
       { label: "Fluid", value: habitStats.fluidMinutes, color: "#34d399" },
@@ -631,45 +615,18 @@ export default function ReadingHabitsPage() {
   );
 
   if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-100 px-6 py-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="text-sm text-slate-600">Loading reading habits…</div>
-        </div>
-      </main>
-    );
+    return <ReadingHabitsLoadingPanel />;
   }
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
       <div className="mx-auto max-w-7xl space-y-5">
-        <div>
-          <Link
-            href="/community/stats"
-            className="text-sm font-semibold text-slate-500 hover:text-slate-900"
-          >
-            ← Back to Stats Home
-          </Link>
+        <ReadingHabitsHeader
+          selectedTimeLabel={selectedTimeLabel}
+          pageHeaderTone={selectedTheme.pageHeader}
+        />
 
-          <div className={`mt-5 rounded-3xl border-2 p-5 shadow-sm ${selectedTheme.pageHeader}`}>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
-              Reading rhythm
-            </p>
-            <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-              Reading Habits
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-              A more visual look at your reading rhythm for {selectedTimeLabel.toLowerCase()}:
-              modes, sessions, time, and daily rhythm.
-            </p>
-          </div>
-        </div>
-
-        {errorMsg ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-            {errorMsg}
-          </div>
-        ) : null}
+        <ReadingHabitsErrorBanner message={errorMsg} />
 
         <TimeRangeSelector
           filters={HABIT_TIME_FILTERS}
@@ -683,32 +640,13 @@ export default function ReadingHabitsPage() {
           }}
         />
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Active Days"
-            value={habitStats.activeDays}
-            hint="Days with at least one reading session"
-            tone={selectedTheme.statOne}
-          />
-          <StatCard
-            label="Reading Sessions"
-            value={habitStats.readingSessions}
-            hint="Fluid + curiosity sessions"
-            tone={selectedTheme.statTwo}
-          />
-          <StatCard
-            label="Listening Sessions"
-            value={habitStats.listeningSessions}
-            hint="Ear-training sessions"
-            tone={selectedTheme.statThree}
-          />
-          <StatCard
-            label="Pages Read"
-            value={habitStats.pagesRead}
-            hint="Fluid + curiosity page movement"
-            tone={selectedTheme.statFour}
-          />
-        </div>
+        <ReadingHabitsMetricGrid
+          activeDays={habitStats.activeDays}
+          readingSessions={habitStats.readingSessions}
+          listeningSessions={habitStats.listeningSessions}
+          pagesRead={habitStats.pagesRead}
+          tone={selectedTheme}
+        />
 
         <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
           <SectionBand
@@ -749,177 +687,18 @@ export default function ReadingHabitsPage() {
           </SectionBand>
         </div>
 
-        <SectionBand
-          eyebrow={`Reading Rhythm — ${selectedTimeLabel}`}
-          title="Reading rhythm by day"
-          description={`${readingRhythmWindowLabel}: which days you read, listened, or mixed modes. Untimed sessions still count as activity.`}
+        <ReadingRhythmPanel
+          selectedTimeLabel={selectedTimeLabel}
+          readingRhythmWindowLabel={readingRhythmWindowLabel}
           tone={selectedTheme.softSection}
-        >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-semibold text-sky-800">
-              Showing: {readingRhythmWindowLabel}
-            </div>
-
-            {readingRhythmActivity.length > COLLAPSED_READING_RHYTHM_DAY_COUNT ? (
-              <button
-                type="button"
-                onClick={() => setShowFullReadingRhythm((prev) => !prev)}
-                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-              >
-                {showFullReadingRhythm
-                  ? "Collapse to recent 90 days"
-                  : `Show full ${selectedTimeLabel.toLowerCase()}`}
-              </button>
-            ) : null}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-[repeat(14,minmax(0,1fr))] xl:grid-cols-[repeat(28,minmax(0,1fr))]">
-            {visibleReadingRhythmActivity.map((item, index) => {
-              const hasFluid = item.fluidSessions > 0;
-              const hasCuriosity = item.curiositySessions > 0;
-              const hasListening = item.listeningSessions > 0;
-              const activeModeCount = [hasFluid, hasCuriosity, hasListening].filter(
-                Boolean
-              ).length;
-              const isMixed = activeModeCount >= 2;
-              const intensity = item.sessions + Math.floor(item.minutes / 30);
-
-              const colorClass =
-                item.sessions === 0
-                  ? "bg-slate-100"
-                  : isMixed
-                    ? intensity < 3
-                      ? "bg-violet-300"
-                      : intensity < 6
-                        ? "bg-violet-500"
-                        : "bg-violet-700"
-                    : hasListening
-                      ? intensity < 3
-                        ? "bg-sky-300"
-                        : intensity < 6
-                          ? "bg-sky-500"
-                          : "bg-sky-700"
-                      : hasCuriosity
-                        ? intensity < 3
-                          ? "bg-amber-200"
-                          : intensity < 6
-                            ? "bg-amber-400"
-                            : "bg-amber-600"
-                        : intensity < 3
-                          ? "bg-emerald-300"
-                          : intensity < 6
-                            ? "bg-emerald-500"
-                            : "bg-emerald-700";
-
-              const previousItem = visibleReadingRhythmActivity[index - 1];
-              const startsMonth =
-                index === 0 || item.day.slice(0, 7) !== previousItem?.day.slice(0, 7);
-
-              const monthLabel = new Date(`${item.day}T00:00:00`).toLocaleString(
-                "en-US",
-                {
-                  month: "short",
-                }
-              ).toUpperCase();
-
-              const monthTextClass =
-                item.sessions > 0 ? "text-white drop-shadow-sm" : "text-slate-500";
-
-              return (
-                <div key={item.day} className="space-y-1">
-                  <div
-                    className={`relative h-10 rounded-lg border border-white/70 ${colorClass}`}
-                    title={`${item.day}: ${item.sessions} session${item.sessions === 1 ? "" : "s"
-                      }, ${item.pages} page${item.pages === 1 ? "" : "s"}, ${item.minutes
-                      } minute${item.minutes === 1 ? "" : "s"}`}
-                  >
-                    {startsMonth ? (
-                      <span
-                        className={`absolute left-1 top-1 text-[8px] font-black tracking-wide ${monthTextClass}`}
-                      >
-                        {monthLabel}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="text-center text-[9px] text-slate-500">
-                    {item.day.slice(8)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-emerald-500" />
-              Fluid
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-amber-400" />
-              Curiosity
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-sky-500" />
-              Listening
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-violet-500" />
-              Mixed modes
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
-              <div className="text-xs text-slate-500">Active days</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">
-                {readingRhythmSummary.activeDays}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
-              <div className="text-xs text-slate-500">Fluid days</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">
-                {readingRhythmSummary.fluidDays}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
-              <div className="text-xs text-slate-500">Curiosity days</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">
-                {readingRhythmSummary.curiosityDays}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
-              <div className="text-xs text-slate-500">Listening days</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">
-                {readingRhythmSummary.listeningDays}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-900/10 bg-white px-4 py-3">
-              <div className="text-xs text-slate-500">Mixed-mode days</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">
-                {readingRhythmSummary.mixedDays}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-sm font-semibold text-slate-900">
-              Reading rhythm
-            </div>
-
-            <div className="mt-2 text-sm leading-6 text-slate-600">
-              {readingRhythmSummary.sessions === 0
-                ? "No reading sessions in this window yet. One tiny session is enough to start a rhythm."
-                : `You logged ${readingRhythmSummary.sessions} session${readingRhythmSummary.sessions === 1 ? "" : "s"
-                }, ${formatMinutesAsReadableTime(readingRhythmSummary.minutes)}, and ${readingRhythmSummary.pages
-                } page${readingRhythmSummary.pages === 1 ? "" : "s"} in this window.`}
-            </div>
-          </div>
-        </SectionBand>
+          visibleActivity={visibleReadingRhythmActivity}
+          totalActivityDays={readingRhythmActivity.length}
+          collapsedDayCount={COLLAPSED_READING_RHYTHM_DAY_COUNT}
+          showFullReadingRhythm={showFullReadingRhythm}
+          summary={readingRhythmSummary}
+          formatMinutesAsReadableTime={formatMinutesAsReadableTime}
+          onToggleFullReadingRhythm={() => setShowFullReadingRhythm((prev) => !prev)}
+        />
 
         <div className="grid gap-4 lg:grid-cols-2">
           <SectionBand
