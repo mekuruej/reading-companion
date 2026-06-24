@@ -4,14 +4,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import StatCard from "./components/StatCard";
 import SectionBand from "./components/SectionBand";
-import BarStrip from "./components/BarStrip";
 import PieChart from "./components/PieChart";
 import ReadingAbilityFilterSelector from "./components/ReadingAbilityFilterSelector";
 import ReadingAbilityHeader from "./components/ReadingAbilityHeader";
 import PaceLegendCards from "./components/PaceLegendCards";
 import ReadingRangeCard from "./components/ReadingRangeCard";
+import ReadingAbilityComparisonPanel from "./components/ReadingAbilityComparisonPanel";
+import ReadingAbilityMetricGrid from "./components/ReadingAbilityMetricGrid";
+import {
+  ReadingAbilityErrorBanner,
+  ReadingAbilityLoadingPanel,
+} from "./components/ReadingAbilityStatePanels";
+import ReadingAbilityTypePanel from "./components/ReadingAbilityTypePanel";
 
 type SessionMode = "fluid" | "curiosity" | "listening" | string;
 
@@ -775,25 +780,15 @@ export default function ReadingAbilityPage() {
     }, [filteredBookMetrics]);
 
     if (loading) {
-        return (
-            <main className="min-h-screen bg-slate-100 px-6 py-8">
-                <div className="mx-auto max-w-7xl">
-                    <div className="text-sm text-slate-600">Loading reading ability…</div>
-                </div>
-            </main>
-        );
-    }
+        return <ReadingAbilityLoadingPanel />;
+     }
 
     return (
         <main className="min-h-screen bg-slate-100 px-6 py-8">
             <div className="mx-auto max-w-7xl space-y-5">
                 <ReadingAbilityHeader pageHeaderTone={selectedTheme.pageHeader} />
 
-                {errorMsg ? (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                        {errorMsg}
-                    </div>
-                ) : null}
+                <ReadingAbilityErrorBanner message={errorMsg} />
 
                 <SectionBand
                     eyebrow={`Book category — ${selectedFilterLabel}`}
@@ -809,42 +804,15 @@ export default function ReadingAbilityPage() {
                     />
                 </SectionBand>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                    <StatCard
-                        label="Timed Page Coverage"
-                        value={
-                            abilityTotals.timedCoveragePercent == null
-                                ? "—"
-                                : `${Math.round(abilityTotals.timedCoveragePercent)}%`
-                        }
-                        hint={`${abilityTotals.timedPages} timed pages · ${abilityTotals.untimedPages} untimed pages`}
-                        tone={selectedTheme.statOne}
-                    />
-
-                    <StatCard
-                        label="Fluid Pace Per Page"
-                        value={
-                            abilityTotals.fluidMinutesPerPage == null
-                                ? "—"
-                                : `${formatDecimal(abilityTotals.fluidMinutesPerPage)} min/page`
-                        }
-                        hint="Time per page during fluid reading"
-                        tone={selectedTheme.statTwo}
-                    />
-
-                    <StatCard
-                        label="Curiosity Pace Per Page"
-                        value={
-                            abilityTotals.curiosityMinutesPerPage == null
-                                ? "—"
-                                : `${formatDecimal(
-                                    abilityTotals.curiosityMinutesPerPage
-                                )} min/page`
-                        }
-                        hint="Time per page during curiosity reading"
-                        tone={selectedTheme.statThree}
-                    />
-                </div>
+                <ReadingAbilityMetricGrid
+                    timedCoveragePercent={abilityTotals.timedCoveragePercent}
+                    timedPages={abilityTotals.timedPages}
+                    untimedPages={abilityTotals.untimedPages}
+                    fluidMinutesPerPage={abilityTotals.fluidMinutesPerPage}
+                    curiosityMinutesPerPage={abilityTotals.curiosityMinutesPerPage}
+                    formatDecimal={formatDecimal}
+                    tone={selectedTheme}
+                />
 
                 <div className="grid gap-4 md:grid-cols-2">
                     <ReadingRangeCard
@@ -917,120 +885,20 @@ export default function ReadingAbilityPage() {
                     </div>
                 </SectionBand>
 
-                <div className="grid gap-4">
-                    <SectionBand
-                        eyebrow={`Book type — ${selectedFilterLabel}`}
-                        title="Ability by book type"
-                        description="This groups your reading by book category and compares page movement and timed reading pace."
-                        tone={selectedTheme.section}
-                    >
-                        <div className="space-y-5">
-                            <BarStrip
-                                items={abilityTypeMetrics.map((item) => ({
-                                    label: item.bookType,
-                                    value: item.pagesRead,
-                                }))}
-                                colorClass="bg-indigo-500"
-                                valueSuffix=" pages"
-                            />
-
-                            <div className="overflow-hidden rounded-2xl border border-slate-200">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                                        <tr>
-                                            <th className="px-3 py-2">Type</th>
-                                            <th className="px-3 py-2">Pages</th>
-                                            <th className="px-3 py-2">Min/page</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 bg-white">
-                                        {abilityTypeMetrics.map((item) => (
-                                            <tr key={item.bookType}>
-                                                <td className="px-3 py-2 font-medium text-slate-900">
-                                                    {item.bookType}
-                                                </td>
-                                                <td className="px-3 py-2 text-slate-700">
-                                                    {item.pagesRead}
-                                                </td>
-                                                <td className="px-3 py-2 text-slate-700">
-                                                    {formatDecimal(item.averageMinutesPerPage)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </SectionBand>
-
-                </div>
-
-                <SectionBand
-                    eyebrow={`Comparison — ${selectedFilterLabel}`}
-                    title="Books that pushed back / books that flowed"
-                    description="Within each book type, this compares the slowest and fastest timed reading experiences."
+                <ReadingAbilityTypePanel
+                    selectedFilterLabel={selectedFilterLabel}
                     tone={selectedTheme.section}
-                >
-                    {abilityComparisonRows.length === 0 ? (
-                        <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-                            No timed reading comparison yet. Add minutes to reading sessions to
-                            see pace.
-                        </div>
-                    ) : (
-                        <div className="overflow-hidden rounded-2xl border border-slate-200">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                                    <tr>
-                                        <th className="px-3 py-2">Book type</th>
-                                        <th className="px-3 py-2">Pushed back</th>
-                                        <th className="px-3 py-2">Flowed</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                    {abilityComparisonRows.map((row) => (
-                                        <tr key={row.bookType}>
-                                            <td className="px-3 py-2 font-medium text-slate-900">
-                                                {bookTypeLabel(row.bookType)}
-                                            </td>
+                    rows={abilityTypeMetrics}
+                    formatDecimal={formatDecimal}
+                />
 
-                                            <td className="px-3 py-2 text-slate-700">
-                                                {row.pushed ? (
-                                                    <div>
-                                                        <div className="font-medium text-slate-900">
-                                                            {row.pushed.title}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500">
-                                                            {formatDecimal(row.pushed.averageMinutesPerPage)}{" "}
-                                                            min/page · {row.pushed.pagesRead} pages
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    "—"
-                                                )}
-                                            </td>
-
-                                            <td className="px-3 py-2 text-slate-700">
-                                                {row.flowed ? (
-                                                    <div>
-                                                        <div className="font-medium text-slate-900">
-                                                            {row.flowed.title}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500">
-                                                            {formatDecimal(row.flowed.averageMinutesPerPage)}{" "}
-                                                            min/page · {row.flowed.pagesRead} pages
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    "—"
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </SectionBand>
+                <ReadingAbilityComparisonPanel
+                    selectedFilterLabel={selectedFilterLabel}
+                    tone={selectedTheme.section}
+                    rows={abilityComparisonRows}
+                    bookTypeLabel={bookTypeLabel}
+                    formatDecimal={formatDecimal}
+                />
             </div>
         </main>
     );
