@@ -53,7 +53,6 @@ type ReadingFitCountProfileRow = {
 
 type TeacherRatingCountUserBookRow = {
   finished_at: string | null;
-  dnf_at: string | null;
   notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
@@ -121,7 +120,7 @@ const attentionCards: AttentionCard[] = [
     title: "Teacher Ratings",
     href: "/teacher/ratings",
     eyebrow: "Lesson fit",
-    description: "Rate finished or stopped books so useful lesson books are easier to find later.",
+    description: "Rate finished books so useful lesson books are easier to find later.",
     countKey: "teacherRatings",
   },
   {
@@ -355,7 +354,7 @@ export default function TeacherNeedsAttentionPage() {
             .is("teacher_review_cleared_at", null),
           supabase
             .from("user_books")
-            .select("finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
+            .select("finished_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
             .in("user_id", studentIds),
         ]);
 
@@ -380,14 +379,14 @@ export default function TeacherNeedsAttentionPage() {
 
         const teacherRatingCount = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
           (item) => {
-            const isFinishedOrDnf = !!item.finished_at || !!item.dnf_at;
+            const isFinished = !!item.finished_at;
             const hasTeacherReview =
               !!String(item.recommended_level ?? "").trim() ||
               item.teacher_student_use_rating != null ||
               item.rating_recommend != null ||
               !!String(item.notes ?? "").trim();
 
-            return isFinishedOrDnf && !hasTeacherReview;
+            return isFinished && !hasTeacherReview;
           }
         ).length;
 

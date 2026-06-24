@@ -46,7 +46,6 @@ type ReadingFitCountUserBookRow = {
 
 type TeacherRatingCountUserBookRow = {
   finished_at: string | null;
-  dnf_at: string | null;
   notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
@@ -258,7 +257,7 @@ export default function TeacherHubPage() {
             .is("teacher_review_cleared_at", null),
           supabase
             .from("user_books")
-            .select("finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
+            .select("finished_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
             .in("user_id", studentIds),
         ]);
 
@@ -283,14 +282,14 @@ export default function TeacherHubPage() {
 
         const teacherRatingCount = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
           (item) => {
-            const isFinishedOrDnf = !!item.finished_at || !!item.dnf_at;
+            const isFinished = !!item.finished_at;
             const hasTeacherReview =
               !!String(item.recommended_level ?? "").trim() ||
               item.teacher_student_use_rating != null ||
               item.rating_recommend != null ||
               !!String(item.notes ?? "").trim();
 
-            return isFinishedOrDnf && !hasTeacherReview;
+            return isFinished && !hasTeacherReview;
           }
         ).length;
 
@@ -305,7 +304,7 @@ export default function TeacherHubPage() {
             title: "Teacher Ratings Needed",
             href: "/teacher/ratings",
             count: teacherRatingCount ?? 0,
-            description: "Finished or DNF books waiting for lesson-fit ratings and teacher notes.",
+            description: "Finished books waiting for lesson-fit ratings and teacher notes.",
           },
           {
             title: "Lesson Vocabulary Reminder",
