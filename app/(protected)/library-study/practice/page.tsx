@@ -170,7 +170,6 @@ type StudyMode =
   | "reading_to_meaning_mc"
   | "complete_study";
 
-type LibraryStudyMode = "check" | "practice";
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
 type PracticeRevealStep = "word" | "reading" | "meaning";
 type PracticeStudyMode = "reveal" | "typing";
@@ -981,88 +980,6 @@ function promptModeClass(gate: LibraryCheckGate | undefined) {
   return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
 }
 
-function LibraryCheckIntroCard({
-  mode,
-  onModeChange,
-}: {
-  mode: LibraryStudyMode;
-  onModeChange: (mode: LibraryStudyMode) => void;
-}) {
-  const colorSteps = [
-    { label: "Yellow", className: "bg-yellow-300", text: "ready for gate checks" },
-    { label: "Green", className: "bg-emerald-500", text: "reading gate" },
-    { label: "Blue", className: "bg-sky-500", text: "meaning gate" },
-    { label: "Purple", className: "bg-violet-500", text: "mastered" },
-  ];
-
-  return (
-    <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_180px] md:items-center">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold text-slate-900">
-            {mode === "practice" ? "Library Practice" : "Ability Check"}
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            {mode === "practice"
-              ? "A gentle reveal space for reviewing all words in your library without moving their colors."
-              : "A once-a-day check for words that are ready to move by ability."}
-          </p>
-        </div>
-
-        <div className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1 text-sm font-semibold">
-          <button
-            type="button"
-            onClick={() => onModeChange("check")}
-            className={`rounded-lg px-3 py-2 transition ${mode === "check" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-              }`}
-          >
-            Check
-          </button>
-          <button
-            type="button"
-            onClick={() => onModeChange("practice")}
-            className={`rounded-lg px-3 py-2 transition ${mode === "practice" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-              }`}
-          >
-            Practice
-          </button>
-        </div>
-      </div>
-
-      {mode === "practice" ? (
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-xl bg-sky-50 px-3 py-2">
-            <div className="text-xs font-semibold text-sky-950">Reveal slowly</div>
-            <div className="text-[11px] leading-4 text-slate-500">Word, then reading, then meaning.</div>
-          </div>
-
-          <div className="rounded-xl bg-slate-50 px-3 py-2">
-            <div className="text-xs font-semibold text-slate-800">No gate movement</div>
-            <div className="text-[11px] leading-4 text-slate-500">Practice never passes or fails a word.</div>
-          </div>
-
-          <div className="rounded-xl bg-violet-50 px-3 py-2">
-            <div className="text-xs font-semibold text-violet-950">Repeat freely</div>
-            <div className="text-[11px] leading-4 text-slate-500">Shuffle and review as much as you want.</div>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {colorSteps.map((step) => (
-            <div key={step.label} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-              <span className={`h-3 w-3 rounded-full ${step.className}`} />
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-slate-800">{step.label}</div>
-                <div className="truncate text-[11px] text-slate-500">{step.text}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function LibraryPracticePanel({
   card,
   total,
@@ -1671,7 +1588,6 @@ export default function LibraryStudyPage() {
   const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
   const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
-  const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("practice");
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
   const [dailyCheckPlan, setDailyCheckPlan] = useState<DailyCheckPlan | null>(null);
   const [setupLevels, setSetupLevels] = useState<DailyCheckLevel[]>([]);
