@@ -2,6 +2,7 @@ type BookStatsHeaderProps = {
   bookTitle: string | null;
   bookTitleReading?: string | null;
   coverUrl?: string | null;
+  canOpenVocabList?: boolean;
   onOpenBookHub: () => void;
   onOpenVocabList: () => void;
 };
@@ -10,6 +11,7 @@ export default function BookStatsHeader({
   bookTitle,
   bookTitleReading,
   coverUrl,
+  canOpenVocabList = false,
   onOpenBookHub,
   onOpenVocabList,
 }: BookStatsHeaderProps) {
@@ -52,19 +54,21 @@ export default function BookStatsHeader({
             ) : null}
 
             <p className="mt-2 hidden text-sm text-stone-600 sm:block">
-              Reading history, time, pace, vocabulary, and difficulty.
+              Reading history, time, pace, and difficulty.
             </p>
           </div>
         </button>
 
         <div className="flex flex-wrap gap-2 sm:justify-end">
-          <button
-            type="button"
-            onClick={onOpenVocabList}
-            className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-          >
-            Vocab List
-          </button>
+          {canOpenVocabList ? (
+            <button
+              type="button"
+              onClick={onOpenVocabList}
+              className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+            >
+              Vocab List
+            </button>
+          ) : null}
 
           <button
             type="button"

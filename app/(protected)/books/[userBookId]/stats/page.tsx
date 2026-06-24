@@ -558,13 +558,12 @@ export default function BookStatsPage() {
         <main className="min-h-screen bg-stone-50 p-6">
             <div className="mx-auto max-w-6xl space-y-5">
                 <BookStatsHeader
-                    bookTitle={book.title}
-                    bookTitleReading={book.title_reading}
-                    coverUrl={book.cover_url}
-                    onOpenBookHub={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-                    onOpenVocabList={() =>
-                        router.push(`/books/${encodeURIComponent(userBookId)}/words`)
-                    }
+                    bookTitle={book?.title ?? null}
+                    bookTitleReading={book?.title_reading ?? null}
+                    coverUrl={book?.cover_url ?? null}
+                    canOpenVocabList={canSeeVocabularyStats}
+                    onOpenBookHub={() => router.push(`/books/${userBookId}`)}
+                    onOpenVocabList={() => router.push(`/books/${userBookId}/words`)}
                 />
 
                 <DifficultyNeighborhoodPanel
