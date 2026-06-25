@@ -25,6 +25,9 @@ type GlobalBookRow = {
   publisher: string | null;
   published_date: string | null;
   page_count: number | null;
+  allow_missing_isbn?: boolean | null;
+  allow_missing_publisher?: boolean | null;
+  missing_info_cleared_at?: string | null;
 };
 
 type ReadingFitCountUserBookRow = {
@@ -72,52 +75,59 @@ const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 
 const attentionCards: NeedsAttentionCard[] = [
   {
-    title: "Book Requests / Book Review",
-    href: "/teacher/books",
+    title: "Books",
     eyebrow: "Books",
-    description: "Review pending book requests, book flags, and global books missing core information.",
+    description: "Review book requests, book flags, and global books missing core information.",
     countKey: "books",
+    actions: [
+      {
+        label: "Book Requests",
+        href: "/teacher/books?from=needs-attention#book-requests",
+        countKey: "bookRequests",
+      },
+      {
+        label: "Book Flags",
+        href: "/teacher/books?from=needs-attention#book-flags",
+        countKey: "bookFlags",
+      },
+      {
+        label: "Missing Info",
+        href: "/teacher/books?from=needs-attention#missing-book-info",
+        countKey: "missingBooks",
+      },
+    ],
   },
   {
-    title: "Missing Book Info",
-    href: "/teacher/books",
-    eyebrow: "Book cleanup",
-    description: "Find books that need covers, authors, reading metadata, ISBN cleanup, or other global book details.",
-    countKey: "missingBooks",
-  },
-  {
-    title: "Kanji Reports / Errors",
-    href: "/teacher/kanji",
-    eyebrow: "Kanji",
-    description: "Review kanji reports, flagged kanji readings, and enrichment queues.",
-    countKey: "kanji",
-  },
-  {
-    title: "Word Reports / Vocab Fixes",
-    href: "/teacher/words",
+    title: "Vocabulary Flags",
+    href: "/teacher/words?from=needs-attention",
     eyebrow: "Vocabulary",
     description: "Review flagged saved-word cards, readings, meanings, and vocabulary support issues.",
     countKey: "wordReports",
   },
   {
-    title: "Reading Fit Review",
-    href: "/teacher/reading-fit",
-    eyebrow: "Reading fit",
-    description: "Review finished books missing learner reflection or placement signals.",
-    countKey: "readingFit",
+    title: "Kanji Flags",
+    href: "/teacher/kanji?from=needs-attention",
+    eyebrow: "Kanji",
+    description: "Review kanji reports, flagged kanji readings, and enrichment queues.",
+    countKey: "kanji",
   },
   {
-    title: "Teacher Ratings",
-    href: "/teacher/ratings",
-    eyebrow: "Lesson fit",
-    description: "Rate finished books so useful lesson books are easier to find later.",
-    countKey: "teacherRatings",
-  },
-  {
-    title: "Student Follow-up",
-    eyebrow: "Learners",
-    description: "Placeholder for assigned work, student task follow-up, and prep reminders when that workflow is ready.",
-    disabled: true,
+    title: "Rating Flags",
+    eyebrow: "Ratings",
+    description: "Review finished books that need learner reflection details or teacher lesson-fit ratings.",
+    countKey: "ratingFlags",
+    actions: [
+      {
+        label: "Teacher Ratings",
+        href: "/teacher/ratings?from=needs-attention",
+        countKey: "teacherRatings",
+      },
+      {
+        label: "Student Ratings",
+        href: "/teacher/reading-fit?from=needs-attention",
+        countKey: "readingFit",
+      },
+    ],
   },
 ];
 
@@ -126,13 +136,15 @@ function isSuperTeacherFlag(value: unknown) {
 }
 
 function missingGlobalBookFields(book: GlobalBookRow) {
+  if (book.missing_info_cleared_at) return [];
+
   const missing: string[] = [];
   if (!String(book.title ?? "").trim()) missing.push("title");
-  if (!String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
   if (!String(book.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book.book_type ?? "").trim()) missing.push("book type");
   if (!String(book.author ?? "").trim()) missing.push("author");
-  if (!String(book.publisher ?? "").trim()) missing.push("publisher");
+  if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
   if (!String(book.published_date ?? "").trim()) missing.push("published date");
   if (book.page_count == null) missing.push("page count");
   return missing;
@@ -198,8 +210,11 @@ export default function TeacherNeedsAttentionPage() {
   const [countsLoading, setCountsLoading] = useState(true);
   const [attentionCounts, setAttentionCounts] = useState<AttentionCounts>({
     books: 0,
+    bookRequests: 0,
+    bookFlags: 0,
     missingBooks: 0,
     kanji: 0,
+    ratingFlags: 0,
     readingFit: 0,
     wordReports: 0,
     teacherRatings: 0,
@@ -330,11 +345,14 @@ export default function TeacherNeedsAttentionPage() {
 
         let nextCounts: AttentionCounts = {
           books: 0,
+          bookRequests: 0,
+          bookFlags: 0,
           missingBooks: 0,
           kanji: 0,
           wordReports: 0,
           readingFit: readingFitCount,
           teacherRatings: teacherRatingCount,
+          ratingFlags: readingFitCount + teacherRatingCount,
         };
 
         if (isSuperTeacher) {
@@ -356,7 +374,7 @@ export default function TeacherNeedsAttentionPage() {
             supabase
               .from("books")
               .select(
-                "title, isbn13, cover_url, book_type, author, publisher, published_date, page_count"
+                "title, isbn13, cover_url, book_type, author, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
               ),
             supabase
               .from("user_book_words")
@@ -445,7 +463,12 @@ export default function TeacherNeedsAttentionPage() {
 
           nextCounts = {
             ...nextCounts,
-            books: (pendingBookRequestCount ?? 0) + (manualBookFlagCount ?? 0),
+            books:
+              (pendingBookRequestCount ?? 0) +
+              (manualBookFlagCount ?? 0) +
+              missingBookInfoCount,
+            bookRequests: pendingBookRequestCount ?? 0,
+            bookFlags: manualBookFlagCount ?? 0,
             missingBooks: missingBookInfoCount,
             kanji: activeKanjiQueueCount,
             wordReports: flaggedWordReportCount ?? 0,

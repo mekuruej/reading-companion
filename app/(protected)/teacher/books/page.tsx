@@ -4,8 +4,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 
 type BookFlag = {
   id: string;
@@ -30,6 +32,9 @@ type GlobalBookRow = {
   publisher: string | null;
   published_date: string | null;
   page_count: number | null;
+  allow_missing_isbn?: boolean | null;
+  allow_missing_publisher?: boolean | null;
+  missing_info_cleared_at?: string | null;
 };
 
 type PendingBookRequest = {
@@ -43,13 +48,15 @@ type PendingBookRequest = {
 };
 
 function missingGlobalBookFields(book: GlobalBookRow) {
+  if (book.missing_info_cleared_at) return [];
+
   const missing: string[] = [];
   if (!String(book.title ?? "").trim()) missing.push("title");
-  if (!String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
   if (!String(book.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book.book_type ?? "").trim()) missing.push("book type");
   if (!String(book.author ?? "").trim()) missing.push("author");
-  if (!String(book.publisher ?? "").trim()) missing.push("publisher");
+  if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
   if (!String(book.published_date ?? "").trim()) missing.push("published date");
   if (book.page_count == null) missing.push("page count");
   return missing;
@@ -86,8 +93,12 @@ async function rejectBookRequestWithSession(requestId: string) {
 }
 
 export default function TeacherBooksQueuePage() {
+  const searchParams = useSearchParams();
+  const backLink = getTeacherBackLink(searchParams.get("from"));
+
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [clearingBookId, setClearingBookId] = useState<string | null>(null);
   const [flags, setFlags] = useState<BookFlag[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingBookRequest[]>([]);
 
@@ -185,7 +196,9 @@ export default function TeacherBooksQueuePage() {
 
       const { data: globalBooks, error: globalBooksError } = await supabase
         .from("books")
-        .select("id, title, isbn13, cover_url, book_type, author, publisher, published_date, page_count")
+        .select(
+          "id, title, isbn13, cover_url, book_type, author, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+        )
         .order("title", { ascending: true });
 
       if (globalBooksError) throw globalBooksError;
@@ -258,6 +271,47 @@ export default function TeacherBooksQueuePage() {
     }
   }
 
+  async function clearMissingBookInfoAlert(bookId: string | null) {
+    if (!bookId) return;
+
+    const confirmed = window.confirm(
+      "Clear this missing-info alert? The book record will stay in Mekuru, but it will stop appearing in the missing information queue."
+    );
+
+    if (!confirmed) return;
+
+    setClearingBookId(bookId);
+    setMessage("");
+
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth?.user;
+
+      if (!user) {
+        setMessage("Please sign in again.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("books")
+        .update({
+          missing_info_cleared_at: new Date().toISOString(),
+          missing_info_cleared_by: user.id,
+        })
+        .eq("id", bookId);
+
+      if (error) throw error;
+
+      setFlags((prev) => prev.filter((flag) => flag.book_id !== bookId));
+      setMessage("Missing-info alert cleared.");
+    } catch (error: any) {
+      console.error("Clear missing book info alert error:", error);
+      setMessage(error?.message ?? "Could not clear this missing-info alert.");
+    } finally {
+      setClearingBookId(null);
+    }
+  }
+
   async function rejectBookRequest(requestId: string) {
     const confirmed = window.confirm(
       "Reject this book request? It will leave the pending list, but the request history will stay in Mekuru."
@@ -276,8 +330,8 @@ export default function TeacherBooksQueuePage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/teacher" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-        ← Teacher Home
+      <Link href={backLink.href} className="text-sm font-semibold text-stone-500 hover:text-stone-900">
+        {backLink.label}
       </Link>
 
       <section className="mt-4 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -294,7 +348,7 @@ export default function TeacherBooksQueuePage() {
 
       {message ? <p className="mt-4 text-sm text-amber-700">{message}</p> : null}
 
-      <section className="mt-6 space-y-3">
+      <section id="book-requests" className="mt-6 scroll-mt-24 space-y-3">
         <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -374,7 +428,7 @@ export default function TeacherBooksQueuePage() {
         })}
       </section>
 
-      <section className="mt-6 space-y-3">
+      <section id="book-flags" className="mt-6 scroll-mt-24 space-y-3">
         <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
             Books Missing Information
@@ -391,6 +445,8 @@ export default function TeacherBooksQueuePage() {
             No books are flagged right now.
           </div>
         ) : null}
+
+        <div id="missing-book-info" className="scroll-mt-24" />
 
         {flags.map((flag) => (
           <div key={flag.id} className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -414,12 +470,25 @@ export default function TeacherBooksQueuePage() {
                 </p>
 
                 {flag.href ? (
-                  <Link
-                    href={flag.href}
-                    className="mt-3 inline-flex rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-                  >
-                    {flag.actionLabel}
-                  </Link>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href={flag.href}
+                      className="inline-flex rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+                    >
+                      {flag.actionLabel}
+                    </Link>
+
+                    {flag.type === "missing_book_info" ? (
+                      <button
+                        type="button"
+                        onClick={() => void clearMissingBookInfoAlert(flag.book_id)}
+                        disabled={clearingBookId === flag.book_id}
+                        className="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        {clearingBookId === flag.book_id ? "Clearing..." : "Clear alert"}
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             </div>

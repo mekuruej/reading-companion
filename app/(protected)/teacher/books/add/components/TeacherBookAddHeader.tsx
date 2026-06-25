@@ -3,11 +3,13 @@ import Link from "next/link";
 type TeacherBookAddHeaderProps = {
   isEditing: boolean;
   backHref?: string;
+  backLabel?: string;
 };
 
 export function TeacherBookAddHeader({
   isEditing,
   backHref = "/teacher/books",
+  backLabel = "← Books Needing My Attention",
 }: TeacherBookAddHeaderProps) {
   return (
     <header className="mb-8 space-y-3">
@@ -15,7 +17,7 @@ export function TeacherBookAddHeader({
         href={backHref}
         className="text-sm font-medium text-amber-700 hover:text-amber-800"
       >
-        ← Books Needing My Attention
+        {backLabel}
       </Link>
 
       <div className="space-y-2">

@@ -6,8 +6,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 
 type BookMeta = {
   id: string;
@@ -49,6 +51,9 @@ function bookTypeLabel(value: string | null | undefined) {
 }
 
 export default function TeacherLibraryPage() {
+  const searchParams = useSearchParams();
+  const backLink = getTeacherBackLink(searchParams.get("from"));
+
   const [loading, setLoading] = useState(true);
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [canAccess, setCanAccess] = useState(false);
@@ -197,8 +202,8 @@ export default function TeacherLibraryPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <Link href="/teacher" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-        &larr; Teacher Home
+      <Link href={backLink.href} className="text-sm font-semibold text-stone-500 hover:text-stone-900">
+        {backLink.label}
       </Link>
 
       <section className="mt-4 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">

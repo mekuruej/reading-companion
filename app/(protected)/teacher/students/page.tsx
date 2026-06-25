@@ -4,8 +4,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 import TeacherStudentsAccessState from "./components/TeacherStudentsAccessState";
 import TeacherStudentsErrorBanner from "./components/TeacherStudentsErrorBanner";
 import TeacherStudentsHeader from "./components/TeacherStudentsHeader";
@@ -379,22 +381,12 @@ function StudentCardArticle({
                         </button>
                     )}
 
-                    {student.currentBookId ? (
-                        <Link
-                            href={`/books/${student.currentBookId}`}
-                            className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-3 text-center text-base font-semibold text-white hover:bg-emerald-800"
-                        >
-                            Book Hub
-                        </Link>
-                    ) : (
-                        <button
-                            type="button"
-                            disabled
-                            className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
-                        >
-                            No Book Hub
-                        </button>
-                    )}
+                    <Link
+                        href={`/books/add?destination=student&targetUserId=${student.id}`}
+                        className="rounded-2xl border border-emerald-700 bg-emerald-700 px-4 py-3 text-center text-base font-semibold text-white hover:bg-emerald-800"
+                    >
+                        Add Book
+                    </Link>
 
                     {student.currentBookId ? (
                         <Link
@@ -448,6 +440,9 @@ function StudentCardArticle({
 }
 
 export default function TeacherStudentsPage() {
+    const searchParams = useSearchParams();
+    const backLink = getTeacherBackLink(searchParams.get("from"));
+
     const [loading, setLoading] = useState(true);
     const [canAccess, setCanAccess] = useState(false);
     const [viewerIsSuperTeacher, setViewerIsSuperTeacher] = useState(false);
@@ -1202,7 +1197,7 @@ export default function TeacherStudentsPage() {
 
     return (
         <main className="mx-auto max-w-6xl px-4 py-8">
-            <TeacherStudentsHeader />
+            <TeacherStudentsHeader backHref={backLink.href} backLabel={backLink.label} />
 
             {loading ? (
                 <TeacherStudentsLoadingState />

@@ -21,7 +21,10 @@ type TeacherAlertSummary = {
   href?: string;
   count: number;
   description: string;
+  badgeLabel?: string;
+  hasToday?: boolean;
   placeholder?: boolean;
+  sortDate?: string | null;
 };
 
 type GlobalBookRow = {
@@ -33,6 +36,10 @@ type GlobalBookRow = {
   publisher: string | null;
   published_date: string | null;
   page_count: number | null;
+  created_at?: string | null;
+  allow_missing_isbn?: boolean | null;
+  allow_missing_publisher?: boolean | null;
+  missing_info_cleared_at?: string | null;
 };
 
 type ReadingFitCountUserBookRow = {
@@ -52,6 +59,10 @@ type TeacherRatingCountUserBookRow = {
   rating_recommend: number | null;
 };
 
+type CreatedAtRow = {
+  created_at: string | null;
+};
+
 type ReadingFitCountProfileRow = {
   id: string;
   level: string | null;
@@ -60,6 +71,7 @@ type ReadingFitCountProfileRow = {
 type KanjiCountWordRow = {
   id: string;
   user_book_id: string;
+  created_at?: string | null;
   surface: string | null;
   vocabulary_cache_id: number | null;
   ignore_kanji_enrichment?: boolean | null;
@@ -84,7 +96,7 @@ const teacherHubCards: TeacherHubCard[] = [
     href: "/teacher/lesson-prep",
     eyebrow: "Prepare",
     description:
-      "Prepare student lessons, trial prep, reusable materials, and teaching workflows.",
+      "Open teaching books, assignments, trial prep, clubs, and reusable lesson materials.",
   },
   {
     title: "Needs Attention",
@@ -94,25 +106,11 @@ const teacherHubCards: TeacherHubCard[] = [
       "Review book requests, kanji reports, missing book info, and other cleanup queues.",
   },
   {
-    title: "Teacher Books",
-    href: "/teacher/books",
-    eyebrow: "Books",
-    description:
-      "Open the teacher book review queue, requests, flags, and shared catalog cleanup.",
-  },
-  {
-    title: "General Upkeep",
+    title: "Site Upkeep",
     href: "/teacher/general-upkeep",
     eyebrow: "Maintain",
     description:
       "Open global cleanup tools and admin maintenance areas that do not belong to learner follow-up.",
-  },
-  {
-    title: "Teacher Ratings",
-    href: "/teacher/ratings",
-    eyebrow: "Plan",
-    description:
-      "Compare lesson-fit ratings and teacher notes to find useful books again.",
   },
 ];
 
@@ -120,14 +118,52 @@ function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
+function isTodayDate(value: string | null | undefined) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const today = new Date();
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+}
+
+function oldestDate(values: Array<string | null | undefined>) {
+  const dates = values
+    .filter((value): value is string => !!value)
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+  return dates[0] ?? null;
+}
+
+function sortTeacherAlerts(alerts: TeacherAlertSummary[]) {
+  return [...alerts].sort((a, b) => {
+    if (!!a.placeholder !== !!b.placeholder) return a.placeholder ? 1 : -1;
+    if (!!a.hasToday !== !!b.hasToday) return a.hasToday ? -1 : 1;
+
+    if (a.sortDate && b.sortDate) {
+      return new Date(a.sortDate).getTime() - new Date(b.sortDate).getTime();
+    }
+
+    if (a.sortDate) return -1;
+    if (b.sortDate) return 1;
+    return 0;
+  });
+}
+
 function missingGlobalBookFields(book: GlobalBookRow) {
+  if (book.missing_info_cleared_at) return [];
+
   const missing: string[] = [];
   if (!String(book.title ?? "").trim()) missing.push("title");
-  if (!String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
   if (!String(book.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book.book_type ?? "").trim()) missing.push("book type");
   if (!String(book.author ?? "").trim()) missing.push("author");
-  if (!String(book.publisher ?? "").trim()) missing.push("publisher");
+  if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
   if (!String(book.published_date ?? "").trim()) missing.push("published date");
   if (book.page_count == null) missing.push("page count");
   return missing;
@@ -189,8 +225,7 @@ function isActiveKanjiQueueStatus(params: {
 export default function TeacherHubPage() {
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [alertsLoading, setAlertsLoading] = useState(true);
-  const [learnerAlerts, setLearnerAlerts] = useState<TeacherAlertSummary[]>([]);
-  const [upkeepAlerts, setUpkeepAlerts] = useState<TeacherAlertSummary[]>([]);
+  const [teacherAlerts, setTeacherAlerts] = useState<TeacherAlertSummary[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -268,7 +303,7 @@ export default function TeacherHubPage() {
           ])
         );
 
-        const readingFitCount = ((readingFitRows ?? []) as ReadingFitCountUserBookRow[]).filter(
+        const readingFitItems = ((readingFitRows ?? []) as ReadingFitCountUserBookRow[]).filter(
           (item) => {
             const effectiveReaderLevel =
               item.reader_level || readerLevelByUserId.get(item.user_id) || null;
@@ -278,9 +313,9 @@ export default function TeacherHubPage() {
               item.rating_overall == null
             );
           }
-        ).length;
+        );
 
-        const teacherRatingCount = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
+        const teacherRatingItems = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
           (item) => {
             const isFinished = !!item.finished_at;
             const hasTeacherReview =
@@ -291,65 +326,76 @@ export default function TeacherHubPage() {
 
             return isFinished && !hasTeacherReview;
           }
-        ).length;
+        );
 
-        const nextLearnerAlerts: TeacherAlertSummary[] = [
+        const nextTeacherAlerts: TeacherAlertSummary[] = [
           {
             title: "Reading Reflection Reviews",
             href: "/teacher/reading-fit",
-            count: readingFitCount ?? 0,
+            count: readingFitItems.length,
             description: "Finished books waiting for teacher review or reflection cleanup.",
+            badgeLabel: "Student",
+            hasToday: readingFitItems.some((item) => isTodayDate(item.finished_at)),
+            sortDate: oldestDate(readingFitItems.map((item) => item.finished_at)),
           },
           {
             title: "Teacher Ratings Needed",
             href: "/teacher/ratings",
-            count: teacherRatingCount ?? 0,
+            count: teacherRatingItems.length,
             description: "Finished books waiting for lesson-fit ratings and teacher notes.",
+            badgeLabel: "Student",
+            hasToday: teacherRatingItems.some((item) => isTodayDate(item.finished_at)),
+            sortDate: oldestDate(teacherRatingItems.map((item) => item.finished_at)),
           },
           {
             title: "Lesson Vocabulary Reminder",
             count: 0,
             description: "Future alert for entering words after a student's scheduled lesson day.",
+            badgeLabel: "Student",
             placeholder: true,
           },
           {
             title: "Assignment Follow-up",
             count: 0,
             description: "Future alert for assignments that are pending, completed, or waiting on feedback.",
+            badgeLabel: "Student",
             placeholder: true,
           },
         ];
 
-        let nextUpkeepAlerts: TeacherAlertSummary[] = [];
-
         if (hasSuperTeacherAccess) {
           const [
-            { count: pendingBookRequestCount },
-            { count: manualBookFlagCount },
+            { data: pendingBookRequests },
+            { data: manualBookFlags },
             { data: globalBooks },
-            { count: vocabularyFlagCount },
+            { data: vocabularyFlags },
           ] = await Promise.all([
             supabase
               .from("book_requests")
-              .select("id", { count: "exact", head: true })
+              .select("created_at")
               .eq("status", "pending"),
             supabase
               .from("user_alerts")
-              .select("id", { count: "exact", head: true })
+              .select("created_at")
               .eq("user_id", user.id)
               .eq("type", "book_flag"),
             supabase
               .from("books")
-              .select("title, isbn13, cover_url, book_type, author, publisher, published_date, page_count"),
+              .select(
+                "title, isbn13, cover_url, book_type, author, publisher, published_date, page_count, created_at, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+              ),
             supabase
               .from("user_book_words")
-              .select("id", { count: "exact", head: true })
+              .select("created_at")
               .eq("flagged_for_review", true),
           ]);
 
-          const missingBookInfoCount = ((globalBooks ?? []) as GlobalBookRow[]).filter(
+          const missingBookInfoItems = ((globalBooks ?? []) as GlobalBookRow[]).filter(
             (book) => missingGlobalBookFields(book).length > 0
-          ).length;
+          );
+          const pendingBookRequestRows = (pendingBookRequests ?? []) as CreatedAtRow[];
+          const manualBookFlagRows = (manualBookFlags ?? []) as CreatedAtRow[];
+          const vocabularyFlagRows = (vocabularyFlags ?? []) as CreatedAtRow[];
 
           const { data: kanjiUserBooks } = await supabase
             .from("user_books")
@@ -361,11 +407,12 @@ export default function TeacherHubPage() {
             .filter(Boolean);
 
           let activeKanjiQueueCount = 0;
+          let activeKanjiQueueDates: string[] = [];
 
           if (kanjiUserBookIds.length > 0) {
             const { data: kanjiWordRows } = await supabase
               .from("user_book_words")
-              .select("id, user_book_id, surface, vocabulary_cache_id, ignore_kanji_enrichment")
+              .select("id, user_book_id, surface, vocabulary_cache_id, ignore_kanji_enrichment, created_at")
               .in("user_book_id", kanjiUserBookIds)
               .eq("is_manual_override", false)
               .gte("created_at", KANJI_ENRICHMENT_TEST_START)
@@ -410,7 +457,7 @@ export default function TeacherHubPage() {
               }
             }
 
-            activeKanjiQueueCount = kanjiWords.filter((word) => {
+            const activeKanjiQueueWords = kanjiWords.filter((word) => {
               const surface = String(word.surface ?? "");
               const mapRows =
                 word.vocabulary_cache_id != null
@@ -423,40 +470,57 @@ export default function TeacherHubPage() {
                 mapRows,
                 ignored: word.ignore_kanji_enrichment,
               });
-            }).length;
+            });
+
+            activeKanjiQueueCount = activeKanjiQueueWords.length;
+            activeKanjiQueueDates = activeKanjiQueueWords
+              .map((word) => word.created_at)
+              .filter((value): value is string => !!value);
           }
 
-          nextUpkeepAlerts = [
+          const bookFlagAndMissingDates = [
+            ...manualBookFlagRows.map((row) => row.created_at),
+            ...missingBookInfoItems.map((book) => book.created_at),
+          ];
+
+          nextTeacherAlerts.push(
             {
               title: "Pending Book Requests",
               href: "/teacher/books",
-              count: pendingBookRequestCount ?? 0,
+              count: pendingBookRequestRows.length,
               description: "Reader book requests waiting for global book entry.",
+              hasToday: pendingBookRequestRows.some((row) => isTodayDate(row.created_at)),
+              sortDate: oldestDate(pendingBookRequestRows.map((row) => row.created_at)),
             },
             {
               title: "Book Flags / Missing Info",
               href: "/teacher/books",
-              count: (manualBookFlagCount ?? 0) + missingBookInfoCount,
+              count: manualBookFlagRows.length + missingBookInfoItems.length,
               description: "Manual book flags and global books missing core details.",
+              hasToday: bookFlagAndMissingDates.some((date) => isTodayDate(date)),
+              sortDate: oldestDate(bookFlagAndMissingDates),
             },
             {
               title: "Kanji Queue",
               href: "/teacher/kanji",
               count: activeKanjiQueueCount,
               description: "Kanji reports and enrichment rows waiting for review.",
+              hasToday: activeKanjiQueueDates.some((date) => isTodayDate(date)),
+              sortDate: oldestDate(activeKanjiQueueDates),
             },
             {
               title: "Vocabulary Flags",
               href: "/teacher/words",
-              count: vocabularyFlagCount ?? 0,
+              count: vocabularyFlagRows.length,
               description: "Flagged saved-word input that needs super-teacher/admin review.",
+              hasToday: vocabularyFlagRows.some((row) => isTodayDate(row.created_at)),
+              sortDate: oldestDate(vocabularyFlagRows.map((row) => row.created_at)),
             },
-          ];
+          );
         }
 
         if (!cancelled) {
-          setLearnerAlerts(nextLearnerAlerts);
-          setUpkeepAlerts(nextUpkeepAlerts);
+          setTeacherAlerts(sortTeacherAlerts(nextTeacherAlerts));
         }
       } finally {
         if (!cancelled) setAlertsLoading(false);
@@ -481,8 +545,7 @@ export default function TeacherHubPage() {
       <TeacherHubTodaySection
         alertsLoading={alertsLoading}
         isSuperTeacher={isSuperTeacher}
-        learnerAlerts={learnerAlerts}
-        upkeepAlerts={upkeepAlerts}
+        alerts={teacherAlerts}
       />
     </main>
   );

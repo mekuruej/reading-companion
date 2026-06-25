@@ -1,4 +1,4 @@
-// Teacher General Upkeep
+// Teacher Site Upkeep
 //
 
 "use client";
@@ -17,44 +17,28 @@ type UpkeepCard = {
 
 const baseUpkeepCards: UpkeepCard[] = [
   {
-    title: "Global Word Entry",
-    href: "/teacher/global-words",
-    eyebrow: "Global prep",
-    description: "Prepare global vocabulary, people, places, cultural references, and Word Sky candidates.",
+    title: "Global Book Entry",
+    href: "/teacher/books/add?from=site-upkeep",
+    eyebrow: "Books",
+    description: "Add or edit global book records, including books that do not come from ISBN lookup.",
   },
   {
-    title: "Word Data / Word Sky",
-    href: "/teacher/words",
-    eyebrow: "Vocabulary data",
-    description: "Review word data flags and vocabulary cleanup that is not tied to one lesson.",
+    title: "Global Vocabulary Entry",
+    href: "/teacher/global-words?from=site-upkeep",
+    eyebrow: "Vocabulary",
+    description: "Create global vocabulary, people, places, cultural references, and support entries.",
   },
   {
-    title: "Global Vocabulary Cleanup",
-    eyebrow: "Future cleanup",
-    description:
-      "Placeholder for deduping global vocabulary, reviewing cultural-reference metadata, and cleaning shared word records.",
-    disabled: true,
+    title: "Global Kanji Entry",
+    href: "/teacher/kanji?from=site-upkeep",
+    eyebrow: "Kanji",
+    description: "Open global kanji reading data tools and kanji-map maintenance.",
   },
   {
-    title: "Global Book / Data Cleanup",
-    href: "/teacher/books",
-    eyebrow: "Book data",
-    description: "Review global book data cleanup, missing book information, and book review queues.",
-  },
-  {
-    title: "Kanji Queue",
-    href: "/teacher/kanji",
-    eyebrow: "Kanji maintenance",
-    description: "Review kanji reports and queue items as general data maintenance without moving the workflow yet.",
-  },
-];
-
-const superTeacherUpkeepCards: UpkeepCard[] = [
-  {
-    title: "Teacher Testing Tools",
-    href: "/teacher/testing",
-    eyebrow: "Temporary tools",
-    description: "Use temporary teacher-side testing tools while they still need a home.",
+    title: "Testing Tools",
+    href: "/teacher/testing?from=site-upkeep",
+    eyebrow: "Test lab",
+    description: "Use internal teacher-side testing tools for access checks and tricky app behavior.",
   },
 ];
 
@@ -102,7 +86,6 @@ function UpkeepCardGrid({ cards }: { cards: UpkeepCard[] }) {
 export default function TeacherGeneralUpkeepPage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccess, setCanAccess] = useState(false);
-  const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -119,7 +102,7 @@ export default function TeacherGeneralUpkeepPage() {
       if (cancelled) return;
 
       if (authError || !user) {
-        setMessage("Please sign in to use General Upkeep.");
+        setMessage("Please sign in to use Site Upkeep.");
         setAccessChecked(true);
         return;
       }
@@ -142,11 +125,7 @@ export default function TeacherGeneralUpkeepPage() {
         profile?.role === "teacher" ||
         profile?.role === "super_teacher" ||
         isSuperTeacherFlag(profile?.is_super_teacher);
-      const hasSuperTeacherAccess =
-        profile?.role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher);
-
       setCanAccess(isTeacher);
-      setIsSuperTeacher(hasSuperTeacherAccess);
       setMessage(isTeacher ? "" : "Teacher access is required.");
       setAccessChecked(true);
     }
@@ -175,7 +154,7 @@ export default function TeacherGeneralUpkeepPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
             Teacher access
           </p>
-          <h1 className="mt-2 text-2xl font-black text-stone-900">General Upkeep</h1>
+          <h1 className="mt-2 text-2xl font-black text-stone-900">Site Upkeep</h1>
           <p className="mt-3 text-sm leading-6 text-stone-600">
             {message || "Teacher access is required."}
           </p>
@@ -195,20 +174,15 @@ export default function TeacherGeneralUpkeepPage() {
             Maintenance workspace
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
-            General Upkeep
+            Site Upkeep
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-            Keep global vocabulary, Word Sky candidates, cleanup queues, and temporary teacher tools in one place.
+            Keep global entry tools and internal testing pages in one place. Cleanup queues now live in Needs Attention.
           </p>
         </section>
 
         <section className="mt-6">
-          <UpkeepCardGrid
-            cards={[
-              ...baseUpkeepCards,
-              ...(isSuperTeacher ? superTeacherUpkeepCards : []),
-            ]}
-          />
+          <UpkeepCardGrid cards={baseUpkeepCards} />
         </section>
       </div>
     </main>

@@ -2,10 +2,12 @@ import Link from "next/link";
 
 type TeacherKanjiHeaderProps = {
   homeHref: string;
+  homeLabel?: string;
 };
 
 export default function TeacherKanjiHeader({
   homeHref,
+  homeLabel = "← Teacher Home",
 }: TeacherKanjiHeaderProps) {
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -29,7 +31,7 @@ export default function TeacherKanjiHeader({
           href={homeHref}
           className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
         >
-          ← Teacher Home
+          {homeLabel}
         </Link>
       </div>
     </section>

@@ -2,8 +2,11 @@ import Link from "next/link";
 
 export type AttentionCountKey =
   | "books"
+  | "bookRequests"
+  | "bookFlags"
   | "missingBooks"
   | "kanji"
+  | "ratingFlags"
   | "readingFit"
   | "wordReports"
   | "teacherRatings";
@@ -16,6 +19,11 @@ export type NeedsAttentionCard = {
   eyebrow: string;
   description: string;
   countKey?: AttentionCountKey;
+  actions?: Array<{
+    label: string;
+    href: string;
+    countKey?: AttentionCountKey;
+  }>;
   disabled?: boolean;
 };
 
@@ -31,7 +39,7 @@ export function NeedsAttentionCardGrid({
   countsLoading,
 }: NeedsAttentionCardGridProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-2">
       {cards.map((card) => {
         const count = card.countKey ? counts[card.countKey] : null;
 
@@ -59,13 +67,32 @@ export function NeedsAttentionCardGrid({
 
             <p className="mt-3 text-sm leading-6 text-stone-600">{card.description}</p>
 
-            <p className="mt-4 text-sm font-semibold text-stone-900">
-              {card.disabled ? "Placeholder" : "Open →"}
-            </p>
+            {card.actions?.length ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {card.actions.map((action) => (
+                  <Link
+                    key={action.label}
+                    href={action.href}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-black text-stone-900 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
+                  >
+                    <span>{action.label}</span>
+                    {action.countKey ? (
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs text-stone-600">
+                        {countsLoading ? "..." : counts[action.countKey]}
+                      </span>
+                    ) : null}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm font-semibold text-stone-900">
+                {card.disabled ? "Placeholder" : "Open →"}
+              </p>
+            )}
           </div>
         );
 
-        if (!card.href || card.disabled) {
+        if (!card.href || card.disabled || card.actions?.length) {
           return <div key={card.title}>{cardContent}</div>;
         }
 

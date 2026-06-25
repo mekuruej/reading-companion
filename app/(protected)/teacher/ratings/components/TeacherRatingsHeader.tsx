@@ -1,10 +1,18 @@
 import Link from "next/link";
 
-export function TeacherRatingsHeader() {
+type TeacherRatingsHeaderProps = {
+  backHref?: string;
+  backLabel?: string;
+};
+
+export function TeacherRatingsHeader({
+  backHref = "/teacher",
+  backLabel = "← Teacher Hub",
+}: TeacherRatingsHeaderProps) {
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-      <Link href="/teacher" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-        ← Teacher Hub
+      <Link href={backHref} className="text-sm font-semibold text-stone-500 hover:text-stone-900">
+        {backLabel}
       </Link>
 
       <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">

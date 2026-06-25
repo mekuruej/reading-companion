@@ -67,6 +67,9 @@ type BookRow = {
     page_count: number | null;
     series_number: number | null;
     related_links: any | null;
+    allow_missing_isbn?: boolean | null;
+    allow_missing_publisher?: boolean | null;
+    missing_info_cleared_at?: string | null;
 };
 
 type EditingPanel = "bookInfoDetails" | "bookInfoPeople" | "bookInfoLinks" | null;
@@ -283,6 +286,8 @@ export default function TeacherAddBookPage() {
     const [pageCount, setPageCount] = useState("");
     const [seriesNumber, setSeriesNumber] = useState("");
     const [linksText, setLinksText] = useState("");
+    const [allowMissingIsbn, setAllowMissingIsbn] = useState(false);
+    const [allowMissingPublisher, setAllowMissingPublisher] = useState(false);
     const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
     const [selectedTranslatorId, setSelectedTranslatorId] = useState<string | null>(null);
     const [selectedIllustratorId, setSelectedIllustratorId] = useState<string | null>(null);
@@ -305,12 +310,23 @@ export default function TeacherAddBookPage() {
         if (!coverUrl.trim()) missing.push("Cover");
         if (!bookType.trim()) missing.push("Book type");
         if (!author.trim()) missing.push("Author");
-        if (!publisher.trim()) missing.push("Publisher");
+        if (!isbn13.trim() && !allowMissingIsbn) missing.push("ISBN-13");
+        if (!publisher.trim() && !allowMissingPublisher) missing.push("Publisher");
         if (!publishedDate.trim()) missing.push("Published date");
         if (!pageCount.trim()) missing.push("Page count");
 
         return missing;
-    }, [coverUrl, bookType, author, publisher, publishedDate, pageCount]);
+    }, [
+        allowMissingIsbn,
+        allowMissingPublisher,
+        coverUrl,
+        bookType,
+        author,
+        isbn13,
+        publisher,
+        publishedDate,
+        pageCount,
+    ]);
 
     useEffect(() => {
         async function load() {
@@ -390,7 +406,10 @@ export default function TeacherAddBookPage() {
         published_date,
         page_count,
         series_number,
-        related_links
+        related_links,
+        allow_missing_isbn,
+        allow_missing_publisher,
+        missing_info_cleared_at
       `
             )
             .eq("id", id)
@@ -450,6 +469,8 @@ export default function TeacherAddBookPage() {
         setPageCount(data.page_count == null ? "" : String(data.page_count));
         setSeriesNumber(data.series_number == null ? "" : String(data.series_number));
         setLinksText(linksToText(data.related_links));
+        setAllowMissingIsbn(Boolean(data.allow_missing_isbn));
+        setAllowMissingPublisher(Boolean(data.allow_missing_publisher));
         setSelectedAuthorId(null);
         setSelectedTranslatorId(null);
         setSelectedIllustratorId(null);
@@ -588,6 +609,8 @@ export default function TeacherAddBookPage() {
         setPageCount("");
         setSeriesNumber("");
         setLinksText("");
+        setAllowMissingIsbn(false);
+        setAllowMissingPublisher(false);
         setSelectedAuthorId(null);
         setSelectedTranslatorId(null);
         setSelectedIllustratorId(null);
@@ -889,6 +912,8 @@ export default function TeacherAddBookPage() {
                     page_count: cleanPageCount,
                     series_number: cleanSeriesNumber,
                     related_links: relatedLinks,
+                    allow_missing_isbn: allowMissingIsbn,
+                    allow_missing_publisher: allowMissingPublisher,
                 })
                 .eq("id", currentBookId);
 
@@ -1068,6 +1093,54 @@ export default function TeacherAddBookPage() {
                         Detail={Detail}
                         PersonRow={PersonRow}
                     />
+
+                    <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">
+                            Manual reader exceptions
+                        </p>
+                        <h3 className="mt-2 text-lg font-black text-stone-900">
+                            Let this book pass missing metadata checks
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-stone-700">
+                            Use these only for classroom/JSL/small-reader books where the metadata is genuinely not available.
+                        </p>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <label className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-white p-3 text-sm font-semibold text-stone-800">
+                                <input
+                                    type="checkbox"
+                                    checked={allowMissingIsbn}
+                                    onChange={(event) => setAllowMissingIsbn(event.target.checked)}
+                                    className="mt-1 h-4 w-4"
+                                />
+                                <span>
+                                    No ISBN for this book
+                                    <span className="mt-1 block text-xs font-normal leading-5 text-stone-600">
+                                        Missing ISBN-13 will not keep this book in the attention queue.
+                                    </span>
+                                </span>
+                            </label>
+
+                            <label className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-white p-3 text-sm font-semibold text-stone-800">
+                                <input
+                                    type="checkbox"
+                                    checked={allowMissingPublisher}
+                                    onChange={(event) => setAllowMissingPublisher(event.target.checked)}
+                                    className="mt-1 h-4 w-4"
+                                />
+                                <span>
+                                    Publisher is unknown / not applicable
+                                    <span className="mt-1 block text-xs font-normal leading-5 text-stone-600">
+                                        Missing publisher will not keep this book in the attention queue.
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <p className="mt-3 text-xs font-semibold text-amber-900">
+                            Click Save in the book info editor to store these exceptions.
+                        </p>
+                    </div>
                 </TeacherBookInfoSection>
             ) : null}
 

@@ -99,6 +99,10 @@ export default function AddBookPage() {
         let alive = true;
 
         async function loadDestinations() {
+            const params = new URLSearchParams(window.location.search);
+            const requestedDestination = params.get("destination");
+            const requestedTargetUserId = params.get("targetUserId") || params.get("userId");
+
             const {
                 data: { user },
             } = await supabase.auth.getUser();
@@ -144,7 +148,20 @@ export default function AddBookPage() {
                         .in("id", studentIds)
                         .order("display_name", { ascending: true });
 
-                    if (alive) setStudentOptions((students ?? []) as DestinationUser[]);
+                    const nextStudentOptions = (students ?? []) as DestinationUser[];
+
+                    if (alive) {
+                        setStudentOptions(nextStudentOptions);
+
+                        if (
+                            requestedDestination === "student" &&
+                            requestedTargetUserId &&
+                            nextStudentOptions.some((student) => student.id === requestedTargetUserId)
+                        ) {
+                            setDestinationMode("student");
+                            setDestinationUserId(requestedTargetUserId);
+                        }
+                    }
                 }
             }
 
@@ -158,6 +175,15 @@ export default function AddBookPage() {
                     setUserOptions(
                         ((users ?? []) as DestinationUser[]).filter((item) => item.id !== user.id)
                     );
+
+                    if (
+                        requestedDestination === "user" &&
+                        requestedTargetUserId &&
+                        ((users ?? []) as DestinationUser[]).some((item) => item.id === requestedTargetUserId)
+                    ) {
+                        setDestinationMode("user");
+                        setDestinationUserId(requestedTargetUserId);
+                    }
                 }
             }
         }

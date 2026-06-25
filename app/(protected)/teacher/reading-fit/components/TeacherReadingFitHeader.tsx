@@ -1,6 +1,14 @@
 import Link from "next/link";
 
-export function TeacherReadingFitHeader() {
+type TeacherReadingFitHeaderProps = {
+  backHref?: string;
+  backLabel?: string;
+};
+
+export function TeacherReadingFitHeader({
+  backHref = "/teacher",
+  backLabel = "← Teacher Home",
+}: TeacherReadingFitHeaderProps) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -20,10 +28,10 @@ export function TeacherReadingFitHeader() {
       </div>
 
       <Link
-        href="/teacher"
+        href={backHref}
         className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
       >
-        ← Teacher Home
+        {backLabel}
       </Link>
     </div>
   );
