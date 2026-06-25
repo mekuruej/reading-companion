@@ -410,10 +410,6 @@ export default function BookFlashcardsPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [firstTouch, setFirstTouch] = useState(true);
 
-  const [defSaving, setDefSaving] = useState(false);
-  const [defError, setDefError] = useState<string | null>(null);
-  const [showDefPicker, setShowDefPicker] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -883,8 +879,6 @@ export default function BookFlashcardsPage() {
         setTypeRevealIndex(0);
         setReadyForNextCard(false);
         setLastTypedResult(null);
-        setDefError(null);
-        setShowDefPicker(false);
       } catch (e: any) {
         setErrorMsg(
           e?.message?.includes("single JSON object")
@@ -942,8 +936,6 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setDefError(null);
-    setShowDefPicker(false);
     setCorrectionInput("");
     setCorrectionFeedback(null);
   }, [cards, jlptSelected, colorSelected, chapterFilter, repeatsOnly, studySet]);
@@ -958,16 +950,12 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setDefError(null);
-    setShowDefPicker(false);
     setFirstTouch(true);
     setCorrectionInput("");
     setCorrectionFeedback(null);
   }, [filteredCards, studyOnceMode]);
 
   useEffect(() => {
-    setShowDefPicker(false);
-    setDefError(null);
     setTypedInput("");
     setTypedFeedback(null);
     setTypeRevealIndex(0);
@@ -1353,8 +1341,6 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setDefError(null);
-    setShowDefPicker(false);
     setCorrectionInput("");
     setCorrectionFeedback(null);
     resetMcState();
@@ -1376,8 +1362,6 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setDefError(null);
-    setShowDefPicker(false);
     setCorrectionInput("");
     setCorrectionFeedback(null);
     resetMcState();
