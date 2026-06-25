@@ -30,6 +30,7 @@ type BookInfoRecordSearchPanelProps<T extends SearchRecord> = {
   onCreateFromSearch: () => void;
 
   extraMatches?: ReactNode;
+  footerContent?: ReactNode;
 };
 
 export default function BookInfoRecordSearchPanel<T extends SearchRecord>({
@@ -52,6 +53,7 @@ export default function BookInfoRecordSearchPanel<T extends SearchRecord>({
   createNewButtonLabel,
   onCreateFromSearch,
   extraMatches,
+  footerContent,
 }: BookInfoRecordSearchPanelProps<T>) {
   const hasSearch = searchValue.trim().length > 0;
 
@@ -128,6 +130,8 @@ export default function BookInfoRecordSearchPanel<T extends SearchRecord>({
           </button>
         </div>
       ) : null}
+
+       {footerContent}
     </div>
   );
 }

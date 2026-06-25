@@ -1226,100 +1226,43 @@ export default function BookInfoTab({
           {(book.publisher || book.publisher_image_url || isEditingPeople) && (
             <div className="space-y-2">
               {isEditingPeople ? (
-                <div className="rounded border bg-white p-3 text-sm">
-                  <label className="mb-1 block text-sm font-medium text-stone-700">
-                    Search existing publisher
-                  </label>
-                  <input
-                    value={publisherSearch}
-                    onChange={(e) => {
-                      setPublisherSearch(e.target.value);
-                      setSelectedPublisherId(null);
-                      setPublisherSearchError(null);
-                    }}
-                    placeholder="講談社 / Kodansha / こうだんしゃ"
-                    className="w-full rounded border px-2 py-1 text-sm"
-                  />
-
-                  {publisherSearchLoading ? (
-                    <div className="mt-2 text-xs text-stone-500">Searching…</div>
-                  ) : null}
-
-                  {publisherSearchError ? (
-                    <div className="mt-2 text-xs text-red-600">{publisherSearchError}</div>
-                  ) : null}
-
-                  {publisherResults.length > 0 ? (
-                    <div className="mt-2 rounded border border-stone-200">
-                      {publisherResults.map((publisher) => (
-                        <button
-                          key={publisher.id}
-                          type="button"
-                          onClick={() => handleSelectPublisher(publisher)}
-                          className="block w-full border-b border-stone-200 px-3 py-2 text-left last:border-b-0 hover:bg-stone-50"
-                        >
-                          <div className="font-medium text-stone-900">
-                            {publisher.name_ja}
-                          </div>
-                          <div className="text-xs text-stone-600">
-                            {publisher.name_en || "—"} · {publisher.reading || "—"}
-                          </div>
-                        </button>
-                      ))}
+                <BookInfoRecordSearchPanel
+                  label="Search existing publisher"
+                  searchValue={publisherSearch}
+                  onSearchChange={(value) => {
+                    setPublisherSearch(value);
+                    setSelectedPublisherId(null);
+                    setPublisherSearchError(null);
+                  }}
+                  placeholder="講談社 / Kodansha / こうだんしゃ"
+                  loading={publisherSearchLoading}
+                  error={publisherSearchError}
+                  results={publisherResults}
+                  onSelectResult={handleSelectPublisher}
+                  noResultsMessage="No matching publisher found."
+                  selectedLabel="Linked to publisher record"
+                  hasSelectedRecord={Boolean(selectedPublisherId)}
+                  onClearSelected={clearSelectedPublisher}
+                  canCreateSharedRecords={canCreateSharedRecords}
+                  requireSharedRecord={requireSharedPublisherRecord}
+                  requireSharedRecordMessage="New shared publisher record will be required on save."
+                  createNewMessage="Don&apos;t see the right match? Create a new shared publisher record from this search, then finish the details below."
+                  createNewButtonLabel="Create New Publisher"
+                  onCreateFromSearch={startNewPublisherFromSearch}
+                  footerContent={
+                    <div className="mt-3">
+                      <label className="mb-1 block text-sm font-medium text-stone-700">
+                        Publisher name (English)
+                      </label>
+                      <input
+                        value={publisherEnglishName}
+                        onChange={(e) => setPublisherEnglishName(e.target.value)}
+                        placeholder="Kodansha"
+                        className="w-full rounded border px-2 py-1 text-sm"
+                      />
                     </div>
-                  ) : publisherSearch.trim() && !publisherSearchLoading && !publisherSearchError ? (
-                    <div className="mt-2 text-xs text-stone-500">No matching publisher found.</div>
-                  ) : null}
-
-                  {selectedPublisherId ? (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
-                      <span className="rounded-full bg-stone-100 px-2 py-1">
-                        Linked to publisher record
-                      </span>
-                      <button
-                        type="button"
-                        onClick={clearSelectedPublisher}
-                        className="text-stone-500 underline hover:text-stone-700"
-                      >
-                        Clear selection
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {canCreateSharedRecords && requireSharedPublisherRecord ? (
-                    <div className="mt-2 text-xs font-medium text-amber-700">
-                      New shared publisher record will be required on save.
-                    </div>
-                  ) : null}
-
-                  {canCreateSharedRecords && publisherSearch.trim() ? (
-                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                      <div className="text-xs text-amber-900">
-                        Don&apos;t see the right match? Create a new shared publisher record from this
-                        search, then finish the details below.
-                      </div>
-                      <button
-                        type="button"
-                        onClick={startNewPublisherFromSearch}
-                        className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
-                      >
-                        Create New Publisher
-                      </button>
-                    </div>
-                  ) : null}
-
-                  <div className="mt-3">
-                    <label className="mb-1 block text-sm font-medium text-stone-700">
-                      Publisher name (English)
-                    </label>
-                    <input
-                      value={publisherEnglishName}
-                      onChange={(e) => setPublisherEnglishName(e.target.value)}
-                      placeholder="Kodansha"
-                      className="w-full rounded border px-2 py-1 text-sm"
-                    />
-                  </div>
-                </div>
+                  }
+                />
               ) : null}
 
               <PersonRow
