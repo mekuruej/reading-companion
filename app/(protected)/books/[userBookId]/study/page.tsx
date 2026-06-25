@@ -5,7 +5,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
-import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import {
@@ -23,7 +22,6 @@ import StudyBookHeader from "./components/StudyBookHeader";
 import StudyProgressPanel from "./components/StudyProgressPanel";
 import Row from "./components/StudyCardFieldRow";
 import StudyCardBadges from "./components/StudyCardBadges";
-import StudyInstructionNav from "./components/StudyInstructionNav";
 import StudyFilterPanel from "./components/StudyFilterPanel";
 import StudyModePanel from "./components/StudyModePanel";
 import MultipleChoiceAnswerPanel from "./components/MultipleChoiceAnswerPanel";
@@ -412,6 +410,10 @@ export default function BookFlashcardsPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [firstTouch, setFirstTouch] = useState(true);
 
+  const [defSaving, setDefSaving] = useState(false);
+  const [defError, setDefError] = useState<string | null>(null);
+  const [showDefPicker, setShowDefPicker] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -431,10 +433,6 @@ export default function BookFlashcardsPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
   const [meId, setMeId] = useState("");
-
-  const [defSaving, setDefSaving] = useState(false);
-  const [defError, setDefError] = useState<string | null>(null);
-  const [showDefPicker, setShowDefPicker] = useState(false);
 
   const [flaggedCardIds, setFlaggedCardIds] = useState<Set<string>>(() => new Set());
   const [flaggingCardId, setFlaggingCardId] = useState<string | null>(null);
@@ -1698,60 +1696,6 @@ export default function BookFlashcardsPage() {
     if (firstTouch) setFirstTouch(false);
     if (typeModeEnabled) return;
     nextCardReveal();
-  }
-
-  async function setDefinitionForCurrent(newIndex: number) {
-    if (!canAccessBook || !canUseStudyFlashcards) {
-      setDefError("You do not have access to this flashcard set.");
-      return;
-    }
-
-    if (!card) return;
-    if (!card.meaningChoices?.length) return;
-
-    const safe = Math.max(0, Math.min(newIndex, card.meaningChoices.length - 1));
-    const chosen = card.meaningChoices[safe] ?? "";
-
-    setDefSaving(true);
-    setDefError(null);
-
-    try {
-      const { error } = await supabase
-        .from("user_book_words")
-        .update({
-          meaning_choice_index: safe,
-          meaning: chosen || null,
-        })
-        .eq("id", card.id)
-        .eq("user_book_id", userBookId);
-
-      if (error) throw error;
-
-      setCards((prev) =>
-        prev.map((x) =>
-          x.id === card.id
-            ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning }
-            : x
-        )
-      );
-
-      setFilteredCards((prev) =>
-        prev.map((x) =>
-          x.id === card.id
-            ? { ...x, meaningChoiceIndex: safe, meaning: chosen || x.meaning }
-            : x
-        )
-      );
-
-      setTypedInput("");
-      setTypedFeedback(null);
-      setReadyForNextCard(false);
-      setLastTypedResult(null);
-    } catch (e: any) {
-      setDefError(e?.message ?? "Failed to change definition");
-    } finally {
-      setDefSaving(false);
-    }
   }
 
   const currentTypeAnswerField =
