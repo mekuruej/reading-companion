@@ -74,6 +74,25 @@ function studySetLabel(s: StudySet) {
   }
 }
 
+const BOOK_FLASHCARD_MODE_OPTIONS = [
+  { value: "READING", label: studySetLabel("READING") },
+  { value: "MEANING", label: studySetLabel("MEANING") },
+  {
+    value: "FROM_READING_MEANING",
+    label: studySetLabel("FROM_READING_MEANING"),
+  },
+  { value: "divider-1", label: "──────────", disabled: true },
+  { value: "READING_MC", label: studySetLabel("READING_MC") },
+  { value: "MEANING_MC", label: studySetLabel("MEANING_MC") },
+  { value: "FROM_READING_MC", label: studySetLabel("FROM_READING_MC") },
+  {
+    value: "FROM_READING_MEANING_MC",
+    label: studySetLabel("FROM_READING_MEANING_MC"),
+  },
+  { value: "divider-2", label: "──────────", disabled: true },
+  { value: "COMPLETE", label: studySetLabel("COMPLETE") },
+];
+
 type KanjiMetaItem = {
   kanji: string;
   strokes: number | null;
@@ -1993,24 +2012,7 @@ export default function BookFlashcardsPage() {
 
         <StudyModePanel
           studySet={studySet}
-          modeOptions={[
-            { value: "READING", label: studySetLabel("READING") },
-            { value: "MEANING", label: studySetLabel("MEANING") },
-            {
-              value: "FROM_READING_MEANING",
-              label: studySetLabel("FROM_READING_MEANING"),
-            },
-            { value: "divider-1", label: "──────────", disabled: true },
-            { value: "READING_MC", label: studySetLabel("READING_MC") },
-            { value: "MEANING_MC", label: studySetLabel("MEANING_MC") },
-            { value: "FROM_READING_MC", label: studySetLabel("FROM_READING_MC") },
-            {
-              value: "FROM_READING_MEANING_MC",
-              label: studySetLabel("FROM_READING_MEANING_MC"),
-            },
-            { value: "divider-2", label: "──────────", disabled: true },
-            { value: "COMPLETE", label: studySetLabel("COMPLETE") },
-          ]}
+          modeOptions={BOOK_FLASHCARD_MODE_OPTIONS}
           onStudySetChange={(value) => setStudySet(value as StudySet)}
         />
       </div>
