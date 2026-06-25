@@ -6,6 +6,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import BookInfoDetailsSection from "./BookInfoDetailsSection";
+import BookInfoLinksSection from "./BookInfoLinksSection";
 
 type Book = {
   id: string;
@@ -1459,87 +1460,19 @@ export default function BookInfoTab({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-stone-900">Where to Find It</div>
-          {!isEditingLinks ? (
-            canEditBookInfo ? (
-              <button
-                type="button"
-                onClick={onEditLinks}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-              >
-                Edit
-              </button>
-            ) : null
-          ) : (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={saving}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {relatedLinksArr.length > 0 ? (
-          <ul className="flex flex-wrap gap-2 text-sm">
-            {relatedLinksArr.map((item: any, idx: number) => {
-              const label = displayLinkLabel(item);
-              const url = displayLinkUrl(item);
-
-              return (
-                <li key={idx}>
-                  {url ? (
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-stone-700 transition hover:bg-stone-100"
-                    >
-                      {label}
-                    </a>
-                  ) : (
-                    <span className="text-stone-500">{label || "—"}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <div className="text-sm text-stone-500">—</div>
-        )}
-
-        {isEditingLinks ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {LINK_FIELD_OPTIONS.map((option) => (
-              <label key={option.label} className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                  {option.label}
-                </span>
-
-                <input
-                  value={getLinkFieldValue(option.label)}
-                  onChange={(event) => updateLinkField(option.label, event.target.value)}
-                  placeholder={option.placeholder}
-                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </label>
-            ))}
-          </div>
-        ) : null}
-      </div>
+      <BookInfoLinksSection
+        canEditBookInfo={canEditBookInfo}
+        isEditingLinks={isEditingLinks}
+        saving={saving}
+        relatedLinksArr={relatedLinksArr}
+        linksText={linksText}
+        setLinksText={setLinksText}
+        displayLinkLabel={displayLinkLabel}
+        displayLinkUrl={displayLinkUrl}
+        onEditLinks={onEditLinks}
+        onCancel={onCancel}
+        onSave={onSave}
+      />
 
     </div>
   );
