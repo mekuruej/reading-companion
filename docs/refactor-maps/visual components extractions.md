@@ -41,11 +41,11 @@ Good extraction targets:
 
 # Current Visual-Only Cleanup Target
 
-## `app/(protected)/library-study/practice/page.tsx`
+## `app/(protected)/books/[userBookId]/study/page.tsx`
 
-**Current lines:** 3334
-**Reason parked:** Library Review source/performance logic needs to settle first.
-**Next later action:** Map Library Review logic before extracting more.
+**Current lines:** 2294
+**Reason parked:** Book flashcard sequencing and answer logic are the real bulk.
+**Next later action:** Map study sequencing before extracting more.
 
 
 # Parked for Later: Architecture-Heavy Refactors
@@ -65,14 +65,6 @@ Move these to a separate refactor map later, then delete this section from this 
 **Current lines:** 3484
 **Reason parked:** Ability Check has study logic, review branches, and answer-flow complexity.
 **Next later action:** Map study logic before extracting more.
-
-
-
-## `app/(protected)/books/[userBookId]/study/page.tsx`
-
-**Current lines:** 2294
-**Reason parked:** Book flashcard sequencing and answer logic are the real bulk.
-**Next later action:** Map study sequencing before extracting more.
 
 ## `app/(protected)/teacher/library/[teacherBookId]/page.tsx`
 
