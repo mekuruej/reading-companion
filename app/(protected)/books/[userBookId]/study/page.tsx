@@ -35,6 +35,7 @@ import StudyEmptyState from "./components/StudyEmptyState";
 import StudyCompleteState from "./components/StudyCompleteState";
 import StudyFullAccessLockedState from "./components/StudyFullAccessLockedState";
 import StudyFlashcardShell from "./components/StudyFlashcardShell";
+import StudyBottomControls from "./components/StudyBottomControls";
 
 const FLASHCARD_AUTO_ADVANCE_MS = 3000;
 
@@ -2231,63 +2232,18 @@ export default function BookFlashcardsPage() {
         </div>
       </StudyFlashcardShell>
 
-      <section className="mt-4 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-sm">
-        <div className="grid gap-2 sm:grid-cols-4">
-          <button
-            type="button"
-            onClick={goToPrevWord}
-            disabled={sessionTotal <= 1}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${sessionTotal > 1
-                ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
-              }`}
-          >
-            ← Previous
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (card) void skipCardForToday(card.id);
-            }}
-            disabled={!card || sessionTotal <= 1}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${card && sessionTotal > 1
-                ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
-              }`}
-          >
-            Skip
-          </button>
-
-          <button
-            type="button"
-            onClick={shuffleBookFlashcardDeck}
-            disabled={sessionTotal <= 1}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${sessionTotal > 1
-                ? "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
-                : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
-              }`}
-          >
-            Shuffle
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handleFlagCurrentBookFlashcard()}
-            disabled={!card || (card ? flaggedCardIds.has(card.id) : false) || flaggingCardId === card?.id}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${card && flaggedCardIds.has(card.id)
-                ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-              } disabled:opacity-80`}
-          >
-            {card && flaggedCardIds.has(card.id)
-              ? "Flagged ✓"
-              : flaggingCardId === card?.id
-                ? "Flagging..."
-                : "Flag card"}
-          </button>
-        </div>
-      </section>
+      <StudyBottomControls
+        sessionTotal={sessionTotal}
+        hasCard={Boolean(card)}
+        isFlagged={card ? flaggedCardIds.has(card.id) : false}
+        isFlagging={flaggingCardId === card?.id}
+        onPrevious={goToPrevWord}
+        onSkip={() => {
+          if (card) void skipCardForToday(card.id);
+        }}
+        onShuffle={shuffleBookFlashcardDeck}
+        onFlag={() => void handleFlagCurrentBookFlashcard()}
+      />
     </main>
   );
 }
