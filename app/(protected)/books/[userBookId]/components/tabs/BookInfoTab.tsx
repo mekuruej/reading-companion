@@ -5,6 +5,7 @@
 
 import { useEffect, useState, type ComponentType } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import BookInfoDetailsSection from "./BookInfoDetailsSection";
 
 type Book = {
   id: string;
@@ -885,126 +886,32 @@ export default function BookInfoTab({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
-              <span>These book details are managed by the site.</span>
-            </div>
-            <div className="mt-2 text-sm font-semibold text-stone-900">
-              Book Info
-            </div>
-          </div>
-          {!isEditingBookInfo ? (
-            canEditBookInfo ? (
-              <button
-                type="button"
-                onClick={onEditBookInfo}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-100"
-              >
-                Edit
-              </button>
-            ) : null
-          ) : (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="rounded-lg bg-stone-200 px-3 py-1.5 text-sm text-stone-900 transition hover:bg-stone-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={saving}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Book Type</div>
-            {!isEditingBookInfo ? (
-              <div className="font-medium">{bookTypeLabel(book.book_type)}</div>
-            ) : (
-              <select
-                value={bookType}
-                onChange={(e) => setBookType(e.target.value)}
-                className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
-              >
-                <option value="">—</option>
-                {BOOK_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <Detail
-            label="Published"
-            value={book.published_date}
-            editing={isEditingBookInfo}
-            inputValue={publishedDate}
-            setInputValue={setPublishedDate}
-            placeholder="e.g. 2005"
-          />
-
-          <Detail
-            label="Page Count"
-            value={book.page_count}
-            editing={isEditingBookInfo}
-            inputValue={pageCount}
-            setInputValue={setPageCount}
-            placeholder="e.g. 352"
-          />
-
-          <Detail
-            label="Series Number"
-            value={book.series_number}
-            editing={isEditingBookInfo}
-            inputValue={seriesNumber}
-            setInputValue={setSeriesNumber}
-            placeholder="e.g. 2"
-          />
-
-          <Detail
-            label="ISBN"
-            value={book.isbn}
-            editing={isEditingBookInfo}
-            inputValue={isbn}
-            setInputValue={setIsbn}
-            placeholder="ISBN"
-          />
-
-          <Detail
-            label="ISBN-13"
-            value={book.isbn13}
-            editing={isEditingBookInfo}
-            inputValue={isbn13}
-            setInputValue={setIsbn13}
-            placeholder="ISBN-13"
-          />
-        </div>
-
-        {isEditingBookInfo ? (
-          <div className="mt-4 rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Cover URL</div>
-            <input
-              value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
-              placeholder="Cover URL"
-              className="mt-1 w-full rounded border px-2 py-1 text-sm"
-            />
-          </div>
-        ) : null}
-      </div>
+      <BookInfoDetailsSection
+        book={book}
+        canEditBookInfo={canEditBookInfo}
+        isEditingBookInfo={isEditingBookInfo}
+        saving={saving}
+        onEditBookInfo={onEditBookInfo}
+        onCancel={onCancel}
+        onSave={onSave}
+        bookType={bookType}
+        setBookType={setBookType}
+        publishedDate={publishedDate}
+        setPublishedDate={setPublishedDate}
+        pageCount={pageCount}
+        setPageCount={setPageCount}
+        seriesNumber={seriesNumber}
+        setSeriesNumber={setSeriesNumber}
+        isbn={isbn}
+        setIsbn={setIsbn}
+        isbn13={isbn13}
+        setIsbn13={setIsbn13}
+        coverUrl={coverUrl}
+        setCoverUrl={setCoverUrl}
+        bookTypeLabel={bookTypeLabel}
+        BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
+        Detail={Detail}
+      />
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
