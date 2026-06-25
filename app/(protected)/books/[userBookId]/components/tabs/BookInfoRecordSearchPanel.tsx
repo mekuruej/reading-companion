@@ -31,6 +31,7 @@ type BookInfoRecordSearchPanelProps<T extends SearchRecord> = {
 
   extraMatches?: ReactNode;
   footerContent?: ReactNode;
+  descriptionContent?: ReactNode;
 };
 
 export default function BookInfoRecordSearchPanel<T extends SearchRecord>({
@@ -54,6 +55,7 @@ export default function BookInfoRecordSearchPanel<T extends SearchRecord>({
   onCreateFromSearch,
   extraMatches,
   footerContent,
+  descriptionContent,
 }: BookInfoRecordSearchPanelProps<T>) {
   const hasSearch = searchValue.trim().length > 0;
 
@@ -68,6 +70,10 @@ export default function BookInfoRecordSearchPanel<T extends SearchRecord>({
         placeholder={placeholder}
         className="w-full rounded border px-2 py-1 text-sm"
       />
+
+      {descriptionContent ? (
+        <div className="mt-2 text-xs text-stone-500">{descriptionContent}</div>
+      ) : null}
 
       {loading ? (
         <div className="mt-2 text-xs text-stone-500">Searching…</div>
@@ -131,7 +137,7 @@ export default function BookInfoRecordSearchPanel<T extends SearchRecord>({
         </div>
       ) : null}
 
-       {footerContent}
+      {footerContent}
     </div>
   );
 }

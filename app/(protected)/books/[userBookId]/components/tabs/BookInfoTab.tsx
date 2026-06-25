@@ -958,140 +958,87 @@ export default function BookInfoTab({
         <div className="space-y-4">
           <div className="space-y-2">
             {isEditingPeople ? (
-              <div className="rounded border bg-white p-3 text-sm">
-                <label className="mb-1 block text-sm font-medium text-stone-700">
-                  Search existing author
-                </label>
-                <input
-                  value={authorSearch}
-                  onChange={(e) => {
-                    setAuthorSearch(e.target.value);
-                    setSelectedAuthorId(null);
-                    setAuthorSearchError(null);
-                  }}
-                  placeholder="宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ"
-                  className="w-full rounded border px-2 py-1 text-sm"
-                />
-                <div className="mt-2 text-xs text-stone-500">
-                  Pick an existing author when you can. If no match exists, keep the author typed
-                  in below and save.
-                  {canCreateSharedRecords
-                    ? " The app will try to create a shared author record automatically."
-                    : ""}
-                </div>
-
-                {authorSearchLoading ? (
-                  <div className="mt-2 text-xs text-stone-500">Searching…</div>
-                ) : null}
-
-                {authorSearchError ? (
-                  <div className="mt-2 text-xs text-red-600">{authorSearchError}</div>
-                ) : null}
-
-                {authorResults.length > 0 ? (
-                  <div className="mt-2 rounded border border-stone-200">
-                    {authorResults.map((person) => (
-                      <button
-                        key={person.id}
-                        type="button"
-                        onClick={() => handleSelectAuthor(person)}
-                        className="block w-full border-b border-stone-200 px-3 py-2 text-left last:border-b-0 hover:bg-stone-50"
-                      >
-                        <div className="font-medium text-stone-900">{person.name_ja}</div>
-                        <div className="text-xs text-stone-600">
-                          {person.name_en || "—"} · {person.reading || "—"}
+              <BookInfoRecordSearchPanel
+                label="Search existing author"
+                searchValue={authorSearch}
+                onSearchChange={(value) => {
+                  setAuthorSearch(value);
+                  setSelectedAuthorId(null);
+                  setAuthorSearchError(null);
+                }}
+                placeholder="宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ"
+                descriptionContent={
+                  <>
+                    Pick an existing author when you can. If no match exists, keep the author typed
+                    in below and save.
+                    {canCreateSharedRecords
+                      ? " The app will try to create a shared author record automatically."
+                      : ""}
+                  </>
+                }
+                loading={authorSearchLoading}
+                error={authorSearchError}
+                results={authorResults}
+                onSelectResult={handleSelectAuthor}
+                noResultsMessage="No matching author found in saved people records yet."
+                selectedLabel="Linked to person record"
+                hasSelectedRecord={Boolean(selectedAuthorId)}
+                onClearSelected={clearSelectedAuthor}
+                canCreateSharedRecords={canCreateSharedRecords}
+                requireSharedRecord={requireSharedAuthorRecord}
+                requireSharedRecordMessage="New shared author record will be required on save."
+                createNewMessage="Don&apos;t see the right match? Create a new shared author record from this search, then finish the details below."
+                createNewButtonLabel="Create New Author"
+                onCreateFromSearch={startNewAuthorFromSearch}
+                extraMatches={
+                  <>
+                    {authorContributorMatches.length > 0 ? (
+                      <div className="mt-2 rounded border border-blue-200 bg-blue-50">
+                        <div className="border-b border-blue-200 px-3 py-2 text-xs font-medium text-blue-800">
+                          Found through existing author links
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : authorSearch.trim() && !authorSearchLoading && !authorSearchError ? (
-                  <div className="mt-2 text-xs text-stone-500">
-                    No matching author found in saved people records yet.
-                  </div>
-                ) : null}
+                        {authorContributorMatches.map((person) => (
+                          <button
+                            key={person.id}
+                            type="button"
+                            onClick={() => handleSelectAuthor(person)}
+                            className="block w-full border-b border-blue-200 px-3 py-2 text-left last:border-b-0 hover:bg-blue-100"
+                          >
+                            <div className="font-medium text-stone-900">{person.name_ja}</div>
+                            <div className="text-xs text-stone-600">
+                              {person.name_en || "—"} · {person.reading || "—"}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
 
-                {authorContributorMatches.length > 0 ? (
-                  <div className="mt-2 rounded border border-blue-200 bg-blue-50">
-                    <div className="border-b border-blue-200 px-3 py-2 text-xs font-medium text-blue-800">
-                      Found through existing author links
-                    </div>
-                    {authorContributorMatches.map((person) => (
-                      <button
-                        key={person.id}
-                        type="button"
-                        onClick={() => handleSelectAuthor(person)}
-                        className="block w-full border-b border-blue-200 px-3 py-2 text-left last:border-b-0 hover:bg-blue-100"
-                      >
-                        <div className="font-medium text-stone-900">{person.name_ja}</div>
-                        <div className="text-xs text-stone-600">
-                          {person.name_en || "—"} · {person.reading || "—"}
+                    {authorBookMatches.length > 0 ? (
+                      <div className="mt-2 rounded border border-emerald-200 bg-emerald-50">
+                        <div className="border-b border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-800">
+                          Found in existing book records
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {authorBookMatches.length > 0 ? (
-                  <div className="mt-2 rounded border border-emerald-200 bg-emerald-50">
-                    <div className="border-b border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-800">
-                      Found in existing book records
-                    </div>
-                    {authorBookMatches.map((match) => (
-                      <button
-                        key={match.id}
-                        type="button"
-                        onClick={() => handleUseBookAuthorMatch(match)}
-                        className="block w-full border-b border-emerald-200 px-3 py-2 text-left last:border-b-0 hover:bg-emerald-100"
-                      >
-                        <div className="font-medium text-stone-900">{match.author}</div>
-                        <div className="text-xs text-stone-600">
-                          {match.author_english_name || "—"} · {match.author_reading || "—"}
+                        {authorBookMatches.map((match) => (
+                          <button
+                            key={match.id}
+                            type="button"
+                            onClick={() => handleUseBookAuthorMatch(match)}
+                            className="block w-full border-b border-emerald-200 px-3 py-2 text-left last:border-b-0 hover:bg-emerald-100"
+                          >
+                            <div className="font-medium text-stone-900">{match.author}</div>
+                            <div className="text-xs text-stone-600">
+                              {match.author_english_name || "—"} · {match.author_reading || "—"}
+                            </div>
+                          </button>
+                        ))}
+                        <div className="px-3 py-2 text-xs text-emerald-800">
+                          Selecting one will fill the author fields here, and saving will create or link the person record.
                         </div>
-                      </button>
-                    ))}
-                    <div className="px-3 py-2 text-xs text-emerald-800">
-                      Selecting one will fill the author fields here, and saving will create or link the person record.
-                    </div>
-                  </div>
-                ) : null}
-
-                {selectedAuthorId ? (
-                  <div className="mt-2 flex items-center gap-2 text-xs text-stone-600">
-                    <span className="rounded-full bg-stone-100 px-2 py-1">
-                      Linked to person record
-                    </span>
-                    <button
-                      type="button"
-                      onClick={clearSelectedAuthor}
-                      className="text-stone-500 underline hover:text-stone-700"
-                    >
-                      Clear selection
-                    </button>
-                  </div>
-                ) : null}
-
-                {canCreateSharedRecords && requireSharedAuthorRecord ? (
-                  <div className="mt-2 text-xs font-medium text-amber-700">
-                    New shared author record will be required on save.
-                  </div>
-                ) : null}
-
-                {canCreateSharedRecords && authorSearch.trim() ? (
-                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <div className="text-xs text-amber-900">
-                      Don&apos;t see the right match? Create a new shared author record from this
-                      search, then finish the details below.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={startNewAuthorFromSearch}
-                      className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100"
-                    >
-                      Create New Author
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+                      </div>
+                    ) : null}
+                  </>
+                }
+              />
             ) : null}
 
             <PersonRow
