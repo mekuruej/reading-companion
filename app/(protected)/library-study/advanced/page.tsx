@@ -1,64 +1,29 @@
 import Link from "next/link";
 import VocabularyGrowthCycleSection from "./components/VocabularyGrowthCycleSection";
 
-const cycleSteps = [
-    {
-        title: "Read books",
-        description: "Meet words naturally inside real books.",
-    },
-    {
-        title: "Save words",
-        description: "Save the words you want support with while reading.",
-    },
-    {
-        title: "Book Flashcards",
-        description: "Study saved words from one book when you want a focused session.",
-    },
-    {
-        title: "Saved Words Review",
-        description: "Review saved words across books without moving colors.",
-    },
-    {
-        title: "Ability Check",
-        description: "Check whether words are ready to move forward by reading or meaning ability.",
-    },
-    {
-        title: "Color movement",
-        description: "Colors show whether a word needs support, is ready for a gate, or has passed one.",
-    },
-    {
-        title: "Notice again",
-        description: "Return to your books and wait for that golden recognition moment.",
-    },
-];
-
 const advancedTools = [
     {
         title: "Book Flashcards",
         href: "/library-study/book-flashcards",
         eyebrow: "Start here",
-        description: "Study words from a specific book. This is the simplest advanced study path.",
         className: "border-indigo-200 bg-indigo-50 text-indigo-950",
     },
     {
         title: "Saved Words Review",
         href: "/library-study/practice",
         eyebrow: "Across books",
-        description: "Review saved words freely across your library. Review does not move colors.",
         className: "border-sky-200 bg-sky-50 text-sky-950",
     },
     {
         title: "Ability Check",
         href: "/library-study/check",
         eyebrow: "Color movement",
-        description: "A short check for words that are ready to move by reading or meaning ability.",
         className: "border-emerald-200 bg-emerald-50 text-emerald-950",
     },
     {
         title: "久しぶり Review",
         href: "/library-study/practice?color=purple",
         eyebrow: "Mastered words",
-        description: "Lightly revisit mastered words so they stay alive in your reading.",
         className: "border-violet-200 bg-violet-50 text-violet-950",
     },
 ];
@@ -82,9 +47,10 @@ export default function AdvancedStudyPage() {
                     </p>
                 </div>
 
-                <VocabularyGrowthCycleSection />
-
-                <details className="group mt-6 rounded-3xl border border-sky-200 bg-white p-6 text-slate-900 shadow-sm">
+                <details
+                    open
+                    className="group rounded-3xl border border-sky-200 bg-white p-6 text-slate-900 shadow-sm"
+                >
                     <summary className="cursor-pointer list-none">
                         <div className="flex items-center justify-between gap-4">
                             <div>
@@ -106,34 +72,59 @@ export default function AdvancedStudyPage() {
 
                     <div className="mt-5 border-t border-slate-200 pt-5">
                         <p className="text-sm leading-7 text-slate-700">
-                            Mekuru’s goal is to encourage and support your natural learning through native material. The advanced vocabulary study is built around noticing. The
-                            goal is not to force a word into your memory all at once. The goal
-                            is to meet it again and again: in your book, in flashcards, in
-                            review, and eventually in Ability Check, by testing your reading and meaning knowledge of that specific word.
+                            Mekuru’s goal is to support natural learning through native
+                            material. Advanced vocabulary study is built around noticing:
+                            meeting a word in real reading, seeing it again in a focused
+                            study moment, checking it lightly, and then returning it to books
+                            so recognition can grow.
                         </p>
 
                         <p className="mt-3 text-sm leading-7 text-slate-700">
-                            The colors help you see where each word is in that noticing cycle.
-                            They are not grades. They are gentle signals that show whether a
-                            word needs more support, is becoming familiar, or is ready to
-                            return to real reading.
+                            The goal is not to force a word into memory all at once. The goal
+                            is to give each word enough useful encounters that the next time
+                            you see it in a book, it has a better chance of feeling familiar.
                         </p>
 
                         <p className="mt-3 text-sm leading-7 text-slate-700">
-                            Each study tool gives you another chance to notice the word, but
-                            Mekuru keeps reading encounters and Ability Check movement
-                            separate. Study can make a word feel more familiar, while the
-                            colors help show whether it needs more support, is ready for a
-                            gate check, or has already passed one.
-                        </p>
-
-                        <p className="mt-3 text-sm leading-7 text-slate-700">
-                            After enough chances to notice a word, the next time you see it in
-                            a book may become that golden moment: you recognize it without
-                            trying to memorize it.
+                            Full-access study tools apply this idea to your saved words with
+                            Book Flashcards, Saved Words Review, Ability Check, and color
+                            movement. The colors are not grades; they are gentle signals for
+                            where a word is in its noticing cycle.
                         </p>
                     </div>
                 </details>
+
+                <section className="mt-4">
+                    <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                        Quick study jumps
+                    </p>
+
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {advancedTools.map((tool) => (
+                            <Link
+                                key={tool.href}
+                                href={tool.href}
+                                className={`group rounded-2xl border px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tool.className}`}
+                            >
+                                <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-60">
+                                    {tool.eyebrow}
+                                </div>
+
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                    <h3 className="min-w-0 text-base font-black leading-tight">
+                                        {tool.title}
+                                    </h3>
+
+                                    <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-xs font-black shadow-sm transition group-hover:bg-white">
+                                        →
+                                    </span>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </section>
+
+                <VocabularyGrowthCycleSection />
 
                 <details className="group mt-6 rounded-3xl border border-sky-200 bg-white p-6 text-slate-900 shadow-sm">
                     <summary className="cursor-pointer list-none">
@@ -295,71 +286,6 @@ export default function AdvancedStudyPage() {
                         </p>
                     </div>
                 </details>
-
-                <section className="mt-6">
-                    <div className="mb-4">
-                        <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                            Study tools
-                        </p>
-                        <h2 className="mt-2 text-2xl font-black text-slate-950">
-                            Choose your next step
-                        </h2>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">
-                            Ability Check becomes more consistent after you have saved a larger pool of
-                            words. It is normal for Ability Check to have only a few cards — or no cards — when your
-                            saved-word pool is still small. Just keep reading and saving words. The pool
-                            will grow naturally.
-                        </p>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {advancedTools.map((tool) => (
-                            <Link
-                                key={tool.href}
-                                href={tool.href}
-                                className={`group rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tool.className}`}
-                            >
-                                <div className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                                    {tool.eyebrow}
-                                </div>
-
-                                <div className="mt-3 flex items-start justify-between gap-4">
-                                    <div>
-                                        <h3 className="text-xl font-black">{tool.title}</h3>
-                                        <p className="mt-2 text-sm leading-6 opacity-80">
-                                            {tool.description}
-                                        </p>
-                                    </div>
-
-                                    <span className="rounded-full bg-white/80 px-3 py-1 text-sm font-black shadow-sm transition group-hover:bg-white">
-                                        →
-                                    </span>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                </section>
-
-                <section className="mt-6 rounded-3xl border border-sky-200 bg-sky-50 p-6 text-sky-950 shadow-sm">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                        Extra
-                    </p>
-
-                    <h2 className="mt-2 text-2xl font-black">Word Sky</h2>
-
-                    <p className="mt-3 max-w-3xl text-sm leading-7 opacity-85">
-                        Word Sky is a fun extra tool for finding your previously known words. Use it to level up words you probably would not save
-                        from book flashcards, so they can eventually become ready for Ability
-                        Check too.
-                    </p>
-
-                    <Link
-                        href="/library-study/word-sky"
-                        className="mt-4 inline-flex rounded-full bg-white px-4 py-2 text-sm font-black text-sky-950 shadow-sm transition hover:bg-sky-100"
-                    >
-                        Open Word Sky →
-                    </Link>
-                </section>
 
                 <div className="mt-6 text-center">
                     <Link

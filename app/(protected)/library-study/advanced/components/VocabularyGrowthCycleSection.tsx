@@ -1,6 +1,6 @@
 const cycleSteps = [
     {
-        title: "Read books",
+        title: "Read and Notice",
         description: "Meet words naturally inside real books.",
         href: "/books",
     },
@@ -27,10 +27,10 @@ const cycleSteps = [
         href: "/library-study/check",
     },
     {
-        title: "Notice again",
+        title: "Strengthen what you know",
         description:
-            "Return to your books and wait for that golden recognition moment.",
-        href: "/books",
+            "Revisit mastered words so they stay alive in your reading.",
+        href: "/library-study/practice?color=purple",
     },
 ];
 
@@ -182,7 +182,7 @@ export default function VocabularyGrowthCycleSection() {
 
                         <a
                             href="/books"
-                            aria-label="Open your library to read books"
+                            aria-label="Open your library to read and notice words"
                             className="cursor-pointer"
                         >
                             <g>
@@ -200,11 +200,11 @@ export default function VocabularyGrowthCycleSection() {
                                 x="465"
                                 y="60"
                                 fill="#0f172a"
-                                fontSize="21"
+                                fontSize="20"
                                 fontWeight="900"
                                 textAnchor="middle"
                             >
-                                Read books
+                                Read and Notice
                             </text>
                             <text
                                 x="465"
@@ -371,8 +371,8 @@ export default function VocabularyGrowthCycleSection() {
                         </a>
 
                         <a
-                            href="/books"
-                            aria-label="Open your library and notice words again"
+                            href="/library-study/practice?color=purple"
+                            aria-label="Open purple review to strengthen what you know"
                             className="cursor-pointer"
                         >
                             <g>
@@ -382,28 +382,38 @@ export default function VocabularyGrowthCycleSection() {
                                 width="245"
                                 height="92"
                                 rx="28"
-                                fill="#ffffff"
-                                stroke="#cbd5e1"
+                                fill="#f5f3ff"
+                                stroke="#ddd6fe"
                                 strokeWidth="2"
                             />
                             <text
                                 x="148"
-                                y="140"
-                                fill="#0f172a"
-                                fontSize="21"
+                                y="135"
+                                fill="#4c1d95"
+                                fontSize="19"
                                 fontWeight="900"
                                 textAnchor="middle"
                             >
-                                Notice again
+                                Strengthen
                             </text>
                             <text
                                 x="148"
-                                y="167"
-                                fill="#475569"
+                                y="160"
+                                fill="#4c1d95"
+                                fontSize="19"
+                                fontWeight="900"
+                                textAnchor="middle"
+                            >
+                                what you know
+                            </text>
+                            <text
+                                x="148"
+                                y="183"
+                                fill="#6d28d9"
                                 fontSize="14"
                                 textAnchor="middle"
                             >
-                                Recognize
+                                Purple review
                             </text>
                             </g>
                         </a>
@@ -558,30 +568,16 @@ export default function VocabularyGrowthCycleSection() {
                     ))}
                 </div>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sky-950">
-                        <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                            Word Sky
-                        </p>
-                        <h3 className="mt-2 text-lg font-black">Optional extra words</h3>
-                        <p className="mt-2 text-sm leading-6 opacity-85">
-                            Word Sky is a fun extra tool for leveling up useful words you may
-                            not save from your books, so they can eventually become ready for
-                            Ability Check too.
-                        </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
-                        <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                            Recognition Colors
-                        </p>
-                        <h3 className="mt-2 text-lg font-black">Ebb and flow</h3>
-                        <p className="mt-2 text-sm leading-6 opacity-85">
-                            Words are assigned colors depending on encounters and skill.
-                            These colors are constantly ebbing and flowing to match your
-                            relationship with that word.
-                        </p>
-                    </div>
+                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
+                        Recognition Colors
+                    </p>
+                    <h3 className="mt-2 text-lg font-black">Ebb and flow</h3>
+                    <p className="mt-2 text-sm leading-6 opacity-85">
+                        Words are assigned colors depending on encounters and skill.
+                        These colors are constantly ebbing and flowing to match your
+                        relationship with that word.
+                    </p>
                 </div>
             </div>
         </details>

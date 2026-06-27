@@ -28,12 +28,15 @@ export default function AddBookLookupCard({
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-stone-600">
-                Enter an ISBN-13. Mekuru will look for the book, show you a preview, and
-                then add it to the selected library.
+                Enter an ISBN-13 first when you have one. Mekuru can use it to look
+                up the fullest book details, show you a preview, and add the book to
+                your library.
             </p>
 
             <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-                For now, this flow is intended for Japanese books with ISBN-13 numbers.
+                ISBN-13 is the best first choice. Use title or author search below
+                only when the ISBN lookup does not work, or when the book does not
+                have an ISBN.
             </div>
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">

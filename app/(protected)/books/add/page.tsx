@@ -511,7 +511,12 @@ export default function AddBookPage() {
             const data = await response.json();
 
             if (!response.ok) {
-                setError(data.error ?? "I couldn’t add this book to the selected library.");
+                setError(
+                    data.error ??
+                    (destinationMode === "me"
+                        ? "I couldn’t add this book to your library."
+                        : "I couldn’t add this book to that library.")
+                );
                 return;
             }
 
@@ -539,7 +544,11 @@ export default function AddBookPage() {
             });
         } catch (addError) {
             console.error("Add existing book failed:", addError);
-            setError("Something went wrong while adding this book to the selected library.");
+            setError(
+                destinationMode === "me"
+                    ? "Something went wrong while adding this book to your library."
+                    : "Something went wrong while adding this book to that library."
+            );
         } finally {
             setAddingExistingBookId(null);
         }
@@ -666,30 +675,33 @@ export default function AddBookPage() {
 
             <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                    Search existing books
+                    Fallback search
                 </p>
                 <h2 className="mt-2 text-xl font-black text-stone-950">
-                    Search by title, author, or ISBN
+                    Search by title or author
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
-                    Use this when you are adding a book for another user and the book may
-                    already be in Mekuru. Complete records can be added directly; incomplete
-                    records should be requested for review.
+                    Use this when ISBN-13 lookup does not find the book, or when the
+                    book does not have an ISBN. If Mekuru already has a complete
+                    record, you can add it to your library. If details are missing,
+                    send a request so the book can be reviewed.
                 </p>
 
-                <AddBookDestinationPanel
-                    destinationMode={destinationMode}
-                    destinationUserId={destinationUserId}
-                    isTeacher={isTeacher}
-                    isSuperTeacher={isSuperTeacher}
-                    studentOptions={studentOptions}
-                    userOptions={userOptions}
-                    onDestinationModeChange={handleDestinationModeChange}
-                    onDestinationUserChange={(userId) => {
-                        setDestinationUserId(userId);
-                        setLibraryNotice(null);
-                    }}
-                />
+                {isTeacher || isSuperTeacher ? (
+                    <AddBookDestinationPanel
+                        destinationMode={destinationMode}
+                        destinationUserId={destinationUserId}
+                        isTeacher={isTeacher}
+                        isSuperTeacher={isSuperTeacher}
+                        studentOptions={studentOptions}
+                        userOptions={userOptions}
+                        onDestinationModeChange={handleDestinationModeChange}
+                        onDestinationUserChange={(userId) => {
+                            setDestinationUserId(userId);
+                            setLibraryNotice(null);
+                        }}
+                    />
+                ) : null}
 
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <input
@@ -701,7 +713,7 @@ export default function AddBookPage() {
                         onKeyDown={(event) => {
                             if (event.key === "Enter") void handleBookSearch();
                         }}
-                        placeholder="Title, author, or ISBN"
+                        placeholder="Title or author"
                         className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                     />
 
