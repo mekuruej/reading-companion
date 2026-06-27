@@ -1,17 +1,11 @@
-type DestinationMode = "me" | "student" | "user" | "global";
-
 type AddBookActionRowProps = {
   addLoading: boolean;
-  destinationMode: DestinationMode;
-  selectedDestinationLabel: string;
   onAdd: () => void;
   onCancel: () => void;
 };
 
 export default function AddBookActionRow({
   addLoading,
-  destinationMode,
-  selectedDestinationLabel,
   onAdd,
   onCancel,
 }: AddBookActionRowProps) {
@@ -23,11 +17,7 @@ export default function AddBookActionRow({
         disabled={addLoading}
         className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {addLoading
-          ? "Adding..."
-          : destinationMode === "global"
-            ? "Open Global Review"
-            : `Add to ${selectedDestinationLabel}`}
+        {addLoading ? "Adding..." : "Add to my library"}
       </button>
 
       <button

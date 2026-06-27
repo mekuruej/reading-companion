@@ -2,7 +2,7 @@
 // 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddBookLookupCard from "./components/AddBookLookupCard";
@@ -10,7 +10,6 @@ import AddBookMessagePanel from "./components/AddBookMessagePanel";
 import AddBookLibraryNotice from "./components/AddBookLibraryNotice";
 import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
 import AddBookActionRow from "./components/AddBookActionRow";
-import AddBookDestinationPanel from "./components/AddBookDestinationPanel";
 
 type LookupBook = {
     isbn13: string;
@@ -39,14 +38,6 @@ type LookupBook = {
     needs_review?: boolean;
     found_existing_book?: boolean;
     existing_book_id?: string | null;
-};
-
-type DestinationUser = {
-    id: string;
-    display_name: string | null;
-    username: string | null;
-    level: string | null;
-    role: string | null;
 };
 
 type BookSearchResult = {
@@ -112,12 +103,6 @@ export default function AddBookPage() {
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
-    const [isTeacher, setIsTeacher] = useState(false);
-    const [isSuperTeacher, setIsSuperTeacher] = useState(false);
-    const [destinationMode, setDestinationMode] = useState<"me" | "student" | "user" | "global">("me");
-    const [destinationUserId, setDestinationUserId] = useState("");
-    const [studentOptions, setStudentOptions] = useState<DestinationUser[]>([]);
-    const [userOptions, setUserOptions] = useState<DestinationUser[]>([]);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [addLoading, setAddLoading] = useState(false);
     const [requestLoading, setRequestLoading] = useState(false);
@@ -138,11 +123,7 @@ export default function AddBookPage() {
     useEffect(() => {
         let alive = true;
 
-        async function loadDestinations() {
-            const params = new URLSearchParams(window.location.search);
-            const requestedDestination = params.get("destination");
-            const requestedTargetUserId = params.get("targetUserId") || params.get("userId");
-
+        async function loadCurrentUser() {
             const {
                 data: { user },
             } = await supabase.auth.getUser();
@@ -153,82 +134,16 @@ export default function AddBookPage() {
 
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("id, display_name, username, level, role, is_super_teacher")
+                .select("id, username")
                 .eq("id", user.id)
                 .maybeSingle();
 
             if (!alive) return;
 
-            const profileRole = (profile?.role ?? "") as string;
-            const superTeacher =
-                profileRole === "super_teacher" ||
-                profile?.is_super_teacher === true ||
-                profile?.is_super_teacher === "true";
-            const teacher = profileRole === "teacher" || superTeacher;
-
             setCurrentUsername((profile as any)?.username ?? null);
-            setIsTeacher(teacher);
-            setIsSuperTeacher(superTeacher);
-
-            if (teacher) {
-                const { data: links } = await supabase
-                    .from("teacher_students")
-                    .select("student_id")
-                    .eq("teacher_id", user.id)
-                    .is("archived_at", null);
-
-                const studentIds = Array.from(
-                    new Set(((links ?? []) as any[]).map((link) => link.student_id).filter(Boolean))
-                );
-
-                if (studentIds.length > 0) {
-                    const { data: students } = await supabase
-                        .from("profiles")
-                        .select("id, display_name, username, level, role")
-                        .in("id", studentIds)
-                        .order("display_name", { ascending: true });
-
-                    const nextStudentOptions = (students ?? []) as DestinationUser[];
-
-                    if (alive) {
-                        setStudentOptions(nextStudentOptions);
-
-                        if (
-                            requestedDestination === "student" &&
-                            requestedTargetUserId &&
-                            nextStudentOptions.some((student) => student.id === requestedTargetUserId)
-                        ) {
-                            setDestinationMode("student");
-                            setDestinationUserId(requestedTargetUserId);
-                        }
-                    }
-                }
-            }
-
-            if (superTeacher) {
-                const { data: users } = await supabase
-                    .from("profiles")
-                    .select("id, display_name, username, level, role")
-                    .order("display_name", { ascending: true });
-
-                if (alive) {
-                    setUserOptions(
-                        ((users ?? []) as DestinationUser[]).filter((item) => item.id !== user.id)
-                    );
-
-                    if (
-                        requestedDestination === "user" &&
-                        requestedTargetUserId &&
-                        ((users ?? []) as DestinationUser[]).some((item) => item.id === requestedTargetUserId)
-                    ) {
-                        setDestinationMode("user");
-                        setDestinationUserId(requestedTargetUserId);
-                    }
-                }
-            }
         }
 
-        void loadDestinations();
+        void loadCurrentUser();
 
         return () => {
             alive = false;
@@ -310,27 +225,13 @@ export default function AddBookPage() {
         }
     }
 
-    function handleDestinationModeChange(mode: "me" | "student" | "user" | "global") {
-        setDestinationMode(mode);
-
-        if (mode === "student") {
-            setDestinationUserId(studentOptions[0]?.id ?? "");
-        } else if (mode === "user") {
-            setDestinationUserId(userOptions[0]?.id ?? "");
-        } else {
-            setDestinationUserId("");
-        }
-
-        setLibraryNotice(null);
-    }
-
     async function handleBookSearch() {
         const query = bookSearch.trim();
         setLibraryNotice(null);
         setBookSearchResults([]);
 
         if (!query) {
-            setError("Enter a title, author, or ISBN to search.");
+            setError("Enter a title or author to search.");
             return;
         }
 
@@ -344,7 +245,7 @@ export default function AddBookPage() {
                 .select(
                     "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, needs_review"
                 )
-                .or(`title.ilike.%${escaped}%,author.ilike.%${escaped}%,isbn13.ilike.%${escaped}%`)
+                .or(`title.ilike.%${escaped}%,author.ilike.%${escaped}%`)
                 .order("title", { ascending: true })
                 .limit(12);
 
@@ -368,15 +269,8 @@ export default function AddBookPage() {
     async function handleAddToLibrary() {
         if (!book?.isbn13) return;
 
-        const selectedTargetUserId =
-            destinationMode === "me"
-                ? currentUserId
-                : destinationMode === "student" || destinationMode === "user"
-                    ? destinationUserId
-                    : "";
-
-        if (destinationMode !== "global" && !selectedTargetUserId) {
-            setError("Choose who should receive this book.");
+        if (!currentUserId) {
+            setError("Sign in again before adding this book to your library.");
             return;
         }
 
@@ -408,8 +302,8 @@ export default function AddBookPage() {
                 },
                 body: JSON.stringify({
                     isbn13: book.isbn13,
-                    mode: destinationMode === "global" ? "global_only" : "add_to_library",
-                    targetUserId: selectedTargetUserId || undefined,
+                    mode: "add_to_library",
+                    targetUserId: currentUserId,
                 }),
             });
 
@@ -421,16 +315,6 @@ export default function AddBookPage() {
                 return;
             }
 
-            if (destinationMode === "global") {
-                if (!data.bookId) {
-                    setError("The global book was created, but Mekuru could not open it for review.");
-                    return;
-                }
-
-                router.push(`/teacher/books/add?bookId=${data.bookId}`);
-                return;
-            }
-
             if (!data.userBookId) {
                 console.error("Add book response had no userBookId:", data);
                 setError("The book was added, but Mekuru could not open the Book Hub.");
@@ -439,26 +323,14 @@ export default function AddBookPage() {
 
             if (data.alreadyInLibrary) {
                 setLibraryNotice({
-                    message:
-                        destinationMode === "me"
-                            ? "This book is already in your library."
-                            : "This book is already in that library.",
+                    message: "This book is already in your library.",
                     detail: "We found the existing copy.",
                     userBookId: data.userBookId,
                 });
                 return;
             }
 
-            if (destinationMode === "me") {
-                router.push(currentUsername ? `/users/${currentUsername}/books` : "/books");
-                return;
-            }
-
-            setLibraryNotice({
-                message: "Book added.",
-                detail: "It was added to the selected user's library.",
-                userBookId: data.userBookId,
-            });
+            router.push(currentUsername ? `/users/${currentUsername}/books` : "/books");
         } catch (addError) {
             console.error("Add book failed:", addError);
             setError("Something went wrong while adding this book to your library.");
@@ -468,20 +340,8 @@ export default function AddBookPage() {
     }
 
     async function handleAddExistingBook(bookId: string) {
-        const selectedTargetUserId =
-            destinationMode === "me"
-                ? currentUserId
-                : destinationMode === "student" || destinationMode === "user"
-                    ? destinationUserId
-                    : "";
-
-        if (destinationMode === "global") {
-            router.push(`/teacher/books/add?bookId=${bookId}`);
-            return;
-        }
-
-        if (!selectedTargetUserId) {
-            setError("Choose who should receive this book.");
+        if (!currentUserId) {
+            setError("Sign in again before adding this book to your library.");
             return;
         }
 
@@ -504,51 +364,30 @@ export default function AddBookPage() {
                 },
                 body: JSON.stringify({
                     bookId,
-                    targetUserId: selectedTargetUserId,
+                    targetUserId: currentUserId,
                 }),
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                setError(
-                    data.error ??
-                    (destinationMode === "me"
-                        ? "I couldn’t add this book to your library."
-                        : "I couldn’t add this book to that library.")
-                );
+                setError(data.error ?? "I couldn’t add this book to your library.");
                 return;
             }
 
             if (data.alreadyInLibrary) {
                 setLibraryNotice({
-                    message:
-                        destinationMode === "me"
-                            ? "This book is already in your library."
-                            : "This book is already in that library.",
+                    message: "This book is already in your library.",
                     detail: "We found the existing copy.",
                     userBookId: data.userBookId,
                 });
                 return;
             }
 
-            if (destinationMode === "me") {
-                router.push(currentUsername ? `/users/${currentUsername}/books` : "/books");
-                return;
-            }
-
-            setLibraryNotice({
-                message: "Book added.",
-                detail: "It was added to the selected user's library.",
-                userBookId: data.userBookId,
-            });
+            router.push(currentUsername ? `/users/${currentUsername}/books` : "/books");
         } catch (addError) {
             console.error("Add existing book failed:", addError);
-            setError(
-                destinationMode === "me"
-                    ? "Something went wrong while adding this book to your library."
-                    : "Something went wrong while adding this book to that library."
-            );
+            setError("Something went wrong while adding this book to your library.");
         } finally {
             setAddingExistingBookId(null);
         }
@@ -624,14 +463,6 @@ export default function AddBookPage() {
     const displayAuthor = book ? getDisplayAuthor(book) : "";
     const publishedDate = book ? getPublishedDate(book) : null;
     const pageCount = book ? getPageCount(book) : null;
-    const selectedDestinationLabel = useMemo(() => {
-        if (destinationMode === "global") return "Global catalog only";
-        if (destinationMode === "me") return "My library";
-
-        const options = destinationMode === "student" ? studentOptions : userOptions;
-        const selected = options.find((item) => item.id === destinationUserId);
-        return selected?.display_name || selected?.username || "selected user";
-    }, [destinationMode, destinationUserId, studentOptions, userOptions]);
     const isNewToMekuru =
         !!book &&
         book.found_existing_book !== true &&
@@ -686,22 +517,6 @@ export default function AddBookPage() {
                     record, you can add it to your library. If details are missing,
                     send a request so the book can be reviewed.
                 </p>
-
-                {isTeacher || isSuperTeacher ? (
-                    <AddBookDestinationPanel
-                        destinationMode={destinationMode}
-                        destinationUserId={destinationUserId}
-                        isTeacher={isTeacher}
-                        isSuperTeacher={isSuperTeacher}
-                        studentOptions={studentOptions}
-                        userOptions={userOptions}
-                        onDestinationModeChange={handleDestinationModeChange}
-                        onDestinationUserChange={(userId) => {
-                            setDestinationUserId(userId);
-                            setLibraryNotice(null);
-                        }}
-                    />
-                ) : null}
 
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <input
@@ -795,9 +610,7 @@ export default function AddBookPage() {
                                             >
                                                 {addingExistingBookId === result.id
                                                     ? "Adding..."
-                                                    : destinationMode === "global"
-                                                        ? "Open Review"
-                                                        : "Add Book"}
+                                                    : "Add Book"}
                                             </button>
                                         ) : (
                                             <button
@@ -842,24 +655,8 @@ export default function AddBookPage() {
                     isbn13={book.isbn13}
                     isNewToMekuru={isNewToMekuru}
                 >
-                    <AddBookDestinationPanel
-                        destinationMode={destinationMode}
-                        destinationUserId={destinationUserId}
-                        isTeacher={isTeacher}
-                        isSuperTeacher={isSuperTeacher}
-                        studentOptions={studentOptions}
-                        userOptions={userOptions}
-                        onDestinationModeChange={handleDestinationModeChange}
-                        onDestinationUserChange={(userId) => {
-                            setDestinationUserId(userId);
-                            setLibraryNotice(null);
-                        }}
-                    />
-
                     <AddBookActionRow
                         addLoading={addLoading}
-                        destinationMode={destinationMode}
-                        selectedDestinationLabel={selectedDestinationLabel}
                         onAdd={handleAddToLibrary}
                         onCancel={() => router.push("/dashboard")}
                     />
