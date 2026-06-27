@@ -109,7 +109,7 @@ export default function AdvancedStudyPage() {
                             Mekuru’s goal is to encourage and support your natural learning through native material. The advanced vocabulary study is built around noticing. The
                             goal is not to force a word into your memory all at once. The goal
                             is to meet it again and again: in your book, in flashcards, in
-                            review, and eventually in Ability Check.
+                            review, and eventually in Ability Check, by testing your reading and meaning knowledge of that specific word.
                         </p>
 
                         <p className="mt-3 text-sm leading-7 text-slate-700">

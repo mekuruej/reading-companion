@@ -29,7 +29,7 @@ export default function TeacherLibraryBookHeader({
         ) : null}
       </div>
 
-      <h1 className="mt-4 text-2xl font-semibold text-stone-900">Prep Add</h1>
+      <h1 className="mt-4 text-2xl font-semibold text-stone-900">Teaching Book</h1>
     </>
   );
 }

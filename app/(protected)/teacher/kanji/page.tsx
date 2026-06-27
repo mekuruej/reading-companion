@@ -4,7 +4,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 import TeacherKanjiHeader from "./components/TeacherKanjiHeader";
 import TeacherKanjiAccessState from "./components/TeacherKanjiAccessState";
 import TeacherKanjiLoadingState from "./components/TeacherKanjiLoadingState";
@@ -355,6 +357,9 @@ function getQueueStatus(params: {
 }
 
 export default function TeacherKanjiPage() {
+  const searchParams = useSearchParams();
+  const backLink = getTeacherBackLink(searchParams.get("from"));
+
   const [loading, setLoading] = useState(true);
   const [preparingId, setPreparingId] = useState<string | null>(null);
   const [bulkOpening, setBulkOpening] = useState(false);
@@ -1308,7 +1313,7 @@ export default function TeacherKanjiPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <TeacherKanjiHeader homeHref="/teacher" />
+      <TeacherKanjiHeader homeHref={backLink.href} homeLabel={backLink.label} />
 
       {loading ? (
         <TeacherKanjiLoadingState />

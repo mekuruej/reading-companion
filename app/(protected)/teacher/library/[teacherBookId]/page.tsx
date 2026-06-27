@@ -35,6 +35,9 @@ type BookMeta = {
   author: string | null;
   cover_url: string | null;
   book_type: string | null;
+  isbn13: string | null;
+  page_count: number | null;
+  related_links: any[] | null;
 };
 
 type TeacherBookRow = {
@@ -63,6 +66,7 @@ type TeacherBookItem = {
 };
 
 type PrepItemDraft = {
+  id: string;
   itemType: ItemType;
   surfaceText: string;
   reading: string;
@@ -94,6 +98,7 @@ type SavedItemEditDraft = {
 };
 
 const itemTypes: ItemType[] = ["word", "phrase", "grammar", "sentence", "translation", "note"];
+let draftIdCounter = 0;
 
 function isTeacherRole(profile: any) {
   return (
@@ -240,8 +245,14 @@ function editDraftFromItem(item: TeacherBookItem): SavedItemEditDraft {
   };
 }
 
+function createDraftId() {
+  draftIdCounter += 1;
+  return `prep-draft-${Date.now()}-${draftIdCounter}`;
+}
+
 function blankDraft(surfaceText: string, defaultType: ItemType): PrepItemDraft {
   return {
+    id: createDraftId(),
     itemType: defaultType,
     surfaceText,
     reading: "",
@@ -426,7 +437,10 @@ export default function TeacherBookPrepPage() {
             title,
             author,
             cover_url,
-            book_type
+            book_type,
+            isbn13,
+            page_count,
+            related_links
           )
         `
         )
@@ -1013,7 +1027,7 @@ export default function TeacherBookPrepPage() {
 
                 <ul className="space-y-3">
                   {drafts.map((draft, index) => (
-                    <li key={`${draft.surfaceText}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <li key={draft.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <button
@@ -1184,7 +1198,7 @@ export default function TeacherBookPrepPage() {
 
                 <ul className="space-y-3">
                   {drafts.map((draft, index) => (
-                    <li key={`${draft.surfaceText}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <li key={draft.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <div className="text-lg font-semibold">{draft.surfaceText}</div>

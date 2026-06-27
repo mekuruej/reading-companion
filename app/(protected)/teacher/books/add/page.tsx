@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../../components/teacherBackLink";
 import BookInfoTab from "../../../books/[userBookId]/components/tabs/BookInfoTab";
 import { TeacherBookAddLoadingState } from "./components/TeacherBookAddLoadingState";
 import { TeacherBookAddAccessState } from "./components/TeacherBookAddAccessState";
@@ -247,6 +248,9 @@ export default function TeacherAddBookPage() {
     const searchParams = useSearchParams();
     const bookId = searchParams.get("bookId");
     const requestId = searchParams.get("requestId");
+    const sourceParam = searchParams.get("from");
+    const backLink = getTeacherBackLink(sourceParam);
+    const sourceQuerySuffix = sourceParam ? `&from=${encodeURIComponent(sourceParam)}` : "";
 
     const isEditMode = !!bookId;
 
@@ -694,7 +698,7 @@ export default function TeacherAddBookPage() {
             if (existingBook) {
                 await loadBook(existingBook.id);
                 setMessage(`Loaded existing book: ${existingBook.title}`);
-                router.replace(`/teacher/books/add?bookId=${existingBook.id}`);
+                router.replace(`/teacher/books/add?bookId=${existingBook.id}${sourceQuerySuffix}`);
                 setSaving(false);
                 return;
             }
@@ -727,7 +731,7 @@ export default function TeacherAddBookPage() {
                     ? "Manual catalog book created. Add shared book details below."
                     : "Catalog book created. Add shared book details below."
             );
-            router.replace(`/teacher/books/add?bookId=${data.id}`);
+            router.replace(`/teacher/books/add?bookId=${data.id}${sourceQuerySuffix}`);
         } catch (error: any) {
             console.error("Create/load global book error:", JSON.stringify(error, null, 2));
             setMessage(error?.message ?? "Failed to create or load book.");
@@ -779,7 +783,7 @@ export default function TeacherAddBookPage() {
             try {
                 await loadBook(isbnLookupPreview.existing_book_id);
                 setMessage("This ISBN already exists in Mekuru. Loaded the existing global book.");
-                router.replace(`/teacher/books/add?bookId=${isbnLookupPreview.existing_book_id}`);
+                router.replace(`/teacher/books/add?bookId=${isbnLookupPreview.existing_book_id}${sourceQuerySuffix}`);
             } catch (error: any) {
                 setIsbnLookupError(error?.message ?? "Could not load the existing global book.");
             } finally {
@@ -809,7 +813,7 @@ export default function TeacherAddBookPage() {
             if (existingBook) {
                 await loadBook(existingBook.id);
                 setMessage("This ISBN already exists in Mekuru. Loaded the existing global book.");
-                router.replace(`/teacher/books/add?bookId=${existingBook.id}`);
+                router.replace(`/teacher/books/add?bookId=${existingBook.id}${sourceQuerySuffix}`);
                 setSaving(false);
                 return;
             }
@@ -837,7 +841,7 @@ export default function TeacherAddBookPage() {
 
             await loadBook(data.id);
             setMessage("Global book created from ISBN metadata. Review and edit details below.");
-            router.replace(`/teacher/books/add?bookId=${data.id}`);
+            router.replace(`/teacher/books/add?bookId=${data.id}${sourceQuerySuffix}`);
         } catch (error: any) {
             console.error("Create global book from ISBN metadata error:", JSON.stringify(error, null, 2));
             setIsbnLookupError(error?.message ?? "Failed to create global book from metadata.");
@@ -950,7 +954,11 @@ export default function TeacherAddBookPage() {
 
     return (
         <TeacherBookAddPageShell>
-            <TeacherBookAddHeader isEditing={isEditMode || !!currentBookId} />
+            <TeacherBookAddHeader
+                isEditing={isEditMode || !!currentBookId}
+                backHref={backLink.href}
+                backLabel={backLink.label}
+            />
 
             {bookRequest ? (
                 <TeacherBookRequestPanel

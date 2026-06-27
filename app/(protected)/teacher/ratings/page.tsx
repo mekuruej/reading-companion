@@ -4,7 +4,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 import {
   TeacherRatingBookCard,
   type TeacherRatingBookCardItem,
@@ -116,6 +118,9 @@ function compareItems(a: TeacherRatingBookCardItem, b: TeacherRatingBookCardItem
 }
 
 export default function TeacherRatingsPage() {
+  const searchParams = useSearchParams();
+  const backLink = getTeacherBackLink(searchParams.get("from"));
+
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [items, setItems] = useState<TeacherRatingBookCardItem[]>([]);
@@ -318,7 +323,7 @@ export default function TeacherRatingsPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <TeacherRatingsHeader />
+        <TeacherRatingsHeader backHref={backLink.href} backLabel={backLink.label} />
 
         <TeacherRatingsSummaryCards
           totalCount={items.length}

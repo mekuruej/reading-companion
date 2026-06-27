@@ -18,7 +18,7 @@ export default function TeacherStudentsHeader({
           </p>
 
           <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
-            My Students
+            My students
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">

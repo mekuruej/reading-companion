@@ -101,10 +101,10 @@ export default function TeacherClubsPage() {
           </div>
 
           <Link
-            href="/teacher"
+            href="/teacher/lesson-prep"
             className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
           >
-            ← Teacher Home
+            ← Lesson Prep
           </Link>
         </div>
       </section>

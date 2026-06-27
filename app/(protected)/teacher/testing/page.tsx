@@ -8,7 +8,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 
 type ProfileRow = {
     role: string | null;
@@ -16,6 +18,8 @@ type ProfileRow = {
 };
 
 export default function TeacherTestingPage() {
+    const searchParams = useSearchParams();
+    const backLink = getTeacherBackLink(searchParams.get("from"));
     const [loading, setLoading] = useState(true);
     const [allowed, setAllowed] = useState(false);
 
@@ -83,7 +87,14 @@ export default function TeacherTestingPage() {
         <main className="min-h-screen bg-slate-100 px-6 py-8">
             <div className="mx-auto max-w-4xl">
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    <Link
+                        href={backLink.href}
+                        className="text-sm font-semibold text-slate-500 hover:text-slate-900"
+                    >
+                        {backLink.label}
+                    </Link>
+
+                    <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
                         Mekuru Test Lab
                     </p>
 

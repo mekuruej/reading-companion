@@ -116,6 +116,23 @@ export default function Header() {
     pathname.startsWith("/kanji-reading-study");
   const profileSectionActive = pathname.startsWith("/community");
   const teacherSectionActive = pathname.startsWith("/teacher");
+  const teacherLessonPrepActive =
+    pathname === "/teacher/lesson-prep" ||
+    pathname === "/teacher/students" ||
+    pathname.startsWith("/teacher/library") ||
+    pathname.startsWith("/teacher/clubs");
+  const teacherNeedsAttentionActive =
+    pathname === "/teacher/needs-attention" ||
+    pathname === "/teacher/books" ||
+    pathname === "/teacher/words" ||
+    pathname === "/teacher/kanji" ||
+    pathname === "/teacher/ratings" ||
+    pathname === "/teacher/reading-fit";
+  const teacherSiteUpkeepActive =
+    pathname === "/teacher/general-upkeep" ||
+    pathname === "/teacher/books/add" ||
+    pathname === "/teacher/global-words" ||
+    pathname.startsWith("/teacher/testing");
   const showTeacherLink =
     profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher;
 
@@ -527,7 +544,7 @@ export default function Header() {
 
                     <Link
                       href="/teacher/lesson-prep"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/lesson-prep"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherLessonPrepActive
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
                         }`}
@@ -537,25 +554,25 @@ export default function Header() {
                     </Link>
 
                     <Link
-                      href="/teacher/library"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/teacher/library")
+                      href="/teacher/needs-attention"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherNeedsAttentionActive
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
                         }`}
                       onClick={() => setShowTeacherMenu(false)}
                     >
-                      Teacher Library
+                      Needs Attention
                     </Link>
 
                     <Link
-                      href="/teacher/students"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/students"
+                      href="/teacher/general-upkeep"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherSiteUpkeepActive
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
                         }`}
                       onClick={() => setShowTeacherMenu(false)}
                     >
-                      Students
+                      Site Upkeep
                     </Link>
                   </div>
                 ) : null}

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getLearnerAccessLabel } from "@/lib/access/learnerDisplayLabels";
 import { getTeacherBackLink } from "../components/teacherBackLink";
 import TeacherStudentsAccessState from "./components/TeacherStudentsAccessState";
 import TeacherStudentsErrorBanner from "./components/TeacherStudentsErrorBanner";
@@ -256,6 +257,11 @@ function StudentCardArticle({
 }) {
     const displayName = student.display_name || student.username || "Unnamed student";
     const isArchived = student.relationshipStatus === "archived";
+    const learnerAccessLabel = getLearnerAccessLabel({
+        role: student.role,
+        app_access_type: student.app_access_type,
+        linkedToTeacher: Boolean(student.teacherStudentTeacherId),
+    });
 
     return (
         <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -289,6 +295,9 @@ function StudentCardArticle({
                                 </span>
                                 <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-semibold text-stone-500">
                                     {student.level || "No level"}
+                                </span>
+                                <span className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-sm font-semibold text-stone-500">
+                                    {learnerAccessLabel}
                                 </span>
                             </div>
                         </div>
@@ -1187,8 +1196,8 @@ export default function TeacherStudentsPage() {
         }));
     }
 
-    const searchSingularNounLabel = viewerIsSuperTeacher ? "account" : "student";
-    const searchPluralNounLabel = viewerIsSuperTeacher ? "accounts" : "students";
+    const searchSingularNounLabel = viewerIsSuperTeacher ? "learner" : "student";
+    const searchPluralNounLabel = viewerIsSuperTeacher ? "learners" : "students";
 
     const activeTasksForModalStudent = useMemo(() => {
         if (!taskModalStudent) return [];
@@ -1261,7 +1270,7 @@ export default function TeacherStudentsPage() {
                         {students.length === 0 ? (
                             <TeacherStudentsEmptyState
                                 title="No linked students yet."
-                                description="Students linked to your teacher account will appear here."
+                                description="People linked to your teacher account will appear here."
                             />
                         ) : (
                             <div className="space-y-8">
@@ -1297,10 +1306,10 @@ export default function TeacherStudentsPage() {
                                                             <span className="mr-2 text-stone-400">
                                                                 {myStudentsOpen ? "▾" : "▸"}
                                                             </span>
-                                                            My Students
+                                                            My students
                                                         </h2>
                                                         <p className="mt-1 text-sm text-stone-600">
-                                                            Learners linked to your teacher account.
+                                                            People linked to your teacher account.
                                                         </p>
                                                     </div>
 
@@ -1343,15 +1352,15 @@ export default function TeacherStudentsPage() {
                                                             <span className="mr-2 text-stone-400">
                                                                 {otherUsersOpen ? "▾" : "▸"}
                                                             </span>
-                                                            Other Users
+                                                            Other learners
                                                         </h2>
                                                         <p className="mt-1 text-sm text-stone-600">
-                                                            Visible because you are a super teacher, but not linked as your students.
+                                                            Learners visible to super teachers, but not linked to your student list.
                                                         </p>
                                                     </div>
 
                                                     <span className="text-sm font-semibold text-stone-400">
-                                                        {otherFilteredUsers.length} user{otherFilteredUsers.length === 1 ? "" : "s"}
+                                                        {otherFilteredUsers.length} learner{otherFilteredUsers.length === 1 ? "" : "s"}
                                                     </span>
                                                 </button>
 
@@ -1377,15 +1386,15 @@ export default function TeacherStudentsPage() {
                                                             <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                                                                 <div>
                                                                     <h3 className="text-base font-black text-stone-900">
-                                                                        Unlinked accounts
+                                                                        Other learners
                                                                     </h3>
                                                                     <p className="text-sm text-stone-500">
-                                                                        Accounts visible to super teachers, but not connected to your teacher list.
+                                                                        Learners visible to super teachers, but not linked to your student list.
                                                                     </p>
                                                                 </div>
 
                                                                 <span className="text-sm font-semibold text-stone-400">
-                                                                    {otherFilteredUsers.length} user{otherFilteredUsers.length === 1 ? "" : "s"}
+                                                                    {otherFilteredUsers.length} learner{otherFilteredUsers.length === 1 ? "" : "s"}
                                                                 </span>
                                                             </div>
 

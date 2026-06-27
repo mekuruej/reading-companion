@@ -4,8 +4,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 import { ReadingFitSignalCard } from "./components/ReadingFitSignalCard";
 import { TeacherReadingFitEmptyState } from "./components/TeacherReadingFitEmptyState";
 import { TeacherReadingFitHeader } from "./components/TeacherReadingFitHeader";
@@ -132,6 +134,9 @@ function difficultyLabel(value: number | null) {
 }
 
 export default function TeacherReadingFitPage() {
+  const searchParams = useSearchParams();
+  const backLink = getTeacherBackLink(searchParams.get("from"));
+
   const [errorMessage, setErrorMessage] = useState("");
   const [items, setItems] = useState<ReadingFitItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -338,7 +343,7 @@ export default function TeacherReadingFitPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-        <TeacherReadingFitHeader />
+        <TeacherReadingFitHeader backHref={backLink.href} backLabel={backLink.label} />
         <TeacherReadingFitSummaryGrid summary={summary} />
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

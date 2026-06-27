@@ -4,8 +4,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getTeacherBackLink } from "../components/teacherBackLink";
 
 type WordFlag = {
   id: string;
@@ -20,6 +22,9 @@ type WordFlag = {
 };
 
 export default function TeacherWordsQueuePage() {
+  const searchParams = useSearchParams();
+  const backLink = getTeacherBackLink(searchParams.get("from"));
+
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [words, setWords] = useState<WordFlag[]>([]);
@@ -143,8 +148,8 @@ export default function TeacherWordsQueuePage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/teacher" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-        ← Teacher Home
+      <Link href={backLink.href} className="text-sm font-semibold text-stone-500 hover:text-stone-900">
+        {backLink.label}
       </Link>
 
       <section className="mt-4 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">

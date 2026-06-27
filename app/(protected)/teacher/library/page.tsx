@@ -316,7 +316,7 @@ export default function TeacherLibraryPage() {
             <div className="mb-3">
               <h2 className="text-xl font-black text-stone-900">My teaching books</h2>
               <p className="mt-1 text-sm text-stone-500">
-                Open a book to add lesson prep items or use follow-along support.
+                Open a book to review its info, add lesson prep items, or use follow-along support.
               </p>
             </div>
 
@@ -356,6 +356,9 @@ export default function TeacherLibraryPage() {
                               {book.author}
                             </p>
                           ) : null}
+                          <p className="mt-3 text-sm font-semibold text-stone-700">
+                            Open book info
+                          </p>
                         </div>
                       </div>
                     </Link>
