@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
@@ -82,6 +83,12 @@ export default function LoginPage() {
                 : undefined
             }
           />
+
+          <div className="mt-4 text-center text-sm text-slate-500">
+            <Link href="/login/forgot-password" className="font-semibold underline">
+              Forgot your password?
+            </Link>
+          </div>
         </div>
       </div>
     </main>

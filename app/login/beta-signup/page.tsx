@@ -47,6 +47,12 @@ export default function BetaSignupPage() {
                             Sign in here
                         </Link>
                     </div>
+
+                    <div className="mt-3 text-center text-xs text-slate-500">
+                        <Link href="/login/forgot-password" className="font-semibold underline">
+                            Forgot your password?
+                        </Link>
+                    </div>
                 </div>
             </div>
         </main>
