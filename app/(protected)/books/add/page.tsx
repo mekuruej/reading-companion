@@ -112,6 +112,7 @@ export default function AddBookPage() {
     const [bookSearchLoading, setBookSearchLoading] = useState(false);
     const [addingExistingBookId, setAddingExistingBookId] = useState<string | null>(null);
     const [error, setError] = useState("");
+    const [bookSearchError, setBookSearchError] = useState("");
     const [canRequestBook, setCanRequestBook] = useState(false);
     const [libraryNotice, setLibraryNotice] = useState<{
         message: string;
@@ -152,6 +153,7 @@ export default function AddBookPage() {
 
     async function handleLookup() {
         setError("");
+        setBookSearchError("");
         setBook(null);
         setCanRequestBook(false);
         setLibraryNotice(null);
@@ -229,38 +231,48 @@ export default function AddBookPage() {
         const query = bookSearch.trim();
         setLibraryNotice(null);
         setBookSearchResults([]);
+        setBookSearchError("");
+        setError("");
 
         if (!query) {
-            setError("Enter a title or author to search.");
+            setBookSearchError("Enter a title or author to search.");
             return;
         }
 
         setBookSearchLoading(true);
-        setError("");
+        setCanRequestBook(false);
 
         try {
-            const escaped = query.replaceAll("%", "\\%").replaceAll("_", "\\_");
-            const { data, error: searchError } = await supabase
-                .from("books")
-                .select(
-                    "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, needs_review"
-                )
-                .or(`title.ilike.%${escaped}%,author.ilike.%${escaped}%`)
-                .order("title", { ascending: true })
-                .limit(12);
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
 
-            if (searchError) throw searchError;
+            const response = await fetch(
+                `/api/books/search?q=${encodeURIComponent(query)}`,
+                {
+                    headers: session?.access_token
+                        ? { Authorization: `Bearer ${session.access_token}` }
+                        : {},
+                }
+            );
 
-            const results = (data ?? []) as BookSearchResult[];
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error ?? "Could not search books.");
+            }
+
+            const results = (data.books ?? []) as BookSearchResult[];
+
             setBookSearchResults(results);
 
             if (results.length === 0) {
                 setCanRequestBook(true);
-                setError("No matching book found. You can request this book for review.");
+                setBookSearchError("No matching book found. You can request this book for review.");
             }
         } catch (searchError) {
             console.error("Book title/author search failed:", searchError);
-            setError("Something went wrong while searching books.");
+            setBookSearchError("Something went wrong while searching books.");
         } finally {
             setBookSearchLoading(false);
         }
@@ -341,12 +353,12 @@ export default function AddBookPage() {
 
     async function handleAddExistingBook(bookId: string) {
         if (!currentUserId) {
-            setError("Sign in again before adding this book to your library.");
+            setBookSearchError("Sign in again before adding this book to your library.");
             return;
         }
 
         setAddingExistingBookId(bookId);
-        setError("");
+        setBookSearchError("");
         setLibraryNotice(null);
 
         try {
@@ -371,7 +383,7 @@ export default function AddBookPage() {
             const data = await response.json();
 
             if (!response.ok) {
-                setError(data.error ?? "I couldn’t add this book to your library.");
+                setBookSearchError(data.error ?? "I couldn’t add this book to your library.");
                 return;
             }
 
@@ -387,7 +399,7 @@ export default function AddBookPage() {
             router.push(currentUsername ? `/users/${currentUsername}/books` : "/books");
         } catch (addError) {
             console.error("Add existing book failed:", addError);
-            setError("Something went wrong while adding this book to your library.");
+            setBookSearchError("Something went wrong while adding this book to your library.");
         } finally {
             setAddingExistingBookId(null);
         }
@@ -397,14 +409,18 @@ export default function AddBookPage() {
         const cleanIsbn = (bookToRequest?.isbn13 ?? isbn).replace(/[\s-]/g, "").trim();
         const requestTitle = (bookToRequest?.title ?? bookSearch).trim();
         const requestAuthor = (bookToRequest?.author ?? "").trim();
+        const isFallbackRequest = !!bookToRequest || (!!bookSearch.trim() && !cleanIsbn);
+        const setRequestMessage = isFallbackRequest ? setBookSearchError : setError;
+
         if (!cleanIsbn && !requestTitle) {
-            setError("Search for a title or enter an ISBN before requesting review.");
+            setRequestMessage("Search for a title or enter an ISBN before requesting review.");
             return;
         }
 
         setRequestingBookId(bookToRequest?.id ?? null);
         setRequestLoading(true);
         setError("");
+        setBookSearchError("");
 
         try {
             const {
@@ -412,7 +428,7 @@ export default function AddBookPage() {
             } = await supabase.auth.getUser();
 
             if (!user) {
-                setError("You need to be signed in to request a book.");
+                setRequestMessage("You need to be signed in to request a book.");
                 return;
             }
 
@@ -434,7 +450,7 @@ export default function AddBookPage() {
 
             if (existingPendingRequest) {
                 setCanRequestBook(false);
-                setError("This book request is already waiting for review.");
+                setRequestMessage("This book request is already waiting for review.");
                 return;
             }
 
@@ -449,10 +465,14 @@ export default function AddBookPage() {
             if (requestError) throw requestError;
 
             setCanRequestBook(false);
-            setError("Book request sent. An admin can review this ISBN and add the book details.");
+            setRequestMessage(
+                isFallbackRequest
+                    ? "Book request sent. An admin can review the title and author details."
+                    : "Book request sent. An admin can review this ISBN and add the book details."
+            );
         } catch (requestError) {
             console.error("Book request failed:", requestError);
-            setError("Could not send this book request. Please ask an admin or teacher to add it.");
+            setRequestMessage("Could not send this book request. Please ask an admin or teacher to add it.");
         } finally {
             setRequestLoading(false);
             setRequestingBookId(null);
@@ -523,6 +543,7 @@ export default function AddBookPage() {
                         value={bookSearch}
                         onChange={(event) => {
                             setBookSearch(event.target.value);
+                            setBookSearchError("");
                             setLibraryNotice(null);
                         }}
                         onKeyDown={(event) => {
@@ -541,6 +562,23 @@ export default function AddBookPage() {
                         {bookSearchLoading ? "Searching..." : "Search"}
                     </button>
                 </div>
+
+                {bookSearchError ? (
+                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                        <p>{bookSearchError}</p>
+
+                        {canRequestBook && bookSearch.trim() ? (
+                            <button
+                                type="button"
+                                onClick={() => void handleRequestBook()}
+                                disabled={requestLoading}
+                                className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-xs font-black text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {requestLoading ? "Sending..." : "Request this book for review"}
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
 
                 {bookSearchResults.length > 0 ? (
                     <div className="mt-5 space-y-3">
@@ -631,16 +669,6 @@ export default function AddBookPage() {
                     </div>
                 ) : null}
 
-                {canRequestBook && bookSearch.trim() && bookSearchResults.length === 0 ? (
-                    <button
-                        type="button"
-                        onClick={() => void handleRequestBook()}
-                        disabled={requestLoading}
-                        className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-black text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
-                    >
-                        {requestLoading ? "Sending..." : "Request this book for review"}
-                    </button>
-                ) : null}
             </section>
 
             {book ? (
