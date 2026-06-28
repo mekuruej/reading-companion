@@ -7,7 +7,64 @@ const supabaseAdmin = createClient(
 );
 
 const BOOK_SELECT =
-  "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, needs_review";
+  "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count";
+
+function escapeLikePattern(value: string) {
+  return value.replaceAll("%", "\\%").replaceAll("_", "\\_");
+}
+
+function searchTermsForQuery(query: string) {
+  const compactQuery = query.replace(/[\s　]+/g, "").trim();
+  const particleParts = compactQuery
+    .split(/[のなとをにはがでへもや・]+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2);
+
+  return Array.from(new Set([query, ...particleParts])).filter(
+    (term) => term.trim().length >= 2
+  );
+}
+
+async function searchBooksByTerm(term: string) {
+  const escaped = escapeLikePattern(term.trim());
+
+  const [titleResponse, authorResponse, titleReadingResponse] = await Promise.all([
+    supabaseAdmin
+      .from("books")
+      .select(BOOK_SELECT)
+      .ilike("title", `%${escaped}%`)
+      .order("title", { ascending: true })
+      .limit(12),
+    supabaseAdmin
+      .from("books")
+      .select(BOOK_SELECT)
+      .ilike("author", `%${escaped}%`)
+      .order("title", { ascending: true })
+      .limit(12),
+    supabaseAdmin
+      .from("books")
+      .select(BOOK_SELECT)
+      .ilike("title_reading", `%${escaped}%`)
+      .order("title", { ascending: true })
+      .limit(12),
+  ]);
+
+  const errors = [
+    titleResponse.error,
+    authorResponse.error,
+    titleReadingResponse.error,
+  ].filter(Boolean);
+
+  if (errors.length > 0) {
+    throw errors[0];
+  }
+
+  return [
+    ...(titleResponse.data ?? []),
+    ...(authorResponse.data ?? []),
+    ...(titleReadingResponse.data ?? []),
+  ];
+}
 
 async function getAuthenticatedUser(req: Request) {
   const authHeader = req.headers.get("authorization") ?? "";
@@ -43,29 +100,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ books: [] });
   }
 
-  const escaped = query.replaceAll("%", "\\%").replaceAll("_", "\\_");
+  let foundBooks: any[] = [];
 
-  const [titleResponse, authorResponse] = await Promise.all([
-    supabaseAdmin
-      .from("books")
-      .select(BOOK_SELECT)
-      .ilike("title", `%${escaped}%`)
-      .order("title", { ascending: true })
-      .limit(12),
-    supabaseAdmin
-      .from("books")
-      .select(BOOK_SELECT)
-      .ilike("author", `%${escaped}%`)
-      .order("title", { ascending: true })
-      .limit(12),
-  ]);
-
-  if (titleResponse.error || authorResponse.error) {
-    console.error("Book search failed:", {
-      titleError: titleResponse.error,
-      authorError: authorResponse.error,
-    });
-
+  try {
+    const resultGroups = await Promise.all(
+      searchTermsForQuery(query).map((term) => searchBooksByTerm(term))
+    );
+    foundBooks = resultGroups.flat();
+  } catch (searchError) {
+    console.error("Book search failed:", searchError);
     return NextResponse.json(
       { error: "Could not search books." },
       { status: 500 }
@@ -73,7 +116,7 @@ export async function GET(request: Request) {
   }
 
   const booksById = new Map<string, any>();
-  for (const book of [...(titleResponse.data ?? []), ...(authorResponse.data ?? [])]) {
+  for (const book of foundBooks) {
     booksById.set(book.id, book);
   }
 

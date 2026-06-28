@@ -413,7 +413,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontSize="14"
                                 textAnchor="middle"
                             >
-                                Purple review
+                                Review
                             </text>
                             </g>
                         </a>

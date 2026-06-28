@@ -70,15 +70,13 @@ async function canAddToTargetUser({
 }
 
 function missingGlobalBookFields(book: any) {
-  if (book?.missing_info_cleared_at) return [];
-
   const missing: string[] = [];
   if (!String(book?.title ?? "").trim()) missing.push("title");
-  if (!book?.allow_missing_isbn && !String(book?.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!String(book?.isbn13 ?? "").trim()) missing.push("ISBN-13");
   if (!String(book?.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book?.book_type ?? "").trim()) missing.push("book type");
   if (!String(book?.author ?? "").trim()) missing.push("author");
-  if (!book?.allow_missing_publisher && !String(book?.publisher ?? "").trim()) missing.push("publisher");
+  if (!String(book?.publisher ?? "").trim()) missing.push("publisher");
   if (!String(book?.published_date ?? "").trim()) missing.push("published date");
   if (book?.page_count == null) missing.push("page count");
   return missing;
@@ -121,7 +119,7 @@ export async function POST(request: Request) {
   const { data: book, error: bookError } = await supabaseAdmin
     .from("books")
     .select(
-      "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, needs_review"
+      "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count"
     )
     .eq("id", bookId)
     .maybeSingle();
@@ -139,7 +137,7 @@ export async function POST(request: Request) {
   }
 
   const missingFields = missingGlobalBookFields(book);
-  if (book.needs_review || missingFields.length > 0) {
+  if (missingFields.length > 0) {
     return NextResponse.json(
       {
         error: "This book needs review before it can be added directly.",

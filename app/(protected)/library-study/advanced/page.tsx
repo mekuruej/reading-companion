@@ -5,7 +5,7 @@ const advancedTools = [
     {
         title: "Book Flashcards",
         href: "/library-study/book-flashcards",
-        eyebrow: "Start here",
+        eyebrow: "Targeted Study",
         className: "border-indigo-200 bg-indigo-50 text-indigo-950",
     },
     {
