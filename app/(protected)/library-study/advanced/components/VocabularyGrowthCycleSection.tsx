@@ -567,18 +567,6 @@ export default function VocabularyGrowthCycleSection() {
                         </a>
                     ))}
                 </div>
-
-                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                        Recognition Colors
-                    </p>
-                    <h3 className="mt-2 text-lg font-black">Ebb and flow</h3>
-                    <p className="mt-2 text-sm leading-6 opacity-85">
-                        Words are assigned colors depending on encounters and skill.
-                        These colors are constantly ebbing and flowing to match your
-                        relationship with that word.
-                    </p>
-                </div>
             </div>
         </details>
     );

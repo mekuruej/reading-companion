@@ -6,6 +6,14 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const BOOK_BASE_SELECT =
+  "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count";
+const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
+
+function isMissingColumnError(error: any) {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+
 async function getAuthenticatedUser(req: Request) {
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -70,16 +78,36 @@ async function canAddToTargetUser({
 }
 
 function missingGlobalBookFields(book: any) {
+  if (book?.missing_info_cleared_at) return [];
+
   const missing: string[] = [];
   if (!String(book?.title ?? "").trim()) missing.push("title");
-  if (!String(book?.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!book?.allow_missing_isbn && !String(book?.isbn13 ?? "").trim()) missing.push("ISBN-13");
   if (!String(book?.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book?.book_type ?? "").trim()) missing.push("book type");
   if (!String(book?.author ?? "").trim()) missing.push("author");
-  if (!String(book?.publisher ?? "").trim()) missing.push("publisher");
+  if (!book?.allow_missing_publisher && !String(book?.publisher ?? "").trim()) missing.push("publisher");
   if (!String(book?.published_date ?? "").trim()) missing.push("published date");
   if (book?.page_count == null) missing.push("page count");
   return missing;
+}
+
+async function getBookForDirectAdd(bookId: string) {
+  const fullResponse = await supabaseAdmin
+    .from("books")
+    .select(BOOK_REVIEW_SELECT)
+    .eq("id", bookId)
+    .maybeSingle();
+
+  if (!isMissingColumnError(fullResponse.error)) {
+    return fullResponse;
+  }
+
+  return supabaseAdmin
+    .from("books")
+    .select(BOOK_BASE_SELECT)
+    .eq("id", bookId)
+    .maybeSingle();
 }
 
 export async function POST(request: Request) {
@@ -116,13 +144,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: book, error: bookError } = await supabaseAdmin
-    .from("books")
-    .select(
-      "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count"
-    )
-    .eq("id", bookId)
-    .maybeSingle();
+  const { data: book, error: bookError } = await getBookForDirectAdd(bookId);
 
   if (bookError) {
     console.error("Error loading existing book:", bookError);

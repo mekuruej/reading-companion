@@ -50,12 +50,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <Link
-            href="/dashboard"
-            className="shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
-          >
-            Student Login
-          </Link>
+          <div aria-hidden="true" className="hidden sm:block" />
         </header>
 
         <section className="flex flex-1 flex-col justify-between gap-8 pt-8 sm:pt-10">
@@ -130,9 +125,8 @@ export default function HomePage() {
             </Link>
 
             {SHOW_STUDENT_APP_CARD ? (
-              <Link
-                href="/dashboard"
-                className="group flex min-h-[210px] flex-col justify-between rounded-[1.75rem] border border-slate-400 bg-slate-700 p-6 text-white shadow-md transition hover:-translate-y-1 hover:bg-slate-800 hover:shadow-xl"
+              <div
+                className="flex min-h-[210px] flex-col justify-between rounded-[1.75rem] border border-slate-400 bg-slate-700 p-6 text-white shadow-md"
               >
                 <div>
                   <p className="text-sm font-bold uppercase tracking-[0.25em] text-slate-200">
@@ -147,10 +141,10 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                <p className="mt-6 text-sm font-bold group-hover:underline">
-                  Student entrance →
+                <p className="mt-6 text-sm font-bold text-slate-200">
+                  Included for enrolled students and invited beta readers.
                 </p>
-              </Link>
+              </div>
             ) : null}
           </div>
         </section>

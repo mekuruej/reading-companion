@@ -5099,7 +5099,14 @@ export default function BookHubPage() {
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   const showBookHubFinishDnfButtons = !finishedAt && !dnfAt;
-  const showBookHubReflectionPrompt = !!finishedAt;
+  const hasReadingReflection =
+    !!myReview.trim() ||
+    !!readerAdvice.trim() ||
+    !!ratingOverall.trim() ||
+    !!ratingDifficulty.trim() ||
+    !!favoriteQuotes.trim() ||
+    !!memorableWords.trim();
+  const showBookHubReflectionPrompt = !!finishedAt && !hasReadingReflection;
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">

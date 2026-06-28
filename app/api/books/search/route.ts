@@ -6,8 +6,33 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const BOOK_SELECT =
+const BOOK_BASE_SELECT =
   "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count";
+const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
+
+function isMissingColumnError(error: any) {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+
+async function runBookSearch(column: string, escapedTerm: string) {
+  const fullResponse = await supabaseAdmin
+    .from("books")
+    .select(BOOK_REVIEW_SELECT)
+    .ilike(column, `%${escapedTerm}%`)
+    .order("title", { ascending: true })
+    .limit(12);
+
+  if (!isMissingColumnError(fullResponse.error)) {
+    return fullResponse;
+  }
+
+  return supabaseAdmin
+    .from("books")
+    .select(BOOK_BASE_SELECT)
+    .ilike(column, `%${escapedTerm}%`)
+    .order("title", { ascending: true })
+    .limit(12);
+}
 
 function escapeLikePattern(value: string) {
   return value.replaceAll("%", "\\%").replaceAll("_", "\\_");
@@ -28,32 +53,14 @@ function searchTermsForQuery(query: string) {
 async function searchBooksByTerm(term: string) {
   const escaped = escapeLikePattern(term.trim());
 
-  const [titleResponse, authorResponse, titleReadingResponse] = await Promise.all([
-    supabaseAdmin
-      .from("books")
-      .select(BOOK_SELECT)
-      .ilike("title", `%${escaped}%`)
-      .order("title", { ascending: true })
-      .limit(12),
-    supabaseAdmin
-      .from("books")
-      .select(BOOK_SELECT)
-      .ilike("author", `%${escaped}%`)
-      .order("title", { ascending: true })
-      .limit(12),
-    supabaseAdmin
-      .from("books")
-      .select(BOOK_SELECT)
-      .ilike("title_reading", `%${escaped}%`)
-      .order("title", { ascending: true })
-      .limit(12),
+  const [titleResponse, authorResponse] = await Promise.all([
+    runBookSearch("title", escaped),
+    runBookSearch("author", escaped),
   ]);
 
-  const errors = [
-    titleResponse.error,
-    authorResponse.error,
-    titleReadingResponse.error,
-  ].filter(Boolean);
+  const titleReadingResponse = await runBookSearch("title_reading", escaped);
+
+  const errors = [titleResponse.error, authorResponse.error].filter(Boolean);
 
   if (errors.length > 0) {
     throw errors[0];
@@ -62,7 +69,7 @@ async function searchBooksByTerm(term: string) {
   return [
     ...(titleResponse.data ?? []),
     ...(authorResponse.data ?? []),
-    ...(titleReadingResponse.data ?? []),
+    ...(titleReadingResponse.error ? [] : titleReadingResponse.data ?? []),
   ];
 }
 

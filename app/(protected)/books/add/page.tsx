@@ -256,13 +256,14 @@ export default function AddBookPage() {
                 }
             );
 
-            const data = await response.json();
+            const data = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error(data.error ?? "Could not search books.");
+                setBookSearchError(data?.error ?? "Could not search books.");
+                return;
             }
 
-            const results = (data.books ?? []) as BookSearchResult[];
+            const results = (data?.books ?? []) as BookSearchResult[];
 
             setBookSearchResults(results);
 

@@ -1118,13 +1118,19 @@ export default function TeacherAddBookPage() {
                                 <input
                                     type="checkbox"
                                     checked={allowMissingIsbn}
-                                    onChange={(event) => setAllowMissingIsbn(event.target.checked)}
+                                    onChange={(event) => {
+                                        setAllowMissingIsbn(event.target.checked);
+                                        if (event.target.checked) {
+                                            setIsbn("");
+                                            setIsbn13("");
+                                        }
+                                    }}
                                     className="mt-1 h-4 w-4"
                                 />
                                 <span>
-                                    No ISBN for this book
+                                    ISBN: none / not available
                                     <span className="mt-1 block text-xs font-normal leading-5 text-stone-600">
-                                        Missing ISBN-13 will not keep this book in the attention queue.
+                                        Use when the book genuinely has no ISBN. This clears ISBN fields and lets missing ISBN-13 pass review.
                                     </span>
                                 </span>
                             </label>
@@ -1133,21 +1139,42 @@ export default function TeacherAddBookPage() {
                                 <input
                                     type="checkbox"
                                     checked={allowMissingPublisher}
-                                    onChange={(event) => setAllowMissingPublisher(event.target.checked)}
+                                    onChange={(event) => {
+                                        setAllowMissingPublisher(event.target.checked);
+                                        if (event.target.checked) {
+                                            setPublisher("");
+                                            setPublisherReading("");
+                                            setPublisherEnglishName("");
+                                            setPublisherImageUrl("");
+                                            setSelectedPublisherId(null);
+                                            setRequireSharedPublisherRecord(false);
+                                        }
+                                    }}
                                     className="mt-1 h-4 w-4"
                                 />
                                 <span>
-                                    Publisher is unknown / not applicable
+                                    Publisher: none / not applicable
                                     <span className="mt-1 block text-xs font-normal leading-5 text-stone-600">
-                                        Missing publisher will not keep this book in the attention queue.
+                                        Use for web readers or small readers with no publisher. This clears publisher fields and lets missing publisher pass review.
                                     </span>
                                 </span>
                             </label>
                         </div>
 
-                        <p className="mt-3 text-xs font-semibold text-amber-900">
-                            Click Save in the book info editor to store these exceptions.
-                        </p>
+                        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-xs font-semibold text-amber-900">
+                                Save these choices after marking any category as none.
+                            </p>
+
+                            <button
+                                type="button"
+                                onClick={() => void saveBookInfo()}
+                                disabled={saving}
+                                className="rounded-2xl bg-amber-700 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {saving ? "Saving..." : "Save none settings"}
+                            </button>
+                        </div>
                     </div>
                 </TeacherBookInfoSection>
             ) : null}
