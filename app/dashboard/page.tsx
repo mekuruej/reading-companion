@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
@@ -378,6 +379,12 @@ export default function DashboardPage() {
                     : undefined
                 }
               />
+
+              <div className="mt-4 text-center text-sm text-slate-500">
+                <Link href="/login/forgot-password" className="font-semibold underline">
+                  Forgot your password?
+                </Link>
+              </div>
             </SignedOutLoginSection>
 
             <ReaderRolesSection />

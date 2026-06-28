@@ -44,7 +44,7 @@ export default function ReaderRolesSection() {
   return (
     <section className="w-full max-w-5xl">
       <div className="mb-4 text-center">
-        <h3 className="mt-1 text-2xl font-black text-slate-950">
+        <h3 className="mx-auto inline-block rounded-lg bg-white/90 px-4 py-2 text-2xl font-black text-slate-950 shadow-sm ring-1 ring-white/70 backdrop-blur">
           Every reading journey needs its characters.
         </h3>
 
