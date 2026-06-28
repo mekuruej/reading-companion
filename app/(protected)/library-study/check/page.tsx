@@ -927,6 +927,21 @@ function gatePromptClass(card: StudyCard | undefined) {
   return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
 }
 
+function definitionGateChipClass(card: StudyCard | null | undefined) {
+  const base =
+    "rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide shadow-sm sm:px-3 sm:py-1.5 sm:text-xs";
+
+  if (card?.activeGate === "readiness") {
+    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950`;
+  }
+
+  if (card?.activeGate === "meaning") {
+    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
+  }
+
+  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
+}
+
 function checkModeLabel(card: StudyCard | undefined) {
   if (!card) return "Ability Check";
   if (card.activeGate === "readiness") return "Readiness Check";
@@ -3174,6 +3189,7 @@ export default function LibraryStudyPage() {
     return (
       <AbilityCheckNoCardsState
         onBackToLibrary={() => router.push("/books")}
+        onContinueStudy={() => router.push("/library-study/advanced")}
       />
     );
   }
@@ -3194,6 +3210,7 @@ export default function LibraryStudyPage() {
           dueCount={allLevelsDueCount}
           minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
           onBackToLibrary={() => router.push("/books")}
+          onContinueStudy={() => router.push("/library-study/advanced")}
         />
       );
     }
@@ -3221,6 +3238,7 @@ export default function LibraryStudyPage() {
       <AbilityCheckNoDueState
         minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
         onBackToLibrary={() => router.push("/books")}
+        onContinueStudy={() => router.push("/library-study/advanced")}
       />
     );
   }
@@ -3329,10 +3347,7 @@ export default function LibraryStudyPage() {
       <AbilityCheckCompleteState
         endedEarly={endedEarly}
         onBackToLibrary={() => router.push("/books")}
-        onOpenPractice={() => router.push("/library-study/practice")}
-        onOpenPurpleReview={() => router.push("/library-study/practice?color=purple")}
-        onOpenWordSky={() => router.push("/library-study/word-sky")}
-        onOpenBookFlashcards={() => router.push("/library-study/book-flashcards")}
+        onContinueStudy={() => router.push("/library-study/advanced")}
       />
     );
   }
@@ -3410,7 +3425,7 @@ export default function LibraryStudyPage() {
             colorName={currentCard ? libraryStudyColorName(currentCard.colorStatus) : ""}
             showKatakanaBadge={currentCard ? isKatakanaOnly(currentCard.surface) : false}
             definitionText={definitionLabel(currentCard)}
-            definitionChipClassName={libraryStudyChipClass(currentCard?.colorStatus)}
+            definitionChipClassName={definitionGateChipClass(currentCard)}
             readChipClassName={
               currentCard ? libraryStudyChipClass(currentCard.colorStatus) : ""
             }

@@ -1,19 +1,13 @@
 type AbilityCheckCompleteStateProps = {
   endedEarly: boolean;
   onBackToLibrary: () => void;
-  onOpenPractice: () => void;
-  onOpenPurpleReview: () => void;
-  onOpenWordSky: () => void;
-  onOpenBookFlashcards: () => void;
+  onContinueStudy: () => void;
 };
 
 export default function AbilityCheckCompleteState({
   endedEarly,
   onBackToLibrary,
-  onOpenPractice,
-  onOpenPurpleReview,
-  onOpenWordSky,
-  onOpenBookFlashcards,
+  onContinueStudy,
 }: AbilityCheckCompleteStateProps) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-slate-100 p-6">
@@ -67,34 +61,10 @@ export default function AbilityCheckCompleteState({
 
           <button
             type="button"
-            onClick={onOpenPractice}
-            className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-          >
-            Open Library Review
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenPurpleReview}
-            className="rounded-2xl border border-violet-200 bg-violet-100 px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-50"
-          >
-            久しぶり Review
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenWordSky}
-            className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
-          >
-            Open Word Sky
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenBookFlashcards}
+            onClick={onContinueStudy}
             className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
           >
-            Open Book Flashcards
+            Continue Study
           </button>
         </div>
 

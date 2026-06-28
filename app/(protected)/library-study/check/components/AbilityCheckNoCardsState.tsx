@@ -1,9 +1,11 @@
 type AbilityCheckNoCardsStateProps = {
   onBackToLibrary: () => void;
+  onContinueStudy: () => void;
 };
 
 export default function AbilityCheckNoCardsState({
   onBackToLibrary,
+  onContinueStudy,
 }: AbilityCheckNoCardsStateProps) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
@@ -24,6 +26,14 @@ export default function AbilityCheckNoCardsState({
             className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             Back to Library
+          </button>
+
+          <button
+            type="button"
+            onClick={onContinueStudy}
+            className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+          >
+            Continue Study
           </button>
         </div>
       </div>

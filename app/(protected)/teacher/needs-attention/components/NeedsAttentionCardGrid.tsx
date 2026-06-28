@@ -33,6 +33,37 @@ type NeedsAttentionCardGridProps = {
   countsLoading: boolean;
 };
 
+function countBadgeClass(countKey?: AttentionCountKey) {
+  const base = "rounded-full border px-3 py-1 text-sm font-black shadow-sm";
+
+  if (
+    countKey === "books" ||
+    countKey === "bookRequests" ||
+    countKey === "bookFlags" ||
+    countKey === "missingBooks"
+  ) {
+    return `${base} border-amber-200 bg-amber-50 text-amber-900`;
+  }
+
+  if (countKey === "wordReports") {
+    return `${base} border-rose-200 bg-rose-50 text-rose-900`;
+  }
+
+  if (countKey === "kanji") {
+    return `${base} border-emerald-200 bg-emerald-50 text-emerald-900`;
+  }
+
+  if (countKey === "ratingFlags" || countKey === "teacherRatings" || countKey === "readingFit") {
+    return `${base} border-violet-200 bg-violet-50 text-violet-900`;
+  }
+
+  return `${base} border-stone-200 bg-stone-50 text-stone-900`;
+}
+
+function actionCountBadgeClass(countKey?: AttentionCountKey) {
+  return countBadgeClass(countKey).replace("px-3 py-1 text-sm", "px-2 py-0.5 text-xs");
+}
+
 export function NeedsAttentionCardGrid({
   cards,
   counts,
@@ -57,7 +88,7 @@ export function NeedsAttentionCardGrid({
               </p>
 
               {card.countKey ? (
-                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-sm font-black text-stone-900">
+                <span className={countBadgeClass(card.countKey)}>
                   {countsLoading ? "..." : count}
                 </span>
               ) : null}
@@ -77,7 +108,7 @@ export function NeedsAttentionCardGrid({
                   >
                     <span>{action.label}</span>
                     {action.countKey ? (
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs text-stone-600">
+                      <span className={actionCountBadgeClass(action.countKey)}>
                         {countsLoading ? "..." : counts[action.countKey]}
                       </span>
                     ) : null}

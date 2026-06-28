@@ -2,12 +2,14 @@ type AbilityCheckRestingStateProps = {
   dueCount: number;
   minDueCards: number;
   onBackToLibrary: () => void;
+  onContinueStudy: () => void;
 };
 
 export default function AbilityCheckRestingState({
   dueCount,
   minDueCards,
   onBackToLibrary,
+  onContinueStudy,
 }: AbilityCheckRestingStateProps) {
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-8">
@@ -37,6 +39,14 @@ export default function AbilityCheckRestingState({
             className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             Back to Library
+          </button>
+
+          <button
+            type="button"
+            onClick={onContinueStudy}
+            className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+          >
+            Continue Study
           </button>
         </div>
       </div>
