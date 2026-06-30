@@ -29,10 +29,16 @@ const baseUpkeepCards: UpkeepCard[] = [
     description: "Create global vocabulary, people, places, cultural references, and support entries.",
   },
   {
-    title: "Global Kanji Entry",
-    href: "/teacher/kanji?from=site-upkeep",
+    title: "Fast-pass Kanji Reading",
+    href: "/teacher/kanji/fast-pass?from=site-upkeep",
     eyebrow: "Kanji",
-    description: "Open global kanji reading data tools and kanji-map maintenance.",
+    description: "Find an existing global vocabulary word and fill its kanji reading map.",
+  },
+  {
+    title: "Radical Upkeep",
+    href: "/teacher/kanji/radicals?from=site-upkeep",
+    eyebrow: "Kanji",
+    description: "Add main radicals, other visible components, and stroke counts for kanji study data.",
   },
   {
     title: "Testing Tools",

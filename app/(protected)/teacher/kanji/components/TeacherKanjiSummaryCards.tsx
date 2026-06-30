@@ -1,8 +1,6 @@
 type TeacherKanjiSummary = {
-  total: number;
+  active: number;
   flagged: number;
-  needsReading: number;
-  needsWork: number;
   complete: number;
   excluded: number;
 };
@@ -15,11 +13,11 @@ export default function TeacherKanjiSummaryCards({
   summary,
 }: TeacherKanjiSummaryCardsProps) {
   return (
-    <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+    <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
-        <p className="text-xs text-indigo-700">Total tracked</p>
+        <p className="text-xs text-indigo-700">Needs attention</p>
         <p className="mt-1 text-2xl font-black text-indigo-950">
-          {summary.total}
+          {summary.active}
         </p>
       </div>
 
@@ -27,20 +25,6 @@ export default function TeacherKanjiSummaryCards({
         <p className="text-xs text-red-700">Flagged</p>
         <p className="mt-1 text-2xl font-black text-red-900">
           {summary.flagged}
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-        <p className="text-xs text-sky-700">Needs reading</p>
-        <p className="mt-1 text-2xl font-black text-sky-950">
-          {summary.needsReading}
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-        <p className="text-xs text-amber-700">Needs work</p>
-        <p className="mt-1 text-2xl font-black text-amber-900">
-          {summary.needsWork}
         </p>
       </div>
 

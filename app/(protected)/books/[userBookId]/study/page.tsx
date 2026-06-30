@@ -1695,6 +1695,12 @@ export default function BookFlashcardsPage() {
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const isTypingTarget =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
       if (typeModeEnabled) {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -1727,6 +1733,18 @@ export default function BookFlashcardsPage() {
         }
 
         return;
+      }
+
+      if (!isTypingTarget && isMultipleChoiceMode && !mcAnswered) {
+        const optionIndex = Number(e.key) - 1;
+        if (Number.isInteger(optionIndex) && optionIndex >= 0 && optionIndex < 4) {
+          const option = mcOptions[optionIndex];
+          if (option) {
+            e.preventDefault();
+            handleMcAnswer(option);
+            return;
+          }
+        }
       }
 
       if (e.key === "Enter" && isMultipleChoiceMode && mcAnswered && !mcWasCorrect) {
@@ -1762,6 +1780,13 @@ export default function BookFlashcardsPage() {
     steps,
     readyForNextCard,
     lastTypedResult,
+    isMultipleChoiceMode,
+    mcAnswered,
+    mcWasCorrect,
+    mcOptions,
+    mcCorrectAnswer,
+    card,
+    studySet,
   ]);
 
   if (loading) {

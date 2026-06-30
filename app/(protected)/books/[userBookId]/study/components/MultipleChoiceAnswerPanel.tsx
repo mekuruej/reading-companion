@@ -18,6 +18,10 @@ type MultipleChoiceAnswerPanelProps = {
   onCheckCorrection: () => void;
 };
 
+function containsJapanese(value: string) {
+  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value);
+}
+
 export default function MultipleChoiceAnswerPanel({
   answerPrompt,
   options,
@@ -42,10 +46,11 @@ export default function MultipleChoiceAnswerPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        {options.map((option) => {
+        {options.map((option, index) => {
           const isSelected = selected === option;
           const isCorrect = answered && isOptionCorrect(option);
           const isWrongSelected = answered && isSelected && !isCorrect;
+          const hasJapanese = containsJapanese(option);
 
           return (
             <button
@@ -57,7 +62,8 @@ export default function MultipleChoiceAnswerPanel({
               }}
               disabled={answered}
               className={[
-                "rounded-xl border px-3 py-3 text-sm font-medium transition",
+                "rounded-xl border px-3 py-3 font-medium leading-tight transition",
+                hasJapanese ? "text-2xl sm:text-3xl" : "text-sm sm:text-base",
                 isCorrect
                   ? "border-green-600 bg-green-50 text-green-800"
                   : isWrongSelected
@@ -66,6 +72,9 @@ export default function MultipleChoiceAnswerPanel({
                 answered ? "cursor-default" : "",
               ].join(" ")}
             >
+              <span className="mr-2 align-middle text-sm font-semibold text-slate-500">
+                {index + 1}.
+              </span>
               {option}
             </button>
           );

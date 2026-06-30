@@ -820,7 +820,7 @@ function LibraryPracticePanel({
         <button
           type="button"
           onClick={onAdvance}
-          className="relative flex min-h-[28rem] w-full max-w-3xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[32rem]"
+          className="relative flex min-h-[24rem] w-full max-w-3xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[28rem]"
         >
           <LibraryPracticeCardBadges
             modeLabel="Review"
@@ -863,7 +863,7 @@ function LibraryPracticePanel({
         </button>
       ) : (
 
-        <div className="relative flex min-h-[28rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl sm:min-h-[32rem]">
+        <div className="relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl sm:min-h-[28rem]">
           <LibraryPracticeCardBadges
             modeLabel="Typing Practice"
             jlpt={card.jlpt}

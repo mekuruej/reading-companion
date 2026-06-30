@@ -66,6 +66,7 @@ type KanjiMapRow = {
 type QuizCard = {
   key: string;
   kanjiMapId: number;
+  kanjiPosition: number | null;
   flaggedForReview: boolean;
   kanji: string;
   reading: string;
@@ -609,6 +610,71 @@ function splitKunyomiPromptReading(sourceReading: string | null, realizedReading
   };
 }
 
+function splitKunyomiPromptReadingByPosition(card: QuizCard) {
+  const reading = kataToHira(card.sourceReading ?? "").trim();
+  const target = kataToHira(card.reading ?? "").trim();
+  if (!reading || !target) return splitKunyomiPromptReading(card.sourceReading, card.reading);
+
+  const sourceChars = Array.from(card.sourceWord);
+  const readingChars = Array.from(reading);
+  const targetChars = Array.from(target);
+  const position = card.kanjiPosition;
+
+  if (position == null || position < 0) {
+    return splitKunyomiPromptReading(card.sourceReading, card.reading);
+  }
+
+  let sourceCharIndex = -1;
+  let seenKanji = 0;
+  for (const [index, char] of sourceChars.entries()) {
+    if (!/\p{Script=Han}/u.test(char)) continue;
+    if (seenKanji === position) {
+      sourceCharIndex = index;
+      break;
+    }
+    seenKanji += 1;
+  }
+
+  if (sourceCharIndex === -1) {
+    return splitKunyomiPromptReading(card.sourceReading, card.reading);
+  }
+
+  let readingOffset = 0;
+  for (let index = 0; index < sourceCharIndex; index += 1) {
+    const char = sourceChars[index];
+    if (/\p{Script=Hiragana}/u.test(char) || /\p{Script=Katakana}/u.test(char)) {
+      readingOffset += Array.from(kataToHira(char)).length;
+      continue;
+    }
+
+    readingOffset += 1;
+  }
+
+  const normalizedReading = normalizeReading(reading);
+  const normalizedTarget = normalizeReading(target);
+  const normalizedSlice = normalizeReading(readingChars.slice(readingOffset).join(""));
+
+  if (!normalizedSlice.startsWith(normalizedTarget)) {
+    const fallbackIndex = normalizedReading.indexOf(normalizedTarget);
+    if (fallbackIndex >= 0) readingOffset = Array.from(reading.slice(0, fallbackIndex)).length;
+  }
+
+  const endOffset = Math.min(readingChars.length, readingOffset + targetChars.length);
+
+  return {
+    before: readingChars.slice(0, readingOffset).join(""),
+    strong: readingChars.slice(readingOffset, endOffset).join(""),
+    ghost: readingChars.slice(endOffset).join(""),
+  };
+}
+
+function kunyomiToKanjiPromptForCard(card: QuizCard) {
+  const splitReading = splitKunyomiPromptReadingByPosition(card);
+  if (!splitReading.strong && !splitReading.ghost) return null;
+
+  return splitReading;
+}
+
 function selectOneCardPerKanji(cards: QuizCard[]) {
   const byKanji = new Map<string, QuizCard>();
 
@@ -842,6 +908,7 @@ export default function KanjiReadingStudyPage() {
           return [{
             key: `global-${km.id}`,
             kanjiMapId: km.id,
+            kanjiPosition: km.kanji_position,
             flaggedForReview: !!km.flagged_for_review,
             kanji: km.kanji,
             reading,
@@ -1440,6 +1507,9 @@ export default function KanjiReadingStudyPage() {
               <KanjiStudyPrompt
                 label={promptLabelForStudyMode(studyMode)}
                 mainText={promptTextForStudyMode(card, studyMode)}
+                readingPrompt={
+                  studyMode === "kunyomiToKanji" ? kunyomiToKanjiPromptForCard(card) ?? undefined : undefined
+                }
                 contextWord={cardQuestionMode === "readingChoice" ? card.sourceWord : undefined}
                 targetKanji={cardQuestionMode === "readingChoice" ? card.kanji : undefined}
               />

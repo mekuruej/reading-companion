@@ -5,7 +5,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
-import LibraryColorBadge from "@/components/LibraryColorBadge";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import {
@@ -20,14 +19,7 @@ import BookVocabContextCard from "./components/BookVocabContextCard";
 import BookVocabFilterPanel from "./components/BookVocabFilterPanel";
 import BookVocabCsvExportPanel from "./components/BookVocabCsvExportPanel";
 import BookVocabTableShell from "./components/BookVocabTableShell";
-import BookVocabActionsCell from "./components/BookVocabActionsCell";
 import BookVocabEditModalShell from "./components/BookVocabEditModalShell";
-import BookVocabKatakanaBadge from "./components/BookVocabKatakanaBadge";
-import BookVocabLibraryStageCell from "./components/BookVocabLibraryStageCell";
-import BookVocabLibraryStudyStatusBadge from "./components/BookVocabLibraryStudyStatusBadge";
-import BookVocabRepeatCountCell from "./components/BookVocabRepeatCountCell";
-import BookVocabChapterCell from "./components/BookVocabChapterCell";
-import BookVocabPageCell from "./components/BookVocabPageCell";
 import BookVocabLoadingState from "./components/BookVocabLoadingState";
 import BookVocabSignInState from "./components/BookVocabSignInState";
 import BookVocabEditFormBody from "./components/BookVocabEditFormBody";
@@ -959,14 +951,16 @@ export default function BookWordsPage() {
     });
   }, [filtered]);
 
-  function handleExportVocabCsv(exportChapter: string) {
+  function handleExportVocabCsv(exportChapter: string, exportJlpt: string) {
     const exportWords = words.filter((word) => {
-      if (exportChapter === "all") return true;
-      return chapterKey(word) === exportChapter;
+      const chapterMatches = exportChapter === "all" || chapterKey(word) === exportChapter;
+      const jlptMatches = exportJlpt === "all" || normalizeJlpt(word.jlpt) === exportJlpt;
+
+      return chapterMatches && jlptMatches;
     });
 
     if (exportWords.length === 0) {
-      window.alert("There are no words to export for that chapter yet.");
+      window.alert("There are no words to export for those filters yet.");
       return;
     }
 
@@ -991,6 +985,8 @@ export default function BookWordsPage() {
 
     const filename = `${safeCsvFilenamePart(bookTitle)}-${safeCsvFilenamePart(
       selectedChapterLabel
+    )}-${safeCsvFilenamePart(
+      exportJlpt === "all" ? "all-jlpt" : exportJlpt
     )}-vocab.csv`;
 
     downloadCsv(filename, rows);
@@ -1160,23 +1156,7 @@ export default function BookWordsPage() {
 
       <BookVocabTableShell headerStickyStyle={headerStickyStyle}>
         {filteredSorted.map((w) => {
-          const rep = repeatCounts.get(repeatKey(w)) ?? 0;
-          const identityKey = studyIdentityKey(w.surface, w.reading);
-          const globalEncounterCount = globalEncounterCounts[identityKey] ?? rep;
-          const progress = libraryProgressByKey[identityKey];
-          const sharedColorInfo =
-            libraryColorByWordKey[makeLibraryStudyColorKey(w.surface, w.reading)] ?? null;
           const orderPosition = wordOrderPosition(w);
-
-          const status = computeLibraryStudyColorStatus({
-            encounterCount: globalEncounterCount,
-            settings: learningSettings,
-            readingGate: progress?.reading_gate_status ?? "not_started",
-            meaningGate: progress?.meaning_gate_status ?? "not_started",
-            heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-            heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-            mastered: progress?.mastered ?? false,
-          });
 
           return (
             <BookVocabRow
@@ -1185,14 +1165,6 @@ export default function BookWordsPage() {
               surface={w.surface}
               reading={w.reading}
               meaning={w.meaning}
-              meaningChoiceIndex={w.meaning_choice_index}
-              pageNumber={w.page_number}
-              repeatCount={rep}
-              chapter={chapterDisplayParts(w)}
-              sharedColorInfo={sharedColorInfo}
-              status={status}
-              showBadgeNumbers={learningSettings.show_badge_numbers}
-              encounterCount={globalEncounterCount}
               canMoveUp={orderPosition.canMoveUp}
               canMoveDown={orderPosition.canMoveDown}
               onMoveUp={async () => {
@@ -1212,10 +1184,6 @@ export default function BookWordsPage() {
               onOpen={() =>
                 router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
               }
-              onEdit={() => openEdit(w)}
-              onHide={() => hideWord(w)}
-              onUnhide={() => unhideWord(w)}
-              onDelete={() => deleteWord(w)}
             />
           );
         })}

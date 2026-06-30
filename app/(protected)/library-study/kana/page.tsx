@@ -451,6 +451,30 @@ export default function KanaStudyPage() {
         }
     }
 
+    useEffect(() => {
+        function handleKey(event: KeyboardEvent) {
+            const target = event.target as HTMLElement | null;
+            const isTypingTarget =
+                target?.tagName === "INPUT" ||
+                target?.tagName === "TEXTAREA" ||
+                target?.isContentEditable;
+
+            if (isTypingTarget || !card || isComplete || selectedChoice !== null) return;
+
+            const optionIndex = Number(event.key) - 1;
+            if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= 4) return;
+
+            const choice = card.choices[optionIndex];
+            if (!choice) return;
+
+            event.preventDefault();
+            handleChoice(choice);
+        }
+
+        window.addEventListener("keydown", handleKey);
+        return () => window.removeEventListener("keydown", handleKey);
+    }, [card, isComplete, selectedChoice]);
+
     function handleStudySetAgain() {
         resetDeck(studyMode, activeKanaPool);
     }
@@ -506,7 +530,7 @@ export default function KanaStudyPage() {
                         />
                     </div>
 
-                    <section className="relative flex min-h-[28rem] w-full max-w-3xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl sm:min-h-[32rem]">
+                    <section className="relative flex min-h-[24rem] w-full max-w-3xl select-none items-center justify-center rounded-2xl border border-slate-500 bg-white p-8 text-center shadow-2xl sm:min-h-[28rem]">
                         <div className="flex w-full flex-col items-center justify-center gap-6">
                             <KanaStudyPrompt
                                 promptLabel={card.promptLabel}
@@ -534,6 +558,9 @@ export default function KanaStudyPage() {
                                             disabled={isAnswered}
                                             className={`w-full rounded border px-4 py-4 text-2xl font-bold transition disabled:cursor-default sm:text-3xl ${choiceClass}`}
                                         >
+                                            <span className="mr-2 align-middle text-sm font-semibold text-slate-500">
+                                                {index + 1}.
+                                            </span>
                                             {choice}
                                         </button>
                                     );

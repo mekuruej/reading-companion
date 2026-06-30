@@ -16,7 +16,7 @@ export default function BookVocabTableShell({
 }: BookVocabTableShellProps) {
   return (
     <div className="relative overflow-x-auto overflow-y-visible rounded border bg-white">
-      <table className="w-full border-separate border-spacing-0 text-sm">
+      <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
         <BookVocabTableHeader headerStickyStyle={headerStickyStyle} />
 
         <tbody>{children}</tbody>

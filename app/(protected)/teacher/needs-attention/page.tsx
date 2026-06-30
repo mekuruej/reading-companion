@@ -15,6 +15,7 @@ import {
   NeedsAttentionAccessPanel,
   NeedsAttentionLoadingPanel,
 } from "./components/NeedsAttentionStatePanels";
+import { loadActiveKanjiQueueSummary } from "@/lib/teacherKanjiQueueCount";
 
 type GlobalBookRow = {
   title: string | null;
@@ -386,80 +387,11 @@ export default function TeacherNeedsAttentionPage() {
             (book) => missingGlobalBookFields(book).length > 0
           ).length;
 
-          const { data: kanjiUserBooks } = await supabase
-            .from("user_books")
-            .select("id")
-            .in("user_id", studentIds);
-
-          const kanjiUserBookIds = ((kanjiUserBooks ?? []) as { id: string }[])
-            .map((book) => book.id)
-            .filter(Boolean);
-
-          let activeKanjiQueueCount = 0;
-
-          if (kanjiUserBookIds.length > 0) {
-            const { data: kanjiWordRows } = await supabase
-              .from("user_book_words")
-              .select("id, user_book_id, surface, vocabulary_cache_id, ignore_kanji_enrichment")
-              .in("user_book_id", kanjiUserBookIds)
-              .eq("is_manual_override", false)
-              .gte("created_at", KANJI_ENRICHMENT_TEST_START)
-              .limit(5000);
-
-            const kanjiWords = ((kanjiWordRows ?? []) as KanjiCountWordRow[]).filter((word) =>
-              hasKanji(word.surface ?? "")
-            );
-
-            const cacheIds = Array.from(
-              new Set(
-                kanjiWords
-                  .map((word) =>
-                    word.vocabulary_cache_id == null ? null : Number(word.vocabulary_cache_id)
-                  )
-                  .filter((id): id is number => Number.isFinite(id))
-              )
-            );
-
-            const mapRowsByCacheId = new Map<string, KanjiCountMapRow[]>();
-
-            if (cacheIds.length > 0) {
-              const chunkSize = 100;
-
-              for (let i = 0; i < cacheIds.length; i += chunkSize) {
-                const cacheIdChunk = cacheIds.slice(i, i + chunkSize);
-
-                const { data: mapRows } = await supabase
-                  .from("vocabulary_kanji_map")
-                  .select(
-                    "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, excluded_from_kanji_practice"
-                  )
-                  .in("vocabulary_cache_id", cacheIdChunk)
-                  .limit(5000);
-
-                for (const row of (mapRows ?? []) as KanjiCountMapRow[]) {
-                  const cacheKey = String(row.vocabulary_cache_id);
-                  const existing = mapRowsByCacheId.get(cacheKey) ?? [];
-                  existing.push(row);
-                  mapRowsByCacheId.set(cacheKey, existing);
-                }
-              }
-            }
-
-            activeKanjiQueueCount = kanjiWords.filter((word) => {
-              const surface = String(word.surface ?? "");
-              const mapRows =
-                word.vocabulary_cache_id != null
-                  ? mapRowsByCacheId.get(String(Number(word.vocabulary_cache_id))) ?? []
-                  : [];
-
-              return isActiveKanjiQueueStatus({
-                vocabularyCacheId: word.vocabulary_cache_id,
-                surface,
-                mapRows,
-                ignored: word.ignore_kanji_enrichment,
-              });
-            }).length;
-          }
+          const activeKanjiQueue = await loadActiveKanjiQueueSummary({
+            supabase,
+            isSuperTeacher,
+            studentIds,
+          });
 
           nextCounts = {
             ...nextCounts,
@@ -470,7 +402,7 @@ export default function TeacherNeedsAttentionPage() {
             bookRequests: pendingBookRequestCount ?? 0,
             bookFlags: manualBookFlagCount ?? 0,
             missingBooks: missingBookInfoCount,
-            kanji: activeKanjiQueueCount,
+            kanji: activeKanjiQueue.count,
             wordReports: flaggedWordReportCount ?? 0,
           };
         }

@@ -17,7 +17,7 @@ export default function StudyFlashcardShell({
       className="
         relative
         flex
-        min-h-[28rem] w-full max-w-3xl sm:min-h-[32rem]
+        min-h-[24rem] w-full max-w-3xl sm:min-h-[28rem]
         cursor-pointer select-none
         items-center justify-center
         rounded-2xl border border-slate-500

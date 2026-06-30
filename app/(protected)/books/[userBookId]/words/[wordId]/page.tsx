@@ -12,11 +12,15 @@ import WordDetailNeedsSignInState from "./components/WordDetailNeedsSignInState"
 import WordDetailHeader from "./components/WordDetailHeader";
 import WordDetailFooterActions from "./components/WordDetailFooterActions";
 import WordDetailReportIssueLink from "./components/WordDetailReportIssueLink";
-import WordDetailTeacherPhraseSection from "./components/WordDetailTeacherPhraseSection";
-import WordKanjiInfoPanel from "./components/WordKanjiInfoPanel";
-import RelatedKanjiWordsPanel from "./components/RelatedKanjiWordsPanel";
 import WordSeenInSection from "./components/WordSeenInSection";
 import WordDictionaryInfoSection from "./components/WordDictionaryInfoSection";
+import BookVocabEditModalShell from "../components/BookVocabEditModalShell";
+import BookVocabEditFormBody from "../components/BookVocabEditFormBody";
+import {
+  fetchLibraryStudyColorInfoByWord,
+  makeLibraryStudyColorKey,
+  type LibraryStudyWordColorInfo,
+} from "@/lib/libraryStudyColorLookup";
 
 // -------------------------------------------------------------
 // Types
@@ -27,6 +31,7 @@ type WordRow = {
   surface: string;
   reading: string | null;
   meaning: string | null;
+  other_definition: string | null;
   jlpt: string | null;
   is_common: boolean | null;
   page_number: number | null;
@@ -35,6 +40,8 @@ type WordRow = {
   created_at: string;
   meaning_choices: any | null;
   meaning_choice_index: number | null;
+  hidden: boolean | null;
+  hide_kanji_in_reading_support?: boolean | null;
 };
 
 type SeenInstance = {
@@ -325,13 +332,176 @@ export default function WordDetailPage() {
   const [word, setWord] = useState<WordRow | null>(null);
   const [meaningChoices, setMeaningChoices] = useState<string[]>([]);
 
+  const [editing, setEditing] = useState<WordRow | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
+  const [editSurface, setEditSurface] = useState("");
+  const [editReading, setEditReading] = useState("");
+  const [editMeaning, setEditMeaning] = useState("");
+  const [editJlpt, setEditJlpt] = useState("");
+  const [editPage, setEditPage] = useState<string>("");
+  const [editChapterNum, setEditChapterNum] = useState<string>("");
+  const [editChapterName, setEditChapterName] = useState("");
+  const [editMeaningChoices, setEditMeaningChoices] = useState<string[]>([]);
+  const [editMeaningChoiceIndex, setEditMeaningChoiceIndex] = useState<number | null>(0);
+  const [editHideKanjiInReadingSupport, setEditHideKanjiInReadingSupport] = useState(false);
+
   const [repeatsInThisBook, setRepeatsInThisBook] = useState<number>(0);
   const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
   const [totalLookupCount, setTotalLookupCount] = useState<number>(0);
+  const [libraryColorInfo, setLibraryColorInfo] = useState<LibraryStudyWordColorInfo | null>(null);
 
   const [kanjiMeta, setKanjiMeta] = useState<KanjiMeta[]>([]);
   const [kanjiGroups, setKanjiGroups] = useState<KanjiGroup[]>([]);
   const [dictionaryLoading, setDictionaryLoading] = useState(false);
+
+  function openEdit(w: WordRow) {
+    setEditErr(null);
+    setEditing(w);
+    setEditSurface(w.surface ?? "");
+    setEditReading(w.reading ?? "");
+    setEditMeaning(w.meaning ?? "");
+    setEditJlpt(w.jlpt ?? "");
+    setEditPage(w.page_number != null ? String(w.page_number) : "");
+    setEditChapterNum(w.chapter_number != null ? String(w.chapter_number) : "");
+    setEditChapterName(w.chapter_name ?? "");
+    setEditHideKanjiInReadingSupport(!!w.hide_kanji_in_reading_support);
+
+    const choices = asStringArray(w.meaning_choices);
+    const rawIdx =
+      w.meaning_choice_index == null
+        ? null
+        : Number.isFinite(w.meaning_choice_index as any)
+          ? (w.meaning_choice_index as number)
+          : 0;
+    const idx =
+      rawIdx == null
+        ? null
+        : Math.max(0, choices.length ? Math.min(rawIdx, choices.length - 1) : rawIdx);
+
+    setEditMeaningChoices(choices);
+    setEditMeaningChoiceIndex(idx);
+    setEditMeaning(idx != null && choices.length && choices[idx] ? choices[idx] : w.meaning ?? "");
+  }
+
+  function closeEdit() {
+    setEditing(null);
+    setEditErr(null);
+    setEditSaving(false);
+  }
+
+  function parseNullableInt(s: string): number | null {
+    const t = (s ?? "").trim();
+    if (!t) return null;
+    const n = Number(t);
+    if (!Number.isFinite(n)) return null;
+    return Math.trunc(n);
+  }
+
+  function changeDefinition(newValue: string) {
+    const choices = editMeaningChoices ?? [];
+
+    if (newValue === "other") {
+      setEditMeaningChoiceIndex(null);
+      setEditMeaning("");
+      return;
+    }
+
+    const safe = Math.max(0, Number(newValue));
+    setEditMeaningChoiceIndex(safe);
+
+    if (choices.length) {
+      const clamped = Math.min(safe, choices.length - 1);
+      setEditMeaning(choices[clamped] ?? "");
+    }
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+
+    setEditSaving(true);
+    setEditErr(null);
+
+    const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
+    const patch: any = {
+      surface: editSurface.trim(),
+      reading: editReading.trim() ? editReading.trim() : null,
+      meaning: editMeaning.trim() ? editMeaning.trim() : null,
+      other_definition: null,
+      jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
+      page_number: parseNullableInt(editPage),
+      chapter_number: parseNullableInt(editChapterNum),
+      chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
+      hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
+    };
+
+    if (editMeaningChoiceIndex == null) {
+      patch.meaning_choices = null;
+      patch.meaning_choice_index = null;
+    } else {
+      patch.meaning_choice_index = editMeaningChoiceIndex;
+    }
+
+    if (hasChoices && editMeaningChoiceIndex != null) {
+      const chosen = editMeaningChoices[editMeaningChoiceIndex] ?? "";
+      if (chosen) patch.meaning = chosen;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("user_book_words")
+        .update(patch)
+        .eq("id", editing.id)
+        .eq("user_book_id", userBookId);
+
+      if (error) throw error;
+
+      const updatedWord = { ...editing, ...patch } as WordRow;
+      setWord(updatedWord);
+      setMeaningChoices(asStringArray(updatedWord.meaning_choices));
+      closeEdit();
+    } catch (e: any) {
+      setEditErr(e?.message ?? "Failed to save changes");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function hideWord(nextHidden: boolean) {
+    if (!word) return;
+
+    try {
+      const { error } = await supabase
+        .from("user_book_words")
+        .update({ hidden: nextHidden })
+        .eq("id", word.id)
+        .eq("user_book_id", userBookId);
+
+      if (error) throw error;
+      setWord({ ...word, hidden: nextHidden });
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to update word visibility");
+    }
+  }
+
+  async function deleteWord() {
+    if (!word) return;
+    const ok = window.confirm(`Delete "${word.surface}"? This cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      const { error } = await supabase
+        .from("user_book_words")
+        .delete()
+        .eq("id", word.id)
+        .eq("user_book_id", userBookId);
+
+      if (error) throw error;
+      router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to delete word");
+    }
+  }
 
   async function loadAll() {
     setLoading(true);
@@ -425,6 +595,7 @@ export default function WordDetailPage() {
           surface,
           reading,
           meaning,
+          other_definition,
           jlpt,
           is_common,
           page_number,
@@ -432,7 +603,9 @@ export default function WordDetailPage() {
           chapter_name,
           created_at,
           meaning_choices,
-          meaning_choice_index
+          meaning_choice_index,
+          hidden,
+          hide_kanji_in_reading_support
         `
         )
         .eq("id", wordId)
@@ -527,6 +700,17 @@ export default function WordDetailPage() {
     }
   }
 
+  async function loadLibraryColorInfo(surface: string, reading: string | null, userId: string) {
+    try {
+      const colorMap = await fetchLibraryStudyColorInfoByWord(supabase, userId, [
+        { surface, reading },
+      ]);
+      setLibraryColorInfo(colorMap[makeLibraryStudyColorKey(surface, reading)] ?? null);
+    } catch {
+      setLibraryColorInfo(null);
+    }
+  }
+
   async function loadDictionaryExtras(surface: string) {
     setDictionaryLoading(true);
 
@@ -618,7 +802,7 @@ export default function WordDetailPage() {
       if (!user) return;
 
       await loadBookAwareInfo(word.surface, ownerUserId ?? user.id);
-      await loadDictionaryExtras(word.surface);
+      await loadLibraryColorInfo(word.surface, word.reading, ownerUserId ?? user.id);
     }
 
     refreshDerivedData();
@@ -648,10 +832,47 @@ export default function WordDetailPage() {
 
   const jlpt = normalizeJlpt(word.jlpt);
   const chapter = chapterDisplay(word.chapter_number, word.chapter_name);
+  const definitionNumber =
+    word.meaning_choice_index != null ? word.meaning_choice_index + 1 : null;
 
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto w-full max-w-4xl">
+        {editing ? (
+          <BookVocabEditModalShell
+            surface={editing.surface}
+            wordId={editing.id}
+            editErr={editErr}
+            editSaving={editSaving}
+            saveDisabled={editSaving || !editSurface.trim()}
+            onClose={closeEdit}
+            onSave={saveEdit}
+          >
+            <BookVocabEditFormBody
+              cacheSurface={null}
+              editSurface={editSurface}
+              editReading={editReading}
+              editJlpt={editJlpt}
+              editMeaning={editMeaning}
+              editChapterNum={editChapterNum}
+              editChapterName={editChapterName}
+              editPage={editPage}
+              editMeaningChoices={editMeaningChoices}
+              editMeaningChoiceIndex={editMeaningChoiceIndex}
+              editHideKanjiInReadingSupport={editHideKanjiInReadingSupport}
+              onEditSurfaceChange={setEditSurface}
+              onEditReadingChange={setEditReading}
+              onEditJlptChange={setEditJlpt}
+              onDefinitionChange={changeDefinition}
+              onEditMeaningChange={setEditMeaning}
+              onEditChapterNumChange={setEditChapterNum}
+              onEditChapterNameChange={setEditChapterName}
+              onEditPageChange={setEditPage}
+              onEditHideKanjiInReadingSupportChange={setEditHideKanjiInReadingSupport}
+            />
+          </BookVocabEditModalShell>
+        ) : null}
+
         <WordDetailHeader
           bookTitle={bookTitle}
           bookCover={bookCover}
@@ -668,30 +889,29 @@ export default function WordDetailPage() {
         <WordDictionaryInfoSection
           surface={word.surface}
           reading={word.reading}
+          meaning={word.meaning}
           jlpt={jlpt}
           isCommon={word.is_common}
+          definitionNumber={definitionNumber}
+          repeatsInThisBook={repeatsInThisBook}
+          hidden={word.hidden}
+          colorInfo={libraryColorInfo}
         >
-          <WordKanjiInfoPanel
-            dictionaryLoading={dictionaryLoading}
-            kanjiMeta={kanjiMeta}
+          <WordDetailFooterActions
+            onBack={() => router.back()}
+            hidden={word.hidden}
+            onEdit={() => openEdit(word)}
+            onHide={() => hideWord(true)}
+            onUnhide={() => hideWord(false)}
+            onDelete={() => deleteWord()}
           />
-
-          <RelatedKanjiWordsPanel kanjiGroups={kanjiGroups} />
         </WordDictionaryInfoSection>
 
         <WordSeenInSection
-          repeatsInThisBook={repeatsInThisBook}
-          totalLookupCount={totalLookupCount}
           seenInstances={seenInstances}
           meaningChoices={meaningChoices}
           getChapterDisplay={chapterDisplay}
         />
-
-        <WordDetailTeacherPhraseSection>
-          {isTeacher ? (
-            <CollocationsPanel userBookId={userBookId} userBookWordId={word.id} />
-          ) : null}
-        </WordDetailTeacherPhraseSection>
 
         {!isTeacher ? (
           <WordDetailReportIssueLink
@@ -701,10 +921,6 @@ export default function WordDetailPage() {
           />
         ) : null}
 
-        <WordDetailFooterActions
-          onBack={() => router.back()}
-          onRefresh={() => loadAll()}
-        />
       </div>
     </main>
   );

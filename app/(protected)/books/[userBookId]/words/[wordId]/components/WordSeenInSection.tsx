@@ -9,16 +9,12 @@ type WordSeenInstanceItem = {
 };
 
 type WordSeenInSectionProps = {
-  repeatsInThisBook: number;
-  totalLookupCount: number;
   seenInstances: WordSeenInstanceItem[];
   meaningChoices: string[];
   getChapterDisplay: (chapterNumber: number | null, chapterName: string | null) => string;
 };
 
 export default function WordSeenInSection({
-  repeatsInThisBook,
-  totalLookupCount,
   seenInstances,
   meaningChoices,
   getChapterDisplay,
@@ -27,24 +23,8 @@ export default function WordSeenInSection({
     <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
       <div className="mb-4 text-lg font-semibold">Seen In</div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border p-3">
-          <div className="text-xs text-gray-500">Repeats in this book</div>
-          <div className="text-2xl font-semibold">{repeatsInThisBook}</div>
-          <div className="mt-1 text-xs text-gray-400">
-            All saved uses of this word in this book
-          </div>
-        </div>
-
-        <div className="rounded-xl border p-3">
-          <div className="text-xs text-gray-500">Total lookup count</div>
-          <div className="text-2xl font-semibold">{totalLookupCount}</div>
-          <div className="mt-1 text-xs text-gray-400">Across all your books</div>
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <div className="mb-2 text-sm font-semibold">Seen in</div>
+      <div>
+        <div className="mb-2 text-sm font-semibold">Saved from your books</div>
 
         {seenInstances.length === 0 ? (
           <div className="text-sm text-gray-500">No saved instances found yet.</div>

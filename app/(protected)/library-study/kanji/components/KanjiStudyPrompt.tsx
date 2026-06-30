@@ -4,6 +4,11 @@ type KanjiStudyPromptProps = {
   trailingHint?: string;
   contextWord?: string;
   targetKanji?: string;
+  readingPrompt?: {
+    before?: string;
+    strong: string;
+    ghost: string;
+  };
 };
 
 export default function KanjiStudyPrompt({
@@ -12,6 +17,7 @@ export default function KanjiStudyPrompt({
   trailingHint = "",
   contextWord,
   targetKanji,
+  readingPrompt,
 }: KanjiStudyPromptProps) {
   const contextChars = contextWord ? Array.from(contextWord) : [];
 
@@ -22,7 +28,15 @@ export default function KanjiStudyPrompt({
       </div>
 
       <div className="text-5xl font-bold">
-        {contextWord && targetKanji ? (
+        {readingPrompt ? (
+          <>
+            {readingPrompt.before ? (
+              <span className="text-slate-300">{readingPrompt.before}</span>
+            ) : null}
+            <span className="text-slate-950">{readingPrompt.strong}</span>
+            <span className="text-slate-300">{readingPrompt.ghost}</span>
+          </>
+        ) : contextWord && targetKanji ? (
           <>
             {contextChars.map((ch, index) => (
               <span
@@ -43,6 +57,7 @@ export default function KanjiStudyPrompt({
           </span>
         ) : null}
       </div>
+
     </div>
   );
 }

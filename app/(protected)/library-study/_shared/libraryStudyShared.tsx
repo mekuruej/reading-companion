@@ -212,7 +212,7 @@ export function daysSinceIso(value: string | null | undefined, now = new Date())
 export function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base =
-    "relative flex min-h-[30vh] w-full max-w-2xl items-center justify-center rounded-2xl border bg-white p-6 text-center shadow-2xl transition-colors sm:min-h-[36vh]";
+    "relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border bg-white p-6 text-center shadow-2xl transition-colors sm:min-h-[28rem]";
 
   if (color === "green") return `${base} border-emerald-100`;
   if (color === "blue") return `${base} border-sky-100`;

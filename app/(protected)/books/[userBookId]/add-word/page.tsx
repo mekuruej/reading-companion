@@ -933,7 +933,7 @@ export default function AddWordPage() {
       );
       let vocabularyCacheId: number | null = null;
 
-      if (hasKanji(finalSurface) && hasVerifiedDictionaryMatch) {
+      if (hasKanji(finalSurface) && cleanReading) {
         const { data: existingCache, error: cacheLookupError } = await supabase
           .from("vocabulary_cache")
           .select("id")
@@ -949,7 +949,7 @@ export default function AddWordPage() {
 
         if (existingCache?.id) {
           vocabularyCacheId = existingCache.id;
-        } else {
+        } else if (hasVerifiedDictionaryMatch) {
           const { data: createdCache, error: cacheInsertError } = await supabase
             .from("vocabulary_cache")
             .insert({

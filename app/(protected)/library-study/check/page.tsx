@@ -595,7 +595,7 @@ function makeClaimStudyCard(
 function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base =
-    "relative flex min-h-[28rem] w-full max-w-3xl items-center justify-center rounded-2xl border bg-white p-6 text-center shadow-2xl transition-colors sm:min-h-[32rem]";
+    "relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border bg-white p-6 text-center shadow-2xl transition-colors sm:min-h-[28rem]";
 
   if (color === "green") return `${base} border-emerald-100`;
   if (color === "blue") return `${base} border-sky-100`;
@@ -1247,12 +1247,12 @@ function LibraryPracticePanel({
   }
 
   return (
-    <div className="w-full max-w-2xl space-y-2">
+    <div className="w-full max-w-3xl space-y-2">
       {practiceMode === "reveal" ? (
         <button
           type="button"
           onClick={onAdvance}
-          className="relative flex min-h-[28rem] w-full max-w-3xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[32rem]"
+          className="relative flex min-h-[24rem] w-full max-w-3xl cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl transition hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-sky-300 sm:min-h-[28rem]"
         >
           <div className="absolute left-4 top-4 flex">
             <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
@@ -1315,7 +1315,7 @@ function LibraryPracticePanel({
           </div>
         </button>
       ) : (
-        <div className="relative flex min-h-[28rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[32rem]">
+        <div className="relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:min-h-[28rem]">
           <div className="absolute left-4 top-4 flex">
             <div className="rounded-full border border-sky-100 bg-white/90 px-5 py-2 text-sm font-semibold text-sky-950 shadow-sm">
               Typing Practice{card.jlpt ? ` · ${card.jlpt}` : ""}

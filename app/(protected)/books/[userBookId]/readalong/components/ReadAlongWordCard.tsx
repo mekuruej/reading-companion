@@ -16,6 +16,8 @@ type ReadAlongWord = {
   surface: string | null;
   reading: string | null;
   meaning: string | null;
+  jlpt?: string | null;
+  meaning_choice_index?: number | null;
   hide_kanji_in_reading_support?: boolean | null;
 };
 
@@ -27,6 +29,62 @@ type ReadAlongWordCardProps = {
   setWordRef: (wordId: string, element: HTMLDivElement | null) => void;
   onProgressTap: () => void;
 };
+
+function normalizeJlptLabel(jlpt?: string | null) {
+  const normalized = jlpt?.trim().toUpperCase();
+
+  if (!normalized || normalized === "NON-JLPT" || normalized === "NONE") {
+    return null;
+  }
+
+  return normalized.startsWith("N") ? normalized : `N${normalized}`;
+}
+
+function definitionLabel(index?: number | null) {
+  if (typeof index !== "number" || !Number.isFinite(index) || index < 0) {
+    return null;
+  }
+
+  return `Def. ${index + 1}`;
+}
+
+function savedWordBadgeLabel(word: ReadAlongWord) {
+  const parts = [normalizeJlptLabel(word.jlpt), definitionLabel(word.meaning_choice_index)].filter(
+    Boolean
+  );
+
+  return parts.length > 0 ? parts.join(" · ") : "Saved";
+}
+
+function savedWordBorderClass(
+  colorInfo: WordColorInfo | null,
+  isFaded: boolean
+) {
+  if (isFaded) {
+    return "border-stone-200 border-l-stone-200 bg-stone-50 opacity-35";
+  }
+
+  const color = colorInfo?.colorStatus?.color;
+
+  switch (color) {
+    case "red":
+      return "border-stone-200 border-l-red-300 bg-white hover:border-l-red-400 hover:bg-stone-50";
+    case "orange":
+      return "border-stone-200 border-l-orange-300 bg-white hover:border-l-orange-400 hover:bg-stone-50";
+    case "yellow":
+      return "border-stone-200 border-l-amber-300 bg-white hover:border-l-amber-400 hover:bg-stone-50";
+    case "green":
+      return "border-stone-200 border-l-emerald-300 bg-white hover:border-l-emerald-400 hover:bg-stone-50";
+    case "blue":
+      return "border-stone-200 border-l-sky-300 bg-white hover:border-l-sky-400 hover:bg-stone-50";
+    case "purple":
+      return "border-stone-200 border-l-violet-300 bg-white hover:border-l-violet-400 hover:bg-stone-50";
+    case "grey":
+      return "border-stone-200 border-l-slate-300 bg-white hover:border-l-slate-400 hover:bg-stone-50";
+    default:
+      return "border-stone-200 border-l-stone-200 bg-white hover:bg-stone-50";
+  }
+}
 
 // One saved-word support card in the Read Along reader.
 // page.tsx still owns word mapping, fade progress, refs, scroll behavior,
@@ -50,17 +108,16 @@ export default function ReadAlongWordCard({
         setWordRef(word.id, element);
       }}
       onClick={onProgressTap}
-      className={`relative cursor-pointer rounded-2xl border px-4 py-3 pr-28 transition ${
+      className={`relative cursor-pointer rounded-2xl border border-l-8 px-4 py-3 pr-36 transition sm:pr-40 ${savedWordBorderClass(
+        colorInfo,
         isFaded
-          ? "border-stone-200 bg-stone-50 opacity-35"
-          : "border-stone-200 bg-white hover:bg-stone-50"
-      }`}
+      )}`}
     >
       {colorInfo ? (
         <div className="absolute right-4 top-3">
           <LibraryColorBadge
             colorStatus={colorInfo.colorStatus}
-            stageLabel={colorInfo.stageLabel}
+            label={savedWordBadgeLabel(word)}
           />
         </div>
       ) : null}

@@ -92,11 +92,8 @@ type QueueStatus =
   | "excluded";
 
 type StatusFilter =
-  | "all"
   | "active"
   | "flagged_review"
-  | "needs_reading"
-  | "needs_work"
   | "complete"
   | "excluded";
 
@@ -136,6 +133,18 @@ function hiraToKata(text: string) {
 function getBookTitle(book: UserBookRow["books"]) {
   if (Array.isArray(book)) return book[0]?.title ?? "Untitled";
   return book?.title ?? "Untitled";
+}
+
+function cacheRowMatchesWord(
+  cacheRow: VocabularyCacheRow | undefined,
+  surface: string,
+  reading: string
+) {
+  if (!cacheRow) return false;
+  return (
+    (cacheRow.surface ?? "").trim() === surface.trim() &&
+    (cacheRow.reading ?? "").trim() === reading.trim()
+  );
 }
 
 function statusLabel(status: QueueStatus) {
@@ -202,14 +211,6 @@ function statusDetailLabel(status: QueueStatus) {
   }
 }
 
-function isNeedsReadingStatus(status: QueueStatus) {
-  return status === "incomplete_rows" || status === "cleanup";
-}
-
-function isNeedsWorkStatus(status: QueueStatus) {
-  return status === "missing_cache" || status === "missing_rows" || status === "missing_positions";
-}
-
 function isActiveStatus(status: QueueStatus) {
   return status !== "complete" && status !== "excluded";
 }
@@ -217,12 +218,66 @@ function isActiveStatus(status: QueueStatus) {
 function itemMatchesStatusFilter(item: QueueItem, statusFilter: StatusFilter) {
   if (statusFilter === "active") return isActiveStatus(item.status);
   if (statusFilter === "flagged_review") return item.status === "flagged_review";
-  if (statusFilter === "needs_reading") return isNeedsReadingStatus(item.status);
-  if (statusFilter === "needs_work") return isNeedsWorkStatus(item.status);
   if (statusFilter === "complete") return item.status === "complete";
   if (statusFilter === "excluded") return item.status === "excluded";
-  if (statusFilter !== "all") return false;
-  return true;
+  return false;
+}
+
+function queueItemIdentity(item: Pick<QueueItem, "vocabularyCacheId" | "surface" | "reading">) {
+  if (item.vocabularyCacheId) return `cache:${item.vocabularyCacheId}`;
+  return `word:${item.surface.trim()}::${item.reading.trim()}`;
+}
+
+function queueStatusPriority(status: QueueStatus) {
+  switch (status) {
+    case "flagged_review":
+      return 0;
+    case "missing_cache":
+      return 1;
+    case "missing_rows":
+      return 2;
+    case "missing_positions":
+      return 3;
+    case "incomplete_rows":
+      return 4;
+    case "cleanup":
+      return 5;
+    case "complete":
+      return 6;
+    case "excluded":
+      return 7;
+    default:
+      return 8;
+  }
+}
+
+function queueItemTime(item: Pick<QueueItem, "createdAt">) {
+  if (!item.createdAt) return Number.POSITIVE_INFINITY;
+  const time = new Date(item.createdAt).getTime();
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+}
+
+function chooseQueueRepresentative(current: QueueItem, candidate: QueueItem) {
+  const currentPriority = queueStatusPriority(current.status);
+  const candidatePriority = queueStatusPriority(candidate.status);
+
+  if (candidatePriority !== currentPriority) {
+    return candidatePriority < currentPriority ? candidate : current;
+  }
+
+  return queueItemTime(candidate) < queueItemTime(current) ? candidate : current;
+}
+
+function dedupeQueueItems(items: QueueItem[]) {
+  const itemsByKey = new Map<string, QueueItem>();
+
+  for (const item of items) {
+    const key = queueItemIdentity(item);
+    const existing = itemsByKey.get(key);
+    itemsByKey.set(key, existing ? chooseQueueRepresentative(existing, item) : item);
+  }
+
+  return Array.from(itemsByKey.values());
 }
 
 function effectiveReadingType(row: Pick<KanjiMapRow, "reading_type" | "base_reading" | "realized_reading">) {
@@ -356,6 +411,33 @@ function getQueueStatus(params: {
   };
 }
 
+function mapRowHasReadingDetails(
+  row: Pick<KanjiMapRow, "reading_type" | "base_reading" | "realized_reading">
+) {
+  return !!effectiveReadingType(row) && !!row.base_reading && !!row.realized_reading;
+}
+
+function shouldPreferKanjiMapRow(
+  current: KanjiMapRow,
+  candidate: KanjiMapRow,
+  expectedKanji: string
+) {
+  const currentMatches = current.kanji === expectedKanji;
+  const candidateMatches = candidate.kanji === expectedKanji;
+
+  if (currentMatches !== candidateMatches) return candidateMatches;
+
+  const currentComplete = mapRowHasReadingDetails(current);
+  const candidateComplete = mapRowHasReadingDetails(candidate);
+
+  if (currentComplete !== candidateComplete) return candidateComplete;
+  if (!!current.flagged_for_review !== !!candidate.flagged_for_review) {
+    return !!candidate.flagged_for_review;
+  }
+
+  return candidate.id < current.id;
+}
+
 export default function TeacherKanjiPage() {
   const searchParams = useSearchParams();
   const backLink = getTeacherBackLink(searchParams.get("from"));
@@ -372,8 +454,6 @@ export default function TeacherKanjiPage() {
   const [canAccess, setCanAccess] = useState(false);
 
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
-  const [studentFilter, setStudentFilter] = useState("all");
-  const [bookFilter, setBookFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
 
   const [editorOpenByWordId, setEditorOpenByWordId] = useState<Record<string, boolean>>({});
@@ -413,6 +493,7 @@ export default function TeacherKanjiPage() {
         meProfile?.role === "teacher" ||
         meProfile?.role === "super_teacher" ||
         !!meProfile?.is_super_teacher;
+      const isSuperTeacher = meProfile?.role === "super_teacher" || !!meProfile?.is_super_teacher;
 
       setCanAccess(isTeacher);
 
@@ -421,38 +502,30 @@ export default function TeacherKanjiPage() {
         return;
       }
 
-      const { data: teacherLinks, error: teacherLinksError } = await supabase
-        .from("teacher_students")
-        .select("student_id")
-        .eq("teacher_id", user.id)
-        .is("archived_at", null);
+      let studentIds: string[] | null = null;
 
-      if (teacherLinksError) {
-        console.error("Error loading linked students:", teacherLinksError);
+      if (!isSuperTeacher) {
+        const { data: teacherLinks, error: teacherLinksError } = await supabase
+          .from("teacher_students")
+          .select("student_id")
+          .eq("teacher_id", user.id)
+          .is("archived_at", null);
+
+        if (teacherLinksError) {
+          console.error("Error loading linked students:", teacherLinksError);
+        }
+
+        studentIds = Array.from(
+          new Set([
+            user.id,
+            ...((teacherLinks ?? [])
+              .map((row: any) => row.student_id)
+              .filter(Boolean) as string[]),
+          ])
+        );
       }
 
-      const studentIds = Array.from(
-        new Set([
-          user.id,
-          ...((teacherLinks ?? [])
-            .map((row: any) => row.student_id)
-            .filter(Boolean) as string[]),
-        ])
-      );
-
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, display_name, username, role")
-        .in("id", studentIds);
-
-      if (profilesError) throw profilesError;
-
-      const profileById = new Map<string, ProfileRow>();
-      for (const profile of (profiles ?? []) as ProfileRow[]) {
-        profileById.set(profile.id, profile);
-      }
-
-      const { data: userBooks, error: userBooksError } = await supabase
+      let userBooksQuery = supabase
         .from("user_books")
         .select(
           `
@@ -466,8 +539,13 @@ export default function TeacherKanjiPage() {
             title
           )
         `
-        )
-        .in("user_id", studentIds);
+        );
+
+      if (studentIds) {
+        userBooksQuery = userBooksQuery.in("user_id", studentIds);
+      }
+
+      const { data: userBooks, error: userBooksError } = await userBooksQuery;
 
       if (userBooksError) throw userBooksError;
 
@@ -482,6 +560,22 @@ export default function TeacherKanjiPage() {
       const userBookById = new Map<string, UserBookRow>();
       for (const book of books) {
         userBookById.set(book.id, book);
+      }
+
+      const profileIds = Array.from(new Set(books.map((book) => book.user_id).filter(Boolean)));
+      const profileById = new Map<string, ProfileRow>();
+
+      if (profileIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, role")
+          .in("id", profileIds);
+
+        if (profilesError) throw profilesError;
+
+        for (const profile of (profiles ?? []) as ProfileRow[]) {
+          profileById.set(profile.id, profile);
+        }
       }
 
       const { data: words, error: wordsError } = await supabase
@@ -511,12 +605,24 @@ export default function TeacherKanjiPage() {
       );
 
       const mapRowsByCacheId = new Map<string, KanjiMapRow[]>();
+      const cacheRowsById = new Map<number, VocabularyCacheRow>();
 
       if (cacheIds.length > 0) {
         const chunkSize = 100;
 
         for (let i = 0; i < cacheIds.length; i += chunkSize) {
           const cacheIdChunk = cacheIds.slice(i, i + chunkSize);
+
+          const { data: cacheRows, error: cacheRowsError } = await supabase
+            .from("vocabulary_cache")
+            .select("id, surface, reading")
+            .in("id", cacheIdChunk);
+
+          if (cacheRowsError) throw cacheRowsError;
+
+          for (const row of (cacheRows ?? []) as VocabularyCacheRow[]) {
+            cacheRowsById.set(Number(row.id), row);
+          }
 
           const { data: mapRows, error: mapError } = await supabase
             .from("vocabulary_kanji_map")
@@ -566,6 +672,7 @@ export default function TeacherKanjiPage() {
           .eq("excluded_from_kanji_practice", true)
           .eq("reading_type", "other")
           .eq("flagged_for_review", false)
+          .is("flagged_at", null)
           .limit(1000),
       ]);
 
@@ -657,7 +764,6 @@ export default function TeacherKanjiPage() {
         mapRowsByCacheId.set(cacheKey, existing);
       }
 
-      const cacheRowsById = new Map<number, VocabularyCacheRow>();
       const flaggedOnlyCacheIds = flaggedCacheIds.filter(
         (id) => !knownCacheIds.has(String(id))
       );
@@ -680,13 +786,20 @@ export default function TeacherKanjiPage() {
         const profile = userBook ? profileById.get(userBook.user_id) : null;
         const surface = String(word.surface ?? "");
         const reading = String(word.reading ?? "");
+        const rawVocabularyCacheId =
+          word.vocabulary_cache_id == null ? null : Number(word.vocabulary_cache_id);
+        const vocabularyCacheId =
+          rawVocabularyCacheId != null &&
+            cacheRowMatchesWord(cacheRowsById.get(rawVocabularyCacheId), surface, reading)
+            ? rawVocabularyCacheId
+            : null;
         const mapRows =
-          word.vocabulary_cache_id != null
-            ? mapRowsByCacheId.get(String(Number(word.vocabulary_cache_id))) ?? []
+          vocabularyCacheId != null
+            ? mapRowsByCacheId.get(String(vocabularyCacheId)) ?? []
             : [];
 
         const statusInfo = getQueueStatus({
-          vocabularyCacheId: word.vocabulary_cache_id,
+          vocabularyCacheId,
           surface,
           mapRows,
           ignored: word.ignore_kanji_enrichment,
@@ -704,7 +817,7 @@ export default function TeacherKanjiPage() {
           bookTitle: getBookTitle(userBook?.books ?? null),
           surface,
           reading,
-          vocabularyCacheId: word.vocabulary_cache_id,
+          vocabularyCacheId,
           createdAt: word.created_at,
           ...statusInfo,
         };
@@ -744,18 +857,14 @@ export default function TeacherKanjiPage() {
         });
       }
 
-      function createdAtTime(item: QueueItem) {
-        if (!item.createdAt) return Number.POSITIVE_INFINITY;
-        const time = new Date(item.createdAt).getTime();
-        return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
-      }
+      const dedupedItems = dedupeQueueItems(nextItems);
 
-      nextItems.sort((a, b) => {
+      dedupedItems.sort((a, b) => {
         const aDone = a.status === "complete" || a.status === "excluded";
         const bDone = b.status === "complete" || b.status === "excluded";
         const aFlagged = a.status === "flagged_review";
         const bFlagged = b.status === "flagged_review";
-        const createdAtDifference = createdAtTime(a) - createdAtTime(b);
+        const createdAtDifference = queueItemTime(a) - queueItemTime(b);
 
         if (aFlagged !== bFlagged) return aFlagged ? -1 : 1;
         if (aDone !== bDone) return aDone ? 1 : -1;
@@ -765,7 +874,7 @@ export default function TeacherKanjiPage() {
         return a.surface.localeCompare(b.surface);
       });
 
-      setQueueItems(nextItems);
+      setQueueItems(dedupedItems);
     } catch (err: any) {
       console.error("Error loading teacher kanji queue:", err);
       setError(err?.message ?? "Could not load kanji enrichment queue.");
@@ -779,44 +888,11 @@ export default function TeacherKanjiPage() {
     void loadQueue();
   }, []);
 
-  const studentOptions = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const item of queueItems) {
-      if (!item.userId) continue;
-      map.set(item.userId, item.studentName);
-    }
-
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [queueItems]);
-
-  const bookOptions = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const item of queueItems) {
-      if (!item.userBookId) continue;
-      if (studentFilter !== "all" && item.userId !== studentFilter) continue;
-      if (!itemMatchesStatusFilter(item, statusFilter)) continue;
-      map.set(item.userBookId, item.bookTitle);
-    }
-
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [queueItems, studentFilter, statusFilter]);
-
-  useEffect(() => {
-    if (bookFilter === "all") return;
-    if (bookOptions.some(([id]) => id === bookFilter)) return;
-    setBookFilter("all");
-  }, [bookFilter, bookOptions]);
-
   const filteredItems = useMemo(() => {
     return queueItems.filter((item) => {
-      if (studentFilter !== "all" && item.userId !== studentFilter) return false;
-      if (bookFilter !== "all" && item.userBookId !== bookFilter) return false;
-
       return itemMatchesStatusFilter(item, statusFilter);
     });
-  }, [queueItems, studentFilter, bookFilter, statusFilter]);
+  }, [queueItems, statusFilter]);
 
   const bulkOpenItems = useMemo(() => {
     return filteredItems
@@ -837,11 +913,8 @@ export default function TeacherKanjiPage() {
     const active = queueItems.filter((item) => isActiveStatus(item.status));
 
     return {
-      total: queueItems.length,
       active: active.length,
       flagged: queueItems.reduce((count, item) => count + item.flaggedMapRowCount, 0),
-      needsReading: queueItems.filter((item) => isNeedsReadingStatus(item.status)).length,
-      needsWork: queueItems.filter((item) => isNeedsWorkStatus(item.status)).length,
       complete: queueItems.filter((item) => item.status === "complete").length,
       excluded: queueItems.filter((item) => item.status === "excluded").length,
     };
@@ -901,18 +974,52 @@ export default function TeacherKanjiPage() {
 
     const { data: existingRows, error: existingRowsError } = await supabase
       .from("vocabulary_kanji_map")
-      .select("id, kanji, kanji_position")
+      .select(
+        "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+      )
       .eq("vocabulary_cache_id", cacheId);
 
     if (existingRowsError) throw existingRowsError;
 
-    const existingByPosition = new Map<number, { id: number; kanji: string | null }>();
+    const existingByPosition = new Map<number, KanjiMapRow>();
+    const duplicateOrOutOfRangeRowIds: number[] = [];
 
-    for (const row of existingRows ?? []) {
-      existingByPosition.set(Number((row as any).kanji_position), {
-        id: Number((row as any).id),
-        kanji: (row as any).kanji ?? null,
-      });
+    for (const rawRow of existingRows ?? []) {
+      const row = rawRow as KanjiMapRow;
+      const rowId = Number(row.id);
+      const position = Number(row.kanji_position);
+
+      if (!Number.isFinite(rowId)) continue;
+
+      if (!Number.isInteger(position) || position < 0 || position >= chars.length) {
+        duplicateOrOutOfRangeRowIds.push(rowId);
+        continue;
+      }
+
+      const expectedKanji = chars[position];
+      const existing = existingByPosition.get(position);
+
+      if (!existing) {
+        existingByPosition.set(position, { ...row, id: rowId, kanji_position: position });
+        continue;
+      }
+
+      const normalizedRow = { ...row, id: rowId, kanji_position: position };
+      if (shouldPreferKanjiMapRow(existing, normalizedRow, expectedKanji)) {
+        duplicateOrOutOfRangeRowIds.push(existing.id);
+        existingByPosition.set(position, normalizedRow);
+      } else {
+        duplicateOrOutOfRangeRowIds.push(rowId);
+      }
+    }
+
+    if (duplicateOrOutOfRangeRowIds.length > 0) {
+      const { error: deleteDuplicateRowsError } = await supabase
+        .from("vocabulary_kanji_map")
+        .delete()
+        .in("id", duplicateOrOutOfRangeRowIds);
+
+      if (deleteDuplicateRowsError) throw deleteDuplicateRowsError;
     }
 
     const missingRows = chars
@@ -1233,11 +1340,13 @@ export default function TeacherKanjiPage() {
 
     try {
       if (item.vocabularyCacheId) {
+        const dismissedAt = new Date().toISOString();
         const { error: excludeError } = await supabase
           .from("vocabulary_kanji_map")
           .update({
             excluded_from_kanji_practice: true,
             flagged_for_review: false,
+            flagged_at: dismissedAt,
           })
           .eq("vocabulary_cache_id", item.vocabularyCacheId);
 
@@ -1329,13 +1438,7 @@ export default function TeacherKanjiPage() {
 
           <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
             <TeacherKanjiFilterBar
-              studentFilter={studentFilter}
-              bookFilter={bookFilter}
               statusFilter={statusFilter}
-              studentOptions={studentOptions}
-              bookOptions={bookOptions}
-              onStudentFilterChange={setStudentFilter}
-              onBookFilterChange={setBookFilter}
               onStatusFilterChange={(value) => setStatusFilter(value as StatusFilter)}
             />
 

@@ -13,6 +13,7 @@ import {
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
+import { WORD_SKY_ALLOWED_JLPT_LEVELS } from "@/lib/wordSkyLevels";
 import WordSkyLoadingState from "./components/WordSkyLoadingState";
 import WordSkyHeader from "./components/WordSkyHeader";
 import WordSkyMessageBanner from "./components/WordSkyMessageBanner";
@@ -88,14 +89,14 @@ const FALLBACK_SKY_WORDS: SkyWord[] = [
   { surface: "問題", reading: "もんだい", meaning: "problem", level: "middle", jlpt: "N4" },
   { surface: "経験", reading: "けいけん", meaning: "experience", level: "bright", jlpt: "N3" },
   { surface: "普通", reading: "ふつう", meaning: "ordinary", level: "soft", jlpt: "N4" },
-  { surface: "状況", reading: "じょうきょう", meaning: "situation", level: "middle", jlpt: "N2" },
-  { surface: "表情", reading: "ひょうじょう", meaning: "expression", level: "bright", jlpt: null },
+  { surface: "説明", reading: "せつめい", meaning: "explanation", level: "middle", jlpt: "N3" },
+  { surface: "表情", reading: "ひょうじょう", meaning: "expression", level: "bright", jlpt: "N3" },
 ];
 
 const LANES = [3, 8, 13, 18, 24, 30, 36, 43, 50, 57, 64, 71, 78, 85, 92];
 const VISIBLE_WORD_COUNT = 36;
 const PERSONAL_LIBRARY_WORD_LIMIT = 45;
-const PERSONAL_LIBRARY_SKY_LEVELS = new Set(["N2", "N1", "NON-JLPT"]);
+const PERSONAL_LIBRARY_SKY_LEVELS = new Set<string>(WORD_SKY_ALLOWED_JLPT_LEVELS);
 
 function clampPercent(value: number) {
   return Math.max(3, Math.min(92, value));
@@ -147,7 +148,7 @@ function levelForWord(row: WordSkyPoolRow, index: number): SkyWord["level"] {
   const jlpt = (row.jlpt ?? "").toUpperCase();
   if (jlpt === "N5" || jlpt === "N4") return "soft";
   if (jlpt === "N3") return "middle";
-  if (jlpt === "N2" || jlpt === "N1") return "bright";
+  if (jlpt === "N2") return "bright";
   return index % 3 === 0 ? "bright" : index % 2 === 0 ? "middle" : "soft";
 }
 
@@ -343,7 +344,7 @@ export default function WordSkyPage() {
               .from("user_library_word_summaries")
               .select("study_identity_key, surface, reading, meaning, jlpt, total_encounter_count")
               .eq("user_id", user.id)
-              .or("jlpt.in.(N2,N1,NON-JLPT),jlpt.is.null")
+              .in("jlpt", WORD_SKY_ALLOWED_JLPT_LEVELS)
               .not("surface", "is", null)
               .not("reading", "is", null)
               .not("meaning", "is", null)

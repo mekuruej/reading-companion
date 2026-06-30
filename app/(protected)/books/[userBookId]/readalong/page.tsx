@@ -36,6 +36,8 @@ type ReadAlongWord = {
     surface: string;
     reading: string | null;
     meaning: string | null;
+    jlpt?: string | null;
+    meaning_choice_index?: number | null;
     page_number: number | null;
     page_order: number | null;
     chapter_number: number | null;
@@ -294,6 +296,8 @@ export default function ReadAlongPage() {
                     surface,
                     reading,
                     meaning,
+                    jlpt,
+                    meaning_choice_index,
                     page_number,
                     page_order,
                     chapter_number,

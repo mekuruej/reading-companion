@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isWordSkyAllowedJlptLevel } from "@/lib/wordSkyLevels";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -184,6 +185,13 @@ export async function POST(req: Request) {
     let wordSkyUpdated = false;
 
     if (approveForWordSky) {
+      if (!isWordSkyAllowedJlptLevel(jlptLevel)) {
+        return NextResponse.json(
+          { error: "Word Sky only accepts N5-N3 words. Save harder or unlabeled words to the cache only." },
+          { status: 400 }
+        );
+      }
+
       const { error: wordSkyError } = await supabaseAdmin
         .from("word_sky_starter_words")
         .upsert(
