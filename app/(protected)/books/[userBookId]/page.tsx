@@ -16,7 +16,6 @@ import ReadingTab from "./components/tabs/ReadingTab";
 import RatingTab from "./components/tabs/RatingTab";
 import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
 import StoryTab from "./components/tabs/StoryTab";
-import VocabTab from "./components/tabs/VocabTab";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
@@ -125,7 +124,7 @@ type ReadingSession = {
   session_mode: string | null;
 };
 
-type HubTab = "bookInfo" | "study" | "reading" | "story" | "reflection";
+type HubTab = "bookInfo" | "reading" | "story" | "reflection";
 type EditingPanel =
   | HubTab
   | "bookInfoDetails"
@@ -134,7 +133,6 @@ type EditingPanel =
   | "bookInfoCopy"
   | "communityGenres"
   | "communityContentNotes";
-type VocabTab = "readAlong" | "bulk";
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher";
 
 type Character = {
@@ -644,7 +642,6 @@ export default function BookHubPage() {
   const [profileLevel, setProfileLevel] = useState<string>("");
   const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
 
-  const [canUseVocabTools, setCanUseVocabTools] = useState(false);
   const [canUseStoryNotes, setCanUseStoryNotes] = useState(false);
   const [canUseCuriosityReading, setCanUseCuriosityReading] = useState(false);
   const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
@@ -880,7 +877,6 @@ export default function BookHubPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [timerSaveMessage, setTimerSaveMessage] = useState("");
 
-  const [vocabTab, setVocabTab] = useState<VocabTab>("readAlong");
   const [quickWord, setQuickWord] = useState("");
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
@@ -3338,7 +3334,6 @@ export default function BookHubPage() {
 
     setLoading(true);
     setError(null);
-    setCanUseVocabTools(false);
     setCanUseStoryNotes(false);
     setCanUseCuriosityReading(false);
     setCanUseSavedWordReading(false);
@@ -3395,7 +3390,6 @@ export default function BookHubPage() {
       hasFullAccess: appAccessStatus.hasFullAccess
     });
 
-    setCanUseVocabTools(canUseFullAccessFeature(featureAccess, "vocab_tools"));
     setCanUseStoryNotes(canUseFullAccessFeature(featureAccess, "story_notes"));
     setCanUseCuriosityReading(
       canUseFullAccessFeature(featureAccess, "curiosity_reading")
@@ -3659,12 +3653,11 @@ export default function BookHubPage() {
     const requestedTab = params.get("tab") ?? window.location.hash.replace(/^#/, "");
     const normalizedTab =
       requestedTab === "vocab" || requestedTab === "vocabulary"
-        ? "study"
+        ? "bookInfo"
         : requestedTab;
 
     if (
       normalizedTab === "bookInfo" ||
-      normalizedTab === "study" ||
       normalizedTab === "reading" ||
       normalizedTab === "story" ||
       normalizedTab === "reflection"
@@ -5270,6 +5263,7 @@ export default function BookHubPage() {
                 <div className="space-y-4">
                   <BookHubTabSectionHeader title="Book Info" />
                   <BookInfoTab
+                    userBookId={row.id}
                     book={book}
                     canEditBookInfo={canEditBookInfo}
                     isEditingBookInfo={isEditingBookInfoDetails}
@@ -5371,29 +5365,44 @@ export default function BookHubPage() {
                 </div>
               )}
 
-              {activeTab === "study" && (
-                <div className="space-y-4">
-                  <BookHubTabSectionHeader title="Vocab" />
-
-                  {canUseVocabTools ? (
-                    <VocabTab
-                      row={row}
-                      vocabTab={vocabTab}
-                      setVocabTab={setVocabTab}
-                    />
-                  ) : (
-                    <FullAccessBookHubTabPanel
-                      feature="vocab_tools"
-                      title="Vocab Tools uses saved vocabulary"
-                      message="Full access unlocks tools for exploring, bulk adding, and studying vocabulary connected to this book."
-                    />
-                  )}
-                </div>
-              )}
-
               {activeTab === "reading" && (
                 <div className="space-y-4">
                   <BookHubTabSectionHeader title="Reading" />
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-3 text-sm font-semibold text-stone-900">Add Words</div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <a
+                        href={`/books/${encodeURIComponent(row.id)}/curiosity-reading`}
+                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      >
+                        Add from reading
+                        <p className="mt-1 text-sm text-stone-500">
+                          Use Curiosity Reading when you stop to look up and save words.
+                        </p>
+                      </a>
+
+                      <a
+                        href={`/books/${encodeURIComponent(row.id)}/listening`}
+                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      >
+                        Add from listening
+                        <p className="mt-1 text-sm text-stone-500">
+                          Use Listening when you stop to look up and save heard words.
+                        </p>
+                      </a>
+
+                      <a
+                        href={`/vocab/bulk?userBookId=${encodeURIComponent(row.id)}`}
+                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                      >
+                        Bulk Add
+                        <p className="mt-1 text-sm text-stone-500">
+                          Add several words to this book at once.
+                        </p>
+                      </a>
+                    </div>
+                  </div>
                   <ReadingTab
                     row={row}
                     book={book}

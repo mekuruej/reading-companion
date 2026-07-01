@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type BookHubTab = "bookInfo" | "study" | "reading" | "story" | "reflection";
+type BookHubTab = "bookInfo" | "reading" | "story" | "reflection";
 
 type BookHubTabBarProps = {
   activeTab: BookHubTab;
@@ -45,13 +45,6 @@ export default function BookHubTabBar({
             onClick={() => onTabChange("reflection")}
           >
             Reading Reflection
-          </FilingTab>
-
-          <FilingTab
-            active={activeTab === "study"}
-            onClick={() => onTabChange("study")}
-          >
-            Vocab Tools
           </FilingTab>
 
           <FilingTab

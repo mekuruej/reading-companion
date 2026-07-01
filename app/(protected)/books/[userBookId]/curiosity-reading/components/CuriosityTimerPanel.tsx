@@ -15,6 +15,11 @@ type CuriosityTimerPanelProps = {
   onCancelSession: () => void;
   onSessionStartPageChange: (value: string) => void;
   onSessionEndPageChange: (value: string) => void;
+  title?: string;
+  description?: string;
+  saveTitle?: string;
+  startPageLabel?: string;
+  endPageLabel?: string;
 };
 
 export default function CuriosityTimerPanel({
@@ -34,17 +39,21 @@ export default function CuriosityTimerPanel({
   onCancelSession,
   onSessionStartPageChange,
   onSessionEndPageChange,
+  title = "Log your reading session",
+  description = "Use the timer to track a curiosity reading session where you stop, check, and save new words.",
+  saveTitle = "Save this reading session",
+  startPageLabel = "Start page",
+  endPageLabel = "End page",
 }: CuriosityTimerPanelProps) {
   return (
     <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4">
       <div className="mb-2 text-sm font-medium text-stone-900">
-        Log your reading session
+        {title}
       </div>
 
       <div className="mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3">
         <div className="mb-2 text-center text-sm text-stone-600">
-          Use the timer to track a curiosity reading session where you stop,
-          check, and save new words.
+          {description}
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2">
@@ -107,12 +116,12 @@ export default function CuriosityTimerPanel({
       {showTimedSessionForm && !isRunning ? (
         <div className="mt-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">
           <div className="mb-3 text-sm font-medium text-stone-700">
-            Save this reading session
+            {saveTitle}
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <div className="mb-1 text-sm text-stone-600">Start page</div>
+              <div className="mb-1 text-sm text-stone-600">{startPageLabel}</div>
               <input
                 type="number"
                 min={1}
@@ -126,7 +135,7 @@ export default function CuriosityTimerPanel({
             </div>
 
             <div>
-              <div className="mb-1 text-sm text-stone-600">End page</div>
+              <div className="mb-1 text-sm text-stone-600">{endPageLabel}</div>
               <input
                 type="number"
                 min={1}

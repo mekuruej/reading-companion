@@ -78,6 +78,7 @@ type ContributorAuthorRecord = {
 };
 
 type BookInfoTabProps = {
+  userBookId?: string;
   book: Book;
   canEditBookInfo: boolean;
   isEditingBookInfo: boolean;
@@ -200,6 +201,7 @@ type BookInfoTabProps = {
 };
 
 export default function BookInfoTab({
+  userBookId,
   book,
   canEditBookInfo,
   isEditingBookInfo,
@@ -888,6 +890,21 @@ export default function BookInfoTab({
 
   return (
     <div className="space-y-6">
+      {userBookId ? (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="mb-3 text-sm font-semibold text-stone-900">My Words</div>
+          <a
+            href={`/vocab/explore?userBookId=${encodeURIComponent(userBookId)}`}
+            className="block rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+          >
+            My Word History in This Book
+            <p className="mt-1 text-sm text-stone-500">
+              See where you met words in this book and how you saved them.
+            </p>
+          </a>
+        </div>
+      ) : null}
+
       <BookInfoDetailsSection
         book={book}
         canEditBookInfo={canEditBookInfo}

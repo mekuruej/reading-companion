@@ -38,17 +38,24 @@ export default function StudyTab({
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 text-sm font-semibold text-stone-900">Add Vocab</div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-3">
           <a
-            href={`/books/${encodeURIComponent(row.id)}/add-word`}
+            href={`/books/${encodeURIComponent(row.id)}/curiosity-reading`}
             className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
           >
-            Single Add
+            Add from reading
             <p className="mt-1 text-sm text-stone-500">
-              Add one word to this book outside of a reading session.
+              Use Curiosity Reading when you stop to look up and save words.
             </p>
-            <p className="text-sm text-stone-500">
-              Best for quick fixes, remembered words, or one-off additions.
+          </a>
+
+          <a
+            href={`/books/${encodeURIComponent(row.id)}/listening`}
+            className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+          >
+            Add from listening
+            <p className="mt-1 text-sm text-stone-500">
+              Use Listening when you stop to look up and save heard words.
             </p>
           </a>
 
