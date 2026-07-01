@@ -31,21 +31,18 @@ export default function BookVocabMobileCard({
         hidden ? "border-stone-200 bg-stone-50 text-stone-400" : "border-stone-200 text-stone-900"
       }`}
     >
-      <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-2xl font-semibold leading-snug text-stone-950">
           <span className="break-words">{surface || "—"}</span>
           <BookVocabKatakanaBadge surface={surface} />
         </div>
 
-        <div className="mt-1 break-words text-lg font-medium leading-7 text-stone-700">
+        <div className="break-words text-base font-medium leading-6 text-stone-600">
           {reading || "—"}
         </div>
       </div>
 
       <div className="mt-3 rounded-xl bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-800">
-        <div className="mb-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-stone-400">
-          Definition
-        </div>
         <div className="break-words">{meaning || "—"}</div>
       </div>
 
