@@ -103,6 +103,7 @@ export default function ReadAlongPage() {
     const params = useParams<{ userBookId: string }>();
     const userBookId = params.userBookId;
     const searchParams = useSearchParams();
+    const savedPageStorageKey = `readalong-current-page:${userBookId}`;
 
     const [words, setWords] = useState<ReadAlongWord[]>([]);
     const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
@@ -113,6 +114,7 @@ export default function ReadAlongPage() {
 
     const [pageIndex, setPageIndex] = useState(0);
     const [jumpPageInput, setJumpPageInput] = useState("");
+    const [hasRestoredSavedPage, setHasRestoredSavedPage] = useState(false);
     const [selectedChapterKey, setSelectedChapterKey] = useState("all");
     const [fadedThroughIndex, setFadedThroughIndex] = useState<number>(-1);
 
@@ -533,12 +535,39 @@ export default function ReadAlongPage() {
 
         if (matchIndex >= 0) {
             setPageIndex(matchIndex);
-            setJumpPageInput(String(pageNum));
+            setJumpPageInput("");
+            setHasRestoredSavedPage(true);
         }
     }, [pages, searchParams]);
 
+    useEffect(() => {
+        if (!pages.length || hasRestoredSavedPage) return;
+        if (searchParams.get("page")) return;
+        if (typeof window === "undefined") return;
+
+        const savedPage = Number(window.localStorage.getItem(savedPageStorageKey));
+        if (!Number.isFinite(savedPage) || savedPage <= 0) {
+            setHasRestoredSavedPage(true);
+            return;
+        }
+
+        const matchIndex = pages.findIndex((p) => p.pageNumber === savedPage);
+        if (matchIndex >= 0) {
+            setPageIndex(matchIndex);
+        }
+
+        setHasRestoredSavedPage(true);
+    }, [hasRestoredSavedPage, pages, savedPageStorageKey, searchParams]);
+
     const currentPage = pages[pageIndex] ?? null;
     const currentPageNumber = currentPage?.pageNumber ?? null;
+
+    useEffect(() => {
+        if (!hasRestoredSavedPage || currentPageNumber == null) return;
+        if (typeof window === "undefined") return;
+
+        window.localStorage.setItem(savedPageStorageKey, String(currentPageNumber));
+    }, [currentPageNumber, hasRestoredSavedPage, savedPageStorageKey]);
 
     function jumpToPage(pageNum: number) {
         if (!Number.isFinite(pageNum) || pageNum <= 0) return;
@@ -547,7 +576,7 @@ export default function ReadAlongPage() {
 
         if (matchIndex >= 0) {
             setPageIndex(matchIndex);
-            setJumpPageInput(String(pageNum));
+            setJumpPageInput("");
         }
     }
 
@@ -556,6 +585,10 @@ export default function ReadAlongPage() {
     }
 
     function goNext() {
+        setPageIndex((prev) => Math.min(pages.length - 1, prev + 1));
+    }
+
+    function goNextFromWordTap() {
         setPageIndex((prev) => Math.min(pages.length - 1, prev + 1));
     }
 
@@ -586,13 +619,25 @@ export default function ReadAlongPage() {
     }
 
     function handleProgressTap(index: number, wordId: string) {
+        if (index === 0 && fadedThroughIndex >= 0 && pageIndex > 0) {
+            window.setTimeout(() => goPrev(), 120);
+            return;
+        }
+
         setFadedThroughIndex(index);
 
         const container = scrollAreaRef.current;
 
         const nextWord = currentPage.words[index + 1];
+        if (!nextWord) {
+            if (pageIndex < pages.length - 1) {
+                window.setTimeout(() => goNextFromWordTap(), 180);
+            }
+            return;
+        }
+
         const target =
-            (nextWord ? wordRefs.current[nextWord.id] : null) ?? wordRefs.current[wordId];
+            wordRefs.current[nextWord.id] ?? wordRefs.current[wordId];
 
         if (!container || !target) return;
 
