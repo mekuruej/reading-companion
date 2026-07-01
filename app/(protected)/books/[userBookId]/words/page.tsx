@@ -24,6 +24,7 @@ import BookVocabLoadingState from "./components/BookVocabLoadingState";
 import BookVocabSignInState from "./components/BookVocabSignInState";
 import BookVocabEditFormBody from "./components/BookVocabEditFormBody";
 import BookVocabRow from "./components/BookVocabRow";
+import BookVocabMobileCard from "./components/BookVocabMobileCard";
 import {
   fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
@@ -1154,12 +1155,12 @@ export default function BookWordsPage() {
 
       <BookVocabReorderHint reordering={reordering} />
 
-      <BookVocabTableShell headerStickyStyle={headerStickyStyle}>
+      <div className="space-y-3 md:hidden">
         {filteredSorted.map((w) => {
           const orderPosition = wordOrderPosition(w);
 
           return (
-            <BookVocabRow
+            <BookVocabMobileCard
               key={w.id}
               hidden={w.hidden}
               surface={w.surface}
@@ -1188,8 +1189,51 @@ export default function BookWordsPage() {
           );
         })}
 
-        {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
-      </BookVocabTableShell>
+        {filteredSorted.length === 0 ? (
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 text-sm text-stone-500">
+            No words match your filters.
+          </div>
+        ) : null}
+      </div>
+
+      <div className="hidden md:block">
+        <BookVocabTableShell headerStickyStyle={headerStickyStyle}>
+          {filteredSorted.map((w) => {
+            const orderPosition = wordOrderPosition(w);
+
+            return (
+              <BookVocabRow
+                key={w.id}
+                hidden={w.hidden}
+                surface={w.surface}
+                reading={w.reading}
+                meaning={w.meaning}
+                canMoveUp={orderPosition.canMoveUp}
+                canMoveDown={orderPosition.canMoveDown}
+                onMoveUp={async () => {
+                  const scrollY = window.scrollY;
+                  await moveWordInGroup(w.id, "up");
+                  requestAnimationFrame(() => {
+                    window.scrollTo({ top: scrollY });
+                  });
+                }}
+                onMoveDown={async () => {
+                  const scrollY = window.scrollY;
+                  await moveWordInGroup(w.id, "down");
+                  requestAnimationFrame(() => {
+                    window.scrollTo({ top: scrollY });
+                  });
+                }}
+                onOpen={() =>
+                  router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
+                }
+              />
+            );
+          })}
+
+          {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
+        </BookVocabTableShell>
+      </div>
       <BookVocabBackToTopButton />
     </main >
   );
