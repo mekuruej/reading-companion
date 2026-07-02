@@ -101,9 +101,9 @@ export default function WordDictionaryInfoSection({
           </div>
 
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3">
-            <div className="text-xs uppercase tracking-wide text-rose-700">Common</div>
+            <div className="text-xs uppercase tracking-wide text-rose-700">Frequency</div>
             <div className="mt-1 text-lg font-black text-rose-950">
-              {isCommon ? "Yes" : "Not marked"}
+              {isCommon ? "Common" : "Unlisted"}
             </div>
           </div>
         </div>

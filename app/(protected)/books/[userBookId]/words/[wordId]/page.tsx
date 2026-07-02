@@ -59,6 +59,18 @@ type SeenInstance = {
   books_cover_url: string | null;
 };
 
+type WordNeighbor = {
+  id: string;
+  surface: string;
+  reading: string | null;
+  page_number: number | null;
+  chapter_number: number | null;
+  chapter_name: string | null;
+  page_order: number | null;
+  created_at: string;
+  hidden: boolean | null;
+};
+
 type CollocationRow = {
   id: string;
   user_id: string;
@@ -125,6 +137,27 @@ function normalizeCollocation(s: string) {
 
 function getUniqueKanji(surface: string) {
   return Array.from(new Set(surface.match(/[\u3400-\u9FFF]/g) || []));
+}
+
+function sortWordNeighbors(words: WordNeighbor[]) {
+  return [...words].sort((a, b) => {
+    const aChapter = a.chapter_number ?? Number.MAX_SAFE_INTEGER;
+    const bChapter = b.chapter_number ?? Number.MAX_SAFE_INTEGER;
+    if (aChapter !== bChapter) return aChapter - bChapter;
+
+    const aPage = a.page_number ?? Number.MAX_SAFE_INTEGER;
+    const bPage = b.page_number ?? Number.MAX_SAFE_INTEGER;
+    if (aPage !== bPage) return aPage - bPage;
+
+    const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = b.page_order ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    const created = a.created_at.localeCompare(b.created_at);
+    if (created !== 0) return created;
+
+    return a.id.localeCompare(b.id);
+  });
 }
 
 // -------------------------------------------------------------
@@ -331,6 +364,8 @@ export default function WordDetailPage() {
 
   const [word, setWord] = useState<WordRow | null>(null);
   const [meaningChoices, setMeaningChoices] = useState<string[]>([]);
+  const [previousWord, setPreviousWord] = useState<WordNeighbor | null>(null);
+  const [nextWord, setNextWord] = useState<WordNeighbor | null>(null);
 
   const [editing, setEditing] = useState<WordRow | null>(null);
   const [editSaving, setEditSaving] = useState(false);
@@ -507,6 +542,8 @@ export default function WordDetailPage() {
     setLoading(true);
     setErrorMsg(null);
     setNeedsSignIn(false);
+    setPreviousWord(null);
+    setNextWord(null);
 
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -623,11 +660,43 @@ export default function WordDetailPage() {
 
       setWord(w);
       setMeaningChoices(asStringArray((w as any).meaning_choices));
+
+      const { data: neighborRows, error: neighborErr } = await supabase
+        .from("user_book_words")
+        .select(
+          `
+          id,
+          surface,
+          reading,
+          page_number,
+          chapter_number,
+          chapter_name,
+          page_order,
+          created_at,
+          hidden
+        `
+        )
+        .eq("user_book_id", userBookId)
+        .returns<WordNeighbor[]>();
+
+      if (neighborErr) throw neighborErr;
+
+      const orderedNeighbors = sortWordNeighbors(neighborRows ?? []);
+      const currentIndex = orderedNeighbors.findIndex((item) => item.id === wordId);
+
+      setPreviousWord(currentIndex > 0 ? orderedNeighbors[currentIndex - 1] : null);
+      setNextWord(
+        currentIndex >= 0 && currentIndex < orderedNeighbors.length - 1
+          ? orderedNeighbors[currentIndex + 1]
+          : null
+      );
     } catch (e: any) {
       setErrorMsg(e?.message ?? "Failed to load word");
       setWord(null);
       setSeenInstances([]);
       setTotalLookupCount(0);
+      setPreviousWord(null);
+      setNextWord(null);
     } finally {
       setLoading(false);
     }
@@ -885,6 +954,54 @@ export default function WordDetailPage() {
             router.push(`/books/${encodeURIComponent(userBookId)}/words`)
           }
         />
+
+        <div className="mb-4 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={!previousWord}
+            onClick={() => {
+              if (!previousWord) return;
+              router.push(
+                `/books/${encodeURIComponent(userBookId)}/words/${previousWord.id}`
+              );
+            }}
+            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-left text-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <div className="text-xs font-bold uppercase tracking-[0.12em] text-stone-400">
+              ← Previous word
+            </div>
+            <div className="mt-1 truncate text-base font-black text-stone-900">
+              {previousWord?.surface ?? "Start of list"}
+            </div>
+            {previousWord?.reading ? (
+              <div className="truncate text-sm font-medium text-stone-500">
+                {previousWord.reading}
+              </div>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            disabled={!nextWord}
+            onClick={() => {
+              if (!nextWord) return;
+              router.push(`/books/${encodeURIComponent(userBookId)}/words/${nextWord.id}`);
+            }}
+            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-left text-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40 sm:text-right"
+          >
+            <div className="text-xs font-bold uppercase tracking-[0.12em] text-stone-400">
+              Next word →
+            </div>
+            <div className="mt-1 truncate text-base font-black text-stone-900">
+              {nextWord?.surface ?? "End of list"}
+            </div>
+            {nextWord?.reading ? (
+              <div className="truncate text-sm font-medium text-stone-500">
+                {nextWord.reading}
+              </div>
+            ) : null}
+          </button>
+        </div>
 
         <WordDictionaryInfoSection
           surface={word.surface}

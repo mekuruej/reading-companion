@@ -24,7 +24,7 @@ export default function AddBookLookupCard({
             </p>
 
             <h1 className="mt-2 text-2xl font-black text-stone-950">
-                Add a Japanese book by ISBN
+                Add a Japanese book by ISBN-13
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-stone-600">
