@@ -48,7 +48,7 @@ export default function KanjiStudyCardFrame({
   const showKanjiMeta = strokeCount != null || radical || radicalName || radicalEnglishName || isJouyou != null || schoolGrade != null;
   const radicalNames = [radicalName, radicalEnglishName].filter(Boolean).join(" / ");
   const jouyouLabel = isJouyou == null ? "" : isJouyou ? "Jouyou" : "Not Jouyou";
-  const gradeLabel = schoolGrade == null ? "" : schoolGrade === 8 ? "Junior high+" : `Grade ${schoolGrade}`;
+  const gradeLabel = schoolGrade == null ? "" : schoolGrade === 8 ? "Junior High" : schoolGrade === 9 ? "High School" : `Grade ${schoolGrade}`;
 
   return (
     <div

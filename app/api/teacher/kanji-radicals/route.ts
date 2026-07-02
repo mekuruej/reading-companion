@@ -67,7 +67,7 @@ function normalizeNullableBoolean(value: unknown) {
 function normalizeSchoolGrade(value: unknown) {
   if (value === "" || value == null) return null;
   const grade = Number(value);
-  return Number.isInteger(grade) && grade >= 1 && grade <= 8 ? grade : null;
+  return Number.isInteger(grade) && grade >= 1 && grade <= 9 ? grade : null;
 }
 
 function missingColumnName(error: unknown) {

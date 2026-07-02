@@ -327,7 +327,7 @@ export default function TeacherKanjiRadicalsPage() {
                             {item.jlpt_level ? ` · ${item.jlpt_level}` : ""}
                             {item.stroke_count ? ` · ${item.stroke_count} strokes` : ""}
                             {item.is_jouyou == null ? "" : item.is_jouyou ? " · Jouyou" : " · Not Jouyou"}
-                            {item.school_grade ? ` · ${item.school_grade === 8 ? "Junior high+" : `Grade ${item.school_grade}`}` : ""}
+                            {item.school_grade ? ` · ${item.school_grade === 8 ? "Junior High" : item.school_grade === 9 ? "High School" : `Grade ${item.school_grade}`}` : ""}
                             {item.source ? ` · ${item.source}` : ""}
                             {item.components?.length ? ` · parts: ${item.components.map((component) => component.component).join(" ")}` : ""}
                           </p>
@@ -429,7 +429,8 @@ export default function TeacherKanjiRadicalsPage() {
                     <option value="4">Grade 4</option>
                     <option value="5">Grade 5</option>
                     <option value="6">Grade 6</option>
-                    <option value="8">Junior high+</option>
+                    <option value="8">Junior High</option>
+                    <option value="9">High School</option>
                   </select>
                 </label>
 
