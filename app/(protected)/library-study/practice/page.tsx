@@ -367,7 +367,7 @@ async function loadAllLibraryWordSummaries(userId: string) {
   return allRows;
 }
 
-async function loadDefinitionNumbersByWordId(wordIds: string[]) {
+async function loadDefinitionNumbersByWordId(wordIds: string[], userBookIds: string[]) {
   const definitionNumberByWordId = new Map<string, number>();
   const uniqueWordIds = uniqueStrings(wordIds);
 
@@ -376,7 +376,8 @@ async function loadDefinitionNumbersByWordId(wordIds: string[]) {
     const { data: sampleWords, error: sampleWordsErr } = await supabase
       .from("user_book_words")
       .select("id, meaning_choice_index")
-      .in("id", batch);
+      .in("id", batch)
+      .in("user_book_id", userBookIds);
 
     if (sampleWordsErr) throw sampleWordsErr;
 
@@ -1167,6 +1168,7 @@ export default function LibraryStudyPage() {
   const searchParams = useSearchParams();
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [ownedUserBookIds, setOwnedUserBookIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1240,6 +1242,7 @@ export default function LibraryStudyPage() {
 
         if (authErr || !user) {
           setCurrentUserId(null);
+          setOwnedUserBookIds([]);
           setNeedsSignIn(true);
           setLoading(false);
           return;
@@ -1280,6 +1283,7 @@ export default function LibraryStudyPage() {
         setCanUseLibraryReview(canUseLibraryReviewNow);
 
         if (!canUseLibraryReviewNow) {
+          setOwnedUserBookIds([]);
           setLibraryReviewCards([]);
           setPracticeDeck([]);
           setFullAccessLocked(true);
@@ -1302,8 +1306,10 @@ export default function LibraryStudyPage() {
         if (userBooksErr) throw userBooksErr;
 
         const userBookIds = (userBooks ?? []).map((row) => row.id).filter(Boolean);
+        setOwnedUserBookIds(userBookIds);
 
         if (userBookIds.length === 0) {
+          setOwnedUserBookIds([]);
           setLibraryReviewCards([]);
           setPracticeDeck([]);
           setLoading(false);
@@ -1366,7 +1372,10 @@ export default function LibraryStudyPage() {
 
           if (sampleWordIds.length > 0) {
             try {
-              definitionNumberByWordId = await loadDefinitionNumbersByWordId(sampleWordIds);
+              definitionNumberByWordId = await loadDefinitionNumbersByWordId(
+                sampleWordIds,
+                userBookIds
+              );
             } catch (sampleWordsErr) {
               console.warn("Could not load definition numbers for Library Practice:", sampleWordsErr);
             }
@@ -1846,7 +1855,9 @@ export default function LibraryStudyPage() {
   }
 
   async function flagPracticeCard(cardToFlag: StudyCard) {
-    if (!canUseLibraryReview) return false;
+    if (!canUseLibraryReview || !currentUserId || ownedUserBookIds.length === 0) {
+      return false;
+    }
 
     if (isClaimCardId(cardToFlag.id)) {
       setNotice("Thanks — Word Sky claim flagging is not wired yet.");
@@ -1863,7 +1874,8 @@ export default function LibraryStudyPage() {
         flagged_by_user_id: currentUserId,
         flagged_at: new Date().toISOString(),
       })
-      .in("id", idsToFlag);
+      .in("id", idsToFlag)
+      .in("user_book_id", ownedUserBookIds);
 
     if (error) {
       console.error("Error flagging Library Review card:", error);

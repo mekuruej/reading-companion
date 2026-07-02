@@ -26,7 +26,6 @@ type ProfileRow = {
   username: string | null;
   level: string | null;
   target_language: string | null;
-  role: string | null;
 };
 
 type PublicProfileRow = {
@@ -118,7 +117,7 @@ export default function PublicProfilePreviewPage() {
         ] = await Promise.all([
           supabase
             .from("profiles")
-            .select("display_name, username, level, target_language, role")
+            .select("display_name, username, level, target_language")
             .eq("id", user.id)
             .maybeSingle<ProfileRow>(),
           supabase
@@ -267,7 +266,6 @@ export default function PublicProfilePreviewPage() {
 
             <ProfilePreviewDetailsGrid
               publicLevelLabel={displayValue(publicProfile?.jlpt_level_public, "Hidden")}
-              roleLabel={displayValue(profile?.role, "member")}
               favoriteGenres={favoriteGenres}
             />
           </div>

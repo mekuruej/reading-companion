@@ -1,12 +1,10 @@
 type ProfilePreviewDetailsGridProps = {
   publicLevelLabel: string;
-  roleLabel: string;
   favoriteGenres: string[];
 };
 
 export default function ProfilePreviewDetailsGrid({
   publicLevelLabel,
-  roleLabel,
   favoriteGenres,
 }: ProfilePreviewDetailsGridProps) {
   return (
@@ -17,15 +15,6 @@ export default function ProfilePreviewDetailsGrid({
         </div>
         <p className="mt-2 text-sm leading-6 text-stone-600">
           {publicLevelLabel}
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-stone-100 p-4">
-        <div className="text-xs font-black uppercase tracking-[0.16em] text-stone-400">
-          Role
-        </div>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          {roleLabel}
         </p>
       </div>
 

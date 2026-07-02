@@ -518,3 +518,176 @@ Component organization cleanup complete. Remaining shared folders are intentiona
    - Visual cleanup complete
    - Component organization cleanup complete
    - Architecture cleanup deferred
+
+   ### `/community/profile/preview`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only loads the current user’s own `profiles` row with `profiles.id = user.id`.
+* Confirmed it only loads the current user’s own `user_public_profile` row with `user_public_profile.user_id = user.id`.
+* Confirmed book counts, current books, library word counts, and color totals are scoped to the current user.
+* Confirmed the page does not accept `userId`, `username`, or `userBookId` from route/search params.
+* Removed internal app role display from the public profile preview.
+
+Decision:
+
+`/community/profile/preview` is a self-preview page and does not expose other users’ private profile/library data.
+
+### `/community/profile/settings`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only loads the current user’s own `profiles` row with `profiles.id = user.id`.
+* Confirmed it only loads the current user’s own `user_public_profile` row with `user_public_profile.user_id = user.id`.
+* Confirmed profile saves write to `profiles.id = user.id` and `user_public_profile.user_id = user.id`.
+* Removed `role` from the client-side profile settings upsert payload.
+* Removed the old `existingRole` preserve/write behavior from the profile settings page.
+
+Decision:
+
+`/community/profile/settings` remains a self-profile edit page. Users can update reader/profile fields, but app roles remain outside the normal profile settings save flow.
+
+### `/community/profile/preview`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only loads the current user’s own `profiles` row with `profiles.id = user.id`.
+* Confirmed it only loads the current user’s own `user_public_profile` row with `user_public_profile.user_id = user.id`.
+* Confirmed book counts, current books, library word counts, and color totals are scoped to the current user.
+* Confirmed the page does not accept `userId`, `username`, or `userBookId` from route/search params.
+* Removed internal app role display from the public profile preview.
+
+Decision:
+
+`/community/profile/preview` is a self-preview page and does not expose other users’ private profile/library data.
+
+### Public profile route
+
+Checked:
+
+* Searched current `app` routes for profile/user/public pages.
+* Confirmed there is not currently a separate public profile route.
+* Existing profile routes are self-profile pages.
+* `/users/[username]/books` exists, but it is a protected user-library route and is deferred while Codex is actively editing the Teacher Student / library hub area.
+
+Decision:
+
+No public profile route audit is needed yet because the route does not exist.
+
+### `/community/profile/setup`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only loads the current user’s own `profiles` row with `profiles.id = user.id`.
+* Confirmed profile setup saves only to `profiles.id = user.id`.
+* Removed `role` from the client-side setup upsert payload.
+* Removed the old `existingRole` preserve/write behavior from the setup page.
+* Confirmed `profiles.role` has a database default of `'student'`, so new profile rows do not need the browser to send a role.
+
+Decision:
+
+`/community/profile/setup` remains a self-profile setup page. Users can create/update basic profile fields, but app roles remain outside the normal profile setup save flow.
+
+### `/community`
+
+Checked:
+
+* Confirmed the Community Hub currently has `SHOW_COMMUNITY_STUDY_SNAPSHOT = false`.
+* Confirmed the raw community snapshot queries do not run while that flag is false.
+* Found dormant client-side community snapshot code that would query `user_library_word_summaries` and `user_library_word_progress` with `user_id` fields if re-enabled.
+* Confirmed the current page does not display individual users, names, or profile links from those rows.
+
+Decision:
+
+`/community` has no immediate exposure because the community snapshot is disabled. However, the dormant snapshot code should not be re-enabled as-is.
+
+Follow-up:
+
+Remove the disabled client-side community snapshot code, or replace it later with a safe anonymous aggregate view/RPC that returns only community-level counts/averages and no `user_id` or per-user study rows.
+
+### `/community/book-clubs`
+
+Finished:
+
+* Confirmed the page does not call `supabase.auth.getUser()` or `getSession()`.
+* Confirmed the page does not query `profiles`, `user_books`, `user_book_words`, `teacher_students`, or book club member data.
+* Confirmed the page does not accept route/search params for user or book access.
+* Confirmed the page is currently static/community-facing content only.
+
+Decision:
+
+`/community/book-clubs` passed the non-book route access audit with no code changes.
+
+### `/community/stats`
+
+Finished:
+
+* Confirmed the page gets the logged-in user session before loading personal stats.
+* Confirmed it queries `user_books` only with `user_id = user.id`.
+* Confirmed reading sessions are loaded only through the current user’s owned `user_book_id` list.
+* Confirmed saved word counts are loaded only through the current user’s owned `user_book_id` list.
+* Confirmed library color totals are requested with the current user’s ID.
+* Confirmed the page does not accept `userId`, `username`, or `userBookId` from route/search params.
+
+Decision:
+
+`/community/stats` passed the non-book route access audit with no code changes.
+
+### `/library-study`
+
+Finished:
+
+* Confirmed the page does not call `supabase.auth.getUser()` or `getSession()`.
+* Confirmed the page does not query `user_books`, `user_book_words`, study logs, or profile data.
+* Confirmed the page does not accept route/search params for user or book access.
+* Confirmed the page is currently a study hub/navigation page only.
+
+Decision:
+
+`/library-study` passed the non-book route access audit with no code changes.
+
+### `/library-study/characters`
+
+Finished:
+
+* Confirmed the page does not call `supabase.auth.getUser()` or `getSession()`.
+* Confirmed the page does not query `user_books`, `user_book_words`, study logs, or profile data.
+* Confirmed the page does not accept route/search params for user or book access.
+* Confirmed the page is currently a Free Study / character-study navigation page only.
+
+Decision:
+
+`/library-study/characters` passed the non-book route access audit with no code changes.
+
+### `/library-study/book-study`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it only loads the current user’s own `profiles` row with `profiles.id = user.id`.
+* Confirmed it reads role/access fields only to determine the current user’s Book Study access.
+* Confirmed the page does not query `user_books`, `user_book_words`, study logs, or private saved-word data.
+* Confirmed the page does not accept route/search params for user or book access.
+* Confirmed the page does not write profile, book, or study data.
+
+Decision:
+
+`/library-study/book-study` passed the non-book route access audit with no code changes.
+
+### `/library-study/kana`
+
+Finished:
+
+* Confirmed the page does not call `supabase.auth.getUser()` or `getSession()`.
+* Confirmed the page does not query `profiles`, `user_books`, `user_book_words`, study logs, or saved-word data.
+* Confirmed the page does not accept route/search params for user or book access.
+* Confirmed the page does not write study progress or profile data.
+* Confirmed the page is local-only Kana practice.
+
+Decision:
+
+`/library-study/kana` passed the non-book route access audit with no code changes.

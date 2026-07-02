@@ -9,8 +9,6 @@ import ProfileShell from "@/components/profile/ProfileShell";
 import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import { supabase } from "@/lib/supabaseClient";
 
-type ProfileRole = "teacher" | "member" | "student" | "super_teacher";
-
 const NATIVE_LANGUAGE_OPTIONS = [
   "English",
   "Japanese",
@@ -44,7 +42,6 @@ export default function ProfileSetupPage() {
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("Japanese");
   const [level, setLevel] = useState("");
-  const [existingRole, setExistingRole] = useState<ProfileRole | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -67,7 +64,7 @@ export default function ProfileSetupPage() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("display_name, username, native_language, target_language, level, role")
+        .select("display_name, username, native_language, target_language, level")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -83,7 +80,6 @@ export default function ProfileSetupPage() {
       setUsername(profile?.username ?? "");
       setTargetLanguage(profile?.target_language ?? "Japanese");
       setLevel(profile?.level ?? "");
-      setExistingRole((profile?.role as ProfileRole | null) ?? null);
 
       const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
       if (
@@ -172,7 +168,6 @@ export default function ProfileSetupPage() {
           native_language: selectedNativeLanguage,
           target_language: targetLanguage.trim(),
           level: level.trim(),
-          role: existingRole ?? "member",
         },
         { onConflict: "id" }
       );
