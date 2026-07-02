@@ -936,7 +936,7 @@ export default function AddWordPage() {
       if (hasKanji(finalSurface) && cleanReading) {
         const { data: existingCache, error: cacheLookupError } = await supabase
           .from("vocabulary_cache")
-          .select("id")
+          .select("id, jlpt, is_common")
           .eq("surface", finalSurface)
           .eq("reading", cleanReading)
           .maybeSingle();
@@ -947,14 +947,32 @@ export default function AddWordPage() {
           return;
         }
 
+        const normalizedJlpt = normalizeJlpt(jlpt);
+        const cacheMetadata = {
+          jlpt: normalizedJlpt === "NON-JLPT" ? null : normalizedJlpt,
+          is_common: !!isCommon,
+        };
+
         if (existingCache?.id) {
           vocabularyCacheId = existingCache.id;
+
+          if ((!existingCache.jlpt && cacheMetadata.jlpt) || existingCache.is_common == null) {
+            const { error: cacheUpdateError } = await supabase
+              .from("vocabulary_cache")
+              .update(cacheMetadata)
+              .eq("id", existingCache.id);
+
+            if (cacheUpdateError) {
+              console.error("Error updating vocabulary cache metadata:", cacheUpdateError);
+            }
+          }
         } else if (hasVerifiedDictionaryMatch) {
           const { data: createdCache, error: cacheInsertError } = await supabase
             .from("vocabulary_cache")
             .insert({
               surface: finalSurface,
               reading: cleanReading,
+              ...cacheMetadata,
             })
             .select("id")
             .single();

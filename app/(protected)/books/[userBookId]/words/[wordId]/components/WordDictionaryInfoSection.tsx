@@ -58,17 +58,12 @@ export default function WordDictionaryInfoSection({
         </div>
 
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-xs uppercase tracking-wide text-slate-500">
-              Definition
-            </div>
-            {definitionNumber != null ? (
-              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-stone-700 shadow-sm">
-                Def. {definitionNumber}
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1 text-xl font-semibold leading-8 text-stone-900">
+          {definitionNumber != null ? (
+            <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-black text-stone-700 shadow-sm">
+              Definition #{definitionNumber}
+            </span>
+          ) : null}
+          <div className={definitionNumber != null ? "mt-2 text-xl font-semibold leading-8 text-stone-900" : "text-xl font-semibold leading-8 text-stone-900"}>
             {meaning || "—"}
           </div>
         </div>

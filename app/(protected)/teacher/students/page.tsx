@@ -130,7 +130,7 @@ const DEFAULT_TASK_COPY: Record<LearningTaskType, { title: string; instructions:
     },
     listening: {
         title: "Listen to today’s section",
-        instructions: "Listen to the book or audiobook and log the session.",
+        instructions: "Listen to the audiobook, log any words you hear, and time your session.",
     },
 };
 

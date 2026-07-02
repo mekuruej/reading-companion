@@ -1920,7 +1920,8 @@ export default function LibraryStudyPage() {
             const { data: sampleWords, error: sampleWordsErr } = await supabase
               .from("user_book_words")
               .select("id, meaning_choice_index")
-              .in("id", sampleWordIds);
+              .in("id", sampleWordIds)
+              .in("user_book_id", userBookIds);
 
             if (sampleWordsErr) {
               console.warn("Could not load definition numbers for Ability Check:", sampleWordsErr);
@@ -3113,17 +3114,19 @@ export default function LibraryStudyPage() {
 
   async function flagCurrentCard() {
     if (!canUseAbilityCheck) return;
-    if (!currentCard) return;
+    if (!currentUserId || !currentCard) return;
 
     const ok = window.confirm("Hide this card from study?");
     if (!ok) return;
 
     if (isClaimCardId(currentCard.id)) {
+      if (!currentCard.userBookId) return;
+
       const { error } = await supabase
-        .from("user_library_word_claims")
-        .delete()
-        .eq("user_id", currentUserId)
-        .eq("study_identity_key", currentCard.studyIdentityKey);
+        .from("user_book_words")
+        .update({ hidden: true })
+        .eq("id", currentCard.id)
+        .eq("user_book_id", currentCard.userBookId);
 
       if (error) {
         console.error("Error hiding Word Sky claim:", error);

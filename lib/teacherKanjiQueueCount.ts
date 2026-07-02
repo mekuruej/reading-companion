@@ -35,6 +35,9 @@ type ActiveKanjiQueueSummary = {
   dates: string[];
 };
 
+const WORD_ROW_PAGE_SIZE = 1000;
+const MAP_ROW_PAGE_SIZE = 1000;
+
 function hasKanji(value: string) {
   return /[\p{Script=Han}]/u.test(value);
 }
@@ -114,6 +117,40 @@ function isActiveKanjiQueueStatus(params: {
   return completePositions.size < kanjiCount || incompleteRowCount > 0;
 }
 
+async function loadKanjiWordRows(
+  supabase: SupabaseLike,
+  userBookIds: string[]
+) {
+  const rows: KanjiCountWordRow[] = [];
+  const userBookChunkSize = 100;
+
+  for (let i = 0; i < userBookIds.length; i += userBookChunkSize) {
+    const userBookIdChunk = userBookIds.slice(i, i + userBookChunkSize);
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .select("id, user_book_id, surface, reading, vocabulary_cache_id, ignore_kanji_enrichment, created_at")
+        .in("user_book_id", userBookIdChunk)
+        .eq("is_manual_override", false)
+        .gte("created_at", KANJI_ENRICHMENT_TEST_START)
+        .order("created_at", { ascending: true })
+        .range(from, from + WORD_ROW_PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      const pageRows = (data ?? []) as KanjiCountWordRow[];
+      rows.push(...pageRows);
+
+      if (pageRows.length < WORD_ROW_PAGE_SIZE) break;
+      from += WORD_ROW_PAGE_SIZE;
+    }
+  }
+
+  return rows;
+}
+
 async function loadCacheAndMapRows(
   supabase: SupabaseLike,
   cacheIds: number[],
@@ -138,23 +175,112 @@ async function loadCacheAndMapRows(
       cacheRowsById.set(Number(row.id), row);
     }
 
-    const { data: mapRows, error: mapError } = await supabase
+    let from = 0;
+
+    while (true) {
+      const { data: mapRows, error: mapError } = await supabase
+        .from("vocabulary_kanji_map")
+        .select(
+          "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+        )
+        .in("vocabulary_cache_id", cacheIdChunk)
+        .order("id", { ascending: true })
+        .range(from, from + MAP_ROW_PAGE_SIZE - 1);
+
+      if (mapError) throw mapError;
+
+      const pageRows = (mapRows ?? []) as KanjiCountMapRow[];
+
+      for (const row of pageRows) {
+        const cacheKey = String(row.vocabulary_cache_id);
+        const existing = mapRowsByCacheId.get(cacheKey) ?? [];
+        existing.push(row);
+        mapRowsByCacheId.set(cacheKey, existing);
+      }
+
+      if (pageRows.length < MAP_ROW_PAGE_SIZE) break;
+      from += MAP_ROW_PAGE_SIZE;
+    }
+  }
+}
+
+async function loadOldFlaggedRows(supabase: SupabaseLike) {
+  const rows: KanjiCountMapRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
       .from("vocabulary_kanji_map")
       .select(
         "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
       )
-      .in("vocabulary_cache_id", cacheIdChunk)
-      .limit(5000);
+      .eq("flagged_for_review", true)
+      .order("id", { ascending: true })
+      .range(from, from + MAP_ROW_PAGE_SIZE - 1);
 
-    if (mapError) throw mapError;
+    if (error) throw error;
 
-    for (const row of (mapRows ?? []) as KanjiCountMapRow[]) {
-      const cacheKey = String(row.vocabulary_cache_id);
-      const existing = mapRowsByCacheId.get(cacheKey) ?? [];
-      existing.push(row);
-      mapRowsByCacheId.set(cacheKey, existing);
-    }
+    const pageRows = (data ?? []) as KanjiCountMapRow[];
+    rows.push(...pageRows);
+
+    if (pageRows.length < MAP_ROW_PAGE_SIZE) break;
+    from += MAP_ROW_PAGE_SIZE;
   }
+
+  return rows;
+}
+
+async function loadOpenReportRows(supabase: SupabaseLike) {
+  const rows: any[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("kanji_map_reports")
+      .select("id, vocabulary_kanji_map_id, created_at, status")
+      .in("status", ["open", "reviewing"])
+      .order("id", { ascending: true })
+      .range(from, from + MAP_ROW_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const pageRows = data ?? [];
+    rows.push(...pageRows);
+
+    if (pageRows.length < MAP_ROW_PAGE_SIZE) break;
+    from += MAP_ROW_PAGE_SIZE;
+  }
+
+  return rows;
+}
+
+async function loadWordSkyImportRows(supabase: SupabaseLike) {
+  const rows: KanjiCountMapRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("vocabulary_kanji_map")
+      .select(
+        "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+      )
+      .eq("excluded_from_kanji_practice", true)
+      .eq("reading_type", "other")
+      .eq("flagged_for_review", false)
+      .is("flagged_at", null)
+      .order("id", { ascending: true })
+      .range(from, from + MAP_ROW_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const pageRows = (data ?? []) as KanjiCountMapRow[];
+    rows.push(...pageRows);
+
+    if (pageRows.length < MAP_ROW_PAGE_SIZE) break;
+    from += MAP_ROW_PAGE_SIZE;
+  }
+
+  return rows;
 }
 
 export async function loadActiveKanjiQueueSummary(params: {
@@ -176,19 +302,9 @@ export async function loadActiveKanjiQueueSummary(params: {
 
   if (kanjiUserBookIds.length === 0) return { count: 0, dates: [] };
 
-  const { data: kanjiWordRows, error: wordRowsError } = await supabase
-    .from("user_book_words")
-    .select("id, user_book_id, surface, reading, vocabulary_cache_id, ignore_kanji_enrichment, created_at")
-    .in("user_book_id", kanjiUserBookIds)
-    .eq("is_manual_override", false)
-    .gte("created_at", KANJI_ENRICHMENT_TEST_START)
-    .limit(5000);
+  const kanjiWordRows = await loadKanjiWordRows(supabase, kanjiUserBookIds);
 
-  if (wordRowsError) throw wordRowsError;
-
-  const kanjiWords = ((kanjiWordRows ?? []) as KanjiCountWordRow[]).filter((word) =>
-    hasKanji(word.surface ?? "")
-  );
+  const kanjiWords = kanjiWordRows.filter((word) => hasKanji(word.surface ?? ""));
 
   const cacheIds = Array.from(
     new Set(
@@ -203,38 +319,11 @@ export async function loadActiveKanjiQueueSummary(params: {
 
   await loadCacheAndMapRows(supabase, cacheIds, cacheRowsById, mapRowsByCacheId);
 
-  const [
-    { data: oldFlaggedRows, error: oldFlaggedRowsError },
-    { data: reportRows, error: reportRowsError },
-    { data: wordSkyImportRows, error: wordSkyImportRowsError },
-  ] = await Promise.all([
-    supabase
-      .from("vocabulary_kanji_map")
-      .select(
-        "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
-      )
-      .eq("flagged_for_review", true)
-      .limit(1000),
-    supabase
-      .from("kanji_map_reports")
-      .select("id, vocabulary_kanji_map_id, created_at, status")
-      .in("status", ["open", "reviewing"])
-      .limit(1000),
-    supabase
-      .from("vocabulary_kanji_map")
-      .select(
-        "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
-      )
-      .eq("excluded_from_kanji_practice", true)
-      .eq("reading_type", "other")
-      .eq("flagged_for_review", false)
-      .is("flagged_at", null)
-      .limit(1000),
+  const [oldFlaggedRows, reportRows, wordSkyImportRows] = await Promise.all([
+    loadOldFlaggedRows(supabase),
+    loadOpenReportRows(supabase),
+    loadWordSkyImportRows(supabase),
   ]);
-
-  if (oldFlaggedRowsError) throw oldFlaggedRowsError;
-  if (reportRowsError) throw reportRowsError;
-  if (wordSkyImportRowsError) throw wordSkyImportRowsError;
 
   const reportedKanjiMapIds = Array.from(
     new Set(
@@ -247,17 +336,22 @@ export async function loadActiveKanjiQueueSummary(params: {
   let reportedMapRows: KanjiCountMapRow[] = [];
 
   if (reportedKanjiMapIds.length > 0) {
-    const { data: reportMapRows, error: reportMapRowsError } = await supabase
-      .from("vocabulary_kanji_map")
-      .select(
-        "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
-      )
-      .in("id", reportedKanjiMapIds)
-      .limit(1000);
+    const reportedMapRowChunks: KanjiCountMapRow[] = [];
 
-    if (reportMapRowsError) throw reportMapRowsError;
+    for (let i = 0; i < reportedKanjiMapIds.length; i += 100) {
+      const idChunk = reportedKanjiMapIds.slice(i, i + 100);
+      const { data: reportMapRows, error: reportMapRowsError } = await supabase
+        .from("vocabulary_kanji_map")
+        .select(
+          "id, vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading, flagged_for_review, flagged_at, excluded_from_kanji_practice"
+        )
+        .in("id", idChunk);
 
-    reportedMapRows = ((reportMapRows ?? []) as KanjiCountMapRow[]).map((row) => ({
+      if (reportMapRowsError) throw reportMapRowsError;
+      reportedMapRowChunks.push(...((reportMapRows ?? []) as KanjiCountMapRow[]));
+    }
+
+    reportedMapRows = reportedMapRowChunks.map((row) => ({
       ...row,
       flagged_for_review: true,
     }));

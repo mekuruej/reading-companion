@@ -63,6 +63,17 @@ type KanjiMapRow = {
   flagged_for_review: boolean | null;
 };
 
+type KanjiRadicalMetaRow = {
+  kanji: string;
+  radical: string | null;
+  radical_name: string | null;
+  radical_english_name: string | null;
+  jlpt_level: string | null;
+  is_jouyou: boolean | null;
+  school_grade: number | null;
+  stroke_count: number | null;
+};
+
 type QuizCard = {
   key: string;
   kanjiMapId: number;
@@ -82,6 +93,9 @@ type QuizCard = {
   strokeCount: number | null;
   radical: string | null;
   radicalName: string | null;
+  radicalEnglishName: string | null;
+  isJouyou: boolean | null;
+  schoolGrade: number | null;
   chapterNumber: number | null;
   chapterName: string | null;
   pageNumber: number | null;
@@ -224,6 +238,13 @@ function studyModeSummary(mode: KanjiStudyMode) {
   if (mode === "kanjiToKunyomi") return "Kanji to kunyomi";
   if (mode === "onyomiToKanji") return "Onyomi to kanji";
   return "Kanji to onyomi";
+}
+
+function nextKanjiStudyMode(mode: KanjiStudyMode): KanjiStudyMode {
+  if (mode === "kanjiToOnyomi") return "onyomiToKanji";
+  if (mode === "onyomiToKanji") return "kanjiToKunyomi";
+  if (mode === "kanjiToKunyomi") return "kunyomiToKanji";
+  return "kanjiToOnyomi";
 }
 
 function studyModeDescription(mode: KanjiStudyMode) {
@@ -716,6 +737,106 @@ function chunkArray<T>(items: T[], size: number) {
   return chunks;
 }
 
+function missingKanjiRadicalColumnName(error: unknown) {
+  const message = typeof (error as any)?.message === "string" ? (error as any).message : "";
+  if (message.includes("jlpt_level") && message.includes("does not exist")) return "jlpt_level";
+  if (message.includes("radical_english_name") && message.includes("does not exist")) return "radical_english_name";
+  if (message.includes("is_jouyou") && message.includes("does not exist")) return "is_jouyou";
+  if (message.includes("school_grade") && message.includes("does not exist")) return "school_grade";
+  return null;
+}
+
+function kanjiRadicalMetaSelectColumns(includeJlptLevel: boolean, includeEnglishName: boolean, includeJouyou: boolean, includeSchoolGrade: boolean) {
+  return [
+    "kanji",
+    "radical",
+    "radical_name",
+    includeEnglishName ? "radical_english_name" : null,
+    includeJlptLevel ? "jlpt_level" : null,
+    includeJouyou ? "is_jouyou" : null,
+    includeSchoolGrade ? "school_grade" : null,
+    "stroke_count",
+  ].filter(Boolean).join(", ");
+}
+
+async function loadKanjiRadicalMetaRows(kanjiChunk: string[]) {
+  let includeJlptLevel = true;
+  let includeEnglishName = true;
+  let includeJouyou = true;
+  let includeSchoolGrade = true;
+
+  while (true) {
+    const result = await supabase
+      .from("kanji_radicals")
+      .select(kanjiRadicalMetaSelectColumns(includeJlptLevel, includeEnglishName, includeJouyou, includeSchoolGrade))
+      .in("kanji", kanjiChunk)
+      .returns<Partial<KanjiRadicalMetaRow>[]>();
+
+    if (!result.error) {
+      return (result.data ?? []).map((row) => ({
+        kanji: row.kanji ?? "",
+        radical: row.radical ?? null,
+        radical_name: row.radical_name ?? null,
+        radical_english_name: row.radical_english_name ?? null,
+        jlpt_level: row.jlpt_level ?? null,
+        is_jouyou: row.is_jouyou ?? null,
+        school_grade: row.school_grade ?? null,
+        stroke_count: row.stroke_count ?? null,
+      }));
+    }
+
+    const missing = missingKanjiRadicalColumnName(result.error);
+    if (missing === "jlpt_level" && includeJlptLevel) {
+      includeJlptLevel = false;
+      continue;
+    }
+    if (missing === "radical_english_name" && includeEnglishName) {
+      includeEnglishName = false;
+      continue;
+    }
+    if (missing === "is_jouyou" && includeJouyou) {
+      includeJouyou = false;
+      continue;
+    }
+    if (missing === "school_grade" && includeSchoolGrade) {
+      includeSchoolGrade = false;
+      continue;
+    }
+
+    throw result.error;
+  }
+}
+
+async function loadKanjiMapRows() {
+  const rows: KanjiMapRow[] = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("vocabulary_kanji_map")
+      .select(
+        "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, excluded_from_kanji_practice, flagged_for_review"
+      )
+      .not("kanji", "is", null)
+      .not("base_reading", "is", null)
+      .not("realized_reading", "is", null)
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1)
+      .returns<KanjiMapRow[]>();
+
+    if (error) throw error;
+
+    const pageRows = data ?? [];
+    rows.push(...pageRows);
+
+    if (pageRows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return rows;
+}
+
 function makeContextKey(surface: string | null | undefined, reading: string | null | undefined) {
   return `${normalizeWord(surface ?? "")}|||${normalizeReading(reading ?? "")}`;
 }
@@ -792,20 +913,9 @@ export default function KanjiReadingStudyPage() {
           return;
         }
 
-        const { data: kanjiMapRows, error: kanjiMapErr } = await supabase
-          .from("vocabulary_kanji_map")
-          .select(
-            "id, vocabulary_cache_id, kanji, kanji_position, reading_type, base_reading, realized_reading, excluded_from_kanji_practice, flagged_for_review"
-          )
-          .not("kanji", "is", null)
-          .not("base_reading", "is", null)
-          .not("realized_reading", "is", null)
-          .limit(5000)
-          .returns<KanjiMapRow[]>();
+        const kanjiMapRows = await loadKanjiMapRows();
 
-        if (kanjiMapErr) throw kanjiMapErr;
-
-        const activeKanjiMapRows = (kanjiMapRows ?? []).filter((row) => {
+        const activeKanjiMapRows = kanjiMapRows.filter((row) => {
           const hasReading = !!(row.realized_reading?.trim() || row.base_reading?.trim());
           return hasReading && (!row.excluded_from_kanji_practice || !!row.flagged_for_review);
         });
@@ -817,8 +927,16 @@ export default function KanjiReadingStudyPage() {
               .filter((id): id is number => id != null)
           )
         );
+        const kanjiChars = Array.from(
+          new Set(
+            activeKanjiMapRows
+              .map((row) => row.kanji?.trim() ?? "")
+              .filter(Boolean)
+          )
+        );
 
         const vocabularyById = new Map<number, VocabularyCacheRow>();
+        const radicalMetaByKanji = new Map<string, KanjiRadicalMetaRow>();
 
         for (const cacheIdChunk of chunkArray(vocabularyCacheIds, 400)) {
           const { data: cacheRows, error: cacheErr } = await supabase
@@ -831,6 +949,14 @@ export default function KanjiReadingStudyPage() {
 
           for (const row of cacheRows ?? []) {
             vocabularyById.set(row.id, row);
+          }
+        }
+
+        for (const kanjiChunk of chunkArray(kanjiChars, 400)) {
+          const radicalRows = await loadKanjiRadicalMetaRows(kanjiChunk);
+
+          for (const row of radicalRows) {
+            radicalMetaByKanji.set(row.kanji, row);
           }
         }
 
@@ -887,6 +1013,7 @@ export default function KanjiReadingStudyPage() {
 
         const core: QuizCard[] = activeKanjiMapRows.flatMap((km) => {
           const vocab = vocabularyById.get(km.vocabulary_cache_id);
+          const radicalMeta = km.kanji ? radicalMetaByKanji.get(km.kanji) : null;
           const surface = vocab?.surface?.trim() ?? "";
           const sourceReading = vocab?.reading?.trim() ?? "";
           const reading = km.realized_reading?.trim() || km.base_reading?.trim() || "";
@@ -917,7 +1044,7 @@ export default function KanjiReadingStudyPage() {
             sourceWord: surface,
             sourceMeaning,
             sourceReading,
-            jlpt: vocab?.jlpt ?? null,
+            jlpt: radicalMeta?.jlpt_level ?? vocab?.jlpt ?? null,
             userBookId: context?.user_book_id ?? null,
             userBookWordId: context?.id ?? null,
             bookTitle: context
@@ -926,9 +1053,12 @@ export default function KanjiReadingStudyPage() {
             bookCover: context
               ? bookInfoByUserBookId.get(context.user_book_id)?.cover ?? null
               : null,
-            strokeCount: null,
-            radical: null,
-            radicalName: null,
+            strokeCount: radicalMeta?.stroke_count ?? null,
+            radical: radicalMeta?.radical ?? null,
+            radicalName: radicalMeta?.radical_name ?? null,
+            radicalEnglishName: radicalMeta?.radical_english_name ?? null,
+            isJouyou: radicalMeta?.is_jouyou ?? null,
+            schoolGrade: radicalMeta?.school_grade ?? null,
             chapterNumber: context?.chapter_number ?? null,
             chapterName: context?.chapter_name ?? null,
             pageNumber: context?.page_number ?? null,
@@ -1194,6 +1324,18 @@ export default function KanjiReadingStudyPage() {
     setCardsSinceLastRecall(0);
   }
 
+  function moveDeckToNextMode() {
+    const nextMode = nextKanjiStudyMode(studyMode);
+    setStudyMode(nextMode);
+    setIndex(0);
+    resetCardState();
+    setSkipTypingThisSession(false);
+    setEndedEarly(false);
+    setUsedRecallWords([]);
+    setCardsSinceLastRecall(0);
+    setNotice(`Next mode: ${studyModeSummary(nextMode)}`);
+  }
+
   function recordKanjiReadingStudyEvent({
     result,
     isCorrect,
@@ -1443,7 +1585,9 @@ export default function KanjiReadingStudyPage() {
     return (
       <KanjiStudyCompleteState
         endedEarly={endedEarly}
+        nextModeLabel={studyModeSummary(nextKanjiStudyMode(studyMode))}
         onBackToStudyHub={() => router.push("/library-study")}
+        onNextMode={moveDeckToNextMode}
         onRestart={restartDeck}
       />
     );
@@ -1497,6 +1641,9 @@ export default function KanjiReadingStudyPage() {
             strokeCount={card.strokeCount}
             radical={card.radical}
             radicalName={card.radicalName}
+            radicalEnglishName={card.radicalEnglishName}
+            isJouyou={card.isJouyou}
+            schoolGrade={card.schoolGrade}
             onCardClick={() => {
               if (!checked && !inRecallFlow) return;
               if (inRecallFlow) return;

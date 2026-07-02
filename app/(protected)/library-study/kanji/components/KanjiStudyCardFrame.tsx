@@ -8,6 +8,9 @@ type KanjiStudyCardFrameProps = {
   strokeCount?: number | null;
   radical?: string | null;
   radicalName?: string | null;
+  radicalEnglishName?: string | null;
+  isJouyou?: boolean | null;
+  schoolGrade?: number | null;
   onCardClick: () => void;
   children: ReactNode;
 };
@@ -36,10 +39,16 @@ export default function KanjiStudyCardFrame({
   strokeCount,
   radical,
   radicalName,
+  radicalEnglishName,
+  isJouyou,
+  schoolGrade,
   onCardClick,
   children,
 }: KanjiStudyCardFrameProps) {
-  const showKanjiMeta = strokeCount != null || radical || radicalName;
+  const showKanjiMeta = strokeCount != null || radical || radicalName || radicalEnglishName || isJouyou != null || schoolGrade != null;
+  const radicalNames = [radicalName, radicalEnglishName].filter(Boolean).join(" / ");
+  const jouyouLabel = isJouyou == null ? "" : isJouyou ? "Jouyou" : "Not Jouyou";
+  const gradeLabel = schoolGrade == null ? "" : schoolGrade === 8 ? "Junior high+" : `Grade ${schoolGrade}`;
 
   return (
     <div
@@ -73,7 +82,9 @@ export default function KanjiStudyCardFrame({
 
             <div className="mt-1 text-[10px] text-slate-400">
               {radical ? `radical: ${radical}` : ""}
-              {radicalName ? ` (${radicalName})` : ""}
+              {radicalNames ? ` (${radicalNames})` : ""}
+              {jouyouLabel ? ` · ${jouyouLabel}` : ""}
+              {gradeLabel ? ` · ${gradeLabel}` : ""}
             </div>
           </div>
         </div>

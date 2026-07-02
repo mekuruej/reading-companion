@@ -141,7 +141,7 @@ export default function BookHubActionGrid({
                 <ActionButton
                     title="Listening"
                     subtitle="(Ear Training)"
-                    description="Listen to the book or audiobook and log listening time."
+                    description="Listen to the audiobook, log any words you hear and time your session."
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onListening}
                 />

@@ -53,27 +53,6 @@ type TeacherRatingCountUserBookRow = {
   rating_recommend: number | null;
 };
 
-type KanjiCountWordRow = {
-  id: string;
-  user_book_id: string;
-  surface: string | null;
-  vocabulary_cache_id: number | null;
-  ignore_kanji_enrichment?: boolean | null;
-};
-
-type KanjiCountMapRow = {
-  id: number;
-  vocabulary_cache_id: number;
-  kanji_position: number;
-  reading_type: "on" | "kun" | "other" | null;
-  base_reading: string | null;
-  realized_reading: string | null;
-  flagged_for_review?: boolean | null;
-  excluded_from_kanji_practice?: boolean | null;
-};
-
-const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
-
 const attentionCards: NeedsAttentionCard[] = [
   {
     title: "Books",
@@ -149,59 +128,6 @@ function missingGlobalBookFields(book: GlobalBookRow) {
   if (!String(book.published_date ?? "").trim()) missing.push("published date");
   if (book.page_count == null) missing.push("page count");
   return missing;
-}
-
-function hasKanji(value: string) {
-  return /[\p{Script=Han}]/u.test(value);
-}
-
-function kanjiChars(value: string) {
-  return Array.from(value).filter((ch) => /\p{Script=Han}/u.test(ch));
-}
-
-function effectiveKanjiReadingType(
-  row: Pick<KanjiCountMapRow, "reading_type" | "base_reading" | "realized_reading">
-) {
-  if (row.reading_type) return row.reading_type;
-  return row.base_reading?.trim() && row.realized_reading?.trim() ? "on" : null;
-}
-
-function isActiveKanjiQueueStatus(params: {
-  vocabularyCacheId: number | null;
-  surface: string;
-  mapRows: KanjiCountMapRow[];
-  ignored?: boolean | null;
-}) {
-  const mapRows = params.mapRows;
-  const kanjiCount = kanjiChars(params.surface).length;
-  const flaggedMapRowCount = mapRows.filter((row) => row.flagged_for_review).length;
-  const excludedMapRowCount = mapRows.filter((row) => row.excluded_from_kanji_practice).length;
-
-  if (params.ignored || (mapRows.length > 0 && excludedMapRowCount === mapRows.length)) {
-    return false;
-  }
-
-  if (!params.vocabularyCacheId || mapRows.length === 0 || flaggedMapRowCount > 0) {
-    return true;
-  }
-
-  const completePositions = new Set(
-    mapRows
-      .filter(
-        (row) =>
-          typeof row.kanji_position === "number" &&
-          !!effectiveKanjiReadingType(row) &&
-          !!row.base_reading &&
-          !!row.realized_reading
-      )
-      .map((row) => row.kanji_position)
-  );
-
-  const incompleteRowCount = mapRows.filter(
-    (row) => !effectiveKanjiReadingType(row) || !row.base_reading || !row.realized_reading
-  ).length;
-
-  return completePositions.size < kanjiCount || incompleteRowCount > 0;
 }
 
 export default function TeacherNeedsAttentionPage() {

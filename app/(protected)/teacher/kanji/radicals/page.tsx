@@ -12,6 +12,10 @@ type RadicalQueueItem = {
   has_radical: boolean;
   radical: string | null;
   radical_name: string | null;
+  radical_english_name: string | null;
+  jlpt_level: string | null;
+  is_jouyou: boolean | null;
+  school_grade: number | null;
   stroke_count: number | null;
   notes: string | null;
   source: string | null;
@@ -23,9 +27,14 @@ type EditorState = {
   kanji: string;
   radical: string;
   radical_name: string;
+  radical_english_name: string;
+  jlpt_level: string;
+  is_jouyou: string;
+  school_grade: string;
   components: string;
   stroke_count: string;
   notes: string;
+  source: string;
 };
 
 function isSuperTeacherFlag(value: unknown) {
@@ -41,9 +50,14 @@ function editorFromItem(item: RadicalQueueItem): EditorState {
     kanji: item.kanji,
     radical: item.radical ?? "",
     radical_name: item.radical_name ?? "",
+    radical_english_name: item.radical_english_name ?? "",
+    jlpt_level: item.jlpt_level ?? "",
+    is_jouyou: item.is_jouyou == null ? "" : item.is_jouyou ? "true" : "false",
+    school_grade: item.school_grade == null ? "" : String(item.school_grade),
     components: (item.components ?? []).map((component) => component.component).join(" "),
     stroke_count: item.stroke_count == null ? "" : String(item.stroke_count),
     notes: item.notes ?? "",
+    source: item.source ?? "jisho+kakimashou",
   };
 }
 
@@ -305,12 +319,16 @@ export default function TeacherKanjiRadicalsPage() {
                         <div>
                           <p className="text-sm font-black text-stone-900">
                             {item.has_radical
-                              ? `${item.radical}${item.radical_name ? ` · ${item.radical_name}` : ""}`
+                              ? [item.radical, item.radical_name, item.radical_english_name].filter(Boolean).join(" · ")
                               : "Needs radical"}
                           </p>
                           <p className="mt-1 text-xs font-semibold text-stone-500">
                             {item.count} mapped row{item.count === 1 ? "" : "s"}
+                            {item.jlpt_level ? ` · ${item.jlpt_level}` : ""}
                             {item.stroke_count ? ` · ${item.stroke_count} strokes` : ""}
+                            {item.is_jouyou == null ? "" : item.is_jouyou ? " · Jouyou" : " · Not Jouyou"}
+                            {item.school_grade ? ` · ${item.school_grade === 8 ? "Junior high+" : `Grade ${item.school_grade}`}` : ""}
+                            {item.source ? ` · ${item.source}` : ""}
                             {item.components?.length ? ` · parts: ${item.components.map((component) => component.component).join(" ")}` : ""}
                           </p>
                         </div>
@@ -344,7 +362,7 @@ export default function TeacherKanjiRadicalsPage() {
                 <label className="block text-sm font-semibold text-stone-700">
                   Kanji
                   <input
-                    value={editor.kanji}
+                    value={editor.kanji ?? ""}
                     onChange={(event) => updateEditor("kanji", event.target.value)}
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-3xl font-black"
                   />
@@ -353,7 +371,7 @@ export default function TeacherKanjiRadicalsPage() {
                 <label className="block text-sm font-semibold text-stone-700">
                   Main radical
                   <input
-                    value={editor.radical}
+                    value={editor.radical ?? ""}
                     onChange={(event) => updateEditor("radical", event.target.value)}
                     placeholder="言"
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-3xl font-black"
@@ -363,7 +381,7 @@ export default function TeacherKanjiRadicalsPage() {
                 <label className="block text-sm font-semibold text-stone-700">
                   Other radicals/components
                   <input
-                    value={editor.components}
+                    value={editor.components ?? ""}
                     onChange={(event) => updateEditor("components", event.target.value)}
                     placeholder="言 五 口"
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xl font-black"
@@ -374,30 +392,104 @@ export default function TeacherKanjiRadicalsPage() {
                 </label>
 
                 <label className="block text-sm font-semibold text-stone-700">
-                  Radical name
+                  Stroke count
                   <input
-                    value={editor.radical_name}
-                    onChange={(event) => updateEditor("radical_name", event.target.value)}
-                    placeholder="speech"
+                    value={editor.stroke_count ?? ""}
+                    onChange={(event) => updateEditor("stroke_count", event.target.value)}
+                    inputMode="numeric"
+                    placeholder="3"
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                   />
                 </label>
 
                 <label className="block text-sm font-semibold text-stone-700">
-                  Stroke count
+                  Jouyou status
+                  <select
+                    value={editor.is_jouyou ?? ""}
+                    onChange={(event) => updateEditor("is_jouyou", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Unknown</option>
+                    <option value="true">Jouyou</option>
+                    <option value="false">Not Jouyou</option>
+                  </select>
+                </label>
+
+                <label className="block text-sm font-semibold text-stone-700">
+                  School grade
+                  <select
+                    value={editor.school_grade ?? ""}
+                    onChange={(event) => updateEditor("school_grade", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Unknown</option>
+                    <option value="1">Grade 1</option>
+                    <option value="2">Grade 2</option>
+                    <option value="3">Grade 3</option>
+                    <option value="4">Grade 4</option>
+                    <option value="5">Grade 5</option>
+                    <option value="6">Grade 6</option>
+                    <option value="8">Junior high+</option>
+                  </select>
+                </label>
+
+                <label className="block text-sm font-semibold text-stone-700">
+                  Kanji JLPT level
+                  <select
+                    value={editor.jlpt_level ?? ""}
+                    onChange={(event) => updateEditor("jlpt_level", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Unlabeled</option>
+                    <option value="N5">N5</option>
+                    <option value="N4">N4</option>
+                    <option value="N3">N3</option>
+                    <option value="N2">N2</option>
+                    <option value="N1">N1</option>
+                  </select>
+                </label>
+
+                <label className="block text-sm font-semibold text-stone-700">
+                  Kakimashou/source radical name
                   <input
-                    value={editor.stroke_count}
-                    onChange={(event) => updateEditor("stroke_count", event.target.value)}
-                    inputMode="numeric"
-                    placeholder="14"
+                    value={editor.radical_name ?? ""}
+                    onChange={(event) => updateEditor("radical_name", event.target.value)}
+                    placeholder="ごんべん"
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                   />
+                </label>
+
+                <label className="block text-sm font-semibold text-stone-700">
+                  Learner English name
+                  <input
+                    value={editor.radical_english_name ?? ""}
+                    onChange={(event) => updateEditor("radical_english_name", event.target.value)}
+                    placeholder="speech"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                  />
+                  <span className="mt-1 block text-xs font-normal leading-5 text-stone-500">
+                    Optional. Use this for future learner-facing radical cards.
+                  </span>
+                </label>
+
+
+                <label className="block text-sm font-semibold text-stone-700">
+                  Source
+                  <input
+                    value={editor.source ?? ""}
+                    onChange={(event) => updateEditor("source", event.target.value)}
+                    placeholder="jisho+kakimashou"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                  />
+                  <span className="mt-1 block text-xs font-normal leading-5 text-stone-500">
+                    Example: jisho+kakimashou, jisho, or kakimashou.
+                  </span>
                 </label>
 
                 <label className="block text-sm font-semibold text-stone-700">
                   Notes
                   <textarea
-                    value={editor.notes}
+                    value={editor.notes ?? ""}
                     onChange={(event) => updateEditor("notes", event.target.value)}
                     rows={3}
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"

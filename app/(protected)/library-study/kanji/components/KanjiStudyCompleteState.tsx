@@ -1,12 +1,16 @@
 type KanjiStudyCompleteStateProps = {
   endedEarly: boolean;
+  nextModeLabel: string;
   onBackToStudyHub: () => void;
+  onNextMode: () => void;
   onRestart: () => void;
 };
 
 export default function KanjiStudyCompleteState({
   endedEarly,
+  nextModeLabel,
   onBackToStudyHub,
+  onNextMode,
   onRestart,
 }: KanjiStudyCompleteStateProps) {
   return (
@@ -33,7 +37,7 @@ export default function KanjiStudyCompleteState({
             </p>
 
             <p className="mt-2 text-sm text-gray-500">
-              Study again to reshuffle this mode and level.
+              Try the next direction, or reshuffle this mode and level.
             </p>
           </>
         )}
@@ -41,18 +45,26 @@ export default function KanjiStudyCompleteState({
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             type="button"
-            onClick={onBackToStudyHub}
-            className="rounded bg-gray-200 px-4 py-2"
+            onClick={onNextMode}
+            className="rounded-2xl border border-slate-300 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
           >
-            Back to Study Hub
+            Next: {nextModeLabel}
           </button>
 
           <button
             type="button"
             onClick={onRestart}
-            className="rounded bg-gray-700 px-4 py-2 text-white"
+            className="rounded-2xl border border-sky-200 bg-sky-100 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-50"
           >
-            {endedEarly ? "Do More Today" : "Do It Again"}
+            {endedEarly ? "Keep Going" : "Review Again"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onBackToStudyHub}
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            Back to Study Hub
           </button>
         </div>
       </div>

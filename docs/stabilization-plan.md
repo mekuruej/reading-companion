@@ -691,3 +691,20 @@ Finished:
 Decision:
 
 `/library-study/kana` passed the non-book route access audit with no code changes.
+
+### `/library-study/practice`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads the current user’s own profile/access row with `profiles.id = user.id`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed saved-word summary, claim, learning settings, and progress queries are scoped to the current user.
+* Confirmed `searchParams` only controls the color filter and does not control user/book identity.
+* Hardened definition-number lookup by requiring sample word IDs to also belong to the current user’s owned `user_book_id` list.
+* Hardened card flagging so `user_book_words` updates require both the target word IDs and the current user’s owned `user_book_id` list.
+* Confirmed progress upserts use the current logged-in user ID.
+
+Decision:
+
+`/library-study/practice` uses the logged-in user’s own saved-word library and progress. After hardening the sample-word lookup and flag update, it passed the non-book route access audit.
