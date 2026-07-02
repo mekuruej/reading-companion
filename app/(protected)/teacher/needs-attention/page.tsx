@@ -83,17 +83,17 @@ const attentionCards: NeedsAttentionCard[] = [
     actions: [
       {
         label: "Book Requests",
-        href: "/teacher/books?from=needs-attention#book-requests",
+        href: "/teacher/books/requests?from=needs-attention",
         countKey: "bookRequests",
       },
       {
         label: "Book Flags",
-        href: "/teacher/books?from=needs-attention#book-flags",
+        href: "/teacher/books/flags?from=needs-attention",
         countKey: "bookFlags",
       },
       {
         label: "Missing Info",
-        href: "/teacher/books?from=needs-attention#missing-book-info",
+        href: "/teacher/books/missing-info?from=needs-attention",
         countKey: "missingBooks",
       },
     ],
