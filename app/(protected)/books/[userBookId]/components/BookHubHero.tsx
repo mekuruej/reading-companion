@@ -3,8 +3,6 @@ type BookHubHeroBook = {
   title_reading: string | null;
   author: string | null;
   author_reading: string | null;
-  translator: string | null;
-  translator_reading: string | null;
   cover_url: string | null;
 };
 
@@ -19,10 +17,8 @@ type BookHubHeroProps = {
   selectedUserBookId: string;
   bookHubContextLabel: string;
   isViewingStudentBookHub: boolean;
-  isTeacherContext: boolean;
   currentlyReadingBooks: BookHubBookOption[];
   otherBooks: BookHubBookOption[];
-  onTeacherReview: () => void;
   onSwitchBook: (nextValue: string) => void;
 };
 
@@ -32,10 +28,8 @@ export default function BookHubHero({
   selectedUserBookId,
   bookHubContextLabel,
   isViewingStudentBookHub,
-  isTeacherContext,
   currentlyReadingBooks,
   otherBooks,
-  onTeacherReview,
   onSwitchBook,
 }: BookHubHeroProps) {
   return (
@@ -52,6 +46,16 @@ export default function BookHubHero({
             No cover
           </div>
         )}
+
+        <div
+          className={`mt-3 inline-flex w-full justify-center rounded-full border px-3 py-1 text-center text-xs font-semibold ${
+            isViewingStudentBookHub
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : "border-stone-200 bg-stone-50 text-stone-600"
+          }`}
+        >
+          {bookHubContextLabel}
+        </div>
       </div>
 
       <div className="min-w-0">
@@ -61,30 +65,8 @@ export default function BookHubHero({
               {book.title}
             </h1>
 
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <div
-                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                  isViewingStudentBookHub
-                    ? "border-amber-200 bg-amber-50 text-amber-800"
-                    : "border-stone-200 bg-stone-50 text-stone-600"
-                }`}
-              >
-                {bookHubContextLabel}
-              </div>
-
-              {isTeacherContext ? (
-                <button
-                  type="button"
-                  onClick={onTeacherReview}
-                  className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800 transition hover:bg-violet-100"
-                >
-                  Teacher Review →
-                </button>
-              ) : null}
-            </div>
-
             {book.title_reading ? (
-              <div className="mt-1 text-lg text-stone-500 md:text-xl">
+              <div className="mt-1 text-sm font-medium text-stone-500">
                 {book.title_reading}
               </div>
             ) : null}
@@ -97,22 +79,8 @@ export default function BookHubHero({
               </div>
 
               {book.author_reading ? (
-                <div className="mt-1 text-base text-stone-500 md:text-lg">
+                <div className="mt-1 text-sm font-medium text-stone-500">
                   {book.author_reading}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {book.translator ? (
-            <div>
-              <div className="text-base font-medium text-stone-700 md:text-lg">
-                Translated by {book.translator}
-              </div>
-
-              {book.translator_reading ? (
-                <div className="mt-1 text-sm text-stone-500 md:text-base">
-                  {book.translator_reading}
                 </div>
               ) : null}
             </div>

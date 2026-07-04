@@ -20,7 +20,6 @@ type BookHubStatusPanelProps = {
   furthestTrackedPage: number | null;
   pageCount: number | null;
 
-  canRemoveFromMyLibrary: boolean;
 
   onStartToday: () => void;
   onMarkFinished: () => void;
@@ -28,7 +27,6 @@ type BookHubStatusPanelProps = {
   onOpenReflection: () => void;
   onFillBeginningPages: () => void;
   onFillEndingPages: () => void;
-  onRemoveFromLibrary: () => void;
 };
 
 function dnfReasonLabel(value: string) {
@@ -83,14 +81,12 @@ export default function BookHubStatusPanel({
   earliestTrackedStartPage,
   furthestTrackedPage,
   pageCount,
-  canRemoveFromMyLibrary,
   onStartToday,
   onMarkFinished,
   onMarkDnf,
   onOpenReflection,
   onFillBeginningPages,
   onFillEndingPages,
-  onRemoveFromLibrary,
 }: BookHubStatusPanelProps) {
   return (
     <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
@@ -228,18 +224,6 @@ export default function BookHubStatusPanel({
         <div className="mt-2 text-xs text-stone-500">
           Looks like your story ended on page {furthestTrackedPage}. Fill pages{" "}
           {furthestTrackedPage + 1}–{pageCount}?
-        </div>
-      ) : null}
-
-      {canRemoveFromMyLibrary ? (
-        <div className="mt-5 border-t border-violet-100 pt-4">
-          <button
-            type="button"
-            onClick={onRemoveFromLibrary}
-            className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
-          >
-            Remove from My Library
-          </button>
         </div>
       ) : null}
     </div>

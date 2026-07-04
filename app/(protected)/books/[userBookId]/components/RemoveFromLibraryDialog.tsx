@@ -19,13 +19,13 @@ export default function RemoveFromLibraryDialog({
         </div>
 
         <h2 className="mt-2 text-2xl font-bold text-stone-950">
-          Remove from My Library?
+          Are you sure you want to remove this book?
         </h2>
 
         <p className="mt-3 text-sm leading-6 text-stone-700">
-          Remove this book from your library? This will remove your saved words,
-          reading sessions, and stats for this book. The shared book record will
-          stay in Mekuru.
+          This will remove the book from your Mekuru library, including your saved
+          words, reading sessions, and stats for this book. The shared book record
+          will stay in Mekuru.
         </p>
 
         {error ? (

@@ -679,6 +679,7 @@ export default function BookHubPage() {
   const [recommendedLevel, setRecommendedLevel] = useState<string>("");
 
   const [genre, setGenre] = useState<string>("");
+  const [titleReading, setTitleReading] = useState<string>("");
   const [bookType, setBookType] = useState<string>("");
   const [triggerWarnings, setTriggerWarnings] = useState<string>("");
   const [savedCommunityGenres, setSavedCommunityGenres] = useState<string>("");
@@ -1051,24 +1052,14 @@ export default function BookHubPage() {
       ? `${savedWordsProgressCount} word${savedWordsProgressCount === 1 ? "" : "s"} saved`
       : "";
 
-  const bookHubProgressLabel = finished
-    ? canSeeVocabularySummary
-      ? `${savedWordsProgressLabel} · 100%`
-      : "100%"
-    : readingSessions.length > 0 && progressPercent != null && furthestPage != null
-      ? [
-        canSeeVocabularySummary ? savedWordsProgressLabel : null,
-        `${progressPercent}%`,
-        `On page ${furthestPage}`,
-        canSeeVocabularySummary && lastSavedWord
-          ? `Last saved word: ${lastSavedWord}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-      : started
-        ? "In progress"
-        : "Not started";
+  const currentProgressPage = furthestPage ?? (finished && book?.page_count ? book.page_count : null);
+  const bookHubProgressLabel = currentProgressPage != null
+    ? book?.page_count
+      ? `${currentProgressPage} / ${book.page_count}`
+      : `Page ${currentProgressPage}`
+    : started
+      ? "In progress"
+      : "Not started";
 
   const bookHubProgressBarWidth =
     progressPercent != null
@@ -1080,22 +1071,34 @@ export default function BookHubPage() {
           : "0%";
 
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
-  const bookHubPagesReadLabel = totalPagesRead ? String(totalPagesRead) : "—";
-  const bookHubWordsSavedLabel =
-    canSeeVocabularySummary && uniqueLookupCount != null
-      ? String(uniqueLookupCount)
-      : "—";
+  const savedWordsPerPage =
+    canSeeVocabularySummary && uniqueLookupCount != null && totalPagesRead > 0
+      ? uniqueLookupCount / totalPagesRead
+      : null;
+  const bookHubSavedWordsPerPageLabel =
+    savedWordsPerPage != null ? savedWordsPerPage.toFixed(1) : "—";
   const bookHubAverageMinutesPerPageLabel =
     averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
-
   const shouldNudgeStartBook = !started && realReadingSessions.length === 0;
   const shouldNudgeFinishBook =
-    !finishedAt && !dnfAt && progressPercent != null && progressPercent >= 90;
+    !finishedAt && !dnfAt && progressPercent != null && progressPercent >= 98;
 
   const lastReadDate = useMemo(() => {
     if (visualReadingSessions.length === 0) return null;
     return visualReadingSessions[0]?.read_on ?? null;
   }, [visualReadingSessions]);
+
+  const bookHubProgressSummaryLabel = [
+    `${totalPagesRead || 0} page${totalPagesRead === 1 ? "" : "s"}`,
+    formatMinutes(totalTimedMinutes),
+    canSeeVocabularySummary
+      ? `${savedWordsProgressCount} saved word${savedWordsProgressCount === 1 ? "" : "s"}`
+      : null,
+    `Last read ${lastReadDate ?? "—"}`,
+  ]
+    .filter((item) => item && item !== "—")
+    .join(" · ");
+
 
   const visibleReadingSessions = useMemo(() => {
     return showAllSessions ? readingSessions : readingSessions.slice(0, 3);
@@ -3586,6 +3589,7 @@ export default function BookHubPage() {
     setShowPageNumbers(r.show_page_numbers ?? true);
 
     const b = r.books as Book | null;
+    setTitleReading(b?.title_reading ?? "");
     setBookType(b?.book_type ?? "");
     setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
@@ -4376,6 +4380,7 @@ export default function BookHubPage() {
       .eq("id", row.id);
 
     const bookUpdatePayload = {
+      title_reading: titleReading || null,
       author: authorName || null,
       author_english_name: authorEnglishName || null,
       translator: translatorName || null,
@@ -5141,10 +5146,8 @@ export default function BookHubPage() {
                 selectedUserBookId={userBookId ?? ""}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
-                isTeacherContext={isTeacherContext}
                 currentlyReadingBooks={currentlyReadingBooks}
                 otherBooks={otherBooks}
-                onTeacherReview={() => router.push(`/teacher/books/${row.id}`)}
                 onSwitchBook={(nextValue) => {
                   if (!nextValue) return;
 
@@ -5177,18 +5180,12 @@ export default function BookHubPage() {
                 earliestTrackedStartPage={earliestTrackedStartPage}
                 furthestTrackedPage={furthestTrackedPage}
                 pageCount={book.page_count}
-                canRemoveFromMyLibrary={canRemoveFromMyLibrary}
                 onStartToday={() => void markStartedToday()}
                 onMarkFinished={() => void markFinishedToday()}
                 onMarkDnf={() => void markDnfToday()}
                 onOpenReflection={openReadingReflection}
                 onFillBeginningPages={fillBeginningPages}
                 onFillEndingPages={fillEndingPages}
-                onRemoveFromLibrary={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  setRemoveLibraryError(null);
-                  setShowRemoveLibraryConfirm(true);
-                }}
               />
             </div>
 
@@ -5201,13 +5198,11 @@ export default function BookHubPage() {
             <div className="mt-6 space-y-4">
               <BookHubProgressSummary
                 progressLabel={bookHubProgressLabel}
+                progressSummaryLabel={bookHubProgressSummaryLabel}
                 progressBarWidth={bookHubProgressBarWidth}
-                lastReadDateLabel={lastReadDate ?? "—"}
                 daysEngagedLabel={bookHubDaysEngagedLabel}
-                pagesReadLabel={bookHubPagesReadLabel}
-                wordsSavedLabel={bookHubWordsSavedLabel}
+                savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
-                showVocabularySummary={canSeeVocabularySummary}
               />
 
               <BookHubActionPrompt />
@@ -5247,15 +5242,36 @@ export default function BookHubPage() {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/words`);
                 }}
-                onBookStats={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/stats`);
-                }}
-                onFlagBook={() => {
-                  setBookFlagNote("");
-                  setShowBookFlagModal(true);
-                }}
               />
+
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 text-center">
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookFlagNote("");
+                      setShowBookFlagModal(true);
+                    }}
+                    className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Flag a problem
+                  </button>
+
+                  {canRemoveFromMyLibrary ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirmLeaveIfTimerActive()) return;
+                        setRemoveLibraryError(null);
+                        setShowRemoveLibraryConfirm(true);
+                      }}
+                      className="rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
+                    >
+                      Remove from My Mekuru Library
+                    </button>
+                  ) : null}
+                </div>
+              </div>
 
               <BookHubTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -5290,6 +5306,8 @@ export default function BookHubPage() {
                     }}
                     onCancel={cancelEdits}
                     onSave={saveAll}
+                    titleReading={titleReading}
+                    setTitleReading={setTitleReading}
                     bookType={bookType}
                     setBookType={setBookType}
                     publishedDate={publishedDate}

@@ -3,31 +3,32 @@ import BookHubStatCard from "./BookHubStatCard";
 type BookHubProgressSummaryProps = {
   // Progress math and reading-session calculations stay in page.tsx.
   progressLabel: string;
+  progressSummaryLabel: string;
   progressBarWidth: string;
-  lastReadDateLabel: string;
   daysEngagedLabel: string;
-  pagesReadLabel: string;
-  wordsSavedLabel: string;
+  savedWordsPerPageLabel: string;
   averageMinutesPerPageLabel: string;
-  showVocabularySummary?: boolean;
 };
 
 export default function BookHubProgressSummary({
   progressLabel,
+  progressSummaryLabel,
   progressBarWidth,
-  lastReadDateLabel,
   daysEngagedLabel,
-  pagesReadLabel,
-  wordsSavedLabel,
+  savedWordsPerPageLabel,
   averageMinutesPerPageLabel,
-  showVocabularySummary = true,
 }: BookHubProgressSummaryProps) {
   return (
     <>
       <div>
-        <div className="mb-2 text-sm text-stone-700">
-          <div className="font-medium">Progress</div>
-          <div className="mt-1 text-stone-500">{progressLabel}</div>
+        <div className="mb-3 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700 shadow-sm sm:px-5">
+          <div className="font-semibold text-stone-900">Your Progress</div>
+          <div className="mt-1 text-stone-600">{progressSummaryLabel}</div>
+        </div>
+
+        <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
+          <span>Current page</span>
+          <span>{progressLabel}</span>
         </div>
 
         <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
@@ -38,11 +39,7 @@ export default function BookHubProgressSummary({
         </div>
       </div>
 
-      <p className="mt-2 mb-4 text-xs text-stone-500">
-        Last read: {lastReadDateLabel}
-      </p>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <BookHubStatCard
           label="Days Engaged"
           value={daysEngagedLabel}
@@ -50,18 +47,10 @@ export default function BookHubProgressSummary({
         />
 
         <BookHubStatCard
-          label="Pages Read"
-          value={pagesReadLabel}
-          caption="Page-tracked only"
+          label="Saved Words/Page"
+          value={savedWordsPerPageLabel}
+          caption="Saved-word load"
         />
-
-        {showVocabularySummary ? (
-          <BookHubStatCard
-            label="Words Saved"
-            value={wordsSavedLabel}
-            caption="Unique saved words"
-          />
-        ) : null}
 
         <BookHubStatCard
           label="Avg Min/Page"

@@ -15,8 +15,6 @@ type BookHubActionGridProps = {
     onListening: () => void;
     onStudyFlashcards: () => void;
     onVocabularyList: () => void;
-    onBookStats: () => void;
-    onFlagBook: () => void | Promise<void>;
 };
 
 function ActionButton({
@@ -30,7 +28,7 @@ function ActionButton({
 }: {
     title: string;
     subtitle?: string;
-    description: string;
+    description: string | string[];
     className: string;
     onClick: () => void | Promise<void>;
     locked?: boolean;
@@ -83,7 +81,13 @@ function ActionButton({
                     locked ? "text-stone-500" : "text-stone-700",
                 ].join(" ")}
             >
-                {description}
+                {Array.isArray(description)
+                    ? description.map((line) => (
+                        <span key={line} className="block">
+                            {line}
+                        </span>
+                    ))
+                    : description}
             </div>
 
             {locked ? (
@@ -106,42 +110,40 @@ export default function BookHubActionGrid({
     onListening,
     onStudyFlashcards,
     onVocabularyList,
-    onBookStats,
-    onFlagBook,
 }: BookHubActionGridProps) {
     return (
         <div className="pb-2">
-            <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <ActionButton
                     title="Curiosity Reading"
                     subtitle="(Intensive)"
-                    description="Read while saving vocab and logging a slower, mindful session."
-                    className="bg-rose-50 hover:bg-rose-100"
+                    description={["Read while saving vocab", "and log a slower, mindful session."]}
+                    className="bg-sky-50 hover:bg-sky-100"
                     locked={!canUseCuriosityReading}
                     onClick={onCuriosityReading}
                 />
 
                 <ActionButton
-                    title="Fluid Reading"
-                    subtitle="(Saved Word Support)"
-                    description="Read forward with light support from words you already saved."
+                    title="Supported Reading"
+                    subtitle="(Extensive Saved Word Support)"
+                    description={["Review reading with light support", "from words you already saved."]}
                     className="bg-emerald-50 hover:bg-emerald-100"
                     locked={!canUseSavedWordReading}
                     onClick={onFluidReadingExtensive}
                 />
 
                 <ActionButton
-                    title="Fluid Reading"
-                    subtitle="(Extensive · Just Reading)"
-                    description="Read without support or lookups. Just enjoy the book and log your time."
-                    className="bg-sky-50 hover:bg-sky-100"
+                    title="Just Reading"
+                    subtitle="(Extensive Fluid Reading)"
+                    description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
+                    className="bg-violet-50 hover:bg-violet-100"
                     onClick={onFluidReadingJustReading}
                 />
 
                 <ActionButton
                     title="Listening"
                     subtitle="(Ear Training)"
-                    description="Listen to the audiobook, log any words you hear and time your session."
+                    description={["Listen to the audiobook", "and log words you hear."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onListening}
                 />
@@ -150,7 +152,7 @@ export default function BookHubActionGrid({
                     title="Study"
                     subtitle="Flashcards"
                     description="Review the words you saved from this book."
-                    className="bg-violet-50 hover:bg-violet-100"
+                    className="bg-sky-50 hover:bg-sky-100"
                     locked={!canUseStudyFlashcards}
                     onClick={onStudyFlashcards}
                 />
@@ -159,25 +161,9 @@ export default function BookHubActionGrid({
                     title="Vocabulary"
                     subtitle="List"
                     description="Open the saved words and vocabulary tools for this book."
-                    className="bg-sky-50 hover:bg-sky-100"
+                    className="bg-emerald-50 hover:bg-emerald-100"
                     locked={!canUseVocabularyList}
                     onClick={onVocabularyList}
-                />
-
-                <ActionButton
-                    title="Book"
-                    subtitle="Stats"
-                    description="See this book’s progress, pace, time, and reading patterns."
-                    className="bg-emerald-50 hover:bg-emerald-100"
-                    onClick={onBookStats}
-                />
-
-                <ActionButton
-                    title="Flag"
-                    subtitle="This Book"
-                    description="Send this Book Hub to the review queue with anything that needs attention."
-                    className="bg-rose-50 hover:bg-rose-100"
-                    onClick={onFlagBook}
                 />
             </div>
         </div>

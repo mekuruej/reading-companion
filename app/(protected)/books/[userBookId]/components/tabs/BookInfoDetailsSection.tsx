@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 
 type BookDetails = {
+  title_reading?: string | null;
   book_type?: string | null;
   published_date?: string | null;
   page_count?: number | string | null;
@@ -23,6 +24,8 @@ type BookInfoDetailsSectionProps = {
   onCancel: () => void;
   onSave: () => void;
 
+  titleReading: string;
+  setTitleReading: (value: string) => void;
   bookType: string;
   setBookType: (value: string) => void;
   publishedDate: string;
@@ -59,6 +62,8 @@ export default function BookInfoDetailsSection({
   onEditBookInfo,
   onCancel,
   onSave,
+  titleReading,
+  setTitleReading,
   bookType,
   setBookType,
   publishedDate,
@@ -120,6 +125,15 @@ export default function BookInfoDetailsSection({
       </div>
 
       <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <Detail
+          label="Title Reading"
+          value={book.title_reading}
+          editing={isEditingBookInfo}
+          inputValue={titleReading}
+          setInputValue={setTitleReading}
+          placeholder="かな reading for the title"
+        />
+
         <div className="rounded border bg-white p-3 text-sm">
           <div className="text-stone-600">Book Type</div>
           {!isEditingBookInfo ? (
