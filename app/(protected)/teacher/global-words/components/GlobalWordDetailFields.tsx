@@ -29,7 +29,8 @@ type Props = {
   onJlptChange: (value: string) => void;
   onIsCommonChange: (checked: boolean) => void;
   onContextNoteChange: (value: string) => void;
-  onPlaceholderSave: () => void;
+  onSave: () => void;
+  saving: boolean;
   onClear: () => void;
 };
 
@@ -50,7 +51,8 @@ export default function GlobalWordDetailFields({
   onJlptChange,
   onIsCommonChange,
   onContextNoteChange,
-  onPlaceholderSave,
+  onSave,
+  saving,
   onClear,
 }: Props) {
   return (
@@ -147,20 +149,11 @@ export default function GlobalWordDetailFields({
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={onPlaceholderSave}
-          disabled={!surface.trim()}
+          onClick={onSave}
+          disabled={saving || !surface.trim()}
           className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
         >
-          Show Placeholder Message
-        </button>
-
-        <button
-          type="button"
-          disabled
-          className="rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-500"
-          title="Global save is not wired yet."
-        >
-          Save Globally Disabled
+          {saving ? "Saving..." : "Save Globally"}
         </button>
 
         <button

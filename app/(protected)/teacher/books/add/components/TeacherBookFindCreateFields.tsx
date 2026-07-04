@@ -1,22 +1,26 @@
 type TeacherBookFindCreateFieldsProps = {
     title: string;
+    titleReading: string;
     isbn13: string;
     isBookRequest: boolean;
     titleNeedsManualResearch: boolean;
     onTitleChange: (value: string) => void;
+    onTitleReadingChange: (value: string) => void;
     onIsbn13Change: (value: string) => void;
 };
 
 export function TeacherBookFindCreateFields({
     title,
+    titleReading,
     isbn13,
     isBookRequest,
     titleNeedsManualResearch,
     onTitleChange,
+    onTitleReadingChange,
     onIsbn13Change,
 }: TeacherBookFindCreateFieldsProps) {
     return (
-        <div className="mt-5 grid gap-5 md:grid-cols-2">
+        <div className="mt-5 grid gap-5 md:grid-cols-3">
             <div>
                 <label className="mb-1 block text-sm font-semibold">Title *</label>
                 <input
@@ -34,6 +38,19 @@ export function TeacherBookFindCreateFields({
                         The request only gave an ISBN, so the real title needs to be entered here.
                     </p>
                 ) : null}
+            </div>
+
+            <div>
+                <label className="mb-1 block text-sm font-semibold">
+                    Title reading
+                    <span className="font-normal text-stone-500"> (optional)</span>
+                </label>
+                <input
+                    value={titleReading}
+                    onChange={(event) => onTitleReadingChange(event.target.value)}
+                    placeholder="かな reading for the title"
+                    className="w-full rounded-xl border border-slate-500 px-4 py-3"
+                />
             </div>
 
             <div>

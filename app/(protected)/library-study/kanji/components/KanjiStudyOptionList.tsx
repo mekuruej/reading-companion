@@ -4,6 +4,7 @@ type KanjiStudyOptionItem = {
   value: string;
   state: KanjiStudyOptionState;
   largeText?: boolean;
+  compactText?: boolean;
 };
 
 type KanjiStudyOptionListProps = {
@@ -12,8 +13,8 @@ type KanjiStudyOptionListProps = {
   onChoose: (value: string) => void;
 };
 
-function optionClassName(state: KanjiStudyOptionState, largeText: boolean) {
-  const textSize = largeText ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl";
+function optionClassName(state: KanjiStudyOptionState, largeText: boolean, compactText: boolean) {
+  const textSize = compactText ? "text-base sm:text-lg text-left" : largeText ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl";
   const base = `w-full rounded border px-4 py-3 ${textSize} `;
 
   if (state === "idle") return `${base}bg-white hover:bg-gray-50`;
@@ -44,7 +45,7 @@ export default function KanjiStudyOptionList({
               event.stopPropagation();
               onChoose(option.value);
             }}
-            className={optionClassName(option.state, !!option.largeText)}
+            className={optionClassName(option.state, !!option.largeText, !!option.compactText)}
           >
             <span className="mr-2 align-middle text-sm text-gray-500">
               {index + 1}.

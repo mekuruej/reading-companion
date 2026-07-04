@@ -2072,6 +2072,8 @@ export default function BookFlashcardsPage() {
                   }
                 }}
                 onCheckCorrection={checkCorrectionAnswer}
+                autoAdvancePaused={autoAdvancePaused}
+                onToggleAutoAdvancePaused={() => setAutoAdvancePaused((current) => !current)}
               />
             </>
           ) : typeModeEnabled && card ? (
@@ -2163,6 +2165,8 @@ export default function BookFlashcardsPage() {
                       checkTypedAnswer();
                     }
                   }}
+                  autoAdvancePaused={autoAdvancePaused}
+                  onToggleAutoAdvancePaused={() => setAutoAdvancePaused((current) => !current)}
                 />
               ) : null}
             </>

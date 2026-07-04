@@ -52,7 +52,7 @@ function editorFromItem(item: RadicalQueueItem): EditorState {
     radical_name: item.radical_name ?? "",
     radical_english_name: item.radical_english_name ?? "",
     jlpt_level: item.jlpt_level ?? "",
-    is_jouyou: item.is_jouyou == null ? "" : item.is_jouyou ? "true" : "false",
+    is_jouyou: item.is_jouyou == null ? "true" : item.is_jouyou ? "true" : "false",
     school_grade: item.school_grade == null ? "" : String(item.school_grade),
     components: (item.components ?? []).map((component) => component.component).join(" "),
     stroke_count: item.stroke_count == null ? "" : String(item.stroke_count),
@@ -247,6 +247,9 @@ export default function TeacherKanjiRadicalsPage() {
           <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
             Add the main radical, other visible radicals/components, and stroke information for kanji already used in the kanji reading map.
           </p>
+          <p className="mt-3 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-900">
+            Mekuru uses the KangXi main radical as the official answer. If Nelson or another source lists a different main radical, put it in Notes as an alternative main radical.
+          </p>
         </section>
 
         {message ? (
@@ -376,6 +379,9 @@ export default function TeacherKanjiRadicalsPage() {
                     placeholder="言"
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-3xl font-black"
                   />
+                  <span className="mt-1 block text-xs font-normal leading-5 text-stone-500">
+                    Use the KangXi main radical here. Put Nelson or alternate source radicals in Notes as alternative main radicals.
+                  </span>
                 </label>
 
                 <label className="block text-sm font-semibold text-stone-700">
@@ -493,8 +499,12 @@ export default function TeacherKanjiRadicalsPage() {
                     value={editor.notes ?? ""}
                     onChange={(event) => updateEditor("notes", event.target.value)}
                     rows={3}
+                    placeholder="alternative main: 心 忄"
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                   />
+                  <span className="mt-1 block text-xs font-normal leading-5 text-stone-500">
+                    If another source lists a second main radical, add it like: alternative main: 心 忄. Radical flashcards will not use those as same-card distractors.
+                  </span>
                 </label>
 
                 <button

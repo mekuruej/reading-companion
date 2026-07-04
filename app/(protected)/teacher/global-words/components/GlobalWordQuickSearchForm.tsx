@@ -30,7 +30,7 @@ export default function GlobalWordQuickSearchForm({
         Rapid search
       </label>
       <p className="text-xs text-stone-500">
-        Start with the surface, name, or reference title. Lookup stays placeholder-only for now.
+        Start with the surface, name, or reference title. Search can prefill from the existing cache or Jisho before saving globally.
       </p>
 
       <div className="flex flex-col gap-2 sm:flex-row">

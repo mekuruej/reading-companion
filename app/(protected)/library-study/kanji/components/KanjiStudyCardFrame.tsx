@@ -77,7 +77,7 @@ export default function KanjiStudyCardFrame({
         <div className="absolute right-4 top-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
           <div className="flex flex-col items-end leading-none">
             <div className="text-sm font-medium">
-              {kanji} {strokeCount ?? ""}
+              {kanji}{strokeCount != null ? ` · ${strokeCount} strokes` : ""}
             </div>
 
             <div className="mt-1 text-[10px] text-slate-400">

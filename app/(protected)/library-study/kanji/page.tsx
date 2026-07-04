@@ -86,6 +86,8 @@ type QuizCard = {
   sourceMeaning: string | null;
   sourceReading: string | null;
   jlpt: string | null;
+  kanjiJlpt: string | null;
+  wordJlpt: string | null;
   userBookId: string | null;
   userBookWordId: string | null;
   bookTitle: string | null;
@@ -104,14 +106,15 @@ type QuizCard = {
 
 type RecallResult = "correct" | "wrong" | "shown" | "unverified" | null;
 type RecallMode = "wordForKanji" | "kanjiForReading";
-type CardQuestionMode = "readingChoice" | "kanjiChoice";
+type CardQuestionMode = "readingChoice" | "kanjiChoice" | "strokeCountChoice";
 type LevelFilter = KanjiLevelFilter;
 type KanjiAnswerStyle = "multipleChoice" | "typing";
 type KanjiStudyMode =
   | "kunyomiToKanji"
   | "kanjiToKunyomi"
   | "onyomiToKanji"
-  | "kanjiToOnyomi";
+  | "kanjiToOnyomi"
+  | "kanjiStrokeCount";
 
 const KANJI_STUDY_MODE_OPTIONS: Array<{
   value: KanjiStudyMode;
@@ -137,6 +140,11 @@ const KANJI_STUDY_MODE_OPTIONS: Array<{
       value: "kanjiToOnyomi",
       label: "Kanji -> Onyomi",
       description: "See a kanji and choose its onyomi reading.",
+    },
+    {
+      value: "kanjiStrokeCount",
+      label: "Kanji stroke count",
+      description: "See a kanji and choose how many strokes it has.",
     },
   ];
 
@@ -197,6 +205,34 @@ function matchesLevelFilters(
   return selectedLevels.includes(normalizeKanjiLevel(jlpt));
 }
 
+function jlptRank(value: string | null | undefined) {
+  const normalized = normalizeKanjiLevel(value);
+  if (normalized === "N5") return 5;
+  if (normalized === "N4") return 4;
+  if (normalized === "N3") return 3;
+  if (normalized === "N2") return 2;
+  if (normalized === "N1") return 1;
+  return null;
+}
+
+function wordLevelAllowedForKanji(kanjiJlpt: string | null | undefined, wordJlpt: string | null | undefined) {
+  const kanjiLevel = normalizeKanjiLevel(kanjiJlpt);
+  const wordLevel = normalizeKanjiLevel(wordJlpt);
+
+  if (kanjiLevel === "unlabeled") {
+    return wordLevel === "unlabeled";
+  }
+
+  if (wordLevel === "unlabeled") return false;
+
+  const kanjiRank = jlptRank(kanjiLevel);
+  const wordRank = jlptRank(wordLevel);
+  if (kanjiRank == null || wordRank == null) return false;
+
+  const allowedWordRank = Math.max(1, kanjiRank - 1);
+  return wordRank >= allowedWordRank;
+}
+
 function kanjiLevelSummaryLabel(selectedLevels: LevelFilter[]) {
   if (
     selectedLevels.length === 0 ||
@@ -223,11 +259,13 @@ function kanjiLevelSummaryLabel(selectedLevels: LevelFilter[]) {
     .join(" + ");
 }
 
-function readingTypeForStudyMode(mode: KanjiStudyMode): QuizCard["readingType"] {
+function readingTypeForStudyMode(mode: KanjiStudyMode): QuizCard["readingType"] | null {
+  if (mode === "kanjiStrokeCount") return null;
   return mode === "kunyomiToKanji" || mode === "kanjiToKunyomi" ? "kunyomi" : "onyomi";
 }
 
 function questionModeForStudyMode(mode: KanjiStudyMode): CardQuestionMode {
+  if (mode === "kanjiStrokeCount") return "strokeCountChoice";
   return mode === "kunyomiToKanji" || mode === "onyomiToKanji"
     ? "kanjiChoice"
     : "readingChoice";
@@ -237,14 +275,16 @@ function studyModeSummary(mode: KanjiStudyMode) {
   if (mode === "kunyomiToKanji") return "Kunyomi to kanji";
   if (mode === "kanjiToKunyomi") return "Kanji to kunyomi";
   if (mode === "onyomiToKanji") return "Onyomi to kanji";
+  if (mode === "kanjiStrokeCount") return "Kanji stroke count";
   return "Kanji to onyomi";
 }
 
 function nextKanjiStudyMode(mode: KanjiStudyMode): KanjiStudyMode {
+  if (mode === "kanjiStrokeCount") return "kanjiToOnyomi";
   if (mode === "kanjiToOnyomi") return "onyomiToKanji";
   if (mode === "onyomiToKanji") return "kanjiToKunyomi";
   if (mode === "kanjiToKunyomi") return "kunyomiToKanji";
-  return "kanjiToOnyomi";
+  return "kanjiStrokeCount";
 }
 
 function studyModeDescription(mode: KanjiStudyMode) {
@@ -255,14 +295,16 @@ function studyModeDescription(mode: KanjiStudyMode) {
 }
 
 function correctAnswerForCard(card: QuizCard, mode: KanjiStudyMode) {
-  return questionModeForStudyMode(mode) === "kanjiChoice"
-    ? card.kanji
-    : formatReadingForType(card.reading, card.readingType);
+  const questionMode = questionModeForStudyMode(mode);
+  if (questionMode === "kanjiChoice") return card.kanji;
+  if (questionMode === "strokeCountChoice") return String(card.strokeCount ?? "");
+  return formatReadingForType(card.reading, card.readingType);
 }
 
 function promptLabelForStudyMode(mode: KanjiStudyMode) {
   if (mode === "kunyomiToKanji") return "Kunyomi";
   if (mode === "onyomiToKanji") return "Onyomi";
+  if (mode === "kanjiStrokeCount") return "Stroke Count";
   return "Kanji";
 }
 
@@ -276,6 +318,14 @@ function answerStyleForMode(mode: KanjiStudyMode, preferredStyle: KanjiAnswerSty
   return questionModeForStudyMode(mode) === "readingChoice"
     ? preferredStyle
     : "multipleChoice";
+}
+
+function strokeCountOptionsForCard(card: QuizCard) {
+  const correct = card.strokeCount;
+  if (correct == null) return [];
+
+  const bucketStart = Math.floor((correct - 1) / 4) * 4 + 1;
+  return Array.from({ length: 4 }, (_, index) => String(bucketStart + index));
 }
 
 function relatedReadingExamplesForCard(card: QuizCard, cards: QuizCard[]) {
@@ -880,13 +930,16 @@ export default function KanjiReadingStudyPage() {
   const filteredBaseCards = useMemo(() => {
     const readingType = readingTypeForStudyMode(studyMode);
 
-    return baseCards.filter(
-      (card) =>
-        card.readingType === readingType &&
-        !!card.reading &&
-        !!card.kanji &&
-        matchesLevelFilters(card.jlpt, levelFilters)
-    );
+    return baseCards.filter((card) => {
+      if (!card.kanji || !matchesLevelFilters(card.kanjiJlpt, levelFilters)) return false;
+      if (!wordLevelAllowedForKanji(card.kanjiJlpt, card.wordJlpt)) return false;
+
+      if (studyMode === "kanjiStrokeCount") {
+        return card.strokeCount != null;
+      }
+
+      return card.readingType === readingType && !!card.reading;
+    });
   }, [baseCards, levelFilters, studyMode]);
 
   useEffect(() => {
@@ -1045,6 +1098,8 @@ export default function KanjiReadingStudyPage() {
             sourceMeaning,
             sourceReading,
             jlpt: radicalMeta?.jlpt_level ?? vocab?.jlpt ?? null,
+            kanjiJlpt: radicalMeta?.jlpt_level ?? null,
+            wordJlpt: vocab?.jlpt ?? null,
             userBookId: context?.user_book_id ?? null,
             userBookWordId: context?.id ?? null,
             bookTitle: context
@@ -1108,6 +1163,10 @@ export default function KanjiReadingStudyPage() {
 
   const options = useMemo(() => {
     if (!card || filteredBaseCards.length === 0) return [];
+
+    if (cardQuestionMode === "strokeCountChoice") {
+      return strokeCountOptionsForCard(card);
+    }
 
     if (cardQuestionMode === "kanjiChoice") {
       const correct = card.kanji;
@@ -1304,7 +1363,7 @@ export default function KanjiReadingStudyPage() {
       return;
     }
 
-    const studyCards = shuffleArray(cards);
+    const studyCards = shuffleArray(selectOneCardPerKanji(cards));
 
     const onePassDeck = studyCards.map((c, i) => ({
       ...c,
@@ -1369,7 +1428,7 @@ export default function KanjiReadingStudyPage() {
 
     const displayedCorrect = correctAnswerForCard(card, studyMode);
     const ok =
-      cardQuestionMode === "kanjiChoice"
+      cardQuestionMode === "kanjiChoice" || cardQuestionMode === "strokeCountChoice"
         ? choice.trim() === displayedCorrect
         : normalizeReadingAnswer(choice) === normalizeReadingAnswer(displayedCorrect);
 
@@ -1596,6 +1655,7 @@ export default function KanjiReadingStudyPage() {
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-6 py-4">
       <KanjiStudyHeader
+        note="This is kanji reading practice, so easier kanji may appear in harder words, and harder kanji may appear in easier words. To study whole words, use Library Review."
         onOpenCharacterStudy={() => router.push("/library-study/characters")}
         onOpenLibrary={() => router.push("/library")}
       />
@@ -1636,9 +1696,9 @@ export default function KanjiReadingStudyPage() {
           <KanjiStudyCardFrame
             flaggedForReview={card.flaggedForReview}
             kanji={card.kanji}
-            showReadingTypeBadge={Boolean(card.readingType)}
-            readingTypeText={card.readingType ? readingTypeLabel(card.readingType) : ""}
-            strokeCount={card.strokeCount}
+            showReadingTypeBadge={studyMode === "kanjiStrokeCount" || Boolean(card.readingType)}
+            readingTypeText={studyMode === "kanjiStrokeCount" ? "Strokes" : card.readingType ? readingTypeLabel(card.readingType) : ""}
+            strokeCount={studyMode === "kanjiStrokeCount" && !checked ? null : card.strokeCount}
             radical={card.radical}
             radicalName={card.radicalName}
             radicalEnglishName={card.radicalEnglishName}
@@ -1661,6 +1721,12 @@ export default function KanjiReadingStudyPage() {
                 targetKanji={cardQuestionMode === "readingChoice" ? card.kanji : undefined}
               />
 
+              {studyMode === "kanjiStrokeCount" && !checked ? (
+                <p className="text-sm font-semibold text-slate-500">
+                  How many strokes does this kanji have?
+                </p>
+              ) : null}
+
               {effectiveAnswerStyle === "typing" ? (
                 <KanjiStudyTypingAnswer
                   value={typingAnswer}
@@ -1682,19 +1748,19 @@ export default function KanjiReadingStudyPage() {
 
                     const isCorrect =
                       !!checked &&
-                      (cardQuestionMode === "kanjiChoice"
+                      (cardQuestionMode === "kanjiChoice" || cardQuestionMode === "strokeCountChoice"
                         ? opt.trim() === displayedCorrect
                         : normalizeReadingAnswer(opt) === normalizeReadingAnswer(displayedCorrect));
 
                     const isChosen =
                       !!selected &&
-                      (cardQuestionMode === "kanjiChoice"
+                      (cardQuestionMode === "kanjiChoice" || cardQuestionMode === "strokeCountChoice"
                         ? opt.trim() === selected.trim()
                         : normalizeReadingAnswer(opt) === normalizeReadingAnswer(selected));
 
                     return {
                       value: opt,
-                      largeText: cardQuestionMode === "kanjiChoice",
+                      largeText: cardQuestionMode === "kanjiChoice" || cardQuestionMode === "strokeCountChoice",
                       state: !checked
                         ? "idle"
                         : isCorrect
@@ -1719,8 +1785,8 @@ export default function KanjiReadingStudyPage() {
                     normalizeReading(card.baseReading) !== normalizeReading(card.reading)
                   }
                   baseReading={card.baseReading}
-                  showExample={!inRecallFlow}
-                  relatedExamples={relatedReadingExamplesForCard(card, baseCards)}
+                  showExample={studyMode !== "kanjiStrokeCount" && !inRecallFlow}
+                  relatedExamples={studyMode === "kanjiStrokeCount" ? [] : relatedReadingExamplesForCard(card, baseCards)}
                   autoAdvancePaused={autoAdvancePaused}
                   onToggleAutoAdvancePaused={() => setAutoAdvancePaused((prev) => !prev)}
                   recallSlot={

@@ -231,7 +231,7 @@ const COMPONENT_STROKE_GROUPS = [
 
 const COMPONENT_STROKE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17];
 
-const COMPONENT_STROKE_INFO = new Map(
+export const COMPONENT_STROKE_INFO = new Map(
   COMPONENT_STROKE_GROUPS.flatMap((group, groupIndex) =>
     group.map((component, componentIndex) => [
       component,
@@ -239,6 +239,22 @@ const COMPONENT_STROKE_INFO = new Map(
     ])
   )
 );
+
+export function getComponentStrokeCount(component: string) {
+  return COMPONENT_STROKE_INFO.get(component)?.strokes ?? null;
+}
+
+function estimatedKanjiStrokeCount(kanji: string) {
+  const pieces = KANJI_COMPONENTS[kanji] ?? [];
+  if (pieces.length === 0) return null;
+
+  const knownStrokes = pieces
+    .map((piece) => getComponentStrokeCount(piece))
+    .filter((strokes): strokes is number => strokes != null);
+
+  if (knownStrokes.length === 0) return null;
+  return knownStrokes.reduce((total, strokes) => total + strokes, 0);
+}
 
 function sortComponents(components: string[]) {
   return [...components].sort((a, b) => {
@@ -269,7 +285,30 @@ function groupComponentsByStroke(components: string[]) {
 }
 
 function sortKanjiResults(kanji: string[]) {
-  return [...kanji].sort((a, b) => a.localeCompare(b, "ja"));
+  return [...kanji].sort((a, b) => {
+    const aStrokes = estimatedKanjiStrokeCount(a);
+    const bStrokes = estimatedKanjiStrokeCount(b);
+
+    if (aStrokes != null && bStrokes != null && aStrokes !== bStrokes) {
+      return aStrokes - bStrokes;
+    }
+
+    if (aStrokes != null && bStrokes == null) return -1;
+    if (aStrokes == null && bStrokes != null) return 1;
+
+    return a.localeCompare(b, "ja");
+  });
+}
+
+function groupKanjiByEstimatedStroke(kanji: string[]) {
+  const grouped = new Map<number, string[]>();
+
+  for (const item of kanji) {
+    const strokes = estimatedKanjiStrokeCount(item) ?? 99;
+    grouped.set(strokes, [...(grouped.get(strokes) ?? []), item]);
+  }
+
+  return Array.from(grouped.entries()).sort(([a], [b]) => a - b);
 }
 
 export default function KanjiComponentLookup({
@@ -301,6 +340,8 @@ export default function KanjiComponentLookup({
       )
     );
   }, [selectedPieces]);
+
+  const kanjiGroups = useMemo(() => groupKanjiByEstimatedStroke(filteredKanji), [filteredKanji]);
 
   function togglePiece(piece: string) {
     setSelectedPieces((prev) =>
@@ -349,17 +390,25 @@ export default function KanjiComponentLookup({
           </div>
 
           {filteredKanji.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {filteredKanji.map((kanji) => (
-                <button
-                  key={kanji}
-                  type="button"
-                  onClick={() => pickKanji(kanji)}
-                  className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-2xl font-semibold text-stone-900 transition hover:border-stone-400 hover:bg-white"
-                  title={`Add ${kanji}`}
-                >
-                  {kanji}
-                </button>
+            <div className="space-y-2">
+              {kanjiGroups.map(([strokes, groupKanji]) => (
+                <div key={strokes} className="flex flex-wrap gap-2">
+                  <div className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-stone-900 px-2 text-sm font-black text-white">
+                    {strokes === 99 ? "?" : strokes}
+                  </div>
+
+                  {groupKanji.map((kanji) => (
+                    <button
+                      key={kanji}
+                      type="button"
+                      onClick={() => pickKanji(kanji)}
+                      className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-2xl font-semibold text-stone-900 transition hover:border-stone-400 hover:bg-white"
+                      title={`Add ${kanji}${strokes !== 99 ? ` · about ${strokes} strokes from selected parts` : ""}`}
+                    >
+                      {kanji}
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           ) : (

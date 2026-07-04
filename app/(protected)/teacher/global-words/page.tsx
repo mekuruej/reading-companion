@@ -33,6 +33,7 @@ export default function TeacherGlobalWordsPage() {
   const [contextNote, setContextNote] = useState("");
 
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
   const [scratchWord, setScratchWord] = useState("");
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
@@ -109,16 +110,76 @@ export default function TeacherGlobalWordsPage() {
     window.setTimeout(() => surfaceInputRef.current?.focus({ preventScroll: true }), 0);
   }
 
-  function handlePlaceholderLookup() {
-    setLookupLoading(true);
+  function extractMeaningChoices(entry: any) {
+    const senses = Array.isArray(entry?.senses) ? entry.senses : [];
+    const choices: string[] = [];
 
-    window.setTimeout(() => {
-      setLookupLoading(false);
-      setMessage(
-        "Global lookup is not wired yet. This page is ready for the next implementation pass."
-      );
+    for (const sense of senses) {
+      const definitions = Array.isArray(sense?.english_definitions)
+        ? sense.english_definitions
+            .map((definition: unknown) => String(definition).trim())
+            .filter(Boolean)
+        : [];
+
+      if (definitions.length === 0) continue;
+      choices.push(definitions.slice(0, 4).join("; "));
+    }
+
+    return Array.from(new Set(choices));
+  }
+
+  function normalizeJlpt(value: unknown) {
+    const text = String(value ?? "").trim().toUpperCase().replace(/^JLPT[-_\s]?/, "");
+    if (text === "N5" || text === "N4" || text === "N3" || text === "N2" || text === "N1") return text;
+    return "NON-JLPT";
+  }
+
+  async function handleLookup() {
+    const keyword = surface.trim();
+    if (!keyword || lookupLoading) return;
+
+    setLookupLoading(true);
+    setMessage("");
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Please sign in again before searching.");
+
+      const response = await fetch(`/api/jisho?keyword=${encodeURIComponent(keyword)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error ?? "Could not search dictionary/cache.");
+
+      const entry = Array.isArray(json?.data) ? json.data[0] : null;
+      if (!entry) {
+        setMessage("No dictionary/cache match found. Fill the fields manually, then save globally.");
+        fieldsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
+      const japanese = Array.isArray(entry?.japanese) ? entry.japanese[0] ?? {} : {};
+      const nextSurface = String(japanese.word ?? keyword).trim();
+      const nextReading = String(japanese.reading ?? "").trim();
+      const meaningChoices = extractMeaningChoices(entry);
+
+      if (nextSurface) setSurface(nextSurface);
+      if (nextReading) setReading(nextReading);
+      if (meaningChoices[0]) setMeaningNote(meaningChoices[0]);
+      setJlpt(normalizeJlpt(Array.isArray(entry?.jlpt) ? entry.jlpt[0] : null));
+      setIsCommon(!!entry?.is_common);
+      setMessage("✅ Found a match. Check the fields, then save globally.");
       fieldsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 250);
+    } catch (err: any) {
+      console.error("Global word lookup failed:", err);
+      setMessage(`❌ ${err?.message ?? "Could not search dictionary/cache."}`);
+    } finally {
+      setLookupLoading(false);
+    }
   }
 
   function handleUseScratchWord() {
@@ -135,12 +196,65 @@ export default function TeacherGlobalWordsPage() {
     setScratchWord((prev) => `${prev}${kanji}`);
   }
 
-  function handlePlaceholderSave() {
-    // TODO: In the next implementation pass, validate and route this draft to
-    // the appropriate global vocabulary/cultural-reference save flow.
-    setMessage(
-      "Global save is not wired yet. This page is ready for the next implementation pass."
-    );
+  async function handleSaveGlobalWord() {
+    const cleanSurface = surface.trim();
+    const cleanReading = reading.trim();
+    const cleanMeaning = meaningNote.trim();
+
+    if (!cleanSurface) {
+      setMessage("❌ Surface is required.");
+      return;
+    }
+
+    if (!cleanReading) {
+      setMessage("❌ Reading is required.");
+      return;
+    }
+
+    if (!cleanMeaning) {
+      setMessage("❌ Meaning / note is required.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Please sign in again before saving.");
+
+      const response = await fetch("/api/teacher/global-words", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          surface: cleanSurface,
+          reading: cleanReading,
+          meaning: cleanMeaning,
+          entry_type: entryType,
+          jlpt,
+          is_common: isCommon,
+          context_note: contextNote.trim(),
+        }),
+      });
+
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error ?? "Could not save global word.");
+
+      const action = json?.created ? "created" : "updated";
+      const kanjiCreated = Number(json?.kanji_map?.created ?? 0);
+      setMessage(`✅ Global word ${action}. Kanji queue rows added: ${kanjiCreated}. Word Sky was not changed.`);
+    } catch (err: any) {
+      console.error("Global word save failed:", err);
+      setMessage(`❌ ${err?.message ?? "Could not save global word."}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!accessChecked) {
@@ -190,11 +304,11 @@ export default function TeacherGlobalWordsPage() {
                   setSurface(value);
                   setMessage("");
                 }}
-                onLookup={handlePlaceholderLookup}
+                onLookup={handleLookup}
               />
 
               <div className="flex min-h-12 items-center rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
-                Single global entry draft. Cache writes, Word Sky approval, and kanji-map generation are intentionally disabled.
+                Saves to the global vocabulary cache only. Word Sky approval stays separate and N5-N3 only.
               </div>
             </div>
 
@@ -223,7 +337,8 @@ export default function TeacherGlobalWordsPage() {
               onJlptChange={setJlpt}
               onIsCommonChange={setIsCommon}
               onContextNoteChange={setContextNote}
-              onPlaceholderSave={handlePlaceholderSave}
+              onSave={handleSaveGlobalWord}
+              saving={saving}
               onClear={clearForm}
             />
           </GlobalWordFormShell>

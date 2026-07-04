@@ -927,15 +927,33 @@ function LibraryPracticePanel({
                   <div className="mt-1 text-xl font-semibold text-slate-900">
                     {typingFeedback.label}: {typingFeedback.answer}
                   </div>
-                  <p className="mt-2 text-xs font-medium text-slate-500">
-                    {typingFeedback.ok
-                      ? pendingTypingAdvance === "meaning"
-                        ? "Meaning check comes automatically."
-                        : "Next card comes automatically."
-                      : typingStep === "reading"
-                        ? "Retype the reading once to continue."
-                        : "Type one meaning word once to continue."}
-                  </p>
+
+                  {pendingTypingAdvance ? (
+                    <div className="mt-2 flex flex-col items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setAutoAdvancePaused((current) => !current)}
+                        className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+                      >
+                        {autoAdvancePaused ? "Resume" : "Pause"}
+                      </button>
+                      <p className="text-xs text-slate-400">
+                        {autoAdvancePaused
+                          ? "Paused. Take your time with this card."
+                          : "Next step comes automatically."}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs font-medium text-slate-500">
+                      {typingFeedback.ok
+                        ? pendingTypingAdvance === "meaning"
+                          ? "Meaning check comes automatically."
+                          : "Next card comes automatically."
+                        : typingStep === "reading"
+                          ? "Retype the reading once to continue."
+                          : "Type one meaning word once to continue."}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <button
@@ -946,23 +964,6 @@ function LibraryPracticePanel({
                   Show answer
                 </button>
               )}
-
-              {pendingTypingAdvance ? (
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAutoAdvancePaused((current) => !current)}
-                    className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
-                  >
-                    {autoAdvancePaused ? "Resume" : "Pause"}
-                  </button>
-                  <p className="text-xs text-slate-400">
-                    {autoAdvancePaused
-                      ? "Paused. Take your time with this card."
-                      : "Next step comes automatically."}
-                  </p>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>

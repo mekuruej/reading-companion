@@ -14,7 +14,7 @@ export default function GlobalWordAddEditCard({ children }: Props) {
           Add / Prepare Global Entry
         </div>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
-          Use this like a single Add Word form for global vocabulary and cultural references. This first pass stores nothing.
+          Use this like a single Add Word form for global vocabulary and cultural references. This saves an exact global vocabulary-cache entry without adding it to any book.
         </p>
       </div>
 

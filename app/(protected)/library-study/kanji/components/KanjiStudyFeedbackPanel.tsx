@@ -66,6 +66,25 @@ export default function KanjiStudyFeedbackPanel({
         </>
       )}
 
+      <div className="mt-2 flex flex-col items-center gap-1.5">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleAutoAdvancePaused();
+          }}
+          className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+        >
+          {autoAdvancePaused ? "Resume" : "Pause"}
+        </button>
+
+        <p className="text-xs text-slate-400">
+          {autoAdvancePaused
+            ? "Paused. Take your time with this reading."
+            : "Next word comes automatically."}
+        </p>
+      </div>
+
       {showExample ? (
         <>
           <div className="mt-3 rounded-xl border bg-slate-50 p-3 text-center">
@@ -103,25 +122,6 @@ export default function KanjiStudyFeedbackPanel({
                 </div>
               </div>
             ) : null}
-          </div>
-
-          <div className="mt-3 flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleAutoAdvancePaused();
-              }}
-              className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              {autoAdvancePaused ? "Resume" : "Pause"}
-            </button>
-
-            <p className="text-xs text-slate-400">
-              {autoAdvancePaused
-                ? "Paused. Take your time with this reading."
-                : "Next word comes automatically."}
-            </p>
           </div>
         </>
       ) : null}

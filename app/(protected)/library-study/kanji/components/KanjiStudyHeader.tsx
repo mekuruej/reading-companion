@@ -1,11 +1,15 @@
 type KanjiStudyHeaderProps = {
   title?: string;
+  description?: string;
+  note?: string;
   onOpenLibrary?: () => void;
   onOpenCharacterStudy?: () => void;
 };
 
 export function KanjiStudyHeader({
   title = "Kanji Reading Study",
+  description = "Practice kanji readings from your saved words.",
+  note,
   onOpenLibrary,
   onOpenCharacterStudy,
 }: KanjiStudyHeaderProps) {
@@ -26,18 +30,24 @@ export function KanjiStudyHeader({
           </h1>
 
           <p className="mt-1 text-sm font-medium text-stone-500">
-            Practice kanji readings from your saved words.
+            {description}
           </p>
+
+          {note ? (
+            <p className="mt-2 max-w-xl rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-semibold leading-5 text-sky-900">
+              {note}
+            </p>
+          ) : null}
         </div>
       </div>
 
       {onOpenLibrary || onOpenCharacterStudy ? (
-        <div className="flex flex-wrap gap-2 sm:mr-10 sm:justify-end">
+        <div className="flex shrink-0 flex-row flex-wrap gap-2 sm:mr-6 sm:justify-end">
           {onOpenCharacterStudy ? (
             <button
               type="button"
               onClick={onOpenCharacterStudy}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Basic Study
             </button>
@@ -47,7 +57,7 @@ export function KanjiStudyHeader({
             <button
               type="button"
               onClick={onOpenLibrary}
-              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+              className="whitespace-nowrap rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
             >
               Library
             </button>

@@ -261,6 +261,7 @@ export default function TeacherAddBookPage() {
     const [editingPanel, setEditingPanel] = useState<EditingPanel>(null);
 
     const [title, setTitle] = useState("");
+    const [titleReading, setTitleReading] = useState("");
     const [isbn, setIsbn] = useState("");
     const [isbn13, setIsbn13] = useState("");
     const [coverUrl, setCoverUrl] = useState("");
@@ -427,6 +428,7 @@ export default function TeacherAddBookPage() {
         setCurrentBookId(data.id);
         setCurrentBook(data);
         setTitle(data.title ?? "");
+        setTitleReading(data.title_reading ?? "");
         setIsbn(data.isbn ?? "");
         setIsbn13(data.isbn13 ?? "");
         setCoverUrl(data.cover_url ?? "");
@@ -707,6 +709,7 @@ export default function TeacherAddBookPage() {
                 .from("books")
                 .insert({
                     title: title.trim(),
+                    title_reading: cleanText(titleReading),
                     author: cleanText(author),
                     isbn13: cleanIsbn13 || null,
                 })
@@ -887,6 +890,7 @@ export default function TeacherAddBookPage() {
                 .from("books")
                 .update({
                     title: title.trim(),
+                    title_reading: cleanText(titleReading),
                     isbn: cleanText(isbn),
                     isbn13: cleanIsbn13 || null,
                     cover_url: cleanText(coverUrl),
@@ -977,10 +981,12 @@ export default function TeacherAddBookPage() {
 
                     <TeacherBookFindCreateFields
                         title={title}
+                        titleReading={titleReading}
                         isbn13={isbn13}
                         isBookRequest={Boolean(bookRequest)}
                         titleNeedsManualResearch={requestTitleNeedsManualResearch(bookRequest)}
                         onTitleChange={setTitle}
+                        onTitleReadingChange={setTitleReading}
                         onIsbn13Change={(value) => {
                             setIsbn13(value);
                             setIsbnLookupError("");
@@ -1029,6 +1035,8 @@ export default function TeacherAddBookPage() {
                         onEditMyCopy={() => null}
                         onCancel={cancelBookInfoEdits}
                         onSave={saveBookInfo}
+                        titleReading={titleReading}
+                        setTitleReading={setTitleReading}
                         bookType={bookType}
                         setBookType={setBookType}
                         publishedDate={publishedDate}

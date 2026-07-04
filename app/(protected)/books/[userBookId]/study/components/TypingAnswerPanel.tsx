@@ -17,6 +17,8 @@ type TypingAnswerPanelProps = {
   typedInputRef: RefObject<HTMLInputElement | null>;
   onTypedInputChange: (value: string) => void;
   onTypedInputKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  autoAdvancePaused?: boolean;
+  onToggleAutoAdvancePaused?: () => void;
 };
 
 export default function TypingAnswerPanel({
@@ -31,6 +33,8 @@ export default function TypingAnswerPanel({
   typedInputRef,
   onTypedInputChange,
   onTypedInputKeyDown,
+  autoAdvancePaused = false,
+  onToggleAutoAdvancePaused,
 }: TypingAnswerPanelProps) {
   return (
     <div className="w-full max-w-md">
@@ -74,6 +78,25 @@ export default function TypingAnswerPanel({
             {typedFeedback.ok ? "✅ " : "❌ "}
             {typedFeedback.message}
           </p>
+
+          {readyForNextCard && onToggleAutoAdvancePaused ? (
+            <div className="mt-2 flex flex-col items-center gap-1.5 text-slate-500">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleAutoAdvancePaused();
+                }}
+                className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                {autoAdvancePaused ? "Resume" : "Pause"}
+              </button>
+
+              <p className="text-xs text-slate-400">
+                {autoAdvancePaused ? "Paused. Take your time with this card." : "Next card comes automatically."}
+              </p>
+            </div>
+          ) : null}
 
           {!typedFeedback.ok && feedbackHelpText ? (
             <p className="mt-1 text-xs text-slate-500">{feedbackHelpText}</p>

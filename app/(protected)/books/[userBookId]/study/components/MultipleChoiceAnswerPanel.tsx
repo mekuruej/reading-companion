@@ -16,6 +16,8 @@ type MultipleChoiceAnswerPanelProps = {
   onCorrectionInputChange: (value: string) => void;
   onCorrectionInputKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onCheckCorrection: () => void;
+  autoAdvancePaused?: boolean;
+  onToggleAutoAdvancePaused?: () => void;
 };
 
 function containsJapanese(value: string) {
@@ -38,6 +40,8 @@ export default function MultipleChoiceAnswerPanel({
   onCorrectionInputChange,
   onCorrectionInputKeyDown,
   onCheckCorrection,
+  autoAdvancePaused = false,
+  onToggleAutoAdvancePaused,
 }: MultipleChoiceAnswerPanelProps) {
   return (
     <div className="w-full max-w-md pt-2">
@@ -88,6 +92,25 @@ export default function MultipleChoiceAnswerPanel({
               ? "✅ You got it!"
               : `❌ Not quite. Correct answer: ${correctAnswerText}`}
           </p>
+
+          {wasCorrect && onToggleAutoAdvancePaused ? (
+            <div className="mt-2 flex flex-col items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleAutoAdvancePaused();
+                }}
+                className="rounded-full border border-slate-300 bg-white px-4 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                {autoAdvancePaused ? "Resume" : "Pause"}
+              </button>
+
+              <p className="text-xs text-slate-400">
+                {autoAdvancePaused ? "Paused. Take your time with this card." : "Next card comes automatically."}
+              </p>
+            </div>
+          ) : null}
 
           {!wasCorrect ? (
             <div className="mt-3 space-y-2">

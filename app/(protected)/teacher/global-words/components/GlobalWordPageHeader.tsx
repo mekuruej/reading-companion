@@ -23,7 +23,7 @@ export default function GlobalWordPageHeader() {
       </p>
 
       <p className="mt-2 max-w-2xl text-xs leading-5 text-amber-700">
-        Visual scaffold only: global saving, cache writes, Word Sky approval, and kanji-map generation are intentionally disabled.
+        Saves global vocabulary-cache entries only. Word Sky approval stays separate and limited to N5-N3 words.
       </p>
     </section>
   );

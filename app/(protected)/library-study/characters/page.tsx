@@ -17,6 +17,14 @@ const basicStudyTools = [
       "Practice kanji readings from vocabulary you have saved while reading.",
     className: "border-amber-200 bg-amber-50 text-amber-950",
   },
+  {
+    title: "Radical Flashcards",
+    href: "/library-study/radicals",
+    eyebrow: "Character Patterns",
+    description:
+      "Practice the main radicals for kanji used in Mekuru.",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-950",
+  },
 ];
 
 const comingSoonTools = [
@@ -25,12 +33,6 @@ const comingSoonTools = [
     eyebrow: "Sample deck",
     description:
       "A small sample flashcard set so you can try Mekuru-style book study before using your own saved words.",
-  },
-  {
-    title: "Radicals",
-    eyebrow: "Character patterns",
-    description:
-      "A future place to practice kanji building blocks and character patterns.",
   },
 ];
 
