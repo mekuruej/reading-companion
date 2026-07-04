@@ -1,7 +1,7 @@
 // Teacher Library
 //
-// Teacher-only lesson prep shelf. This page intentionally writes to teacher_books,
-// not user_books, so prep does not affect personal reading data or stats.
+// Teacher-only lesson prep shelf. Each Teacher Book links to a user_books row
+// for personal library/study history, while prep content stays in teacher_book_items.
 
 "use client";
 
@@ -24,6 +24,7 @@ type TeacherBookRow = {
   id: string;
   teacher_id: string;
   book_id: string;
+  user_book_id: string | null;
   created_at: string | null;
   books: BookMeta | BookMeta[] | null;
 };
@@ -110,6 +111,7 @@ export default function TeacherLibraryPage() {
           id,
           teacher_id,
           book_id,
+          user_book_id,
           created_at,
           books:book_id (
             id,
@@ -172,12 +174,41 @@ export default function TeacherLibraryPage() {
     setMessage("");
 
     try {
+      const { data: existingUserBook, error: existingUserBookError } = await supabase
+        .from("user_books")
+        .select("id")
+        .eq("user_id", teacherId)
+        .eq("book_id", bookId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingUserBookError) throw existingUserBookError;
+
+      let linkedUserBookId = existingUserBook?.id ?? null;
+
+      if (!linkedUserBookId) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: insertedUserBook, error: insertUserBookError } = await supabase
+          .from("user_books")
+          .insert({
+            user_id: teacherId,
+            book_id: bookId,
+            started_at: today,
+          })
+          .select("id")
+          .single();
+
+        if (insertUserBookError) throw insertUserBookError;
+        linkedUserBookId = insertedUserBook.id;
+      }
+
       const { error } = await supabase
         .from("teacher_books")
         .upsert(
           {
             teacher_id: teacherId,
             book_id: bookId,
+            user_book_id: linkedUserBookId,
           },
           { onConflict: "teacher_id,book_id" }
         );
@@ -208,15 +239,13 @@ export default function TeacherLibraryPage() {
 
       <section className="mt-4 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-          Teacher Library
+          Teacher Books
         </p>
         <h1 className="mt-2 text-3xl font-black text-stone-900">
-          Lesson Prep Books
+          Teacher Books
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-          Prepare books for lessons with vocabulary, phrases, grammar notes,
-          sentence translations, and follow-along support. These books do not
-          affect learner libraries, reading stats, saved words, or Ability Check.
+          Manage the books you read and prepare for lessons. Progress and study history will count toward My Mekuru Library, while teaching prep stays in the Teacher Workspace.
         </p>
       </section>
 
@@ -314,9 +343,9 @@ export default function TeacherLibraryPage() {
 
           <section className="mt-6">
             <div className="mb-3">
-              <h2 className="text-xl font-black text-stone-900">My teaching books</h2>
+              <h2 className="text-xl font-black text-stone-900">My Teacher Books</h2>
               <p className="mt-1 text-sm text-stone-500">
-                Open a book to review its info, add lesson prep items, or use follow-along support.
+                Open a book to continue reading, study vocabulary, or prepare teaching support.
               </p>
             </div>
 
@@ -357,7 +386,7 @@ export default function TeacherLibraryPage() {
                             </p>
                           ) : null}
                           <p className="mt-3 text-sm font-semibold text-stone-700">
-                            Open book info
+                            Open Workspace
                           </p>
                         </div>
                       </div>

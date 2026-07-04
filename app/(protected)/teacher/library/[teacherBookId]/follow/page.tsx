@@ -32,6 +32,7 @@ type TeacherBookRow = {
   id: string;
   teacher_id: string;
   book_id: string;
+  user_book_id: string | null;
   books: BookMeta | BookMeta[] | null;
 };
 
@@ -181,6 +182,7 @@ export default function TeacherFollowAlongPage() {
           id,
           teacher_id,
           book_id,
+          user_book_id,
           books:book_id (
             title,
             author,
