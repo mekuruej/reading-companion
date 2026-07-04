@@ -31,6 +31,10 @@ type CuriosityWordDetailFieldsProps = {
   onHideKanjiChange: (checked: boolean) => void;
   onSaveWord: () => void;
   onClearWordFields: () => void;
+  locationLabel?: string;
+  locationPlaceholder?: string;
+  locationHelpText?: string;
+  allowPercentLocation?: boolean;
 };
 
 export default function CuriosityWordDetailFields({
@@ -50,6 +54,10 @@ export default function CuriosityWordDetailFields({
   onHideKanjiChange,
   onSaveWord,
   onClearWordFields,
+  locationLabel = "Page",
+  locationPlaceholder = "Page",
+  locationHelpText,
+  allowPercentLocation = false,
 }: CuriosityWordDetailFieldsProps) {
   return (
     <>
@@ -123,17 +131,22 @@ export default function CuriosityWordDetailFields({
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-stone-700">
-            Page
+            {locationLabel}
           </span>
           <input
-            type="number"
-            min={1}
-            inputMode="numeric"
+            type={allowPercentLocation ? "text" : "number"}
+            min={allowPercentLocation ? undefined : 1}
+            inputMode={allowPercentLocation ? "decimal" : "numeric"}
             value={quickPreview.page}
             onChange={(event) => onPageChange(event.target.value)}
-            placeholder="Page"
+            placeholder={locationPlaceholder}
             className="w-full rounded border bg-white px-3 py-2 text-sm"
           />
+          {locationHelpText ? (
+            <span className="mt-1 block text-xs leading-5 text-stone-500">
+              {locationHelpText}
+            </span>
+          ) : null}
         </label>
 
         <ChapterNameCombobox

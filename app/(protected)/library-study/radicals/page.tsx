@@ -439,9 +439,7 @@ export default function RadicalFlashcardsPage() {
 
   function restartDeck(cards = filteredBaseCards, mode: RadicalStudyMode = studyMode) {
     const usableCards = cards.filter((candidate) => makeOptions(candidate, cards, mode).length >= 2);
-    const sessionCards = mode === "radicalStrokeCount"
-      ? oneCardPerRadical(usableCards)
-      : usableCards;
+    const sessionCards = oneCardPerRadical(usableCards);
     setDeck(shuffleArray(sessionCards));
     setIndex(0);
     setSelected(null);

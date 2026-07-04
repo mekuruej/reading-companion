@@ -360,7 +360,7 @@ export default function TeacherLibraryPage() {
                   return (
                     <Link
                       key={row.id}
-                      href={`/teacher/library/${row.id}`}
+                      href={`/teacher/library/${row.id}/book-workspace`}
                       className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                     >
                       <div className="flex gap-3">

@@ -716,8 +716,9 @@ export default function BookFlashcardsPage() {
                   ? w.meaning_choice_index
                   : 0;
 
+              const savedMeaning = (w.meaning ?? "").trim();
               const chosenMeaning =
-                meaningChoices.length > 0 ? meaningChoices[safeIdx] : w.meaning ?? null;
+                savedMeaning || (meaningChoices.length > 0 ? meaningChoices[safeIdx] : "");
 
               const repeatKey = normalizeRepeatKey(w.surface);
               const repeatCount = repeatKey ? (libraryRepeatCounts.get(repeatKey) ?? 1) : 1;
@@ -817,8 +818,9 @@ export default function BookFlashcardsPage() {
               ? w.meaning_choice_index
               : 0;
 
+          const savedMeaning = (w.meaning ?? "").trim();
           const chosenMeaning =
-            meaningChoices.length > 0 ? meaningChoices[safeIdx] : w.meaning ?? null;
+            savedMeaning || (meaningChoices.length > 0 ? meaningChoices[safeIdx] : "");
 
           const repeatKey = normalizeRepeatKey(w.surface);
           const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;

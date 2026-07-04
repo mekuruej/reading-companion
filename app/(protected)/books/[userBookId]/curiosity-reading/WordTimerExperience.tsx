@@ -126,6 +126,13 @@ function toNullableInt(value: string): number | null {
   return Math.trunc(n);
 }
 
+function pageNumberForSavedWordLocation(value: string, allowPercent: boolean): number | null {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (allowPercent && trimmed.includes("%")) return null;
+  return toNullableInt(trimmed);
+}
+
 function sortQuickSessionWords(words: QuickSessionWord[]) {
   return [...words].sort((a, b) => {
     const aChapter = toNullableInt(a.chapterNumber) ?? Number.MAX_SAFE_INTEGER;
@@ -952,7 +959,7 @@ export function CuriosityReadingExperience({
     const isManualEntry = quickPreview.isCustomMeaning && quickPreview.meanings.length === 0;
 
     const chapterNum = quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null;
-    const pageNum = quickPreview.page ? Number(quickPreview.page) : null;
+    const pageNum = pageNumberForSavedWordLocation(quickPreview.page, isListeningMode);
     const chapterNameTrimmed = quickPreview.chapterName?.trim() || null;
 
     let vocabularyCacheId: number | null = null;
@@ -1552,6 +1559,10 @@ export function CuriosityReadingExperience({
               onHideKanjiChange={setHideKanjiInReadingSupport}
               onSaveWord={() => void saveQuickWord()}
               onClearWordFields={() => clearQuickWordFields()}
+              locationLabel={isListeningMode ? "Page or %" : "Page"}
+              locationPlaceholder={isListeningMode ? "p. 42 or 37%" : "Page"}
+              locationHelpText={isListeningMode ? "Use a page if you have the book open, or a Kindle/audio percent as a listening note. Percent is not saved as a page." : undefined}
+              allowPercentLocation={isListeningMode}
             />
           </CuriosityAddEditWordFormShell>
           <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>

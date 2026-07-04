@@ -197,6 +197,13 @@ export default function TeacherWordsQueuePage() {
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link
+                    href={`/books/${word.user_book_id}/words/${word.id}`}
+                    className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black"
+                  >
+                    Open Word Detail
+                  </Link>
+
+                  <Link
                     href={`/books/${word.user_book_id}`}
                     className="rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
                   >
