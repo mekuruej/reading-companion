@@ -307,7 +307,7 @@ export default function TeacherBookWorkspacePage() {
       {
         title: "Supported Reading",
         subtitle: "Extensive Reading with Saved Words",
-        description: "Reread with light support from words you already saved.",
+        description: "Reread with light support from your saved reader words.",
         href: `/books/${encodedUserBookId}/readalong`,
         tone: "green",
       },
@@ -332,8 +332,8 @@ export default function TeacherBookWorkspacePage() {
         tone: "blue",
       },
       {
-        title: "Vocabulary List",
-        description: "Open saved words and vocabulary tools for this book.",
+        title: "My Reader Vocab",
+        description: "Review and manage your saved reader words for this book.",
         href: `/books/${encodedUserBookId}/words`,
         tone: "green",
       },
@@ -344,14 +344,14 @@ export default function TeacherBookWorkspacePage() {
     const encodedTeacherBookId = encodeURIComponent(teacherBookId);
     return [
       {
-        title: "Teaching Prep Items",
-        description: "Add words, phrases, notes, translations, and lesson support.",
+        title: "Teaching Prep",
+        description: "Prepare teacher support items such as words, phrases, grammar notes, translations, and lesson notes.",
         href: `/teacher/library/${encodedTeacherBookId}`,
         tone: "stone",
       },
       {
         title: "Follow-Along Support",
-        description: "Use your prepared support while reading with a learner.",
+        description: "Use your teacher support items while reading with a learner.",
         href: `/teacher/library/${encodedTeacherBookId}/follow`,
         tone: "stone",
       },
@@ -443,7 +443,7 @@ export default function TeacherBookWorkspacePage() {
                 </p>
               ) : null}
               <p className="mt-5 max-w-2xl text-sm leading-6 text-stone-600">
-                Reading tools use your My Mekuru Library history. Teaching Prep Items stays with this Teacher Book.
+                My Reader Tools use your My Mekuru Library history. Teacher support stays with this Teacher Book.
               </p>
             </div>
           </div>
@@ -520,7 +520,7 @@ export default function TeacherBookWorkspacePage() {
           <section className="mt-6">
             <div className="mb-3">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-                Reading Tools
+                My Reader Tools
               </p>
               <h2 className="mt-1 text-2xl font-black text-stone-950">Read and study</h2>
             </div>
@@ -535,7 +535,7 @@ export default function TeacherBookWorkspacePage() {
         <section className="mt-7">
           <div className="mb-3">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-              Teacher Tools
+              Teacher Support
             </p>
             <h2 className="mt-1 text-2xl font-black text-stone-950">Prepare and support</h2>
           </div>
