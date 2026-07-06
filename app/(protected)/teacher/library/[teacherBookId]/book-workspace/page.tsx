@@ -25,6 +25,8 @@ type TeacherBookRow = {
   teacher_id: string;
   book_id: string;
   user_book_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
   books: BookMeta | BookMeta[] | null;
 };
 
@@ -79,7 +81,7 @@ function ToolCardLink({ tool }: { tool: ToolCard }) {
           ) : null}
           <p className="mt-3 text-sm leading-6 text-stone-600">{tool.description}</p>
         </div>
-        <p className="text-sm font-black text-stone-900">Open -&gt;</p>
+        <p className="text-sm font-black text-stone-900">Open</p>
       </div>
     </Link>
   );
@@ -134,6 +136,8 @@ export default function TeacherBookWorkspacePage() {
           teacher_id,
           book_id,
           user_book_id,
+          created_at,
+          updated_at,
           books:book_id (
             id,
             title,
@@ -155,14 +159,8 @@ export default function TeacherBookWorkspacePage() {
         return;
       }
 
-      const row = data as TeacherBookRow;
-      if (row.teacher_id !== user.id) {
-        setMessage("You do not have access to this Teacher Book.");
-        return;
-      }
-
       setCanAccess(true);
-      setTeacherBook(row);
+      setTeacherBook(data as TeacherBookRow);
     } catch (error: any) {
       console.error("Error loading Teacher Book Workspace:", error);
       setMessage(error?.message ?? "Could not load Teacher Book Workspace.");
@@ -188,8 +186,8 @@ export default function TeacherBookWorkspacePage() {
       },
       {
         title: "Supported Reading",
-        subtitle: "Extensive Saved Word Support",
-        description: "Review reading with light support from saved words.",
+        subtitle: "Extensive Reading with Saved Words",
+        description: "Reread with light support from words you already saved.",
         href: `/books/${encodedUserBookId}/readalong`,
         tone: "green",
       },
@@ -226,13 +224,13 @@ export default function TeacherBookWorkspacePage() {
     const encodedTeacherBookId = encodeURIComponent(teacherBookId);
     return [
       {
-        title: "Teaching Prep",
+        title: "Teaching Prep Items",
         description: "Add words, phrases, notes, translations, and lesson support.",
         href: `/teacher/library/${encodedTeacherBookId}`,
         tone: "stone",
       },
       {
-        title: "Follow-Along",
+        title: "Follow-Along Support",
         description: "Use your prepared support while reading with a learner.",
         href: `/teacher/library/${encodedTeacherBookId}/follow`,
         tone: "stone",
@@ -313,7 +311,7 @@ export default function TeacherBookWorkspacePage() {
                 ) : null}
               </div>
               <p className="mt-5 max-w-2xl text-sm leading-6 text-stone-600">
-                Reading tools use your My Mekuru Library history. Teaching prep stays with this Teacher Book.
+                Reading tools use your My Mekuru Library history. Teaching Prep Items stays with this Teacher Book.
               </p>
             </div>
           </div>
@@ -321,13 +319,13 @@ export default function TeacherBookWorkspacePage() {
 
         {!userBookId ? (
           <section className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900 shadow-sm">
-            This Teacher Book is not linked to a My Mekuru Library record yet. Reader tools will appear here after the library link is created.
+            This Teacher Book is not linked to My Mekuru Library yet.
           </section>
         ) : (
           <section className="mt-6">
             <div className="mb-3">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-                Reader Tools
+                Reading Tools
               </p>
               <h2 className="mt-1 text-2xl font-black text-stone-950">Read and study</h2>
             </div>
