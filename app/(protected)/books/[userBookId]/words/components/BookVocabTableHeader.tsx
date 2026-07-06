@@ -19,21 +19,28 @@ export default function BookVocabTableHeader({
         >
           Order
         </th>
+        <th
+          className="sticky z-20 w-16 bg-gray-50 p-2 text-center"
+          style={headerStickyStyle}
+          title="Words can be reordered within the same page"
+        >
+          Page
+        </th>
 
         <th
-          className="sticky z-20 w-[22%] bg-gray-50 p-2"
+          className="sticky z-20 w-[21%] bg-gray-50 p-2"
           style={headerStickyStyle}
         >
           Word
         </th>
         <th
-          className="sticky z-20 w-[22%] bg-gray-50 p-2"
+          className="sticky z-20 w-[21%] bg-gray-50 p-2"
           style={headerStickyStyle}
         >
           Reading
         </th>
         <th
-          className="sticky z-20 w-[46%] bg-gray-50 p-2"
+          className="sticky z-20 w-[42%] bg-gray-50 p-2"
           style={headerStickyStyle}
         >
           Definition

@@ -15,7 +15,7 @@ export default function BookVocabReorderHint({
 
   return (
     <p className="mb-2 text-sm text-stone-500">
-      Use Up and Down to adjust reading order within the same chapter/page.
+      Use ⬆️ and ⬇️ to adjust order within the same chapter/page.
     </p>
   );
 }

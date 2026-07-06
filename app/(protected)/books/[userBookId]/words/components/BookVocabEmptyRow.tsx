@@ -5,7 +5,7 @@ type BookVocabEmptyRowProps = {
 // Empty table row shown when the current filters hide all saved words.
 // The page still decides when the list is empty; this component only renders the message.
 export default function BookVocabEmptyRow({
-  colSpan = 5,
+  colSpan = 6,
 }: BookVocabEmptyRowProps) {
   return (
     <tr>

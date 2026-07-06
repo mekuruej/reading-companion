@@ -7,5 +7,5 @@ type BookVocabPageCellProps = {
 export default function BookVocabPageCell({
   pageNumber,
 }: BookVocabPageCellProps) {
-  return <td className="p-2">{pageNumber ?? "—"}</td>;
+  return <td className="p-2 text-center text-sm font-semibold text-stone-600">{pageNumber ?? "—"}</td>;
 }

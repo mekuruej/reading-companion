@@ -1,11 +1,13 @@
 import BookVocabActionsCell from "./BookVocabActionsCell";
 import BookVocabKatakanaBadge from "./BookVocabKatakanaBadge";
+import BookVocabPageCell from "./BookVocabPageCell";
 
 type BookVocabRowProps = {
   hidden: boolean;
   surface: string | null | undefined;
   reading: string | null | undefined;
   meaning: string | null | undefined;
+  pageNumber: number | null | undefined;
 
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -23,6 +25,7 @@ export default function BookVocabRow({
   surface,
   reading,
   meaning,
+  pageNumber,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -53,6 +56,8 @@ export default function BookVocabRow({
           </button>
         </div>
       </td>
+
+      <BookVocabPageCell pageNumber={pageNumber} />
 
       <td className="break-words p-2 text-lg font-semibold text-stone-950">
         <span className="inline-flex min-w-0 flex-wrap items-center gap-2">

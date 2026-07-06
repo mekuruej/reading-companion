@@ -1166,6 +1166,7 @@ export default function BookWordsPage() {
               surface={w.surface}
               reading={w.reading}
               meaning={w.meaning}
+              pageNumber={w.page_number}
               canMoveUp={orderPosition.canMoveUp}
               canMoveDown={orderPosition.canMoveDown}
               onMoveUp={async () => {
@@ -1208,6 +1209,7 @@ export default function BookWordsPage() {
                 surface={w.surface}
                 reading={w.reading}
                 meaning={w.meaning}
+                pageNumber={w.page_number}
                 canMoveUp={orderPosition.canMoveUp}
                 canMoveDown={orderPosition.canMoveDown}
                 onMoveUp={async () => {

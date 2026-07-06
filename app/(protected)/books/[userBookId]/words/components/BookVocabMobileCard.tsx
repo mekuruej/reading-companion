@@ -5,6 +5,7 @@ type BookVocabMobileCardProps = {
   surface: string | null | undefined;
   reading: string | null | undefined;
   meaning: string | null | undefined;
+  pageNumber: number | null | undefined;
 
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -19,6 +20,7 @@ export default function BookVocabMobileCard({
   surface,
   reading,
   meaning,
+  pageNumber,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -66,6 +68,13 @@ export default function BookVocabMobileCard({
           >
             ↓
           </button>
+        </div>
+
+        <div
+          className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500"
+          title="Words can be reordered within the same page"
+        >
+          Page {pageNumber ?? "—"}
         </div>
 
         <button
