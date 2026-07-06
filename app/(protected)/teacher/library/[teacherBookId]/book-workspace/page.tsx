@@ -305,9 +305,9 @@ export default function TeacherBookWorkspacePage() {
         tone: "blue",
       },
       {
-        title: "Supported Reading",
+        title: "Saved Word Reading",
         subtitle: "Extensive Reading with Saved Words",
-        description: "Reread with light support from your saved reader words.",
+        description: "Reread with light support from your saved reader words and reader session tracking.",
         href: `/books/${encodedUserBookId}/readalong`,
         tone: "green",
       },
@@ -344,15 +344,15 @@ export default function TeacherBookWorkspacePage() {
     const encodedTeacherBookId = encodeURIComponent(teacherBookId);
     return [
       {
-        title: "Teaching Prep",
-        description: "Prepare teacher support items such as words, phrases, grammar notes, translations, and lesson notes.",
-        href: `/teacher/library/${encodedTeacherBookId}`,
+        title: "Follow-Along Support",
+        description: "Use your saved reader words and teacher support items while reading with a learner.",
+        href: `/teacher/library/${encodedTeacherBookId}/follow`,
         tone: "stone",
       },
       {
-        title: "Follow-Along Support",
-        description: "Use your teacher support items while reading with a learner.",
-        href: `/teacher/library/${encodedTeacherBookId}/follow`,
+        title: "Teaching Prep",
+        description: "Prepare teacher support items such as grammar notes, phrases, translations, and lesson notes.",
+        href: `/teacher/library/${encodedTeacherBookId}`,
         tone: "stone",
       },
     ];
