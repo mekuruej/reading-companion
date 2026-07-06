@@ -20,11 +20,21 @@ type BookMeta = {
   page_count: number | null;
 };
 
+type TeacherUseStatus =
+  | "want_to_test"
+  | "testing"
+  | "currently_using"
+  | "approved_for_lesson"
+  | "use_with_caution"
+  | "do_not_use";
+
 type TeacherBookRow = {
   id: string;
   teacher_id: string;
   book_id: string;
   user_book_id: string | null;
+  teacher_use_status: TeacherUseStatus | null;
+  teacher_use_note: string | null;
   created_at: string | null;
   updated_at: string | null;
   books: BookMeta | BookMeta[] | null;
@@ -38,18 +48,64 @@ type ToolCard = {
   tone: "blue" | "green" | "purple" | "stone";
 };
 
-function isTeacherRole(profile: any) {
+function isSuperTeacherRole(profile: any) {
   return (
-    profile?.role === "teacher" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
   );
 }
 
+function isTeacherRole(profile: any) {
+  return profile?.role === "teacher" || isSuperTeacherRole(profile);
+}
+
 function firstBook(book: TeacherBookRow["books"]) {
   if (Array.isArray(book)) return book[0] ?? null;
   return book ?? null;
+}
+
+const teacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }> = [
+  { value: "want_to_test", label: "Want to Test" },
+  { value: "testing", label: "Testing" },
+  { value: "currently_using", label: "Currently Using" },
+  { value: "approved_for_lesson", label: "Approved for Lesson" },
+  { value: "use_with_caution", label: "Use with Caution" },
+  { value: "do_not_use", label: "Do Not Use" },
+];
+
+const teacherUseStatusLabels = teacherUseStatusOptions.reduce(
+  (labels, option) => ({ ...labels, [option.value]: option.label }),
+  {} as Record<TeacherUseStatus, string>
+);
+
+function isTeacherUseStatus(value: string): value is TeacherUseStatus {
+  return teacherUseStatusOptions.some((option) => option.value === value);
+}
+
+function normalizeTeacherUseStatus(value: string | null | undefined): TeacherUseStatus {
+  return value && isTeacherUseStatus(value) ? value : "want_to_test";
+}
+
+function teacherUseStatusLabel(status: TeacherUseStatus | null | undefined) {
+  return teacherUseStatusLabels[normalizeTeacherUseStatus(status)];
+}
+
+function teacherUseStatusBadgeClass(status: TeacherUseStatus | null | undefined) {
+  switch (normalizeTeacherUseStatus(status)) {
+    case "approved_for_lesson":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "currently_using":
+      return "border-sky-200 bg-sky-50 text-sky-800";
+    case "testing":
+      return "border-violet-200 bg-violet-50 text-violet-800";
+    case "use_with_caution":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "do_not_use":
+      return "border-rose-200 bg-rose-50 text-rose-800";
+    default:
+      return "border-stone-200 bg-stone-50 text-stone-700";
+  }
 }
 
 function bookTypeLabel(value: string | null | undefined) {
@@ -94,7 +150,13 @@ export default function TeacherBookWorkspacePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [canAccess, setCanAccess] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [teacherBook, setTeacherBook] = useState<TeacherBookRow | null>(null);
+  const [statusDraft, setStatusDraft] = useState<TeacherUseStatus>("want_to_test");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
 
   useEffect(() => {
     void loadWorkspace();
@@ -104,7 +166,12 @@ export default function TeacherBookWorkspacePage() {
     setLoading(true);
     setMessage("");
     setCanAccess(false);
+    setCurrentUserId(null);
+    setIsSuperTeacher(false);
     setTeacherBook(null);
+    setStatusDraft("want_to_test");
+    setNoteDraft("");
+    setStatusMessage("");
 
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -115,6 +182,8 @@ export default function TeacherBookWorkspacePage() {
         return;
       }
 
+      setCurrentUserId(user.id);
+
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role, is_super_teacher")
@@ -122,6 +191,9 @@ export default function TeacherBookWorkspacePage() {
         .maybeSingle();
 
       if (profileError) throw profileError;
+
+      const profileIsSuperTeacher = isSuperTeacherRole(profile);
+      setIsSuperTeacher(profileIsSuperTeacher);
 
       if (!isTeacherRole(profile)) {
         setMessage("Teacher access is required.");
@@ -136,6 +208,8 @@ export default function TeacherBookWorkspacePage() {
           teacher_id,
           book_id,
           user_book_id,
+          teacher_use_status,
+          teacher_use_note,
           created_at,
           updated_at,
           books:book_id (
@@ -159,13 +233,59 @@ export default function TeacherBookWorkspacePage() {
         return;
       }
 
+      const row = data as TeacherBookRow;
       setCanAccess(true);
-      setTeacherBook(data as TeacherBookRow);
+      setTeacherBook(row);
+      setStatusDraft(normalizeTeacherUseStatus(row.teacher_use_status));
+      setNoteDraft(row.teacher_use_note ?? "");
     } catch (error: any) {
       console.error("Error loading Teacher Book Workspace:", error);
       setMessage(error?.message ?? "Could not load Teacher Book Workspace.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  const canEditTeacherUseStatus =
+    teacherBook != null &&
+    currentUserId != null &&
+    (teacherBook.teacher_id === currentUserId || isSuperTeacher);
+
+  async function handleSaveTeacherUseStatus() {
+    if (!teacherBook) return;
+
+    if (!canEditTeacherUseStatus) {
+      setStatusMessage("You do not have permission to update this Teacher Book status.");
+      return;
+    }
+
+    if (!isTeacherUseStatus(statusDraft)) {
+      setStatusMessage("Choose a valid Teacher Book status.");
+      return;
+    }
+
+    setStatusSaving(true);
+    setStatusMessage("");
+
+    try {
+      const cleanedNote = noteDraft.trim() || null;
+      const { error } = await supabase
+        .from("teacher_books")
+        .update({
+          teacher_use_status: statusDraft,
+          teacher_use_note: cleanedNote,
+        })
+        .eq("id", teacherBook.id);
+
+      if (error) throw error;
+
+      await loadWorkspace();
+      setStatusMessage("Teacher Book status saved.");
+    } catch (error: any) {
+      console.error("Error saving Teacher Book use status:", error);
+      setStatusMessage(error?.message ?? "Could not save Teacher Book status.");
+    } finally {
+      setStatusSaving(false);
     }
   }
 
@@ -299,6 +419,13 @@ export default function TeacherBookWorkspacePage() {
                 <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1">
                   {bookTypeLabel(book?.book_type)}
                 </span>
+                <span
+                  className={`rounded-full border px-3 py-1 ${teacherUseStatusBadgeClass(
+                    teacherBook.teacher_use_status
+                  )}`}
+                >
+                  {teacherUseStatusLabel(teacherBook.teacher_use_status)}
+                </span>
                 {book?.page_count != null ? (
                   <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1">
                     {book.page_count} pages
@@ -310,11 +437,79 @@ export default function TeacherBookWorkspacePage() {
                   </span>
                 ) : null}
               </div>
+              {teacherBook.teacher_use_note ? (
+                <p className="mt-3 max-w-2xl rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
+                  {teacherBook.teacher_use_note}
+                </p>
+              ) : null}
               <p className="mt-5 max-w-2xl text-sm leading-6 text-stone-600">
                 Reading tools use your My Mekuru Library history. Teaching Prep Items stays with this Teacher Book.
               </p>
             </div>
           </div>
+        </section>
+
+        <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+                Teacher Use Status
+              </p>
+              <h2 className="mt-1 text-xl font-black text-stone-950">Book fit for lessons</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+                This is separate from your My Mekuru Library reading status. Use the note for cautions such as level fit, content warning, personal-read-only, or too much dialect.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleSaveTeacherUseStatus()}
+              disabled={!canEditTeacherUseStatus || statusSaving}
+              className="rounded-2xl border border-stone-900 bg-stone-900 px-5 py-3 text-sm font-black text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {statusSaving ? "Saving..." : "Save Status"}
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-[260px_minmax(0,1fr)]">
+            <label className="block">
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
+                Status
+              </span>
+              <select
+                value={statusDraft}
+                onChange={(event) => {
+                  const nextStatus = event.target.value;
+                  if (isTeacherUseStatus(nextStatus)) setStatusDraft(nextStatus);
+                }}
+                disabled={!canEditTeacherUseStatus || statusSaving}
+                className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-900 disabled:bg-stone-100"
+              >
+                {teacherUseStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
+                Note or reason
+              </span>
+              <textarea
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                disabled={!canEditTeacherUseStatus || statusSaving}
+                rows={3}
+                placeholder="Level fit, content warning, personal-read-only, too much dialect..."
+                className="w-full resize-none rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm leading-6 text-stone-900 disabled:bg-stone-100"
+              />
+            </label>
+          </div>
+
+          {statusMessage ? (
+            <p className="mt-3 text-sm font-semibold text-stone-600">{statusMessage}</p>
+          ) : null}
         </section>
 
         {!userBookId ? (

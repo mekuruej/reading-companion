@@ -20,11 +20,21 @@ type BookMeta = {
   isbn13: string | null;
 };
 
+type TeacherUseStatus =
+  | "want_to_test"
+  | "testing"
+  | "currently_using"
+  | "approved_for_lesson"
+  | "use_with_caution"
+  | "do_not_use";
+
 type TeacherBookRow = {
   id: string;
   teacher_id: string;
   book_id: string;
   user_book_id: string | null;
+  teacher_use_status: TeacherUseStatus | null;
+  teacher_use_note: string | null;
   created_at: string | null;
   books: BookMeta | BookMeta[] | null;
 };
@@ -41,6 +51,36 @@ function isTeacherRole(profile: any) {
 function firstBook(book: TeacherBookRow["books"]) {
   if (Array.isArray(book)) return book[0] ?? null;
   return book ?? null;
+}
+
+const teacherUseStatusLabels: Record<TeacherUseStatus, string> = {
+  want_to_test: "Want to Test",
+  testing: "Testing",
+  currently_using: "Currently Using",
+  approved_for_lesson: "Approved for Lesson",
+  use_with_caution: "Use with Caution",
+  do_not_use: "Do Not Use",
+};
+
+function teacherUseStatusLabel(status: TeacherUseStatus | null | undefined) {
+  return teacherUseStatusLabels[status ?? "want_to_test"];
+}
+
+function teacherUseStatusBadgeClass(status: TeacherUseStatus | null | undefined) {
+  switch (status ?? "want_to_test") {
+    case "approved_for_lesson":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "currently_using":
+      return "border-sky-200 bg-sky-50 text-sky-800";
+    case "testing":
+      return "border-violet-200 bg-violet-50 text-violet-800";
+    case "use_with_caution":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "do_not_use":
+      return "border-rose-200 bg-rose-50 text-rose-800";
+    default:
+      return "border-stone-200 bg-stone-50 text-stone-700";
+  }
 }
 
 function bookTypeLabel(value: string | null | undefined) {
@@ -112,6 +152,8 @@ export default function TeacherLibraryPage() {
           teacher_id,
           book_id,
           user_book_id,
+          teacher_use_status,
+          teacher_use_note,
           created_at,
           books:book_id (
             id,
@@ -383,6 +425,20 @@ export default function TeacherLibraryPage() {
                           {book?.author ? (
                             <p className="mt-1 line-clamp-2 text-sm text-stone-500">
                               {book.author}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-xs font-black ${teacherUseStatusBadgeClass(
+                                row.teacher_use_status
+                              )}`}
+                            >
+                              {teacherUseStatusLabel(row.teacher_use_status)}
+                            </span>
+                          </div>
+                          {row.teacher_use_note ? (
+                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-stone-500">
+                              {row.teacher_use_note}
                             </p>
                           ) : null}
                           <p className="mt-3 text-sm font-semibold text-stone-700">
