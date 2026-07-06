@@ -7,6 +7,7 @@ type SupportMode = "full" | "reading" | "meaning";
 
 type TeacherFollowAlongPrepItem = {
   id: string;
+  source?: "reader_vocab" | "teacher_support";
   item_type: ItemType;
   surface_text: string | null;
   reading: string | null;
@@ -16,6 +17,8 @@ type TeacherFollowAlongPrepItem = {
   explanation: string | null;
   translation: string | null;
   support_url?: string | null;
+  jlpt?: string | null;
+  meaning_choice_index?: number | null;
 };
 
 type TeacherFollowAlongPrepItemCardProps = {
@@ -32,6 +35,7 @@ type SupportBlockProps = {
   value: string | null | undefined;
   tone?: SupportBlockTone;
   collapseAfter?: number;
+  collapseByDefault?: boolean;
 };
 
 function itemTypeLabel(value: string) {
@@ -88,11 +92,65 @@ function compactPreview(value: string, limit: number) {
   return `${value.slice(0, limit).trimEnd()}...`;
 }
 
+function normalizeJlptLabel(jlpt?: string | null) {
+  const normalized = jlpt?.trim().toUpperCase();
+
+  if (!normalized || normalized === "NON-JLPT" || normalized === "NONE") {
+    return null;
+  }
+
+  return normalized.startsWith("N") ? normalized : `N${normalized}`;
+}
+
+function definitionLabel(index?: number | null) {
+  if (typeof index !== "number" || !Number.isFinite(index) || index < 0) {
+    return null;
+  }
+
+  return `Def. ${index + 1}`;
+}
+
+function savedWordBadgeLabel(item: TeacherFollowAlongPrepItem) {
+  const parts = [normalizeJlptLabel(item.jlpt), definitionLabel(item.meaning_choice_index)].filter(
+    Boolean
+  );
+
+  return parts.length > 0 ? parts.join(" · ") : "Saved";
+}
+
+function readerWordCardClass(isFaded: boolean) {
+  if (isFaded) {
+    return "border-stone-200 border-l-stone-200 bg-stone-50 opacity-35";
+  }
+
+  return "border-stone-200 border-l-red-300 bg-white hover:border-l-red-400 hover:bg-stone-50";
+}
+
+function ReaderWordBadge({ item }: { item: TeacherFollowAlongPrepItem }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-700 shadow-sm">
+      <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+      {savedWordBadgeLabel(item)}
+    </span>
+  );
+}
+
+
+function teacherSupportCardClass(isFaded: boolean) {
+  if (isFaded) {
+    return "border-stone-200 border-l-stone-200 bg-stone-50 opacity-35";
+  }
+
+  return "border-stone-200 border-l-stone-900 bg-white hover:border-l-black hover:bg-stone-50";
+}
+
+
 function SupportBlock({
   label,
   value,
   tone = "stone",
   collapseAfter = 180,
+  collapseByDefault = false,
 }: SupportBlockProps) {
   const cleaned = value?.trim();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -100,7 +158,13 @@ function SupportBlock({
   if (!cleaned) return null;
 
   const isLong = cleaned.length > collapseAfter;
-  const visibleText = isLong && !isExpanded ? compactPreview(cleaned, collapseAfter) : cleaned;
+  const isCollapsible = collapseByDefault || isLong;
+  const visibleText =
+    collapseByDefault && !isExpanded
+      ? ""
+      : isLong && !isExpanded
+        ? compactPreview(cleaned, collapseAfter)
+        : cleaned;
 
   return (
     <section
@@ -115,8 +179,10 @@ function SupportBlock({
       >
         {label}
       </div>
-      <p className="whitespace-pre-wrap break-words">{visibleText}</p>
-      {isLong ? (
+      {visibleText ? (
+        <p className="whitespace-pre-wrap break-words">{visibleText}</p>
+      ) : null}
+      {isCollapsible ? (
         <button
           type="button"
           aria-expanded={isExpanded}
@@ -168,14 +234,54 @@ export function TeacherFollowAlongPrepItemCard({
   const showMeaning =
     (supportMode === "full" || supportMode === "meaning") && item.meaning;
 
+  const isReaderWord = item.source === "reader_vocab" && item.item_type === "word";
+
+  if (isReaderWord) {
+    return (
+      <article
+        onClick={onSelect}
+        className={`relative cursor-pointer rounded-2xl border border-l-8 px-4 py-3 pr-4 transition sm:pr-40 ${readerWordCardClass(
+          isFaded
+        )}`}
+      >
+        <div className="mb-2 flex flex-wrap gap-2 sm:absolute sm:right-4 sm:top-3 sm:mb-0">
+          <ReaderWordBadge item={item} />
+          {item.chapter_name ? (
+            <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-600 shadow-sm">
+              {item.chapter_name}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="break-words text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
+              {displaySurface}
+            </div>
+
+            {(supportMode === "full" || supportMode === "reading") ? (
+              <div className="text-sm text-stone-500 sm:text-base">
+                {item.reading || "—"}
+              </div>
+            ) : null}
+          </div>
+
+          {(supportMode === "full" || supportMode === "meaning") ? (
+            <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
+              {item.meaning || "—"}
+            </div>
+          ) : null}
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article
       onClick={onSelect}
-      className={`relative cursor-pointer rounded-2xl border px-4 py-3 transition ${
+      className={`relative cursor-pointer rounded-2xl border border-l-8 px-4 py-3 transition ${teacherSupportCardClass(
         isFaded
-          ? "border-stone-200 bg-stone-50 opacity-35"
-          : "border-stone-200 bg-white hover:bg-stone-50"
-      }`}
+      )}`}
     >
       <div className="mb-2 flex flex-wrap gap-2">
         <span
@@ -214,7 +320,12 @@ export function TeacherFollowAlongPrepItemCard({
 
         <SupportBlock label="Explanation" value={item.explanation} tone="stone" />
         <SupportBlock label="Translation" value={item.translation} tone="teal" />
-        <SupportBlock label="Teacher Note" value={item.teacher_note} tone="amber" />
+        <SupportBlock
+          label="Teacher Note"
+          value={item.teacher_note}
+          tone="amber"
+          collapseByDefault
+        />
         <SupportUrlBlock value={item.support_url} />
       </div>
     </article>
