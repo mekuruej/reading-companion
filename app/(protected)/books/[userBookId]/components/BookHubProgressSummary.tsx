@@ -5,6 +5,8 @@ type BookHubProgressSummaryProps = {
   progressLabel: string;
   progressSummaryLabel: string;
   progressBarWidth: string;
+  progressPercentLabel?: string;
+  lastSavedWordLabel?: string;
   daysEngagedLabel: string;
   savedWordsPerPageLabel: string;
   averageMinutesPerPageLabel: string;
@@ -14,6 +16,8 @@ export default function BookHubProgressSummary({
   progressLabel,
   progressSummaryLabel,
   progressBarWidth,
+  progressPercentLabel,
+  lastSavedWordLabel,
   daysEngagedLabel,
   savedWordsPerPageLabel,
   averageMinutesPerPageLabel,
@@ -24,11 +28,18 @@ export default function BookHubProgressSummary({
         <div className="mb-3 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700 shadow-sm sm:px-5">
           <div className="font-semibold text-stone-900">Your Progress</div>
           <div className="mt-1 text-stone-600">{progressSummaryLabel}</div>
+          {lastSavedWordLabel ? (
+            <div className="mt-1 text-stone-600">
+              Last saved word: <span className="font-semibold text-stone-800">{lastSavedWordLabel}</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
-          <span>Current page</span>
-          <span>{progressLabel}</span>
+          <span>Current Page Progress</span>
+          <span>
+            {progressPercentLabel ? `${progressPercentLabel} · ` : ""}{progressLabel}
+          </span>
         </div>
 
         <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">

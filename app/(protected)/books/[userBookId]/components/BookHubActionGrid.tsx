@@ -125,7 +125,7 @@ export default function BookHubActionGrid({
 
                 <ActionButton
                     title="Supported Reading"
-                    subtitle="(Extensive Saved Word Support)"
+                    subtitle="(Extensive Reading with Saved Words)"
                     description={["Review reading with light support", "from words you already saved."]}
                     className="bg-emerald-50 hover:bg-emerald-100"
                     locked={!canUseSavedWordReading}

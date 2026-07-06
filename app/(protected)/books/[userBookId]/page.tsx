@@ -1069,6 +1069,10 @@ export default function BookHubPage() {
         : started
           ? "8%"
           : "0%";
+  const bookHubProgressPercentLabel =
+    progressPercent != null ? `${progressPercent}% done` : "";
+  const bookHubLastSavedWordLabel =
+    canSeeVocabularySummary && lastSavedWord.trim() ? lastSavedWord.trim() : "";
 
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
   const savedWordsPerPage =
@@ -1089,7 +1093,6 @@ export default function BookHubPage() {
   }, [visualReadingSessions]);
 
   const bookHubProgressSummaryLabel = [
-    `${totalPagesRead || 0} page${totalPagesRead === 1 ? "" : "s"}`,
     formatMinutes(totalTimedMinutes),
     canSeeVocabularySummary
       ? `${savedWordsProgressCount} saved word${savedWordsProgressCount === 1 ? "" : "s"}`
@@ -5200,6 +5203,8 @@ export default function BookHubPage() {
                 progressLabel={bookHubProgressLabel}
                 progressSummaryLabel={bookHubProgressSummaryLabel}
                 progressBarWidth={bookHubProgressBarWidth}
+                progressPercentLabel={bookHubProgressPercentLabel}
+                lastSavedWordLabel={bookHubLastSavedWordLabel}
                 daysEngagedLabel={bookHubDaysEngagedLabel}
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
