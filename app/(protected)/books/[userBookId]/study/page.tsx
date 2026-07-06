@@ -309,12 +309,18 @@ function bookFlashcardChapterFilterLabel(
   );
 }
 
+function bookFlashcardPageFilterLabel(pageFilter: string) {
+  if (pageFilter === "all") return "All pages";
+  return `Page ${pageFilter}`;
+}
+
 function buildBookFlashcardsStudyingNowLabel({
   studySet,
   jlptSelected,
   colorSelected,
   chapterFilter,
   chapterOptions,
+  pageFilter,
   repeatsOnly,
 }: {
   studySet: StudySet;
@@ -322,6 +328,7 @@ function buildBookFlashcardsStudyingNowLabel({
   colorSelected: LibraryStudyColor[];
   chapterFilter: string;
   chapterOptions: { value: string; label: string }[];
+  pageFilter: string;
   repeatsOnly: boolean;
 }) {
   return [
@@ -329,6 +336,7 @@ function buildBookFlashcardsStudyingNowLabel({
     bookFlashcardColorFilterLabel(colorSelected),
     bookFlashcardJlptFilterLabel(jlptSelected),
     bookFlashcardChapterFilterLabel(chapterFilter, chapterOptions),
+    bookFlashcardPageFilterLabel(pageFilter),
     repeatsOnly ? "Repeats only" : null,
   ]
     .filter(Boolean)
@@ -422,9 +430,11 @@ export default function BookFlashcardsPage() {
   const [jlptSelected, setJlptSelected] = useState<string[]>([]);
   const [colorSelected, setColorSelected] = useState<LibraryStudyColor[]>([]);
   const [chapterFilter, setChapterFilter] = useState("all");
+  const [pageFilter, setPageFilter] = useState("all");
   const [repeatsOnly, setRepeatsOnly] = useState(false);
 
   const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
+  const [pageOptions, setPageOptions] = useState<number[]>([]);
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -489,6 +499,7 @@ export default function BookFlashcardsPage() {
         );
       }
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
+      if (parsed?.pageFilter) setPageFilter(String(parsed.pageFilter));
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
     } catch { }
   }, [settingsKey, userBookId]);
@@ -505,6 +516,7 @@ export default function BookFlashcardsPage() {
           jlptSelected,
           colorSelected,
           chapterFilter,
+          pageFilter,
           repeatsOnly,
         })
       );
@@ -517,6 +529,7 @@ export default function BookFlashcardsPage() {
     jlptSelected,
     colorSelected,
     chapterFilter,
+    pageFilter,
     repeatsOnly,
   ]);
 
@@ -607,6 +620,7 @@ export default function BookFlashcardsPage() {
           setFilteredCards([]);
           setLibraryCards([]);
           setChapterOptions([]);
+          setPageOptions([]);
           setLoading(false);
           return;
         }
@@ -622,6 +636,7 @@ export default function BookFlashcardsPage() {
           setFilteredCards([]);
           setLibraryCards([]);
           setChapterOptions([]);
+          setPageOptions([]);
           setLoading(false);
           return;
         }
@@ -637,6 +652,7 @@ export default function BookFlashcardsPage() {
           setFilteredCards([]);
           setLibraryCards([]);
           setChapterOptions([]);
+          setPageOptions([]);
           setLoading(false);
           return;
         }
@@ -874,6 +890,15 @@ export default function BookFlashcardsPage() {
         });
 
         setChapterOptions(opts);
+        setPageOptions(
+          Array.from(
+            new Set(
+              deduped
+                .map((card) => card.page_number)
+                .filter((page): page is number => page != null)
+            )
+          ).sort((a, b) => a - b)
+        );
 
         setStepIndex(0);
         setTypedInput("");
@@ -891,6 +916,7 @@ export default function BookFlashcardsPage() {
         setFilteredCards([]);
         setLibraryCards([]);
         setChapterOptions([]);
+        setPageOptions([]);
       } finally {
         setLoading(false);
       }
@@ -919,6 +945,13 @@ export default function BookFlashcardsPage() {
       result = result.filter((c) => c.chapterLabel === chapterFilter);
     }
 
+    if (pageFilter !== "all") {
+      const selectedPage = Number(pageFilter);
+      if (Number.isFinite(selectedPage)) {
+        result = result.filter((c) => c.page_number === selectedPage);
+      }
+    }
+
     if (repeatsOnly) {
       result = result.filter((c) => (c.repeatCount ?? 1) >= 2);
     }
@@ -940,7 +973,7 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setCorrectionInput("");
     setCorrectionFeedback(null);
-  }, [cards, jlptSelected, colorSelected, chapterFilter, repeatsOnly, studySet]);
+  }, [cards, jlptSelected, colorSelected, chapterFilter, pageFilter, repeatsOnly, studySet]);
 
   useEffect(() => {
     const order = filteredCards.map((_, i) => i);
@@ -1837,6 +1870,7 @@ export default function BookFlashcardsPage() {
     setJlptSelected([]);
     setColorSelected([]);
     setChapterFilter("all");
+    setPageFilter("all");
     setRepeatsOnly(false);
   };
 
@@ -1874,6 +1908,8 @@ export default function BookFlashcardsPage() {
       colorSelected={colorSelected}
       chapterFilter={chapterFilter}
       chapterOptions={chapterOptions}
+      pageFilter={pageFilter}
+      pageOptions={pageOptions}
       repeatsOnly={repeatsOnly}
       onToggleJlpt={(level) =>
         setJlptSelected((prev) =>
@@ -1892,6 +1928,7 @@ export default function BookFlashcardsPage() {
       onSelectAllColors={() => setColorSelected([...LIBRARY_COLOR_FILTERS])}
       onClearColors={() => setColorSelected([])}
       onChapterFilterChange={setChapterFilter}
+      onPageFilterChange={setPageFilter}
       onRepeatsOnlyChange={setRepeatsOnly}
     />
   );
@@ -1946,6 +1983,7 @@ export default function BookFlashcardsPage() {
     colorSelected,
     chapterFilter,
     chapterOptions,
+    pageFilter,
     repeatsOnly,
   });
 

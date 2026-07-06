@@ -74,6 +74,11 @@ function chapterSummary(
   );
 }
 
+function pageSummary(pageFilter: string) {
+  if (pageFilter === "all") return "All pages";
+  return `Page ${pageFilter}`;
+}
+
 type StudyFilterPanelProps = {
   jlptLevels: readonly string[];
   jlptSelected: string[];
@@ -81,6 +86,8 @@ type StudyFilterPanelProps = {
   colorSelected: LibraryStudyColor[];
   chapterFilter: string;
   chapterOptions: { value: string; label: string }[];
+  pageFilter: string;
+  pageOptions: number[];
   repeatsOnly: boolean;
   onToggleJlpt: (level: string) => void;
   onSelectAllJlpt: () => void;
@@ -89,6 +96,7 @@ type StudyFilterPanelProps = {
   onSelectAllColors: () => void;
   onClearColors: () => void;
   onChapterFilterChange: (value: string) => void;
+  onPageFilterChange: (value: string) => void;
   onRepeatsOnlyChange: (checked: boolean) => void;
 };
 
@@ -99,6 +107,8 @@ export default function StudyFilterPanel({
   colorSelected,
   chapterFilter,
   chapterOptions,
+  pageFilter,
+  pageOptions,
   repeatsOnly,
   onToggleJlpt,
   onSelectAllJlpt,
@@ -107,6 +117,7 @@ export default function StudyFilterPanel({
   onSelectAllColors,
   onClearColors,
   onChapterFilterChange,
+  onPageFilterChange,
   onRepeatsOnlyChange,
 }: StudyFilterPanelProps) {
   const [open, setOpen] = useState(false);
@@ -122,6 +133,7 @@ export default function StudyFilterPanel({
     jlptSummary(jlptLevels, jlptSelected),
     colorSummary(colorOptions, colorSelected),
     chapterSummary(chapterFilter, chapterOptions),
+    pageSummary(pageFilter),
     repeatsOnly ? "Repeats only" : null,
   ]
     .filter(Boolean)
@@ -254,19 +266,38 @@ export default function StudyFilterPanel({
               Book section
             </p>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <select
-                value={chapterFilter}
-                onChange={(event) => onChapterFilterChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="all">All Chapters</option>
-                {chapterOptions.map((chapter) => (
-                  <option key={chapter.value} value={chapter.value}>
-                    {chapter.label}
-                  </option>
-                ))}
-              </select>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <label className="block">
+                <span className="sr-only">Chapter</span>
+                <select
+                  value={chapterFilter}
+                  onChange={(event) => onChapterFilterChange(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="all">All Chapters</option>
+                  {chapterOptions.map((chapter) => (
+                    <option key={chapter.value} value={chapter.value}>
+                      {chapter.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="sr-only">Page</span>
+                <select
+                  value={pageFilter}
+                  onChange={(event) => onPageFilterChange(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="all">All pages</option>
+                  {pageOptions.map((page) => (
+                    <option key={page} value={String(page)}>
+                      Page {page}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label
                 className="flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
