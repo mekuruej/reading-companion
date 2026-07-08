@@ -11,12 +11,10 @@ import TeacherKanjiHeader from "./components/TeacherKanjiHeader";
 import TeacherKanjiAccessState from "./components/TeacherKanjiAccessState";
 import TeacherKanjiLoadingState from "./components/TeacherKanjiLoadingState";
 import TeacherKanjiMessageBanner from "./components/TeacherKanjiMessageBanner";
-import TeacherKanjiSummaryCards from "./components/TeacherKanjiSummaryCards";
 import TeacherKanjiEmptyState from "./components/TeacherKanjiEmptyState";
 import TeacherKanjiFilterBar from "./components/TeacherKanjiFilterBar";
 import TeacherKanjiBulkActionBar from "./components/TeacherKanjiBulkActionBar";
 import TeacherKanjiStatusBadge from "./components/TeacherKanjiStatusBadge";
-import TeacherKanjiRowCounts from "./components/TeacherKanjiRowCounts";
 import TeacherKanjiWordCell from "./components/TeacherKanjiWordCell";
 import TeacherKanjiStudentCell from "./components/TeacherKanjiStudentCell";
 import TeacherKanjiBookCell from "./components/TeacherKanjiBookCell";
@@ -86,16 +84,13 @@ type VocabularyCacheRow = {
 
 type QueueStatus =
   | "flagged_review"
-  | "missing_cache"
-  | "missing_rows"
-  | "missing_positions"
-  | "incomplete_rows"
-  | "cleanup"
+  | "ongoing"
   | "complete"
   | "excluded";
 
 type StatusFilter =
-  | "active"
+  | "all"
+  | "ongoing"
   | "flagged_review"
   | "complete"
   | "excluded";
@@ -157,14 +152,8 @@ function statusLabel(status: QueueStatus) {
   switch (status) {
     case "flagged_review":
       return "Flagged";
-    case "missing_cache":
-    case "missing_rows":
-    case "missing_positions":
-      return "Needs work";
-    case "incomplete_rows":
-      return "Needs reading";
-    case "cleanup":
-      return "Needs reading";
+    case "ongoing":
+      return "Ongoing";
     case "complete":
       return "Complete";
     case "excluded":
@@ -178,13 +167,8 @@ function statusTone(status: QueueStatus) {
   switch (status) {
     case "flagged_review":
       return "border-red-200 bg-red-50 text-red-700";
-    case "missing_cache":
-    case "missing_rows":
-    case "missing_positions":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "incomplete_rows":
-    case "cleanup":
-      return "border-yellow-200 bg-yellow-50 text-yellow-700";
+    case "ongoing":
+      return "border-stone-200 bg-stone-50 text-stone-700";
     case "complete":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "excluded":
@@ -198,16 +182,8 @@ function statusDetailLabel(status: QueueStatus) {
   switch (status) {
     case "flagged_review":
       return "Flagged from Kanji Study";
-    case "missing_cache":
-      return "Choose whether to include it";
-    case "missing_rows":
-      return "Open editor to make rows";
-    case "missing_positions":
-      return "Open editor to add missing kanji";
-    case "incomplete_rows":
-      return "Needs reading details";
-    case "cleanup":
-      return "Check extra rows";
+    case "ongoing":
+      return "Kanji queue item";
     case "complete":
       return "Complete";
     case "excluded":
@@ -236,7 +212,10 @@ function normalizeJlpt(value: string | null | undefined): JlptFilter {
 }
 
 function itemMatchesStatusFilter(item: QueueItem, statusFilter: StatusFilter) {
-  if (statusFilter === "active") return isActiveStatus(item.status);
+  if (statusFilter === "all") return true;
+  if (statusFilter === "ongoing") {
+    return item.status !== "flagged_review" && isActiveStatus(item.status);
+  }
   if (statusFilter === "flagged_review") return item.status === "flagged_review";
   if (statusFilter === "complete") return item.status === "complete";
   if (statusFilter === "excluded") return item.status === "excluded";
@@ -257,22 +236,14 @@ function queueStatusPriority(status: QueueStatus) {
   switch (status) {
     case "flagged_review":
       return 0;
-    case "missing_cache":
+    case "ongoing":
       return 1;
-    case "missing_rows":
-      return 2;
-    case "missing_positions":
-      return 3;
-    case "incomplete_rows":
-      return 4;
-    case "cleanup":
-      return 5;
     case "complete":
-      return 6;
+      return 2;
     case "excluded":
-      return 7;
+      return 3;
     default:
-      return 8;
+      return 4;
   }
 }
 
@@ -346,7 +317,7 @@ function getQueueStatus(params: {
 
   if (!params.vocabularyCacheId) {
     return {
-      status: "missing_cache",
+      status: "ongoing",
       kanjiCount,
       mapRowCount: 0,
       completePositionCount: 0,
@@ -373,7 +344,7 @@ function getQueueStatus(params: {
 
   if (mapRows.length === 0) {
     return {
-      status: "missing_rows",
+      status: "ongoing",
       kanjiCount,
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
@@ -395,7 +366,7 @@ function getQueueStatus(params: {
 
   if (completePositions.size < kanjiCount && incompleteRowCount > 0) {
     return {
-      status: "incomplete_rows",
+      status: "ongoing",
       kanjiCount,
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
@@ -406,7 +377,7 @@ function getQueueStatus(params: {
 
   if (completePositions.size < kanjiCount) {
     return {
-      status: "missing_positions",
+      status: "ongoing",
       kanjiCount,
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
@@ -417,7 +388,7 @@ function getQueueStatus(params: {
 
   if (incompleteRowCount > 0) {
     return {
-      status: "cleanup",
+      status: "ongoing",
       kanjiCount,
       mapRowCount: mapRows.length,
       completePositionCount: completePositions.size,
@@ -628,7 +599,7 @@ export default function TeacherKanjiPage() {
   const [canAccess, setCanAccess] = useState(false);
 
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [jlptFilter, setJlptFilter] = useState<JlptFilter>("all");
 
   const [editorOpenByWordId, setEditorOpenByWordId] = useState<Record<string, boolean>>({});
@@ -1036,17 +1007,6 @@ export default function TeacherKanjiPage() {
     );
   }, [queueItems, editorOpenByWordId, editorRowsByWordId]);
 
-  const summary = useMemo(() => {
-    const active = queueItems.filter((item) => isActiveStatus(item.status));
-
-    return {
-      active: active.length,
-      flagged: queueItems.filter((item) => item.status === "flagged_review").length,
-      complete: queueItems.filter((item) => item.status === "complete").length,
-      excluded: queueItems.filter((item) => item.status === "excluded").length,
-    };
-  }, [queueItems]);
-
   async function ensureKanjiRows(item: QueueItem) {
     const surface = item.surface.trim();
     const reading = item.reading.trim();
@@ -1227,8 +1187,8 @@ export default function TeacherKanjiPage() {
     if (bulkOpenItems.length === 0) return;
 
     const ok = window.confirm(
-      `Open editors for the first ${bulkOpenItems.length} visible item${bulkOpenItems.length === 1 ? "" : "s"
-      } that need attention?`
+      `Open editors for the first ${bulkOpenItems.length} visible queue item${bulkOpenItems.length === 1 ? "" : "s"
+      }?`
     );
 
     if (!ok) return;
@@ -1560,9 +1520,6 @@ export default function TeacherKanjiPage() {
           <TeacherKanjiMessageBanner type="error" message={error} />
           <TeacherKanjiMessageBanner type="success" message={saveMessage} />
 
-
-          <TeacherKanjiSummaryCards summary={summary} />
-
           <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
             <TeacherKanjiFilterBar
               statusFilter={statusFilter}
@@ -1793,7 +1750,6 @@ export default function TeacherKanjiPage() {
                       <th className="px-4 py-3">Book</th>
                       <th className="px-4 py-3">Word</th>
                       <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Rows</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1812,10 +1768,6 @@ export default function TeacherKanjiPage() {
                         statusLabel={statusLabel(item.status)}
                         statusDetail={statusDetailLabel(item.status)}
                         statusToneClassName={statusTone(item.status)}
-                        kanjiCount={item.kanjiCount}
-                        mapRowCount={item.mapRowCount}
-                        completePositionCount={item.completePositionCount}
-                        incompleteRowCount={item.incompleteRowCount}
                         flaggedMapRowCount={item.flaggedMapRowCount}
                         isPreparing={preparingId === item.userBookWordId}
                         isEditorOpen={!!editorOpenByWordId[item.userBookWordId]}

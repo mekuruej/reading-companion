@@ -23,7 +23,7 @@ export default function TeacherKanjiBulkActionBar({
         <p className="text-sm font-semibold text-stone-900">Bulk open</p>
         <p className="mt-1 text-xs text-stone-500">
           Prepare rows and open editors for the first {bulkOpenLimit} visible
-          items that need attention.
+          queue items.
         </p>
       </div>
 

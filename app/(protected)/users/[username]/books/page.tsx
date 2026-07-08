@@ -32,7 +32,6 @@ import PendingBookRequestsAlert from "./components/PendingBookRequestsAlert";
 import {
   AbilityCheckReminderBanner,
   LearningTasksErrorBanner,
-  NeedsAttentionReminderBanner,
 } from "./components/LibraryStatusBanners";
 
 type Book = {
@@ -197,8 +196,6 @@ const MEKURU_ABILITY_COLORS: MekuruColor[] = ["green", "blue", "purple"];
 const ABILITY_CHECK_SEEN_STORAGE_KEY = "library-study-seen-by-date";
 const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
 const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
-const SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY =
-  "super-teacher-kanji-enrichment-reminder-hidden-date";
 const PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY =
   "pending-book-requests-alert-hidden-signature";
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
@@ -261,16 +258,6 @@ function abilityCheckCompletedToday() {
 function hideAbilityCheckReminderForToday() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
-}
-
-function superTeacherKanjiReminderHiddenToday() {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY) === getTodayKey();
-}
-
-function hideSuperTeacherKanjiReminderForToday() {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SUPER_TEACHER_KANJI_REMINDER_HIDE_KEY, getTodayKey());
 }
 
 function pendingBookRequestsSignature(requests: Array<{ id?: string | null }>) {
@@ -782,8 +769,6 @@ export default function BooksPage() {
   const [abilityCheckReminderHidden, setAbilityCheckReminderHidden] = useState(false);
   const [abilityCheckReminderCompleted, setAbilityCheckReminderCompleted] = useState(false);
   const [abilityCheckReminderDayKey, setAbilityCheckReminderDayKey] = useState(getTodayKey());
-  const [superTeacherKanjiReminderHidden, setSuperTeacherKanjiReminderHidden] =
-    useState(false);
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId
@@ -1846,7 +1831,6 @@ export default function BooksPage() {
 
       setMyRole(role);
       setIsSuperTeacher(superTeacherFlag);
-      setSuperTeacherKanjiReminderHidden(superTeacherKanjiReminderHiddenToday());
 
       if (role === "super_teacher" || superTeacherFlag) {
         await loadPendingBookRequests();
@@ -2043,7 +2027,6 @@ export default function BooksPage() {
 
       setAbilityCheckReminderHidden(hiddenToday);
       setAbilityCheckReminderCompleted(completedToday);
-      setSuperTeacherKanjiReminderHidden(superTeacherKanjiReminderHiddenToday());
 
       if (hiddenToday || completedToday) {
         setAbilityCheckReminderCount(0);
@@ -2328,11 +2311,6 @@ export default function BooksPage() {
     !abilityCheckReminderLoading &&
     !abilityCheckReminderHidden &&
     !abilityCheckReminderCompleted;
-  const showSuperTeacherKanjiReminder =
-    viewingUserId === meId &&
-    (myRole === "super_teacher" || isSuperTeacher) &&
-    (kanjiEnrichmentAlerts.length > 0 || bookRequests.length > 0) &&
-    !superTeacherKanjiReminderHidden;
   const showLearningTasks =
     (viewingUserId === meId || isViewingStudentLibrary) &&
     !learningTasksLoading &&
@@ -2407,20 +2385,6 @@ export default function BooksPage() {
             onHide={() => {
               hideAbilityCheckReminderForToday();
               setAbilityCheckReminderHidden(true);
-            }}
-          />
-        ) : null}
-
-        {showSuperTeacherKanjiReminder ? (
-          <NeedsAttentionReminderBanner
-            onOpen={() => {
-              hideSuperTeacherKanjiReminderForToday();
-              setSuperTeacherKanjiReminderHidden(true);
-              router.push("/teacher/needs-attention");
-            }}
-            onHide={() => {
-              hideSuperTeacherKanjiReminderForToday();
-              setSuperTeacherKanjiReminderHidden(true);
             }}
           />
         ) : null}

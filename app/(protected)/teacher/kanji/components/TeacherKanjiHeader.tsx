@@ -22,8 +22,8 @@ export default function TeacherKanjiHeader({
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-            Review saved vocabulary that needs kanji-reading enrichment. Work through
-            students and books from one teacher page instead of jumping between Book Hubs.
+            User-flagged kanji stay at the top. Everything else is an ongoing
+            kanji-reading queue you can work through when it is useful.
           </p>
         </div>
 

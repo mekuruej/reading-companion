@@ -22,9 +22,10 @@ export default function TeacherKanjiFilterBar({
           onChange={(event) => onStatusFilterChange(event.target.value)}
           className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
         >
-          <option value="active">Needs attention</option>
-          <option value="flagged_review">Flagged</option>
-          <option value="complete">Complete</option>
+          <option value="all">All queue items</option>
+          <option value="flagged_review">Flagged by users</option>
+          <option value="ongoing">Ongoing queue</option>
+          <option value="complete">Done</option>
           <option value="excluded">Excluded</option>
         </select>
       </label>
