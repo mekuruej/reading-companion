@@ -98,7 +98,8 @@ type SavedItemEditDraft = {
   supportUrl: string;
 };
 
-const itemTypes: ItemType[] = ["word", "phrase", "grammar", "sentence", "translation", "note"];
+const allItemTypes: ItemType[] = ["word", "phrase", "grammar", "sentence", "translation", "note"];
+const newPrepItemTypes: ItemType[] = ["phrase", "grammar", "sentence", "translation", "note"];
 let draftIdCounter = 0;
 
 function isTeacherRole(profile: any) {
@@ -282,7 +283,7 @@ export default function TeacherBookPrepPage() {
   const [message, setMessage] = useState("");
 
   const [step, setStep] = useState<PrepStep>("paste");
-  const [defaultItemType, setDefaultItemType] = useState<ItemType>("word");
+  const [defaultItemType, setDefaultItemType] = useState<ItemType>("phrase");
   const [rawInput, setRawInput] = useState("");
   const [drafts, setDrafts] = useState<PrepItemDraft[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -372,7 +373,7 @@ export default function TeacherBookPrepPage() {
     setSavedItems([]);
     setMessage("");
     setStep("paste");
-    setDefaultItemType("word");
+    setDefaultItemType("phrase");
     setRawInput("");
     setDrafts([]);
     setIsPreviewing(false);
@@ -1001,7 +1002,7 @@ export default function TeacherBookPrepPage() {
 
             {step === "paste" ? (
               <TeacherPrepPastePanel
-                itemTypes={itemTypes}
+                itemTypes={newPrepItemTypes}
                 defaultItemType={defaultItemType}
                 onDefaultItemTypeChange={(value) => setDefaultItemType(value as ItemType)}
                 itemTypeLabel={itemTypeLabel}
@@ -1074,7 +1075,7 @@ export default function TeacherBookPrepPage() {
                             onChange={(event) => updateDraft(index, { itemType: event.target.value as ItemType })}
                             className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
                           >
-                            {itemTypes.map((type) => (
+                            {newPrepItemTypes.map((type) => (
                               <option key={type} value={type}>
                                 {itemTypeLabel(type)}
                               </option>
@@ -1500,7 +1501,7 @@ export default function TeacherBookPrepPage() {
                       }
                       className="w-full rounded border bg-white p-2 text-sm"
                     >
-                      {itemTypes.map((type) => (
+                      {allItemTypes.map((type) => (
                         <option key={type} value={type}>
                           {itemTypeLabel(type)}
                         </option>

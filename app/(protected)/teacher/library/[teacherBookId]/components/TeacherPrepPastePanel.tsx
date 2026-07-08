@@ -32,8 +32,9 @@ export default function TeacherPrepPastePanel<T extends string>({
         Enter prep items
       </h2>
       <p className="mt-1 text-sm text-stone-500">
-        Enter one item per line. Use word/phrase for dictionary lookup; grammar,
-        sentence, translation, and note can be filled manually in the next step.
+        For vocabulary words, use Curiosity Reading or Bulk Add so they stay in
+        Reader Vocab, flashcards, and Follow-Along. Use Teaching Prep for
+        phrases, grammar notes, translations, sentences, and lesson notes.
       </p>
 
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
