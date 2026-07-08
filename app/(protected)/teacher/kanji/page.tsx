@@ -374,7 +374,7 @@ export default function TeacherKanjiPage() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [studentFilter, setStudentFilter] = useState("all");
   const [bookFilter, setBookFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("flagged_review");
 
   const [editorOpenByWordId, setEditorOpenByWordId] = useState<Record<string, boolean>>({});
   const [editorRowsByWordId, setEditorRowsByWordId] = useState<Record<string, KanjiMapRow[]>>({});
@@ -834,18 +834,11 @@ export default function TeacherKanjiPage() {
   }, [queueItems, editorOpenByWordId, editorRowsByWordId]);
 
   const summary = useMemo(() => {
-    const active = queueItems.filter((item) => isActiveStatus(item.status));
-
     return {
-      total: queueItems.length,
-      active: active.length,
+      total: filteredItems.length,
       flagged: queueItems.reduce((count, item) => count + item.flaggedMapRowCount, 0),
-      needsReading: queueItems.filter((item) => isNeedsReadingStatus(item.status)).length,
-      needsWork: queueItems.filter((item) => isNeedsWorkStatus(item.status)).length,
-      complete: queueItems.filter((item) => item.status === "complete").length,
-      excluded: queueItems.filter((item) => item.status === "excluded").length,
     };
-  }, [queueItems]);
+  }, [filteredItems.length, queueItems]);
 
   async function ensureKanjiRows(item: QueueItem) {
     const surface = item.surface.trim();
@@ -1580,10 +1573,6 @@ export default function TeacherKanjiPage() {
                         statusLabel={statusLabel(item.status)}
                         statusDetail={statusDetailLabel(item.status)}
                         statusToneClassName={statusTone(item.status)}
-                        kanjiCount={item.kanjiCount}
-                        mapRowCount={item.mapRowCount}
-                        completePositionCount={item.completePositionCount}
-                        incompleteRowCount={item.incompleteRowCount}
                         flaggedMapRowCount={item.flaggedMapRowCount}
                         isPreparing={preparingId === item.userBookWordId}
                         isEditorOpen={!!editorOpenByWordId[item.userBookWordId]}

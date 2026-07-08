@@ -144,6 +144,7 @@ function PrepCardGrid({ cards }: { cards: PrepCard[] }) {
 export default function TeacherLessonPrepPage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccess, setCanAccess] = useState(false);
+  const [viewerIsSuperTeacher, setViewerIsSuperTeacher] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [taskAlertsLoading, setTaskAlertsLoading] = useState(false);
@@ -157,6 +158,7 @@ export default function TeacherLessonPrepPage() {
     async function checkTeacherAccess() {
       setAccessChecked(false);
       setCanAccess(false);
+      setViewerIsSuperTeacher(false);
       setMessage("");
 
       const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -167,6 +169,7 @@ export default function TeacherLessonPrepPage() {
       if (authError || !user) {
         setMessage("Please sign in to use Lesson Prep.");
         setCurrentTeacherId(null);
+        setViewerIsSuperTeacher(false);
         setAccessChecked(true);
         return;
       }
@@ -189,8 +192,11 @@ export default function TeacherLessonPrepPage() {
         profile?.role === "teacher" ||
         profile?.role === "super_teacher" ||
         isSuperTeacherFlag(profile?.is_super_teacher);
+      const isSuperTeacher =
+        profile?.role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher);
 
       setCanAccess(isTeacher);
+      setViewerIsSuperTeacher(isSuperTeacher);
       setCurrentTeacherId(isTeacher ? user.id : null);
       setMessage(isTeacher ? "" : "Teacher access is required.");
       setAccessChecked(true);
@@ -267,6 +273,17 @@ export default function TeacherLessonPrepPage() {
     setTaskAlerts((prev) => prev.filter((task) => task.id !== taskId));
   }
 
+  const visiblePrepCards = prepCards.map((card) =>
+    card.href === "/teacher/students?from=lesson-prep" && viewerIsSuperTeacher
+      ? {
+          ...card,
+          title: "Students / Users",
+          description:
+            "Open student cards, user libraries, follow-up areas, and learner-specific teacher tools.",
+        }
+      : card
+  );
+
   if (!accessChecked) {
     return (
       <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
@@ -312,7 +329,7 @@ export default function TeacherLessonPrepPage() {
         </section>
 
         <section className="mt-6">
-          <PrepCardGrid cards={prepCards} />
+          <PrepCardGrid cards={visiblePrepCards} />
         </section>
 
         <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -332,7 +349,7 @@ export default function TeacherLessonPrepPage() {
               href="/teacher/students"
               className="inline-flex rounded-2xl border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              Open Students →
+              {viewerIsSuperTeacher ? "Open Students / Users →" : "Open Students →"}
             </Link>
           </div>
 

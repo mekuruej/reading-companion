@@ -18,12 +18,12 @@ export default function TeacherKanjiHeader({
           </p>
 
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">
-            Kanji Enrichment Queue
+            Kanji Flags
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-            Review saved vocabulary that needs kanji-reading enrichment. Work through
-            students and books from one teacher page instead of jumping between Book Hubs.
+            Review kanji readings that readers flagged from study. Use Global Kanji
+            Entry for general kanji enrichment work.
           </p>
         </div>
 

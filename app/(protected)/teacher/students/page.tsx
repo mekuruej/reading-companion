@@ -247,13 +247,17 @@ function StudentCardArticle({
     onCreateTask,
     onArchive,
     onRestore,
+    onAddAsStudent,
     isUpdatingArchive,
+    isAddingAsStudent = false,
 }: {
     student: StudentCard;
     onCreateTask: (student: StudentCard) => void;
     onArchive: (student: StudentCard) => void;
     onRestore: (student: StudentCard) => void;
+    onAddAsStudent?: (student: StudentCard) => void;
     isUpdatingArchive: boolean;
+    isAddingAsStudent?: boolean;
 }) {
     const displayName = student.display_name || student.username || "Unnamed student";
     const isArchived = student.relationshipStatus === "archived";
@@ -372,7 +376,7 @@ function StudentCardArticle({
                     </div>
                 ) : null}
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className={`grid gap-3 sm:grid-cols-2 ${onAddAsStudent ? "lg:grid-cols-3" : "lg:grid-cols-5"}`}>
                     {student.username ? (
                         <Link
                             href={`/users/${student.username}/books`}
@@ -423,7 +427,16 @@ function StudentCardArticle({
                         Assign Task
                     </button>
 
-                    {isArchived ? (
+                    {onAddAsStudent ? (
+                        <button
+                            type="button"
+                            onClick={() => onAddAsStudent(student)}
+                            disabled={isAddingAsStudent}
+                            className="rounded-2xl border border-emerald-700 bg-emerald-50 px-4 py-3 text-base font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                            {isAddingAsStudent ? "Adding..." : "Add as Student"}
+                        </button>
+                    ) : isArchived ? (
                         <button
                             type="button"
                             onClick={() => onRestore(student)}
@@ -493,6 +506,7 @@ export default function TeacherStudentsPage() {
     const [activeLearningTasks, setActiveLearningTasks] = useState<ActiveLearningTask[]>([]);
     const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
     const [updatingArchiveStudentId, setUpdatingArchiveStudentId] = useState<string | null>(null);
+    const [addingStudentId, setAddingStudentId] = useState<string | null>(null);
 
     async function loadActiveLearningTasks(teacherId: string, learnerIds: string[]) {
         if (learnerIds.length === 0) {
@@ -898,6 +912,41 @@ export default function TeacherStudentsPage() {
             setTaskMessage(err?.message ?? "Could not cancel this task.");
         } finally {
             setCancellingTaskId(null);
+        }
+    }
+
+    async function addStudentRelationship(student: StudentCard) {
+        if (!currentUserId || !viewerIsSuperTeacher) {
+            setError("Only super teachers can add users as students here.");
+            return;
+        }
+
+        const displayName = student.display_name || student.username || "this user";
+        const ok = window.confirm(`Add ${displayName} to your student list?`);
+        if (!ok) return;
+
+        setAddingStudentId(student.id);
+        setError(null);
+
+        try {
+            const { error: insertError } = await supabase
+                .from("teacher_students")
+                .insert({
+                    teacher_id: currentUserId,
+                    student_id: student.id,
+                    relationship_status: "current",
+                });
+
+            if (insertError) throw insertError;
+
+            await loadStudents();
+            setMyStudentsOpen(true);
+            setOtherUsersOpen(true);
+        } catch (err: any) {
+            console.error("Error adding student relationship:", err);
+            setError(err?.message ?? "Could not add this user as a student.");
+        } finally {
+            setAddingStudentId(null);
         }
     }
 
@@ -1406,7 +1455,9 @@ export default function TeacherStudentsPage() {
                                                                         onCreateTask={openTaskModal}
                                                                         onArchive={archiveStudent}
                                                                         onRestore={restoreStudent}
+                                                                        onAddAsStudent={addStudentRelationship}
                                                                         isUpdatingArchive={updatingArchiveStudentId === student.id}
+                                                                        isAddingAsStudent={addingStudentId === student.id}
                                                                     />
                                                                 ))}
                                                             </div>

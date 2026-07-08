@@ -16,10 +16,6 @@ type TeacherKanjiQueueItemProps = {
   statusLabel: string;
   statusDetail: string;
   statusToneClassName: string;
-  kanjiCount: number;
-  mapRowCount: number;
-  completePositionCount: number;
-  incompleteRowCount: number;
   flaggedMapRowCount: number;
   isPreparing: boolean;
   isEditorOpen: boolean;
@@ -40,10 +36,6 @@ export default function TeacherKanjiQueueItem({
   statusLabel,
   statusDetail,
   statusToneClassName,
-  kanjiCount,
-  mapRowCount,
-  completePositionCount,
-  incompleteRowCount,
   flaggedMapRowCount,
   isPreparing,
   isEditorOpen,
@@ -84,10 +76,6 @@ export default function TeacherKanjiQueueItem({
 
       <td className="px-4 py-4">
         <TeacherKanjiRowCounts
-          kanjiCount={kanjiCount}
-          mapRowCount={mapRowCount}
-          completePositionCount={completePositionCount}
-          incompleteRowCount={incompleteRowCount}
           flaggedMapRowCount={flaggedMapRowCount}
         />
       </td>
