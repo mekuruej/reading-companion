@@ -15,7 +15,6 @@ import {
   NeedsAttentionAccessPanel,
   NeedsAttentionLoadingPanel,
 } from "./components/NeedsAttentionStatePanels";
-import { loadActiveKanjiQueueSummary } from "@/lib/teacherKanjiQueueCount";
 
 type GlobalBookRow = {
   title: string | null;
@@ -88,8 +87,7 @@ const attentionCards: NeedsAttentionCard[] = [
     title: "Kanji Flags",
     href: "/teacher/kanji?from=needs-attention",
     eyebrow: "Kanji",
-    description: "Review kanji reports, flagged kanji readings, and enrichment queues.",
-    countKey: "kanji",
+    description: "Review kanji reports and flagged kanji readings.",
   },
   {
     title: "Rating Flags",
@@ -313,12 +311,6 @@ export default function TeacherNeedsAttentionPage() {
             (book) => missingGlobalBookFields(book).length > 0
           ).length;
 
-          const activeKanjiQueue = await loadActiveKanjiQueueSummary({
-            supabase,
-            isSuperTeacher,
-            studentIds,
-          });
-
           nextCounts = {
             ...nextCounts,
             books:
@@ -328,7 +320,6 @@ export default function TeacherNeedsAttentionPage() {
             bookRequests: pendingBookRequestCount ?? 0,
             bookFlags: manualBookFlagCount ?? 0,
             missingBooks: missingBookInfoCount,
-            kanji: activeKanjiQueue.count,
             wordReports: flaggedWordReportCount ?? 0,
           };
         }

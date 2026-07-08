@@ -118,6 +118,12 @@ function oldestDate(values: Array<string | null | undefined>) {
   return dates[0] ?? null;
 }
 
+function recentKanjiQueueCutoff() {
+  const date = new Date();
+  date.setDate(date.getDate() - 3);
+  return date.toISOString();
+}
+
 function sortTeacherAlerts(alerts: TeacherAlertSummary[]) {
   return [...alerts].sort((a, b) => {
     if (!!a.placeholder !== !!b.placeholder) return a.placeholder ? 1 : -1;
@@ -327,6 +333,7 @@ export default function TeacherHubPage() {
             supabase,
             isSuperTeacher: hasSuperTeacherAccess,
             studentIds,
+            createdSince: recentKanjiQueueCutoff(),
           });
 
           const bookFlagAndMissingDates = [

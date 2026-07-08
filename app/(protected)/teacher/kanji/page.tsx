@@ -1153,7 +1153,10 @@ export default function TeacherKanjiPage() {
 
     if (rowsError) throw rowsError;
 
-    return (rows ?? []) as KanjiMapRow[];
+    return ((rows ?? []) as KanjiMapRow[]).map((row) => ({
+      ...row,
+      reading_type: row.reading_type ?? "on",
+    }));
   }
 
   async function openKanjiEditor(item: QueueItem) {
@@ -1274,10 +1277,7 @@ export default function TeacherKanjiPage() {
       const { error: saveError } = await supabase
         .from("vocabulary_kanji_map")
         .update({
-          reading_type:
-            row.reading_type === "on" || row.reading_type === "kun"
-              ? row.reading_type
-              : null,
+          reading_type: row.reading_type ?? "on",
           base_reading: row.base_reading,
           realized_reading: row.realized_reading,
           excluded_from_kanji_practice: false,
