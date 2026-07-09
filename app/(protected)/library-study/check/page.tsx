@@ -1661,10 +1661,10 @@ export default function LibraryStudyPage() {
     ? typingInstructionOverride
     : checked
       ? checked.ok || typingCorrectionComplete
-      ? "Great! Next word comes automatically."
-      : activeStudyMode === "reading_typing"
-        ? "Not quite. Retype the reading."
-        : `Not quite. Retype "${shortMeaningRetypeHint(checked.correct)}" from the meaning.`
+        ? "Great! Next word comes automatically."
+        : activeStudyMode === "reading_typing"
+          ? "Not quite. Retype the reading."
+          : `Not quite. Retype "${shortMeaningRetypeHint(checked.correct)}" from the meaning.`
       : null;
 
   const filteredCards = useMemo(() => {
@@ -3076,13 +3076,11 @@ export default function LibraryStudyPage() {
     if (!ok) return;
 
     if (isClaimCardId(currentCard.id)) {
-      if (!currentCard.userBookId) return;
-
       const { error } = await supabase
-        .from("user_book_words")
-        .update({ hidden: true })
-        .eq("id", currentCard.id)
-        .eq("user_book_id", currentCard.userBookId);
+        .from("user_library_word_claims")
+        .delete()
+        .eq("user_id", currentUserId)
+        .eq("study_identity_key", currentCard.studyIdentityKey);
 
       if (error) {
         console.error("Error hiding Word Sky claim:", error);
@@ -3095,10 +3093,13 @@ export default function LibraryStudyPage() {
       return;
     }
 
+    if (!currentCard.userBookId) return;
+
     const { error } = await supabase
       .from("user_book_words")
       .update({ hidden: true })
-      .eq("id", currentCard.id);
+      .eq("id", currentCard.id)
+      .eq("user_book_id", currentCard.userBookId);
 
     if (error) {
       console.error("Error hiding study card:", error);

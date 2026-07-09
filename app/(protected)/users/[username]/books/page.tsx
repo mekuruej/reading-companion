@@ -33,6 +33,11 @@ import {
   AbilityCheckReminderBanner,
   LearningTasksErrorBanner,
 } from "./components/LibraryStatusBanners";
+import {
+  makeBookKey,
+  normalizeBookPart,
+  normalizeIsbn,
+} from "./helpers";
 
 type Book = {
   id: string;
@@ -606,18 +611,6 @@ function UserBar({
       </button>
     </div>
   );
-}
-
-function normalizeBookPart(value: string | null | undefined) {
-  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function normalizeIsbn(isbn: string | null | undefined) {
-  return (isbn ?? "").replace(/[^0-9X]/gi, "");
-}
-
-function makeBookKey(title: string, author?: string | null) {
-  return [normalizeBookPart(title), normalizeBookPart(author)].join("|");
 }
 
 function mekuruColorLabel(color: MekuruColor) {
