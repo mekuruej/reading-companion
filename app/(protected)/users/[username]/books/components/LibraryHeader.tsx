@@ -14,7 +14,16 @@ export default function LibraryHeader({
   return (
     <div className="mb-5 flex items-center justify-between gap-4 pr-6 sm:pr-10">
       <div>
-        <div className="flex items-center gap-3">
+        <div className="sm:hidden">
+          <div className="text-2xl font-black text-slate-900">
+            My MEKURU Library
+          </div>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Read, listen, and review from your phone.
+          </p>
+        </div>
+
+        <div className="hidden items-center gap-3 sm:flex">
           <span className="text-2xl font-semibold sm:text-3xl">
             {libraryOwnerLabel}
           </span>

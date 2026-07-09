@@ -28,6 +28,7 @@ import FloatingAddBookButton from "./components/FloatingAddBookButton";
 import LibraryReminderBanner from "./components/LibraryReminderBanner";
 import LearningTaskCard from "./components/LearningTaskCard";
 import LearningTasksPanel from "./components/LearningTasksPanel";
+import MobileVersionNotice from "./components/MobileVersionNotice";
 import PendingBookRequestsAlert from "./components/PendingBookRequestsAlert";
 import {
   AbilityCheckReminderBanner,
@@ -2370,6 +2371,8 @@ export default function BooksPage() {
         >
           <UserBar isTeacher={isTeacher} variant="logoutOnly" />
         </LibraryHeader>
+
+        <MobileVersionNotice />
 
         {showAbilityCheckReminder ? (
           <AbilityCheckReminderBanner
