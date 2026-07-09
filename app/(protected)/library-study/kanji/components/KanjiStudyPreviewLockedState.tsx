@@ -14,7 +14,7 @@ export default function KanjiStudyPreviewLockedState() {
           </div>
 
           <p className="mt-3 text-sm leading-6 text-stone-600">
-            Practice kanji readings based on the vocabulary saved from your book.
+            Practice kanji readings from vocabulary-linked cards.
             This study area helps learners notice how readings show up inside real
             words, not just in isolation.
           </p>
@@ -76,12 +76,12 @@ export default function KanjiStudyPreviewLockedState() {
 
             <div>
               <h2 className="text-lg font-semibold text-stone-900">
-                Available to students
+                Vocabulary-linked practice
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-stone-600">
-                Kanji Readings Practice is part of Mekuru student study support and
-                includes teacher-guided enrichment based on your book’s vocabulary.
+                Kanji Reading Practice uses MEKURU’s vocabulary-linked kanji data to help
+                you practice readings in real word context.
               </p>
             </div>
           </div>

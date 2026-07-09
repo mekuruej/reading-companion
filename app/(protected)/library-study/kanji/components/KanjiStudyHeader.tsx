@@ -8,7 +8,7 @@ type KanjiStudyHeaderProps = {
 
 export function KanjiStudyHeader({
   title = "Kanji Reading Study",
-  description = "Practice kanji readings from your saved words.",
+  description = "Practice kanji readings from vocabulary-linked cards.",
   note,
   onOpenLibrary,
   onOpenCharacterStudy,
