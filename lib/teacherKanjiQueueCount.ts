@@ -382,15 +382,20 @@ export async function loadActiveKanjiQueueSummary(params: {
   const flaggedRowsById = new Map<number, KanjiCountMapRow>();
   for (const row of (oldFlaggedRows ?? []) as KanjiCountMapRow[]) flaggedRowsById.set(Number(row.id), row);
   for (const row of reportedMapRows) flaggedRowsById.set(Number(row.id), row);
-  for (const row of (wordSkyImportRows ?? []) as KanjiCountMapRow[]) {
-    flaggedRowsById.set(Number(row.id), { ...row, flagged_for_review: true });
-  }
 
   const flaggedRows = Array.from(flaggedRowsById.values());
+  const wordSkyRows = (wordSkyImportRows ?? []) as KanjiCountMapRow[];
   const knownCacheIds = new Set(cacheIds.map((id) => String(id)));
   const flaggedCacheIds = Array.from(
     new Set(
       flaggedRows
+        .map((row) => Number(row.vocabulary_cache_id))
+        .filter((id) => Number.isFinite(id))
+    )
+  );
+  const wordSkyImportCacheIds = Array.from(
+    new Set(
+      wordSkyRows
         .map((row) => Number(row.vocabulary_cache_id))
         .filter((id) => Number.isFinite(id))
     )
@@ -406,10 +411,37 @@ export async function loadActiveKanjiQueueSummary(params: {
   }
 
   const flaggedOnlyCacheIds = flaggedCacheIds.filter((id) => !knownCacheIds.has(String(id)));
-  await loadCacheAndMapRows(supabase, flaggedOnlyCacheIds, cacheRowsById, mapRowsByCacheId);
+  const wordSkyOnlyCacheIds = wordSkyImportCacheIds.filter(
+    (id) => !knownCacheIds.has(String(id)) && !flaggedCacheIds.includes(id)
+  );
+  const cacheOnlyQueueIds = Array.from(new Set([...flaggedOnlyCacheIds, ...wordSkyOnlyCacheIds]));
+  await loadCacheAndMapRows(supabase, cacheOnlyQueueIds, cacheRowsById, mapRowsByCacheId);
 
   const activeKeys = new Set<string>();
   const dates: string[] = [];
+
+  if (createdSince) {
+    for (const cacheId of flaggedCacheIds) {
+      const cacheRow = cacheRowsById.get(cacheId);
+      const surface = String(cacheRow?.surface ?? "");
+      if (!surface || !hasKanji(surface)) continue;
+
+      const mapRows = mapRowsByCacheId.get(String(cacheId)) ?? [];
+      const hasRecentFlag = mapRows.some((row) => row.flagged_for_review === true);
+      if (!hasRecentFlag) continue;
+
+      activeKeys.add(kanjiQueueIdentity({
+        vocabularyCacheId: cacheId,
+        surface,
+        reading: String(cacheRow?.reading ?? ""),
+      }));
+
+      const flagDate = mapRows.find((row) => row.flagged_for_review && row.flagged_at)?.flagged_at;
+      if (flagDate) dates.push(flagDate);
+    }
+
+    return { count: activeKeys.size, dates };
+  }
 
   for (const word of kanjiWords) {
     const surface = String(word.surface ?? "");
@@ -423,12 +455,20 @@ export async function loadActiveKanjiQueueSummary(params: {
     const mapRows =
       vocabularyCacheId != null ? mapRowsByCacheId.get(String(vocabularyCacheId)) ?? [] : [];
 
-    const isActive = isActiveKanjiQueueStatus({
-      vocabularyCacheId,
-      surface,
-      mapRows,
-      ignored: word.ignore_kanji_enrichment,
-    });
+    const isWordSkyImport = mapRows.some(
+      (row) =>
+        row.excluded_from_kanji_practice === true &&
+        row.reading_type === "other" &&
+        row.flagged_for_review !== true
+    );
+    const isActive =
+      (isWordSkyImport && !word.ignore_kanji_enrichment) ||
+      isActiveKanjiQueueStatus({
+        vocabularyCacheId,
+        surface,
+        mapRows,
+        ignored: word.ignore_kanji_enrichment,
+      });
 
     if (isActive) {
       const key = kanjiQueueIdentity({ vocabularyCacheId, surface, reading });
@@ -438,13 +478,20 @@ export async function loadActiveKanjiQueueSummary(params: {
     }
   }
 
-  for (const cacheId of flaggedOnlyCacheIds) {
+  for (const cacheId of cacheOnlyQueueIds) {
     const cacheRow = cacheRowsById.get(cacheId);
     const surface = String(cacheRow?.surface ?? "");
     if (!surface || !hasKanji(surface)) continue;
 
     const mapRows = mapRowsByCacheId.get(String(cacheId)) ?? [];
-    if (isActiveKanjiQueueStatus({ vocabularyCacheId: cacheId, surface, mapRows })) {
+    const isWordSkyImport = mapRows.some(
+      (row) =>
+        row.excluded_from_kanji_practice === true &&
+        row.reading_type === "other" &&
+        row.flagged_for_review !== true
+    );
+
+    if (isWordSkyImport || isActiveKanjiQueueStatus({ vocabularyCacheId: cacheId, surface, mapRows })) {
       activeKeys.add(kanjiQueueIdentity({
         vocabularyCacheId: cacheId,
         surface,

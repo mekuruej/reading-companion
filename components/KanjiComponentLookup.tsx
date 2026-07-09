@@ -390,9 +390,9 @@ export default function KanjiComponentLookup({
           </div>
 
           {filteredKanji.length > 0 ? (
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
               {kanjiGroups.map(([strokes, groupKanji]) => (
-                <div key={strokes} className="flex flex-wrap gap-2">
+                <div key={strokes} className="contents">
                   <div className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-stone-900 px-2 text-sm font-black text-white">
                     {strokes === 99 ? "?" : strokes}
                   </div>

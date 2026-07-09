@@ -178,10 +178,20 @@ export default function ReadingTab({
 }: ReadingTabProps) {
   const [isEditingDates, setIsEditingDates] = useState(false);
   const usePercentMode = progressMode === "percent" && book.page_count != null && book.page_count > 0;
+  const useListeningPercentMode = book.page_count != null && book.page_count > 0;
 
   function pageToPercent(page: number | null) {
     if (page == null || !book.page_count || book.page_count <= 0) return null;
     return Math.max(0, Math.min(100, Math.round((page / book.page_count) * 100)));
+  }
+
+  function listeningProgressLabel(endPage: number | null | undefined) {
+    if (endPage == null) return "Listening session";
+
+    const percent = pageToPercent(endPage);
+    if (percent != null) return `Listening · up to ${percent}%`;
+
+    return `Listening · up to p. ${endPage}`;
   }
 
   return (
@@ -350,7 +360,9 @@ export default function ReadingTab({
           >
             <option value="fluid">Fluid Reading</option>
             <option value="curiosity">Curiosity Reading</option>
-            <option value="listening">Listening</option>
+            <option value="listening">
+              {useListeningPercentMode ? "Listening (%)" : "Listening"}
+            </option>
           </select>
         </div>
 
@@ -416,21 +428,21 @@ export default function ReadingTab({
           {sessionMode === "listening" && (
             <div className="rounded border bg-white p-3 text-sm">
               <div className="text-stone-600">
-                {usePercentMode
+                {useListeningPercentMode
                   ? "Listening end percent (optional)"
                   : "Listening end page (optional)"}
               </div>
               <input
                 type="number"
-                min={usePercentMode ? 0 : 1}
-                max={usePercentMode ? 100 : undefined}
+                min={useListeningPercentMode ? 0 : 1}
+                max={useListeningPercentMode ? 100 : undefined}
                 value={sessionEndPage}
                 onChange={(e) => setSessionEndPage(e.target.value)}
-                placeholder={usePercentMode ? "e.g. 35" : "e.g. 45"}
+                placeholder={useListeningPercentMode ? "e.g. 35" : "e.g. 45"}
                 className="mt-1 w-full rounded border px-2 py-1"
               />
               <p className="mt-2 text-xs text-stone-500">
-                Fill this in only if you want to update your book progress. It does not affect reading stats.
+                Fill this in only if you want to update your listening progress. It does not affect reading stats.
               </p>
             </div>
           )}
@@ -483,13 +495,7 @@ export default function ReadingTab({
                         <div className="font-medium">{session.read_on}</div>
                         <div className="mt-1">
                           {session.session_mode === "listening" ? (
-                            session.end_page != null ? (
-                              usePercentMode
-                                ? `Listening · up to ${pageToPercent(session.end_page)}%`
-                                : `Listening · up to p. ${session.end_page}`
-                            ) : (
-                              "Listening session"
-                            )
+                            listeningProgressLabel(session.end_page)
                           ) : session.start_page != null && session.end_page != null ? (
                             usePercentMode
                               ? `${pageToPercent(session.start_page)}% → ${pageToPercent(session.end_page)}%`

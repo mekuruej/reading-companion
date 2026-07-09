@@ -1125,7 +1125,9 @@ export default function BookHubPage() {
 
   function startEditingReadingSession(session: ReadingSession) {
     const usePercentMode =
-      progressMode === "percent" && session.session_mode !== "listening";
+      (progressMode === "percent" || session.session_mode === "listening") &&
+      book?.page_count != null &&
+      book.page_count > 0;
 
     setEditingReadingSessionId(session.id);
     setSessionDate(session.read_on);
@@ -3129,6 +3131,12 @@ export default function BookHubPage() {
     if (!row?.id) return;
 
     const usingPercentMode = progressMode === "percent";
+    const usingListeningPercentMode =
+      sessionMode === "listening" &&
+      book?.page_count != null &&
+      book.page_count > 0;
+    const endInputIsPercent =
+      sessionMode === "listening" ? usingListeningPercentMode : usingPercentMode;
     const parsedStart =
       sessionMode === "listening" || sessionStartPage.trim() === ""
         ? null
@@ -3142,7 +3150,7 @@ export default function BookHubPage() {
         : parsedStart;
 
     const end =
-      usingPercentMode
+      endInputIsPercent
         ? percentToPage(parsedEnd, book?.page_count ?? null)
         : parsedEnd;
 
@@ -3206,7 +3214,7 @@ export default function BookHubPage() {
       }
     } else {
       if (
-        usingPercentMode &&
+        endInputIsPercent &&
         parsedEnd !== null &&
         (!Number.isFinite(parsedEnd) || parsedEnd < 0 || parsedEnd > 100)
       ) {
@@ -3214,7 +3222,7 @@ export default function BookHubPage() {
         return;
       }
 
-      if (!usingPercentMode && end !== null && (!Number.isFinite(end) || end <= 0)) {
+      if (!endInputIsPercent && end !== null && (!Number.isFinite(end) || end <= 0)) {
         alert("Listening end page must be greater than 0 if provided.");
         return;
       }

@@ -38,7 +38,7 @@ export default function AbilityCheckModeStatusPanel({
           </select>
         ) : (
           <div className="flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-            Today’s levels: {dailyLevelsLabel}
+            Today’s check: {dailyLevelsLabel}
           </div>
         )}
 

@@ -213,6 +213,8 @@ const DAILY_CHECK_PLAN_STORAGE_KEY = "library-study-daily-check-plan-by-date";
 const DAILY_CHECK_JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const DAILY_CHECK_LEVELS = [...DAILY_CHECK_JLPT_LEVELS, "NON-JLPT"] as const;
 const ABILITY_CHECK_MIN_DUE_CARDS = 10;
+const MEANING_LANGUAGE_WARNING =
+  "This is a MEANING question. Please type your answers in English.";
 
 type DailyCheckLevel = (typeof DAILY_CHECK_LEVELS)[number];
 
@@ -221,20 +223,15 @@ type DailyCheckPlan = {
   levels: DailyCheckLevel[];
   startedAt: string;
   cardIds?: string[];
+  includeKatakana?: boolean;
 };
 
 function isDailyCheckLevel(value: string): value is DailyCheckLevel {
   return (DAILY_CHECK_LEVELS as readonly string[]).includes(value);
 }
 
-function cardMatchesDailyCheckLevels(card: StudyCard, levels: DailyCheckLevel[]) {
-  if (levels.length === 0) return false;
-  return levels.includes(normalizeJlpt(card.jlpt) as DailyCheckLevel);
-}
-
 function dailyCheckLevelsLabel(levels: DailyCheckLevel[]) {
-  if (levels.length === 0) return "No levels selected";
-  return levels.join(", ");
+  return levels.length > 0 ? "All due cards" : "Not started";
 }
 
 function loadDailyCheckPlanForToday() {
@@ -261,6 +258,7 @@ function loadDailyCheckPlanForToday() {
       cardIds: Array.isArray(plan.cardIds)
         ? plan.cardIds.filter((id) => typeof id === "string" && id.trim())
         : undefined,
+      includeKatakana: plan.includeKatakana === true,
     };
   } catch {
     return null;
@@ -310,6 +308,15 @@ function normalizeJlpt(value: string | null | undefined) {
 function isKatakanaOnly(value: string | null | undefined) {
   const compact = (value ?? "").trim().replace(/\s+/g, "");
   return compact.length > 0 && /^[ァ-ヶー・･]+$/.test(compact);
+}
+
+function isKanaOnly(value: string | null | undefined) {
+  const compact = (value ?? "").trim().replace(/[\sー・･]/g, "");
+  return compact.length > 0 && /^[\u3041-\u3096\u30A1-\u30FA]+$/.test(compact);
+}
+
+function containsJapaneseText(value: string | null | undefined) {
+  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value ?? "");
 }
 
 function studyIdentityKey(surface: string | null | undefined, reading: string | null | undefined) {
@@ -547,10 +554,6 @@ function makeClaimStudyCard(
 
   if (!key || !surface || !reading || !meaning) return null;
 
-  if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
-    return null;
-  }
-
   const progress = progressWithWordSkyClaim(
     userId,
     key,
@@ -584,7 +587,7 @@ function makeClaimStudyCard(
     encounterCount: 0,
     encounterIds: [],
     colorStatus,
-    activeGate: pickLibraryCheckGate(colorStatus, key),
+    activeGate: pickLibraryCheckGate(colorStatus, key, surface),
     studyIdentityKey: key,
     progress,
     definitionNumber: null,
@@ -648,7 +651,12 @@ function hashString(value: string) {
   return Math.abs(hash);
 }
 
-function pickLibraryCheckGate(status: LibraryStudyColorStatus, _seed: string): LibraryCheckGate {
+function pickLibraryCheckGate(
+  status: LibraryStudyColorStatus,
+  _seed: string,
+  surface?: string | null
+): LibraryCheckGate {
+  if (isKanaOnly(surface)) return "meaning";
   if (status.color === "red" && status.eligibleForLibraryStudy) return "readiness";
   if (status.color === "yellow" && status.eligibleForLibraryStudy) return "readiness";
   if (status.nextGate === "reading") return "reading";
@@ -829,18 +837,6 @@ function isCardAvailableForLibraryCheck(
   );
 }
 
-function availableDailyCheckCountForLevel(
-  cards: StudyCard[],
-  level: DailyCheckLevel,
-  seenTodayIds: Set<string>
-) {
-  return cards.filter(
-    (card) =>
-      normalizeJlpt(card.jlpt) === level &&
-      isCardAvailableForLibraryCheck(card, "all", seenTodayIds)
-  ).length;
-}
-
 function buildDailyCheckDeckSource(
   cards: StudyCard[],
   plan: DailyCheckPlan,
@@ -852,12 +848,11 @@ function buildDailyCheckDeckSource(
       ignoreTiming: options.ignoreTiming,
     })
   );
+  const sessionCards = plan.includeKatakana
+    ? dueCards
+    : dueCards.filter((card) => !isKatakanaOnly(card.surface));
 
-  const primaryDueCards = dueCards.filter((card) =>
-    cardMatchesDailyCheckLevels(card, plan.levels)
-  );
-
-  const rotatedDue = rankDailyCheckCards(dedupeCardsByStudyIdentity(primaryDueCards));
+  const rotatedDue = rankDailyCheckCards(dedupeCardsByStudyIdentity(sessionCards));
 
   return rotatedDue;
 }
@@ -1643,12 +1638,13 @@ export default function LibraryStudyPage() {
   const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("check");
   const [selectedJlpt, setSelectedJlpt] = useState("all");
   const [dailyCheckPlan, setDailyCheckPlan] = useState<DailyCheckPlan | null>(null);
-  const [setupLevels, setSetupLevels] = useState<DailyCheckLevel[]>([]);
+  const [includeKatakanaToday, setIncludeKatakanaToday] = useState(false);
   const [practiceColorFilter, setPracticeColorFilter] =
     useState<PracticeColorFilter>("all");
 
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
   const [typingInput, setTypingInput] = useState("");
+  const [typingInstructionOverride, setTypingInstructionOverride] = useState<string | null>(null);
   const [typingCorrectionComplete, setTypingCorrectionComplete] = useState(false);
 
   const [endedEarly, setEndedEarly] = useState(false);
@@ -1661,13 +1657,15 @@ export default function LibraryStudyPage() {
   const currentCard = deck[index];
   const practiceCard = practiceDeck[practiceIndex];
   const activeStudyMode = studyModeForActiveGate(currentCard);
-  const currentInstructionText = checked
-    ? checked.ok || typingCorrectionComplete
+  const currentInstructionText = typingInstructionOverride
+    ? typingInstructionOverride
+    : checked
+      ? checked.ok || typingCorrectionComplete
       ? "Great! Next word comes automatically."
       : activeStudyMode === "reading_typing"
         ? "Not quite. Retype the reading."
         : `Not quite. Retype "${shortMeaningRetypeHint(checked.correct)}" from the meaning.`
-    : null;
+      : null;
 
   const filteredCards = useMemo(() => {
     if (!dailyCheckPlan) return [];
@@ -1681,35 +1679,21 @@ export default function LibraryStudyPage() {
     );
   }, [allCards, selectedJlpt, practiceColorFilter]);
 
-  const availableCountBySetupLevel = useMemo(() => {
-    const counts: Record<DailyCheckLevel, number> = {
-      N5: 0,
-      N4: 0,
-      N3: 0,
-      N2: 0,
-      N1: 0,
-      "NON-JLPT": 0,
-    };
-
-    for (const level of DAILY_CHECK_LEVELS) {
-      counts[level] = availableDailyCheckCountForLevel(
-        allCards,
-        level,
-        seenTodayIds
-      );
-    }
-
-    return counts;
-  }, [allCards, seenTodayIds]);
-
-  const allLevelsDueCount = useMemo(
+  const dueAbilityCheckCards = useMemo(
     () =>
-      DAILY_CHECK_LEVELS.reduce(
-        (sum, level) => sum + availableCountBySetupLevel[level],
-        0
+      allCards.filter((card) =>
+        isCardAvailableForLibraryCheck(card, "all", seenTodayIds)
       ),
-    [availableCountBySetupLevel]
+    [allCards, seenTodayIds]
   );
+  const allLevelsDueCount = dueAbilityCheckCards.length;
+  const katakanaDueCount = useMemo(
+    () => dueAbilityCheckCards.filter((card) => isKatakanaOnly(card.surface)).length,
+    [dueAbilityCheckCards]
+  );
+  const selectedDueCount = includeKatakanaToday
+    ? allLevelsDueCount
+    : allLevelsDueCount - katakanaDueCount;
 
   useEffect(() => {
     if (libraryMode !== "check") return;
@@ -1745,6 +1729,7 @@ export default function LibraryStudyPage() {
           setDailyCheckPlan(todaysPlan);
           setNotice(null);
           setEndedEarly(false);
+          setIncludeKatakanaToday(false);
           setIndex(0);
           resetCardState();
 
@@ -1977,10 +1962,6 @@ export default function LibraryStudyPage() {
                 return null;
               }
 
-              if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
-                return null;
-              }
-
               const colorStatus = computeLibraryStudyColorStatus({
                 encounterCount,
                 settings: colorSettings,
@@ -2005,7 +1986,7 @@ export default function LibraryStudyPage() {
                 encounterCount,
                 encounterIds: [summary.sample_user_book_word_id],
                 colorStatus,
-                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
+                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key, surface),
                 studyIdentityKey: summary.study_identity_key,
                 progress,
                 definitionNumber: definitionNumberByWordId.get(summary.sample_user_book_word_id) ?? null,
@@ -2120,13 +2101,6 @@ export default function LibraryStudyPage() {
               claimByKey.get(key)
             );
 
-            if (
-              colorSettings.skip_katakana_library_check &&
-              isKatakanaOnly(representative.surface)
-            ) {
-              return null;
-            }
-
             const colorStatus = computeLibraryStudyColorStatus({
               encounterCount: group.length,
               settings: colorSettings,
@@ -2151,7 +2125,7 @@ export default function LibraryStudyPage() {
               encounterCount: group.length,
               encounterIds: group.map((word) => word.id),
               colorStatus,
-              activeGate: pickLibraryCheckGate(colorStatus, key),
+              activeGate: pickLibraryCheckGate(colorStatus, key, surface),
               studyIdentityKey: key,
               progress,
               definitionNumber: definitionNumberFromIndex(representative.meaning_choice_index),
@@ -2325,7 +2299,6 @@ export default function LibraryStudyPage() {
     if (endedEarly) return;
     if (deck.length === 0) return;
     if (index < deck.length) return;
-    if (deck.length < ABILITY_CHECK_MIN_DUE_CARDS) return;
 
     markAbilityCheckCompletedToday();
   }, [libraryMode, endedEarly, deck.length, index]);
@@ -2333,6 +2306,7 @@ export default function LibraryStudyPage() {
   function resetCardState() {
     setChecked(null);
     setTypingInput("");
+    setTypingInstructionOverride(null);
     setTypingCorrectionComplete(false);
   }
 
@@ -2346,44 +2320,17 @@ export default function LibraryStudyPage() {
     });
   }
 
-  function toggleSetupLevel(level: DailyCheckLevel) {
-    setSetupLevels((prev) => {
-      if (prev.includes(level)) {
-        return prev.filter((item) => item !== level);
-      }
-
-      return [...prev, level];
-    });
-  }
-
-  function toggleAllSetupLevels() {
-    setSetupLevels((prev) => {
-      const allLevelsSelected = DAILY_CHECK_LEVELS.every((level) =>
-        prev.includes(level)
-      );
-
-      if (allLevelsSelected) {
-        return [];
-      }
-
-      return [...DAILY_CHECK_LEVELS];
-    });
-  }
-
   function startDailyCheck() {
-    if (setupLevels.length === 0) {
-      alert("Please choose at least one level for today’s Ability Check.");
+    if (selectedDueCount <= 0) {
+      setNotice(
+        "No non-katakana Ability Check cards are due today. Include katakana to start."
+      );
       return;
     }
 
-    const selectedDueCount = setupLevels.reduce(
-      (sum, level) => sum + availableCountBySetupLevel[level],
-      0
-    );
-
-    if (selectedDueCount < ABILITY_CHECK_MIN_DUE_CARDS) {
+    if (allLevelsDueCount < ABILITY_CHECK_MIN_DUE_CARDS) {
       setNotice(
-        `Ability Check opens when ${ABILITY_CHECK_MIN_DUE_CARDS} or more cards are due. You have ${selectedDueCount} due right now.`
+        `Ability Check opens when ${ABILITY_CHECK_MIN_DUE_CARDS} or more cards are due. You have ${allLevelsDueCount} due right now.`
       );
       return;
     }
@@ -2392,8 +2339,9 @@ export default function LibraryStudyPage() {
 
     const plan: DailyCheckPlan = {
       dateKey: todayKey,
-      levels: setupLevels,
+      levels: [...DAILY_CHECK_LEVELS],
       startedAt: new Date().toISOString(),
+      includeKatakana: includeKatakanaToday,
     };
 
     saveDailyCheckPlanForToday(plan);
@@ -2924,7 +2872,7 @@ export default function LibraryStudyPage() {
         ...card,
         progress: readyProgress,
         colorStatus,
-        activeGate: pickLibraryCheckGate(colorStatus, card.studyIdentityKey),
+        activeGate: pickLibraryCheckGate(colorStatus, card.studyIdentityKey, card.surface),
       };
     };
 
@@ -3024,7 +2972,7 @@ export default function LibraryStudyPage() {
         ...card,
         progress: restartedProgress,
         colorStatus,
-        activeGate: pickLibraryCheckGate(colorStatus, card.studyIdentityKey),
+        activeGate: pickLibraryCheckGate(colorStatus, card.studyIdentityKey, card.surface),
       };
     };
 
@@ -3051,6 +2999,14 @@ export default function LibraryStudyPage() {
 
   function checkTypingSingle() {
     if (!currentCard) return;
+
+    if (activeStudyMode === "meaning_typing" && containsJapaneseText(typingInput)) {
+      setTypingInstructionOverride(MEANING_LANGUAGE_WARNING);
+      window.requestAnimationFrame(() => typingInputRef.current?.focus());
+      return;
+    }
+
+    setTypingInstructionOverride(null);
 
     if (checked && !checked.ok) {
       const correctionOk =
@@ -3198,15 +3154,6 @@ export default function LibraryStudyPage() {
   }
 
   if (libraryMode === "check" && !dailyCheckPlan) {
-    const allLevelsSelected = DAILY_CHECK_LEVELS.every((level) =>
-      setupLevels.includes(level)
-    );
-
-    const selectedDueCount = setupLevels.reduce(
-      (sum, level) => sum + availableCountBySetupLevel[level],
-      0
-    );
-
     if (allLevelsDueCount < ABILITY_CHECK_MIN_DUE_CARDS) {
       return (
         <AbilityCheckRestingState
@@ -3220,16 +3167,11 @@ export default function LibraryStudyPage() {
 
     return (
       <AbilityCheckSetupPanel
-        levels={DAILY_CHECK_LEVELS}
-        setupLevels={setupLevels}
-        availableCountByLevel={availableCountBySetupLevel}
         allLevelsDueCount={allLevelsDueCount}
-        allLevelsSelected={allLevelsSelected}
         selectedDueCount={selectedDueCount}
-        minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
-        faqSlot={<AbilityCheckFaq />}
-        onToggleAllLevels={toggleAllSetupLevels}
-        onToggleLevel={(level) => toggleSetupLevel(level as DailyCheckLevel)}
+        includeKatakanaToday={includeKatakanaToday}
+        katakanaDueCount={katakanaDueCount}
+        onIncludeKatakanaTodayChange={setIncludeKatakanaToday}
         onStartDailyCheck={startDailyCheck}
         onBackToLibrary={() => router.push("/books")}
       />
@@ -3459,7 +3401,10 @@ export default function LibraryStudyPage() {
                   instructionText={currentInstructionText}
                   canSendBackToSupport={canComeBackLater(currentCard)}
                   inputRef={typingInputRef}
-                  onTypingInputChange={setTypingInput}
+                  onTypingInputChange={(value) => {
+                    setTypingInput(value);
+                    if (typingInstructionOverride) setTypingInstructionOverride(null);
+                  }}
                   onInputKeyDown={(event) => {
                     if (event.key !== "Enter") return;
 
