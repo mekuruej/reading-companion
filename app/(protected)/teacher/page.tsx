@@ -91,6 +91,13 @@ const teacherHubCards: TeacherHubCard[] = [
     description:
       "Open global cleanup tools and admin maintenance areas that do not belong to learner follow-up.",
   },
+  {
+    title: "English Readers Prep",
+    href: "/teacher/english-readers",
+    eyebrow: "Early scaffold",
+    description:
+      "Prepare English books with Japanese support for adult learners. Coming soon.",
+  },
 ];
 
 function isSuperTeacherFlag(value: unknown) {
