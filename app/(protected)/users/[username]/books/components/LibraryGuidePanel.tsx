@@ -8,7 +8,22 @@ export default function LibraryGuidePanel({
 }: LibraryGuidePanelProps) {
   return (
     <div className="mb-8 w-full">
-      <details className="max-w-[1200px] rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm">
+      <details className="rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm md:hidden">
+        <summary className="cursor-pointer text-sm font-black text-slate-900">
+          How do I use this Library on my phone?
+        </summary>
+
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Use your phone to follow along while reading, review flashcards, log
+          reading or listening time, and keep your library updated.
+        </p>
+
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Teacher tools and editing tools are available on computer.
+        </p>
+      </details>
+
+      <details className="hidden max-w-[1200px] rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm md:block">
         <summary className="cursor-pointer text-sm font-black text-slate-900">
           How do I use this library?
         </summary>
@@ -42,7 +57,7 @@ export default function LibraryGuidePanel({
                 Saved Word Reading
               </div>
               <p className="mt-1 truncate text-xs text-slate-600">
-                Time your reading your saved-word support.
+                Time your reading with saved-word support.
               </p>
             </button>
           </div>
@@ -67,10 +82,10 @@ export default function LibraryGuidePanel({
               className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
             >
               <div className="text-sm font-black text-slate-950">
-                Just Listen
+                Listen
               </div>
               <p className="mt-1 truncate text-xs text-slate-600">
-                Time and track your listening for ear-training purposes.
+                Track listening time and save words as you go.
               </p>
             </button>
           </div>
