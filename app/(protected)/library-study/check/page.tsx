@@ -1613,6 +1613,11 @@ function hideAbilityCheckReminderForToday() {
   window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
 }
 
+function completeAbilityCheckForToday() {
+  markAbilityCheckCompletedToday();
+  hideAbilityCheckReminderForToday();
+}
+
 export default function LibraryStudyPage() {
   const router = useRouter();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
@@ -2300,7 +2305,7 @@ export default function LibraryStudyPage() {
     if (deck.length === 0) return;
     if (index < deck.length) return;
 
-    markAbilityCheckCompletedToday();
+    completeAbilityCheckForToday();
   }, [libraryMode, endedEarly, deck.length, index]);
 
   function resetCardState() {
@@ -2411,6 +2416,9 @@ export default function LibraryStudyPage() {
 
   function nextCardWithoutMarkingSeen() {
     if (index + 1 >= deck.length) {
+      if (libraryMode === "check" && !endedEarly) {
+        completeAbilityCheckForToday();
+      }
       setIndex(deck.length);
       resetCardState();
       return;
@@ -2435,6 +2443,7 @@ export default function LibraryStudyPage() {
   }
 
   function finishMeaningReview() {
+    completeAbilityCheckForToday();
     setMeaningReviewItems([]);
   }
 
