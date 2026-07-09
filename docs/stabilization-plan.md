@@ -708,3 +708,64 @@ Finished:
 Decision:
 
 `/library-study/practice` uses the logged-in user’s own saved-word library and progress. After hardening the sample-word lookup and flag update, it passed the non-book route access audit.
+
+### `/library-study/check`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads the current user’s own profile/access row with `profiles.id = user.id`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed saved-word summaries, Word Sky claims, learning settings, and progress queries are scoped to the current user.
+* Confirmed progress upserts use the current logged-in user ID.
+* Hardened the sample-word definition lookup so word IDs must also belong to the current user’s owned `user_book_id` list.
+* Restored Word Sky claim hiding to use `user_library_word_claims`.
+* Hardened regular saved-word hiding so `user_book_words.hidden` can only be updated for the current card’s own `user_book_id`.
+* Confirmed there is no URL-controlled user/book identity in this route.
+
+Decision:
+
+`/library-study/check` uses the logged-in user’s own saved-word library and progress. After hardening the sample-word lookup and hide-card update, it passed the non-book route access audit.
+
+### `/library-study/book-flashcards`
+
+Finished:
+
+* Confirmed the page gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads the current user’s own profile/access row with `profiles.id = user.id`.
+* Confirmed the route itself does not load `user_book_words`, write progress, or take user/book identity from URL params.
+* Confirmed the shared `LibraryBookActionIndex` component gets the logged-in user and loads `user_books` only with `user_id = user.id`.
+* Confirmed the page links to book-specific study routes using the current user’s own `user_books.id` values.
+
+Decision:
+
+`/library-study/book-flashcards` is an access-gated book chooser and only lists the logged-in user’s own books. It passed the non-book route access audit.
+
+### `/library-study/radicals`
+
+Finished:
+
+* Confirmed the page requires the logged-in user with `supabase.auth.getUser()`.
+* Confirmed Supabase reads are from global/public radical reference tables: `kanji_radicals` and `kanji_components`.
+* Confirmed the page does not load private `user_books`, `user_book_words`, or profile data.
+* Confirmed the only write path is `recordStudyEvent`.
+* Confirmed `recordStudyEvent` gets the current logged-in user internally and inserts `user_id = user.id`.
+* Confirmed the radical page does not pass URL-controlled user/book identity into study-event writes.
+
+Decision:
+
+`/library-study/radicals` uses public/global radical data and records study events under the current logged-in user. It passed the non-book route access audit.
+
+### `/discovery/reader-insights`
+
+Finished:
+
+* Confirmed the page has no Supabase usage.
+* Confirmed it does not load private user data.
+* Confirmed it does not use route params or search params.
+* Confirmed it has no writes.
+* Confirmed it is a static coming-soon page with links only.
+
+Decision:
+
+`/discovery/reader-insights` passed the non-book route access audit.
