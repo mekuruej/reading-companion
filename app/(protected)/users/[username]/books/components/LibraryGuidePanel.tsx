@@ -13,14 +13,62 @@ export default function LibraryGuidePanel({
           How do I use this Library on my phone?
         </summary>
 
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Use your phone to follow along while reading, review flashcards, log
-          reading or listening time, and keep your library updated.
-        </p>
+        <div className="mt-4 grid gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigate("/library/saved-word-reading-index")}
+            className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-indigo-100"
+          >
+            <div className="text-sm font-black text-slate-950">Follow-Along</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Read with support from your book.
+            </p>
+          </button>
 
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Teacher tools and editing tools are available on computer.
-        </p>
+          <button
+            type="button"
+            onClick={() => onNavigate("/library-study/book-flashcards")}
+            className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
+          >
+            <div className="text-sm font-black text-slate-950">Flashcards</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Review words from your books. Words are added on computer or by your teacher.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("/library/just-reading-index")}
+            className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-emerald-100"
+          >
+            <div className="text-sm font-black text-slate-950">Just Read</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Time your regular reading.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("/library/just-listening-index")}
+            className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
+          >
+            <div className="text-sm font-black text-slate-950">Listen</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Track listening time and save words as you go.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("/books/add")}
+            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
+          >
+            <div className="text-sm font-black text-slate-950">Add Book</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Add a new book to your library.
+            </p>
+          </button>
+        </div>
       </details>
 
       <details className="hidden max-w-[1200px] rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm md:block">
