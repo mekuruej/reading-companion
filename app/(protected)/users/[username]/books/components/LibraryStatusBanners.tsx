@@ -2,50 +2,49 @@ import LibraryReminderBanner from "./LibraryReminderBanner";
 
 export function AbilityCheckReminderBanner({
   abilityCheckReminderCount,
+  minDueCards,
   onStart,
   onHide,
 }: {
   abilityCheckReminderCount: number;
+  minDueCards: number;
   onStart: () => void;
   onHide: () => void;
 }) {
+  const isReady = abilityCheckReminderCount >= minDueCards;
+
   return (
     <LibraryReminderBanner
-      title="Your Ability Check is ready"
+      title={isReady ? "Your Ability Check is ready" : "Ability Check is resting today"}
       actions={
         <>
-          {abilityCheckReminderCount > 0 ? (
-            <button
-              type="button"
-              onClick={onStart}
-              className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
-            >
-              Start Ability Check
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={onStart}
+            className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
+          >
+            Open Ability Check
+          </button>
 
           <button
             type="button"
             onClick={onHide}
             className="rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
           >
-            {abilityCheckReminderCount > 0 ? "Hide today" : "Hide"}
+            Hide today
           </button>
         </>
       }
     >
-      {abilityCheckReminderCount > 0 ? (
+      {isReady ? (
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Some cards are ready for today. Ability Check is intentionally small and
-          spaced. For more study, use Library Review, Word Sky, or book flashcards.
+          You have {abilityCheckReminderCount} due cards. Ability Check is a
+          strict small quiz for reading and meaning.
         </p>
       ) : (
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          No Ability Check cards are due today. That is normal, especially in the
-          beginning! Ability Check only shows spaced cards when they are ready.
-          <br />
-          For extra study, use Library Review or Book Flashcards. To boost words in
-          your Ability Check, try Word Sky or read and add more words!
+          Ability Check opens when at least {minDueCards} cards are due. You
+          have {abilityCheckReminderCount} due right now.
         </p>
       )}
     </LibraryReminderBanner>

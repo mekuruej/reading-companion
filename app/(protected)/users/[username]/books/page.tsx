@@ -205,8 +205,8 @@ type AbilityCheckProgressRow = {
 const MEKURU_ENCOUNTER_COLORS: MekuruColor[] = ["red", "orange", "yellow"];
 const MEKURU_ABILITY_COLORS: MekuruColor[] = ["green", "blue", "purple"];
 const ABILITY_CHECK_SEEN_STORAGE_KEY = "library-study-seen-by-date";
-const ABILITY_CHECK_COMPLETED_KEY = "ability-check-completed-date";
 const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
+const ABILITY_CHECK_REMINDER_UNLOCKED_KEY = "ability-check-reminder-unlocked";
 const PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY =
   "pending-book-requests-alert-hidden-signature";
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
@@ -240,9 +240,14 @@ function abilityCheckReminderHiddenToday() {
   return window.localStorage.getItem(ABILITY_CHECK_REMINDER_HIDE_KEY) === getTodayKey();
 }
 
-function abilityCheckCompletedToday() {
+function abilityCheckReminderUnlocked() {
   if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(ABILITY_CHECK_COMPLETED_KEY) === getTodayKey();
+  return window.localStorage.getItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY) === "true";
+}
+
+function unlockAbilityCheckReminder() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY, "true");
 }
 
 function hideAbilityCheckReminderForToday() {
@@ -678,7 +683,7 @@ export default function BooksPage() {
   const [abilityCheckReminderCount, setAbilityCheckReminderCount] = useState(0);
   const [abilityCheckReminderLoading, setAbilityCheckReminderLoading] = useState(false);
   const [abilityCheckReminderHidden, setAbilityCheckReminderHidden] = useState(false);
-  const [abilityCheckReminderCompleted, setAbilityCheckReminderCompleted] = useState(false);
+  const [abilityCheckReminderHasUnlocked, setAbilityCheckReminderHasUnlocked] = useState(false);
   const [abilityCheckReminderDayKey, setAbilityCheckReminderDayKey] = useState(getTodayKey());
 
   const viewingLabel =
@@ -947,10 +952,7 @@ export default function BooksPage() {
 
       setAbilityCheckReminderEnabled(resolvedSettings.show_ability_check_reminder);
 
-      const completedToday = abilityCheckCompletedToday();
-      setAbilityCheckReminderCompleted(completedToday);
-
-      if (!resolvedSettings.show_ability_check_reminder || completedToday) {
+      if (!resolvedSettings.show_ability_check_reminder) {
         setAbilityCheckReminderCount(0);
         return;
       }
@@ -1007,6 +1009,11 @@ export default function BooksPage() {
           seenTodayIds
         )
       ).length;
+
+      if (availableCount >= ABILITY_CHECK_REMINDER_MIN_DUE_CARDS) {
+        unlockAbilityCheckReminder();
+        setAbilityCheckReminderHasUnlocked(true);
+      }
 
       setAbilityCheckReminderCount(availableCount);
     } catch (error) {
@@ -1907,17 +1914,15 @@ export default function BooksPage() {
 
   useEffect(() => {
     const hiddenToday = abilityCheckReminderHiddenToday();
-    const completedToday = abilityCheckCompletedToday();
 
     setAbilityCheckReminderHidden(hiddenToday);
-    setAbilityCheckReminderCompleted(completedToday);
+    setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
 
     if (
       !viewingUserId ||
       !meId ||
       viewingUserId !== meId ||
-      hiddenToday ||
-      completedToday
+      hiddenToday
     ) {
       setAbilityCheckReminderCount(0);
       return;
@@ -1930,16 +1935,15 @@ export default function BooksPage() {
     function refreshAbilityCheckReminderDay(options: { refreshCount?: boolean } = {}) {
       const todayKey = getTodayKey();
       const hiddenToday = abilityCheckReminderHiddenToday();
-      const completedToday = abilityCheckCompletedToday();
 
       setAbilityCheckReminderDayKey((previous) =>
         previous === todayKey ? previous : todayKey
       );
 
       setAbilityCheckReminderHidden(hiddenToday);
-      setAbilityCheckReminderCompleted(completedToday);
+      setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
 
-      if (hiddenToday || completedToday) {
+      if (hiddenToday) {
         setAbilityCheckReminderCount(0);
         return;
       }
@@ -2218,10 +2222,9 @@ export default function BooksPage() {
   const showAbilityCheckReminder =
     viewingUserId === meId &&
     abilityCheckReminderEnabled &&
-    abilityCheckReminderCount >= ABILITY_CHECK_REMINDER_MIN_DUE_CARDS &&
+    abilityCheckReminderHasUnlocked &&
     !abilityCheckReminderLoading &&
-    !abilityCheckReminderHidden &&
-    !abilityCheckReminderCompleted;
+    !abilityCheckReminderHidden;
   const showLearningTasks =
     (viewingUserId === meId || isViewingStudentLibrary) &&
     !learningTasksLoading &&
@@ -2294,6 +2297,7 @@ export default function BooksPage() {
         {showAbilityCheckReminder ? (
           <AbilityCheckReminderBanner
             abilityCheckReminderCount={abilityCheckReminderCount}
+            minDueCards={ABILITY_CHECK_REMINDER_MIN_DUE_CARDS}
             onStart={() => router.push("/library-study/check")}
             onHide={() => {
               hideAbilityCheckReminderForToday();
