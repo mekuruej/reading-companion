@@ -1013,15 +1013,7 @@ export default function KanjiReadingStudyPage() {
 
         const { data: userBooks, error: userBooksErr } = await supabase
           .from("user_books")
-          .select(
-            `
-            id,
-            books:book_id (
-              title,
-              cover_url
-            )
-          `
-          )
+          .select("id")
           .eq("user_id", user.id);
 
         if (userBooksErr) throw userBooksErr;
