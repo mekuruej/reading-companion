@@ -29,20 +29,6 @@ import KanjiStudyFilterPanel, {
 } from "./components/KanjiStudyFilterPanel";
 const KANJI_AUTO_ADVANCE_MS = 3000;
 
-type UserBookWordRow = {
-  id: string;
-  user_book_id: string;
-  surface: string;
-  reading: string | null;
-  meaning: string | null;
-  created_at: string;
-  hidden: boolean | null;
-  vocabulary_cache_id: number | null;
-  chapter_number: number | null;
-  chapter_name: string | null;
-  page_number: number | null;
-};
-
 type VocabularyCacheRow = {
   id: number;
   surface: string | null;
@@ -885,10 +871,6 @@ async function loadKanjiMapRows() {
   return rows;
 }
 
-function makeContextKey(surface: string | null | undefined, reading: string | null | undefined) {
-  return `${normalizeWord(surface ?? "")}|||${normalizeReading(reading ?? "")}`;
-}
-
 export default function KanjiReadingStudyPage() {
   const router = useRouter();
 
@@ -1011,44 +993,6 @@ export default function KanjiReadingStudyPage() {
           }
         }
 
-        const { data: userBooks, error: userBooksErr } = await supabase
-          .from("user_books")
-          .select("id")
-          .eq("user_id", user.id);
-
-        if (userBooksErr) throw userBooksErr;
-
-        const userBookIds: string[] = [];
-
-        for (const row of userBooks ?? []) {
-          const id = (row as any).id;
-          if (!id) continue;
-
-          userBookIds.push(id);
-        }
-
-        const contextByKey = new Map<string, UserBookWordRow>();
-
-        for (const userBookIdChunk of chunkArray(userBookIds, 200)) {
-          const { data: rows, error: contextErr } = await supabase
-            .from("user_book_words")
-            .select(
-              "id, user_book_id, surface, reading, meaning, created_at, hidden, vocabulary_cache_id, chapter_number, chapter_name, page_number"
-            )
-            .in("user_book_id", userBookIdChunk)
-            .not("reading", "is", null)
-            .eq("hidden", false)
-            .order("created_at", { ascending: false })
-            .returns<UserBookWordRow[]>();
-
-          if (contextErr) throw contextErr;
-
-          for (const row of rows ?? []) {
-            const key = makeContextKey(row.surface, row.reading);
-            if (!contextByKey.has(key)) contextByKey.set(key, row);
-          }
-        }
-
         const core: QuizCard[] = activeKanjiMapRows.flatMap((km) => {
           const vocab = vocabularyById.get(km.vocabulary_cache_id);
           const radicalMeta = km.kanji ? radicalMetaByKanji.get(km.kanji) : null;
@@ -1058,9 +1002,8 @@ export default function KanjiReadingStudyPage() {
 
           if (!surface || !sourceReading || !km.kanji || !reading) return [];
 
-          const context = contextByKey.get(makeContextKey(surface, sourceReading));
           const sourceMeaning =
-            context?.meaning?.trim() || meaningPreviewFromSenses(vocab?.senses_json) || null;
+            meaningPreviewFromSenses(vocab?.senses_json) || null;
           const readingType: QuizCard["readingType"] =
             km.reading_type === "on"
               ? "onyomi"
@@ -1085,17 +1028,17 @@ export default function KanjiReadingStudyPage() {
             jlpt: radicalMeta?.jlpt_level ?? vocab?.jlpt ?? null,
             kanjiJlpt: radicalMeta?.jlpt_level ?? null,
             wordJlpt: vocab?.jlpt ?? null,
-            userBookId: context?.user_book_id ?? null,
-            userBookWordId: context?.id ?? null,
+            userBookId: null,
+            userBookWordId: null,
             strokeCount: radicalMeta?.stroke_count ?? null,
             radical: radicalMeta?.radical ?? null,
             radicalName: radicalMeta?.radical_name ?? null,
             radicalEnglishName: radicalMeta?.radical_english_name ?? null,
             isJouyou: radicalMeta?.is_jouyou ?? null,
             schoolGrade: radicalMeta?.school_grade ?? null,
-            chapterNumber: context?.chapter_number ?? null,
-            chapterName: context?.chapter_name ?? null,
-            pageNumber: context?.page_number ?? null,
+            chapterNumber: null,
+            chapterName: null,
+            pageNumber: null,
           }];
         });
 
