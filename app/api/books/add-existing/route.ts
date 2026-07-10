@@ -193,14 +193,11 @@ export async function POST(request: Request) {
     });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-
   const { data: insertedUserBook, error: insertUserBookError } = await supabaseAdmin
     .from("user_books")
     .insert({
       user_id: targetUserId,
       book_id: bookId,
-      started_at: today,
     })
     .select("id")
     .single();

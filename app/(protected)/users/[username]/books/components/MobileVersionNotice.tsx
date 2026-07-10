@@ -6,7 +6,7 @@ type MobileVersionNoticeProps = {
 };
 
 export default function MobileVersionNotice({
-  title = "You’re using the iPhone version of MEKURU",
+  title = "You’re using the mobile version of MEKURU",
   body = "Read, Listen, Study, or Record Sessions. Editing tools are available on larger screens.",
 }: MobileVersionNoticeProps) {
   const [hidden, setHidden] = useState(false);

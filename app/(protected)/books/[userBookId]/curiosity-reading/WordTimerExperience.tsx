@@ -39,6 +39,12 @@ import CuriosityQuickErrorMessage from "./components/CuriosityQuickErrorMessage"
 import CuriosityWordDetailFields from "./components/CuriosityWordDetailFields";
 import CuriosityAddEditWordFormShell from "./components/CuriosityAddEditWordFormShell";
 import CuriosityAddEditWordCard from "./components/CuriosityAddEditWordCard";
+import {
+  clearPersistedTimedSession,
+  elapsedMsForPersistedTimedSession,
+  readPersistedTimedSession,
+  writePersistedTimedSession,
+} from "../_shared/timed-session/timedSessionPersistence";
 
 type QuickPreview = {
   id: string | null;
@@ -331,12 +337,16 @@ export function CuriosityReadingExperience({
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [accumulatedElapsedMs, setAccumulatedElapsedMs] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
   const [timerSaveMessage, setTimerSaveMessage] = useState("");
   const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
   const [sessionStartPage, setSessionStartPage] = useState("");
   const [sessionEndPage, setSessionEndPage] = useState("");
+  const [sessionDate, setSessionDate] = useState("");
+  const [timerPersistenceReady, setTimerPersistenceReady] = useState(false);
+  const skippedInitialPersistenceWriteRef = useRef(false);
 
   const quickMetaStorageKey = `${experienceMode}-add-meta:${userBookId}`;
 
@@ -615,14 +625,140 @@ export function CuriosityReadingExperience({
   }, []);
 
   useEffect(() => {
-    if (!isRunning || !startTime) return;
+    if (!isListeningMode || !userBookId) return;
 
-    const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    skippedInitialPersistenceWriteRef.current = false;
+    const persisted = readPersistedTimedSession("listening", userBookId);
+    if (persisted) {
+      const restoredElapsedMs = elapsedMsForPersistedTimedSession(persisted);
+      const restoredRunning =
+        !persisted.isPaused &&
+        !persisted.showTimedSessionForm &&
+        typeof persisted.startedAt === "number";
 
-    return () => clearInterval(interval);
-  }, [isRunning, startTime]);
+      setAccumulatedElapsedMs(Math.max(0, persisted.accumulatedElapsedMs));
+      setStartTime(restoredRunning ? persisted.startedAt : null);
+      setElapsed(Math.floor(restoredElapsedMs / 1000));
+      setIsRunning(restoredRunning);
+      setIsPaused(persisted.isPaused && !persisted.showTimedSessionForm);
+      setShowTimedSessionForm(persisted.showTimedSessionForm);
+      setHasFinishedTimer(persisted.showTimedSessionForm);
+      setSessionDate(persisted.sessionDate);
+      setSessionStartPage(persisted.sessionStartPage);
+      setSessionEndPage(persisted.sessionEndPage);
+    }
+
+    setTimerPersistenceReady(true);
+  }, [isListeningMode, userBookId]);
+
+  useEffect(() => {
+    if (isRunning && startTime) {
+      setElapsed(
+        Math.floor((accumulatedElapsedMs + Math.max(0, Date.now() - startTime)) / 1000)
+      );
+    }
+
+    const interval =
+      isRunning && startTime
+        ? setInterval(() => {
+          setElapsed(
+            Math.floor(
+              (accumulatedElapsedMs + Math.max(0, Date.now() - startTime)) / 1000
+            )
+          );
+        }, 1000)
+        : null;
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [accumulatedElapsedMs, isRunning, startTime]);
+
+  useEffect(() => {
+    if (!isListeningMode || !timerPersistenceReady || !userBookId) return;
+
+    if (!skippedInitialPersistenceWriteRef.current) {
+      skippedInitialPersistenceWriteRef.current = true;
+      return;
+    }
+
+    if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) {
+      clearPersistedTimedSession("listening", userBookId);
+      return;
+    }
+
+    writePersistedTimedSession({
+      version: 1,
+      sessionMode: "listening",
+      userBookId,
+      startedAt: isRunning ? startTime : null,
+      accumulatedElapsedMs,
+      isPaused,
+      sessionDate,
+      sessionStartPage,
+      sessionEndPage,
+      showTimedSessionForm,
+      savedAt: Date.now(),
+    });
+  }, [
+    accumulatedElapsedMs,
+    isListeningMode,
+    isPaused,
+    isRunning,
+    sessionDate,
+    sessionEndPage,
+    sessionStartPage,
+    showTimedSessionForm,
+    startTime,
+    timerPersistenceReady,
+    userBookId,
+  ]);
+
+  useEffect(() => {
+    if (!isListeningMode || !timerPersistenceReady || !userBookId) return;
+
+    const persistCurrentTimer = () => {
+      if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) return;
+
+      writePersistedTimedSession({
+        version: 1,
+        sessionMode: "listening",
+        userBookId,
+        startedAt: isRunning ? startTime : null,
+        accumulatedElapsedMs,
+        isPaused,
+        sessionDate,
+        sessionStartPage,
+        sessionEndPage,
+        showTimedSessionForm,
+        savedAt: Date.now(),
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") persistCurrentTimer();
+    };
+
+    window.addEventListener("pagehide", persistCurrentTimer);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", persistCurrentTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [
+    accumulatedElapsedMs,
+    isListeningMode,
+    isPaused,
+    isRunning,
+    sessionDate,
+    sessionEndPage,
+    sessionStartPage,
+    showTimedSessionForm,
+    startTime,
+    timerPersistenceReady,
+    userBookId,
+  ]);
 
   useEffect(() => {
     const shouldWarn = isRunning || isPaused;
@@ -1200,7 +1336,7 @@ export function CuriosityReadingExperience({
     let startPage: number | null = null;
     let endPage: number | null = null;
     const minutes = Math.max(1, Math.round(elapsed / 60));
-    const readOn = todayYmdAppTimeZone();
+    const readOn = isListeningMode ? sessionDate || todayYmdAppTimeZone() : todayYmdAppTimeZone();
 
     if (!isListeningMode && (!Number.isFinite(start) || !Number.isFinite(end))) {
       setMessage("❌ Please fill in start page and end page.");
@@ -1287,9 +1423,13 @@ export function CuriosityReadingExperience({
     setSessionEndPage("");
     setShowTimedSessionForm(false);
     setElapsed(0);
+    setAccumulatedElapsedMs(0);
     setStartTime(null);
     setIsRunning(false);
     setIsPaused(false);
+    if (isListeningMode) {
+      clearPersistedTimedSession("listening", userBookId);
+    }
     setMessage("");
   }
 
@@ -1399,30 +1539,40 @@ export function CuriosityReadingExperience({
           timerSaveMessage={timerSaveMessage}
           formatTimer={formatTimer}
           onStart={() => {
+            setSessionDate(todayYmdAppTimeZone());
             setStartTime(Date.now());
+            setAccumulatedElapsedMs(0);
             setElapsed(0);
             setIsRunning(true);
             setIsPaused(false);
             setHasFinishedTimer(false);
           }}
           onPause={() => {
+            const nextElapsedMs =
+              accumulatedElapsedMs + (startTime ? Math.max(0, Date.now() - startTime) : 0);
+
             if (startTime) {
-              setElapsed(Math.floor((Date.now() - startTime) / 1000));
+              setElapsed(Math.floor(nextElapsedMs / 1000));
             }
+            setAccumulatedElapsedMs(nextElapsedMs);
+            setStartTime(null);
             setIsRunning(false);
             setIsPaused(true);
           }}
           onFinish={() => {
-            if (startTime) {
-              setElapsed(Math.floor((Date.now() - startTime) / 1000));
-            }
+            const nextElapsedMs =
+              accumulatedElapsedMs + (startTime ? Math.max(0, Date.now() - startTime) : 0);
+
+            setAccumulatedElapsedMs(nextElapsedMs);
+            setElapsed(Math.floor(nextElapsedMs / 1000));
+            setStartTime(null);
             setIsRunning(false);
             setIsPaused(false);
             setHasFinishedTimer(true);
             void openTimedSessionFormWithDefaults();
           }}
           onResume={() => {
-            setStartTime(Date.now() - elapsed * 1000);
+            setStartTime(Date.now());
             setIsPaused(false);
             setIsRunning(true);
           }}
@@ -1430,9 +1580,13 @@ export function CuriosityReadingExperience({
           onCancelSession={() => {
             setShowTimedSessionForm(false);
             setElapsed(0);
+            setAccumulatedElapsedMs(0);
             setStartTime(null);
             setIsPaused(false);
             setIsRunning(false);
+            if (isListeningMode && userBookId) {
+              clearPersistedTimedSession("listening", userBookId);
+            }
           }}
           onSessionStartPageChange={setSessionStartPage}
           onSessionEndPageChange={setSessionEndPage}
