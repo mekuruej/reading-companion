@@ -16,6 +16,17 @@ export default function LibraryGuidePanel({
         <div className="mt-4 grid gap-3">
           <button
             type="button"
+            onClick={() => onNavigate("/books/add")}
+            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
+          >
+            <div className="text-sm font-black text-slate-950">Add Book</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Add a new book to your library.
+            </p>
+          </button>
+
+          <button
+            type="button"
             onClick={() => onNavigate("/library/saved-word-reading-index")}
             className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-indigo-100"
           >
@@ -55,17 +66,6 @@ export default function LibraryGuidePanel({
             <div className="text-sm font-black text-slate-950">Listen</div>
             <p className="mt-1 text-xs leading-5 text-slate-600">
               Track listening time and save words as you go.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("/books/add")}
-            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
-          >
-            <div className="text-sm font-black text-slate-950">Add Book</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Add a new book to your library.
             </p>
           </button>
         </div>
