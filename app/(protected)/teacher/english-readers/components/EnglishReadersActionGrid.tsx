@@ -1,8 +1,11 @@
+import Link from "next/link";
+
 type EnglishReaderAction = {
   title: string;
   eyebrow: string;
   description: string;
   status: "Coming soon" | "Later";
+  href?: string;
 };
 
 type EnglishReadersActionGridProps = {
@@ -35,13 +38,22 @@ export default function EnglishReadersActionGrid({
             {action.description}
           </p>
 
-          <button
-            type="button"
-            disabled
-            className="mt-4 rounded-2xl border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-400"
-          >
-            Not available yet
-          </button>
+          {action.href ? (
+            <Link
+              href={action.href}
+              className="mt-4 inline-flex rounded-2xl bg-stone-900 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-stone-800"
+            >
+              Open
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="mt-4 rounded-2xl border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-400"
+            >
+              Not available yet
+            </button>
+          )}
         </div>
       ))}
     </div>

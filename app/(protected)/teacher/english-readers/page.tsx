@@ -12,12 +12,14 @@ const englishReaderActions = [
     eyebrow: "Books",
     description: "Create a manual English book record for teacher-prepared reader support.",
     status: "Coming soon" as const,
+    href: "/teacher/english-readers/add-book",
   },
   {
     title: "Manage English Reader Books",
     eyebrow: "Library",
     description: "Review teacher-prepared English reader books and their support status.",
     status: "Coming soon" as const,
+    href: "/teacher/english-readers/books",
   },
   {
     title: "Create Japanese Support Items",
