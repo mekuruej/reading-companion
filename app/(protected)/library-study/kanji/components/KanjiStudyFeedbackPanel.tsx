@@ -4,7 +4,6 @@ type KanjiStudyFeedbackCard = {
   sourceWord: string;
   sourceReading: string;
   sourceMeaning: string | null;
-  bookTitle: string | null;
 };
 
 type KanjiStudyRelatedExample = {

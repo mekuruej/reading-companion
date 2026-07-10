@@ -90,8 +90,6 @@ type QuizCard = {
   wordJlpt: string | null;
   userBookId: string | null;
   userBookWordId: string | null;
-  bookTitle: string | null;
-  bookCover: string | null;
   strokeCount: number | null;
   radical: string | null;
   radicalName: string | null;
@@ -1028,7 +1026,6 @@ export default function KanjiReadingStudyPage() {
 
         if (userBooksErr) throw userBooksErr;
 
-        const bookInfoByUserBookId = new Map<string, { title: string; cover: string | null }>();
         const userBookIds: string[] = [];
 
         for (const row of userBooks ?? []) {
@@ -1036,10 +1033,6 @@ export default function KanjiReadingStudyPage() {
           if (!id) continue;
 
           userBookIds.push(id);
-          bookInfoByUserBookId.set(id, {
-            title: (row as any)?.books?.title ?? "Untitled Book",
-            cover: (row as any)?.books?.cover_url ?? null,
-          });
         }
 
         const contextByKey = new Map<string, UserBookWordRow>();
@@ -1102,12 +1095,6 @@ export default function KanjiReadingStudyPage() {
             wordJlpt: vocab?.jlpt ?? null,
             userBookId: context?.user_book_id ?? null,
             userBookWordId: context?.id ?? null,
-            bookTitle: context
-              ? bookInfoByUserBookId.get(context.user_book_id)?.title ?? "Untitled Book"
-              : null,
-            bookCover: context
-              ? bookInfoByUserBookId.get(context.user_book_id)?.cover ?? null
-              : null,
             strokeCount: radicalMeta?.stroke_count ?? null,
             radical: radicalMeta?.radical ?? null,
             radicalName: radicalMeta?.radical_name ?? null,

@@ -5,7 +5,6 @@ type KanjiRecallCard = {
   sourceWord: string;
   sourceReading: string;
   sourceMeaning: string | null;
-  bookTitle: string | null;
 };
 
 type KanjiRecallPanelProps = {
@@ -170,12 +169,6 @@ export default function KanjiRecallPanel({
 
               <div className="text-lg font-semibold">
                 {exampleCard.sourceWord}
-              </div>
-
-              <div className="mt-1 text-xs text-slate-400">
-                {exampleCard.bookTitle
-                  ? `Seen in: ${exampleCard.bookTitle}`
-                  : "Shared kanji bank"}
               </div>
 
               {exampleCard.sourceReading ? (
