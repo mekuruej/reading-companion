@@ -27,6 +27,17 @@ export default function LibraryGuidePanel({
 
           <button
             type="button"
+            onClick={() => onNavigate("/library/curiosity-reading-index")}
+            className="rounded-2xl border border-rose-100 bg-rose-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-rose-100"
+          >
+            <div className="text-sm font-black text-slate-950">Curiosity Read</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Time your reading and quickly save words as you go.
+            </p>
+          </button>
+
+          <button
+            type="button"
             onClick={() => onNavigate("/library/saved-word-reading-index")}
             className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-indigo-100"
           >
@@ -38,12 +49,12 @@ export default function LibraryGuidePanel({
 
           <button
             type="button"
-            onClick={() => onNavigate("/library-study/book-flashcards")}
-            className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
+            onClick={() => onNavigate("/library/just-listening-index")}
+            className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
           >
-            <div className="text-sm font-black text-slate-950">Flashcards</div>
+            <div className="text-sm font-black text-slate-950">Listen</div>
             <p className="mt-1 text-xs leading-5 text-slate-600">
-              Review words from your books. Words are added on computer or by your teacher.
+              Track listening time and save words as you go.
             </p>
           </button>
 
@@ -60,12 +71,12 @@ export default function LibraryGuidePanel({
 
           <button
             type="button"
-            onClick={() => onNavigate("/library/just-listening-index")}
-            className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
+            onClick={() => onNavigate("/library-study/book-flashcards")}
+            className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
           >
-            <div className="text-sm font-black text-slate-950">Listen</div>
+            <div className="text-sm font-black text-slate-950">Flashcards</div>
             <p className="mt-1 text-xs leading-5 text-slate-600">
-              Track listening time and save words as you go.
+              Review words from your books.
             </p>
           </button>
         </div>

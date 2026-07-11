@@ -19,7 +19,7 @@ export default function LibraryHeader({
             My MEKURU Library
           </div>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Read, listen, and review from your phone.
+            Read, listen, and review.
           </p>
         </div>
 

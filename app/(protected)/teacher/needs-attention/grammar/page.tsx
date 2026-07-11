@@ -98,7 +98,7 @@ type PointDraft = {
   basicMeaningEn: string;
   reading: string;
   jlptLevel: string;
-  registerTags: string;
+  registerTags: string[];
   spokenWrittenTendency: string;
   registerNoteEn: string;
   status: GrammarStatus;
@@ -131,6 +131,34 @@ const FILTER_OPTIONS: Array<{ value: GrammarFilter; label: string }> = [
 
 const JLPT_OPTIONS = ["", "N5", "N4", "N3", "N2", "N1"];
 const SOURCE_TYPE_OPTIONS = ["original", "licensed", "public_domain"] as const;
+const REGISTER_TAG_OPTIONS = [
+  "neutral",
+  "casual",
+  "polite",
+  "formal",
+  "conversational",
+  "emphatic",
+  "literary",
+  "business",
+  "stiff",
+  "archaic",
+  "other",
+] as const;
+
+const SPOKEN_WRITTEN_OPTIONS = [
+  { value: "", label: "Not set" },
+  { value: "spoken", label: "Spoken" },
+  { value: "written", label: "Written" },
+  { value: "both", label: "Both" },
+  { value: "strongly_spoken", label: "Strongly spoken" },
+  { value: "strongly_written", label: "Strongly written" },
+  { value: "other", label: "Other" },
+] as const;
+
+const KNOWN_REGISTER_TAGS = new Set<string>(REGISTER_TAG_OPTIONS);
+const KNOWN_SPOKEN_WRITTEN_VALUES = new Set<string>(
+  SPOKEN_WRITTEN_OPTIONS.map((option) => option.value).filter(Boolean)
+);
 
 const EMPTY_DELETED_CHILDREN: DeletedGrammarChildren = {
   grammar_point_senses: [],
@@ -177,7 +205,7 @@ function pointDraftFrom(point: GrammarPoint): PointDraft {
     basicMeaningEn: point.basic_meaning_en ?? "",
     reading: point.reading ?? "",
     jlptLevel: point.jlpt_level ?? "",
-    registerTags: (point.register_tags ?? []).join(", "),
+    registerTags: point.register_tags ?? [],
     spokenWrittenTendency: point.spoken_written_tendency ?? "",
     registerNoteEn: point.register_note_en ?? "",
     status: point.status ?? "needs_review",
@@ -286,6 +314,16 @@ export default function TeacherGrammarNeedsAttentionPage() {
 
   const selectedPoint = points.find((point) => point.id === selectedId) ?? points[0] ?? null;
   const primaryConstruction = primaryConstructionFor(selectedPoint);
+  const customRegisterTags =
+    draft?.registerTags.filter((tag) => !KNOWN_REGISTER_TAGS.has(tag)) ?? [];
+  const spokenWrittenSelectValue =
+    draft?.spokenWrittenTendency && KNOWN_SPOKEN_WRITTEN_VALUES.has(draft.spokenWrittenTendency)
+      ? draft.spokenWrittenTendency
+      : draft?.spokenWrittenTendency
+        ? "other"
+        : "";
+  const shouldShowRegisterDetails =
+    Boolean(draft?.registerTags.includes("other")) || spokenWrittenSelectValue === "other";
   const relatedPointOptions = useMemo(
     () => points.filter((point) => point.id !== selectedPoint?.id),
     [points, selectedPoint?.id]
@@ -475,8 +513,9 @@ export default function TeacherGrammarNeedsAttentionPage() {
           basic_meaning_en: clean(draft.basicMeaningEn),
           reading: clean(draft.reading),
           jlpt_level: clean(draft.jlptLevel),
-          register_tags: splitTags(draft.registerTags),
+          register_tags: draft.registerTags,
           spoken_written_tendency: clean(draft.spokenWrittenTendency),
+          register_note_en: clean(draft.registerNoteEn),
         })
         .eq("id", selectedPoint.id);
 
@@ -537,8 +576,9 @@ export default function TeacherGrammarNeedsAttentionPage() {
             basic_meaning_en: clean(draft.basicMeaningEn),
             reading: clean(draft.reading),
             jlpt_level: clean(draft.jlptLevel),
-            register_tags: splitTags(draft.registerTags),
+            register_tags: draft.registerTags,
             spoken_written_tendency: clean(draft.spokenWrittenTendency),
+            register_note_en: clean(draft.registerNoteEn),
             grammar_point_constructions: sortByOrder(
               savedPrimaryConstruction
                 ? [savedPrimaryConstruction, ...withoutPrimary]
@@ -1077,6 +1117,24 @@ export default function TeacherGrammarNeedsAttentionPage() {
     );
   }
 
+  function toggleRegisterTag(tag: string) {
+    if (!draft) return;
+    setDraft({
+      ...draft,
+      registerTags: draft.registerTags.includes(tag)
+        ? draft.registerTags.filter((value) => value !== tag)
+        : [...draft.registerTags, tag],
+    });
+  }
+
+  function updateSpokenWrittenTendency(value: string) {
+    if (!draft) return;
+    setDraft({
+      ...draft,
+      spokenWrittenTendency: value === "other" ? "other" : value,
+    });
+  }
+
   function updateSelectedPointPatch<T extends keyof GrammarPoint>(
     key: T,
     value: GrammarPoint[T]
@@ -1298,24 +1356,78 @@ export default function TeacherGrammarNeedsAttentionPage() {
                         className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm"
                       />
                     </label>
-                    <label>
+                    <div className="md:col-span-3">
                       <FieldLabel>Register</FieldLabel>
-                      <input
-                        value={draft.registerTags}
-                        onChange={(event) => setDraft({ ...draft, registerTags: event.target.value })}
-                        placeholder="neutral, conversational"
-                        className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm"
-                      />
-                    </label>
+                      <div className="flex flex-wrap gap-2">
+                        {REGISTER_TAG_OPTIONS.map((tag) => {
+                          const checked = draft.registerTags.includes(tag);
+                          return (
+                            <label
+                              key={tag}
+                              className={`flex cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition ${
+                                checked
+                                  ? "border-stone-900 bg-stone-900 text-white"
+                                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleRegisterTag(tag)}
+                                className="sr-only"
+                              />
+                              {tag}
+                            </label>
+                          );
+                        })}
+                        {customRegisterTags.map((tag) => (
+                          <label
+                            key={tag}
+                            className="flex cursor-pointer items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900"
+                          >
+                            <input
+                              type="checkbox"
+                              checked
+                              onChange={() => toggleRegisterTag(tag)}
+                              className="sr-only"
+                            />
+                            Custom: {tag}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                     <label>
                       <FieldLabel>Spoken / Written tendency</FieldLabel>
-                      <input
-                        value={draft.spokenWrittenTendency}
-                        onChange={(event) => setDraft({ ...draft, spokenWrittenTendency: event.target.value })}
-                        placeholder="spoken, written, both..."
-                        className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm"
-                      />
+                      <select
+                        value={spokenWrittenSelectValue}
+                        onChange={(event) => updateSpokenWrittenTendency(event.target.value)}
+                        className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                      >
+                        {SPOKEN_WRITTEN_OPTIONS.map((option) => (
+                          <option key={option.value || "none"} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </label>
+                    {draft.spokenWrittenTendency &&
+                    !KNOWN_SPOKEN_WRITTEN_VALUES.has(draft.spokenWrittenTendency) ? (
+                      <p className="self-end rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                        Preserved stored value: {draft.spokenWrittenTendency}
+                      </p>
+                    ) : null}
+                    {shouldShowRegisterDetails ? (
+                      <label className="md:col-span-3">
+                        <FieldLabel>Other register / tendency explanation</FieldLabel>
+                        <textarea
+                          value={draft.registerNoteEn}
+                          onChange={(event) => setDraft({ ...draft, registerNoteEn: event.target.value })}
+                          rows={2}
+                          placeholder="Use this for custom register details or why this is marked Other."
+                          className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm"
+                        />
+                      </label>
+                    ) : null}
                   </div>
                 </section>
 

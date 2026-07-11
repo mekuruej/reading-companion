@@ -39,6 +39,7 @@ import CuriosityQuickErrorMessage from "./components/CuriosityQuickErrorMessage"
 import CuriosityWordDetailFields from "./components/CuriosityWordDetailFields";
 import CuriosityAddEditWordFormShell from "./components/CuriosityAddEditWordFormShell";
 import CuriosityAddEditWordCard from "./components/CuriosityAddEditWordCard";
+import MobileQuickCapture from "./components/MobileQuickCapture";
 import {
   clearPersistedTimedSession,
   elapsedMsForPersistedTimedSession,
@@ -1592,6 +1593,58 @@ export function CuriosityReadingExperience({
           onSessionEndPageChange={setSessionEndPage}
         />
 
+        <div className="md:hidden">
+          <MobileQuickCapture
+            title={isListeningMode ? "Save a heard word" : "Save a word"}
+            description={
+              isListeningMode
+                ? "Type a word you heard, search it, and save it without leaving your listening timer."
+                : "Type a word from your book, search it, and save it without leaving your reading timer."
+            }
+            surface={quickPreview.surface}
+            reading={quickPreview.reading}
+            meaning={quickPreview.meaning}
+            quickLoading={quickLoading}
+            quickError={quickError}
+            savedNotice={savedQuickNotice}
+            candidates={quickLookupCandidates}
+            lastAddedWord={quickSessionWords[0] ?? null}
+            inputRef={quickWordInputRef}
+            onSurfaceChange={(value) => {
+              setQuickPreview((prev) => ({
+                ...prev,
+                surface: value,
+                cacheSurface: value.trim() ? prev.cacheSurface : "",
+              }));
+              setSavedQuickNotice("");
+              if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+            }}
+            onSearch={() => void pullQuickWord()}
+            onSearchKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void pullQuickWord();
+              }
+            }}
+            onSelectCandidate={(candidate) => {
+              setQuickPreview((prev) => ({
+                ...prev,
+                surface: candidate.surface,
+                cacheSurface: candidate.cacheSurface,
+                reading: candidate.reading,
+                meanings: candidate.meanings,
+                selectedMeaningIndex: candidate.selectedMeaningIndex,
+                meaning: candidate.meaning,
+                isCustomMeaning: candidate.isCustomMeaning,
+              }));
+              setQuickError(null);
+            }}
+            onSaveWord={() => void saveQuickWord()}
+            onDeleteLastWord={(id) => void deleteQuickWordById(id)}
+          />
+        </div>
+
+        <div className="hidden md:block">
         <CuriosityAddEditWordCard title={addWordTitle} description={addWordDescription}>
           <CuriosityAddEditWordFormShell
             editingSurface={quickPreview.id ? quickPreview.surface : null}
@@ -1797,6 +1850,7 @@ export function CuriosityReadingExperience({
             ) : null}
           </CuriosityRecentSessionWords>
         </CuriosityAddEditWordCard>
+        </div>
       </div>
     </main >
   );
