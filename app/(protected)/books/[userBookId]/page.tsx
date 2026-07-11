@@ -109,6 +109,8 @@ type UserBook = {
 type LookupRow = {
   surface?: string | null;
   meaning?: string | null;
+  chapter_number?: number | null;
+  chapter_name?: string | null;
   created_at?: string | null;
 };
 
@@ -659,6 +661,7 @@ export default function BookHubPage() {
   const [activeTab, setActiveTab] = useState<HubTab>("reflection");
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
+  const [lastSavedChapter, setLastSavedChapter] = useState<string>("");
 
   const [startedAt, setStartedAt] = useState<string>("");
   const [finishedAt, setFinishedAt] = useState<string>("");
@@ -1073,6 +1076,8 @@ export default function BookHubPage() {
     progressPercent != null ? `${progressPercent}% done` : "";
   const bookHubLastSavedWordLabel =
     canSeeVocabularySummary && lastSavedWord.trim() ? lastSavedWord.trim() : "";
+  const bookHubLastChapterLabel =
+    canSeeVocabularySummary && lastSavedChapter.trim() ? lastSavedChapter.trim() : "";
 
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
   const savedWordsPerPage =
@@ -3317,7 +3322,7 @@ export default function BookHubPage() {
   const loadUniqueLookupCount = async (id: string) => {
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("surface, meaning, created_at")
+      .select("surface, meaning, chapter_number, chapter_name, created_at")
       .eq("user_book_id", id)
       .order("created_at", { ascending: false });
 
@@ -3325,12 +3330,19 @@ export default function BookHubPage() {
       console.error("Error loading lookup count:", error);
       setUniqueLookupCount(null);
       setLastSavedWord("");
+      setLastSavedChapter("");
       return;
     }
 
     const rows = (data ?? []) as LookupRow[];
     const newestWord = rows.find((r) => (r.surface ?? "").trim() || (r.meaning ?? "").trim());
     setLastSavedWord((newestWord?.surface ?? newestWord?.meaning ?? "").trim());
+    const newestChapterName = (newestWord?.chapter_name ?? "").trim();
+    const newestChapterNumber = newestWord?.chapter_number;
+    setLastSavedChapter(
+      newestChapterName ||
+      (newestChapterNumber != null ? `Chapter ${newestChapterNumber}` : "")
+    );
 
     const set = new Set<string>();
     for (const r of rows) {
@@ -3646,6 +3658,7 @@ export default function BookHubPage() {
     } else {
       setUniqueLookupCount(null);
       setLastSavedWord("");
+      setLastSavedChapter("");
     }
     await loadReadingSessions(r.id);
     await loadChapterSummaries(r.id);
@@ -5213,6 +5226,7 @@ export default function BookHubPage() {
                 progressBarWidth={bookHubProgressBarWidth}
                 progressPercentLabel={bookHubProgressPercentLabel}
                 lastSavedWordLabel={bookHubLastSavedWordLabel}
+                lastChapterLabel={bookHubLastChapterLabel}
                 daysEngagedLabel={bookHubDaysEngagedLabel}
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
