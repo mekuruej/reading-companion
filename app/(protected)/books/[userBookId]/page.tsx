@@ -3337,8 +3337,18 @@ export default function BookHubPage() {
     const rows = (data ?? []) as LookupRow[];
     const newestWord = rows.find((r) => (r.surface ?? "").trim() || (r.meaning ?? "").trim());
     setLastSavedWord((newestWord?.surface ?? newestWord?.meaning ?? "").trim());
-    const newestChapterName = (newestWord?.chapter_name ?? "").trim();
-    const newestChapterNumber = newestWord?.chapter_number;
+    const furthestChapterWord =
+      rows
+        .filter((r) => (r.surface ?? "").trim() || (r.meaning ?? "").trim())
+        .filter((r) => r.chapter_number != null || (r.chapter_name ?? "").trim())
+        .sort((a, b) => {
+          const aChapter = a.chapter_number ?? Number.NEGATIVE_INFINITY;
+          const bChapter = b.chapter_number ?? Number.NEGATIVE_INFINITY;
+          if (aChapter !== bChapter) return bChapter - aChapter;
+          return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+        })[0] ?? null;
+    const newestChapterName = (furthestChapterWord?.chapter_name ?? "").trim();
+    const newestChapterNumber = furthestChapterWord?.chapter_number;
     setLastSavedChapter(
       newestChapterName ||
       (newestChapterNumber != null ? `Chapter ${newestChapterNumber}` : "")

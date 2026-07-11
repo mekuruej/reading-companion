@@ -6,6 +6,7 @@ export type AttentionCountKey =
   | "bookFlags"
   | "missingBooks"
   | "kanji"
+  | "grammar"
   | "ratingFlags"
   | "readingFit"
   | "wordReports"
@@ -49,7 +50,7 @@ function countBadgeClass(countKey?: AttentionCountKey) {
     return `${base} border-rose-200 bg-rose-50 text-rose-900`;
   }
 
-  if (countKey === "kanji") {
+  if (countKey === "kanji" || countKey === "grammar") {
     return `${base} border-emerald-200 bg-emerald-50 text-emerald-900`;
   }
 

@@ -90,6 +90,13 @@ const attentionCards: NeedsAttentionCard[] = [
     description: "Review kanji reports and flagged kanji readings.",
   },
   {
+    title: "Grammar DB",
+    href: "/teacher/needs-attention/grammar?from=needs-attention",
+    eyebrow: "Grammar",
+    description: "Review shared grammar points, meanings, constructions, aliases, examples, and source notes.",
+    countKey: "grammar",
+  },
+  {
     title: "Rating Flags",
     eyebrow: "Ratings",
     description: "Review finished books that need learner reflection details or teacher lesson-fit ratings.",
@@ -139,6 +146,7 @@ export default function TeacherNeedsAttentionPage() {
     bookFlags: 0,
     missingBooks: 0,
     kanji: 0,
+    grammar: 0,
     ratingFlags: 0,
     readingFit: 0,
     wordReports: 0,
@@ -220,6 +228,7 @@ export default function TeacherNeedsAttentionPage() {
           { data: readingFitProfiles },
           { data: readingFitRows },
           { data: teacherRatingRows },
+          { count: grammarReviewCount },
         ] = await Promise.all([
           supabase.from("profiles").select("id, level").in("id", studentIds),
           supabase
@@ -234,6 +243,11 @@ export default function TeacherNeedsAttentionPage() {
             .from("user_books")
             .select("finished_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
             .in("user_id", studentIds),
+          supabase
+            .from("grammar_points")
+            .select("id", { count: "exact", head: true })
+            .eq("is_active", true)
+            .in("status", ["needs_review", "in_progress"]),
         ]);
 
         const readerLevelByUserId = new Map(
@@ -275,6 +289,7 @@ export default function TeacherNeedsAttentionPage() {
           missingBooks: 0,
           kanji: 0,
           wordReports: 0,
+          grammar: grammarReviewCount ?? 0,
           readingFit: readingFitCount,
           teacherRatings: teacherRatingCount,
           ratingFlags: readingFitCount + teacherRatingCount,
