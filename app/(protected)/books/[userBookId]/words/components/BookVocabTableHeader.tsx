@@ -2,12 +2,14 @@ import type { CSSProperties } from "react";
 
 type BookVocabTableHeaderProps = {
   headerStickyStyle: CSSProperties;
+  readOnly?: boolean;
 };
 
 // Static table header for the book vocabulary list.
 // page.tsx still owns the row rendering, reorder behavior, and word actions.
 export default function BookVocabTableHeader({
   headerStickyStyle,
+  readOnly = false,
 }: BookVocabTableHeaderProps) {
   return (
     <thead className="bg-gray-50">
@@ -15,9 +17,9 @@ export default function BookVocabTableHeader({
         <th
           className="sticky z-20 w-20 bg-gray-50 p-2 text-center"
           style={headerStickyStyle}
-          title="Move words up or down within the same chapter/page"
+          title={readOnly ? "" : "Move words up or down within the same chapter/page"}
         >
-          Order
+          {readOnly ? "" : "Order"}
         </th>
         <th
           className="sticky z-20 w-16 bg-gray-50 p-2 text-center"
@@ -25,6 +27,13 @@ export default function BookVocabTableHeader({
           title="Words can be reordered within the same page"
         >
           Page
+        </th>
+
+        <th
+          className="sticky z-20 w-20 bg-gray-50 p-2"
+          style={headerStickyStyle}
+        >
+          {readOnly ? "" : ""}
         </th>
 
         <th

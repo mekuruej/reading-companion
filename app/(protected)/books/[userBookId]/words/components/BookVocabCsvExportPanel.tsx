@@ -60,7 +60,7 @@ export default function BookVocabCsvExportPanel({
             onChange={(event) => setExportJlpt(event.target.value)}
             className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 shadow-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
           >
-            <option value="all">All JLPT</option>
+            <option value="all">All Words</option>
             <option value="N5">N5</option>
             <option value="N4">N4</option>
             <option value="N3">N3</option>

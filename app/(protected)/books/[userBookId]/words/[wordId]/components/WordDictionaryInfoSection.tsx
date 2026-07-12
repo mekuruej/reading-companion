@@ -17,6 +17,7 @@ type WordDictionaryInfoSectionProps = {
     colorStatus: LibraryColorBadgeProps["colorStatus"];
     stageLabel: LibraryColorBadgeProps["stageLabel"];
   } | null;
+  showStudyColor?: boolean;
   children?: ReactNode;
 };
 
@@ -30,6 +31,7 @@ export default function WordDictionaryInfoSection({
   repeatsInThisBook,
   hidden,
   colorInfo,
+  showStudyColor = true,
   children,
 }: WordDictionaryInfoSectionProps) {
   return (
@@ -76,17 +78,19 @@ export default function WordDictionaryInfoSection({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-3">
-            <div className="mb-2 text-xs uppercase tracking-wide text-violet-700">Study color</div>
-            {colorInfo ? (
-              <LibraryColorBadge
-                colorStatus={colorInfo.colorStatus}
-                stageLabel={colorInfo.stageLabel}
-              />
-            ) : (
-              <div className="text-sm font-semibold text-violet-900">No color yet</div>
-            )}
-          </div>
+          {showStudyColor ? (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-3">
+              <div className="mb-2 text-xs uppercase tracking-wide text-violet-700">Study color</div>
+              {colorInfo ? (
+                <LibraryColorBadge
+                  colorStatus={colorInfo.colorStatus}
+                  stageLabel={colorInfo.stageLabel}
+                />
+              ) : (
+                <div className="text-sm font-semibold text-violet-900">No color yet</div>
+              )}
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
             <div className="text-xs uppercase tracking-wide text-emerald-700">This book</div>

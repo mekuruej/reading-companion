@@ -5,6 +5,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import WordDetailErrorState from "./components/WordDetailErrorState";
 import WordDetailLoadingState from "./components/WordDetailLoadingState";
@@ -166,9 +169,11 @@ function sortWordNeighbors(words: WordNeighbor[]) {
 function CollocationsPanel({
   userBookId,
   userBookWordId,
+  readOnly = false,
 }: {
   userBookId: string;
   userBookWordId: string;
+  readOnly?: boolean;
 }) {
   const [rows, setRows] = useState<CollocationRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +221,8 @@ function CollocationsPanel({
   }, [userBookId, userBookWordId]);
 
   async function add() {
+    if (readOnly) return;
+
     const coll = normalizeCollocation(value);
     if (!coll) return;
 
@@ -249,6 +256,8 @@ function CollocationsPanel({
   }
 
   async function remove(id: string) {
+    if (readOnly) return;
+
     setError(null);
 
     try {
@@ -268,43 +277,45 @@ function CollocationsPanel({
           <span className="text-xs text-gray-500">{rows.length} saved</span>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Add a collocation (e.g. 深い眠り / 〜を取り戻す)"
-            className="w-full rounded border p-2"
-          />
+        {readOnly ? null : (
+          <div className="flex flex-col gap-2">
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Add a collocation (e.g. 深い眠り / 〜を取り戻す)"
+              className="w-full rounded border p-2"
+            />
 
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional note (where/nuance)"
-            className="w-full rounded border p-2"
-          />
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional note (where/nuance)"
+              className="w-full rounded border p-2"
+            />
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={!canAdd || saving}
-              onClick={add}
-              className="rounded bg-gray-200 px-3 py-2 disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Add"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={!canAdd || saving}
+                onClick={add}
+                className="rounded bg-gray-200 px-3 py-2 disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Add"}
+              </button>
 
-            <button
-              type="button"
-              onClick={load}
-              className="rounded bg-gray-100 px-3 py-2"
-              disabled={saving || loading}
-            >
-              Refresh
-            </button>
+              <button
+                type="button"
+                onClick={load}
+                className="rounded bg-gray-100 px-3 py-2"
+                disabled={saving || loading}
+              >
+                Refresh
+              </button>
+            </div>
+
+            {error ? <p className="text-sm text-red-700">{error}</p> : null}
           </div>
-
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        </div>
+        )}
 
         <div className="mt-4">
           {loading ? (
@@ -323,14 +334,16 @@ function CollocationsPanel({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => remove(r.id)}
-                    className="shrink-0 rounded bg-gray-100 px-2 py-1 text-sm hover:bg-gray-200"
-                    title="Delete"
-                  >
-                    Delete
-                  </button>
+                  {readOnly ? null : (
+                    <button
+                      type="button"
+                      onClick={() => remove(r.id)}
+                      className="shrink-0 rounded bg-gray-100 px-2 py-1 text-sm hover:bg-gray-200"
+                      title="Delete"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -354,6 +367,7 @@ export default function WordDetailPage() {
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [canUseVocabularyTools, setCanUseVocabularyTools] = useState(false);
 
   const [myRole, setMyRole] = useState<"teacher" | "member" | "student" | "super_teacher">("member");
   const isTeacher = myRole === "teacher";
@@ -391,6 +405,8 @@ export default function WordDetailPage() {
   const [dictionaryLoading, setDictionaryLoading] = useState(false);
 
   function openEdit(w: WordRow) {
+    if (!canUseVocabularyTools) return;
+
     setEditErr(null);
     setEditing(w);
     setEditSurface(w.surface ?? "");
@@ -453,6 +469,10 @@ export default function WordDetailPage() {
 
   async function saveEdit() {
     if (!editing) return;
+    if (!canUseVocabularyTools) {
+      setEditErr("Full access is needed to edit vocabulary.");
+      return;
+    }
 
     setEditSaving(true);
     setEditErr(null);
@@ -504,6 +524,7 @@ export default function WordDetailPage() {
 
   async function hideWord(nextHidden: boolean) {
     if (!word) return;
+    if (!canUseVocabularyTools) return;
 
     try {
       const { error } = await supabase
@@ -521,6 +542,8 @@ export default function WordDetailPage() {
 
   async function deleteWord() {
     if (!word) return;
+    if (!canUseVocabularyTools) return;
+
     const ok = window.confirm(`Delete "${word.surface}"? This cannot be undone.`);
     if (!ok) return;
 
@@ -542,6 +565,7 @@ export default function WordDetailPage() {
     setLoading(true);
     setErrorMsg(null);
     setNeedsSignIn(false);
+    setCanUseVocabularyTools(false);
     setPreviousWord(null);
     setNextWord(null);
 
@@ -559,7 +583,7 @@ export default function WordDetailPage() {
 
       const { data: meProfile, error: meProfileErr } = await supabase
         .from("profiles")
-        .select("role, is_super_teacher")
+        .select("role, is_super_teacher, app_access_type, app_access_expires_at")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -568,6 +592,19 @@ export default function WordDetailPage() {
       }
 
       setMyRole((meProfile?.role as "teacher" | "member" | "student" | "super_teacher") ?? "member");
+
+      const appAccessStatus = meProfile
+        ? getAppAccessStatus(meProfile)
+        : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
+      const featureAccess = getFeatureAccess({
+        role: meProfile?.is_super_teacher ? "super_teacher" : meProfile?.role ?? null,
+        hasFullAccess: appAccessStatus.hasFullAccess,
+      });
+      const canUseVocabularyList = canUseFullAccessFeature(
+        featureAccess,
+        "vocabulary_list"
+      );
+      setCanUseVocabularyTools(canUseVocabularyList);
 
       const { data: ub, error: ubErr } = await supabase
         .from("user_books")
@@ -871,12 +908,16 @@ export default function WordDetailPage() {
       if (!user) return;
 
       await loadBookAwareInfo(word.surface, ownerUserId ?? user.id);
-      await loadLibraryColorInfo(word.surface, word.reading, ownerUserId ?? user.id);
+      if (canUseVocabularyTools) {
+        await loadLibraryColorInfo(word.surface, word.reading, ownerUserId ?? user.id);
+      } else {
+        setLibraryColorInfo(null);
+      }
     }
 
     refreshDerivedData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [word, ownerUserId]);
+  }, [word, ownerUserId, canUseVocabularyTools]);
 
   if (loading) {
     return <WordDetailLoadingState />;
@@ -907,7 +948,7 @@ export default function WordDetailPage() {
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto w-full max-w-4xl">
-        {editing ? (
+        {editing && canUseVocabularyTools ? (
           <BookVocabEditModalShell
             surface={editing.surface}
             wordId={editing.id}
@@ -1012,16 +1053,32 @@ export default function WordDetailPage() {
           definitionNumber={definitionNumber}
           repeatsInThisBook={repeatsInThisBook}
           hidden={word.hidden}
-          colorInfo={libraryColorInfo}
+          colorInfo={canUseVocabularyTools ? libraryColorInfo : null}
+          showStudyColor={canUseVocabularyTools}
         >
-          <WordDetailFooterActions
-            onBack={() => router.back()}
-            hidden={word.hidden}
-            onEdit={() => openEdit(word)}
-            onHide={() => hideWord(true)}
-            onUnhide={() => hideWord(false)}
-            onDelete={() => deleteWord()}
-          />
+          {canUseVocabularyTools ? (
+            <WordDetailFooterActions
+              onBack={() => router.back()}
+              hidden={word.hidden}
+              onEdit={() => openEdit(word)}
+              onHide={() => hideWord(true)}
+              onUnhide={() => hideWord(false)}
+              onDelete={() => deleteWord()}
+            />
+          ) : (
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                Back
+              </button>
+              <span className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-600">
+                Read-only archive
+              </span>
+            </div>
+          )}
         </WordDictionaryInfoSection>
 
         <WordSeenInSection

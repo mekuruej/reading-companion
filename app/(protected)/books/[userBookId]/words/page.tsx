@@ -267,6 +267,7 @@ export default function BookWordsPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fullAccessLocked, setFullAccessLocked] = useState(false);
+  const [canUseVocabularyTools, setCanUseVocabularyTools] = useState(false);
 
   const [myRole, setMyRole] = useState<ProfileRole>("student");
   const isTeacher = myRole === "teacher";
@@ -339,6 +340,8 @@ export default function BookWordsPage() {
   }
 
   async function moveWordInGroup(wordId: string, direction: "up" | "down") {
+    if (!canUseVocabularyTools) return;
+
     const word = words.find((w) => w.id === wordId);
     if (!word) return;
 
@@ -385,6 +388,8 @@ export default function BookWordsPage() {
   }
 
   function openEdit(w: WordRow) {
+    if (!canUseVocabularyTools) return;
+
     setEditErr(null);
     setEditing(w);
 
@@ -459,6 +464,10 @@ export default function BookWordsPage() {
 
   async function saveEdit() {
     if (!editing) return;
+    if (!canUseVocabularyTools) {
+      setEditErr("Full access is needed to edit vocabulary.");
+      return;
+    }
 
     setEditSaving(true);
     setEditErr(null);
@@ -518,6 +527,8 @@ export default function BookWordsPage() {
   }
 
   async function deleteWord(w: WordRow) {
+    if (!canUseVocabularyTools) return;
+
     const ok = window.confirm(`Delete "${w.surface}"? This cannot be undone.`);
     if (!ok) return;
 
@@ -536,6 +547,8 @@ export default function BookWordsPage() {
   }
 
   async function hideWord(w: WordRow) {
+    if (!canUseVocabularyTools) return;
+
     try {
       const { error } = await supabase
         .from("user_book_words")
@@ -556,6 +569,8 @@ export default function BookWordsPage() {
   }
 
   async function unhideWord(w: WordRow) {
+    if (!canUseVocabularyTools) return;
+
     try {
       const { error } = await supabase
         .from("user_book_words")
@@ -579,6 +594,7 @@ export default function BookWordsPage() {
       setErrorMsg(null);
       setNeedsSignIn(false);
       setFullAccessLocked(false);
+      setCanUseVocabularyTools(false);
 
       try {
         const { data: auth } = await supabase.auth.getUser();
@@ -622,6 +638,7 @@ export default function BookWordsPage() {
           featureAccess,
           "vocabulary_list"
         );
+        setCanUseVocabularyTools(canUseVocabularyList);
 
         const { data: ub, error: ubErr } = await supabase
           .from("user_books")
@@ -676,103 +693,102 @@ export default function BookWordsPage() {
           return;
         }
 
-        if (!canUseVocabularyList) {
-          setFullAccessLocked(true);
-          setLoading(false);
-          return;
-        }
-
-        const { data: learningSettingsRow, error: learningSettingsErr } = await supabase
-          .from("user_learning_settings")
-          .select("red_stages, orange_stages, yellow_stages, show_badge_numbers")
-          .eq("user_id", ownerUserId)
-          .maybeSingle();
-
-        if (learningSettingsErr) {
-          console.error("Error loading learning settings:", learningSettingsErr);
-          setLearningSettings(DEFAULT_LEARNING_SETTINGS);
-        } else {
-          setLearningSettings({
-            ...DEFAULT_LEARNING_SETTINGS,
-            ...((learningSettingsRow as Partial<LearningSettingsRow> | null) ?? {}),
-          });
-        }
-
-        try {
-          const counts: Record<string, number> = {};
-          const normalizedKeyByStudyIdentityKey: Record<string, string> = {};
-
-          const { data: summaryRows, error: summaryErr } = await supabase
-            .from("user_library_word_summaries")
-            .select("study_identity_key, surface, reading, total_encounter_count")
+        if (canUseVocabularyList) {
+          const { data: learningSettingsRow, error: learningSettingsErr } = await supabase
+            .from("user_learning_settings")
+            .select("red_stages, orange_stages, yellow_stages, show_badge_numbers")
             .eq("user_id", ownerUserId)
-            .returns<LibraryWordSummaryRow[]>();
+            .maybeSingle();
 
-          if (!summaryErr && summaryRows && summaryRows.length > 0) {
-            for (const row of summaryRows) {
-              const key = row.study_identity_key;
-              if (!key) continue;
-
-              const encounterCount = row.total_encounter_count ?? 0;
-              counts[key] = encounterCount;
-
-              const normalizedKey = studyIdentityKey(row.surface, row.reading);
-              if (normalizedKey) {
-                counts[normalizedKey] = encounterCount;
-                normalizedKeyByStudyIdentityKey[key] = normalizedKey;
-              }
-            }
+          if (learningSettingsErr) {
+            console.error("Error loading learning settings:", learningSettingsErr);
+            setLearningSettings(DEFAULT_LEARNING_SETTINGS);
           } else {
-            if (summaryErr) {
-              console.warn("Library word summaries are not available yet:", summaryErr);
-            }
-
-            const globalWords = await loadAllGlobalEncounterRows(ownerUserId);
-            for (const row of globalWords) {
-              const key = studyIdentityKey(row.surface, row.reading);
-              if (!key) continue;
-              counts[key] = (counts[key] ?? 0) + 1;
-            }
+            setLearningSettings({
+              ...DEFAULT_LEARNING_SETTINGS,
+              ...((learningSettingsRow as Partial<LearningSettingsRow> | null) ?? {}),
+            });
           }
 
-          setGlobalEncounterCounts(counts);
+          try {
+            const counts: Record<string, number> = {};
+            const normalizedKeyByStudyIdentityKey: Record<string, string> = {};
 
-          const { data: progressRows, error: progressErr } = await supabase
-            .from("user_library_word_progress")
-            .select(
-              `
-        study_identity_key,
-        reading_gate_status,
-        meaning_gate_status,
-        held_before_reading_gate,
-        held_before_meaning_gate,
-        mastered
-      `
-            )
-            .eq("user_id", ownerUserId)
-            .returns<LibraryWordProgressRow[]>();
+            const { data: summaryRows, error: summaryErr } = await supabase
+              .from("user_library_word_summaries")
+              .select("study_identity_key, surface, reading, total_encounter_count")
+              .eq("user_id", ownerUserId)
+              .returns<LibraryWordSummaryRow[]>();
 
-          if (progressErr) {
-            console.warn("Library word progress is not available yet:", progressErr);
+            if (!summaryErr && summaryRows && summaryRows.length > 0) {
+              for (const row of summaryRows) {
+                const key = row.study_identity_key;
+                if (!key) continue;
+
+                const encounterCount = row.total_encounter_count ?? 0;
+                counts[key] = encounterCount;
+
+                const normalizedKey = studyIdentityKey(row.surface, row.reading);
+                if (normalizedKey) {
+                  counts[normalizedKey] = encounterCount;
+                  normalizedKeyByStudyIdentityKey[key] = normalizedKey;
+                }
+              }
+            } else {
+              if (summaryErr) {
+                console.warn("Library word summaries are not available yet:", summaryErr);
+              }
+
+              const globalWords = await loadAllGlobalEncounterRows(ownerUserId);
+              for (const row of globalWords) {
+                const key = studyIdentityKey(row.surface, row.reading);
+                if (!key) continue;
+                counts[key] = (counts[key] ?? 0) + 1;
+              }
+            }
+
+            setGlobalEncounterCounts(counts);
+
+            const { data: progressRows, error: progressErr } = await supabase
+              .from("user_library_word_progress")
+              .select(
+                `
+          study_identity_key,
+          reading_gate_status,
+          meaning_gate_status,
+          held_before_reading_gate,
+          held_before_meaning_gate,
+          mastered
+        `
+              )
+              .eq("user_id", ownerUserId)
+              .returns<LibraryWordProgressRow[]>();
+
+            if (progressErr) {
+              console.warn("Library word progress is not available yet:", progressErr);
+              setLibraryProgressByKey({});
+            } else {
+              const progressMap: Record<string, LibraryWordProgressRow> = {};
+
+              for (const row of progressRows ?? []) {
+                if (!row.study_identity_key) continue;
+
+                progressMap[row.study_identity_key] = row;
+
+                const normalizedKey = normalizedKeyByStudyIdentityKey[row.study_identity_key];
+                if (normalizedKey) {
+                  progressMap[normalizedKey] = row;
+                }
+              }
+
+              setLibraryProgressByKey(progressMap);
+            }
+          } catch (globalWordsErr) {
+            console.error("Error loading global word encounters/progress:", globalWordsErr);
+            setGlobalEncounterCounts({});
             setLibraryProgressByKey({});
-          } else {
-            const progressMap: Record<string, LibraryWordProgressRow> = {};
-
-            for (const row of progressRows ?? []) {
-              if (!row.study_identity_key) continue;
-
-              progressMap[row.study_identity_key] = row;
-
-              const normalizedKey = normalizedKeyByStudyIdentityKey[row.study_identity_key];
-              if (normalizedKey) {
-                progressMap[normalizedKey] = row;
-              }
-            }
-
-            setLibraryProgressByKey(progressMap);
           }
-        } catch (globalWordsErr) {
-          console.error("Error loading global word encounters/progress:", globalWordsErr);
+        } else {
           setGlobalEncounterCounts({});
           setLibraryProgressByKey({});
         }
@@ -866,7 +882,7 @@ export default function BookWordsPage() {
         (word) => word.surface?.trim() && word.reading?.trim()
       );
 
-      if (!hasAnyLookupWord) {
+      if (!canUseVocabularyTools || !hasAnyLookupWord) {
         setLibraryColorByWordKey({});
         return;
       }
@@ -893,7 +909,7 @@ export default function BookWordsPage() {
     return () => {
       cancelled = true;
     };
-  }, [words]);
+  }, [words, canUseVocabularyTools]);
 
   const repeatCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -1125,6 +1141,13 @@ export default function BookWordsPage() {
 
       <BookVocabIntroCopy />
 
+      {!canUseVocabularyTools ? (
+        <section className="mb-4 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
+          This is a read-only vocabulary archive. You can view saved words, open word details, and export CSV.
+          Adding, editing, deleting, reordering, study, and progress colors are available with full Mekuru access.
+        </section>
+      ) : null}
+
       <div className="border-b border-stone-200">
         <div className="space-y-3 py-4">
           <BookVocabContextCard
@@ -1153,7 +1176,7 @@ export default function BookWordsPage() {
         </div>
       </div>
 
-      <BookVocabReorderHint reordering={reordering} />
+      <BookVocabReorderHint reordering={reordering} readOnly={!canUseVocabularyTools} />
 
       <div className="space-y-3 md:hidden">
         {filteredSorted.map((w) => {
@@ -1167,6 +1190,7 @@ export default function BookWordsPage() {
               reading={w.reading}
               meaning={w.meaning}
               pageNumber={w.page_number}
+              readOnly={!canUseVocabularyTools}
               canMoveUp={orderPosition.canMoveUp}
               canMoveDown={orderPosition.canMoveDown}
               onMoveUp={async () => {
@@ -1199,7 +1223,7 @@ export default function BookWordsPage() {
       </div>
 
       <div className="hidden md:block">
-        <BookVocabTableShell headerStickyStyle={headerStickyStyle}>
+        <BookVocabTableShell headerStickyStyle={headerStickyStyle} readOnly={!canUseVocabularyTools}>
           {filteredSorted.map((w) => {
             const orderPosition = wordOrderPosition(w);
 
@@ -1211,6 +1235,7 @@ export default function BookWordsPage() {
                 reading={w.reading}
                 meaning={w.meaning}
                 pageNumber={w.page_number}
+                readOnly={!canUseVocabularyTools}
                 canMoveUp={orderPosition.canMoveUp}
                 canMoveDown={orderPosition.canMoveDown}
                 onMoveUp={async () => {

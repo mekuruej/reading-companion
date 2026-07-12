@@ -769,3 +769,101 @@ Finished:
 Decision:
 
 `/discovery/reader-insights` passed the non-book route access audit.
+
+### `/library`
+
+Finished:
+
+* Confirmed the page has no Supabase usage.
+* Confirmed it does not load private user data.
+* Confirmed it does not use route params or search params.
+* Confirmed it has no writes.
+* Confirmed it is a static Library Hub linking to other routes.
+
+Decision:
+
+`/library` passed the non-book route access audit.
+
+### `/library/book-hubs`
+
+Finished:
+
+* Confirmed the page itself has no direct Supabase queries, private-data reads, or writes.
+* Confirmed it renders the shared `LibraryBookActionIndex` component.
+* Confirmed `LibraryBookActionIndex` gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed links are built from the current user’s own `user_books.id` values.
+
+Decision:
+
+`/library/book-hubs` only lists the logged-in user’s own books and passed the non-book route access audit.
+
+### `/library/curiosity-reading-index`
+
+Finished:
+
+* Confirmed the page itself has no direct Supabase queries, private-data reads, or writes.
+* Confirmed it renders the shared `LibraryBookActionIndex` component.
+* Confirmed `LibraryBookActionIndex` gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed links are built from the current user’s own `user_books.id` values.
+
+Decision:
+
+`/library/curiosity-reading-index` only lists the logged-in user’s own books and passed the non-book route access audit.
+
+### `/library/just-listening-index`
+
+Finished:
+
+* Confirmed the page itself has no direct Supabase queries, private-data reads, or writes.
+* Confirmed it renders the shared `LibraryBookActionIndex` component.
+* Confirmed `LibraryBookActionIndex` gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed links are built from the current user’s own `user_books.id` values.
+
+Decision:
+
+`/library/just-listening-index` only lists the logged-in user’s own books and passed the non-book route access audit.
+
+### `/library/just-reading-index`
+
+Finished:
+
+* Confirmed the page itself has no direct Supabase queries, private-data reads, or writes.
+* Confirmed it renders the shared `LibraryBookActionIndex` component.
+* Confirmed `LibraryBookActionIndex` gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed links are built from the current user’s own `user_books.id` values.
+
+Decision:
+
+`/library/just-reading-index` only lists the logged-in user’s own books and passed the non-book route access audit.
+
+### `/library/saved-word-reading-index`
+
+Finished:
+
+* Confirmed the page itself has no direct Supabase queries, private-data reads, or writes.
+* Confirmed it renders the shared `LibraryBookActionIndex` component.
+* Confirmed `LibraryBookActionIndex` gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed links are built from the current user’s own `user_books.id` values.
+
+Decision:
+
+`/library/saved-word-reading-index` only lists the logged-in user’s own books and passed the non-book route access audit.
+
+### `/library/vocab-list-index`
+
+Finished:
+
+* Confirmed the page itself has no direct Supabase queries, private-data reads, or writes.
+* Confirmed it renders the shared `LibraryBookActionIndex` component.
+* Confirmed `LibraryBookActionIndex` gets the logged-in user with `supabase.auth.getUser()`.
+* Confirmed it loads `user_books` only with `user_id = user.id`.
+* Confirmed links are built from the current user’s own `user_books.id` values.
+
+Decision:
+
+`/library/vocab-list-index` only lists the logged-in user’s own books and passed the non-book route access audit.

@@ -1,5 +1,5 @@
 type BookVocabActionsCellProps = {
-  onDelete: () => void;
+  onDelete?: () => void;
 };
 
 // Action buttons for one vocabulary row.
@@ -8,6 +8,10 @@ type BookVocabActionsCellProps = {
 export default function BookVocabActionsCell({
   onDelete,
 }: BookVocabActionsCellProps) {
+  if (!onDelete) {
+    return <td className="w-28 whitespace-nowrap p-2 text-right" />;
+  }
+
   return (
     <td className="w-28 whitespace-nowrap p-2 text-right">
       <button

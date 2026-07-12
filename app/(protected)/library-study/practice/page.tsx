@@ -1181,6 +1181,7 @@ export default function LibraryStudyPage() {
   const [practiceIndex, setPracticeIndex] = useState(0);
   const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
   const [practiceFinished, setPracticeFinished] = useState(false);
+  const [practiceStarted, setPracticeStarted] = useState(false);
   const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
 
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
@@ -1581,12 +1582,37 @@ export default function LibraryStudyPage() {
     load();
   }, []);
 
-  useEffect(() => {
-    setPracticeDeck(buildShuffledPracticeDeck(practiceFilteredCards));
+  function resetPracticeDeck(cards: StudyCard[]) {
+    setPracticeDeck(buildShuffledPracticeDeck(cards));
     setPracticeIndex(0);
     setPracticeRevealStep("word");
     setPracticeFinished(false);
-  }, [practiceFilteredCards]);
+  }
+
+  useEffect(() => {
+    if (!practiceStarted) {
+      setPracticeDeck([]);
+      setPracticeIndex(0);
+      setPracticeRevealStep("word");
+      setPracticeFinished(false);
+      return;
+    }
+
+    resetPracticeDeck(practiceFilteredCards);
+  }, [practiceFilteredCards, practiceStarted]);
+
+  function startPractice() {
+    setPracticeStarted(true);
+    resetPracticeDeck(practiceFilteredCards);
+  }
+
+  function returnToPracticeSetup() {
+    setPracticeStarted(false);
+    setPracticeDeck([]);
+    setPracticeIndex(0);
+    setPracticeFinished(false);
+    resetPracticeReveal();
+  }
 
   function resetPracticeReveal() {
     setPracticeRevealStep("word");
@@ -1639,10 +1665,7 @@ export default function LibraryStudyPage() {
   }
 
   function shufflePracticeDeck() {
-    setPracticeDeck(buildShuffledPracticeDeck(practiceFilteredCards));
-    setPracticeIndex(0);
-    setPracticeFinished(false);
-    resetPracticeReveal();
+    resetPracticeDeck(practiceFilteredCards);
   }
 
   function movePracticeDeckToNextMode() {
@@ -1972,41 +1995,73 @@ export default function LibraryStudyPage() {
         />
       </div>
 
-      <div className="mb-7 w-full max-w-3xl">
-        <LibraryReviewProgressCard
-          current={practiceDeck.length > 0 ? practiceIndex + 1 : 0}
-          total={practiceDeck.length}
-          studyingNowLabel={libraryReviewStudyingNowLabelText}
-        />
-      </div>
-
-      {practiceFinished ? (
-        <LibraryPracticeCompleteCard
-          nextModeLabel={practiceStudyModeLabel(nextPracticeStudyMode(practiceStudyMode))}
-          onNextMode={movePracticeDeckToNextMode}
-          onReviewAgain={shufflePracticeDeck}
-          onOpenWordSky={() => router.push("/library-study/word-sky")}
-        />
+      {!practiceStarted ? (
+        <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-5 py-5 text-center shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Ready to generate
+          </p>
+          <h2 className="mt-2 text-3xl font-black text-slate-950">
+            {practiceFilteredCards.length}{" "}
+            {practiceFilteredCards.length === 1 ? "card" : "cards"} match
+          </h2>
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            {libraryReviewStudyingNowLabelText}
+          </p>
+          <button
+            type="button"
+            onClick={startPractice}
+            disabled={practiceFilteredCards.length === 0}
+            className="mt-5 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+          >
+            Start Review
+          </button>
+        </section>
       ) : (
-        <LibraryPracticePanel
-          card={practiceCard}
-          total={practiceDeck.length}
-          revealStep={practiceRevealStep}
-          practiceMode={practiceStudyMode}
-          onAdvance={advancePracticeCard}
-          onNext={goToNextPracticeCard}
-          onPrevious={goToPreviousPracticeCard}
-          onShuffle={shufflePracticeDeck}
-          onFlagCard={() => {
-            if (!practiceCard) return false;
-            return flagPracticeCard(practiceCard);
-          }}
-          onMeaningAnswered={queuePracticeMeaningReview}
-          onTypingMissed={handlePracticeTypingMiss}
-          meaningReviewCount={meaningReviewItems.length}
-          onReviewMeanings={() => setShowPracticeMeaningReview(true)}
-          onOpenWordSky={() => router.push("/library-study/word-sky")}
-        />
+        <>
+          <div className="mb-7 w-full max-w-3xl">
+            <LibraryReviewProgressCard
+              current={practiceDeck.length > 0 ? practiceIndex + 1 : 0}
+              total={practiceDeck.length}
+              studyingNowLabel={libraryReviewStudyingNowLabelText}
+            />
+            <button
+              type="button"
+              onClick={returnToPracticeSetup}
+              className="mt-3 text-sm font-black text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+            >
+              Change filters
+            </button>
+          </div>
+
+          {practiceFinished ? (
+            <LibraryPracticeCompleteCard
+              nextModeLabel={practiceStudyModeLabel(nextPracticeStudyMode(practiceStudyMode))}
+              onNextMode={movePracticeDeckToNextMode}
+              onReviewAgain={shufflePracticeDeck}
+              onOpenWordSky={() => router.push("/library-study/word-sky")}
+            />
+          ) : (
+            <LibraryPracticePanel
+              card={practiceCard}
+              total={practiceDeck.length}
+              revealStep={practiceRevealStep}
+              practiceMode={practiceStudyMode}
+              onAdvance={advancePracticeCard}
+              onNext={goToNextPracticeCard}
+              onPrevious={goToPreviousPracticeCard}
+              onShuffle={shufflePracticeDeck}
+              onFlagCard={() => {
+                if (!practiceCard) return false;
+                return flagPracticeCard(practiceCard);
+              }}
+              onMeaningAnswered={queuePracticeMeaningReview}
+              onTypingMissed={handlePracticeTypingMiss}
+              meaningReviewCount={meaningReviewItems.length}
+              onReviewMeanings={() => setShowPracticeMeaningReview(true)}
+              onOpenWordSky={() => router.push("/library-study/word-sky")}
+            />
+          )}
+        </>
       )}
     </main>
   );

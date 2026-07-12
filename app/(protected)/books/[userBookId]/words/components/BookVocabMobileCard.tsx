@@ -6,6 +6,7 @@ type BookVocabMobileCardProps = {
   reading: string | null | undefined;
   meaning: string | null | undefined;
   pageNumber: number | null | undefined;
+  readOnly?: boolean;
 
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -22,6 +23,7 @@ export default function BookVocabMobileCard({
   reading,
   meaning,
   pageNumber,
+  readOnly = false,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -59,26 +61,28 @@ export default function BookVocabMobileCard({
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => void onMoveUp()}
-            disabled={!canMoveUp}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-stone-200 bg-white text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-30"
-            title="Move up"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            onClick={() => void onMoveDown()}
-            disabled={!canMoveDown}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-stone-200 bg-white text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-30"
-            title="Move down"
-          >
-            ↓
-          </button>
-        </div>
+        {readOnly ? null : (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => void onMoveUp()}
+              disabled={!canMoveUp}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-stone-200 bg-white text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-30"
+              title="Move up"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => void onMoveDown()}
+              disabled={!canMoveDown}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-stone-200 bg-white text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-30"
+              title="Move down"
+            >
+              ↓
+            </button>
+          </div>
+        )}
 
         <div
           className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500"
@@ -87,13 +91,15 @@ export default function BookVocabMobileCard({
           Page {pageNumber ?? "—"}
         </div>
 
-        <button
-          type="button"
-          onClick={onDelete}
-          className="min-w-0 flex-1 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
-        >
-          Delete
-        </button>
+        {readOnly ? null : (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="min-w-0 flex-1 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+          >
+            Delete
+          </button>
+        )}
       </div>
     </article>
   );
