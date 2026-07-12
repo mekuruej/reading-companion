@@ -1171,6 +1171,7 @@ export default function LibraryStudyPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [ownedUserBookIds, setOwnedUserBookIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewCountsLoading, setReviewCountsLoading] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
@@ -1182,6 +1183,7 @@ export default function LibraryStudyPage() {
   const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
   const [practiceFinished, setPracticeFinished] = useState(false);
   const [practiceStarted, setPracticeStarted] = useState(false);
+  const [practiceStarting, setPracticeStarting] = useState(false);
   const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
 
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
@@ -1231,6 +1233,7 @@ export default function LibraryStudyPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      setReviewCountsLoading(false);
       setNeedsSignIn(false);
       setErrorMsg(null);
       setCanUseLibraryReview(false);
@@ -1288,6 +1291,7 @@ export default function LibraryStudyPage() {
           setOwnedUserBookIds([]);
           setLibraryReviewCards([]);
           setPracticeDeck([]);
+          setPracticeStarted(false);
           setFullAccessLocked(true);
           setLoading(false);
           return;
@@ -1314,6 +1318,7 @@ export default function LibraryStudyPage() {
           setOwnedUserBookIds([]);
           setLibraryReviewCards([]);
           setPracticeDeck([]);
+          setPracticeStarted(false);
           setLoading(false);
           return;
         }
@@ -1348,6 +1353,12 @@ export default function LibraryStudyPage() {
           metaById.set(row.id, getBookMeta(row));
         }
 
+        setLibraryReviewCards([]);
+        setPracticeDeck([]);
+        setPracticeStarted(false);
+        setReviewCountsLoading(true);
+        setLoading(false);
+
         let allSummaryRows: LibraryWordSummaryRow[] = [];
         let summaryLoadError: unknown = null;
 
@@ -1367,21 +1378,6 @@ export default function LibraryStudyPage() {
         if (allSummaryRows.length > 0) {
           const visibleSummaryRows = allSummaryRows
             .filter((row) => (row.total_encounter_count ?? 0) > (row.hidden_encounter_count ?? 0));
-          let definitionNumberByWordId = new Map<string, number>();
-          const sampleWordIds = uniqueStrings(
-            visibleSummaryRows.map((row) => row.sample_user_book_word_id).filter(Boolean)
-          );
-
-          if (sampleWordIds.length > 0) {
-            try {
-              definitionNumberByWordId = await loadDefinitionNumbersByWordId(
-                sampleWordIds,
-                userBookIds
-              );
-            } catch (sampleWordsErr) {
-              console.warn("Could not load definition numbers for Library Practice:", sampleWordsErr);
-            }
-          }
 
           const studyKeys = uniqueStrings([
             ...allSummaryRows.map((row) => row.study_identity_key).filter(Boolean),
@@ -1453,7 +1449,7 @@ export default function LibraryStudyPage() {
                 activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
                 studyIdentityKey: summary.study_identity_key,
                 progress,
-                definitionNumber: definitionNumberByWordId.get(summary.sample_user_book_word_id) ?? null,
+                definitionNumber: null,
               };
             })
             .filter((card): card is StudyCard => Boolean(card));
@@ -1575,6 +1571,7 @@ export default function LibraryStudyPage() {
         console.error("Error loading Ability Check:", err);
         setErrorMsg(errorMessage(err) || "Failed to load Ability Check.");
       } finally {
+        setReviewCountsLoading(false);
         setLoading(false);
       }
     }
@@ -1601,9 +1598,61 @@ export default function LibraryStudyPage() {
     resetPracticeDeck(practiceFilteredCards);
   }, [practiceFilteredCards, practiceStarted]);
 
-  function startPractice() {
-    setPracticeStarted(true);
-    resetPracticeDeck(practiceFilteredCards);
+  async function hydrateDefinitionNumbersForPractice(cards: StudyCard[]) {
+    if (ownedUserBookIds.length === 0) return cards;
+
+    const wordIds = uniqueStrings(
+      cards
+        .filter((card) => !isClaimCardId(card.id))
+        .map((card) => card.id)
+    );
+
+    if (wordIds.length === 0) return cards;
+
+    try {
+      const definitionNumberByWordId = await loadDefinitionNumbersByWordId(
+        wordIds,
+        ownedUserBookIds
+      );
+
+      if (definitionNumberByWordId.size === 0) return cards;
+
+      return cards.map((card) => ({
+        ...card,
+        definitionNumber: definitionNumberByWordId.get(card.id) ?? card.definitionNumber,
+      }));
+    } catch (sampleWordsErr) {
+      console.warn("Could not load definition numbers for Library Practice:", sampleWordsErr);
+      return cards;
+    }
+  }
+
+  async function startPractice() {
+    if (reviewCountsLoading) return;
+
+    setPracticeStarting(true);
+
+    try {
+      const hydratedCards = await hydrateDefinitionNumbersForPractice(practiceFilteredCards);
+      const definitionNumberByCardId = new Map(
+        hydratedCards.map((card) => [card.id, card.definitionNumber] as const)
+      );
+
+      setLibraryReviewCards((current) =>
+        current.map((card) =>
+          definitionNumberByCardId.has(card.id)
+            ? {
+              ...card,
+              definitionNumber: definitionNumberByCardId.get(card.id) ?? card.definitionNumber,
+            }
+            : card
+        )
+      );
+      setPracticeStarted(true);
+      resetPracticeDeck(hydratedCards);
+    } finally {
+      setPracticeStarting(false);
+    }
   }
 
   function returnToPracticeSetup() {
@@ -1944,7 +1993,7 @@ export default function LibraryStudyPage() {
     );
   }
 
-  if (libraryReviewCards.length === 0) {
+  if (!reviewCountsLoading && libraryReviewCards.length === 0) {
     return (
       <LibraryReviewEmptyState
         onOpenWordSky={() => router.push("/library-study/word-sky")}
@@ -1998,22 +2047,25 @@ export default function LibraryStudyPage() {
       {!practiceStarted ? (
         <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-5 py-5 text-center shadow-sm">
           <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-            Ready to generate
+            {reviewCountsLoading ? "Preparing review" : "Ready to generate"}
           </p>
           <h2 className="mt-2 text-3xl font-black text-slate-950">
-            {practiceFilteredCards.length}{" "}
-            {practiceFilteredCards.length === 1 ? "card" : "cards"} match
+            {reviewCountsLoading
+              ? "Loading counts..."
+              : `${practiceFilteredCards.length} ${practiceFilteredCards.length === 1 ? "card" : "cards"} match`}
           </h2>
           <p className="mt-2 text-sm font-semibold text-slate-500">
-            {libraryReviewStudyingNowLabelText}
+            {reviewCountsLoading
+              ? "You can choose filters while MEKURU prepares your review."
+              : libraryReviewStudyingNowLabelText}
           </p>
           <button
             type="button"
             onClick={startPractice}
-            disabled={practiceFilteredCards.length === 0}
+            disabled={reviewCountsLoading || practiceFilteredCards.length === 0 || practiceStarting}
             className="mt-5 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
           >
-            Start Review
+            {practiceStarting ? "Generating..." : "Start Review"}
           </button>
         </section>
       ) : (

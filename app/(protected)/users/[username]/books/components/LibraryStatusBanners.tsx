@@ -18,13 +18,15 @@ export function AbilityCheckReminderBanner({
       title={isReady ? "Your Ability Check is ready" : "Ability Check is resting today"}
       actions={
         <>
-          <button
-            type="button"
-            onClick={onStart}
-            className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
-          >
-            Open Ability Check
-          </button>
+          {isReady ? (
+            <button
+              type="button"
+              onClick={onStart}
+              className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
+            >
+              Open Ability Check
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -38,13 +40,21 @@ export function AbilityCheckReminderBanner({
     >
       {isReady ? (
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          You have {abilityCheckReminderCount} due cards. Ability Check is a
-          strict small quiz for reading and meaning.
+          You have{" "}
+          <span className="text-xl font-black text-slate-950">
+            {abilityCheckReminderCount}
+          </span>{" "}
+          due cards. Ability Check is a strict small quiz for reading and
+          meaning.
         </p>
       ) : (
         <p className="mt-1 text-sm leading-6 text-slate-600">
           Ability Check opens when at least {minDueCards} cards are due. You
-          have {abilityCheckReminderCount} due right now.
+          have{" "}
+          <span className="text-xl font-black text-slate-950">
+            {abilityCheckReminderCount}
+          </span>{" "}
+          due right now.
         </p>
       )}
     </LibraryReminderBanner>

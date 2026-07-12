@@ -36,7 +36,7 @@ export function ymdInTimeZone(value: string | Date, timeZone: string) {
   return `${year}-${month}-${day}`;
 }
 
-function ymdToDayNumber(ymd: string) {
+export function ymdToDayNumber(ymd: string) {
   const [year, month, day] = ymd.split("-").map(Number);
   return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
 }
@@ -106,4 +106,83 @@ export function formatRelativeDate(dateStr: string) {
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
 
   return dateKey;
+}
+
+const ABILITY_CHECK_SEEN_STORAGE_KEY = "library-study-seen-by-date";
+const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
+const ABILITY_CHECK_REMINDER_UNLOCKED_KEY = "ability-check-reminder-unlocked";
+const PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY =
+  "pending-book-requests-alert-hidden-signature";
+
+export function getTodayKey() {
+  return ymdInTimeZone(new Date(), "Asia/Tokyo") ?? new Date().toISOString().slice(0, 10);
+}
+
+export function loadAbilityCheckSeenForToday() {
+  if (typeof window === "undefined") return new Set<string>();
+
+  try {
+    const raw = window.localStorage.getItem(ABILITY_CHECK_SEEN_STORAGE_KEY);
+    if (!raw) return new Set<string>();
+
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    return new Set(parsed[getTodayKey()] ?? []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+export function abilityCheckReminderHiddenToday() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(ABILITY_CHECK_REMINDER_HIDE_KEY) === getTodayKey();
+}
+
+export function abilityCheckReminderUnlocked() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY) === "true";
+}
+
+export function unlockAbilityCheckReminder() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY, "true");
+}
+
+export function hideAbilityCheckReminderForToday() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
+}
+
+export function pendingBookRequestsSignature(
+  requests: Array<{ id?: string | null }>
+) {
+  return requests
+    .map((request) => request.id)
+    .filter(Boolean)
+    .sort()
+    .join("|");
+}
+
+export function pendingBookRequestsAlertHidden(signature: string) {
+  if (typeof window === "undefined" || !signature) return false;
+  return window.localStorage.getItem(PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY) === signature;
+}
+
+export function hidePendingBookRequestsAlert(signature: string) {
+  if (typeof window === "undefined" || !signature) return;
+  window.localStorage.setItem(PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY, signature);
+}
+
+
+export function isListeningFormat(value: string | null | undefined) {
+  const normalized = (value ?? "").trim().toLowerCase();
+
+  return (
+    normalized === "listening" ||
+    normalized === "audiobook" ||
+    normalized.includes("audio")
+  );
+}
+
+export function dateFromYmd(value: string) {
+  return new Date(`${value}T00:00:00`);
 }

@@ -7,7 +7,6 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getLessonAlertInfo } from "@/lib/lessonAlerts";
 import {
-  computeLibraryStudyColorStatus,
   getLibraryStudyEncounterStageCounts,
 } from "@/lib/libraryStudyColor";
 import {
@@ -25,25 +24,40 @@ import LibraryBookRow from "./components/LibraryBookRow";
 import LibrarySection from "./components/LibrarySection";
 import LibraryEmptyState from "./components/LibraryEmptyState";
 import FloatingAddBookButton from "./components/FloatingAddBookButton";
-import LibraryReminderBanner from "./components/LibraryReminderBanner";
 import LearningTaskCard from "./components/LearningTaskCard";
 import LearningTasksPanel from "./components/LearningTasksPanel";
 import MobileVersionNotice from "./components/MobileVersionNotice";
 import PendingBookRequestsAlert from "./components/PendingBookRequestsAlert";
+import UserBar from "./components/UserBar";
 import {
   AbilityCheckReminderBanner,
   LearningTasksErrorBanner,
 } from "./components/LibraryStatusBanners";
 import {
-  formatMinutesAsReadableTime,
   formatRelativeDate,
   getMonthOptions,
   getMonthRange,
-  makeBookKey,
-  normalizeBookPart,
   normalizeIsbn,
   ymdInTimeZone,
+  abilityCheckReminderHiddenToday,
+  abilityCheckReminderUnlocked,
+  getTodayKey,
+  hideAbilityCheckReminderForToday,
+  hidePendingBookRequestsAlert,
+  loadAbilityCheckSeenForToday,
+  pendingBookRequestsAlertHidden,
+  pendingBookRequestsSignature,
+  unlockAbilityCheckReminder,
+  dateFromYmd,
+  isListeningFormat,
+  ymdToDayNumber,
 } from "./helpers";
+import {
+  isAbilityCheckCardInDailyPool,
+  type AbilityCheckProgressRow,
+  type AbilityCheckReminderSettings,
+  type AbilityCheckSummaryRow,
+} from "./abilityCheckHelpers";
 
 type Book = {
   id: string;
@@ -146,12 +160,6 @@ type MonthlyLibraryStats = {
   longestRunDays: number;
 };
 
-type MonthOption = {
-  value: string; // YYYY-MM or "year-YYYY"
-  label: string;
-};
-
-type UserBarVariant = "full" | "logoutOnly" | "labelOnly";
 type LibrarySnapshotView = "monthly" | "colors";
 type MekuruColor = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "grey";
 type LibrarySortMode =
@@ -166,451 +174,7 @@ type LibrarySortMode =
   | "pace_fast"
   | "pace_slow";
 
-function isListeningFormat(value: string | null | undefined) {
-  const normalized = (value ?? "").trim().toLowerCase();
-  return normalized === "listening" || normalized === "audiobook" || normalized.includes("audio");
-}
-
-type AbilityCheckReminderSettings = {
-  red_stages?: number | null;
-  orange_stages?: number | null;
-  yellow_stages?: number | null;
-  skip_katakana_library_check?: boolean | null;
-  show_ability_check_reminder?: boolean | null;
-};
-
-type AbilityCheckSummaryRow = {
-  study_identity_key: string;
-  surface: string | null;
-  reading: string | null;
-  meaning: string | null;
-  total_encounter_count: number | null;
-  check_ready_encounter_count: number | null;
-  last_seen_at: string | null;
-  sample_user_book_word_id: string | null;
-};
-
-type AbilityCheckProgressRow = {
-  study_identity_key: string;
-  reading_gate_status: "not_started" | "passed" | "failed" | null;
-  meaning_gate_status: "not_started" | "passed" | "failed" | null;
-  held_before_reading_gate: boolean | null;
-  held_before_meaning_gate: boolean | null;
-  mastered: boolean | null;
-  mastered_at: string | null;
-  reading_gate_failed_at: string | null;
-  meaning_gate_failed_at: string | null;
-  last_studied_at: string | null;
-};
-
-const MEKURU_ENCOUNTER_COLORS: MekuruColor[] = ["red", "orange", "yellow"];
-const MEKURU_ABILITY_COLORS: MekuruColor[] = ["green", "blue", "purple"];
-const ABILITY_CHECK_SEEN_STORAGE_KEY = "library-study-seen-by-date";
-const ABILITY_CHECK_REMINDER_HIDE_KEY = "ability-check-reminder-hidden-date";
-const ABILITY_CHECK_REMINDER_UNLOCKED_KEY = "ability-check-reminder-unlocked";
-const PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY =
-  "pending-book-requests-alert-hidden-signature";
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
-const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
-const REGULAR_GATE_RECHECK_WINDOW_DAYS = 5;
-const MISSED_GATE_RECHECK_MIN_DAYS = 7;
-const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
-const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
-const PRE_READING_WAIT_RECHECK_DAYS = 90;
-const YELLOW_READINESS_COOLDOWN_DAYS = 30;
-
-function getTodayKey() {
-  return ymdInTimeZone(new Date(), "Asia/Tokyo") ?? new Date().toISOString().slice(0, 10);
-}
-
-function loadAbilityCheckSeenForToday() {
-  if (typeof window === "undefined") return new Set<string>();
-
-  try {
-    const raw = window.localStorage.getItem(ABILITY_CHECK_SEEN_STORAGE_KEY);
-    if (!raw) return new Set<string>();
-
-    const parsed = JSON.parse(raw) as Record<string, string[]>;
-    return new Set(parsed[getTodayKey()] ?? []);
-  } catch {
-    return new Set<string>();
-  }
-}
-
-function abilityCheckReminderHiddenToday() {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(ABILITY_CHECK_REMINDER_HIDE_KEY) === getTodayKey();
-}
-
-function abilityCheckReminderUnlocked() {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY) === "true";
-}
-
-function unlockAbilityCheckReminder() {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY, "true");
-}
-
-function hideAbilityCheckReminderForToday() {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());
-}
-
-function pendingBookRequestsSignature(requests: Array<{ id?: string | null }>) {
-  return requests
-    .map((request) => request.id)
-    .filter(Boolean)
-    .sort()
-    .join("|");
-}
-
-function pendingBookRequestsAlertHidden(signature: string) {
-  if (typeof window === "undefined" || !signature) return false;
-  return window.localStorage.getItem(PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY) === signature;
-}
-
-function hidePendingBookRequestsAlert(signature: string) {
-  if (typeof window === "undefined" || !signature) return;
-  window.localStorage.setItem(PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY, signature);
-}
-
-function isKatakanaOnly(value: string | null | undefined) {
-  const text = (value ?? "").trim();
-  return text.length > 0 && /^[ァ-ヶー・･]+$/.test(text);
-}
-
-function hashString(value: string) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function daysSinceIso(value: string | null | undefined, now = new Date()) {
-  if (!value) return Number.POSITIVE_INFINITY;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
-
-  return (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
-}
-
-function appDayNumber(now = new Date()) {
-  const today = ymdInTimeZone(now, "Asia/Tokyo") ?? new Date().toISOString().slice(0, 10);
-  const [year, month, day] = today.split("-").map(Number);
-  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
-}
-
-function regularGateRecheckDays(studyIdentityKey: string) {
-  return (
-    REGULAR_GATE_RECHECK_MIN_DAYS +
-    (hashString(`${studyIdentityKey}::regular-gate`) % REGULAR_GATE_RECHECK_WINDOW_DAYS)
-  );
-}
-
-function isInitialGateSlotDue(studyIdentityKey: string, now = new Date()) {
-  const recheckDays = regularGateRecheckDays(studyIdentityKey);
-  const releaseOffset =
-    hashString(`${studyIdentityKey}::initial-gate-slot`) % recheckDays;
-
-  return appDayNumber(now) % recheckDays === releaseOffset;
-}
-
-function isInitialYellowReadinessSlotDue(studyIdentityKey: string, now = new Date()) {
-  const releaseOffset =
-    hashString(`${studyIdentityKey}::initial-yellow-readiness-slot`) %
-    YELLOW_READINESS_COOLDOWN_DAYS;
-
-  return appDayNumber(now) % YELLOW_READINESS_COOLDOWN_DAYS === releaseOffset;
-}
-
-function isYellowReadinessCooldownDue(
-  summary: AbilityCheckSummaryRow,
-  progress: AbilityCheckProgressRow | null,
-  now = new Date()
-) {
-  const anchorDate = summary.last_seen_at ?? progress?.last_studied_at;
-
-  if (!anchorDate) {
-    return isInitialYellowReadinessSlotDue(summary.study_identity_key, now);
-  }
-
-  return daysSinceIso(anchorDate, now) >= YELLOW_READINESS_COOLDOWN_DAYS;
-}
-
-function isReadyForReadingGateProgress(progress: AbilityCheckProgressRow | null | undefined) {
-  return Boolean(
-    progress &&
-    progress.reading_gate_status === "not_started" &&
-    progress.meaning_gate_status === "not_started" &&
-    !progress.held_before_reading_gate &&
-    !progress.held_before_meaning_gate &&
-    !progress.mastered
-  );
-}
-
-function isAbilityCheckCardInDailyPool(
-  summary: AbilityCheckSummaryRow,
-  progress: AbilityCheckProgressRow | null,
-  settings: Required<AbilityCheckReminderSettings>,
-  seenTodayIds: Set<string>,
-  now = new Date()
-) {
-  const surface = (summary.surface ?? "").trim();
-  const reading = (summary.reading ?? "").trim();
-  const meaning = (summary.meaning ?? "").trim();
-  const sampleId = summary.sample_user_book_word_id ?? "";
-
-  if (!surface || !reading || !meaning || !sampleId) return false;
-  if (seenTodayIds.has(sampleId) || seenTodayIds.has(summary.study_identity_key)) {
-    return false;
-  }
-  if (settings.skip_katakana_library_check && isKatakanaOnly(surface)) return false;
-
-  const colorStatus = computeLibraryStudyColorStatus({
-    encounterCount: summary.total_encounter_count ?? 0,
-    settings,
-    readingGate: progress?.reading_gate_status ?? "not_started",
-    meaningGate: progress?.meaning_gate_status ?? "not_started",
-    heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-    heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-    readyForReadingGate: isReadyForReadingGateProgress(progress),
-    mastered: progress?.mastered ?? false,
-  });
-
-  const included =
-    colorStatus.eligibleForLibraryStudy ||
-    colorStatus.nextGate === "reading" ||
-    colorStatus.nextGate === "meaning";
-
-  if (!included) return false;
-
-  if (
-    colorStatus.color === "yellow" &&
-    colorStatus.eligibleForLibraryStudy &&
-    !isYellowReadinessCooldownDue(summary, progress, now)
-  ) {
-    return false;
-  }
-
-  if (
-    colorStatus.color === "red" &&
-    progress?.held_before_reading_gate &&
-    progress?.held_before_meaning_gate
-  ) {
-    return daysSinceIso(progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
-  }
-
-  if (colorStatus.color === "grey") {
-    if (colorStatus.greyReason === "pre_reading_support") {
-      const waitDays = progress?.held_before_meaning_gate
-        ? PRE_READING_WAIT_RECHECK_DAYS
-        : PRE_READING_SOFT_WAIT_RECHECK_DAYS;
-      return daysSinceIso(progress?.last_studied_at, now) >= waitDays;
-    }
-
-    const recheckDays =
-      MISSED_GATE_RECHECK_MIN_DAYS +
-      (hashString(`${summary.study_identity_key}::missed-gate`) %
-        MISSED_GATE_RECHECK_WINDOW_DAYS);
-
-    if (colorStatus.greyReason === "reading_gate_support") {
-      return daysSinceIso(progress?.reading_gate_failed_at, now) >= recheckDays;
-    }
-
-    if (colorStatus.greyReason === "meaning_gate_support") {
-      return daysSinceIso(progress?.meaning_gate_failed_at, now) >= recheckDays;
-    }
-
-    return true;
-  }
-
-  if (!progress?.last_studied_at) {
-    return isInitialGateSlotDue(summary.study_identity_key, now);
-  }
-
-  return (
-    daysSinceIso(progress.last_studied_at, now) >=
-    regularGateRecheckDays(summary.study_identity_key)
-  );
-}
-
-function ymdToDayNumber(ymd: string) {
-  const [year, month, day] = ymd.split("-").map(Number);
-  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
-}
-
-function UserBar({
-  isTeacher,
-  variant = "full",
-}: {
-  isTeacher: boolean;
-  variant?: UserBarVariant;
-}) {
-  const router = useRouter();
-  const [label, setLabel] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let loading = false;
-
-    const loadUser = async () => {
-      if (loading) return;
-      loading = true;
-
-      try {
-        const {
-          data: { user },
-          error: userErr,
-        } = await supabase.auth.getUser();
-
-        if (cancelled) return;
-
-        if (userErr || !user) {
-          setLabel(null);
-          return;
-        }
-
-        const { data: prof, error: profErr } = await supabase
-          .from("profiles")
-          .select("display_name")
-          .eq("id", user.id)
-          .single();
-
-        if (cancelled) return;
-
-        if (profErr) {
-          console.warn("UserBar: could not load profile display_name:", profErr);
-        }
-
-        setLabel(prof?.display_name || "User");
-      } catch (err) {
-        if (!cancelled) {
-          console.error("UserBar loadUser error:", err);
-          setLabel(null);
-        }
-      } finally {
-        loading = false;
-      }
-    };
-
-    loadUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void loadUser();
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      console.error("Logout error:", error);
-      return;
-    }
-
-    router.replace("/login");
-    router.refresh();
-  };
-
-  if (!label && variant !== "logoutOnly") return null;
-
-  if (variant === "logoutOnly") {
-    return (
-      <div className="flex justify-end">
-        <button
-          onClick={handleLogout}
-          className="rounded-md border border-slate-400 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-        >
-          Log out
-        </button>
-      </div>
-    );
-  }
-
-  if (variant === "labelOnly") {
-    if (!isTeacher) return null;
-    return (
-      <div className="mb-4 text-sm text-gray-700">
-        <span>Logged in as: {label}</span>
-      </div>
-    );
-  }
-
-  return isTeacher ? (
-    <div className="mb-4 flex items-center justify-between text-sm text-gray-700">
-      <span>Logged in as: {label}</span>
-      <button
-        onClick={handleLogout}
-        className="rounded-md border px-2 py-1 hover:bg-gray-100"
-      >
-        Log out
-      </button>
-    </div>
-  ) : (
-    <div className="mr-3 flex justify-end sm:mr-6">
-      <button
-        onClick={handleLogout}
-        className="rounded-md border px-2 py-1 hover:bg-gray-100"
-      >
-        Log out
-      </button>
-    </div>
-  );
-}
-
-function mekuruColorLabel(color: MekuruColor) {
-  if (color === "grey") return "Limbo";
-  return color.charAt(0).toUpperCase() + color.slice(1);
-}
-
-function mekuruColorDotClass(color: MekuruColor) {
-  if (color === "red") return "bg-red-500";
-  if (color === "orange") return "bg-orange-500";
-  if (color === "yellow") return "bg-yellow-300";
-  if (color === "green") return "bg-emerald-500";
-  if (color === "blue") return "bg-sky-500";
-  if (color === "purple") return "bg-violet-500";
-  return "bg-slate-500";
-}
-
-function MekuruColorRowLabel({ label }: { label: string }) {
-  return (
-    <div className="mb-1.5">
-      <div className="h-px w-full bg-slate-400/70" />
-      <div className="mt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function MekuruColorDelta({ value }: { value: number }) {
-  if (value === 0) {
-    return <span className="text-xs font-semibold text-slate-400">0</span>;
-  }
-
-  const isUp = value > 0;
-
-  return (
-    <span className={`text-xs font-semibold ${isUp ? "text-emerald-600" : "text-rose-600"}`}>
-      {isUp ? "↑" : "↓"} {Math.abs(value)}
-    </span>
-  );
-}
-
-function dateFromYmd(value: string) {
-  return new Date(`${value}T00:00:00`);
-}
 
 export default function BooksPage() {
   const router = useRouter();
@@ -634,7 +198,6 @@ export default function BooksPage() {
   const [messageType, setMessageType] = useState<"error" | "success" | "">("");
 
   const [meId, setMeId] = useState<string>("");
-  const [myUsername, setMyUsername] = useState<string>("");
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [students, setStudents] = useState<StudentOption[]>([]);
@@ -651,7 +214,6 @@ export default function BooksPage() {
   const [showRequestBook, setShowRequestBook] = useState(false);
 
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
-  const [formatFilter, setFormatFilter] = useState<string>("all");
   const isTeacher = myRole === "teacher" || myRole === "super_teacher" || isSuperTeacher;
 
   const filteredRows = useMemo(() => {
@@ -659,12 +221,9 @@ export default function BooksPage() {
       const matchesBookType =
         bookTypeFilter === "all" || row.books?.book_type === bookTypeFilter;
 
-      const matchesFormat =
-        formatFilter === "all" || row.format_type === formatFilter;
-
-      return matchesBookType && matchesFormat;
+      return matchesBookType;
     });
-  }, [rows, bookTypeFilter, formatFilter]);
+  }, [rows, bookTypeFilter]);
 
   const pendingBookRequestsAlertSignature = useMemo(
     () => pendingBookRequestsSignature(bookRequests),
@@ -1773,7 +1332,6 @@ export default function BooksPage() {
 
       if (cancelled) return;
 
-      setMyUsername((meProfile as any)?.username ?? "");
       setMyTimeZone((meProfile as any)?.time_zone || "Asia/Tokyo");
 
       const role = (meProfile?.role as ProfileRole | null) ?? "member";
