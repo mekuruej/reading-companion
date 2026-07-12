@@ -37,7 +37,6 @@ import {
   formatRelativeDate,
   getMonthOptions,
   getMonthRange,
-  normalizeIsbn,
   ymdInTimeZone,
   abilityCheckReminderHiddenToday,
   abilityCheckReminderUnlocked,
@@ -160,8 +159,6 @@ type MonthlyLibraryStats = {
   longestRunDays: number;
 };
 
-type LibrarySnapshotView = "monthly" | "colors";
-type MekuruColor = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "grey";
 type LibrarySortMode =
   | "status"
   | "title"
@@ -194,9 +191,6 @@ export default function BooksPage() {
   const [learningTasksError, setLearningTasksError] = useState<string | null>(null);
   const [completingLearningTaskId, setCompletingLearningTaskId] = useState<string | null>(null);
 
-  const [message, setMessage] = useState<string>("");
-  const [messageType, setMessageType] = useState<"error" | "success" | "">("");
-
   const [meId, setMeId] = useState<string>("");
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
@@ -207,11 +201,6 @@ export default function BooksPage() {
   const [bookRequests, setBookRequests] = useState<any[]>([]);
   const [dismissedPendingBookRequestsSignature, setDismissedPendingBookRequestsSignature] =
     useState("");
-  const [requestBookTitle, setRequestBookTitle] = useState("");
-  const [requestBookAuthor, setRequestBookAuthor] = useState("");
-  const [requestBookIsbn, setRequestBookIsbn] = useState("");
-  const [isSavingRequest, setIsSavingRequest] = useState(false);
-  const [showRequestBook, setShowRequestBook] = useState(false);
 
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
   const isTeacher = myRole === "teacher" || myRole === "super_teacher" || isSuperTeacher;
@@ -240,11 +229,8 @@ export default function BooksPage() {
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<LibrarySortMode>("status");
 
-  const [librarySnapshotView, setLibrarySnapshotView] =
-    useState<LibrarySnapshotView>("monthly");
-  const monthOptions = getMonthOptions(12);
-  const [selectedMonth, setSelectedMonth] = useState<string>(
-    monthOptions[0]?.value ?? ""
+  const [selectedMonth] = useState<string>(
+    getMonthOptions(12)[0]?.value ?? ""
   );
 
   const [monthlyStats, setMonthlyStats] = useState<MonthlyLibraryStats>({
@@ -698,8 +684,6 @@ export default function BooksPage() {
   }
 
   async function fetchBooks(userIdToView: string) {
-    setMessage("");
-    setMessageType("");
 
     const {
       data: { user },
@@ -707,8 +691,6 @@ export default function BooksPage() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      setMessage("Please sign in to see books.");
-      setMessageType("error");
       setRows([]);
       return;
     }
@@ -747,8 +729,6 @@ export default function BooksPage() {
 
     if (error) {
       logSbError("Error fetching user_books:", error);
-      setMessage("Error loading books. (If viewing a student: confirm link + RLS policies.)");
-      setMessageType("error");
       setRows([]);
       return;
     }
@@ -810,70 +790,6 @@ export default function BooksPage() {
     }
 
     setBookRequests((data as any[]) ?? []);
-  }
-
-  async function handleRequestBook() {
-    if (!meId) {
-      alert("You need to be signed in to request a book.");
-      return;
-    }
-
-    const cleanTitle = requestBookTitle.trim();
-    const cleanAuthor = requestBookAuthor.trim();
-    const cleanIsbn = normalizeIsbn(requestBookIsbn);
-
-    if (!cleanTitle) {
-      alert("Please enter a title.");
-      return;
-    }
-
-    setIsSavingRequest(true);
-
-    try {
-      let existingRequestQuery = supabase
-        .from("book_requests")
-        .select("id")
-        .eq("user_id", meId)
-        .eq("status", "pending")
-        .limit(1);
-
-      existingRequestQuery = cleanIsbn
-        ? existingRequestQuery.eq("isbn13", cleanIsbn)
-        : existingRequestQuery.eq("title", cleanTitle);
-
-      const { data: existingPendingRequest, error: existingPendingRequestError } =
-        await existingRequestQuery.maybeSingle();
-
-      if (existingPendingRequestError) throw existingPendingRequestError;
-
-      if (existingPendingRequest) {
-        alert("This book request is already waiting for review.");
-        setShowRequestBook(false);
-        return;
-      }
-
-      const { error } = await supabase.from("book_requests").insert({
-        user_id: meId,
-        title: cleanTitle,
-        author: cleanAuthor || null,
-        isbn13: cleanIsbn || null,
-        status: "pending",
-      });
-
-      if (error) throw error;
-
-      setRequestBookTitle("");
-      setRequestBookAuthor("");
-      setRequestBookIsbn("");
-      setShowRequestBook(false);
-
-      alert("Book request sent!");
-    } catch (err) {
-      console.error("REQUEST BOOK ERROR:", err);
-      alert("Could not send book request.");
-    } finally {
-      setIsSavingRequest(false);
-    }
   }
 
   async function handleApproveRequest(requestId: string) {
@@ -1299,8 +1215,6 @@ export default function BooksPage() {
     let cancelled = false;
 
     (async () => {
-      setMessage("");
-      setMessageType("");
 
       const {
         data: { user },
@@ -1309,8 +1223,6 @@ export default function BooksPage() {
 
       if (userError || !user) {
         if (!cancelled) {
-          setMessage("Please sign in to see your books.");
-          setMessageType("error");
           setRows([]);
         }
         return;
