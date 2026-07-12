@@ -49,7 +49,6 @@ export default function BookVocabTableHeader({
           className="sticky z-20 w-28 bg-gray-50 p-2 text-right"
           style={headerStickyStyle}
         >
-          Word Detail
         </th>
       </tr>
     </thead>

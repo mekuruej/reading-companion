@@ -24,9 +24,12 @@ type MobileQuickCaptureProps = {
   surface: string;
   reading: string;
   meaning: string;
+  meanings: string[];
+  selectedMeaningIndex: number;
   quickLoading: boolean;
   quickError: string | null;
   savedNotice: string;
+  canSaveWord: boolean;
   candidates: MobileQuickCaptureCandidate[];
   lastAddedWord: MobileQuickCaptureWord | null;
   inputRef: RefObject<HTMLInputElement | null>;
@@ -34,6 +37,7 @@ type MobileQuickCaptureProps = {
   onSearch: () => void;
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onSelectCandidate: (candidate: MobileQuickCaptureCandidate) => void;
+  onMeaningChoiceChange: (index: number, meaning: string) => void;
   onSaveWord: () => void;
   onDeleteLastWord: (id: string) => void;
 };
@@ -44,9 +48,12 @@ export default function MobileQuickCapture({
   surface,
   reading,
   meaning,
+  meanings,
+  selectedMeaningIndex,
   quickLoading,
   quickError,
   savedNotice,
+  canSaveWord,
   candidates,
   lastAddedWord,
   inputRef,
@@ -54,10 +61,11 @@ export default function MobileQuickCapture({
   onSearch,
   onSearchKeyDown,
   onSelectCandidate,
+  onMeaningChoiceChange,
   onSaveWord,
   onDeleteLastWord,
 }: MobileQuickCaptureProps) {
-  const hasCandidateDetails = Boolean(reading.trim() || meaning.trim());
+  const hasCandidateDetails = canSaveWord && Boolean(reading.trim() || meaning.trim());
 
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -136,7 +144,29 @@ export default function MobileQuickCapture({
             <>
               <div className="font-black text-stone-900">{surface || "Selected word"}</div>
               <div className="text-stone-500">{reading || "No reading listed"}</div>
-              <div className="mt-1 text-stone-700">{meaning || "No meaning listed"}</div>
+              {meanings.length > 1 ? (
+                <label className="mt-2 block">
+                  <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-stone-400">
+                    Meaning to save
+                  </span>
+                  <select
+                    value={selectedMeaningIndex}
+                    onChange={(event) => {
+                      const nextIndex = Number(event.target.value);
+                      onMeaningChoiceChange(nextIndex, meanings[nextIndex] ?? "");
+                    }}
+                    className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900"
+                  >
+                    {meanings.map((candidateMeaning, index) => (
+                      <option key={`${candidateMeaning}-${index}`} value={index}>
+                        {index + 1}. {candidateMeaning || "No meaning listed"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div className="mt-1 text-stone-700">{meaning || "No meaning listed"}</div>
+              )}
             </>
           ) : (
             <p className="text-stone-500">
@@ -145,14 +175,20 @@ export default function MobileQuickCapture({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={onSaveWord}
-          disabled={quickLoading || !surface.trim()}
-          className="mt-3 w-full rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-black text-emerald-950 hover:bg-emerald-200 disabled:opacity-50"
-        >
-          Save word
-        </button>
+        <p className="mt-2 text-xs leading-5 text-stone-500">
+          Add page and chapter details later on computer or tablet.
+        </p>
+
+        {canSaveWord ? (
+          <button
+            type="button"
+            onClick={onSaveWord}
+            disabled={quickLoading}
+            className="mt-3 w-full rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-black text-emerald-950 hover:bg-emerald-200 disabled:opacity-50"
+          >
+            Save word
+          </button>
+        ) : null}
 
         {savedNotice ? (
           <p className="mt-2 text-center text-xs font-semibold text-emerald-700">

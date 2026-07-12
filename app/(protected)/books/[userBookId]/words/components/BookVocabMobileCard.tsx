@@ -13,6 +13,7 @@ type BookVocabMobileCardProps = {
   onMoveDown: () => void | Promise<void>;
 
   onOpen: () => void;
+  onDelete: () => void;
 };
 
 export default function BookVocabMobileCard({
@@ -26,6 +27,7 @@ export default function BookVocabMobileCard({
   onMoveUp,
   onMoveDown,
   onOpen,
+  onDelete,
 }: BookVocabMobileCardProps) {
   return (
     <article
@@ -34,6 +36,14 @@ export default function BookVocabMobileCard({
       }`}
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="shrink-0 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-800 transition hover:bg-sky-100"
+          title="Open word detail"
+        >
+          Detail
+        </button>
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-2xl font-semibold leading-snug text-stone-950">
           <span className="break-words">{surface || "—"}</span>
           <BookVocabKatakanaBadge surface={surface} />
@@ -79,10 +89,10 @@ export default function BookVocabMobileCard({
 
         <button
           type="button"
-          onClick={onOpen}
-          className="min-w-0 flex-1 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-700"
+          onClick={onDelete}
+          className="min-w-0 flex-1 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
         >
-          Word Detail
+          Delete
         </button>
       </div>
     </article>

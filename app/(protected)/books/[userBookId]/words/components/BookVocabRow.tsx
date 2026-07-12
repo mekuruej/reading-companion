@@ -15,6 +15,7 @@ type BookVocabRowProps = {
   onMoveDown: () => void | Promise<void>;
 
   onOpen: () => void;
+  onDelete: () => void;
 };
 
 // Visual row for one saved vocabulary word.
@@ -31,6 +32,7 @@ export default function BookVocabRow({
   onMoveUp,
   onMoveDown,
   onOpen,
+  onDelete,
 }: BookVocabRowProps) {
   return (
     <tr className={`border-t ${hidden ? "bg-gray-50 text-gray-400" : ""}`}>
@@ -61,6 +63,14 @@ export default function BookVocabRow({
 
       <td className="break-words p-2 text-lg font-semibold text-stone-950">
         <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="shrink-0 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-black text-sky-800 transition hover:bg-sky-100"
+            title="Open word detail"
+          >
+            Detail
+          </button>
           {surface}
           <BookVocabKatakanaBadge surface={surface} />
         </span>
@@ -72,7 +82,7 @@ export default function BookVocabRow({
         <div>{meaning ?? "—"}</div>
       </td>
 
-      <BookVocabActionsCell onOpen={onOpen} />
+      <BookVocabActionsCell onDelete={onDelete} />
     </tr>
   );
 }

@@ -6,6 +6,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function hasUsableSenses(row: any) {
+  return Array.isArray(row?.senses_json) &&
+    row.senses_json.some(
+      (sense: any) =>
+        Array.isArray(sense?.english_definitions) &&
+        sense.english_definitions.some((definition: any) =>
+          typeof definition === "string" && definition.trim().length > 0
+        )
+    );
+}
+
 async function requireAuthenticatedUser(req: Request) {
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -54,10 +65,12 @@ export async function GET(req: Request) {
     console.error("Cache lookup error:", cacheError);
   }
 
-  if (cached && cached.length > 0) {
+  const usableCached = (cached ?? []).filter(hasUsableSenses);
+
+  if (usableCached.length > 0) {
     return NextResponse.json(
       {
-        data: cached.map((row) => ({
+        data: usableCached.map((row) => ({
           slug: row.surface,
           japanese: [
             {
@@ -65,7 +78,7 @@ export async function GET(req: Request) {
               reading: row.reading,
             },
           ],
-          senses: row.senses_json,
+          senses: Array.isArray(row.senses_json) ? row.senses_json : [],
           is_common: row.is_common,
           jlpt: row.jlpt ? [row.jlpt] : [],
         })),

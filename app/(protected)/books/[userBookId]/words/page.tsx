@@ -1186,6 +1186,7 @@ export default function BookWordsPage() {
               onOpen={() =>
                 router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
               }
+              onDelete={() => void deleteWord(w)}
             />
           );
         })}
@@ -1229,6 +1230,7 @@ export default function BookWordsPage() {
                 onOpen={() =>
                   router.push(`/books/${encodeURIComponent(userBookId)}/words/${w.id}`)
                 }
+                onDelete={() => void deleteWord(w)}
               />
             );
           })}

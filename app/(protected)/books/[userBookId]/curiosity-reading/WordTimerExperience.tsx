@@ -1604,9 +1604,16 @@ export function CuriosityReadingExperience({
             surface={quickPreview.surface}
             reading={quickPreview.reading}
             meaning={quickPreview.meaning}
+            meanings={quickPreview.meanings}
+            selectedMeaningIndex={quickPreview.selectedMeaningIndex}
             quickLoading={quickLoading}
             quickError={quickError}
             savedNotice={savedQuickNotice}
+            canSaveWord={Boolean(
+              quickPreview.cacheSurface.trim() &&
+              quickPreview.meaning.trim() &&
+              !quickPreview.isCustomMeaning
+            )}
             candidates={quickLookupCandidates}
             lastAddedWord={quickSessionWords[0] ?? null}
             inputRef={quickWordInputRef}
@@ -1614,7 +1621,15 @@ export function CuriosityReadingExperience({
               setQuickPreview((prev) => ({
                 ...prev,
                 surface: value,
-                cacheSurface: value.trim() ? prev.cacheSurface : "",
+                cacheSurface: "",
+                reading: "",
+                meanings: [],
+                selectedMeaningIndex: 0,
+                meaning: "",
+                isCustomMeaning: true,
+                useAlternateSurface: false,
+                alternateSurface: "",
+                pageOrder: null,
               }));
               setSavedQuickNotice("");
               if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
@@ -1639,6 +1654,14 @@ export function CuriosityReadingExperience({
               }));
               setQuickError(null);
             }}
+            onMeaningChoiceChange={(index, meaning) =>
+              setQuickPreview((prev) => ({
+                ...prev,
+                selectedMeaningIndex: index,
+                meaning,
+                isCustomMeaning: false,
+              }))
+            }
             onSaveWord={() => void saveQuickWord()}
             onDeleteLastWord={(id) => void deleteQuickWordById(id)}
           />
