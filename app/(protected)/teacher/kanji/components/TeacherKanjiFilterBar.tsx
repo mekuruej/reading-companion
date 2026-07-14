@@ -1,6 +1,7 @@
 type TeacherKanjiFilterBarProps = {
   statusFilter: string;
   jlptFilter: string;
+  lockedStatusLabel?: string | null;
   onStatusFilterChange: (value: string) => void;
   onJlptFilterChange: (value: string) => void;
 };
@@ -8,27 +9,39 @@ type TeacherKanjiFilterBarProps = {
 export default function TeacherKanjiFilterBar({
   statusFilter,
   jlptFilter,
+  lockedStatusLabel = null,
   onStatusFilterChange,
   onJlptFilterChange,
 }: TeacherKanjiFilterBarProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:max-w-xl">
-      <label className="text-sm">
-        <span className="mb-1 block text-xs font-semibold text-stone-500">
-          Status
-        </span>
-        <select
-          value={statusFilter}
-          onChange={(event) => onStatusFilterChange(event.target.value)}
-          className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-        >
-          <option value="all">All queue items</option>
-          <option value="flagged_review">Flagged by users</option>
-          <option value="ongoing">Ongoing queue</option>
-          <option value="complete">Done</option>
-          <option value="excluded">Excluded</option>
-        </select>
-      </label>
+      {lockedStatusLabel ? (
+        <div className="text-sm">
+          <span className="mb-1 block text-xs font-semibold text-stone-500">
+            Queue
+          </span>
+          <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700">
+            {lockedStatusLabel}
+          </div>
+        </div>
+      ) : (
+        <label className="text-sm">
+          <span className="mb-1 block text-xs font-semibold text-stone-500">
+            Status
+          </span>
+          <select
+            value={statusFilter}
+            onChange={(event) => onStatusFilterChange(event.target.value)}
+            className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="all">All queue items</option>
+            <option value="flagged_review">Flagged by users</option>
+            <option value="ongoing">Ongoing queue</option>
+            <option value="complete">Done</option>
+            <option value="excluded">Excluded</option>
+          </select>
+        </label>
+      )}
 
       <label className="text-sm">
         <span className="mb-1 block text-xs font-semibold text-stone-500">

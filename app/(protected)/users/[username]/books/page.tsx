@@ -52,7 +52,9 @@ import {
   ymdToDayNumber,
 } from "./helpers";
 import {
+  isAbilityCheckClaimInDailyPool,
   isAbilityCheckCardInDailyPool,
+  type AbilityCheckClaimRow,
   type AbilityCheckProgressRow,
   type AbilityCheckReminderSettings,
   type AbilityCheckSummaryRow,
@@ -551,12 +553,38 @@ export default function BooksPage() {
       if (summaryError) throw summaryError;
 
       const summaries = summaryRows ?? [];
-      if (summaries.length === 0) {
+      const { data: claimRows, error: claimError } = await supabase
+        .from("user_library_word_claims")
+        .select(
+          "id, study_identity_key, surface, reading, meaning, claimed_color, created_at, updated_at"
+        )
+        .eq("user_id", userId)
+        .eq("claimed_color", "green")
+        .order("updated_at", { ascending: false })
+        .limit(500)
+        .returns<AbilityCheckClaimRow[]>();
+
+      if (claimError) {
+        console.warn("Word Sky claims did not load for Ability Check reminder:", claimError);
+      }
+
+      const claims = claimError ? [] : claimRows ?? [];
+      const claimByKey = new Map<string, AbilityCheckClaimRow>();
+      for (const claim of claims) {
+        if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
+      }
+
+      if (summaries.length === 0 && claims.length === 0) {
         setAbilityCheckReminderCount(0);
         return;
       }
 
-      const keys = summaries.map((row) => row.study_identity_key).filter(Boolean);
+      const keys = Array.from(
+        new Set([
+          ...summaries.map((row) => row.study_identity_key).filter(Boolean),
+          ...claims.map((row) => row.study_identity_key).filter(Boolean),
+        ])
+      );
       const progressByKey = new Map<string, AbilityCheckProgressRow>();
 
       for (let i = 0; i < keys.length; i += 75) {
@@ -564,7 +592,7 @@ export default function BooksPage() {
         const { data: progressRows, error: progressError } = await supabase
           .from("user_library_word_progress")
           .select(
-            "study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, mastered_at, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
+            "id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, mastered_at, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
           )
           .eq("user_id", userId)
           .in("study_identity_key", chunk)
@@ -578,14 +606,28 @@ export default function BooksPage() {
       }
 
       const seenTodayIds = loadAbilityCheckSeenForToday();
-      const availableCount = summaries.filter((summary) =>
+      const availableSummaryCount = summaries.filter((summary) =>
         isAbilityCheckCardInDailyPool(
           summary,
           progressByKey.get(summary.study_identity_key) ?? null,
           resolvedSettings,
-          seenTodayIds
+          seenTodayIds,
+          new Date(),
+          claimByKey.get(summary.study_identity_key) ?? null
         )
       ).length;
+      const summaryKeys = new Set(summaries.map((summary) => summary.study_identity_key));
+      const availableClaimCount = claims
+        .filter((claim) => !summaryKeys.has(claim.study_identity_key))
+        .filter((claim) =>
+          isAbilityCheckClaimInDailyPool(
+            claim,
+            progressByKey.get(claim.study_identity_key) ?? null,
+            resolvedSettings,
+            seenTodayIds
+          )
+        ).length;
+      const availableCount = availableSummaryCount + availableClaimCount;
 
       if (availableCount >= ABILITY_CHECK_REMINDER_MIN_DUE_CARDS) {
         unlockAbilityCheckReminder();
@@ -1800,7 +1842,7 @@ export default function BooksPage() {
           <AbilityCheckReminderBanner
             abilityCheckReminderCount={abilityCheckReminderCount}
             minDueCards={ABILITY_CHECK_REMINDER_MIN_DUE_CARDS}
-            onStart={() => router.push("/library-study/check")}
+            onStart={() => router.push("/library-study/check?start=1")}
             onHide={() => {
               hideAbilityCheckReminderForToday();
               setAbilityCheckReminderHidden(true);

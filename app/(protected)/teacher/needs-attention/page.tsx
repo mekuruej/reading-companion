@@ -85,9 +85,17 @@ const attentionCards: NeedsAttentionCard[] = [
   },
   {
     title: "Kanji Flags",
-    href: "/teacher/kanji?from=needs-attention",
+    href: "/teacher/kanji?from=needs-attention&status=flagged_review",
     eyebrow: "Kanji",
-    description: "Review kanji reports and flagged kanji readings.",
+    description: "Review kanji readings explicitly flagged for review.",
+    countKey: "kanji",
+  },
+  {
+    title: "Radical Needs Attention",
+    href: "/teacher/kanji/radicals?from=needs-attention",
+    eyebrow: "Kanji",
+    description: "Add missing radical and component data for kanji already used in the kanji map.",
+    countKey: "radicals",
   },
   {
     title: "Grammar DB",
@@ -146,6 +154,7 @@ export default function TeacherNeedsAttentionPage() {
     bookFlags: 0,
     missingBooks: 0,
     kanji: 0,
+    radicals: 0,
     grammar: 0,
     ratingFlags: 0,
     readingFit: 0,
@@ -288,6 +297,7 @@ export default function TeacherNeedsAttentionPage() {
           bookFlags: 0,
           missingBooks: 0,
           kanji: 0,
+          radicals: 0,
           wordReports: 0,
           grammar: grammarReviewCount ?? 0,
           readingFit: readingFitCount,
@@ -296,11 +306,16 @@ export default function TeacherNeedsAttentionPage() {
         };
 
         if (isSuperTeacher) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData.session?.access_token;
+
           const [
             { count: pendingBookRequestCount },
             { count: manualBookFlagCount },
             { data: globalBooks },
             { count: flaggedWordReportCount },
+            { data: flaggedKanjiMapRows },
+            radicalCountResult,
           ] = await Promise.all([
             supabase
               .from("book_requests")
@@ -320,11 +335,29 @@ export default function TeacherNeedsAttentionPage() {
               .from("user_book_words")
               .select("id", { count: "exact", head: true })
               .eq("flagged_for_review", true),
+            supabase
+              .from("vocabulary_kanji_map")
+              .select("vocabulary_cache_id")
+              .eq("flagged_for_review", true),
+            token
+              ? fetch("/api/teacher/kanji-radicals?countOnly=1", {
+                  headers: { Authorization: `Bearer ${token}` },
+                })
+                  .then((response) => response.json())
+                  .catch(() => null)
+              : Promise.resolve(null),
           ]);
 
           const missingBookInfoCount = ((globalBooks ?? []) as GlobalBookRow[]).filter(
             (book) => missingGlobalBookFields(book).length > 0
           ).length;
+          const flaggedKanjiCacheIds = Array.from(
+            new Set(
+              ((flaggedKanjiMapRows ?? []) as Array<{ vocabulary_cache_id: number | null }>)
+                .map((row) => (row.vocabulary_cache_id == null ? null : Number(row.vocabulary_cache_id)))
+                .filter((id): id is number => Number.isFinite(id))
+            )
+          );
 
           nextCounts = {
             ...nextCounts,
@@ -336,6 +369,11 @@ export default function TeacherNeedsAttentionPage() {
             bookFlags: manualBookFlagCount ?? 0,
             missingBooks: missingBookInfoCount,
             wordReports: flaggedWordReportCount ?? 0,
+            kanji: flaggedKanjiCacheIds.length,
+            radicals:
+              typeof radicalCountResult?.missing_count === "number"
+                ? radicalCountResult.missing_count
+                : 0,
           };
         }
 

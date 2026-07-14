@@ -6,6 +6,7 @@ export function TeacherBookInfoSectionHeader({
   missingFields,
 }: TeacherBookInfoSectionHeaderProps) {
   const hasMissingFields = missingFields.length > 0;
+  const missingFieldsLabel = missingFields.join(", ");
 
   return (
     <div className="flex flex-col gap-3 border-b border-stone-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -27,9 +28,7 @@ export function TeacherBookInfoSectionHeader({
         }`}
       >
         {hasMissingFields
-          ? `${missingFields.length} core field${
-              missingFields.length === 1 ? "" : "s"
-            } missing`
+          ? `Missing: ${missingFieldsLabel}`
           : "Core details complete"}
       </div>
     </div>

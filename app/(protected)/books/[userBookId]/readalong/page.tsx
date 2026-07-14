@@ -30,6 +30,14 @@ import {
     type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import {
+    clearPersistedTimedSession,
+    elapsedMsForPersistedTimedSession,
+    readPersistedTimedSession,
+    writePersistedTimedSession,
+} from "../_shared/timed-session/timedSessionPersistence";
+
+const READ_ALONG_TIMED_SESSION_MODE = "readalong";
 
 type ReadAlongWord = {
     id: string;
@@ -130,10 +138,12 @@ export default function ReadAlongPage() {
     const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
     const [timerSaveMessage, setTimerSaveMessage] = useState("");
     const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
+    const [timerPersistenceReady, setTimerPersistenceReady] = useState(false);
 
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const wordRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const scrollAnimationFrame = useRef<number | null>(null);
+    const skippedInitialPersistenceWriteRef = useRef(false);
 
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
@@ -741,6 +751,7 @@ export default function ReadAlongPage() {
         setIsRunning(false);
         setIsPaused(false);
         setSessionMinutesRead("");
+        clearPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
         setTimerSaveMessage("Your fluid reading session has been saved in the Reading Tab.");
 
         setTimeout(() => {
@@ -761,6 +772,121 @@ export default function ReadAlongPage() {
             if (interval) clearInterval(interval);
         };
     }, [isRunning, startTime]);
+
+    useEffect(() => {
+        if (!userBookId) return;
+
+        skippedInitialPersistenceWriteRef.current = false;
+        const persisted = readPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
+        if (persisted) {
+            const restoredElapsedMs = elapsedMsForPersistedTimedSession(persisted);
+            const restoredRunning =
+                !persisted.isPaused &&
+                !persisted.showTimedSessionForm &&
+                typeof persisted.startedAt === "number";
+
+            setStartTime(restoredRunning ? persisted.startedAt : null);
+            setElapsed(Math.floor(restoredElapsedMs / 1000));
+            setIsRunning(restoredRunning);
+            setIsPaused(persisted.isPaused && !persisted.showTimedSessionForm);
+            setShowTimedSessionForm(persisted.showTimedSessionForm);
+            setHasFinishedTimer(persisted.showTimedSessionForm);
+            setSessionDate(persisted.sessionDate);
+            setSessionStartPage(persisted.sessionStartPage);
+            setSessionEndPage(persisted.sessionEndPage);
+            setSessionMinutesRead(
+                persisted.showTimedSessionForm
+                    ? String(Math.max(1, Math.round(restoredElapsedMs / 60000)))
+                    : ""
+            );
+        }
+
+        setTimerPersistenceReady(true);
+    }, [userBookId]);
+
+    useEffect(() => {
+        if (!timerPersistenceReady || !userBookId) return;
+
+        if (!skippedInitialPersistenceWriteRef.current) {
+            skippedInitialPersistenceWriteRef.current = true;
+            return;
+        }
+
+        if (!isRunning && !isPaused && !showTimedSessionForm && elapsed <= 0) {
+            clearPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
+            return;
+        }
+
+        writePersistedTimedSession({
+            version: 1,
+            sessionMode: READ_ALONG_TIMED_SESSION_MODE,
+            userBookId,
+            startedAt: isRunning ? startTime : null,
+            accumulatedElapsedMs: isRunning ? 0 : Math.max(0, elapsed * 1000),
+            isPaused,
+            sessionDate,
+            sessionStartPage,
+            sessionEndPage,
+            showTimedSessionForm,
+            savedAt: Date.now(),
+        });
+    }, [
+        elapsed,
+        isPaused,
+        isRunning,
+        sessionDate,
+        sessionEndPage,
+        sessionStartPage,
+        showTimedSessionForm,
+        startTime,
+        timerPersistenceReady,
+        userBookId,
+    ]);
+
+    useEffect(() => {
+        if (!timerPersistenceReady || !userBookId) return;
+
+        const persistCurrentTimer = () => {
+            if (!isRunning && !isPaused && !showTimedSessionForm && elapsed <= 0) return;
+
+            writePersistedTimedSession({
+                version: 1,
+                sessionMode: READ_ALONG_TIMED_SESSION_MODE,
+                userBookId,
+                startedAt: isRunning ? startTime : null,
+                accumulatedElapsedMs: isRunning ? 0 : Math.max(0, elapsed * 1000),
+                isPaused,
+                sessionDate,
+                sessionStartPage,
+                sessionEndPage,
+                showTimedSessionForm,
+                savedAt: Date.now(),
+            });
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "hidden") persistCurrentTimer();
+        };
+
+        window.addEventListener("pagehide", persistCurrentTimer);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener("pagehide", persistCurrentTimer);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [
+        elapsed,
+        isPaused,
+        isRunning,
+        sessionDate,
+        sessionEndPage,
+        sessionStartPage,
+        showTimedSessionForm,
+        startTime,
+        timerPersistenceReady,
+        userBookId,
+    ]);
 
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
@@ -993,6 +1119,9 @@ export default function ReadAlongPage() {
         setStartTime(null);
         setIsPaused(false);
         setIsRunning(false);
+        if (userBookId) {
+            clearPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
+        }
     }
 
     return (

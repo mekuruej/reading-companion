@@ -23,6 +23,9 @@ type Book = {
   cover_url: string | null;
   genre: string | null;
   book_type: string | null;
+  language_code?: string | null;
+  edition_format?: string | null;
+  edition_note?: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
   series_number: number | null;
@@ -44,6 +47,11 @@ type Book = {
 type Option = {
   value: string;
   label: string;
+};
+
+type CommunitySignal = {
+  value: string;
+  count: number;
 };
 
 type PublisherRecord = {
@@ -94,11 +102,18 @@ type BookInfoTabProps = {
   onEditMyCopy: () => void;
   onCancel: () => void;
   onSave: () => void;
+  sharedGenres?: CommunitySignal[];
+  sharedContentNotes?: CommunitySignal[];
+  genreLabel?: (value: string | null | undefined) => string;
 
   titleReading: string;
   setTitleReading: (value: string) => void;
   bookType: string;
   setBookType: (value: string) => void;
+  editionFormat: string;
+  setEditionFormat: (value: string) => void;
+  editionNote: string;
+  setEditionNote: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
   pageCount: string;
@@ -219,11 +234,18 @@ export default function BookInfoTab({
   onEditMyCopy,
   onCancel,
   onSave,
+  sharedGenres = [],
+  sharedContentNotes = [],
+  genreLabel,
 
   titleReading,
   setTitleReading,
   bookType,
   setBookType,
+  editionFormat,
+  setEditionFormat,
+  editionNote,
+  setEditionNote,
   publishedDate,
   setPublishedDate,
   pageCount,
@@ -892,6 +914,61 @@ export default function BookInfoTab({
     setPublisherResults([]);
   }
 
+  function formatContentNoteLabel(value: string) {
+    return value
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  function CommunitySignalChips({
+    items,
+    labelFor,
+    expanded,
+    onToggle,
+    emptyLabel,
+  }: {
+    items: CommunitySignal[];
+    labelFor: (value: string) => string;
+    expanded: boolean;
+    onToggle: () => void;
+    emptyLabel: string;
+  }) {
+    const visibleItems = expanded ? items : items.slice(0, 5);
+    const hiddenCount = Math.max(items.length - visibleItems.length, 0);
+
+    if (items.length === 0) {
+      return <div className="text-sm text-stone-500">{emptyLabel}</div>;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        {visibleItems.map((item) => (
+          <span
+            key={item.value}
+            className="inline-flex items-center rounded-full border border-stone-300 bg-white px-3 py-1 text-sm font-medium text-stone-800"
+          >
+            {labelFor(item.value)} <span className="ml-1 text-stone-500">({item.count})</span>
+          </span>
+        ))}
+        {items.length > 5 ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex items-center rounded-full border border-stone-300 bg-stone-100 px-3 py-1 text-sm font-medium text-stone-700 transition hover:bg-stone-200"
+          >
+            {expanded ? "Show fewer" : `+ ${hiddenCount} more`}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  const [showAllCommunityGenres, setShowAllCommunityGenres] = useState(false);
+  const [showAllCommunityNotes, setShowAllCommunityNotes] = useState(false);
+  const hasCommunitySignals = sharedGenres.length > 0 || sharedContentNotes.length > 0;
+
   return (
     <div className="space-y-6">
       {userBookId ? (
@@ -933,6 +1010,10 @@ export default function BookInfoTab({
         setTitleReading={setTitleReading}
         bookType={bookType}
         setBookType={setBookType}
+        editionFormat={editionFormat}
+        setEditionFormat={setEditionFormat}
+        editionNote={editionNote}
+        setEditionNote={setEditionNote}
         publishedDate={publishedDate}
         setPublishedDate={setPublishedDate}
         pageCount={pageCount}
@@ -949,6 +1030,45 @@ export default function BookInfoTab({
         BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
         Detail={Detail}
       />
+
+      {hasCommunitySignals ? (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="mb-3">
+            <div className="text-sm font-semibold text-stone-900">Community Signals</div>
+            <div className="mt-1 text-sm text-stone-500">
+              Accumulated from reader reflections.
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Genres
+              </div>
+              <CommunitySignalChips
+                items={sharedGenres}
+                labelFor={(value) => genreLabel?.(value) ?? value}
+                expanded={showAllCommunityGenres}
+                onToggle={() => setShowAllCommunityGenres((value) => !value)}
+                emptyLabel="No shared genres yet."
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Content Notes
+              </div>
+              <CommunitySignalChips
+                items={sharedContentNotes}
+                labelFor={formatContentNoteLabel}
+                expanded={showAllCommunityNotes}
+                onToggle={() => setShowAllCommunityNotes((value) => !value)}
+                emptyLabel="No shared content notes yet."
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">

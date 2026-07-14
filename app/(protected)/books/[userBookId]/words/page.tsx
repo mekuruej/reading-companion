@@ -68,6 +68,7 @@ type WordRow = {
   hide_kanji_in_reading_support?: boolean | null;
   vocabulary_cache_id?: number | null;
   cache_surface?: string | null;
+  target_language_code?: string | null;
 };
 
 type ProfileRole = "teacher" | "student" | "super_teacher";
@@ -118,6 +119,7 @@ async function loadAllGlobalEncounterRows(ownerUserId: string) {
         `
       )
       .eq("user_books.user_id", ownerUserId)
+      .or("target_language_code.is.null,target_language_code.eq.ja")
       .or("hidden.is.null,hidden.eq.false")
       .range(from, to);
 
@@ -213,7 +215,7 @@ function studyIdentityKey(surface: string | null | undefined, reading: string | 
 
 
 function csvCell(value: unknown) {
-  const text = value == null ? "" : String(value);
+  const text = value == null ? "" : String(value).replace(/\s*\r?\n\s*/g, " ");
   return `"${text.replace(/"/g, '""')}"`;
 }
 
@@ -815,6 +817,7 @@ export default function BookWordsPage() {
               meaning_choices,
               meaning_choice_index,
               hide_kanji_in_reading_support,
+              target_language_code,
               vocabulary_cache_id,
               vocabulary_cache: vocabulary_cache_id (
                 surface
@@ -873,10 +876,12 @@ export default function BookWordsPage() {
     let cancelled = false;
 
     async function loadLibraryColorsForVocabList() {
-      const wordsToCheck = words.map((word) => ({
-        surface: word.surface,
-        reading: word.reading,
-      }));
+      const wordsToCheck = words
+        .filter((word) => word.target_language_code == null || word.target_language_code === "ja")
+        .map((word) => ({
+          surface: word.surface,
+          reading: word.reading,
+        }));
 
       const hasAnyLookupWord = wordsToCheck.some(
         (word) => word.surface?.trim() && word.reading?.trim()
@@ -994,7 +999,7 @@ export default function BookWordsPage() {
         word.meaning ?? "",
         word.meaning_choice_index == null ? "" : word.meaning_choice_index + 1,
         chapterCsvLabel(word),
-        word.page_number ?? "",
+        word.page_number == null ? "" : word.page_number,
         word.jlpt ?? "",
         commonCsvLabel(word.is_common),
       ]),

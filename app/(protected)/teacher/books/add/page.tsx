@@ -47,6 +47,9 @@ type BookRow = {
     cover_url: string | null;
     genre: string | null;
     book_type: string | null;
+    language_code: string | null;
+    edition_format: string | null;
+    edition_note: string | null;
     trigger_warnings: string | null;
     author: string | null;
     author_english_name: string | null;
@@ -288,6 +291,8 @@ export default function TeacherAddBookPage() {
     const [publisherImageUrl, setPublisherImageUrl] = useState("");
 
     const [publishedDate, setPublishedDate] = useState("");
+    const [editionFormat, setEditionFormat] = useState("");
+    const [editionNote, setEditionNote] = useState("");
     const [pageCount, setPageCount] = useState("");
     const [seriesNumber, setSeriesNumber] = useState("");
     const [linksText, setLinksText] = useState("");
@@ -391,6 +396,9 @@ export default function TeacherAddBookPage() {
         cover_url,
         genre,
         book_type,
+        language_code,
+        edition_format,
+        edition_note,
         trigger_warnings,
         author,
         author_english_name,
@@ -433,6 +441,8 @@ export default function TeacherAddBookPage() {
         setIsbn13(data.isbn13 ?? "");
         setCoverUrl(data.cover_url ?? "");
         setBookType(data.book_type ?? "");
+        setEditionFormat(data.edition_format ?? "");
+        setEditionNote(data.edition_note ?? "");
 
         setAuthor(data.author ?? "");
         setAuthorEnglishName(data.author_english_name ?? "");
@@ -590,6 +600,8 @@ export default function TeacherAddBookPage() {
         setIsbn13("");
         setCoverUrl("");
         setBookType("");
+        setEditionFormat("");
+        setEditionNote("");
 
         setAuthor("");
         setAuthorReading("");
@@ -712,6 +724,8 @@ export default function TeacherAddBookPage() {
                     title_reading: cleanText(titleReading),
                     author: cleanText(author),
                     isbn13: cleanIsbn13 || null,
+                    edition_format: cleanText(editionFormat),
+                    edition_note: cleanText(editionNote),
                 })
                 .select("id")
                 .single();
@@ -836,6 +850,8 @@ export default function TeacherAddBookPage() {
                     publisher: cleanText(isbnLookupPreview.publisher ?? ""),
                     published_date: cleanText(isbnLookupPreview.published_date ?? ""),
                     page_count: cleanPageCount,
+                    edition_format: cleanText(editionFormat),
+                    edition_note: cleanText(editionNote),
                 })
                 .select("id")
                 .single();
@@ -917,6 +933,8 @@ export default function TeacherAddBookPage() {
                     publisher_image_url: cleanText(publisherImageUrl),
 
                     published_date: cleanText(publishedDate),
+                    edition_format: cleanText(editionFormat),
+                    edition_note: cleanText(editionNote),
                     page_count: cleanPageCount,
                     series_number: cleanSeriesNumber,
                     related_links: relatedLinks,
@@ -1039,6 +1057,10 @@ export default function TeacherAddBookPage() {
                         setTitleReading={setTitleReading}
                         bookType={bookType}
                         setBookType={setBookType}
+                        editionFormat={editionFormat}
+                        setEditionFormat={setEditionFormat}
+                        editionNote={editionNote}
+                        setEditionNote={setEditionNote}
                         publishedDate={publishedDate}
                         setPublishedDate={setPublishedDate}
                         pageCount={pageCount}

@@ -325,6 +325,7 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const keyword = cleanText(url.searchParams.get("keyword"));
+    const countOnly = url.searchParams.get("countOnly") === "1";
 
     const mapRows = await loadKanjiMapSourceRows();
 
@@ -365,7 +366,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const results = kanjiList
+    const allResults = kanjiList
       .map((kanji) => {
         const radical = radicalsByKanji.get(kanji) ?? null;
         return {
@@ -389,8 +390,16 @@ export async function GET(req: Request) {
         if (a.has_radical !== b.has_radical) return a.has_radical ? 1 : -1;
         if (b.count !== a.count) return b.count - a.count;
         return a.kanji.localeCompare(b.kanji, "ja");
-      })
-      .slice(0, 120);
+      });
+
+    if (countOnly) {
+      return NextResponse.json({
+        ok: true,
+        missing_count: allResults.filter((item) => !item.has_radical).length,
+      });
+    }
+
+    const results = allResults.slice(0, 120);
 
     return NextResponse.json({ ok: true, results });
   } catch (err: any) {

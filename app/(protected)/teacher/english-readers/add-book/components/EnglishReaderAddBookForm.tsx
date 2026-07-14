@@ -2,27 +2,42 @@ type EnglishReaderAddBookFormProps = {
   title: string;
   author: string;
   isbn13: string;
+  editionFormat: string;
+  editionNote: string;
   externalUrl: string;
   recommendedLevel: string;
   saving: boolean;
   onTitleChange: (value: string) => void;
   onAuthorChange: (value: string) => void;
   onIsbn13Change: (value: string) => void;
+  onEditionFormatChange: (value: string) => void;
+  onEditionNoteChange: (value: string) => void;
   onExternalUrlChange: (value: string) => void;
   onRecommendedLevelChange: (value: string) => void;
   onSubmit: () => void;
 };
 
+const ENGLISH_EDITION_FORMAT_OPTIONS = [
+  { value: "paperback", label: "Paperback" },
+  { value: "hardcover", label: "Hardcover" },
+  { value: "ebook", label: "Ebook" },
+  { value: "other", label: "Other" },
+];
+
 export default function EnglishReaderAddBookForm({
   title,
   author,
   isbn13,
+  editionFormat,
+  editionNote,
   externalUrl,
   recommendedLevel,
   saving,
   onTitleChange,
   onAuthorChange,
   onIsbn13Change,
+  onEditionFormatChange,
+  onEditionNoteChange,
   onExternalUrlChange,
   onRecommendedLevelChange,
   onSubmit,
@@ -83,6 +98,41 @@ export default function EnglishReaderAddBookForm({
               placeholder="Hyphens are okay"
               className="w-full rounded-xl border border-stone-300 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-500"
             />
+          </div>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-stone-800">
+              Edition format <span className="font-normal text-stone-500">(optional)</span>
+            </label>
+            <select
+              value={editionFormat}
+              onChange={(event) => onEditionFormatChange(event.target.value)}
+              className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-500"
+            >
+              <option value="">Choose a format</option>
+              {ENGLISH_EDITION_FORMAT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-stone-800">
+              Edition note <span className="font-normal text-stone-500">(optional)</span>
+            </label>
+            <input
+              value={editionNote}
+              onChange={(event) => onEditionNoteChange(event.target.value)}
+              placeholder="US edition, UK edition, revised edition..."
+              className="w-full rounded-xl border border-stone-300 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-500"
+            />
+            <p className="mt-1 text-xs leading-5 text-stone-500">
+              Optional. Use for details that help identify this specific edition.
+            </p>
           </div>
         </div>
 

@@ -79,7 +79,7 @@ function TagChip({
       type="button"
       onClick={onClick}
       className={`inline-flex rounded-full border px-3 py-1 text-sm transition ${selected
-          ? "border-emerald-500 bg-emerald-100 text-emerald-900"
+          ? "border-sky-400 bg-sky-100 text-sky-950"
           : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
         }`}
     >
@@ -146,9 +146,9 @@ export default function CommunityTab({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-        <div className="text-sm font-semibold text-emerald-900">Shared with other readers</div>
-        <p className="mt-1 text-sm leading-6 text-emerald-900/85">
+      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <div className="text-sm font-semibold text-stone-900">Shared with other readers</div>
+        <p className="mt-1 text-sm leading-6 text-stone-600">
           Genres and content notes are community tags. What you add here will show up for
           everyone reading this book.
         </p>

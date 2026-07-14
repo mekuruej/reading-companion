@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type LibraryReminderBannerTone = "sky" | "violet";
+type LibraryReminderBannerTone = "sky" | "emerald" | "violet";
 
 type LibraryReminderBannerProps = {
   title: string;
@@ -20,6 +20,10 @@ const toneStyles: Record<
   sky: {
     shell: "border-sky-200 bg-sky-50",
     title: "text-sky-950",
+  },
+  emerald: {
+    shell: "border-emerald-300 bg-emerald-50 shadow-emerald-100",
+    title: "text-emerald-950",
   },
   violet: {
     shell: "border-violet-200 bg-violet-50",

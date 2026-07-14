@@ -63,7 +63,22 @@ function editorFromItem(item: RadicalQueueItem): EditorState {
 
 export default function TeacherKanjiRadicalsPage() {
   const searchParams = useSearchParams();
-  const backLink = getTeacherBackLink(searchParams.get("from"));
+  const fromParam = searchParams.get("from");
+  const backLink = getTeacherBackLink(fromParam);
+  const isNeedsAttention = fromParam === "needs-attention";
+  const headerCopy = isNeedsAttention
+    ? {
+        eyebrow: "Needs Attention",
+        title: "Radical Needs Attention",
+        description:
+          "Add missing main radicals, visible components, and stroke information for kanji already used in the kanji reading map.",
+      }
+    : {
+        eyebrow: "Kanji upkeep",
+        title: "Radical Upkeep",
+        description:
+          "Add the main radical, other visible radicals/components, and stroke information for kanji already used in the kanji reading map.",
+      };
 
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccess, setCanAccess] = useState(false);
@@ -239,13 +254,13 @@ export default function TeacherKanjiRadicalsPage() {
             ← {backLink.label}
           </Link>
           <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-            Kanji upkeep
+            {headerCopy.eyebrow}
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-stone-900">
-            Radical Upkeep
+            {headerCopy.title}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-            Add the main radical, other visible radicals/components, and stroke information for kanji already used in the kanji reading map.
+            {headerCopy.description}
           </p>
           <p className="mt-3 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-900">
             Mekuru uses the KangXi main radical as the official answer. If Nelson or another source lists a different main radical, put it in Notes as an alternative main radical.

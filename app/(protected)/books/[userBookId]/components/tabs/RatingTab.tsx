@@ -90,6 +90,23 @@ const READER_LEVEL_OPTIONS = [
 
 const READER_ADVICE_MAX_LENGTH = 120;
 
+function ReflectionUseNote({
+  label,
+  children,
+}: {
+  label: string;
+  children: string;
+}) {
+  return (
+    <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-[15px] leading-7 text-sky-950">
+      <div className="mb-1.5 text-xs font-black uppercase tracking-[0.16em]">
+        {label}
+      </div>
+      <p>{children}</p>
+    </div>
+  );
+}
+
 function ReflectionControls({
   editing,
   saving,
@@ -173,241 +190,252 @@ export default function RatingTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <ReflectionControls
-          editing={isEditingReflection}
-          saving={saving}
-          onEdit={onEditReflection}
-          onCancel={onCancel}
-          onSave={onSaveReflection}
-        />
-      </div>
+      <section id="reader-difficulty-section" className="space-y-3 scroll-mt-6">
+        <ReflectionUseNote label="Public contribution">
+          Your answers help other readers discover books in Find Your Next Book. Your responses may contribute to public book information, but they are not publicly connected to you as a person.
+        </ReflectionUseNote>
 
-      <div
-        id="reader-difficulty-section"
-        className="rounded-2xl border border-stone-200 bg-stone-50 p-4 scroll-mt-6"
-      >
-        <div className="mb-3 text-sm font-semibold text-stone-900">
-          Reader Difficulty
-        </div>
+        <div className="space-y-3 rounded-3xl border border-stone-300 bg-white p-4 shadow-sm">
+          <div className="flex justify-end">
+            <ReflectionControls
+              editing={isEditingReflection}
+              saving={saving}
+              onEdit={onEditReflection}
+              onCancel={onCancel}
+              onSave={onSaveReflection}
+            />
+          </div>
 
-        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm leading-6 text-sky-950">
-          Ratings, including entertainment and difficulty, will appear anonymously in Find
-          Your Next Book to help readers filter for books that fit them. Your profile remains
-          anonymous.
-        </div>
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-3 text-sm font-semibold text-stone-900">
+              Reader Difficulty
+            </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded border bg-white p-3 text-sm">
-            <div className="text-stone-600">Reader level from profile</div>
-            {currentLevelInfo ? (
-              <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
-                <div className="font-medium text-stone-900">
-                  {currentLevelInfo.value} · {currentLevelInfo.label}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded border bg-white p-3 text-sm">
+                <div className="text-stone-600">Reader level from profile</div>
+                {currentLevelInfo ? (
+                  <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
+                    <div className="font-medium text-stone-900">
+                      {currentLevelInfo.value} · {currentLevelInfo.label}
+                    </div>
+                    <div className="mt-1 text-xs text-stone-500">
+                      {currentLevelInfo.cefr} · {currentLevelInfo.jlpt}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 font-medium text-stone-900">
+                    {profileLevel ? profileLevel.replace(/_/g, " ") : "—"}
+                  </div>
+                )}
+                <div className="mt-3 text-xs leading-5 text-stone-500">
+                  Reader level comes from your profile. Change it in Profile Settings if needed.
                 </div>
-                <div className="mt-1 text-xs text-stone-500">
-                  {currentLevelInfo.cefr} · {currentLevelInfo.jlpt}
+              </div>
+
+              <DifficultyField
+                value={row.rating_difficulty}
+                editing={isEditingReflection}
+                bookType={bookType}
+                inputValue={ratingDifficulty}
+                setInputValue={setRatingDifficulty}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-3 text-sm font-semibold text-stone-900">
+              Entertainment Rating
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <StarRatingField
+                label="Entertainment Rating"
+                value={row.rating_overall}
+                editing={isEditingReflection}
+                inputValue={ratingOverall}
+                setInputValue={setRatingOverall}
+                descriptions={{
+                  5: "Loved it. Highly recommend.",
+                  4.75: "Good, solid book. Definitely recommend.",
+                  4.5: "Good, solid book. Would most likely recommend.",
+                  4.25: "Good, solid book. May recommend.",
+                  4: "Good, solid book. Probably wouldn't recommend for certain reasons.",
+                  3.75: "Some parts worked; others didn't. Would recommend to specific people.",
+                  3.5: "Some parts worked; others didn't. May recommend.",
+                  3.25: "Some parts worked; others didn't. Would only recommend with reservations.",
+                  3: "Some parts worked; some parts didn't. Definitely wouldn't recommend.",
+                  2.5: "Some parts were okay, but overall, not for me.",
+                  2: "Definitely not for me, but the author tried.",
+                  1.5: "Definitely not for me. You should steer clear too.",
+                  1: "Hated it.",
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-3 text-sm font-semibold text-stone-900">
+              Advice to a Reader
+            </div>
+
+            {!isEditingReflection ? (
+              <div className="min-h-[64px] whitespace-pre-wrap rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-700">
+                {row.reader_advice?.trim() ? row.reader_advice : "—"}
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={readerAdvice}
+                  maxLength={READER_ADVICE_MAX_LENGTH}
+                  onChange={(e) =>
+                    setReaderAdvice(e.target.value.slice(0, READER_ADVICE_MAX_LENGTH))
+                  }
+                  placeholder="A tiny note for the next reader…"
+                  className="min-h-[90px] w-full rounded border bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                />
+                <div className="mt-2 flex items-center justify-between gap-3 text-xs text-stone-500">
+                  <span>Short and practical works best.</span>
+                  <span>
+                    {readerAdvice.length}/{READER_ADVICE_MAX_LENGTH}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <ReflectionUseNote label="Private">
+          This information is just for your own reading history. In the future, Mekuru may offer an optional way to share reviews, but your review is private unless you explicitly choose otherwise.
+        </ReflectionUseNote>
+
+        <div className="space-y-3 rounded-3xl border border-stone-300 bg-white p-4 shadow-sm">
+          <div className="flex justify-end">
+            <ReflectionControls
+              editing={isEditingReflection}
+              saving={saving}
+              onEdit={onEditReflection}
+              onCancel={onCancel}
+              onSave={onSaveReflection}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+
+            {!isEditingReflection ? (
+              <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
+                {row.my_review?.trim() ? row.my_review : "—"}
+              </div>
+            ) : (
+              <textarea
+                value={myReview}
+                onChange={(e) => setMyReview(e.target.value)}
+                placeholder="Write your review here…"
+                className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+              />
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-3 text-sm font-semibold text-stone-900">
+              Reading Memory
+            </div>
+
+            {!isEditingReflection ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded border bg-white p-3 text-sm">
+                  <div className="text-stone-600">Favorite Quotes</div>
+                  <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
+                    {favoriteQuotes.trim() ? favoriteQuotes : "—"}
+                  </div>
+                </div>
+
+                <div className="rounded border bg-white p-3 text-sm">
+                  <div className="text-stone-600">Memorable Words</div>
+                  <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
+                    {memorableWords.trim() ? memorableWords : "—"}
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="mt-2 font-medium text-stone-900">
-                {profileLevel ? profileLevel.replace(/_/g, " ") : "—"}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded border bg-white p-3 text-sm">
+                  <div className="mb-2 text-stone-600">Favorite Quotes</div>
+                  <textarea
+                    value={favoriteQuotes}
+                    onChange={(e) => setFavoriteQuotes(e.target.value)}
+                    placeholder="Add favorite quotes here…"
+                    className="min-h-[140px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                  />
+                  <div className="mt-2 text-xs text-stone-500">
+                    One quote per line works nicely.
+                  </div>
+                </div>
+
+                <div className="rounded border bg-white p-3 text-sm">
+                  <div className="mb-2 text-stone-600">5 Memorable Words</div>
+                  <textarea
+                    value={memorableWords}
+                    onChange={(e) => setMemorableWords(e.target.value)}
+                    placeholder="List memorable words here…"
+                    className="min-h-[140px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                  />
+                  <div className="mt-2 text-xs text-stone-500">
+                    One word per line is easiest.
+                  </div>
+                </div>
               </div>
             )}
-            <div className="mt-3 text-xs leading-5 text-stone-500">
-              Reader level comes from your profile. Change it in Profile Settings if needed.
-            </div>
           </div>
-
-          <DifficultyField
-            value={row.rating_difficulty}
-            editing={isEditingReflection}
-            bookType={bookType}
-            inputValue={ratingDifficulty}
-            setInputValue={setRatingDifficulty}
-          />
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">
-          Entertainment Rating
-        </div>
+      <section className="space-y-3">
+        <ReflectionUseNote label="Helps Mekuru">
+          These answers help Mekuru improve book information and reading data. They may appear as shared book tags, but they are not shown as your personal review or publicly attached to you.
+        </ReflectionUseNote>
 
-        <div className="grid grid-cols-1 gap-3">
-          <StarRatingField
-            label="Entertainment Rating"
-            value={row.rating_overall}
-            editing={isEditingReflection}
-            inputValue={ratingOverall}
-            setInputValue={setRatingOverall}
-            descriptions={{
-              1: "Not for me / did not enjoy much.",
-              2: "Some parts worked, but I would not rush to recommend it.",
-              3: "Good solid book.",
-              4: "Very good! Definitely will recommend it.",
-              5: "Loved it / highly recommend.",
-            }}
-          />
-        </div>
-
-        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-          Ratings, including entertainment and difficulty, will appear anonymously in Find
-          Your Next Book to help readers filter for books that fit them. Your profile remains
-          anonymous.
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
-        <div className="mb-3 text-sm font-semibold text-sky-950">
-          Advice to a Reader
-        </div>
-
-        {!isEditingReflection ? (
-          <div className="min-h-[64px] whitespace-pre-wrap rounded border border-sky-100 bg-white p-3 text-sm leading-6 text-stone-700">
-            {row.reader_advice?.trim() ? row.reader_advice : "—"}
-          </div>
-        ) : (
-          <>
-            <textarea
-              value={readerAdvice}
-              maxLength={READER_ADVICE_MAX_LENGTH}
-              onChange={(e) =>
-                setReaderAdvice(e.target.value.slice(0, READER_ADVICE_MAX_LENGTH))
-              }
-              placeholder="A tiny note for the next reader…"
-              className="min-h-[90px] w-full rounded border bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
+        <div className="space-y-3 rounded-3xl border border-stone-300 bg-white p-4 shadow-sm">
+          <div className="flex justify-end">
+            <ReflectionControls
+              editing={isEditingReflection}
+              saving={saving}
+              onEdit={onEditReflection}
+              onCancel={onCancel}
+              onSave={onSaveReflection}
             />
-            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-sky-900/75">
-              <span>Short and practical works best.</span>
-              <span>
-                {readerAdvice.length}/{READER_ADVICE_MAX_LENGTH}
-              </span>
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-4 text-sm font-semibold text-stone-900">
+              Help Mekuru
             </div>
-          </>
-        )}
-      </div>
 
-      <div className="flex items-center justify-center">
-        <ReflectionControls
-          editing={isEditingReflection}
-          saving={saving}
-          onEdit={onEditReflection}
-          onCancel={onCancel}
-          onSave={onSaveReflection}
-        />
-      </div>
-
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
-
-        {!isEditingReflection ? (
-          <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
-            {row.my_review?.trim() ? row.my_review : "—"}
+            <CommunityTab
+              singleEditMode
+              editing={isEditingReflection}
+              isEditingGenres={false}
+              isEditingContentNotes={false}
+              saving={saving}
+              onEditGenres={onEditReflection}
+              onEditContentNotes={onEditReflection}
+              onCancel={onCancel}
+              onSave={onSaveReflection}
+              genre={genre}
+              setGenre={setGenre}
+              triggerWarnings={triggerWarnings}
+              setTriggerWarnings={setTriggerWarnings}
+              sharedGenres={sharedGenres}
+              sharedContentNotes={sharedContentNotes}
+              genreLabel={genreLabel}
+              GENRE_OPTIONS={GENRE_OPTIONS}
+            />
           </div>
-        ) : (
-          <textarea
-            value={myReview}
-            onChange={(e) => setMyReview(e.target.value)}
-            placeholder="Write your review here…"
-            className="min-h-[160px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-          />
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-        <div className="mb-4">
-          <div className="text-sm font-semibold text-emerald-950">
-            Help other readers
-          </div>
-          <p className="mt-1 text-sm leading-6 text-emerald-900/85">
-            These optional fields are shared community tags. They help future readers
-            understand what kind of book this is.
-          </p>
         </div>
-
-        <CommunityTab
-          singleEditMode
-          editing={isEditingReflection}
-          isEditingGenres={false}
-          isEditingContentNotes={false}
-          saving={saving}
-          onEditGenres={onEditReflection}
-          onEditContentNotes={onEditReflection}
-          onCancel={onCancel}
-          onSave={onSaveReflection}
-          genre={genre}
-          setGenre={setGenre}
-          triggerWarnings={triggerWarnings}
-          setTriggerWarnings={setTriggerWarnings}
-          sharedGenres={sharedGenres}
-          sharedContentNotes={sharedContentNotes}
-          genreLabel={genreLabel}
-          GENRE_OPTIONS={GENRE_OPTIONS}
-        />
-      </div>
-
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">
-          Reading Memory
-        </div>
-
-        {!isEditingReflection ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded border bg-white p-3 text-sm">
-              <div className="text-stone-600">Favorite Quotes</div>
-              <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
-                {favoriteQuotes.trim() ? favoriteQuotes : "—"}
-              </div>
-            </div>
-
-            <div className="rounded border bg-white p-3 text-sm">
-              <div className="text-stone-600">Memorable Words</div>
-              <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
-                {memorableWords.trim() ? memorableWords : "—"}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded border bg-white p-3 text-sm">
-              <div className="mb-2 text-stone-600">Favorite Quotes</div>
-              <textarea
-                value={favoriteQuotes}
-                onChange={(e) => setFavoriteQuotes(e.target.value)}
-                placeholder="Add favorite quotes here…"
-                className="min-h-[140px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-              />
-              <div className="mt-2 text-xs text-stone-500">
-                One quote per line works nicely.
-              </div>
-            </div>
-
-            <div className="rounded border bg-white p-3 text-sm">
-              <div className="mb-2 text-stone-600">5 Memorable Words</div>
-              <textarea
-                value={memorableWords}
-                onChange={(e) => setMemorableWords(e.target.value)}
-                placeholder="List memorable words here…"
-                className="min-h-[140px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-              />
-              <div className="mt-2 text-xs text-stone-500">
-                One word per line is easiest.
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center justify-center">
-        <ReflectionControls
-          editing={isEditingReflection}
-          saving={saving}
-          onEdit={onEditReflection}
-          onCancel={onCancel}
-          onSave={onSaveReflection}
-        />
-      </div>
+      </section>
     </div>
   );
 }

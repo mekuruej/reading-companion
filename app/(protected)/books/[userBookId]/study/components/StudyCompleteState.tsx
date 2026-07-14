@@ -1,8 +1,8 @@
 type StudyCompleteStateProps = {
-  nextStudyModeLabel: string;
+  nextStudyModeLabel?: string;
   onGoToVocabList: () => void;
   onStudyAgain: () => void;
-  onNextStudyMode: () => void;
+  onNextStudyMode?: () => void;
 };
 
 export default function StudyCompleteState({
@@ -21,13 +21,15 @@ export default function StudyCompleteState({
         </p>
 
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button
+          {onNextStudyMode && nextStudyModeLabel ? (
+            <button
             type="button"
             onClick={onNextStudyMode}
             className="rounded bg-gray-700 px-4 py-2 text-white transition hover:bg-gray-800"
           >
             Next: {nextStudyModeLabel}
           </button>
+          ) : null}
 
           <button
             type="button"

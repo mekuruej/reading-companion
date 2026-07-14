@@ -25,6 +25,22 @@ function ratingDescription(
   return descriptions[value] ?? descriptions[Math.round(value)] ?? "—";
 }
 
+const ENTERTAINMENT_RATING_VALUES = [
+  5,
+  4.75,
+  4.5,
+  4.25,
+  4,
+  3.75,
+  3.5,
+  3.25,
+  3,
+  2.5,
+  2,
+  1.5,
+  1,
+];
+
 type StarRatingFieldProps = {
   label: string;
   value: number | null;
@@ -79,27 +95,28 @@ export default function StarRatingField({
             </button>
           </div>
 
-          <input
-            type="range"
-            min="1"
-            max="5"
-            step="0.25"
-            value={selected ?? 3}
-            onChange={(event) => setInputValue(event.target.value)}
-            className="w-full"
-          />
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ENTERTAINMENT_RATING_VALUES.map((rating) => {
+              const isSelected = selected === rating;
 
-          <div className="grid grid-cols-5 gap-1 text-center text-[11px] text-stone-500">
-            <span>1</span>
-            <span>2</span>
-            <span>3</span>
-            <span>4</span>
-            <span>5</span>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 text-[11px] text-stone-500">
-            <span>Not for me</span>
-            <span>Loved it</span>
+              return (
+                <button
+                  key={rating}
+                  type="button"
+                  onClick={() => setInputValue(String(rating))}
+                  className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                    isSelected
+                      ? "border-amber-400 bg-amber-100 text-amber-950 shadow-sm"
+                      : "border-stone-200 bg-white text-stone-700 hover:bg-amber-50"
+                  }`}
+                >
+                  <span className="font-black">{formatRating(rating)}</span>
+                  <span className="ml-2 text-xs leading-5">
+                    {ratingDescription(descriptions, rating)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

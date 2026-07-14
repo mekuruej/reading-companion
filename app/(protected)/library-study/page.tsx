@@ -5,11 +5,11 @@ import Link from "next/link";
 
 const studyPaths = [
   {
-    title: "Free Study",
+    title: "Foundation Sets",
     href: "/library-study/characters",
     eyebrow: "Start here",
     description:
-      "Practice kana, kanji readings, and eventually a small demo flashcard set. Good for simple, low-pressure study.",
+      "Practice kana, kanji readings, and basic vocabulary sets. Good for simple, low-pressure study.",
     className: "border-sky-200 bg-sky-50 text-sky-950",
   },
   {
@@ -44,9 +44,7 @@ export default function StudyToolsPage() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Choose a study path. Free Study is for character practice, Book
-            Study is for everyday saved-word study, and Advanced Study explains
-            Mekuru’s full vocabulary growth cycle.
+            Choose a study path. Foundation Sets are for kana, kanji, and basic vocabulary practice, Book Study is for everyday saved-word study, and Advanced Study explains Mekuru’s full vocabulary growth cycle.
           </p>
         </div>
 
@@ -83,7 +81,7 @@ export default function StudyToolsPage() {
           </p>
 
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Start with Free Study for character practice and simple study tools.
+            Start with Foundation Sets for character practice, basic vocabulary, and simple study tools.
           </p>
 
           <p className="mt-1 text-sm leading-6 text-slate-600">

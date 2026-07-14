@@ -15,12 +15,6 @@ const advancedTools = [
         className: "border-sky-200 bg-sky-50 text-sky-950",
     },
     {
-        title: "Ability Check",
-        href: "/library-study/check",
-        eyebrow: "Color movement",
-        className: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    },
-    {
         title: "久しぶり Review",
         href: "/library-study/practice?color=purple",
         eyebrow: "Mastered words",
@@ -99,7 +93,7 @@ export default function AdvancedStudyPage() {
                         Quick study jumps
                     </p>
 
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {advancedTools.map((tool) => (
                             <Link
                                 key={tool.href}
@@ -122,6 +116,10 @@ export default function AdvancedStudyPage() {
                             </Link>
                         ))}
                     </div>
+
+                    <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-950">
+                        Ability Check opens from your Library page when enough cards are ready.
+                    </p>
                 </section>
 
                 <VocabularyGrowthCycleSection />
@@ -196,7 +194,7 @@ export default function AdvancedStudyPage() {
                                 </h3>
                                 <p className="mt-2 text-sm leading-6 text-slate-600">
                                     This word has enough reading support for a gate check.
-                                    You can try Ability Check, or give it more time if it still feels too hard.
+                                    Look for the Ability Check alert on your Library page.
                                 </p>
                             </div>
 

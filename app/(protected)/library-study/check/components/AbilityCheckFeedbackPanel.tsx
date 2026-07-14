@@ -10,12 +10,14 @@ type AbilityCheckFeedbackPanelProps = {
     ok: boolean;
     correct: string;
   };
+  correctionComplete?: boolean;
   isMeaningCheck: boolean;
   card: AbilityCheckFeedbackCard | undefined;
 };
 
 export default function AbilityCheckFeedbackPanel({
   checked,
+  correctionComplete = false,
   isMeaningCheck,
   card,
 }: AbilityCheckFeedbackPanelProps) {
@@ -61,6 +63,8 @@ export default function AbilityCheckFeedbackPanel({
         </div>
       ) : checked.ok ? (
         <p className="text-green-700">Correct!</p>
+      ) : correctionComplete ? (
+        <p className="text-green-700">Correction accepted.</p>
       ) : (
         <>
           <p className="text-red-700">Not quite.</p>

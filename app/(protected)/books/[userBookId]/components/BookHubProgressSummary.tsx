@@ -8,6 +8,7 @@ type BookHubProgressSummaryProps = {
   progressPercentLabel?: string;
   lastSavedWordLabel?: string;
   lastChapterLabel?: string;
+  lastPageLabel?: string;
   daysEngagedLabel: string;
   savedWordsPerPageLabel: string;
   averageMinutesPerPageLabel: string;
@@ -20,31 +21,49 @@ export default function BookHubProgressSummary({
   progressPercentLabel,
   lastSavedWordLabel,
   lastChapterLabel,
+  lastPageLabel,
   daysEngagedLabel,
   savedWordsPerPageLabel,
   averageMinutesPerPageLabel,
 }: BookHubProgressSummaryProps) {
+  const showLastDetailLine = lastSavedWordLabel || lastChapterLabel || lastPageLabel;
+
   return (
     <>
       <div>
         <div className="mb-3 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700 shadow-sm sm:px-5">
           <div className="font-semibold text-stone-900">Your Progress</div>
           <div className="mt-1 text-stone-600">{progressSummaryLabel}</div>
-          {lastSavedWordLabel ? (
+          {showLastDetailLine ? (
             <div className="mt-1 text-stone-600">
-              Last saved word: <span className="text-stone-800">{lastSavedWordLabel}</span>
+              {lastSavedWordLabel ? (
+                <>
+                  Last saved word: <span className="text-stone-800">{lastSavedWordLabel}</span>
+                </>
+              ) : null}
               {lastChapterLabel ? (
                 <>
-                  {" "}
-                  <span className="text-stone-400">·</span> Last chapter:{" "}
+                  {lastSavedWordLabel ? (
+                    <>
+                      {" "}
+                      <span className="text-stone-400">·</span>{" "}
+                    </>
+                  ) : null}
+                  Last chapter:{" "}
                   <span className="text-stone-800">{lastChapterLabel}</span>
                 </>
               ) : null}
-            </div>
-          ) : null}
-          {!lastSavedWordLabel && lastChapterLabel ? (
-            <div className="mt-1 text-stone-600">
-              Last chapter: <span className="text-stone-800">{lastChapterLabel}</span>
+              {lastPageLabel ? (
+                <>
+                  {lastSavedWordLabel || lastChapterLabel ? (
+                    <>
+                      {" "}
+                      <span className="text-stone-400">·</span>{" "}
+                    </>
+                  ) : null}
+                  Page reached: <span className="text-stone-800">{lastPageLabel}</span>
+                </>
+              ) : null}
             </div>
           ) : null}
         </div>

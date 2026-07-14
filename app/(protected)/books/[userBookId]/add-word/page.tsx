@@ -37,6 +37,9 @@ import AddWordDetailFields from "./components/AddWordDetailFields";
 import AddWordSuperTeacherTools from "./components/AddWordSuperTeacherTools";
 import AddWordFormShell from "./components/AddWordFormShell";
 import AddWordAddEditCard from "./components/AddWordAddEditCard";
+import AddEnglishWordFields from "./components/AddEnglishWordFields";
+
+type EnglishItemType = "word" | "phrase";
 
 type JishoChoice = {
   surface: string;
@@ -65,6 +68,7 @@ type SessionWord = {
   chapterName: string;
   hideKanjiInReadingSupport: boolean;
   pageOrder: number | null;
+  itemType?: EnglishItemType;
 };
 
 type LastSavedWordContext = {
@@ -206,6 +210,7 @@ export default function AddWordPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
+  const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
   const [canUseAddWord, setCanUseAddWord] = useState(false);
@@ -223,6 +228,7 @@ export default function AddWordPage() {
 
   const [meaningChoices, setMeaningChoices] = useState<string[]>([]);
   const [meaningChoiceIndex, setMeaningChoiceIndex] = useState<number | null>(0);
+  const [englishItemType, setEnglishItemType] = useState<EnglishItemType>("word");
 
   const [pageNumber, setPageNumber] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
@@ -265,6 +271,7 @@ export default function AddWordPage() {
   }
   const wordFieldsRef = useRef<HTMLDivElement | null>(null);
   const isSuperTeacher = superTeacherRole === "super_teacher" || profileIsSuperTeacher;
+  const isEnglishBook = bookLanguageCode === "en";
 
   const addWordProgressLine = useMemo(() => {
     const parts = [];
@@ -380,7 +387,8 @@ export default function AddWordPage() {
             user_id,
             books:book_id (
               title,
-              cover_url
+              cover_url,
+              language_code
             )
           `
         )
@@ -417,6 +425,7 @@ export default function AddWordPage() {
       const b = (data as any)?.books;
       setBookTitle(b?.title ?? "");
       setBookCover(b?.cover_url ?? "");
+      setBookLanguageCode(b?.language_code ?? null);
     }
 
     loadBookInfo();
@@ -534,6 +543,11 @@ export default function AddWordPage() {
     let cancelled = false;
 
     async function loadLibraryColors() {
+      if (isEnglishBook) {
+        setLibraryColorByWordKey({});
+        return;
+      }
+
       const currentSurface = useAlternateSurface ? alternateSurface : word;
       const wordsToCheck = [
         ...sessionWords.map((item) => ({
@@ -580,7 +594,7 @@ export default function AddWordPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionWords, word, alternateSurface, useAlternateSurface, reading, editingSessionWordId]);
+  }, [sessionWords, word, alternateSurface, useAlternateSurface, reading, editingSessionWordId, isEnglishBook]);
 
   function prepareForNextWord() {
     window.setTimeout(() => {
@@ -622,6 +636,7 @@ export default function AddWordPage() {
     setIsCommon(false);
     setMeaningChoices([]);
     setMeaningChoiceIndex(0);
+    setEnglishItemType("word");
     setHideKanjiInReadingSupport(false);
     setEditingSessionWordId(null);
     setLookupCandidates([]);
@@ -663,6 +678,7 @@ export default function AddWordPage() {
     setPageNumber(sessionWord.pageNumber);
     setChapterNumber(sessionWord.chapterNumber);
     setChapterName(sessionWord.chapterName);
+    setEnglishItemType(sessionWord.itemType ?? "word");
     setHideKanjiInReadingSupport(sessionWord.hideKanjiInReadingSupport);
     setLookupCandidates([]);
     setMessage(`Editing "${sessionWord.surface}"`);
@@ -738,6 +754,211 @@ export default function AddWordPage() {
       setMessage("❌ Could not load dictionary data.");
     } finally {
       setLookupLoading(false);
+    }
+  }
+
+  async function handleSaveEnglish() {
+    setMessage("");
+
+    const cleanSource = word.trim();
+    const cleanSupport = meaning.trim();
+
+    if (!userBookId) {
+      setMessage("❌ Missing userBookId.");
+      return;
+    }
+
+    if (!cleanSource) {
+      setMessage("❌ Enter an English word or phrase.");
+      return;
+    }
+
+    if (!cleanSupport) {
+      setMessage("❌ Add Japanese meaning/support.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setMessage("❌ Please sign in.");
+        return;
+      }
+
+      if (!canAccessBook) {
+        setMessage("❌ You do not have access to save words to this book.");
+        setSaving(false);
+        return;
+      }
+
+      if (!canUseAddWord) {
+        const copy = getFullAccessRequiredCopy("add_word");
+        setMessage(`❌ ${copy.message}`);
+        setSaving(false);
+        return;
+      }
+
+      const chapterNum = toNullableInt(chapterNumber);
+      const pageNum = toNullableInt(pageNumber);
+      const chapterNameTrimmed = chapterName.trim() || null;
+      const today = new Date().toISOString().slice(0, 10);
+
+      const editingExisting =
+        editingSessionWordId != null
+          ? sessionWords.find((w) => w.id === editingSessionWordId) ?? null
+          : null;
+
+      const basePayload = {
+        user_book_id: userBookId,
+        vocabulary_cache_id: null,
+        surface: cleanSource,
+        encountered_surface: cleanSource,
+        base_form: cleanSource,
+        lookup_surface: cleanSource,
+        target_language_code: "en",
+        support_language_code: "ja",
+        item_type: englishItemType,
+        reading: null,
+        meaning: cleanSupport,
+        other_definition: cleanSupport,
+        meaning_choices: [],
+        meaning_choice_index: null,
+        jlpt: null,
+        is_common: null,
+        page_number: pageNum,
+        chapter_number: chapterNum,
+        chapter_name: chapterNameTrimmed,
+        hide_kanji_in_reading_support: false,
+        seen_on: today,
+      };
+
+      if (!editingExisting) {
+        const payload = {
+          ...basePayload,
+          page_order: await getNextPageOrder(userBookId, chapterNum, pageNum),
+        };
+
+        const { data: insertedRow, error } = await supabase
+          .from("user_book_words")
+          .insert(payload)
+          .select(
+            `
+            id,
+            surface,
+            reading,
+            meaning,
+            page_number,
+            chapter_number,
+            chapter_name,
+            page_order,
+            item_type
+          `
+          )
+          .single();
+
+        if (error) throw error;
+
+        const newSessionWord: SessionWord = {
+          id: insertedRow.id,
+          surface: insertedRow.surface ?? cleanSource,
+          reading: insertedRow.reading ?? null,
+          meaning: insertedRow.meaning ?? cleanSupport,
+          jlpt: "NON-JLPT",
+          isCommon: false,
+          meaningChoices: [],
+          meaningChoiceIndex: null,
+          pageNumber: toDisplayString(insertedRow.page_number),
+          chapterNumber: toDisplayString(insertedRow.chapter_number),
+          chapterName: insertedRow.chapter_name ?? "",
+          hideKanjiInReadingSupport: false,
+          pageOrder: insertedRow.page_order ?? null,
+          itemType: insertedRow.item_type === "phrase" ? "phrase" : "word",
+        };
+
+        setSessionWords((prev) => [
+          newSessionWord,
+          ...prev.filter((item) => item.id !== newSessionWord.id),
+        ]);
+        setLastSavedWordContext({
+          surface: newSessionWord.surface,
+          page: newSessionWord.pageNumber,
+        });
+        setSavedNotice(`Saved: ${cleanSource}`);
+        setMessage("");
+      } else {
+        const { data: updatedRow, error } = await supabase
+          .from("user_book_words")
+          .update(basePayload)
+          .eq("id", editingExisting.id)
+          .eq("user_book_id", userBookId)
+          .select(
+            `
+            id,
+            surface,
+            reading,
+            meaning,
+            page_number,
+            chapter_number,
+            chapter_name,
+            page_order,
+            item_type
+          `
+          )
+          .single();
+
+        if (error) throw error;
+
+        const updatedSessionWord: SessionWord = {
+          id: updatedRow.id,
+          surface: updatedRow.surface ?? cleanSource,
+          reading: updatedRow.reading ?? null,
+          meaning: updatedRow.meaning ?? cleanSupport,
+          jlpt: "NON-JLPT",
+          isCommon: false,
+          meaningChoices: [],
+          meaningChoiceIndex: null,
+          pageNumber: toDisplayString(updatedRow.page_number),
+          chapterNumber: toDisplayString(updatedRow.chapter_number),
+          chapterName: updatedRow.chapter_name ?? "",
+          hideKanjiInReadingSupport: false,
+          pageOrder: updatedRow.page_order ?? null,
+          itemType: updatedRow.item_type === "phrase" ? "phrase" : "word",
+        };
+
+        setSessionWords((prev) => [
+          updatedSessionWord,
+          ...prev.filter((item) => item.id !== updatedSessionWord.id),
+        ]);
+        setLastSavedWordContext({
+          surface: updatedSessionWord.surface,
+          page: updatedSessionWord.pageNumber,
+        });
+        setSavedNotice(`Saved: ${cleanSource}`);
+        setMessage("");
+      }
+
+      setChapterNameOptions((current) =>
+        addChapterNameOption(current, chapterNameTrimmed)
+      );
+      if (chapterNameTrimmed && chapterNum != null) {
+        setChapterNumberByName((current) => ({
+          ...current,
+          [chapterNameTrimmed]: String(chapterNum),
+        }));
+      }
+
+      clearForm(true, { preserveSavedNotice: true });
+      prepareForNextWord();
+    } catch (err: any) {
+      console.error("English save error:", err);
+      setMessage(`❌ Failed saving: ${err?.message ?? "unknown error"}`);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -1248,8 +1469,37 @@ export default function AddWordPage() {
         <AddWordStatusMessage message={message} />
         <AddWordAddEditCard>
           <AddWordFormShell editingSurface={editingSessionWordId ? word : null}>
-
-            <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
+            {isEnglishBook ? (
+              <AddEnglishWordFields
+                itemType={englishItemType}
+                source={word}
+                support={meaning}
+                pageNumber={pageNumber}
+                chapterNumber={chapterNumber}
+                chapterName={chapterName}
+                chapterNameOptions={sortedChapterNameOptions}
+                saving={saving}
+                isEditing={editingSessionWordId != null}
+                savedNotice={savedNotice}
+                onItemTypeChange={setEnglishItemType}
+                onSourceChange={(value) => {
+                  setWord(value);
+                  setSavedNotice("");
+                }}
+                onSupportChange={(value) => {
+                  setMeaning(value);
+                  setMeaningChoiceIndex(null);
+                  setSavedNotice("");
+                }}
+                onPageNumberChange={setPageNumber}
+                onChapterNumberChange={setChapterNumber}
+                onChapterNameChange={updateChapterName}
+                onSaveWord={() => void handleSaveEnglish()}
+                onClearWordFields={() => clearForm(true)}
+              />
+            ) : (
+              <>
+                <div className="grid gap-3 lg:grid-cols-2 lg:items-end">
               <AddWordQuickSearchForm
                 word={word}
                 lookupLoading={lookupLoading}
@@ -1364,6 +1614,8 @@ export default function AddWordPage() {
                 onSaveAndApproveWordSky={() => void saveToGlobalWordData(true)}
               />
             ) : null}
+              </>
+            )}
           </AddWordFormShell>
 
           <AddWordRecentSessionWords wordCount={sessionWords.length}>

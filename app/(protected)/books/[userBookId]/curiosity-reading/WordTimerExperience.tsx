@@ -40,12 +40,15 @@ import CuriosityWordDetailFields from "./components/CuriosityWordDetailFields";
 import CuriosityAddEditWordFormShell from "./components/CuriosityAddEditWordFormShell";
 import CuriosityAddEditWordCard from "./components/CuriosityAddEditWordCard";
 import MobileQuickCapture from "./components/MobileQuickCapture";
+import AddEnglishWordFields from "../add-word/components/AddEnglishWordFields";
 import {
   clearPersistedTimedSession,
   elapsedMsForPersistedTimedSession,
   readPersistedTimedSession,
   writePersistedTimedSession,
 } from "../_shared/timed-session/timedSessionPersistence";
+
+type EnglishItemType = "word" | "phrase";
 
 type QuickPreview = {
   id: string | null;
@@ -80,6 +83,7 @@ type QuickSessionWord = {
   alternateSurface: string;
   hideKanjiInReadingSupport: boolean;
   pageOrder: number | null;
+  itemType?: EnglishItemType;
 };
 
 type QuickLookupCandidate = {
@@ -162,7 +166,15 @@ function upsertAndSortQuickSessionWords(
   words: QuickSessionWord[],
   nextItem: QuickSessionWord
 ) {
-  return [nextItem, ...words.filter((item) => item.id !== nextItem.id)];
+  const existingIndex = words.findIndex((item) => item.id === nextItem.id);
+
+  if (existingIndex < 0) {
+    return [nextItem, ...words];
+  }
+
+  const nextWords = [...words];
+  nextWords[existingIndex] = nextItem;
+  return nextWords;
 }
 
 function extractQuickMeanings(entry: any): string[] {
@@ -232,6 +244,30 @@ function hasKanji(text: string) {
   return /[\p{Script=Han}]/u.test(text);
 }
 
+function readableSupabaseError(error: any) {
+  if (!error) return "Unknown Supabase error.";
+
+  const parts = [
+    error.message,
+    error.details,
+    error.hint ? `Hint: ${error.hint}` : null,
+    error.code ? `Code: ${error.code}` : null,
+  ]
+    .map((part) => (typeof part === "string" ? part.trim() : ""))
+    .filter(Boolean);
+
+  if (parts.length > 0) return parts.join(" ");
+
+  try {
+    const serialized = JSON.stringify(error);
+    if (serialized && serialized !== "{}") return serialized;
+  } catch {
+    // Fall through to String(error).
+  }
+
+  return String(error) || "Unknown Supabase error.";
+}
+
 async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
   const {
     data: { session },
@@ -263,6 +299,7 @@ export function CuriosityReadingExperience({
   const params = useParams<{ userBookId: string }>();
   const routeUserBookId = params.userBookId ?? "";
   const isListeningMode = experienceMode === "listening";
+  const timedSessionMode = isListeningMode ? "listening" : "curiosity";
   const pageTitle = isListeningMode ? "Listening" : "Curiosity Reading";
   const pageDescription = isListeningMode
     ? "Listen to this book or audiobook, track your time, and save words you catch by ear without leaving the session."
@@ -283,6 +320,7 @@ export function CuriosityReadingExperience({
   const [username, setUsername] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
+  const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
@@ -291,6 +329,7 @@ export function CuriosityReadingExperience({
 
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
+  const [englishItemType, setEnglishItemType] = useState<EnglishItemType>("word");
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
   const [isWordHelpOpen, setIsWordHelpOpen] = useState(false);
   const [scratchWord, setScratchWord] = useState("");
@@ -327,6 +366,7 @@ export function CuriosityReadingExperience({
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
   const quickWordFieldsRef = useRef<HTMLDivElement | null>(null);
+  const isEnglishBook = bookLanguageCode === "en";
 
   function closeAndClearWordHelp() {
     setIsWordHelpOpen(false);
@@ -492,7 +532,7 @@ export function CuriosityReadingExperience({
 
       const { data: book, error: bookError } = await supabase
         .from("books")
-        .select("title, cover_url")
+        .select("title, cover_url, language_code")
         .eq("id", userBook.book_id)
         .maybeSingle();
 
@@ -510,6 +550,7 @@ export function CuriosityReadingExperience({
 
       setBookTitle(book.title ?? "");
       setBookCover(book.cover_url ?? "");
+      setBookLanguageCode(book.language_code ?? null);
       setMessage("");
     })();
   }, [fullAccessFeature, userBookId]);
@@ -626,10 +667,10 @@ export function CuriosityReadingExperience({
   }, []);
 
   useEffect(() => {
-    if (!isListeningMode || !userBookId) return;
+    if (!userBookId) return;
 
     skippedInitialPersistenceWriteRef.current = false;
-    const persisted = readPersistedTimedSession("listening", userBookId);
+    const persisted = readPersistedTimedSession(timedSessionMode, userBookId);
     if (persisted) {
       const restoredElapsedMs = elapsedMsForPersistedTimedSession(persisted);
       const restoredRunning =
@@ -650,7 +691,7 @@ export function CuriosityReadingExperience({
     }
 
     setTimerPersistenceReady(true);
-  }, [isListeningMode, userBookId]);
+  }, [timedSessionMode, userBookId]);
 
   useEffect(() => {
     if (isRunning && startTime) {
@@ -676,7 +717,7 @@ export function CuriosityReadingExperience({
   }, [accumulatedElapsedMs, isRunning, startTime]);
 
   useEffect(() => {
-    if (!isListeningMode || !timerPersistenceReady || !userBookId) return;
+    if (!timerPersistenceReady || !userBookId) return;
 
     if (!skippedInitialPersistenceWriteRef.current) {
       skippedInitialPersistenceWriteRef.current = true;
@@ -684,13 +725,13 @@ export function CuriosityReadingExperience({
     }
 
     if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) {
-      clearPersistedTimedSession("listening", userBookId);
+      clearPersistedTimedSession(timedSessionMode, userBookId);
       return;
     }
 
     writePersistedTimedSession({
       version: 1,
-      sessionMode: "listening",
+      sessionMode: timedSessionMode,
       userBookId,
       startedAt: isRunning ? startTime : null,
       accumulatedElapsedMs,
@@ -703,7 +744,6 @@ export function CuriosityReadingExperience({
     });
   }, [
     accumulatedElapsedMs,
-    isListeningMode,
     isPaused,
     isRunning,
     sessionDate,
@@ -711,19 +751,20 @@ export function CuriosityReadingExperience({
     sessionStartPage,
     showTimedSessionForm,
     startTime,
+    timedSessionMode,
     timerPersistenceReady,
     userBookId,
   ]);
 
   useEffect(() => {
-    if (!isListeningMode || !timerPersistenceReady || !userBookId) return;
+    if (!timerPersistenceReady || !userBookId) return;
 
     const persistCurrentTimer = () => {
       if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) return;
 
       writePersistedTimedSession({
         version: 1,
-        sessionMode: "listening",
+        sessionMode: timedSessionMode,
         userBookId,
         startedAt: isRunning ? startTime : null,
         accumulatedElapsedMs,
@@ -749,7 +790,6 @@ export function CuriosityReadingExperience({
     };
   }, [
     accumulatedElapsedMs,
-    isListeningMode,
     isPaused,
     isRunning,
     sessionDate,
@@ -757,6 +797,7 @@ export function CuriosityReadingExperience({
     sessionStartPage,
     showTimedSessionForm,
     startTime,
+    timedSessionMode,
     timerPersistenceReady,
     userBookId,
   ]);
@@ -778,6 +819,11 @@ export function CuriosityReadingExperience({
     let cancelled = false;
 
     async function loadLibraryColors() {
+      if (isEnglishBook) {
+        setLibraryColorByWordKey({});
+        return;
+      }
+
       const wordsToCheck = [
         ...quickSessionWords.map((item) => ({
           surface: item.surface,
@@ -823,7 +869,7 @@ export function CuriosityReadingExperience({
     return () => {
       cancelled = true;
     };
-  }, [quickSessionWords, quickPreview.surface, quickPreview.reading, quickPreview.id]);
+  }, [quickSessionWords, quickPreview.surface, quickPreview.reading, quickPreview.id, isEnglishBook]);
 
   function prepareForNextQuickWord() {
     window.setTimeout(() => {
@@ -920,6 +966,7 @@ export function CuriosityReadingExperience({
       chapterName: quickPreview.chapterName,
     };
     setQuickPreview(makeBlankQuickPreview(meta));
+    setEnglishItemType("word");
     setHideKanjiInReadingSupport(false);
     setQuickError(null);
     setQuickLookupCandidates([]);
@@ -975,6 +1022,7 @@ export function CuriosityReadingExperience({
       chapterName: item.chapterName,
       pageOrder: item.pageOrder,
     });
+    setEnglishItemType(item.itemType ?? "word");
     setHideKanjiInReadingSupport(item.hideKanjiInReadingSupport);
     setQuickLookupCandidates([]);
     setQuickError(null);
@@ -988,6 +1036,8 @@ export function CuriosityReadingExperience({
   }
 
   async function pullQuickWord(wordOverride?: string) {
+    if (isEnglishBook) return;
+
     const word = (wordOverride ?? quickPreview.surface).trim();
     if (!word) return;
 
@@ -1074,6 +1124,11 @@ export function CuriosityReadingExperience({
   }
 
   async function saveQuickWord() {
+    if (isEnglishBook) {
+      await saveEnglishQuickWord();
+      return;
+    }
+
     if (!userBookId || !quickPreview.surface.trim()) return;
 
     if (!canAccessBook) {
@@ -1271,6 +1326,172 @@ export function CuriosityReadingExperience({
     prepareForNextQuickWord();
   }
 
+  async function saveEnglishQuickWord() {
+    const cleanSource = quickPreview.surface.trim();
+    const cleanSupport = quickPreview.meaning.trim();
+
+    if (!userBookId || !cleanSource) return;
+
+    if (!cleanSupport) {
+      setMessage("❌ Add Japanese meaning/support.");
+      return;
+    }
+
+    if (!canAccessBook) {
+      setMessage("❌ You do not have access to save words to this book.");
+      return;
+    }
+
+    if (!canUseCuriosityReading) {
+      const copy = getFullAccessRequiredCopy(fullAccessFeature);
+      setMessage(`❌ ${copy.message}`);
+      return;
+    }
+
+    const chapterNum = quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null;
+    const pageNum = pageNumberForSavedWordLocation(quickPreview.page, isListeningMode);
+    const chapterNameTrimmed = quickPreview.chapterName?.trim() || null;
+
+    const editingExisting =
+      quickPreview.id != null
+        ? quickSessionWords.find((w) => w.id === quickPreview.id) ?? null
+        : null;
+
+    const basePayload = {
+      user_book_id: userBookId,
+      vocabulary_cache_id: null,
+      surface: cleanSource,
+      encountered_surface: cleanSource,
+      base_form: cleanSource,
+      lookup_surface: cleanSource,
+      target_language_code: "en",
+      support_language_code: "ja",
+      item_type: englishItemType,
+      reading: null,
+      meaning: cleanSupport,
+      other_definition: cleanSupport,
+      meaning_choices: [],
+      meaning_choice_index: null,
+      jlpt: null,
+      is_common: null,
+      page_number: pageNum,
+      chapter_number: chapterNum,
+      chapter_name: chapterNameTrimmed,
+      hide_kanji_in_reading_support: false,
+      seen_on: todayYmdAppTimeZone(),
+    };
+
+    if (!editingExisting) {
+      const payload = {
+        ...basePayload,
+        page_order: await getNextPageOrder(userBookId, chapterNum, pageNum),
+      };
+
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .insert(payload)
+        .select(
+          "id, surface, reading, meaning, page_number, page_order, chapter_number, chapter_name, item_type"
+        )
+        .single();
+
+      if (error) {
+        const readableError = readableSupabaseError(error);
+        console.error("Error saving English quick word:", readableError, error);
+        setMessage(`❌ Could not save item: ${readableError}`);
+        return;
+      }
+
+      const newItem: QuickSessionWord = {
+        id: String(data.id),
+        surface: data.surface ?? cleanSource,
+        reading: data.reading ?? "",
+        meaning: data.meaning ?? cleanSupport,
+        page: data.page_number != null ? String(data.page_number) : "",
+        chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
+        chapterName: data.chapter_name ?? "",
+        meanings: [],
+        selectedMeaningIndex: null,
+        isCustomMeaning: true,
+        cacheSurface: "",
+        useAlternateSurface: false,
+        alternateSurface: "",
+        hideKanjiInReadingSupport: false,
+        pageOrder: data.page_order ?? null,
+        itemType: data.item_type === "phrase" ? "phrase" : "word",
+      };
+
+      setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, newItem));
+      setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
+      if (data.chapter_name && data.chapter_number != null) {
+        setChapterNumberByName((current) => ({
+          ...current,
+          [String(data.chapter_name).trim()]: String(data.chapter_number),
+        }));
+      }
+      setSavedQuickNotice(`Saved: ${newItem.surface}`);
+      setLastSavedWordContext({
+        surface: newItem.surface,
+        page: newItem.page,
+      });
+      setMessage("");
+    } else {
+      const { data, error } = await supabase
+        .from("user_book_words")
+        .update(basePayload)
+        .eq("id", editingExisting.id)
+        .eq("user_book_id", userBookId)
+        .select(
+          "id, surface, reading, meaning, page_number, page_order, chapter_number, chapter_name, item_type"
+        )
+        .single();
+
+      if (error) {
+        const readableError = readableSupabaseError(error);
+        console.error("Error updating English quick word:", readableError, error);
+        setMessage(`❌ Could not update item: ${readableError}`);
+        return;
+      }
+
+      const updatedItem: QuickSessionWord = {
+        id: String(data.id),
+        surface: data.surface ?? cleanSource,
+        reading: data.reading ?? "",
+        meaning: data.meaning ?? cleanSupport,
+        page: data.page_number != null ? String(data.page_number) : "",
+        chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
+        chapterName: data.chapter_name ?? "",
+        meanings: [],
+        selectedMeaningIndex: null,
+        isCustomMeaning: true,
+        cacheSurface: "",
+        useAlternateSurface: false,
+        alternateSurface: "",
+        hideKanjiInReadingSupport: false,
+        pageOrder: data.page_order ?? null,
+        itemType: data.item_type === "phrase" ? "phrase" : "word",
+      };
+
+      setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, updatedItem));
+      setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
+      if (data.chapter_name && data.chapter_number != null) {
+        setChapterNumberByName((current) => ({
+          ...current,
+          [String(data.chapter_name).trim()]: String(data.chapter_number),
+        }));
+      }
+      setSavedQuickNotice(`Saved: ${updatedItem.surface}`);
+      setLastSavedWordContext({
+        surface: updatedItem.surface,
+        page: updatedItem.page,
+      });
+      setMessage("");
+    }
+
+    clearQuickWordFields({ preserveSavedNotice: true });
+    prepareForNextQuickWord();
+  }
+
   async function deleteQuickWordById(id: string) {
     if (!userBookId) return;
 
@@ -1428,9 +1649,7 @@ export function CuriosityReadingExperience({
     setStartTime(null);
     setIsRunning(false);
     setIsPaused(false);
-    if (isListeningMode) {
-      clearPersistedTimedSession("listening", userBookId);
-    }
+    clearPersistedTimedSession(timedSessionMode, userBookId);
     setMessage("");
   }
 
@@ -1474,6 +1693,8 @@ export function CuriosityReadingExperience({
   }
 
   function searchScratchWord() {
+    if (isEnglishBook) return;
+
     const nextWord = scratchWord.trim();
 
     if (!nextWord) {
@@ -1585,8 +1806,8 @@ export function CuriosityReadingExperience({
             setStartTime(null);
             setIsPaused(false);
             setIsRunning(false);
-            if (isListeningMode && userBookId) {
-              clearPersistedTimedSession("listening", userBookId);
+            if (userBookId) {
+              clearPersistedTimedSession(timedSessionMode, userBookId);
             }
           }}
           onSessionStartPageChange={setSessionStartPage}
@@ -1594,86 +1815,219 @@ export function CuriosityReadingExperience({
         />
 
         <div className="md:hidden">
-          <MobileQuickCapture
-            title={isListeningMode ? "Save a heard word" : "Save a word"}
-            description={
-              isListeningMode
-                ? "Type a word you heard, search it, and save it without leaving your listening timer."
-                : "Type a word from your book, search it, and save it without leaving your reading timer."
-            }
-            surface={quickPreview.surface}
-            reading={quickPreview.reading}
-            meaning={quickPreview.meaning}
-            meanings={quickPreview.meanings}
-            selectedMeaningIndex={quickPreview.selectedMeaningIndex}
-            quickLoading={quickLoading}
-            quickError={quickError}
-            savedNotice={savedQuickNotice}
-            canSaveWord={Boolean(
-              quickPreview.cacheSurface.trim() &&
-              quickPreview.meaning.trim() &&
-              !quickPreview.isCustomMeaning
-            )}
-            candidates={quickLookupCandidates}
-            lastAddedWord={quickSessionWords[0] ?? null}
-            inputRef={quickWordInputRef}
-            onSurfaceChange={(value) => {
-              setQuickPreview((prev) => ({
-                ...prev,
-                surface: value,
-                cacheSurface: "",
-                reading: "",
-                meanings: [],
-                selectedMeaningIndex: 0,
-                meaning: "",
-                isCustomMeaning: true,
-                useAlternateSurface: false,
-                alternateSurface: "",
-                pageOrder: null,
-              }));
-              setSavedQuickNotice("");
-              if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-            }}
-            onSearch={() => void pullQuickWord()}
-            onSearchKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void pullQuickWord();
+          {isEnglishBook ? (
+            <CuriosityAddEditWordCard
+              title="Save English Word / Phrase"
+              description="Add English from this book with Japanese support."
+            >
+              <CuriosityAddEditWordFormShell
+                editingSurface={quickPreview.id ? quickPreview.surface : null}
+              >
+                <AddEnglishWordFields
+                  itemType={englishItemType}
+                  source={quickPreview.surface}
+                  support={quickPreview.meaning}
+                  pageNumber={quickPreview.page}
+                  chapterNumber={quickPreview.chapterNumber}
+                  chapterName={quickPreview.chapterName}
+                  chapterNameOptions={sortedChapterNameOptions}
+                  saving={quickLoading}
+                  isEditing={quickPreview.id != null}
+                  savedNotice={savedQuickNotice}
+                  onItemTypeChange={setEnglishItemType}
+                  onSourceChange={(value) => {
+                    setQuickPreview((prev) => ({
+                      ...prev,
+                      surface: value,
+                      cacheSurface: "",
+                      reading: "",
+                      meanings: [],
+                      selectedMeaningIndex: 0,
+                      isCustomMeaning: true,
+                      useAlternateSurface: false,
+                      alternateSurface: "",
+                      pageOrder: null,
+                    }));
+                    setSavedQuickNotice("");
+                  }}
+                  onSupportChange={(value) => {
+                    setQuickPreview((prev) => ({
+                      ...prev,
+                      meaning: value,
+                      meanings: [],
+                      selectedMeaningIndex: 0,
+                      isCustomMeaning: true,
+                    }));
+                    setSavedQuickNotice("");
+                  }}
+                  onPageNumberChange={(value) =>
+                    setQuickPreview((prev) => ({ ...prev, page: value }))
+                  }
+                  onChapterNumberChange={(value) =>
+                    setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+                  }
+                  onChapterNameChange={(value) =>
+                    setQuickPreview((prev) => {
+                      const knownChapterNumber = chapterNumberByName[value.trim()];
+                      return {
+                        ...prev,
+                        chapterName: value,
+                        chapterNumber: knownChapterNumber || prev.chapterNumber,
+                      };
+                    })
+                  }
+                  onSaveWord={() => void saveQuickWord()}
+                  onClearWordFields={() => clearQuickWordFields()}
+                />
+              </CuriosityAddEditWordFormShell>
+            </CuriosityAddEditWordCard>
+          ) : (
+            <MobileQuickCapture
+              title={isListeningMode ? "Save a heard word" : "Save a word"}
+              description={
+                isListeningMode
+                  ? "Type a word you heard, search it, and save it without leaving your listening timer."
+                  : "Type a word from your book, search it, and save it without leaving your reading timer."
               }
-            }}
-            onSelectCandidate={(candidate) => {
-              setQuickPreview((prev) => ({
-                ...prev,
-                surface: candidate.surface,
-                cacheSurface: candidate.cacheSurface,
-                reading: candidate.reading,
-                meanings: candidate.meanings,
-                selectedMeaningIndex: candidate.selectedMeaningIndex,
-                meaning: candidate.meaning,
-                isCustomMeaning: candidate.isCustomMeaning,
-              }));
-              setQuickError(null);
-            }}
-            onMeaningChoiceChange={(index, meaning) =>
-              setQuickPreview((prev) => ({
-                ...prev,
-                selectedMeaningIndex: index,
-                meaning,
-                isCustomMeaning: false,
-              }))
-            }
-            onSaveWord={() => void saveQuickWord()}
-            onDeleteLastWord={(id) => void deleteQuickWordById(id)}
-          />
+              surface={quickPreview.surface}
+              reading={quickPreview.reading}
+              meaning={quickPreview.meaning}
+              meanings={quickPreview.meanings}
+              selectedMeaningIndex={quickPreview.selectedMeaningIndex}
+              quickLoading={quickLoading}
+              quickError={quickError}
+              savedNotice={savedQuickNotice}
+              canSaveWord={Boolean(
+                quickPreview.cacheSurface.trim() &&
+                quickPreview.meaning.trim() &&
+                !quickPreview.isCustomMeaning
+              )}
+              candidates={quickLookupCandidates}
+              lastAddedWord={quickSessionWords[0] ?? null}
+              inputRef={quickWordInputRef}
+              onSurfaceChange={(value) => {
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  surface: value,
+                  cacheSurface: "",
+                  reading: "",
+                  meanings: [],
+                  selectedMeaningIndex: 0,
+                  meaning: "",
+                  isCustomMeaning: true,
+                  useAlternateSurface: false,
+                  alternateSurface: "",
+                  pageOrder: null,
+                }));
+                setSavedQuickNotice("");
+                if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+              }}
+              onSearch={() => void pullQuickWord()}
+              onSearchKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void pullQuickWord();
+                }
+              }}
+              onSelectCandidate={(candidate) => {
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  surface: candidate.surface,
+                  cacheSurface: candidate.cacheSurface,
+                  reading: candidate.reading,
+                  meanings: candidate.meanings,
+                  selectedMeaningIndex: candidate.selectedMeaningIndex,
+                  meaning: candidate.meaning,
+                  isCustomMeaning: candidate.isCustomMeaning,
+                }));
+                setQuickError(null);
+              }}
+              onMeaningChoiceChange={(index, meaning) =>
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  selectedMeaningIndex: index,
+                  meaning,
+                  isCustomMeaning: false,
+                }))
+              }
+              onSaveWord={() => void saveQuickWord()}
+              onDeleteLastWord={(id) => void deleteQuickWordById(id)}
+            />
+          )}
         </div>
 
         <div className="hidden md:block">
-        <CuriosityAddEditWordCard title={addWordTitle} description={addWordDescription}>
+        <CuriosityAddEditWordCard
+          title={isEnglishBook ? "Save English Word / Phrase" : addWordTitle}
+          description={
+            isEnglishBook
+              ? "Add English from this book with Japanese support. Page and chapter stay ready for the next item."
+              : addWordDescription
+          }
+        >
           <CuriosityAddEditWordFormShell
             editingSurface={quickPreview.id ? quickPreview.surface : null}
           >
-
-            <CuriosityQuickSearchRow
+            {isEnglishBook ? (
+              <AddEnglishWordFields
+                itemType={englishItemType}
+                source={quickPreview.surface}
+                support={quickPreview.meaning}
+                pageNumber={quickPreview.page}
+                chapterNumber={quickPreview.chapterNumber}
+                chapterName={quickPreview.chapterName}
+                chapterNameOptions={sortedChapterNameOptions}
+                saving={quickLoading}
+                isEditing={quickPreview.id != null}
+                savedNotice={savedQuickNotice}
+                onItemTypeChange={setEnglishItemType}
+                onSourceChange={(value) => {
+                  setQuickPreview((prev) => ({
+                    ...prev,
+                    surface: value,
+                    cacheSurface: "",
+                    reading: "",
+                    meanings: [],
+                    selectedMeaningIndex: 0,
+                    isCustomMeaning: true,
+                    useAlternateSurface: false,
+                    alternateSurface: "",
+                    pageOrder: null,
+                  }));
+                  setSavedQuickNotice("");
+                }}
+                onSupportChange={(value) => {
+                  setQuickPreview((prev) => ({
+                    ...prev,
+                    meaning: value,
+                    meanings: [],
+                    selectedMeaningIndex: 0,
+                    isCustomMeaning: true,
+                  }));
+                  setSavedQuickNotice("");
+                }}
+                onPageNumberChange={(value) =>
+                  setQuickPreview((prev) => ({ ...prev, page: value }))
+                }
+                onChapterNumberChange={(value) =>
+                  setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+                }
+                onChapterNameChange={(value) =>
+                  setQuickPreview((prev) => {
+                    const knownChapterNumber = chapterNumberByName[value.trim()];
+                    return {
+                      ...prev,
+                      chapterName: value,
+                      chapterNumber: knownChapterNumber || prev.chapterNumber,
+                    };
+                  })
+                }
+                onSaveWord={() => void saveQuickWord()}
+                onClearWordFields={() => clearQuickWordFields()}
+              />
+            ) : (
+              <>
+                <CuriosityQuickSearchRow
               surface={quickPreview.surface}
               reading={quickPreview.reading}
               quickLoading={quickLoading}
@@ -1794,6 +2148,8 @@ export function CuriosityReadingExperience({
               locationHelpText={isListeningMode ? "Use a page if you have the book open, or a Kindle/audio percent as a listening note. Percent is not saved as a page." : undefined}
               allowPercentLocation={isListeningMode}
             />
+              </>
+            )}
           </CuriosityAddEditWordFormShell>
           <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
 

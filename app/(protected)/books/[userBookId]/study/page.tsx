@@ -45,7 +45,8 @@ type StudySet =
   | "FROM_READING_MEANING"
   | "FROM_READING_MC"
   | "FROM_READING_MEANING_MC"
-  | "COMPLETE";
+  | "COMPLETE"
+  | "ENGLISH_READER";
 
 type StepField = "word" | "reading" | "meaning";
 
@@ -67,6 +68,8 @@ function studySetLabel(s: StudySet) {
       return "Reading to Meaning MC";
     case "COMPLETE":
       return "Complete Review";
+    case "ENGLISH_READER":
+      return "English → Japanese";
     default:
       return "Reading Typing";
   }
@@ -111,6 +114,7 @@ type WordRow = {
   created_at: string;
   meaning_choices: any | null;
   meaning_choice_index: number | null;
+  item_type?: string | null;
   hidden: boolean | null;
   skipped_on: string | null;
   kanji_meta: KanjiMetaItem[] | null;
@@ -139,6 +143,7 @@ type Flashcard = {
   totalCount: number;
   kanjiMeta: KanjiMetaItem[];
   isCommon: boolean | null;
+  itemType?: string | null;
 };
 
 function normalizeJlpt(val: string | null | undefined) {
@@ -365,6 +370,8 @@ export default function BookFlashcardsPage() {
 
   const steps = useMemo<StepField[]>(() => {
     switch (studySet) {
+      case "ENGLISH_READER":
+        return ["word", "meaning"];
       case "READING":
       case "READING_MC":
         return ["word", "meaning", "reading"];
@@ -438,7 +445,9 @@ export default function BookFlashcardsPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
+  const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
   const [meId, setMeId] = useState("");
+  const isEnglishBook = bookLanguageCode === "en";
 
   const [flaggedCardIds, setFlaggedCardIds] = useState<Set<string>>(() => new Set());
   const [flaggingCardId, setFlaggingCardId] = useState<string | null>(null);
@@ -603,7 +612,8 @@ export default function BookFlashcardsPage() {
             user_id,
             books:book_id (
               title,
-              cover_url
+              cover_url,
+              language_code
             )
           `
           )
@@ -645,6 +655,19 @@ export default function BookFlashcardsPage() {
         setAccessChecked(true);
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
+        const loadedLanguageCode = ((ub as any)?.books?.language_code ?? "ja") as string;
+        setBookLanguageCode(loadedLanguageCode);
+
+        if (loadedLanguageCode === "en") {
+          setStudySet("ENGLISH_READER");
+          setJlptSelected([]);
+          setColorSelected([]);
+          setChapterFilter("all");
+          setPageFilter("all");
+          setRepeatsOnly(false);
+        } else {
+          setStudySet((current) => current === "ENGLISH_READER" ? "READING" : current);
+        }
 
         if (!canUseStudyFlashcardsNow) {
           setFullAccessLocked(true);
@@ -658,6 +681,103 @@ export default function BookFlashcardsPage() {
         }
 
         const totalCounts = new Map<string, number>();
+
+        if (loadedLanguageCode === "en") {
+          setLibraryCards([]);
+
+          const today = new Date().toISOString().slice(0, 10);
+          const { data: englishWords, error: englishWordsErr } = await supabase
+            .from("user_book_words")
+            .select(
+              `
+              id,
+              user_book_id,
+              surface,
+              reading,
+              meaning,
+              jlpt,
+              is_common,
+              page_number,
+              chapter_number,
+              chapter_name,
+              seen_on,
+              created_at,
+              meaning_choices,
+              meaning_choice_index,
+              item_type,
+              hidden,
+              skipped_on,
+              flagged_for_review,
+              excluded_from_flashcards,
+              flag_note,
+              flagged_by_user_id,
+              flagged_at,
+              reviewed_by_user_id,
+              reviewed_at,
+              kanji_meta
+            `
+            )
+            .eq("user_book_id", userBookId)
+            .eq("target_language_code", "en")
+            .eq("hidden", false)
+            .eq("excluded_from_flashcards", false)
+            .or(`skipped_on.is.null,skipped_on.neq.${today}`)
+            .order("page_number", { ascending: true })
+            .order("created_at", { ascending: true });
+
+          if (englishWordsErr) throw englishWordsErr;
+
+          const repeatCounts = new Map<string, number>();
+          for (const w of (englishWords ?? []) as WordRow[]) {
+            const key = normalizeRepeatKey(w.surface);
+            if (!key) continue;
+            repeatCounts.set(key, (repeatCounts.get(key) ?? 0) + 1);
+          }
+
+          const normalized: Flashcard[] = ((englishWords ?? []) as WordRow[])
+            .map<Flashcard | null>((w) => {
+              const source = (w.surface ?? "").trim();
+              const meaning = (w.meaning ?? "").trim();
+              if (!source || !meaning) return null;
+
+              const ch = chapterInfoFromRow(w);
+              const repeatKey = normalizeRepeatKey(source);
+              const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;
+
+              return {
+                id: w.id,
+                word: source,
+                reading: null,
+                meaning,
+                jlpt: "NON-JLPT",
+                chapterLabel: ch.label,
+                chapterDisplay: ch.display,
+                page_number: w.page_number ?? null,
+                meaningChoices: [],
+                meaningChoiceIndex: 0,
+                repeatKey,
+                repeatCount,
+                totalCount: repeatCount,
+                kanjiMeta: [],
+                isCommon: null,
+                itemType: w.item_type ?? null,
+              };
+            })
+            .filter((card): card is Flashcard => Boolean(card));
+
+          setCards(normalized);
+          setFilteredCards(normalized);
+          setChapterOptions([]);
+          setPageOptions([]);
+          setStepIndex(0);
+          setTypedInput("");
+          setTypedFeedback(null);
+          setTypeRevealIndex(0);
+          setReadyForNextCard(false);
+          setLastTypedResult(null);
+          setLoading(false);
+          return;
+        }
 
         if (ownerUserId) {
           const { data: ownedBooks, error: ownedBooksErr } = await supabase
@@ -701,6 +821,7 @@ export default function BookFlashcardsPage() {
               `
               )
               .in("user_book_id", ownedBookIds)
+              .or("target_language_code.is.null,target_language_code.eq.ja")
               .eq("excluded_from_flashcards", false)
               .eq("hidden", false)
               .order("page_number", { ascending: true })
@@ -808,6 +929,7 @@ export default function BookFlashcardsPage() {
           `
           )
           .eq("user_book_id", userBookId)
+          .or("target_language_code.is.null,target_language_code.eq.ja")
           .eq("hidden", false)
           .eq("excluded_from_flashcards", false)
           .or(`skipped_on.is.null,skipped_on.neq.${today}`)
@@ -928,6 +1050,19 @@ export default function BookFlashcardsPage() {
   useEffect(() => {
     let result = [...cards];
 
+    if (isEnglishBook) {
+      setFilteredCards(result);
+      setStepIndex(0);
+      setTypedInput("");
+      setTypedFeedback(null);
+      setTypeRevealIndex(0);
+      setReadyForNextCard(false);
+      setLastTypedResult(null);
+      setCorrectionInput("");
+      setCorrectionFeedback(null);
+      return;
+    }
+
     const isAllSelected = jlptSelected.length === JLPT_LEVELS.length;
     if (jlptSelected.length > 0 && !isAllSelected) {
       result = result.filter((c) => jlptSelected.includes(c.jlpt));
@@ -973,7 +1108,7 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setCorrectionInput("");
     setCorrectionFeedback(null);
-  }, [cards, jlptSelected, colorSelected, chapterFilter, pageFilter, repeatsOnly, studySet]);
+  }, [cards, isEnglishBook, jlptSelected, colorSelected, chapterFilter, pageFilter, repeatsOnly, studySet]);
 
   useEffect(() => {
     const order = filteredCards.map((_, i) => i);
@@ -1901,7 +2036,7 @@ export default function BookFlashcardsPage() {
   const nextStudySet = getNextStudySet(studySet);
 
   const filterControls = (
-    <StudyFilterPanel
+    isEnglishBook ? null : <StudyFilterPanel
       jlptLevels={JLPT_LEVELS}
       jlptSelected={jlptSelected}
       colorOptions={LIBRARY_COLOR_FILTERS}
@@ -1943,9 +2078,22 @@ export default function BookFlashcardsPage() {
           onOpenVocabList={openVocabList}
         />
 
-        <div className="w-full max-w-3xl">{filterControls}</div>
+        {filterControls ? <div className="w-full max-w-3xl">{filterControls}</div> : null}
 
-        <StudyEmptyState onClearFilters={clearFilters} />
+        <StudyEmptyState
+          onClearFilters={clearFilters}
+          title={
+            isEnglishBook
+              ? "No English words or phrases are ready for flashcards yet."
+              : "No matching flashcards"
+          }
+          message={
+            isEnglishBook
+              ? "Save words or phrases while using Curiosity Reading, then come back here to study them."
+              : "No words match your filters (or none have been added to this book yet)."
+          }
+          showClearFilters={!isEnglishBook}
+        />
       </main>
     );
   }
@@ -1953,13 +2101,17 @@ export default function BookFlashcardsPage() {
   if (studyOnceMode && sessionIndex >= sessionOrder.length) {
     return (
       <StudyCompleteState
-        nextStudyModeLabel={studySetLabel(nextStudySet)}
+        nextStudyModeLabel={isEnglishBook ? undefined : studySetLabel(nextStudySet)}
         onGoToVocabList={() => router.push(`/books/${userBookId}/words`)}
         onStudyAgain={restartCurrentFilteredSet}
-        onNextStudyMode={() => {
-          setStudySet(nextStudySet);
-          restartCurrentFilteredSet();
-        }}
+        onNextStudyMode={
+          isEnglishBook
+            ? undefined
+            : () => {
+              setStudySet(nextStudySet);
+              restartCurrentFilteredSet();
+            }
+        }
       />
     );
   }
@@ -1986,6 +2138,9 @@ export default function BookFlashcardsPage() {
     pageFilter,
     repeatsOnly,
   });
+  const studyingNowLabel = isEnglishBook
+    ? "English → Japanese"
+    : bookFlashcardsStudyingNowLabel;
 
   const sessionTotal = sessionOrder.length || filteredCards.length;
   const sessionCurrent =
@@ -2003,18 +2158,27 @@ export default function BookFlashcardsPage() {
       <div className="mb-7 w-full max-w-3xl space-y-0">
         {filterControls}
 
-        <StudyModePanel
+        {isEnglishBook ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-950 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+              English Reader
+            </p>
+            <p className="mt-1 text-lg font-black">English → Japanese</p>
+          </div>
+        ) : (
+          <StudyModePanel
           studySet={studySet}
           modeOptions={BOOK_FLASHCARD_MODE_OPTIONS}
           onStudySetChange={(value) => setStudySet(value as StudySet)}
         />
+        )}
       </div>
 
       <div className="mb-7 w-full max-w-3xl">
         <StudyProgressPanel
           currentNumber={sessionCurrent}
           totalNumber={sessionTotal}
-          studyingNowLabel={bookFlashcardsStudyingNowLabel}
+          studyingNowLabel={studyingNowLabel}
         />
       </div>
 
@@ -2022,15 +2186,33 @@ export default function BookFlashcardsPage() {
         isClickable={!isMultipleChoiceMode}
         onReveal={flip}
       >
-        <StudyCardBadges
+        {!isEnglishBook ? (
+          <StudyCardBadges
           jlpt={card?.jlpt ?? "NON-JLPT"}
           colorStatus={cardColorStatus}
           meaningChoiceIndex={(card?.meaningChoiceIndex ?? 0) as number}
           totalCount={card?.totalCount ?? 0}
         />
+        ) : null}
 
         <div className="w-full flex flex-col items-center justify-center gap-3">
-          {isMultipleChoiceMode &&
+          {isEnglishBook && card ? (
+            <>
+              <Row
+                label={card.itemType === "phrase" ? "English phrase" : "English word or phrase"}
+                value={card.word}
+                visible
+                big
+                placeholder="---"
+              />
+              <Row
+                label="Japanese meaning / support"
+                value={card.meaning || "—"}
+                visible={showMeaning}
+                placeholder="---"
+              />
+            </>
+          ) : isMultipleChoiceMode &&
             (
               studySet === "READING_MC" ||
               studySet === "MEANING_MC" ||

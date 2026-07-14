@@ -55,6 +55,8 @@ export default function EnglishReaderAddBookPage() {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [isbn13, setIsbn13] = useState("");
+  const [editionFormat, setEditionFormat] = useState("");
+  const [editionNote, setEditionNote] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
   const [recommendedLevel, setRecommendedLevel] = useState("");
 
@@ -107,6 +109,7 @@ export default function EnglishReaderAddBookPage() {
 
     const cleanTitle = title.trim();
     const normalizedIsbn13 = cleanIsbn13(isbn13);
+    const trimmedEditionNote = editionNote.trim();
     const trimmedExternalUrl = externalUrl.trim();
     const trimmedRecommendedLevel = recommendedLevel.trim();
 
@@ -144,6 +147,8 @@ export default function EnglishReaderAddBookPage() {
           author: cleanText(author),
           isbn13: normalizedIsbn13 || null,
           language_code: "en",
+          edition_format: editionFormat || null,
+          edition_note: trimmedEditionNote || null,
           allow_missing_isbn: !normalizedIsbn13,
           related_links: relatedLinksForUrl(trimmedExternalUrl),
         })
@@ -214,6 +219,8 @@ export default function EnglishReaderAddBookPage() {
       setTitle("");
       setAuthor("");
       setIsbn13("");
+      setEditionFormat("");
+      setEditionNote("");
       setExternalUrl("");
       setRecommendedLevel("");
     } catch (error: any) {
@@ -242,12 +249,16 @@ export default function EnglishReaderAddBookPage() {
               title={title}
               author={author}
               isbn13={isbn13}
+              editionFormat={editionFormat}
+              editionNote={editionNote}
               externalUrl={externalUrl}
               recommendedLevel={recommendedLevel}
               saving={saving}
               onTitleChange={setTitle}
               onAuthorChange={setAuthor}
               onIsbn13Change={setIsbn13}
+              onEditionFormatChange={setEditionFormat}
+              onEditionNoteChange={setEditionNote}
               onExternalUrlChange={setExternalUrl}
               onRecommendedLevelChange={setRecommendedLevel}
               onSubmit={handleSave}

@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   computeLibraryStudyColorStatus,
   getLibraryStudyEncounterStageCounts,
@@ -656,9 +656,9 @@ function pickLibraryCheckGate(
   _seed: string,
   surface?: string | null
 ): LibraryCheckGate {
-  if (isKanaOnly(surface)) return "meaning";
   if (status.color === "red" && status.eligibleForLibraryStudy) return "readiness";
   if (status.color === "yellow" && status.eligibleForLibraryStudy) return "readiness";
+  if (isKanaOnly(surface)) return "meaning";
   if (status.nextGate === "reading") return "reading";
   if (status.nextGate === "meaning") return "meaning";
   return "reading";
@@ -1620,7 +1620,10 @@ function completeAbilityCheckForToday() {
 
 export default function LibraryStudyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
+  const autoStartedCheckRef = useRef(false);
+  const directStartRequested = searchParams.get("start") === "1";
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [learningSettings, setLearningSettings] =
@@ -1716,6 +1719,33 @@ export default function LibraryStudyPage() {
     libraryMode,
     loading,
     needsSignIn,
+  ]);
+
+  useEffect(() => {
+    if (autoStartedCheckRef.current) return;
+    if (libraryMode !== "check") return;
+    if (dailyCheckPlan) return;
+    if (loading || needsSignIn || errorMsg || fullAccessLocked) return;
+    if (allCards.length === 0) return;
+
+    const shouldAutoStart =
+      directStartRequested || allLevelsDueCount >= ABILITY_CHECK_MIN_DUE_CARDS;
+    if (!shouldAutoStart) return;
+    if (allLevelsDueCount < ABILITY_CHECK_MIN_DUE_CARDS || selectedDueCount <= 0) return;
+
+    autoStartedCheckRef.current = true;
+    startDailyCheck();
+  }, [
+    allCards.length,
+    allLevelsDueCount,
+    dailyCheckPlan,
+    directStartRequested,
+    errorMsg,
+    fullAccessLocked,
+    libraryMode,
+    loading,
+    needsSignIn,
+    selectedDueCount,
   ]);
 
   useEffect(() => {
@@ -3025,6 +3055,7 @@ export default function LibraryStudyPage() {
 
       if (!correctionOk) {
         setTypingInput("");
+        if (typingInputRef.current) typingInputRef.current.value = "";
         setNotice(
           activeStudyMode === "reading_typing"
             ? "Retype the reading once to continue."
@@ -3034,6 +3065,7 @@ export default function LibraryStudyPage() {
       }
 
       setTypingInput("");
+      if (typingInputRef.current) typingInputRef.current.value = "";
       setTypingCorrectionComplete(true);
       setNotice(null);
       return;
@@ -3057,11 +3089,12 @@ export default function LibraryStudyPage() {
       queueMeaningReview(currentCard, typingInput.trim(), correct, currentStudyMode, ok);
     }
 
-    setChecked({ ok, correct });
     if (!ok) {
       setTypingInput("");
+      if (typingInputRef.current) typingInputRef.current.value = "";
       window.requestAnimationFrame(() => typingInputRef.current?.focus());
     }
+    setChecked({ ok, correct });
     markStudyCardSeen(currentCard);
 
     recordCurrentStudyEvent(
@@ -3433,6 +3466,7 @@ export default function LibraryStudyPage() {
               {checked ? (
                 <AbilityCheckFeedbackPanel
                   checked={checked}
+                  correctionComplete={typingCorrectionComplete}
                   isMeaningCheck={activeStudyMode === "meaning_typing"}
                   card={currentCard}
                 />

@@ -32,10 +32,8 @@ export default function AbilityCheckSetupPanel({
           </h1>
 
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-            Ability Check is a strict small quiz to test your reading and meaning
-            of words you have encountered a lot. Your Ability Check has{" "}
-            <span className="font-black text-slate-900">{allLevelsDueCount}</span>{" "}
-            cards today.
+            Test the reading and meaning of words that are ready for a careful
+            check.
           </p>
         </div>
 
@@ -87,7 +85,7 @@ export default function AbilityCheckSetupPanel({
             disabled={selectedDueCount === 0}
             className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:opacity-40"
           >
-            Start {selectedDueCount} Card Check
+            Start Ability Check
           </button>
 
           <button

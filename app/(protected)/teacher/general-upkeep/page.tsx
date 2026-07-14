@@ -29,6 +29,12 @@ const baseUpkeepCards: UpkeepCard[] = [
     description: "Create global vocabulary, people, places, cultural references, and support entries.",
   },
   {
+    title: "Kanji Reading Upkeep",
+    href: "/teacher/kanji?from=site-upkeep&status=ongoing",
+    eyebrow: "Kanji",
+    description: "Work through the ongoing kanji-reading enrichment queue for saved words.",
+  },
+  {
     title: "Fast-pass Kanji Reading",
     href: "/teacher/kanji/fast-pass?from=site-upkeep",
     eyebrow: "Kanji",

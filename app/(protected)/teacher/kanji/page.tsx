@@ -96,6 +96,39 @@ type StatusFilter =
   | "excluded";
 
 type JlptFilter = "all" | "N5" | "N4" | "N3" | "N2" | "N1" | "unlabeled";
+type HeaderMode = "flagged" | "ongoing" | "all";
+
+function statusFilterFromParam(value: string | null): StatusFilter {
+  if (
+    value === "all" ||
+    value === "ongoing" ||
+    value === "flagged_review" ||
+    value === "complete" ||
+    value === "excluded"
+  ) {
+    return value;
+  }
+
+  return "all";
+}
+
+function statusFilterFromRouteContext(fromParam: string | null, statusParam: string | null): StatusFilter {
+  if (fromParam === "site-upkeep") return "ongoing";
+  if (fromParam === "needs-attention") return "flagged_review";
+  return statusFilterFromParam(statusParam);
+}
+
+function headerModeForStatus(statusFilter: StatusFilter): HeaderMode {
+  if (statusFilter === "flagged_review") return "flagged";
+  if (statusFilter === "ongoing") return "ongoing";
+  return "all";
+}
+
+function lockedStatusLabelForRouteContext(fromParam: string | null) {
+  if (fromParam === "site-upkeep") return "Ongoing queue";
+  if (fromParam === "needs-attention") return "Flagged by users";
+  return null;
+}
 
 type QueueItem = {
   userBookWordId: string;
@@ -585,7 +618,9 @@ function shouldPreferKanjiMapRow(
 
 export default function TeacherKanjiPage() {
   const searchParams = useSearchParams();
-  const backLink = getTeacherBackLink(searchParams.get("from"));
+  const fromParam = searchParams.get("from");
+  const statusParam = searchParams.get("status");
+  const backLink = getTeacherBackLink(fromParam);
 
   const [loading, setLoading] = useState(true);
   const [preparingId, setPreparingId] = useState<string | null>(null);
@@ -599,11 +634,17 @@ export default function TeacherKanjiPage() {
   const [canAccess, setCanAccess] = useState(false);
 
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    statusFilterFromRouteContext(fromParam, statusParam)
+  );
   const [jlptFilter, setJlptFilter] = useState<JlptFilter>("all");
 
   const [editorOpenByWordId, setEditorOpenByWordId] = useState<Record<string, boolean>>({});
   const [editorRowsByWordId, setEditorRowsByWordId] = useState<Record<string, KanjiMapRow[]>>({});
+
+  useEffect(() => {
+    setStatusFilter(statusFilterFromRouteContext(fromParam, statusParam));
+  }, [fromParam, statusParam]);
 
   async function loadQueue() {
     setLoading(true);
@@ -1545,7 +1586,11 @@ export default function TeacherKanjiPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <TeacherKanjiHeader homeHref={backLink.href} homeLabel={backLink.label} />
+      <TeacherKanjiHeader
+        homeHref={backLink.href}
+        homeLabel={backLink.label}
+        mode={headerModeForStatus(statusFilter)}
+      />
 
       {loading ? (
         <TeacherKanjiLoadingState />
@@ -1560,6 +1605,7 @@ export default function TeacherKanjiPage() {
             <TeacherKanjiFilterBar
               statusFilter={statusFilter}
               jlptFilter={jlptFilter}
+              lockedStatusLabel={lockedStatusLabelForRouteContext(fromParam)}
               onStatusFilterChange={(value) => setStatusFilter(value as StatusFilter)}
               onJlptFilterChange={(value) => setJlptFilter(value as JlptFilter)}
             />
@@ -1776,7 +1822,7 @@ export default function TeacherKanjiPage() {
 
           <section className="mt-6 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
             {filteredItems.length === 0 ? (
-              <TeacherKanjiEmptyState />
+              <TeacherKanjiEmptyState mode={headerModeForStatus(statusFilter)} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-stone-200 text-sm">

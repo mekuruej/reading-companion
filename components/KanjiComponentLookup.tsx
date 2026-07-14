@@ -317,10 +317,16 @@ export default function KanjiComponentLookup({
 }: KanjiComponentLookupProps) {
   const [selectedPieces, setSelectedPieces] = useState<string[]>([]);
   const [recentKanji, setRecentKanji] = useState<string[]>([]);
+  const [showAllResults, setShowAllResults] = useState(false);
 
   useEffect(() => {
     setSelectedPieces([]);
+    setShowAllResults(false);
   }, [resetKey]);
+
+  useEffect(() => {
+    setShowAllResults(false);
+  }, [selectedPieces]);
 
   const pieces = useMemo(() => {
     return sortComponents(KANJI_COMPONENT_LIST);
@@ -376,9 +382,6 @@ export default function KanjiComponentLookup({
             >
               Clear parts
             </button>
-            <div className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold text-sky-900">
-              Scroll down to choose more radicals
-            </div>
           </div>
         ) : null}
       </div>
@@ -390,27 +393,47 @@ export default function KanjiComponentLookup({
           </div>
 
           {filteredKanji.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {kanjiGroups.map(([strokes, groupKanji]) => (
-                <div key={strokes} className="contents">
-                  <div className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-stone-900 px-2 text-sm font-black text-white">
-                    {strokes === 99 ? "?" : strokes}
-                  </div>
+            <>
+              <div
+                className={`overflow-hidden transition-[max-height] ${
+                  showAllResults ? "max-h-none" : "max-h-28"
+                }`}
+              >
+                <div className="flex flex-wrap gap-2">
+                  {kanjiGroups.map(([strokes, groupKanji]) => (
+                    <div key={strokes} className="contents">
+                      <div className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-stone-900 px-2 text-sm font-black text-white">
+                        {strokes === 99 ? "?" : strokes}
+                      </div>
 
-                  {groupKanji.map((kanji) => (
-                    <button
-                      key={kanji}
-                      type="button"
-                      onClick={() => pickKanji(kanji)}
-                      className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-2xl font-semibold text-stone-900 transition hover:border-stone-400 hover:bg-white"
-                      title={`Add ${kanji}${strokes !== 99 ? ` · about ${strokes} strokes from selected parts` : ""}`}
-                    >
-                      {kanji}
-                    </button>
+                      {groupKanji.map((kanji) => (
+                        <button
+                          key={kanji}
+                          type="button"
+                          onClick={() => pickKanji(kanji)}
+                          className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-2xl font-semibold text-stone-900 transition hover:border-stone-400 hover:bg-white"
+                          title={`Add ${kanji}${strokes !== 99 ? ` · about ${strokes} strokes from selected parts` : ""}`}
+                        >
+                          {kanji}
+                        </button>
+                      ))}
+                    </div>
                   ))}
                 </div>
-              ))}
-            </div>
+              </div>
+
+              {filteredKanji.length > 18 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllResults((value) => !value)}
+                  className="mt-3 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:border-stone-500 hover:bg-stone-100"
+                >
+                  {showAllResults
+                    ? "Show fewer results"
+                    : `See more results (${filteredKanji.length})`}
+                </button>
+              ) : null}
+            </>
           ) : (
             <p className="text-sm text-stone-500">
               No matches yet. Try fewer parts or a different piece.

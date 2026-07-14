@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { TeacherHubCardGrid } from "./components/TeacherHubCardGrid";
 import { TeacherHubHeader } from "./components/TeacherHubHeader";
 import { TeacherHubTodaySection } from "./components/TeacherHubTodaySection";
-import { loadActiveKanjiQueueSummary } from "@/lib/teacherKanjiQueueCount";
 
 type TeacherHubCard = {
   title: string;
@@ -62,6 +61,11 @@ type TeacherRatingCountUserBookRow = {
 
 type CreatedAtRow = {
   created_at: string | null;
+};
+
+type FlaggedKanjiMapCountRow = {
+  vocabulary_cache_id: number | null;
+  flagged_at: string | null;
 };
 
 type ReadingFitCountProfileRow = {
@@ -308,6 +312,7 @@ export default function TeacherHubPage() {
             { data: manualBookFlags },
             { data: globalBooks },
             { data: vocabularyFlags },
+            { data: flaggedKanjiMapRows },
           ] = await Promise.all([
             supabase
               .from("book_requests")
@@ -327,6 +332,11 @@ export default function TeacherHubPage() {
               .from("user_book_words")
               .select("created_at")
               .eq("flagged_for_review", true),
+            supabase
+              .from("vocabulary_kanji_map")
+              .select("vocabulary_cache_id, flagged_at")
+              .eq("flagged_for_review", true)
+              .gte("flagged_at", recentKanjiQueueCutoff()),
           ]);
 
           const missingBookInfoItems = ((globalBooks ?? []) as GlobalBookRow[]).filter(
@@ -335,13 +345,12 @@ export default function TeacherHubPage() {
           const pendingBookRequestRows = (pendingBookRequests ?? []) as CreatedAtRow[];
           const manualBookFlagRows = (manualBookFlags ?? []) as CreatedAtRow[];
           const vocabularyFlagRows = (vocabularyFlags ?? []) as CreatedAtRow[];
-
-          const activeKanjiQueue = await loadActiveKanjiQueueSummary({
-            supabase,
-            isSuperTeacher: hasSuperTeacherAccess,
-            studentIds,
-            createdSince: recentKanjiQueueCutoff(),
-          });
+          const flaggedKanjiRows = (flaggedKanjiMapRows ?? []) as FlaggedKanjiMapCountRow[];
+          const flaggedKanjiCount = new Set(
+            flaggedKanjiRows
+              .map((row) => (row.vocabulary_cache_id == null ? null : Number(row.vocabulary_cache_id)))
+              .filter((id): id is number => Number.isFinite(id))
+          ).size;
 
           const bookFlagAndMissingDates = [
             ...manualBookFlagRows.map((row) => row.created_at),
@@ -366,12 +375,12 @@ export default function TeacherHubPage() {
               sortDate: oldestDate(bookFlagAndMissingDates),
             },
             {
-              title: "Kanji Queue",
-              href: "/teacher/kanji",
-              count: activeKanjiQueue.count,
-              description: "Kanji reports and enrichment rows waiting for review.",
-              hasToday: activeKanjiQueue.dates.some((date) => isTodayDate(date)),
-              sortDate: oldestDate(activeKanjiQueue.dates),
+              title: "Kanji Flags",
+              href: "/teacher/kanji?from=needs-attention&status=flagged_review",
+              count: flaggedKanjiCount,
+              description: "User-flagged kanji readings waiting for review.",
+              hasToday: flaggedKanjiRows.some((row) => isTodayDate(row.flagged_at)),
+              sortDate: oldestDate(flaggedKanjiRows.map((row) => row.flagged_at)),
             },
             {
               title: "Vocabulary Flags",

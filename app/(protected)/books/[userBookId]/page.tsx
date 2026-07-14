@@ -25,7 +25,6 @@ import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
 import BookHubTabBar from "./components/BookHubTabBar";
-import BookHubTabSectionHeader from "./components/BookHubTabSectionHeader";
 import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
 import BookHubActionPrompt from "./components/BookHubActionPrompt";
@@ -50,6 +49,9 @@ type Book = {
   cover_url: string | null;
   genre: string | null;
   book_type: string | null;
+  language_code: string | null;
+  edition_format: string | null;
+  edition_note: string | null;
   published_date: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
@@ -109,6 +111,7 @@ type UserBook = {
 type LookupRow = {
   surface?: string | null;
   meaning?: string | null;
+  page_number?: number | null;
   chapter_number?: number | null;
   chapter_name?: string | null;
   created_at?: string | null;
@@ -435,15 +438,31 @@ function ratingDescription(
 function entertainmentRatingText(value: number | null) {
   switch (value) {
     case 5:
-      return "Exceptional! Already want to read it again!"
+      return "Loved it. Highly recommend."
+    case 4.75:
+      return "Good, solid book. Definitely recommend."
+    case 4.5:
+      return "Good, solid book. Would most likely recommend."
+    case 4.25:
+      return "Good, solid book. May recommend."
     case 4:
-      return "Very good! Definitely will recommend it."
+      return "Good, solid book. Probably wouldn't recommend for certain reasons."
+    case 3.75:
+      return "Some parts worked; others didn't. Would recommend to specific people."
+    case 3.5:
+      return "Some parts worked; others didn't. May recommend."
+    case 3.25:
+      return "Some parts worked; others didn't. Would only recommend with reservations."
     case 3:
-      return "Good solid book."
+      return "Some parts worked; some parts didn't. Definitely wouldn't recommend."
+    case 2.5:
+      return "Some parts were okay, but overall, not for me."
     case 2:
-      return "Not bad, but I would have liked to read something else."
+      return "Definitely not for me, but the author tried."
+    case 1.5:
+      return "Definitely not for me. You should steer clear too."
     case 1:
-      return "Didn’t like it."
+      return "Hated it."
     default:
       return "—"
   }
@@ -661,6 +680,7 @@ export default function BookHubPage() {
   const [activeTab, setActiveTab] = useState<HubTab>("reflection");
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
+  const [lastSavedWordPage, setLastSavedWordPage] = useState<number | null>(null);
   const [lastSavedChapter, setLastSavedChapter] = useState<string>("");
 
   const [startedAt, setStartedAt] = useState<string>("");
@@ -684,6 +704,8 @@ export default function BookHubPage() {
   const [genre, setGenre] = useState<string>("");
   const [titleReading, setTitleReading] = useState<string>("");
   const [bookType, setBookType] = useState<string>("");
+  const [editionFormat, setEditionFormat] = useState<string>("");
+  const [editionNote, setEditionNote] = useState<string>("");
   const [triggerWarnings, setTriggerWarnings] = useState<string>("");
   const [savedCommunityGenres, setSavedCommunityGenres] = useState<string>("");
   const [savedCommunityContentNotes, setSavedCommunityContentNotes] = useState<string>("");
@@ -1078,6 +1100,9 @@ export default function BookHubPage() {
     canSeeVocabularySummary && lastSavedWord.trim() ? lastSavedWord.trim() : "";
   const bookHubLastChapterLabel =
     canSeeVocabularySummary && lastSavedChapter.trim() ? lastSavedChapter.trim() : "";
+  const bookHubLastPage = furthestPage ?? (canSeeVocabularySummary ? lastSavedWordPage : null);
+  const bookHubLastPageLabel =
+    bookHubLastPage != null ? `Page ${bookHubLastPage}` : "";
 
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
   const savedWordsPerPage =
@@ -1891,6 +1916,7 @@ export default function BookHubPage() {
         "id, user_book_id, vocabulary_cache_id, surface, reading, is_manual_override, created_at"
       )
       .eq("user_book_id", userBookIdValue)
+      .or("target_language_code.is.null,target_language_code.eq.ja")
       .eq("is_manual_override", false)
       .eq("ignore_kanji_enrichment", false)
       .gte("created_at", KANJI_ENRICHMENT_TEST_START);
@@ -2025,6 +2051,7 @@ export default function BookHubPage() {
       )
       .eq("is_manual_override", false)
       .eq("ignore_kanji_enrichment", false)
+      .or("target_language_code.is.null,target_language_code.eq.ja")
       .eq("user_book_id", userBookIdValue);
 
     if (!LEGACY_KANJI_BOOK_IDS.includes(userBookIdValue)) {
@@ -2933,6 +2960,7 @@ export default function BookHubPage() {
         kanji_enrichment_ignored_by: userId,
       })
       .eq("user_book_id", currentUserBookId)
+      .or("target_language_code.is.null,target_language_code.eq.ja")
       .eq("vocabulary_cache_id", vocabId);
 
     if (error) {
@@ -3322,7 +3350,7 @@ export default function BookHubPage() {
   const loadUniqueLookupCount = async (id: string) => {
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("surface, meaning, chapter_number, chapter_name, created_at")
+      .select("surface, meaning, page_number, chapter_number, chapter_name, created_at")
       .eq("user_book_id", id)
       .order("created_at", { ascending: false });
 
@@ -3330,6 +3358,7 @@ export default function BookHubPage() {
       console.error("Error loading lookup count:", error);
       setUniqueLookupCount(null);
       setLastSavedWord("");
+      setLastSavedWordPage(null);
       setLastSavedChapter("");
       return;
     }
@@ -3337,6 +3366,7 @@ export default function BookHubPage() {
     const rows = (data ?? []) as LookupRow[];
     const newestWord = rows.find((r) => (r.surface ?? "").trim() || (r.meaning ?? "").trim());
     setLastSavedWord((newestWord?.surface ?? newestWord?.meaning ?? "").trim());
+    setLastSavedWordPage(newestWord?.page_number ?? null);
     const furthestChapterWord =
       rows
         .filter((r) => (r.surface ?? "").trim() || (r.meaning ?? "").trim())
@@ -3486,6 +3516,9 @@ export default function BookHubPage() {
           cover_url,
           genre,
           book_type,
+          language_code,
+          edition_format,
+          edition_note,
           audience_category,
           trigger_warnings,
           page_count,
@@ -3624,6 +3657,8 @@ export default function BookHubPage() {
     const b = r.books as Book | null;
     setTitleReading(b?.title_reading ?? "");
     setBookType(b?.book_type ?? "");
+    setEditionFormat(b?.edition_format ?? "");
+    setEditionNote(b?.edition_note ?? "");
     setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
@@ -3668,6 +3703,7 @@ export default function BookHubPage() {
     } else {
       setUniqueLookupCount(null);
       setLastSavedWord("");
+      setLastSavedWordPage(null);
       setLastSavedChapter("");
     }
     await loadReadingSessions(r.id);
@@ -3811,6 +3847,8 @@ export default function BookHubPage() {
 
     const b = row.books;
     setBookType(b?.book_type ?? "");
+    setEditionFormat(b?.edition_format ?? "");
+    setEditionNote(b?.edition_note ?? "");
     setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
@@ -3934,30 +3972,7 @@ export default function BookHubPage() {
     if (!cleanedName) return null;
 
     if (selectedPublisherId) {
-      const { data, error } = await supabase
-        .from("publishers")
-        .update({
-          name_ja: cleanedName,
-          name_en: publisherEnglishName.trim() || null,
-          reading: publisherReading.trim() || null,
-          logo_url: publisherImg.trim() || null,
-        })
-        .eq("id", selectedPublisherId)
-        .select("id, name_ja")
-        .single();
-
-      if (error) {
-        console.error("Error updating selected publisher:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          raw: error,
-        });
-        return { id: selectedPublisherId, name_ja: cleanedName };
-      }
-
-      return data;
+      return { id: selectedPublisherId, name_ja: cleanedName };
     }
 
     const normalized = normalizeName(cleanedName);
@@ -4425,6 +4440,8 @@ export default function BookHubPage() {
       publisher_id: publisherRecord?.id ?? null,
       published_date: publishedDate || null,
       book_type: bookType || null,
+      edition_format: editionFormat || null,
+      edition_note: editionNote.trim() || null,
       page_count,
       series_number,
       isbn: isbn || null,
@@ -5237,6 +5254,7 @@ export default function BookHubPage() {
                 progressPercentLabel={bookHubProgressPercentLabel}
                 lastSavedWordLabel={bookHubLastSavedWordLabel}
                 lastChapterLabel={bookHubLastChapterLabel}
+                lastPageLabel={bookHubLastPageLabel}
                 daysEngagedLabel={bookHubDaysEngagedLabel}
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
@@ -5314,7 +5332,6 @@ export default function BookHubPage() {
 
               {activeTab === "bookInfo" && (
                 <div className="space-y-4">
-                  <BookHubTabSectionHeader title="Book Info" />
                   <BookInfoTab
                     userBookId={row.id}
                     book={book}
@@ -5343,10 +5360,17 @@ export default function BookHubPage() {
                     }}
                     onCancel={cancelEdits}
                     onSave={saveAll}
+                    sharedGenres={sharedGenres}
+                    sharedContentNotes={sharedContentNotes}
+                    genreLabel={genreLabel}
                     titleReading={titleReading}
                     setTitleReading={setTitleReading}
                     bookType={bookType}
                     setBookType={setBookType}
+                    editionFormat={editionFormat}
+                    setEditionFormat={setEditionFormat}
+                    editionNote={editionNote}
+                    setEditionNote={setEditionNote}
                     publishedDate={publishedDate}
                     setPublishedDate={setPublishedDate}
                     pageCount={pageCount}
@@ -5422,7 +5446,6 @@ export default function BookHubPage() {
 
               {activeTab === "reading" && (
                 <div className="space-y-4">
-                  <BookHubTabSectionHeader title="Reading" />
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Add Words</div>
 
@@ -5513,8 +5536,6 @@ export default function BookHubPage() {
 
               {activeTab === "story" && (
                 <div className="space-y-4">
-                  <BookHubTabSectionHeader title="Story" />
-
                   {canUseStoryNotes ? (
                     <StoryTab
                       storyTab={storyTab}
@@ -5596,7 +5617,6 @@ export default function BookHubPage() {
 
               {activeTab === "reflection" && (
                 <div id="reading-reflection-panel" className="space-y-4 scroll-mt-6">
-                  <BookHubTabSectionHeader title="Reading Reflection" />
                   <RatingTab
                     row={row}
                     onSaveReflection={saveReadingReflectionFields}

@@ -15,23 +15,28 @@ export function AbilityCheckReminderBanner({
 
   return (
     <LibraryReminderBanner
-      title={isReady ? "Your Ability Check is ready" : "Ability Check is resting today"}
+      tone={isReady ? "emerald" : "sky"}
+      title={isReady ? "Your Ability Check is ready!" : "Ability Check is resting today"}
       actions={
         <>
           {isReady ? (
             <button
               type="button"
               onClick={onStart}
-              className="rounded-xl bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800"
+              className="animate-pulse rounded-xl bg-emerald-700 px-4 py-2 text-sm font-black text-white shadow-sm shadow-emerald-300 transition hover:bg-emerald-600"
             >
-              Open Ability Check
+              Start now
             </button>
           ) : null}
 
           <button
             type="button"
             onClick={onHide}
-            className="rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+            className={`rounded-xl border bg-white px-4 py-2 text-sm font-semibold transition ${
+              isReady
+                ? "border-emerald-200 text-emerald-900 hover:bg-emerald-100"
+                : "border-sky-200 text-sky-900 hover:bg-sky-100"
+            }`}
           >
             Hide today
           </button>
@@ -39,14 +44,14 @@ export function AbilityCheckReminderBanner({
       }
     >
       {isReady ? (
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          You have{" "}
-          <span className="text-xl font-black text-slate-950">
-            {abilityCheckReminderCount}
-          </span>{" "}
-          due cards. Ability Check is a strict small quiz for reading and
-          meaning.
-        </p>
+        <div className="mt-1 space-y-1">
+          <p className="text-xl font-black leading-tight text-emerald-950">
+            Time to test your reading and meaning knowledge.
+          </p>
+          <p className="text-sm leading-6 text-emerald-900">
+            These words are nearing mastery and ready to check.
+          </p>
+        </div>
       ) : (
         <p className="mt-1 text-sm leading-6 text-slate-600">
           Ability Check opens when at least {minDueCards} cards are due. You

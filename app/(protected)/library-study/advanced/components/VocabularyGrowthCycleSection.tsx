@@ -23,8 +23,7 @@ const cycleSteps = [
     {
         title: "Ability Check",
         description:
-            "Check whether words are ready to move forward by reading or meaning ability.",
-        href: "/library-study/check",
+            "When enough words are ready, Mekuru shows an alert on your Library page.",
     },
     {
         title: "Strengthen what you know",
@@ -332,12 +331,7 @@ export default function VocabularyGrowthCycleSection() {
                             </g>
                         </a>
 
-                        <a
-                            href="/library-study/check"
-                            aria-label="Open Ability Check"
-                            className="cursor-pointer"
-                        >
-                            <g>
+                        <g>
                             <rect
                                 x="25"
                                 y="405"
@@ -367,8 +361,7 @@ export default function VocabularyGrowthCycleSection() {
                             >
                                 Check
                             </text>
-                            </g>
-                        </a>
+                        </g>
 
                         <a
                             href="/library-study/practice?color=purple"
@@ -546,12 +539,11 @@ export default function VocabularyGrowthCycleSection() {
                 </div>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
-                    {cycleSteps.map((step, index) => (
-                        <a
-                            key={step.title}
-                            href={step.href}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white hover:shadow-sm"
-                        >
+                    {cycleSteps.map((step, index) => {
+                        const className =
+                            "rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white hover:shadow-sm";
+                        const content = (
+                            <>
                             <div className="flex items-center gap-3">
                                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
                                     {index + 1}
@@ -564,8 +556,19 @@ export default function VocabularyGrowthCycleSection() {
                             <p className="mt-3 text-sm leading-6 text-slate-600">
                                 {step.description}
                             </p>
-                        </a>
-                    ))}
+                            </>
+                        );
+
+                        return step.href ? (
+                            <a key={step.title} href={step.href} className={className}>
+                                {content}
+                            </a>
+                        ) : (
+                            <div key={step.title} className={className}>
+                                {content}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </details>

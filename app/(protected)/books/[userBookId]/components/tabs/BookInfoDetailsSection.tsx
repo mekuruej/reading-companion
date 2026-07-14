@@ -3,6 +3,9 @@ import type { ComponentType } from "react";
 type BookDetails = {
   title_reading?: string | null;
   book_type?: string | null;
+  language_code?: string | null;
+  edition_format?: string | null;
+  edition_note?: string | null;
   published_date?: string | null;
   page_count?: number | string | null;
   series_number?: number | string | null;
@@ -28,6 +31,10 @@ type BookInfoDetailsSectionProps = {
   setTitleReading: (value: string) => void;
   bookType: string;
   setBookType: (value: string) => void;
+  editionFormat: string;
+  setEditionFormat: (value: string) => void;
+  editionNote: string;
+  setEditionNote: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
   pageCount: string;
@@ -66,6 +73,10 @@ export default function BookInfoDetailsSection({
   setTitleReading,
   bookType,
   setBookType,
+  editionFormat,
+  setEditionFormat,
+  editionNote,
+  setEditionNote,
   publishedDate,
   setPublishedDate,
   pageCount,
@@ -82,6 +93,26 @@ export default function BookInfoDetailsSection({
   BOOK_TYPE_OPTIONS,
   Detail,
 }: BookInfoDetailsSectionProps) {
+  const genericEditionFormatOptions = [
+    { value: "paperback", label: "Paperback" },
+    { value: "hardcover", label: "Hardcover" },
+    { value: "ebook", label: "Ebook" },
+    { value: "other", label: "Other" },
+  ];
+  const japaneseEditionFormatOptions = [
+    { value: "bunko", label: "Bunkobon (Pocket-sized book)" },
+    { value: "tankobon_hardcover", label: "Tankobon (Hardcover)" },
+    { value: "tankobon_softcover", label: "Tankobon (Softcover)" },
+    { value: "ebook", label: "Ebook" },
+    { value: "other", label: "Other" },
+  ];
+  const editionFormatOptions =
+    book.language_code === "ja" ? japaneseEditionFormatOptions : genericEditionFormatOptions;
+  const editionFormatLabel =
+    [...japaneseEditionFormatOptions, ...genericEditionFormatOptions].find(
+      (option) => option.value === book.edition_format
+    )?.label ?? "—";
+
   return (
     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -153,6 +184,35 @@ export default function BookInfoDetailsSection({
             </select>
           )}
         </div>
+
+        <div className="rounded border bg-white p-3 text-sm">
+          <div className="text-stone-600">Edition Format</div>
+          {!isEditingBookInfo ? (
+            <div className="font-medium">{editionFormatLabel}</div>
+          ) : (
+            <select
+              value={editionFormat}
+              onChange={(e) => setEditionFormat(e.target.value)}
+              className="mt-1 w-full rounded border bg-white px-2 py-1 text-sm"
+            >
+              <option value="">—</option>
+              {editionFormatOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <Detail
+          label="Edition Note"
+          value={book.edition_note}
+          editing={isEditingBookInfo}
+          inputValue={editionNote}
+          setInputValue={setEditionNote}
+          placeholder="Optional. Use for details such as US edition, UK edition, revised edition, or other information that helps identify this specific edition."
+        />
 
         <Detail
           label="Published"
