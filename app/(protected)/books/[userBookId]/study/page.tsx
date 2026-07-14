@@ -57,15 +57,15 @@ function studySetLabel(s: StudySet) {
     case "MEANING":
       return "Meaning Typing";
     case "FROM_READING_MEANING":
-      return "Reading to Meaning Typing";
+      return "Kana to Meaning Typing";
     case "READING_MC":
       return "Reading MC";
     case "MEANING_MC":
       return "Meaning MC";
     case "FROM_READING_MC":
-      return "Reading to Kanji MC";
+      return "Kana to Kanji MC";
     case "FROM_READING_MEANING_MC":
-      return "Reading to Meaning MC";
+      return "Kana to Meaning MC";
     case "COMPLETE":
       return "Complete Review";
     case "ENGLISH_READER":
