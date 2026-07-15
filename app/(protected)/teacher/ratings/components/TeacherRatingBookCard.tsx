@@ -2,6 +2,7 @@ import Link from "next/link";
 
 export type TeacherRatingBookCardItem = {
   id: string;
+  bookId: string | null;
   title: string;
   author: string | null;
   coverUrl: string | null;
@@ -16,11 +17,14 @@ export type TeacherRatingBookCardItem = {
   dnfReason: string | null;
   dnfNote: string | null;
   wouldRetry: string | null;
+  teacherReviewClearedAt: string | null;
   hasTeacherReview: boolean;
 };
 
 type TeacherRatingBookCardProps = {
   item: TeacherRatingBookCardItem;
+  dismissing?: boolean;
+  onDismiss?: (item: TeacherRatingBookCardItem) => void;
 };
 
 function ratingText(value: number | null) {
@@ -73,7 +77,11 @@ function wouldRetryLabel(value: string | null) {
   }
 }
 
-export function TeacherRatingBookCard({ item }: TeacherRatingBookCardProps) {
+export function TeacherRatingBookCard({
+  item,
+  dismissing = false,
+  onDismiss,
+}: TeacherRatingBookCardProps) {
   return (
     <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -100,10 +108,16 @@ export function TeacherRatingBookCard({ item }: TeacherRatingBookCardProps) {
             <span
               className={`rounded-full px-3 py-1 text-xs font-black ${item.hasTeacherReview
                 ? "bg-emerald-50 text-emerald-700"
+                : item.teacherReviewClearedAt
+                  ? "bg-stone-100 text-stone-600"
                 : "bg-amber-50 text-amber-700"
                 }`}
             >
-              {item.hasTeacherReview ? "Rated" : "Needs rating"}
+              {item.hasTeacherReview
+                ? "Rated"
+                : item.teacherReviewClearedAt
+                  ? "Dismissed"
+                  : "Needs rating"}
             </span>
           </div>
 
@@ -181,6 +195,16 @@ export function TeacherRatingBookCard({ item }: TeacherRatingBookCardProps) {
             >
               Book Hub
             </Link>
+            {onDismiss ? (
+              <button
+                type="button"
+                onClick={() => onDismiss(item)}
+                disabled={dismissing}
+                className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-600 hover:border-stone-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {dismissing ? "Dismissing..." : "Dismiss request"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

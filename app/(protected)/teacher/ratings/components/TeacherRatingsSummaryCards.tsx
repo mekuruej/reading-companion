@@ -21,7 +21,7 @@ export function TeacherRatingsSummaryCards({
     {
       label: "Need ratings",
       value: needsRatingCount,
-      note: "Finished books without teacher-facing review notes yet.",
+      note: "Finished books without teacher-facing review notes yet. DNF and dismissed books are skipped.",
       color: "border-amber-200 bg-amber-50 text-amber-900",
     },
     {

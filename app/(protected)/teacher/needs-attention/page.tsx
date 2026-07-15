@@ -33,6 +33,7 @@ type GlobalBookRow = {
 type ReadingFitCountUserBookRow = {
   user_id: string;
   finished_at: string | null;
+  dnf_at: string | null;
   reader_level: string | null;
   rating_difficulty: number | null;
   rating_overall: number | null;
@@ -45,12 +46,39 @@ type ReadingFitCountProfileRow = {
 };
 
 type TeacherRatingCountUserBookRow = {
+  id: string;
+  book_id: string | null;
   finished_at: string | null;
+  dnf_at: string | null;
   notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
   rating_recommend: number | null;
+  teacher_review_cleared_at: string | null;
 };
+
+function countNeededTeacherRatingBooks(items: TeacherRatingCountUserBookRow[]) {
+  const bookIds = new Set<string>();
+
+  for (const item of items) {
+    const hasTeacherReview =
+      !!String(item.recommended_level ?? "").trim() ||
+      item.teacher_student_use_rating != null ||
+      item.rating_recommend != null ||
+      !!String(item.notes ?? "").trim();
+
+    if (
+      item.finished_at &&
+      !item.dnf_at &&
+      !item.teacher_review_cleared_at &&
+      !hasTeacherReview
+    ) {
+      bookIds.add(item.book_id ?? `user-book:${item.id}`);
+    }
+  }
+
+  return bookIds.size;
+}
 
 const attentionCards: NeedsAttentionCard[] = [
   {
@@ -243,14 +271,15 @@ export default function TeacherNeedsAttentionPage() {
           supabase
             .from("user_books")
             .select(
-              "user_id, finished_at, reader_level, rating_difficulty, rating_overall, teacher_review_cleared_at"
+              "user_id, finished_at, dnf_at, reader_level, rating_difficulty, rating_overall, teacher_review_cleared_at"
             )
             .in("user_id", studentIds)
             .not("finished_at", "is", null)
+            .is("dnf_at", null)
             .is("teacher_review_cleared_at", null),
           supabase
             .from("user_books")
-            .select("finished_at, notes, recommended_level, teacher_student_use_rating, rating_recommend")
+            .select("id, book_id, finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, rating_recommend, teacher_review_cleared_at")
             .in("user_id", studentIds),
           supabase
             .from("grammar_points")
@@ -278,18 +307,9 @@ export default function TeacherNeedsAttentionPage() {
           }
         ).length;
 
-        const teacherRatingCount = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
-          (item) => {
-            const isFinished = !!item.finished_at;
-            const hasTeacherReview =
-              !!String(item.recommended_level ?? "").trim() ||
-              item.teacher_student_use_rating != null ||
-              item.rating_recommend != null ||
-              !!String(item.notes ?? "").trim();
-
-            return isFinished && !hasTeacherReview;
-          }
-        ).length;
+        const teacherRatingCount = countNeededTeacherRatingBooks(
+          (teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]
+        );
 
         let nextCounts: AttentionCounts = {
           books: 0,

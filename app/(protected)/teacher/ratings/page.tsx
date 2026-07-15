@@ -34,6 +34,7 @@ type BookRow = {
 type UserBookRow = {
   id: string;
   user_id: string;
+  book_id: string | null;
   notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
@@ -43,6 +44,7 @@ type UserBookRow = {
   dnf_reason: string | null;
   dnf_note: string | null;
   would_retry: string | null;
+  teacher_review_cleared_at: string | null;
   created_at: string | null;
   books: BookRow | BookRow[] | null;
 };
@@ -77,6 +79,7 @@ function toItem(row: UserBookRow, learnerById: Map<string, ProfileRow>): Teacher
 
   return {
     id: row.id,
+    bookId: row.book_id,
     title: book?.title?.trim() || "Untitled book",
     author: book?.author?.trim() || null,
     coverUrl: book?.cover_url ?? null,
@@ -91,6 +94,7 @@ function toItem(row: UserBookRow, learnerById: Map<string, ProfileRow>): Teacher
     dnfReason: row.dnf_reason,
     dnfNote: row.dnf_note,
     wouldRetry: row.would_retry,
+    teacherReviewClearedAt: row.teacher_review_cleared_at,
     hasTeacherReview: hasTeacherReview(row),
   };
 }
@@ -124,6 +128,7 @@ export default function TeacherRatingsPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [items, setItems] = useState<TeacherRatingBookCardItem[]>([]);
+  const [dismissingBookId, setDismissingBookId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [levelFilter, setLevelFilter] = useState("all");
@@ -199,6 +204,7 @@ export default function TeacherRatingsPage() {
                 `
                   id,
                   user_id,
+                  book_id,
                   notes,
                   recommended_level,
                   teacher_student_use_rating,
@@ -208,6 +214,7 @@ export default function TeacherRatingsPage() {
                   dnf_reason,
                   dnf_note,
                   would_retry,
+                  teacher_review_cleared_at,
                   created_at,
                   books (
                     title,
@@ -253,6 +260,75 @@ export default function TeacherRatingsPage() {
     };
   }, []);
 
+  async function dismissTeacherRatingRequest(item: TeacherRatingBookCardItem) {
+    const confirmed = window.confirm(
+      "Dismiss this teacher rating request? This will clear the needed-rating alert, but it will not add ratings or notes."
+    );
+
+    if (!confirmed) return;
+
+    const matchingIds = items
+      .filter((candidate) => {
+        const sameBook = item.bookId
+          ? candidate.bookId === item.bookId
+          : candidate.id === item.id;
+
+        return (
+          sameBook &&
+          candidate.finishedAt &&
+          !candidate.dnfAt &&
+          !candidate.hasTeacherReview &&
+          !candidate.teacherReviewClearedAt
+        );
+      })
+      .map((candidate) => candidate.id);
+
+    if (matchingIds.length === 0) return;
+
+    setDismissingBookId(item.bookId ?? item.id);
+
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+
+      const user = auth?.user;
+      if (!user) throw new Error("Please sign in to dismiss teacher rating requests.");
+
+      const { error } = await supabase
+        .from("user_books")
+        .update({
+          teacher_review_cleared_at: new Date().toISOString(),
+          teacher_review_cleared_by: user.id,
+          teacher_review_clear_note: "Dismissed from Teacher Ratings queue.",
+        })
+        .in("id", matchingIds);
+
+      if (error) throw error;
+
+      setItems((currentItems) =>
+        currentItems.map((candidate) =>
+          matchingIds.includes(candidate.id)
+            ? {
+                ...candidate,
+                teacherReviewClearedAt: new Date().toISOString(),
+              }
+            : candidate
+        )
+      );
+    } catch (error: any) {
+      console.error("Error dismissing teacher rating request:", {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        raw: error,
+      });
+      window.alert(error?.message ?? "Could not dismiss this teacher rating request.");
+    } finally {
+      setDismissingBookId(null);
+    }
+  }
+
   const levelOptions = useMemo(() => {
     return Array.from(
       new Set(items.map((item) => item.recommendedLevel).filter(Boolean) as string[])
@@ -261,14 +337,18 @@ export default function TeacherRatingsPage() {
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const queuedBookIds = new Set<string>();
 
     return items
       .filter((item) => {
+        const isNeededRating =
+          !item.hasTeacherReview &&
+          !!item.finishedAt &&
+          !item.dnfAt &&
+          !item.teacherReviewClearedAt;
+
         if (statusFilter === "rated" && !item.hasTeacherReview) return false;
-        if (
-          statusFilter === "needs-rating" &&
-          (item.hasTeacherReview || (!item.finishedAt && !item.dnfAt))
-        ) {
+        if (statusFilter === "needs-rating" && !isNeededRating) {
           return false;
         }
         if (statusFilter === "strong-fit" && ratingValue(item.studentUseRating) < 4) {
@@ -276,9 +356,9 @@ export default function TeacherRatingsPage() {
         }
         if (levelFilter !== "all" && item.recommendedLevel !== levelFilter) return false;
 
-        if (!query) return true;
-
-        return [
+        const matchesSearch =
+          !query ||
+          [
           item.title,
           item.author ?? "",
           item.learnerName,
@@ -287,15 +367,33 @@ export default function TeacherRatingsPage() {
         ]
           .join(" ")
           .toLowerCase()
-          .includes(query);
+            .includes(query);
+
+        if (!matchesSearch) return false;
+
+        if (isNeededRating) {
+          const queueKey = item.bookId ?? item.id;
+          if (queuedBookIds.has(queueKey)) return false;
+          queuedBookIds.add(queueKey);
+        }
+
+        return true;
       })
       .sort((a, b) => compareItems(a, b, sortMode));
   }, [items, levelFilter, search, sortMode, statusFilter]);
 
   const ratedCount = items.filter((item) => item.hasTeacherReview).length;
-  const needsRatingCount = items.filter(
-    (item) => !item.hasTeacherReview && (item.finishedAt || item.dnfAt)
-  ).length;
+  const needsRatingCount = new Set(
+    items
+      .filter(
+        (item) =>
+          !item.hasTeacherReview &&
+          !!item.finishedAt &&
+          !item.dnfAt &&
+          !item.teacherReviewClearedAt
+      )
+      .map((item) => item.bookId ?? item.id)
+  ).size;
   const wouldTeachAgainCount = items.filter(
     (item) => ratingValue(item.studentUseRating) >= 4
   ).length;
@@ -354,7 +452,19 @@ export default function TeacherRatingsPage() {
         ) : (
           <section className="space-y-4">
             {filteredItems.map((item) => (
-              <TeacherRatingBookCard key={item.id} item={item} />
+              <TeacherRatingBookCard
+                key={item.id}
+                item={item}
+                dismissing={dismissingBookId === (item.bookId ?? item.id)}
+                onDismiss={
+                  !item.hasTeacherReview &&
+                  !!item.finishedAt &&
+                  !item.dnfAt &&
+                  !item.teacherReviewClearedAt
+                    ? dismissTeacherRatingRequest
+                    : undefined
+                }
+              />
             ))}
           </section>
         )}

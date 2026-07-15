@@ -36,6 +36,7 @@ type UserBookRow = {
   id: string;
   user_id: string;
   finished_at: string | null;
+  dnf_at: string | null;
   reader_level: string | null;
   rating_difficulty: number | null;
   rating_overall: number | null;
@@ -210,6 +211,7 @@ export default function TeacherReadingFitPage() {
               id,
               user_id,
               finished_at,
+              dnf_at,
               reader_level,
               rating_difficulty,
               rating_overall,
@@ -222,6 +224,7 @@ export default function TeacherReadingFitPage() {
             `)
             .in("user_id", studentIds)
             .not("finished_at", "is", null)
+            .is("dnf_at", null)
             .is("teacher_review_cleared_at", null)
             .order("finished_at", { ascending: false }),
         ]);

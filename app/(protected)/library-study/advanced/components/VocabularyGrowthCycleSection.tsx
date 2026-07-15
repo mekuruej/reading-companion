@@ -26,7 +26,7 @@ const cycleSteps = [
             "When enough words are ready, Mekuru shows an alert on your Library page.",
     },
     {
-        title: "Strengthen what you know",
+        title: "Mastered Words",
         description:
             "Revisit mastered words so they stay alive in your reading.",
         href: "/library-study/practice?color=purple",
@@ -406,7 +406,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontSize="14"
                                 textAnchor="middle"
                             >
-                                Review
+                                Strengthen what you know
                             </text>
                             </g>
                         </a>
