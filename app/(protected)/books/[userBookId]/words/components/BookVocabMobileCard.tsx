@@ -1,3 +1,4 @@
+import { KeyboardEvent, useEffect, useState } from "react";
 import BookVocabKatakanaBadge from "./BookVocabKatakanaBadge";
 
 type BookVocabMobileCardProps = {
@@ -7,6 +8,7 @@ type BookVocabMobileCardProps = {
   meaning: string | null | undefined;
   pageNumber: number | null | undefined;
   readOnly?: boolean;
+  onPageChange?: (value: string) => void | Promise<void>;
 
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -24,6 +26,7 @@ export default function BookVocabMobileCard({
   meaning,
   pageNumber,
   readOnly = false,
+  onPageChange,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -31,6 +34,29 @@ export default function BookVocabMobileCard({
   onOpen,
   onDelete,
 }: BookVocabMobileCardProps) {
+  const [pageDraft, setPageDraft] = useState(pageNumber == null ? "" : String(pageNumber));
+
+  useEffect(() => {
+    setPageDraft(pageNumber == null ? "" : String(pageNumber));
+  }, [pageNumber]);
+
+  async function commitPage() {
+    const nextValue = pageDraft.trim();
+    const currentValue = pageNumber == null ? "" : String(pageNumber);
+    if (nextValue === currentValue) return;
+    await onPageChange?.(nextValue);
+  }
+
+  function handlePageKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+    }
+    if (event.key === "Escape") {
+      setPageDraft(pageNumber == null ? "" : String(pageNumber));
+      event.currentTarget.blur();
+    }
+  }
+
   return (
     <article
       className={`rounded-2xl border bg-white p-4 shadow-sm ${
@@ -84,12 +110,27 @@ export default function BookVocabMobileCard({
           </div>
         )}
 
-        <div
-          className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500"
-          title="Words can be reordered within the same page"
-        >
-          Page {pageNumber ?? "—"}
-        </div>
+        {readOnly || !onPageChange ? (
+          <div
+            className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500"
+            title="Words can be reordered within the same page"
+          >
+            Page {pageNumber ?? "—"}
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500">
+            Page
+            <input
+              type="number"
+              value={pageDraft}
+              onChange={(event) => setPageDraft(event.target.value)}
+              onBlur={() => void commitPage()}
+              onKeyDown={handlePageKeyDown}
+              className="w-16 rounded-lg border border-stone-200 bg-white px-2 py-1 text-center text-sm font-semibold normal-case tracking-normal text-stone-700 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              aria-label="Page number"
+            />
+          </label>
+        )}
 
         {readOnly ? null : (
           <button

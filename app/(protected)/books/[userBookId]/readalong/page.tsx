@@ -106,6 +106,10 @@ function chapterLabelForWord(word: Pick<ReadAlongWord, "chapter_number" | "chapt
     return "Unchaptered";
 }
 
+function hasUsefulSupportMeaning(word: Pick<ReadAlongWord, "meaning">) {
+    return Boolean(word.meaning?.trim());
+}
+
 export default function ReadAlongPage() {
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -329,7 +333,7 @@ export default function ReadAlongPage() {
                 return;
             }
 
-            setWords((data as ReadAlongWord[]) ?? []);
+            setWords(((data as ReadAlongWord[]) ?? []).filter(hasUsefulSupportMeaning));
             setLoading(false);
         }
 

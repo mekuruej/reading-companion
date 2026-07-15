@@ -35,6 +35,14 @@ import DateField from "./components/DateField";
 import StarRatingField from "./components/StarRatingField";
 import DifficultyField from "./components/DifficultyField";
 
+function isMissingSeriesTotalColumnError(error: any) {
+  return (
+    error?.code === "42703" ||
+    error?.code === "PGRST204" ||
+    String(error?.message ?? "").includes("series_total")
+  );
+}
+
 type Book = {
   id: string;
   title: string;
@@ -56,6 +64,7 @@ type Book = {
   trigger_warnings: string | null;
   page_count: number | null;
   series_number: number | null;
+  series_total: number | null;
   isbn: string | null;
   isbn13: string | null;
   publisher: string | null;
@@ -714,6 +723,7 @@ export default function BookHubPage() {
   const [publishedDate, setPublishedDate] = useState("");
   const [pageCount, setPageCount] = useState<string>("");
   const [seriesNumber, setSeriesNumber] = useState<string>("");
+  const [seriesTotal, setSeriesTotal] = useState<string>("");
   const [isbn, setIsbn] = useState<string>("");
   const [isbn13, setIsbn13] = useState<string>("");
 
@@ -3471,10 +3481,7 @@ export default function BookHubPage() {
     );
     setCanSeeVocabularySummary(featureAccess.canSeeVocabularyColors);
 
-    const { data, error } = await supabase
-      .from("user_books")
-      .select(
-        `
+    const bookHubSelect = `
         id,
         user_id,
         book_id,
@@ -3523,6 +3530,7 @@ export default function BookHubPage() {
           trigger_warnings,
           page_count,
           series_number,
+          series_total,
           isbn,
           isbn13,
           publisher,
@@ -3538,10 +3546,24 @@ export default function BookHubPage() {
           translator_reading,
           illustrator_reading
         )
-      `
-      )
+      `;
+
+    let { data, error } = await supabase
+      .from("user_books")
+      .select(bookHubSelect)
       .eq("id", userBookId)
       .maybeSingle();
+
+    if (error && isMissingSeriesTotalColumnError(error)) {
+      const retry = await supabase
+        .from("user_books")
+        .select(bookHubSelect.replace(/\n\s*series_total,/u, ""))
+        .eq("id", userBookId)
+        .maybeSingle();
+
+      data = retry.data as unknown as typeof data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error("Error loading Book Hub row:", error);
@@ -3662,6 +3684,7 @@ export default function BookHubPage() {
     setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
+    setSeriesTotal(b?.series_total != null ? String(b.series_total) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
 
@@ -3852,6 +3875,7 @@ export default function BookHubPage() {
     setPublishedDate(b?.published_date ?? "");
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
+    setSeriesTotal(b?.series_total != null ? String(b.series_total) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
 
@@ -4386,6 +4410,8 @@ export default function BookHubPage() {
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
     const sn = seriesNumber.trim() ? Number(seriesNumber.trim()) : null;
     const series_number = Number.isFinite(sn as any) ? (sn as number) : null;
+    const st = seriesTotal.trim() ? Number(seriesTotal.trim()) : null;
+    const series_total = Number.isFinite(st as any) ? (st as number) : null;
 
     const ro = ratingOverall.trim() ? clampRating5(Number(ratingOverall.trim())) : null;
     const rr = ratingRecommend.trim() ? clampRating5(Number(ratingRecommend.trim())) : null;
@@ -4444,6 +4470,7 @@ export default function BookHubPage() {
       edition_note: editionNote.trim() || null,
       page_count,
       series_number,
+      series_total,
       isbn: isbn || null,
       isbn13: isbn13 || null,
       publisher_reading: publisherReading || null,
@@ -5377,6 +5404,8 @@ export default function BookHubPage() {
                     setPageCount={setPageCount}
                     seriesNumber={seriesNumber}
                     setSeriesNumber={setSeriesNumber}
+                    seriesTotal={seriesTotal}
+                    setSeriesTotal={setSeriesTotal}
                     isbn={isbn}
                     setIsbn={setIsbn}
                     isbn13={isbn13}

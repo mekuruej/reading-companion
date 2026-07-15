@@ -29,6 +29,7 @@ type Book = {
   trigger_warnings: string | null;
   page_count: number | null;
   series_number: number | null;
+  series_total?: number | null;
   isbn: string | null;
   isbn13: string | null;
   publisher: string | null;
@@ -120,6 +121,8 @@ type BookInfoTabProps = {
   setPageCount: (value: string) => void;
   seriesNumber: string;
   setSeriesNumber: (value: string) => void;
+  seriesTotal: string;
+  setSeriesTotal: (value: string) => void;
   isbn: string;
   setIsbn: (value: string) => void;
   isbn13: string;
@@ -252,6 +255,8 @@ export default function BookInfoTab({
   setPageCount,
   seriesNumber,
   setSeriesNumber,
+  seriesTotal,
+  setSeriesTotal,
   isbn,
   setIsbn,
   isbn13,
@@ -1020,6 +1025,8 @@ export default function BookInfoTab({
         setPageCount={setPageCount}
         seriesNumber={seriesNumber}
         setSeriesNumber={setSeriesNumber}
+        seriesTotal={seriesTotal}
+        setSeriesTotal={setSeriesTotal}
         isbn={isbn}
         setIsbn={setIsbn}
         isbn13={isbn13}

@@ -70,6 +70,7 @@ type BookRow = {
     published_date: string | null;
     page_count: number | null;
     series_number: number | null;
+    series_total: number | null;
     related_links: any | null;
     allow_missing_isbn?: boolean | null;
     allow_missing_publisher?: boolean | null;
@@ -217,7 +218,7 @@ function requestTitleNeedsManualResearch(request: BookRequestRow | null) {
     if (!request) return false;
     const title = (request.title ?? "").trim();
     const isbn = (request.isbn13 ?? "").trim();
-    return !title || title === `ISBN ${isbn}`;
+    return !title || title === `ISBN ${isbn}` || title === "Book details pending";
 }
 
 async function rejectBookRequestWithSession(requestId: string) {
@@ -295,6 +296,7 @@ export default function TeacherAddBookPage() {
     const [editionNote, setEditionNote] = useState("");
     const [pageCount, setPageCount] = useState("");
     const [seriesNumber, setSeriesNumber] = useState("");
+    const [seriesTotal, setSeriesTotal] = useState("");
     const [linksText, setLinksText] = useState("");
     const [allowMissingIsbn, setAllowMissingIsbn] = useState(false);
     const [allowMissingPublisher, setAllowMissingPublisher] = useState(false);
@@ -419,6 +421,7 @@ export default function TeacherAddBookPage() {
         published_date,
         page_count,
         series_number,
+        series_total,
         related_links,
         allow_missing_isbn,
         allow_missing_publisher,
@@ -484,6 +487,7 @@ export default function TeacherAddBookPage() {
         setPublishedDate(data.published_date ?? "");
         setPageCount(data.page_count == null ? "" : String(data.page_count));
         setSeriesNumber(data.series_number == null ? "" : String(data.series_number));
+        setSeriesTotal(data.series_total == null ? "" : String(data.series_total));
         setLinksText(linksToText(data.related_links));
         setAllowMissingIsbn(Boolean(data.allow_missing_isbn));
         setAllowMissingPublisher(Boolean(data.allow_missing_publisher));
@@ -626,6 +630,7 @@ export default function TeacherAddBookPage() {
         setPublishedDate("");
         setPageCount("");
         setSeriesNumber("");
+        setSeriesTotal("");
         setLinksText("");
         setAllowMissingIsbn(false);
         setAllowMissingPublisher(false);
@@ -895,6 +900,9 @@ export default function TeacherAddBookPage() {
         const cleanSeriesNumber = seriesNumber.trim()
             ? Number(seriesNumber.replace(/[^0-9]/g, ""))
             : null;
+        const cleanSeriesTotal = seriesTotal.trim()
+            ? Number(seriesTotal.replace(/[^0-9]/g, ""))
+            : null;
         const relatedLinks = linksText.trim() ? parseLinks(linksText) : null;
 
         setSaving(true);
@@ -937,6 +945,7 @@ export default function TeacherAddBookPage() {
                     edition_note: cleanText(editionNote),
                     page_count: cleanPageCount,
                     series_number: cleanSeriesNumber,
+                    series_total: cleanSeriesTotal,
                     related_links: relatedLinks,
                     allow_missing_isbn: allowMissingIsbn,
                     allow_missing_publisher: allowMissingPublisher,
@@ -1067,6 +1076,8 @@ export default function TeacherAddBookPage() {
                         setPageCount={setPageCount}
                         seriesNumber={seriesNumber}
                         setSeriesNumber={setSeriesNumber}
+                        seriesTotal={seriesTotal}
+                        setSeriesTotal={setSeriesTotal}
                         isbn={isbn}
                         setIsbn={setIsbn}
                         isbn13={isbn13}

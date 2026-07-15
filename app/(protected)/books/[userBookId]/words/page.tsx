@@ -548,6 +548,33 @@ export default function BookWordsPage() {
     }
   }
 
+  async function updateWordPage(w: WordRow, value: string) {
+    if (!canUseVocabularyTools) return;
+
+    const nextPage = parseNullableInt(value);
+    if ((w.page_number ?? null) === nextPage) return;
+
+    const previousPage = w.page_number ?? null;
+    setWords((prev) =>
+      prev.map((word) => (word.id === w.id ? { ...word, page_number: nextPage } : word))
+    );
+
+    try {
+      const { error } = await supabase
+        .from("user_book_words")
+        .update({ page_number: nextPage })
+        .eq("id", w.id)
+        .eq("user_book_id", userBookId);
+
+      if (error) throw error;
+    } catch (e: any) {
+      setWords((prev) =>
+        prev.map((word) => (word.id === w.id ? { ...word, page_number: previousPage } : word))
+      );
+      alert(e?.message ?? "Failed to update page number.");
+    }
+  }
+
   async function hideWord(w: WordRow) {
     if (!canUseVocabularyTools) return;
 
@@ -1196,6 +1223,7 @@ export default function BookWordsPage() {
               meaning={w.meaning}
               pageNumber={w.page_number}
               readOnly={!canUseVocabularyTools}
+              onPageChange={(value) => updateWordPage(w, value)}
               canMoveUp={orderPosition.canMoveUp}
               canMoveDown={orderPosition.canMoveDown}
               onMoveUp={async () => {
@@ -1241,6 +1269,7 @@ export default function BookWordsPage() {
                 meaning={w.meaning}
                 pageNumber={w.page_number}
                 readOnly={!canUseVocabularyTools}
+                onPageChange={(value) => updateWordPage(w, value)}
                 canMoveUp={orderPosition.canMoveUp}
                 canMoveDown={orderPosition.canMoveDown}
                 onMoveUp={async () => {

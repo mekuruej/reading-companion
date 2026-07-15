@@ -317,7 +317,7 @@ export default function TeacherHubPage() {
             supabase
               .from("book_requests")
               .select("created_at")
-              .eq("status", "pending"),
+              .or("status.eq.pending,status.is.null"),
             supabase
               .from("user_alerts")
               .select("created_at")

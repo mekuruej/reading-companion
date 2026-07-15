@@ -116,9 +116,9 @@ export default function Header() {
     pathname.startsWith("/kanji-reading-study");
   const profileSectionActive = pathname.startsWith("/community");
   const teacherSectionActive = pathname.startsWith("/teacher");
+  const teacherStudentsActive = pathname === "/teacher/students" || pathname.startsWith("/teacher/students/");
   const teacherLessonPrepActive =
     pathname === "/teacher/lesson-prep" ||
-    pathname === "/teacher/students" ||
     pathname.startsWith("/teacher/library") ||
     pathname.startsWith("/teacher/clubs");
   const teacherNeedsAttentionActive =
@@ -491,6 +491,24 @@ export default function Header() {
               ) : null}
             </div>
             {showTeacherLink ? (
+              <Link
+                href="/teacher/students"
+                className={`rounded-full border px-3 py-1.5 transition ${teacherStudentsActive
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                  }`}
+                onClick={() => {
+                  setShowLibraryMenu(false);
+                  setShowDiscoveryMenu(false);
+                  setShowStudyMenu(false);
+                  setShowTeacherMenu(false);
+                  setShowProfileMenu(false);
+                }}
+              >
+                Students
+              </Link>
+            ) : null}
+            {showTeacherLink ? (
               <div
                 className="relative order-last flex basis-full justify-center md:order-none md:block md:basis-auto"
                 ref={teacherMenuRef}
@@ -540,6 +558,17 @@ export default function Header() {
                       onClick={() => setShowTeacherMenu(false)}
                     >
                       Teacher Hub
+                    </Link>
+
+                    <Link
+                      href="/teacher/students"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherStudentsActive
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowTeacherMenu(false)}
+                    >
+                      Students
                     </Link>
 
                     <Link

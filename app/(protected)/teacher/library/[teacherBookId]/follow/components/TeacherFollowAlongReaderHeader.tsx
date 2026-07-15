@@ -38,10 +38,10 @@ export function TeacherFollowAlongReaderHeader({
       <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
         <div className="order-2 text-sm text-stone-500 sm:order-1">
           {currentPageItemCount != null
-            ? `${currentPageItemCount} prep item${
+            ? `${currentPageItemCount} ready item${
                 currentPageItemCount === 1 ? "" : "s"
               }`
-            : "No prep items yet"}
+            : "No ready words yet"}
         </div>
 
         <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">

@@ -235,7 +235,7 @@ export default function TeacherBooksQueuePage() {
             username
           )
         `)
-        .eq("status", "pending")
+        .or("status.eq.pending,status.is.null")
         .order("created_at", { ascending: false });
 
       if (requestRowsError) throw requestRowsError;

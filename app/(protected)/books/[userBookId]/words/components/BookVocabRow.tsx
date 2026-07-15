@@ -9,6 +9,7 @@ type BookVocabRowProps = {
   meaning: string | null | undefined;
   pageNumber: number | null | undefined;
   readOnly?: boolean;
+  onPageChange?: (value: string) => void | Promise<void>;
 
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -29,6 +30,7 @@ export default function BookVocabRow({
   meaning,
   pageNumber,
   readOnly = false,
+  onPageChange,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -63,7 +65,11 @@ export default function BookVocabRow({
         )}
       </td>
 
-      <BookVocabPageCell pageNumber={pageNumber} />
+      <BookVocabPageCell
+        pageNumber={pageNumber}
+        readOnly={readOnly}
+        onPageChange={onPageChange}
+      />
 
       <td className="w-20 whitespace-nowrap p-2">
         <button

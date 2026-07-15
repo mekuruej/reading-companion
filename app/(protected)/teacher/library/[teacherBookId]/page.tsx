@@ -5,7 +5,7 @@
 
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
@@ -108,6 +108,52 @@ function isTeacherRole(profile: any) {
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
+  );
+}
+
+function InlinePageNumberInput({
+  pageNumber,
+  disabled,
+  onPageChange,
+}: {
+  pageNumber: number | null | undefined;
+  disabled?: boolean;
+  onPageChange: (value: string) => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState(pageNumber == null ? "" : String(pageNumber));
+
+  useEffect(() => {
+    setDraft(pageNumber == null ? "" : String(pageNumber));
+  }, [pageNumber]);
+
+  async function commit() {
+    const nextValue = draft.trim();
+    const currentValue = pageNumber == null ? "" : String(pageNumber);
+    if (nextValue === currentValue) return;
+    await onPageChange(nextValue);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+    }
+    if (event.key === "Escape") {
+      setDraft(pageNumber == null ? "" : String(pageNumber));
+      event.currentTarget.blur();
+    }
+  }
+
+  return (
+    <input
+      type="number"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => void commit()}
+      onKeyDown={handleKeyDown}
+      disabled={disabled}
+      aria-label="Page number"
+      className="w-14 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-stone-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-stone-100 disabled:opacity-60"
+    />
   );
 }
 
@@ -296,6 +342,7 @@ export default function TeacherBookPrepPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<SavedItemEditDraft | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [pageSavingItemId, setPageSavingItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(() => new Set());
   const [savedSearch, setSavedSearch] = useState("");
@@ -385,6 +432,7 @@ export default function TeacherBookPrepPage() {
     setEditingItemId(null);
     setEditDraft(null);
     setEditSaving(false);
+    setPageSavingItemId(null);
     setDeletingItemId(null);
     setExpandedItemIds(new Set());
     setSavedSearch("");
@@ -895,6 +943,39 @@ export default function TeacherBookPrepPage() {
     }
   }
 
+  async function saveSavedItemPage(item: TeacherBookItem, value: string) {
+    const nextPage = toNullableInt(value);
+    if ((item.page_number ?? null) === nextPage) return;
+
+    const previousPage = item.page_number ?? null;
+    setPageSavingItemId(item.id);
+    setSavedItems((prev) =>
+      prev.map((savedItem) =>
+        savedItem.id === item.id ? { ...savedItem, page_number: nextPage } : savedItem
+      )
+    );
+
+    try {
+      const { error } = await supabase
+        .from("teacher_book_items")
+        .update({ page_number: nextPage })
+        .eq("id", item.id)
+        .eq("teacher_book_id", teacherBookId);
+
+      if (error) throw error;
+      setMessage("Page updated.");
+    } catch (error: any) {
+      setSavedItems((prev) =>
+        prev.map((savedItem) =>
+          savedItem.id === item.id ? { ...savedItem, page_number: previousPage } : savedItem
+        )
+      );
+      setMessage(error?.message ?? "Could not update page.");
+    } finally {
+      setPageSavingItemId(null);
+    }
+  }
+
   async function deleteSavedItem(item: TeacherBookItem) {
     const label = item.surface_text?.trim() || "this prep item";
     if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
@@ -1301,7 +1382,7 @@ export default function TeacherBookPrepPage() {
                   <table className="w-full min-w-[840px] border-separate border-spacing-0 text-sm">
                     <thead className="bg-gray-50">
                       <tr className="text-left">
-                        <th className="w-20 p-2 text-xs font-semibold text-stone-600">
+                        <th className="w-24 p-2 text-xs font-semibold text-stone-600">
                           Order
                         </th>
                         <th className="w-24 p-2 text-xs font-semibold text-stone-600">
@@ -1371,7 +1452,7 @@ export default function TeacherBookPrepPage() {
                               <td className="border-t border-stone-100 p-2 font-medium text-stone-900">
                                 {compactText(item.surface_text || "Teaching note")}
                               </td>
-                              <td className="border-t border-stone-100 p-2 text-stone-700">
+                              <td className="border-t border-stone-100 p-2 pr-4 text-stone-700">
                                 {compactText(item.reading)}
                               </td>
                               <td className="border-t border-stone-100 p-2 text-stone-700">
@@ -1383,7 +1464,11 @@ export default function TeacherBookPrepPage() {
                                 {chapterDisplay(item)}
                               </td>
                               <td className="border-t border-stone-100 p-2 text-stone-700">
-                                {item.page_number ?? "—"}
+                                <InlinePageNumberInput
+                                  pageNumber={item.page_number}
+                                  disabled={pageSavingItemId === item.id}
+                                  onPageChange={(value) => saveSavedItemPage(item, value)}
+                                />
                               </td>
                               <td className="border-t border-stone-100 p-2">
                                 <div className="flex flex-wrap gap-2">

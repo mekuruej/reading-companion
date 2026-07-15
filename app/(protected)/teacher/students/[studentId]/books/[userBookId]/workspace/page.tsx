@@ -291,9 +291,9 @@ export default function StudentBookWorkspacePage() {
     const encodedUserBookId = encodeURIComponent(userBookId);
     return [
       {
-        title: "Add Words for This Student",
-        description: "Temporary bulk add flow until Lesson Add is built.",
-        href: `/vocab/bulk?userBookId=${encodedUserBookId}`,
+        title: "Live Lesson Add Word",
+        description: "Capture words quickly during a live lesson.",
+        href: `/teacher/students/${encodeURIComponent(studentId)}/books/${encodedUserBookId}/lesson-add`,
         tone: "amber",
       },
       {
@@ -315,7 +315,7 @@ export default function StudentBookWorkspacePage() {
         tone: "green",
       },
     ];
-  }, [userBookId]);
+  }, [studentId, userBookId]);
 
   const teacherSupportActions = useMemo<ActionCard[]>(() => {
     if (!teacherBook) return [];

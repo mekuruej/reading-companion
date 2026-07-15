@@ -440,7 +440,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontSize="13"
                                 textAnchor="middle"
                             >
-                                Optional extra words
+                                Fast track words you already know.
                             </text>
                             </g>
                         </a>

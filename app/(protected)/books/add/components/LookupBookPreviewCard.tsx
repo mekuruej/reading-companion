@@ -10,6 +10,7 @@ type LookupBookPreviewCardProps = {
   pageCount?: number | string | null;
   isbn13: string;
   isNewToMekuru: boolean;
+  libraryLabel?: string;
   children?: ReactNode;
 };
 
@@ -23,6 +24,7 @@ export default function LookupBookPreviewCard({
   pageCount,
   isbn13,
   isNewToMekuru,
+  libraryLabel = "your library",
   children,
 }: LookupBookPreviewCardProps) {
   return (
@@ -91,8 +93,8 @@ export default function LookupBookPreviewCard({
 
           {isNewToMekuru ? (
             <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-              This book is not in Mekuru’s database yet. You can still add it to
-              your library now, but an admin may need to review it before all book
+              This book is not in Mekuru’s database yet. You can still add it to{" "}
+              {libraryLabel} now, but an admin may need to review it before all book
               details show up.
             </p>
           ) : null}

@@ -822,7 +822,7 @@ export default function BooksPage() {
           username
         )
       `)
-      .eq("status", "pending")
+      .or("status.eq.pending,status.is.null")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -1741,6 +1741,10 @@ export default function BooksPage() {
   }
 
   function renderBookCard(row: UserBookRow) {
+    const liveLessonHref = isViewingStudentLibrary
+      ? `/teacher/students/${encodeURIComponent(viewingUserId)}/books/${encodeURIComponent(row.id)}/lesson-add`
+      : null;
+
     return (
       <LibraryBookCard
         key={row.id}
@@ -1748,17 +1752,25 @@ export default function BooksPage() {
         stats={readingStatsByUserBookId[row.id]}
         href={`/books/${row.id}`}
         formatRelativeDate={formatRelativeDate}
+        secondaryActionHref={liveLessonHref}
+        secondaryActionLabel="Live Lesson Add Word"
       />
     );
   }
 
   function renderBookRow(row: UserBookRow) {
+    const liveLessonHref = isViewingStudentLibrary
+      ? `/teacher/students/${encodeURIComponent(viewingUserId)}/books/${encodeURIComponent(row.id)}/lesson-add`
+      : null;
+
     return (
       <LibraryBookRow
         key={row.id}
         row={row}
         status={getStatusLabel(row)}
         onOpen={() => router.push(`/books/${row.id}`)}
+        secondaryActionHref={liveLessonHref}
+        secondaryActionLabel="Live Lesson Add Word"
       />
     );
   }

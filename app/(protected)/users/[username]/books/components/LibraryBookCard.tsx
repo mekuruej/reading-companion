@@ -22,6 +22,8 @@ type LibraryBookCardProps = {
   stats: LibraryBookCardStats | undefined;
   href: string;
   formatRelativeDate: (value: string) => string;
+  secondaryActionHref?: string | null;
+  secondaryActionLabel?: string;
 };
 
 export default function LibraryBookCard({
@@ -29,6 +31,8 @@ export default function LibraryBookCard({
   stats,
   href,
   formatRelativeDate,
+  secondaryActionHref = null,
+  secondaryActionLabel = "Open",
 }: LibraryBookCardProps) {
   const book = row.books;
   if (!book) return null;
@@ -103,6 +107,16 @@ export default function LibraryBookCard({
           <div className="text-[11px] text-gray-400">Not started</div>
         )}
       </div>
+
+      {secondaryActionHref ? (
+        <a
+          href={secondaryActionHref}
+          onClick={(event) => event.stopPropagation()}
+          className="mt-3 rounded-full border border-amber-600 bg-amber-50 px-3 py-1.5 text-center text-xs font-semibold text-amber-800 hover:bg-amber-100"
+        >
+          {secondaryActionLabel}
+        </a>
+      ) : null}
     </li>
   );
 }

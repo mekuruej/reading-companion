@@ -22,7 +22,7 @@ export default function BookVocabTableHeader({
           {readOnly ? "" : "Order"}
         </th>
         <th
-          className="sticky z-20 w-16 bg-gray-50 p-2 text-center"
+          className="sticky z-20 w-24 bg-gray-50 p-2 text-center"
           style={headerStickyStyle}
           title="Words can be reordered within the same page"
         >

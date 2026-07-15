@@ -184,6 +184,10 @@ function readerWordToFollowAlongItem(word: ReaderVocabWord): TeacherFollowAlongI
   };
 }
 
+function hasUsefulReaderVocabSupport(word: ReaderVocabWord) {
+  return Boolean(word.meaning?.trim());
+}
+
 function teacherSupportToFollowAlongItem(item: TeacherBookItem): TeacherFollowAlongItem {
   return {
     id: `teacher-support-${item.id}`,
@@ -299,9 +303,9 @@ export default function TeacherFollowAlongPage() {
           .order("created_at", { ascending: true });
 
         if (wordError) throw wordError;
-        readerVocabItems = ((wordRows ?? []) as ReaderVocabWord[]).map(
-          readerWordToFollowAlongItem
-        );
+        readerVocabItems = ((wordRows ?? []) as ReaderVocabWord[])
+          .filter(hasUsefulReaderVocabSupport)
+          .map(readerWordToFollowAlongItem);
       }
 
       const { data: itemRows, error: itemsError } = await supabase

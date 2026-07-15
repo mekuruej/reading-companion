@@ -16,8 +16,8 @@ export default function ReadAlongCurrentPageSummary({
     <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:items-center sm:text-left">
       <div className="order-2 text-sm text-stone-500 sm:order-1">
         {hasCurrentPage
-          ? `${wordCount} saved word${wordCount === 1 ? "" : "s"}`
-          : "No saved words yet"}
+          ? `${wordCount} ready word${wordCount === 1 ? "" : "s"}`
+          : "No ready words yet"}
       </div>
 
       <div className="order-1 text-xl font-bold text-stone-900 sm:order-2 sm:text-center">

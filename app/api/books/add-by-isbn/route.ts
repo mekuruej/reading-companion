@@ -84,6 +84,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const isbn13 = normalizeIsbn13(body?.isbn13 ?? body?.isbn ?? "");
   const mode = body?.mode === "global_only" ? "global_only" : "add_to_library";
+  const allowPendingPlaceholder = body?.allowPendingPlaceholder === true;
   const targetUserId =
     typeof body?.targetUserId === "string" && body.targetUserId.trim()
       ? body.targetUserId.trim()
@@ -144,38 +145,62 @@ export async function POST(request: Request) {
     const lookupResult = await lookupBookByIsbn13(isbn13);
 
     if (!lookupResult) {
-      return NextResponse.json(
-        {
-          error:
-            "We couldn’t find enough information for that ISBN yet. Please request this book for review.",
-        },
-        { status: 404 }
-      );
+      if (!allowPendingPlaceholder || mode === "global_only") {
+        return NextResponse.json(
+          {
+            error:
+              "We couldn’t find enough information for that ISBN yet. Please request this book for review.",
+          },
+          { status: 404 }
+        );
+      }
+
+      let { data: insertedPlaceholderBook, error: insertPlaceholderBookError } =
+        await supabaseAdmin
+          .from("books")
+          .insert({
+            isbn13,
+            title: "Book details pending",
+            needs_review: true,
+          })
+          .select("id")
+          .single();
+
+      if (insertPlaceholderBookError?.code === "42703" || insertPlaceholderBookError?.code === "PGRST204") {
+        const retry = await supabaseAdmin
+          .from("books")
+          .insert({
+            isbn13,
+            title: "Book details pending",
+          })
+          .select("id")
+          .single();
+
+        insertedPlaceholderBook = retry.data;
+        insertPlaceholderBookError = retry.error;
+      }
+
+      if (insertPlaceholderBookError) {
+        console.error("Error creating pending ISBN book:", insertPlaceholderBookError);
+
+        return NextResponse.json(
+          { error: "The request was sent, but Mekuru could not add the pending book to the library." },
+          { status: 500 }
+        );
+      }
+
+      bookId = insertedPlaceholderBook.id;
     }
 
-    const authorDisplay =
-      lookupResult.authors.length > 0
-        ? lookupResult.authors.join("、")
-        : null;
+    if (bookId) {
+      // The explicit pending-placeholder path created the minimal global book above.
+    } else {
+      const authorDisplay =
+        lookupResult.authors.length > 0
+          ? lookupResult.authors.join("、")
+          : null;
 
-    let { data: insertedBook, error: insertBookError } = await supabaseAdmin
-      .from("books")
-      .insert({
-        isbn13: lookupResult.isbn13,
-        title: lookupResult.title,
-        author: authorDisplay,
-        cover_url: lookupResult.coverUrl,
-        publisher: lookupResult.publisher,
-        published_date: lookupResult.publishedDate,
-        page_count: lookupResult.pageCount,
-        metadata_source: lookupResult.source,
-        needs_review: true,
-      })
-      .select("id")
-      .single();
-
-    if (insertBookError?.code === "42703" || insertBookError?.code === "PGRST204") {
-      const retry = await supabaseAdmin
+      let { data: insertedBook, error: insertBookError } = await supabaseAdmin
         .from("books")
         .insert({
           isbn13: lookupResult.isbn13,
@@ -185,24 +210,42 @@ export async function POST(request: Request) {
           publisher: lookupResult.publisher,
           published_date: lookupResult.publishedDate,
           page_count: lookupResult.pageCount,
+          metadata_source: lookupResult.source,
+          needs_review: true,
         })
         .select("id")
         .single();
 
-      insertedBook = retry.data;
-      insertBookError = retry.error;
+      if (insertBookError?.code === "42703" || insertBookError?.code === "PGRST204") {
+        const retry = await supabaseAdmin
+          .from("books")
+          .insert({
+            isbn13: lookupResult.isbn13,
+            title: lookupResult.title,
+            author: authorDisplay,
+            cover_url: lookupResult.coverUrl,
+            publisher: lookupResult.publisher,
+            published_date: lookupResult.publishedDate,
+            page_count: lookupResult.pageCount,
+          })
+          .select("id")
+          .single();
+
+        insertedBook = retry.data;
+        insertBookError = retry.error;
+      }
+
+      if (insertBookError) {
+        console.error("Error creating imported book:", insertBookError);
+
+        return NextResponse.json(
+          { error: "Something went wrong while creating this book." },
+          { status: 500 }
+        );
+      }
+
+      bookId = insertedBook.id;
     }
-
-    if (insertBookError) {
-      console.error("Error creating imported book:", insertBookError);
-
-      return NextResponse.json(
-        { error: "Something went wrong while creating this book." },
-        { status: 500 }
-      );
-    }
-
-    bookId = insertedBook.id;
   }
 
   if (mode === "global_only") {
@@ -226,7 +269,7 @@ export async function POST(request: Request) {
     console.error("Error checking user library:", existingUserBookError);
 
     return NextResponse.json(
-      { error: "Something went wrong while checking your library." },
+      { error: "Something went wrong while checking the library." },
       { status: 500 }
     );
   }
@@ -252,7 +295,7 @@ export async function POST(request: Request) {
     console.error("Error adding book to user library:", insertUserBookError);
 
     return NextResponse.json(
-      { error: "Something went wrong while adding this book to your library." },
+      { error: "Something went wrong while adding this book to the library." },
       { status: 500 }
     );
   }

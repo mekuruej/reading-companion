@@ -4,6 +4,7 @@ type AddBookLookupCardProps = {
     isbn: string;
     lookupLoading: boolean;
     lookupDisabled?: boolean;
+    libraryLabel?: string;
     onIsbnChange: (value: string) => void;
     onLookup: () => void;
     children?: ReactNode;
@@ -13,6 +14,7 @@ export default function AddBookLookupCard({
     isbn,
     lookupLoading,
     lookupDisabled = false,
+    libraryLabel = "your library",
     onIsbnChange,
     onLookup,
     children,
@@ -29,8 +31,8 @@ export default function AddBookLookupCard({
 
             <p className="mt-3 text-sm leading-6 text-stone-600">
                 Enter an ISBN-13 first when you have one. Mekuru can use it to look
-                up the fullest book details, show you a preview, and add the book to
-                your library.
+                up the fullest book details, show you a preview, and add the book to{" "}
+                {libraryLabel}.
             </p>
 
             <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">

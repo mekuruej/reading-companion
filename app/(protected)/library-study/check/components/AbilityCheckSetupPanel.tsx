@@ -32,8 +32,7 @@ export default function AbilityCheckSetupPanel({
           </h1>
 
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-            Test the reading and meaning of words that are ready for a careful
-            check.
+            Test the reading and meaning of words that are ready to check.
           </p>
         </div>
 

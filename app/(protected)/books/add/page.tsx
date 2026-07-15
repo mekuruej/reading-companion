@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddBookLookupCard from "./components/AddBookLookupCard";
 import AddBookMessagePanel from "./components/AddBookMessagePanel";
@@ -98,11 +98,16 @@ function isBookCompleteEnoughToAdd(book: BookSearchResult) {
 
 export default function AddBookPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const destination = searchParams.get("destination") ?? "";
+    const targetUserIdParam = searchParams.get("targetUserId")?.trim() ?? "";
 
     const [isbn, setIsbn] = useState("");
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+    const [targetUsername, setTargetUsername] = useState<string | null>(null);
+    const [targetDisplayName, setTargetDisplayName] = useState<string | null>(null);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [addLoading, setAddLoading] = useState(false);
     const [requestLoading, setRequestLoading] = useState(false);
@@ -150,6 +155,57 @@ export default function AddBookPage() {
             alive = false;
         };
     }, []);
+
+    useEffect(() => {
+        let alive = true;
+
+        async function loadTargetUser() {
+            if (!targetUserIdParam) {
+                setTargetUsername(null);
+                setTargetDisplayName(null);
+                return;
+            }
+
+            const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("id, username, display_name")
+                .eq("id", targetUserIdParam)
+                .maybeSingle();
+
+            if (!alive) return;
+
+            if (profileError) {
+                console.warn("Could not load target library profile:", profileError);
+                setTargetUsername(null);
+                setTargetDisplayName(null);
+                return;
+            }
+
+            setTargetUsername((profile as any)?.username ?? null);
+            setTargetDisplayName((profile as any)?.display_name || (profile as any)?.username || null);
+        }
+
+        void loadTargetUser();
+
+        return () => {
+            alive = false;
+        };
+    }, [targetUserIdParam]);
+
+    const targetLibraryUserId = targetUserIdParam || currentUserId;
+    const isStudentDestination =
+        destination === "student" && !!targetUserIdParam && targetUserIdParam !== currentUserId;
+    const targetLibraryLabel = isStudentDestination
+        ? `${targetDisplayName ?? "this student"}’s library`
+        : "your library";
+    const targetLibraryShortLabel = isStudentDestination ? "student library" : "your library";
+    const targetLibraryHref = isStudentDestination
+        ? targetUsername
+            ? `/users/${targetUsername}/books`
+            : "/teacher/students"
+        : currentUsername
+        ? `/users/${currentUsername}/books`
+        : "/books";
 
     async function handleLookup() {
         setError("");
@@ -282,15 +338,15 @@ export default function AddBookPage() {
     async function handleAddToLibrary() {
         if (!book?.isbn13) return;
 
-        if (!currentUserId) {
-            setError("Sign in again before adding this book to your library.");
+        if (!targetLibraryUserId) {
+            setError(`Sign in again before adding this book to ${targetLibraryShortLabel}.`);
             return;
         }
 
         if (
             isNewToMekuru &&
             !window.confirm(
-                "This book is new to Mekuru. An admin may need to review it before all book details show up. Add it to your library?"
+                `This book is new to Mekuru. An admin may need to review it before all book details show up. Add it to ${targetLibraryLabel}?`
             )
         ) {
             return;
@@ -316,7 +372,7 @@ export default function AddBookPage() {
                 body: JSON.stringify({
                     isbn13: book.isbn13,
                     mode: "add_to_library",
-                    targetUserId: currentUserId,
+                    targetUserId: targetLibraryUserId,
                 }),
             });
 
@@ -324,7 +380,7 @@ export default function AddBookPage() {
 
             if (!response.ok) {
                 console.error("Add book route returned an error:", data);
-                setError(data.error ?? "I couldn’t add this book to your library.");
+                setError(data.error ?? `I couldn’t add this book to ${targetLibraryShortLabel}.`);
                 return;
             }
 
@@ -336,25 +392,25 @@ export default function AddBookPage() {
 
             if (data.alreadyInLibrary) {
                 setLibraryNotice({
-                    message: "This book is already in your library.",
+                    message: `This book is already in ${targetLibraryShortLabel}.`,
                     detail: "We found the existing copy.",
                     userBookId: data.userBookId,
                 });
                 return;
             }
 
-            router.push(currentUsername ? `/users/${currentUsername}/books` : "/books");
+            router.push(targetLibraryHref);
         } catch (addError) {
             console.error("Add book failed:", addError);
-            setError("Something went wrong while adding this book to your library.");
+            setError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
         } finally {
             setAddLoading(false);
         }
     }
 
     async function handleAddExistingBook(bookId: string) {
-        if (!currentUserId) {
-            setBookSearchError("Sign in again before adding this book to your library.");
+        if (!targetLibraryUserId) {
+            setBookSearchError(`Sign in again before adding this book to ${targetLibraryShortLabel}.`);
             return;
         }
 
@@ -377,30 +433,30 @@ export default function AddBookPage() {
                 },
                 body: JSON.stringify({
                     bookId,
-                    targetUserId: currentUserId,
+                    targetUserId: targetLibraryUserId,
                 }),
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                setBookSearchError(data.error ?? "I couldn’t add this book to your library.");
+                setBookSearchError(data.error ?? `I couldn’t add this book to ${targetLibraryShortLabel}.`);
                 return;
             }
 
             if (data.alreadyInLibrary) {
                 setLibraryNotice({
-                    message: "This book is already in your library.",
+                    message: `This book is already in ${targetLibraryShortLabel}.`,
                     detail: "We found the existing copy.",
                     userBookId: data.userBookId,
                 });
                 return;
             }
 
-            router.push(currentUsername ? `/users/${currentUsername}/books` : "/books");
+            router.push(targetLibraryHref);
         } catch (addError) {
             console.error("Add existing book failed:", addError);
-            setBookSearchError("Something went wrong while adding this book to your library.");
+            setBookSearchError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
         } finally {
             setAddingExistingBookId(null);
         }
@@ -433,6 +489,11 @@ export default function AddBookPage() {
                 return;
             }
 
+            if (!targetLibraryUserId) {
+                setRequestMessage(`Sign in again before adding this pending book to ${targetLibraryShortLabel}.`);
+                return;
+            }
+
             let existingPendingRequest: { id: string } | null = null;
 
             if (cleanIsbn) {
@@ -440,7 +501,7 @@ export default function AddBookPage() {
                     .from("book_requests")
                     .select("id")
                     .eq("user_id", user.id)
-                    .eq("status", "pending")
+                    .or("status.eq.pending,status.is.null")
                     .eq("isbn13", cleanIsbn)
                     .limit(1)
                     .maybeSingle();
@@ -457,7 +518,7 @@ export default function AddBookPage() {
 
             const { error: requestError } = await supabase.from("book_requests").insert({
                 user_id: user.id,
-                title: requestTitle || `ISBN ${cleanIsbn}`,
+                title: requestTitle || (cleanIsbn ? "Book details pending" : null),
                 author: requestAuthor || null,
                 isbn13: cleanIsbn || null,
                 status: "pending",
@@ -465,9 +526,50 @@ export default function AddBookPage() {
 
             if (requestError) throw requestError;
 
+            let pendingUserBookId: string | null = null;
+
+            if (cleanIsbn) {
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession();
+
+                const addResponse = await fetch("/api/books/add-by-isbn", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(session?.access_token
+                            ? { Authorization: `Bearer ${session.access_token}` }
+                            : {}),
+                    },
+                    body: JSON.stringify({
+                        isbn13: cleanIsbn,
+                        mode: "add_to_library",
+                        targetUserId: targetLibraryUserId,
+                        allowPendingPlaceholder: true,
+                    }),
+                });
+
+                const addData = await addResponse.json().catch(() => null);
+
+                if (addResponse.ok && addData?.userBookId) {
+                    pendingUserBookId = addData.userBookId;
+                } else {
+                    console.warn("Book request sent, but pending library copy was not added:", addData);
+                }
+            }
+
             setCanRequestBook(false);
+            if (pendingUserBookId) {
+                setLibraryNotice({
+                    message: `Book request sent and a pending copy was added to ${targetLibraryShortLabel}.`,
+                    detail: "You can start using it now. An admin can fill in the book details later.",
+                    userBookId: pendingUserBookId,
+                });
+            }
             setRequestMessage(
-                isFallbackRequest
+                pendingUserBookId
+                    ? `Book request sent. A pending copy was added to ${targetLibraryShortLabel}.`
+                    : isFallbackRequest
                     ? "Book request sent. An admin can review the title and author details."
                     : "Book request sent. An admin can review this ISBN and add the book details."
             );
@@ -502,6 +604,7 @@ export default function AddBookPage() {
                 isbn={isbn}
                 lookupLoading={lookupLoading}
                 lookupDisabled={!isbn.trim()}
+                libraryLabel={targetLibraryLabel}
                 onIsbnChange={(value) => {
                     setIsbn(value);
                     setLibraryNotice(null);
@@ -535,7 +638,7 @@ export default function AddBookPage() {
                 <p className="mt-2 text-sm leading-6 text-stone-600">
                     Use this when ISBN-13 lookup does not find the book, or when the
                     book does not have an ISBN. If Mekuru already has a complete
-                    record, you can add it to your library. If details are missing,
+                    record, you can add it to {targetLibraryLabel}. If details are missing,
                     send a request so the book can be reviewed.
                 </p>
 
@@ -649,6 +752,8 @@ export default function AddBookPage() {
                                             >
                                                 {addingExistingBookId === result.id
                                                     ? "Adding..."
+                                                    : isStudentDestination
+                                                    ? "Add to student library"
                                                     : "Add Book"}
                                             </button>
                                         ) : (
@@ -683,11 +788,15 @@ export default function AddBookPage() {
                     pageCount={pageCount}
                     isbn13={book.isbn13}
                     isNewToMekuru={isNewToMekuru}
+                    libraryLabel={targetLibraryLabel}
                 >
                     <AddBookActionRow
                         addLoading={addLoading}
+                        addLabel={
+                            isStudentDestination ? "Add to student library" : "Add to my library"
+                        }
                         onAdd={handleAddToLibrary}
-                        onCancel={() => router.push("/dashboard")}
+                        onCancel={() => router.push(targetLibraryHref)}
                     />
                 </LookupBookPreviewCard>
             ) : null}

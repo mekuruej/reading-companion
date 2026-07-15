@@ -9,6 +9,7 @@ type BookDetails = {
   published_date?: string | null;
   page_count?: number | string | null;
   series_number?: number | string | null;
+  series_total?: number | string | null;
   isbn?: string | null;
   isbn13?: string | null;
 };
@@ -41,6 +42,8 @@ type BookInfoDetailsSectionProps = {
   setPageCount: (value: string) => void;
   seriesNumber: string;
   setSeriesNumber: (value: string) => void;
+  seriesTotal: string;
+  setSeriesTotal: (value: string) => void;
   isbn: string;
   setIsbn: (value: string) => void;
   isbn13: string;
@@ -83,6 +86,8 @@ export default function BookInfoDetailsSection({
   setPageCount,
   seriesNumber,
   setSeriesNumber,
+  seriesTotal,
+  setSeriesTotal,
   isbn,
   setIsbn,
   isbn13,
@@ -239,6 +244,15 @@ export default function BookInfoDetailsSection({
           inputValue={seriesNumber}
           setInputValue={setSeriesNumber}
           placeholder="e.g. 2"
+        />
+
+        <Detail
+          label="Series Total"
+          value={book.series_total}
+          editing={isEditingBookInfo}
+          inputValue={seriesTotal}
+          setInputValue={setSeriesTotal}
+          placeholder="e.g. 12"
         />
 
         <Detail

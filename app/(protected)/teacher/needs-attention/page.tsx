@@ -320,7 +320,7 @@ export default function TeacherNeedsAttentionPage() {
             supabase
               .from("book_requests")
               .select("id", { count: "exact", head: true })
-              .eq("status", "pending"),
+              .or("status.eq.pending,status.is.null"),
             supabase
               .from("user_alerts")
               .select("id", { count: "exact", head: true })

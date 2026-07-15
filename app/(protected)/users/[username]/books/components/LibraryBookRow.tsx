@@ -12,12 +12,16 @@ type LibraryBookRowProps = {
   row: LibraryBookRowData;
   status: string;
   onOpen: () => void;
+  secondaryActionHref?: string | null;
+  secondaryActionLabel?: string;
 };
 
 export default function LibraryBookRow({
   row,
   status,
   onOpen,
+  secondaryActionHref = null,
+  secondaryActionLabel = "Open",
 }: LibraryBookRowProps) {
   const book = row.books;
   if (!book) return null;
@@ -43,6 +47,16 @@ export default function LibraryBookRow({
         </div>
         <div className="mt-1 text-xs text-stone-500">{status}</div>
       </div>
+
+      {secondaryActionHref ? (
+        <a
+          href={secondaryActionHref}
+          onClick={(event) => event.stopPropagation()}
+          className="shrink-0 rounded-full border border-amber-600 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+        >
+          {secondaryActionLabel}
+        </a>
+      ) : null}
     </li>
   );
 }
