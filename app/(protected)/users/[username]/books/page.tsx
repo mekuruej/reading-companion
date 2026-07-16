@@ -5,17 +5,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { getLessonAlertInfo } from "@/lib/lessonAlerts";
 import {
   getLibraryStudyEncounterStageCounts,
 } from "@/lib/libraryStudyColor";
-import {
-  emptyLibraryStudyColorTotals,
-  emptyLibraryStudyLimboTotals,
-  fetchLibraryStudyColorBreakdown,
-  type LibraryStudyColorTotals,
-  type LibraryStudyLimboTotals,
-} from "@/lib/libraryStudyTotals";
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
@@ -105,23 +97,6 @@ type StudentOption = {
   role?: ProfileRole | null;
 };
 
-type AlertBoxState = {
-  title: string;
-  message: string;
-  alertKey: string;
-  kind: "teacher_prepare" | "student_new_readings" | "student_last_chance";
-  showBadge: boolean;
-  badgeText: string | null;
-} | null;
-
-type TeacherPrepItem = {
-  studentId: string;
-  studentName: string;
-  studentUsername: string | null;
-  message: string;
-  alertKey: string;
-};
-
 type KanjiEnrichmentAlertItem = {
   userBookId: string;
   title: string;
@@ -185,8 +160,6 @@ export default function BooksPage() {
     Record<string, ReadingSessionStats>
   >({});
 
-  const [alertBox, setAlertBox] = useState<AlertBoxState>(null);
-  const [teacherPrepAlerts, setTeacherPrepAlerts] = useState<TeacherPrepItem[]>([]);
   const [kanjiEnrichmentAlerts, setKanjiEnrichmentAlerts] = useState<KanjiEnrichmentAlertItem[]>([]);
   const [learningTasks, setLearningTasks] = useState<LearningTaskRow[]>([]);
   const [learningTasksLoading, setLearningTasksLoading] = useState(false);
@@ -245,19 +218,6 @@ export default function BooksPage() {
   });
 
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
-  const [mekuruColorTotals, setMekuruColorTotals] =
-    useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
-  const [mekuruLimboTotals, setMekuruLimboTotals] =
-    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
-  const [mekuruColorMovementTotals, setMekuruColorMovementTotals] =
-    useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
-  const [previousMekuruColorMovementTotals, setPreviousMekuruColorMovementTotals] =
-    useState<LibraryStudyColorTotals>(emptyLibraryStudyColorTotals());
-  const [mekuruLimboMovementTotals, setMekuruLimboMovementTotals] =
-    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
-  const [previousMekuruLimboMovementTotals, setPreviousMekuruLimboMovementTotals] =
-    useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
-  const [mekuruColorCountsLoading, setMekuruColorCountsLoading] = useState(false);
   const [abilityCheckReminderEnabled, setAbilityCheckReminderEnabled] = useState(true);
   const [abilityCheckReminderCount, setAbilityCheckReminderCount] = useState(0);
   const [abilityCheckReminderLoading, setAbilityCheckReminderLoading] = useState(false);
@@ -447,51 +407,6 @@ export default function BooksPage() {
       });
     } finally {
       setMonthlyStatsLoading(false);
-    }
-  }
-
-  async function loadMekuruColorCounts(userId: string) {
-    setMekuruColorCountsLoading(true);
-
-    try {
-      const now = new Date();
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const previousMonth = `${previousMonthDate.getFullYear()}-${String(
-        previousMonthDate.getMonth() + 1
-      ).padStart(2, "0")}`;
-
-      const currentRange = getMonthRange(currentMonth);
-      const previousRange = getMonthRange(previousMonth);
-
-      const [breakdown, currentMovement, previousMovement] = await Promise.all([
-        fetchLibraryStudyColorBreakdown(userId),
-        fetchLibraryStudyColorBreakdown(userId, null, {
-          since: dateFromYmd(currentRange.startStr),
-          before: dateFromYmd(currentRange.endStr),
-        }),
-        fetchLibraryStudyColorBreakdown(userId, null, {
-          since: dateFromYmd(previousRange.startStr),
-          before: dateFromYmd(previousRange.endStr),
-        }),
-      ]);
-
-      setMekuruColorTotals(breakdown.colorTotals);
-      setMekuruLimboTotals(breakdown.limboTotals);
-      setMekuruColorMovementTotals(currentMovement.colorTotals);
-      setPreviousMekuruColorMovementTotals(previousMovement.colorTotals);
-      setMekuruLimboMovementTotals(currentMovement.limboTotals);
-      setPreviousMekuruLimboMovementTotals(previousMovement.limboTotals);
-    } catch (error) {
-      console.error("Error loading Mekuru color counts:", error);
-      setMekuruColorTotals(emptyLibraryStudyColorTotals());
-      setMekuruLimboTotals(emptyLibraryStudyLimboTotals());
-      setMekuruColorMovementTotals(emptyLibraryStudyColorTotals());
-      setPreviousMekuruColorMovementTotals(emptyLibraryStudyColorTotals());
-      setMekuruLimboMovementTotals(emptyLibraryStudyLimboTotals());
-      setPreviousMekuruLimboMovementTotals(emptyLibraryStudyLimboTotals());
-    } finally {
-      setMekuruColorCountsLoading(false);
     }
   }
 
@@ -1448,15 +1363,6 @@ export default function BooksPage() {
   }, [viewingUserId, meId, isTeacher, selectedMonth, myTimeZone]);
 
   useEffect(() => {
-    if (!viewingUserId || !meId) return;
-
-    // Keep color totals aligned with the same effective user as the library query.
-    const targetUserId = isTeacher ? viewingUserId : meId;
-
-    loadMekuruColorCounts(targetUserId);
-  }, [viewingUserId, meId, isTeacher]);
-
-  useEffect(() => {
     const hiddenToday = abilityCheckReminderHiddenToday();
 
     setAbilityCheckReminderHidden(hiddenToday);
@@ -1517,112 +1423,6 @@ export default function BooksPage() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [viewingUserId, meId]);
-
-  useEffect(() => {
-    const loadAlerts = async () => {
-      if (!viewingUserId || !meId) {
-        setAlertBox(null);
-        setTeacherPrepAlerts([]);
-        return;
-      }
-
-      if (isTeacher && viewingUserId === meId) {
-        const studentIds = students
-          .filter((s) => (s.role === "member" || s.role === "student") && s.id !== meId)
-          .map((s) => s.id);
-
-        if (studentIds.length === 0) {
-          setTeacherPrepAlerts([]);
-          setAlertBox(null);
-          return;
-        }
-
-        const { data: completedRows, error: completedErr } = await supabase
-          .from("teacher_alert_completions")
-          .select("student_id, alert_key")
-          .eq("teacher_id", meId);
-
-        if (completedErr) {
-          logSbError("Error loading completed teacher alerts:", completedErr);
-        }
-
-        const completedSet = new Set(
-          (completedRows ?? []).map((r: any) => `${r.student_id}__${r.alert_key}`)
-        );
-
-        const { data: profiles, error } = await supabase
-          .from("profiles")
-          .select("id, display_name, username, lesson_day")
-          .in("id", studentIds);
-
-        if (error) {
-          logSbError("Error loading student profiles for teacher alerts:", error);
-          setTeacherPrepAlerts([]);
-          setAlertBox(null);
-          return;
-        }
-
-        const prepAlerts: TeacherPrepItem[] = (profiles ?? [])
-          .map((p: any) => {
-            const info = getLessonAlertInfo({
-              lessonDay: p.lesson_day ?? null,
-              isTeacherView: true,
-              studentName: p.display_name ?? null,
-            });
-
-            if (!info || info.kind !== "teacher_prepare") return null;
-
-            const key = `${p.id}__${info.alertKey}`;
-            if (completedSet.has(key)) return null;
-
-            return {
-              studentId: p.id,
-              studentName: p.display_name || "Member",
-              studentUsername: p.username ?? null,
-              message: info.message,
-              alertKey: info.alertKey,
-            };
-          })
-          .filter(Boolean) as TeacherPrepItem[];
-
-        setTeacherPrepAlerts(prepAlerts);
-        setAlertBox(null);
-        return;
-      }
-
-      if (!isTeacher || viewingUserId !== meId) {
-        const { data: viewedProfile, error } = await supabase
-          .from("profiles")
-          .select("id, display_name, lesson_day")
-          .eq("id", viewingUserId)
-          .single();
-
-        if (error) {
-          logSbError("Error loading viewed profile for alerts:", error);
-          setAlertBox(null);
-          setTeacherPrepAlerts([]);
-          return;
-        }
-
-        const nextAlert = getLessonAlertInfo({
-          lessonDay: viewedProfile?.lesson_day ?? null,
-          isTeacherView: false,
-          studentName: viewedProfile?.display_name ?? null,
-        });
-
-        const allowedAlert = !isTeacher && viewingUserId === meId ? nextAlert : null;
-
-        setAlertBox((allowedAlert as AlertBoxState) ?? null);
-        setTeacherPrepAlerts([]);
-        return;
-      }
-
-      setAlertBox(null);
-      setTeacherPrepAlerts([]);
-    };
-
-    loadAlerts();
-  }, [viewingUserId, meId, isTeacher, students]);
 
   const currentlyReading = validRows.filter(
     (r) => !!r.started_at && !r.finished_at && !r.dnf_at

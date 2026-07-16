@@ -1167,6 +1167,7 @@ function libraryReviewStudyingNowLabel({
 export default function LibraryStudyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const lockedMasteredWordsMode = searchParams.get("color") === "purple";
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [ownedUserBookIds, setOwnedUserBookIds] = useState<string[]>([]);
@@ -1189,15 +1190,22 @@ export default function LibraryStudyPage() {
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
   const [practiceColorFilter, setPracticeColorFilter] =
     useState<PracticeColorFilter>("all");
+  const effectivePracticeColorFilter: PracticeColorFilter = lockedMasteredWordsMode
+    ? "purple"
+    : practiceColorFilter;
   const [, setNotice] = useState<string | null>(null);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
 
   const libraryReviewStudyingNowLabelText = libraryReviewStudyingNowLabel({
-    colorFilter: practiceColorFilter,
+    colorFilter: effectivePracticeColorFilter,
     jlptLevels: selectedJlptLevels,
     mode: practiceStudyMode,
   });
+  const reviewTitle = lockedMasteredWordsMode ? "Mastered Words" : "Saved Words Review";
+  const reviewSubtitle = lockedMasteredWordsMode
+    ? "Review purple words so they stay alive in your reading."
+    : "Practice tricky words across your books.";
 
   useEffect(() => {
     const requestedColor = searchParams.get("color");
@@ -1225,10 +1233,10 @@ export default function LibraryStudyPage() {
       isCardAvailableForLibraryPractice(
         card,
         selectedJlptLevels,
-        practiceColorFilter
+        effectivePracticeColorFilter
       )
     );
-  }, [libraryReviewCards, selectedJlptLevels, practiceColorFilter]);
+  }, [libraryReviewCards, selectedJlptLevels, effectivePracticeColorFilter]);
 
   useEffect(() => {
     async function load() {
@@ -1996,6 +2004,17 @@ export default function LibraryStudyPage() {
   if (!reviewCountsLoading && libraryReviewCards.length === 0) {
     return (
       <LibraryReviewEmptyState
+        title={
+          lockedMasteredWordsMode
+            ? "No mastered words are ready for review yet."
+            : undefined
+        }
+        message={
+          lockedMasteredWordsMode
+            ? "Words appear here after they reach the purple mastered stage."
+            : undefined
+        }
+        showWordSkyButton={!lockedMasteredWordsMode}
         onOpenWordSky={() => router.push("/library-study/word-sky")}
         onBackToLibrary={() => router.push("/books")}
       />
@@ -2017,13 +2036,22 @@ export default function LibraryStudyPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
-      <LibraryReviewPageHeader onOpenLibrary={() => router.push("/library")} />
+      <LibraryReviewPageHeader
+        title={reviewTitle}
+        subtitle={reviewSubtitle}
+        eyebrow={lockedMasteredWordsMode ? "Purple review" : "From your library"}
+        icon={lockedMasteredWordsMode ? "★" : "📚"}
+        iconClassName={lockedMasteredWordsMode ? "text-violet-600" : undefined}
+        onOpenLibrary={() => router.push("/library")}
+      />
 
       <div className="mb-3 w-full max-w-3xl space-y-0">
         <LibraryPracticeFilterPanel
           jlptLevels={LIBRARY_PRACTICE_JLPT_LEVELS}
           selectedJlptLevels={selectedJlptLevels}
-          practiceColorFilter={practiceColorFilter}
+          practiceColorFilter={effectivePracticeColorFilter}
+          colorFilterLocked={lockedMasteredWordsMode}
+          lockedColorLabel="Purple (Mastered)"
           onToggleJlpt={(level) =>
             setSelectedJlptLevels((current) =>
               current.includes(level)
@@ -2033,9 +2061,10 @@ export default function LibraryStudyPage() {
           }
           onSelectAllJlpt={() => setSelectedJlptLevels([...LIBRARY_PRACTICE_JLPT_LEVELS])}
           onClearJlpt={() => setSelectedJlptLevels([])}
-          onColorFilterChange={(value) =>
-            setPracticeColorFilter(value as PracticeColorFilter)
-          }
+          onColorFilterChange={(value) => {
+            if (lockedMasteredWordsMode) return;
+            setPracticeColorFilter(value as PracticeColorFilter);
+          }}
         />
 
         <LibraryPracticeModeSelector
@@ -2047,7 +2076,11 @@ export default function LibraryStudyPage() {
       {!practiceStarted ? (
         <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-5 py-5 text-center shadow-sm">
           <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-            {reviewCountsLoading ? "Preparing review" : "Ready to generate"}
+            {reviewCountsLoading
+              ? "Preparing review"
+              : lockedMasteredWordsMode
+                ? "Mastered Words"
+                : "Ready to generate"}
           </p>
           <h2 className="mt-2 text-3xl font-black text-slate-950">
             {reviewCountsLoading
@@ -2065,7 +2098,11 @@ export default function LibraryStudyPage() {
             disabled={reviewCountsLoading || practiceFilteredCards.length === 0 || practiceStarting}
             className="mt-5 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
           >
-            {practiceStarting ? "Generating..." : "Start Review"}
+            {practiceStarting
+              ? "Generating..."
+              : lockedMasteredWordsMode
+                ? "Start Mastered Words"
+                : "Start Review"}
           </button>
         </section>
       ) : (
@@ -2081,7 +2118,7 @@ export default function LibraryStudyPage() {
               onClick={returnToPracticeSetup}
               className="mt-3 text-sm font-black text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
             >
-              Change filters
+              {lockedMasteredWordsMode ? "Change setup" : "Change filters"}
             </button>
           </div>
 

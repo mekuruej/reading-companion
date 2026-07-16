@@ -36,6 +36,10 @@ import {
     readPersistedTimedSession,
     writePersistedTimedSession,
 } from "../_shared/timed-session/timedSessionPersistence";
+import {
+    resolveStudentWorkspaceBackContext,
+    type StudentWorkspaceBackContext,
+} from "@/lib/teacher/studentWorkspaceContext";
 
 const READ_ALONG_TIMED_SESSION_MODE = "readalong";
 
@@ -152,6 +156,8 @@ export default function ReadAlongPage() {
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
     const [username, setUsername] = useState("");
+    const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
+        useState<StudentWorkspaceBackContext | null>(null);
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccessBook, setCanAccessBook] = useState(false);
     const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
@@ -196,6 +202,7 @@ export default function ReadAlongPage() {
             setCanUseSavedWordReading(false);
             setFullAccessLocked(false);
             setAccessMessage("");
+            setStudentWorkspaceBackContext(null);
 
             const {
                 data: { user },
@@ -266,6 +273,16 @@ export default function ReadAlongPage() {
                 setLoading(false);
                 return;
             }
+
+            const workspaceBackContext = await resolveStudentWorkspaceBackContext({
+                supabase,
+                from: searchParams.get("from"),
+                requestedStudentId: searchParams.get("studentId"),
+                currentUserId: user.id,
+                profile,
+                ownerUserId,
+            });
+            setStudentWorkspaceBackContext(workspaceBackContext);
 
             const book = Array.isArray((userBook as any)?.books)
                 ? (userBook as any).books[0]
@@ -338,7 +355,7 @@ export default function ReadAlongPage() {
         }
 
         loadWords();
-    }, [userBookId]);
+    }, [userBookId, searchParams]);
 
     useEffect(() => {
         let cancelled = false;
@@ -1131,16 +1148,32 @@ export default function ReadAlongPage() {
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
             <div className="mx-auto max-w-4xl space-y-4">
+                {studentWorkspaceBackContext ? (
+                    <button
+                        type="button"
+                        onClick={() => router.push(studentWorkspaceBackContext.href)}
+                        className="text-sm font-semibold text-stone-500 hover:text-stone-900"
+                    >
+                        {studentWorkspaceBackContext.label}
+                    </button>
+                ) : null}
+
                 <ReadAlongPageHeader />
                 {bookTitle ? (
                     <ReadAlongBookContextCard
                         bookTitle={bookTitle}
                         bookCover={bookCover}
                         onOpenBookHub={() => {
-                            router.push(`/books/${encodeURIComponent(userBookId)}`);
+                            const contextSuffix = studentWorkspaceBackContext
+                                ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
+                                : "";
+                            router.push(`/books/${encodeURIComponent(userBookId)}${contextSuffix}`);
                         }}
                         onOpenVocabList={() => {
-                            router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                            const contextSuffix = studentWorkspaceBackContext
+                                ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
+                                : "";
+                            router.push(`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`);
                         }}
                     />
                 ) : null}

@@ -6,6 +6,8 @@ type LibraryPracticeFilterPanelProps = {
   jlptLevels: readonly string[];
   selectedJlptLevels: string[];
   practiceColorFilter: string;
+  colorFilterLocked?: boolean;
+  lockedColorLabel?: string;
   onToggleJlpt: (level: string) => void;
   onSelectAllJlpt: () => void;
   onClearJlpt: () => void;
@@ -57,6 +59,8 @@ export default function LibraryPracticeFilterPanel({
   jlptLevels,
   selectedJlptLevels,
   practiceColorFilter,
+  colorFilterLocked = false,
+  lockedColorLabel,
   onToggleJlpt,
   onSelectAllJlpt,
   onClearJlpt,
@@ -77,7 +81,7 @@ export default function LibraryPracticeFilterPanel({
 
       <div className="mt-1 flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-black text-slate-950">
-          Choose which saved words to review
+          {colorFilterLocked ? "Choose which mastered words to review" : "Choose which saved words to review"}
         </h2>
 
         <button
@@ -96,7 +100,9 @@ export default function LibraryPracticeFilterPanel({
       {open ? (
         <div className="mt-4 border-t border-slate-200 pt-4">
           <p className="text-sm text-slate-500">
-            Choose a JLPT level, color, or readiness group for a focused review.
+            {colorFilterLocked
+              ? "Choose a JLPT level for this focused mastered-words review."
+              : "Choose a JLPT level, color, or readiness group for a focused review."}
           </p>
 
           <div className="mt-4">
@@ -153,25 +159,31 @@ export default function LibraryPracticeFilterPanel({
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <label className="block">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                Color / readiness
-              </span>
+          {colorFilterLocked ? (
+            <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-950">
+              Color is locked to {lockedColorLabel ?? colorSummary(practiceColorFilter)} for this Mastered Words review.
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  Color / readiness
+                </span>
 
-              <select
-                value={practiceColorFilter}
-                onChange={(event) => onColorFilterChange(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                {PRACTICE_COLOR_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+                <select
+                  value={practiceColorFilter}
+                  onChange={(event) => onColorFilterChange(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  {PRACTICE_COLOR_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
         </div>
       ) : null}
     </section>

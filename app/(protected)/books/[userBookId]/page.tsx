@@ -2,8 +2,9 @@
 //
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -34,6 +35,10 @@ import PersonRow from "./components/PersonRow";
 import DateField from "./components/DateField";
 import StarRatingField from "./components/StarRatingField";
 import DifficultyField from "./components/DifficultyField";
+import {
+  resolveStudentWorkspaceBackContext,
+  type StudentWorkspaceBackContext,
+} from "@/lib/teacher/studentWorkspaceContext";
 
 function isMissingSeriesTotalColumnError(error: any) {
   return (
@@ -653,6 +658,7 @@ function FullAccessBookHubTabPanel({
 export default function BookHubPage() {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
+  const searchParams = useSearchParams();
   const userBookId = params?.userBookId;
 
   const [loading, setLoading] = useState(true);
@@ -671,6 +677,8 @@ export default function BookHubPage() {
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
   const [profileLevel, setProfileLevel] = useState<string>("");
   const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
+  const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
+    useState<StudentWorkspaceBackContext | null>(null);
 
   const [canUseStoryNotes, setCanUseStoryNotes] = useState(false);
   const [canUseCuriosityReading, setCanUseCuriosityReading] = useState(false);
@@ -3416,6 +3424,7 @@ export default function BookHubPage() {
     setCanUseStudyFlashcards(false);
     setCanUseVocabularyList(false);
     setCanSeeVocabularySummary(false);
+    setStudentWorkspaceBackContext(null);
 
     const {
       data: { session },
@@ -3628,6 +3637,16 @@ export default function BookHubPage() {
       );
     }
 
+    const workspaceBackContext = await resolveStudentWorkspaceBackContext({
+      supabase,
+      from: searchParams.get("from"),
+      requestedStudentId: searchParams.get("studentId"),
+      currentUserId: user.id,
+      profile: meProfile,
+      ownerUserId: r.user_id,
+    });
+    setStudentWorkspaceBackContext(workspaceBackContext);
+
     const studentUserId = r.user_id ?? null;
 
     const isUuid =
@@ -3741,7 +3760,7 @@ export default function BookHubPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userBookId]);
+  }, [userBookId, searchParams]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -5215,6 +5234,15 @@ export default function BookHubPage() {
       ) : null}
 
       <div className="mx-auto max-w-6xl">
+        {studentWorkspaceBackContext ? (
+          <Link
+            href={studentWorkspaceBackContext.href}
+            className="mb-3 inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+          >
+            {studentWorkspaceBackContext.label}
+          </Link>
+        ) : null}
+
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="p-5 md:p-8">
             <div className="grid gap-6 md:grid-cols-[150px_minmax(0,1fr)_380px] md:items-start md:gap-8">

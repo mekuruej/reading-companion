@@ -15,12 +15,7 @@ const STUDENT_GROUPS = [
   {
     key: "past",
     label: "Past",
-    detail: "Expired or former active relationships.",
-  },
-  {
-    key: "archived",
-    label: "Archived",
-    detail: "Hidden from active teacher lists and alerts. Restore when needed.",
+    detail: "Former active relationships. Restore when needed.",
   },
 ] as const;
 

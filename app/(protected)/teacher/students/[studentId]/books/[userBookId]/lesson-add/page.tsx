@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { TeacherFollowAlongPanel } from "../../../../../library/[teacherBookId]/follow/components/TeacherFollowAlongPanel";
 
 type StudentProfile = {
   id: string;
@@ -100,6 +101,10 @@ type JishoCandidate = {
   jlpt: string;
   isCommon: boolean;
 };
+
+type TeacherFollowAlongMatch =
+  | { status: "unchecked" | "loading" | "none" | "duplicate"; teacherBookId: null; message: string }
+  | { status: "found"; teacherBookId: string; message: string };
 
 const INITIAL_DICTIONARY_CHOICE_LIMIT = 2;
 
@@ -377,14 +382,29 @@ export default function LiveLessonAddWordPage() {
   const [expandedLookupChoicesById, setExpandedLookupChoicesById] = useState<
     Record<string, boolean>
   >({});
+  const [teacherFollowAlongMatch, setTeacherFollowAlongMatch] =
+    useState<TeacherFollowAlongMatch>({
+      status: "unchecked",
+      teacherBookId: null,
+      message: "",
+    });
+  const [showMyFollowAlong, setShowMyFollowAlong] = useState(false);
 
   const key = teacherId ? storageKey(teacherId, studentId, userBookId) : "";
   const book = firstBook(studentBook?.books ?? null);
   const isEnglishBook = book?.language_code === "en";
   const studentName = student?.display_name || student?.username || "Student";
-  const backHref = student?.username
-    ? `/users/${encodeURIComponent(student.username)}/books`
-    : "/teacher/students";
+  const fromStudentWorkspace =
+    searchParams.get("from") === "student-workspace" &&
+    searchParams.get("studentId") === studentId;
+  const backHref = fromStudentWorkspace
+    ? `/teacher/students/${encodeURIComponent(studentId)}/workspace`
+    : student?.username
+      ? `/users/${encodeURIComponent(student.username)}/books`
+      : "/teacher/students";
+  const backLabel = fromStudentWorkspace
+    ? `← Back to ${studentName}'s Workspace`
+    : "← Back to Student Library";
   const capturedIds = useMemo(
     () => capturedWords.map((capturedWord) => capturedWord.id),
     [capturedWords]
@@ -394,6 +414,7 @@ export default function LiveLessonAddWordPage() {
     session?.status === "deferred" ||
     session?.status === "completed";
   const readyCount = reviewDrafts.filter(draftReady).length;
+  const canShowMyFollowAlong = teacherFollowAlongMatch.status === "found";
 
   useEffect(() => {
     void loadContextAndRestore();
@@ -496,6 +517,59 @@ export default function LiveLessonAddWordPage() {
     };
   }
 
+  async function loadTeacherFollowAlongMatch(actorId: string, bookId: string) {
+    setTeacherFollowAlongMatch({
+      status: "loading",
+      teacherBookId: null,
+      message: "",
+    });
+
+    try {
+      const { data, error } = await supabase
+        .from("teacher_books")
+        .select("id")
+        .eq("teacher_id", actorId)
+        .eq("book_id", bookId);
+
+      if (error) throw error;
+
+      const rows = data ?? [];
+      if (rows.length === 1) {
+        setTeacherFollowAlongMatch({
+          status: "found",
+          teacherBookId: rows[0].id,
+          message: "",
+        });
+        return;
+      }
+
+      setShowMyFollowAlong(false);
+
+      if (rows.length === 0) {
+        setTeacherFollowAlongMatch({
+          status: "none",
+          teacherBookId: null,
+          message: "Add this book to your Teacher Library to use My Follow-Along.",
+        });
+        return;
+      }
+
+      setTeacherFollowAlongMatch({
+        status: "duplicate",
+        teacherBookId: null,
+        message: "Multiple Teacher Library records matched this book. My Follow-Along is unavailable until that is cleaned up.",
+      });
+    } catch (error: any) {
+      console.error("Error loading Teacher Follow-Along match:", error);
+      setShowMyFollowAlong(false);
+      setTeacherFollowAlongMatch({
+        status: "none",
+        teacherBookId: null,
+        message: "My Follow-Along could not be checked. Live Lesson is still available.",
+      });
+    }
+  }
+
   async function loadContextAndRestore() {
     setLoading(true);
     setMessage("");
@@ -504,6 +578,12 @@ export default function LiveLessonAddWordPage() {
     setCapturedWords([]);
     setReviewDrafts([]);
     setRestoredOlderSession(false);
+    setShowMyFollowAlong(false);
+    setTeacherFollowAlongMatch({
+      status: "unchecked",
+      teacherBookId: null,
+      message: "",
+    });
 
     try {
       const {
@@ -598,6 +678,7 @@ export default function LiveLessonAddWordPage() {
       setTeacherId(nextTeacherId);
       setStudent((studentProfile ?? null) as StudentProfile | null);
       setStudentBook(loadedStudentBook);
+      void loadTeacherFollowAlongMatch(nextTeacherId, loadedStudentBook.book_id);
 
       let restored = await loadSessionFromApi(requestedSessionId);
 
@@ -934,23 +1015,51 @@ export default function LiveLessonAddWordPage() {
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div
+        className={`mx-auto space-y-4 ${
+          showMyFollowAlong && canShowMyFollowAlong ? "max-w-[96rem]" : "max-w-6xl"
+        }`}
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href={backHref} className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-            &lt;- Back to Student Library
+            {backLabel}
           </Link>
-          {!isReviewStage ? (
-            <button
-              type="button"
-              onClick={() => void transitionSession("end-adding")}
-              disabled={reviewSaving || capturedWords.length === 0}
-              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {reviewSaving ? "Opening review..." : "End Adding Words"}
-            </button>
-          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {canShowMyFollowAlong ? (
+              <button
+                type="button"
+                onClick={() => setShowMyFollowAlong((value) => !value)}
+                className="hidden rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-800 shadow-sm hover:bg-sky-50 lg:inline-flex"
+              >
+                {showMyFollowAlong ? "Hide My Follow-Along" : "Show My Follow-Along"}
+              </button>
+            ) : teacherFollowAlongMatch.message ? (
+              <span className="hidden max-w-xs rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-semibold leading-5 text-stone-500 shadow-sm lg:inline-flex">
+                {teacherFollowAlongMatch.message}
+              </span>
+            ) : null}
+
+            {!isReviewStage ? (
+              <button
+                type="button"
+                onClick={() => void transitionSession("end-adding")}
+                disabled={reviewSaving || capturedWords.length === 0}
+                className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reviewSaving ? "Opening review..." : "End Adding Words"}
+              </button>
+            ) : null}
+          </div>
         </div>
 
+        <div
+          className={
+            showMyFollowAlong && canShowMyFollowAlong
+              ? "space-y-4 lg:grid lg:grid-cols-[minmax(360px,0.9fr)_minmax(560px,1.1fr)] lg:items-start lg:gap-4 lg:space-y-0"
+              : "space-y-4"
+          }
+        >
+          <div className="min-w-0 space-y-4 lg:order-2">
         <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             {book?.cover_url ? (
@@ -1421,8 +1530,20 @@ export default function LiveLessonAddWordPage() {
                 })}
               </div>
             )}
-          </section>
-        )}
+            </section>
+          )}
+          </div>
+
+          {showMyFollowAlong && canShowMyFollowAlong ? (
+            <aside className="hidden min-w-0 rounded-2xl border border-stone-200 bg-stone-50 p-3 shadow-sm lg:order-1 lg:block">
+              <TeacherFollowAlongPanel
+                teacherBookId={teacherFollowAlongMatch.teacherBookId}
+                presentation="embedded"
+                ownerTeacherId={teacherId}
+              />
+            </aside>
+          ) : null}
+        </div>
       </div>
     </main>
   );

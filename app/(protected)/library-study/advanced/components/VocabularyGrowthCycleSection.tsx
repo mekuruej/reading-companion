@@ -387,7 +387,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontWeight="900"
                                 textAnchor="middle"
                             >
-                                Strengthen
+                                Mastered
                             </text>
                             <text
                                 x="148"
@@ -397,7 +397,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontWeight="900"
                                 textAnchor="middle"
                             >
-                                what you know
+                                Words
                             </text>
                             <text
                                 x="148"
@@ -406,7 +406,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontSize="14"
                                 textAnchor="middle"
                             >
-                                Strengthen what you know
+                                Mastered Words
                             </text>
                             </g>
                         </a>

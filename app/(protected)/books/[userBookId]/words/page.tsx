@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -37,6 +37,10 @@ import {
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
 import { BookVocabBackToTopButton } from "./components/BookVocabBackToTopButton";
+import {
+  resolveStudentWorkspaceBackContext,
+  type StudentWorkspaceBackContext,
+} from "@/lib/teacher/studentWorkspaceContext";
 
 const DEFAULT_LEARNING_SETTINGS = {
   red_stages: 1,
@@ -264,6 +268,7 @@ export default function BookWordsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -286,6 +291,8 @@ export default function BookWordsPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
+  const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
+    useState<StudentWorkspaceBackContext | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -624,6 +631,7 @@ export default function BookWordsPage() {
       setNeedsSignIn(false);
       setFullAccessLocked(false);
       setCanUseVocabularyTools(false);
+      setStudentWorkspaceBackContext(null);
 
       try {
         const { data: auth } = await supabase.auth.getUser();
@@ -721,6 +729,16 @@ export default function BookWordsPage() {
           setLoading(false);
           return;
         }
+
+        const workspaceBackContext = await resolveStudentWorkspaceBackContext({
+          supabase,
+          from: searchParams.get("from"),
+          requestedStudentId: searchParams.get("studentId"),
+          currentUserId: authedUser.id,
+          profile: meProfile,
+          ownerUserId,
+        });
+        setStudentWorkspaceBackContext(workspaceBackContext);
 
         if (canUseVocabularyList) {
           const { data: learningSettingsRow, error: learningSettingsErr } = await supabase
@@ -897,7 +915,7 @@ export default function BookWordsPage() {
     }
 
     load();
-  }, [userBookId, showHidden]);
+  }, [userBookId, showHidden, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1128,11 +1146,24 @@ export default function BookWordsPage() {
   }
 
   function openBookHub() {
-    router.push(`/books/${encodeURIComponent(userBookId)}`);
+    const contextSuffix = studentWorkspaceBackContext
+      ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
+      : "";
+    router.push(`/books/${encodeURIComponent(userBookId)}${contextSuffix}`);
   }
 
   return (
     <main className="max-w-6xl mx-auto p-6 pb-24">
+      {studentWorkspaceBackContext ? (
+        <button
+          type="button"
+          onClick={() => router.push(studentWorkspaceBackContext.href)}
+          className="mb-3 text-sm font-semibold text-stone-500 hover:text-stone-900"
+        >
+          {studentWorkspaceBackContext.label}
+        </button>
+      ) : null}
+
       {editing && isTeacher ? (
         <BookVocabEditModalShell
           surface={editing.surface}
