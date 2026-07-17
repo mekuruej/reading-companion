@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -74,32 +74,6 @@ type WordNeighbor = {
   hidden: boolean | null;
 };
 
-type CollocationRow = {
-  id: string;
-  user_id: string;
-  user_book_word_id: string;
-  user_book_id: string;
-  collocation: string;
-  note: string | null;
-  created_at: string;
-};
-
-type KanjiMeta = {
-  kanji: string;
-  strokes: number | null;
-  radical: string | null;
-};
-
-type RelatedWord = {
-  word: string;
-  reading: string;
-  meaning: string;
-};
-
-type KanjiGroup = {
-  kanji: string;
-  relatedWords: RelatedWord[];
-};
 
 // -------------------------------------------------------------
 // Helpers
@@ -134,13 +108,7 @@ function chapterDisplay(chNum: number | null, chName: string | null) {
   return "";
 }
 
-function normalizeCollocation(s: string) {
-  return (s ?? "").trim().replace(/[　]/g, " ").replace(/\s+/g, " ");
-}
 
-function getUniqueKanji(surface: string) {
-  return Array.from(new Set(surface.match(/[\u3400-\u9FFF]/g) || []));
-}
 
 function sortWordNeighbors(words: WordNeighbor[]) {
   return [...words].sort((a, b) => {
@@ -163,196 +131,6 @@ function sortWordNeighbors(words: WordNeighbor[]) {
   });
 }
 
-// -------------------------------------------------------------
-// Collocations Panel
-// -------------------------------------------------------------
-function CollocationsPanel({
-  userBookId,
-  userBookWordId,
-  readOnly = false,
-}: {
-  userBookId: string;
-  userBookWordId: string;
-  readOnly?: boolean;
-}) {
-  const [rows, setRows] = useState<CollocationRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [value, setValue] = useState("");
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const canAdd = useMemo(() => normalizeCollocation(value).length > 0, [value]);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) {
-        setRows([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("user_word_collocations")
-        .select("id,user_id,user_book_word_id,user_book_id,collocation,note,created_at")
-        .eq("user_book_word_id", userBookWordId)
-        .eq("user_book_id", userBookId)
-        .order("created_at", { ascending: false })
-        .returns<CollocationRow[]>();
-
-      if (error) throw error;
-      setRows(data ?? []);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load collocations");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!userBookId || !userBookWordId) return;
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userBookId, userBookWordId]);
-
-  async function add() {
-    if (readOnly) return;
-
-    const coll = normalizeCollocation(value);
-    if (!coll) return;
-
-    setSaving(true);
-    setError(null);
-
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) throw new Error("You must be signed in.");
-
-      const payload = {
-        user_id: user.id,
-        user_book_word_id: userBookWordId,
-        user_book_id: userBookId,
-        collocation: coll,
-        note: note.trim() ? note.trim() : null,
-      };
-
-      const { error } = await supabase.from("user_word_collocations").insert(payload);
-      if (error) throw error;
-
-      setValue("");
-      setNote("");
-      await load();
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to add collocation");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function remove(id: string) {
-    if (readOnly) return;
-
-    setError(null);
-
-    try {
-      const { error } = await supabase.from("user_word_collocations").delete().eq("id", id);
-      if (error) throw error;
-      setRows((prev) => prev.filter((r) => r.id !== id));
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to delete collocation");
-    }
-  }
-
-  return (
-    <section className="mt-6">
-      <div className="rounded-2xl border bg-white p-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Collocations</h3>
-          <span className="text-xs text-gray-500">{rows.length} saved</span>
-        </div>
-
-        {readOnly ? null : (
-          <div className="flex flex-col gap-2">
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Add a collocation (e.g. 深い眠り / 〜を取り戻す)"
-              className="w-full rounded border p-2"
-            />
-
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Optional note (where/nuance)"
-              className="w-full rounded border p-2"
-            />
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={!canAdd || saving}
-                onClick={add}
-                className="rounded bg-gray-200 px-3 py-2 disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Add"}
-              </button>
-
-              <button
-                type="button"
-                onClick={load}
-                className="rounded bg-gray-100 px-3 py-2"
-                disabled={saving || loading}
-              >
-                Refresh
-              </button>
-            </div>
-
-            {error ? <p className="text-sm text-red-700">{error}</p> : null}
-          </div>
-        )}
-
-        <div className="mt-4">
-          {loading ? (
-            <p className="text-sm text-gray-500">Loading…</p>
-          ) : rows.length === 0 ? (
-            <p className="text-sm text-gray-500">No collocations yet.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-start justify-between gap-3 rounded-xl border p-3">
-                  <div className="min-w-0">
-                    <div className="break-words font-medium">{r.collocation}</div>
-                    {r.note ? <div className="mt-1 break-words text-sm text-gray-600">{r.note}</div> : null}
-                    <div className="mt-1 text-xs text-gray-400">
-                      {new Date(r.created_at).toLocaleString()}
-                    </div>
-                  </div>
-
-                  {readOnly ? null : (
-                    <button
-                      type="button"
-                      onClick={() => remove(r.id)}
-                      className="shrink-0 rounded bg-gray-100 px-2 py-1 text-sm hover:bg-gray-200"
-                      title="Delete"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 // -------------------------------------------------------------
 // Page
@@ -397,12 +175,8 @@ export default function WordDetailPage() {
 
   const [repeatsInThisBook, setRepeatsInThisBook] = useState<number>(0);
   const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
-  const [totalLookupCount, setTotalLookupCount] = useState<number>(0);
   const [libraryColorInfo, setLibraryColorInfo] = useState<LibraryStudyWordColorInfo | null>(null);
 
-  const [kanjiMeta, setKanjiMeta] = useState<KanjiMeta[]>([]);
-  const [kanjiGroups, setKanjiGroups] = useState<KanjiGroup[]>([]);
-  const [dictionaryLoading, setDictionaryLoading] = useState(false);
 
   function openEdit(w: WordRow) {
     if (!canUseVocabularyTools) return;
@@ -731,7 +505,6 @@ export default function WordDetailPage() {
       setErrorMsg(e?.message ?? "Failed to load word");
       setWord(null);
       setSeenInstances([]);
-      setTotalLookupCount(0);
       setPreviousWord(null);
       setNextWord(null);
     } finally {
@@ -799,10 +572,8 @@ export default function WordDetailPage() {
       }));
 
       setSeenInstances(normalizedSeen);
-      setTotalLookupCount(normalizedSeen.length);
     } catch {
       setSeenInstances([]);
-      setTotalLookupCount(0);
     }
   }
 
@@ -817,81 +588,6 @@ export default function WordDetailPage() {
     }
   }
 
-  async function loadDictionaryExtras(surface: string) {
-    setDictionaryLoading(true);
-
-    try {
-      const chars = getUniqueKanji(surface);
-
-      if (chars.length === 0) {
-        setKanjiMeta([]);
-        setKanjiGroups([]);
-        return;
-      }
-
-      const metaResults: KanjiMeta[] = [];
-      const groupResults: KanjiGroup[] = [];
-
-      for (const ch of chars) {
-        try {
-          const r = await fetch(`https://kanjiapi.dev/v1/kanji/${encodeURIComponent(ch)}`);
-          if (!r.ok) {
-            metaResults.push({ kanji: ch, strokes: null, radical: null });
-          } else {
-            const data = await r.json();
-            metaResults.push({
-              kanji: ch,
-              strokes: data.stroke_count ?? null,
-              radical: null,
-            });
-          }
-        } catch {
-          metaResults.push({ kanji: ch, strokes: null, radical: null });
-        }
-
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-
-          const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(ch)}`, {
-            headers: session?.access_token
-              ? { Authorization: `Bearer ${session.access_token}` }
-              : undefined,
-          });
-          if (!res.ok) {
-            groupResults.push({ kanji: ch, relatedWords: [] });
-            continue;
-          }
-
-          const data = await res.json();
-          const relatedWords: RelatedWord[] = (data?.data ?? [])
-            .map((item: any) => ({
-              word: item?.japanese?.[0]?.word ?? item?.japanese?.[0]?.reading ?? "",
-              reading: item?.japanese?.[0]?.reading ?? "",
-              meaning: item?.senses?.[0]?.english_definitions?.join("; ") ?? "",
-            }))
-            .filter((x: RelatedWord) => x.word && x.word !== surface)
-            .slice(0, 3);
-
-          groupResults.push({
-            kanji: ch,
-            relatedWords,
-          });
-        } catch {
-          groupResults.push({ kanji: ch, relatedWords: [] });
-        }
-      }
-
-      setKanjiMeta(metaResults);
-      setKanjiGroups(groupResults);
-    } catch {
-      setKanjiMeta([]);
-      setKanjiGroups([]);
-    } finally {
-      setDictionaryLoading(false);
-    }
-  }
 
   useEffect(() => {
     if (!userBookId || !wordId) return;
