@@ -42,6 +42,9 @@ type LiveLessonSessionRow = {
   review_deferred_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
+  stopping_page_number: number | null;
+  stopping_text: string | null;
+  stopping_point_saved_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -96,6 +99,12 @@ function cleanString(value: unknown) {
 function nullableText(value: unknown) {
   const cleaned = cleanString(value);
   return cleaned || null;
+}
+
+function nullableLimitedText(value: unknown, maxLength: number) {
+  const cleaned = cleanString(value);
+  if (!cleaned) return null;
+  return cleaned.slice(0, maxLength);
 }
 
 function stringArray(value: unknown) {
@@ -311,9 +320,48 @@ function sessionSelect() {
     review_deferred_at,
     completed_at,
     cancelled_at,
+    stopping_page_number,
+    stopping_text,
+    stopping_point_saved_at,
     created_at,
     updated_at
   `;
+}
+
+async function loadLatestStoppingPoint({
+  actorId,
+  studentId,
+  userBookId,
+}: {
+  actorId: string;
+  studentId: string;
+  userBookId: string;
+}) {
+  const { data, error } = await supabaseAdmin
+    .from("live_lesson_capture_sessions")
+    .select(
+      "id, stopping_page_number, stopping_text, stopping_point_saved_at, status"
+    )
+    .eq("teacher_id", actorId)
+    .eq("student_id", studentId)
+    .eq("user_book_id", userBookId)
+    .not("stopping_point_saved_at", "is", null)
+    .neq("status", "cancelled")
+    .order("stopping_point_saved_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!data) return null;
+
+  return {
+    sessionId: (data as any).id as string,
+    pageNumber: (data as any).stopping_page_number as number | null,
+    endingText: (data as any).stopping_text as string | null,
+    savedAt: (data as any).stopping_point_saved_at as string | null,
+    status: (data as any).status as string | null,
+  };
 }
 
 async function loadSession({
@@ -616,6 +664,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ words: data ?? [] });
     }
 
+    const latestStoppingPoint = await loadLatestStoppingPoint({
+      actorId: auth.user.id,
+      studentId,
+      userBookId,
+    });
+
     const session = sessionId
       ? await loadSession({
           sessionId,
@@ -630,11 +684,15 @@ export async function GET(req: Request) {
         });
 
     if (!session) {
-      return NextResponse.json({ session: null, words: [] });
+      return NextResponse.json({
+        session: null,
+        words: [],
+        latestStoppingPoint,
+      });
     }
 
     const words = await loadSessionWords(session.id);
-    return NextResponse.json({ session, words });
+    return NextResponse.json({ session, words, latestStoppingPoint });
   } catch (error: any) {
     console.error("Live Lesson restore error:", error);
     return NextResponse.json(
@@ -808,6 +866,8 @@ export async function PATCH(req: Request) {
     const userBookId = cleanString(body?.userBookId);
     const sessionId = cleanString(body?.sessionId);
     const nextStatus = normalizeTransition(body?.action);
+    const shouldSaveStoppingPoint =
+      body?.action === "end-adding" && body?.saveStoppingPoint === true;
 
     if (!studentId || !userBookId || !sessionId) {
       return NextResponse.json(
@@ -859,6 +919,21 @@ export async function PATCH(req: Request) {
       if (nextStatus === "reviewing") {
         payload.ended_adding_at = timestamp;
         payload.review_started_at = session.review_started_at ?? timestamp;
+        if (shouldSaveStoppingPoint) {
+          const stoppingPageNumber = toNullableInt(body?.stoppingPageNumber);
+          const stoppingText = nullableLimitedText(body?.stoppingText, 500);
+
+          if (stoppingPageNumber == null && !stoppingText) {
+            return NextResponse.json(
+              { error: "Add a stopping page or ending text, or choose Skip." },
+              { status: 400 }
+            );
+          }
+
+          payload.stopping_page_number = stoppingPageNumber;
+          payload.stopping_text = stoppingText;
+          payload.stopping_point_saved_at = timestamp;
+        }
       }
       if (nextStatus === "deferred") {
         payload.review_deferred_at = timestamp;
@@ -885,6 +960,11 @@ export async function PATCH(req: Request) {
     return NextResponse.json({
       session: savedSession,
       words: await loadSessionWords(sessionId),
+      latestStoppingPoint: await loadLatestStoppingPoint({
+        actorId: auth.user.id,
+        studentId,
+        userBookId,
+      }),
     });
   } catch (error: any) {
     console.error("Live Lesson session update error:", error);

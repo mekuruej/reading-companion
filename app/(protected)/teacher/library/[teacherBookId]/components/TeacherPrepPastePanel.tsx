@@ -32,8 +32,8 @@ export default function TeacherPrepPastePanel<T extends string>({
         Enter prep items
       </h2>
       <p className="mt-1 text-sm text-stone-500">
-        For vocabulary words, use Curiosity Reading or Bulk Add so they stay in
-        Reader Vocab, flashcards, and Follow-Along. Use Teaching Prep for
+        For vocabulary words, use Add Word, Curiosity Reading, or Bulk Add so
+        they stay in Reader Vocab, flashcards, and Follow-Along. Use Teaching Prep for
         phrases, grammar notes, translations, sentences, and lesson notes.
       </p>
 

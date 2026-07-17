@@ -893,9 +893,6 @@ export default function BookHubPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [saveNoticeTone, setSaveNoticeTone] = useState<"success" | "warning">("success");
-  const [bookOptions, setBookOptions] = useState<
-    { id: string; title: string; started_at: string | null; finished_at: string | null; dnf_at: string | null }[]
-  >([]);
 
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
   const [showChapterSummaries, setShowChapterSummaries] = useState(false);
@@ -3783,44 +3780,6 @@ export default function BookHubPage() {
   }, []);
 
   useEffect(() => {
-    async function loadBookOptions() {
-      if (!userId) return;
-
-      const { data, error } = await supabase
-        .from("user_books")
-        .select(`
-          id,
-          user_id,
-          started_at,
-          finished_at,
-          dnf_at,
-          books (
-            title
-          )
-        `)
-        .eq("user_id", userId);
-
-      if (error) {
-        console.error("Error loading book options:", error);
-        setBookOptions([]);
-        return;
-      }
-
-      setBookOptions(
-        (data ?? []).map((item: any) => ({
-          id: item.id,
-          title: item.books?.title ?? "Untitled",
-          started_at: item.started_at ?? null,
-          finished_at: item.finished_at ?? null,
-          dnf_at: item.dnf_at ?? null,
-        }))
-      );
-    }
-
-    loadBookOptions();
-  }, [userId]);
-
-  useEffect(() => {
     if (!isRunning || !startTime) return;
 
     const interval = setInterval(() => {
@@ -5166,19 +5125,12 @@ export default function BookHubPage() {
     return <AccessDeniedMessage message="This book could not be found." />;
   }
 
-  const currentlyReadingBooks = [...bookOptions]
-    .filter((b) => b.started_at && !b.finished_at && !b.dnf_at)
-    .sort((a, b) => a.title.localeCompare(b.title));
-
-  const otherBooks = [...bookOptions]
-    .filter((b) => !(b.started_at && !b.finished_at && !b.dnf_at))
-    .sort((a, b) => a.title.localeCompare(b.title));
-
   const relatedLinksArr = Array.isArray(book.related_links) ? book.related_links : [];
 
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
   const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
+  const canOpenTeacherSnapshot = isTeacherContext;
 
   const bookHubContextLabel = isViewingStudentBookHub
     ? `Student Book Hub · ${bookHubOwnerName || "Student"}`
@@ -5235,12 +5187,14 @@ export default function BookHubPage() {
 
       <div className="mx-auto max-w-6xl">
         {studentWorkspaceBackContext ? (
-          <Link
-            href={studentWorkspaceBackContext.href}
-            className="mb-3 inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
-          >
-            {studentWorkspaceBackContext.label}
-          </Link>
+          <nav className="mb-3 flex flex-wrap items-center gap-3">
+            <Link
+              href={studentWorkspaceBackContext.href}
+              className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+            >
+              {studentWorkspaceBackContext.label}
+            </Link>
+          </nav>
         ) : null}
 
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
@@ -5249,23 +5203,10 @@ export default function BookHubPage() {
               <BookHubHero
                 book={book}
                 displayedCoverUrl={isEditingThisTab ? coverUrl : book.cover_url}
-                selectedUserBookId={userBookId ?? ""}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
-                currentlyReadingBooks={currentlyReadingBooks}
-                otherBooks={otherBooks}
-                onSwitchBook={(nextValue) => {
-                  if (!nextValue) return;
-
-                  if (nextValue === "all-book-hubs") {
-                    router.push("/library/book-hubs");
-                    return;
-                  }
-
-                  if (nextValue === userBookId) return;
-
-                  router.push(`/books/${nextValue}`);
-                }}
+                canOpenTeacherSnapshot={canOpenTeacherSnapshot}
+                teacherSnapshotHref={`/books/${userBookId}/teacher-snapshot`}
               />
 
               <BookHubStatusPanel

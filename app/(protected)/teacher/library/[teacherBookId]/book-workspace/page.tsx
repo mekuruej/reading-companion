@@ -6,7 +6,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -145,6 +145,7 @@ function ToolCardLink({ tool }: { tool: ToolCard }) {
 
 export default function TeacherBookWorkspacePage() {
   const params = useParams<{ teacherBookId: string }>();
+  const router = useRouter();
   const teacherBookId = params.teacherBookId ?? "";
 
   const [loading, setLoading] = useState(true);
@@ -289,6 +290,42 @@ export default function TeacherBookWorkspacePage() {
     }
   }
 
+  async function handleRemoveFromTeacherLibrary() {
+    if (!teacherBook) return;
+
+    const confirmed = window.confirm(
+      "Remove this book from Teacher Library? Your My Library copy, saved words, reading sessions, ratings, and reflections will stay untouched."
+    );
+
+    if (!confirmed) return;
+
+    setStatusSaving(true);
+    setStatusMessage("");
+
+    try {
+      const { error } = await supabase
+        .from("teacher_books")
+        .update({
+          teacher_use_status: "do_not_use",
+          teacher_use_note:
+            noteDraft.trim() ||
+            teacherBook.teacher_use_note ||
+            "Removed from Teacher Library; reader data preserved.",
+        })
+        .eq("id", teacherBook.id);
+
+      if (error) throw error;
+
+      setStatusMessage("Removed from Teacher Library. Reader data was preserved.");
+      router.push("/teacher/library");
+    } catch (error: any) {
+      console.error("Error removing Teacher Book relationship:", error);
+      setStatusMessage(error?.message ?? "Could not remove this book from Teacher Library.");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
   const book = firstBook(teacherBook?.books ?? null);
   const userBookId = teacherBook?.user_book_id ?? null;
 
@@ -324,6 +361,12 @@ export default function TeacherBookWorkspacePage() {
         description: "Listen to the book and log words you hear.",
         href: `/books/${encodedUserBookId}/listening`,
         tone: "purple",
+      },
+      {
+        title: "Add Word",
+        description: "Save a word to your normal reader vocabulary for this book.",
+        href: `/books/${encodedUserBookId}/add-word`,
+        tone: "blue",
       },
       {
         title: "Study Flashcards",
@@ -468,6 +511,14 @@ export default function TeacherBookWorkspacePage() {
             >
               {statusSaving ? "Saving..." : "Save Status"}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleRemoveFromTeacherLibrary()}
+              disabled={!canEditTeacherUseStatus || statusSaving}
+              className="rounded-2xl border border-rose-200 bg-white px-5 py-3 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Remove from Teacher Library
+            </button>
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-[260px_minmax(0,1fr)]">
@@ -514,7 +565,7 @@ export default function TeacherBookWorkspacePage() {
 
         {!userBookId ? (
           <section className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900 shadow-sm">
-            This Teacher Book is not linked to My Mekuru Library yet.
+            This Teacher Book is not linked to a proven My Library copy yet, so reader words cannot be shown here. Run the teacher-book reader-link diagnostic and repair with the existing link migration before using reader tools.
           </section>
         ) : (
           <section className="mt-6">

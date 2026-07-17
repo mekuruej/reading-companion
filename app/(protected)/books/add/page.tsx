@@ -195,10 +195,18 @@ export default function AddBookPage() {
     const targetLibraryUserId = targetUserIdParam || currentUserId;
     const isStudentDestination =
         destination === "student" && !!targetUserIdParam && targetUserIdParam !== currentUserId;
+    const isOtherUserDestination =
+        !isStudentDestination && !!targetUserIdParam && targetUserIdParam !== currentUserId;
     const targetLibraryLabel = isStudentDestination
         ? `${targetDisplayName ?? "this student"}’s library`
+        : isOtherUserDestination
+        ? `${targetDisplayName ?? "this user"}’s library`
         : "your library";
-    const targetLibraryShortLabel = isStudentDestination ? "student library" : "your library";
+    const targetLibraryShortLabel = isStudentDestination
+        ? "student library"
+        : isOtherUserDestination
+        ? "user library"
+        : "your library";
     const targetLibraryHref = isStudentDestination
         ? targetUsername
             ? `/users/${targetUsername}/books`
@@ -753,8 +761,10 @@ export default function AddBookPage() {
                                                 {addingExistingBookId === result.id
                                                     ? "Adding..."
                                                     : isStudentDestination
-                                                    ? "Add to student library"
-                                                    : "Add Book"}
+                                                    ? "Add to Student Library"
+                                                    : isOtherUserDestination
+                                                    ? "Add to User Library"
+                                                    : "Add to My Library"}
                                             </button>
                                         ) : (
                                             <button
@@ -793,7 +803,11 @@ export default function AddBookPage() {
                     <AddBookActionRow
                         addLoading={addLoading}
                         addLabel={
-                            isStudentDestination ? "Add to student library" : "Add to my library"
+                            isStudentDestination
+                                ? "Add to Student Library"
+                                : isOtherUserDestination
+                                ? "Add to User Library"
+                                : "Add to My Library"
                         }
                         onAdd={handleAddToLibrary}
                         onCancel={() => router.push(targetLibraryHref)}

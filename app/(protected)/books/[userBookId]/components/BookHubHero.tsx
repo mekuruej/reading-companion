@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type BookHubHeroBook = {
   title: string;
   title_reading: string | null;
@@ -6,31 +8,22 @@ type BookHubHeroBook = {
   cover_url: string | null;
 };
 
-type BookHubBookOption = {
-  id: string;
-  title: string;
-};
-
 type BookHubHeroProps = {
   book: BookHubHeroBook;
   displayedCoverUrl: string | null;
-  selectedUserBookId: string;
   bookHubContextLabel: string;
   isViewingStudentBookHub: boolean;
-  currentlyReadingBooks: BookHubBookOption[];
-  otherBooks: BookHubBookOption[];
-  onSwitchBook: (nextValue: string) => void;
+  canOpenTeacherSnapshot: boolean;
+  teacherSnapshotHref: string;
 };
 
 export default function BookHubHero({
   book,
   displayedCoverUrl,
-  selectedUserBookId,
   bookHubContextLabel,
   isViewingStudentBookHub,
-  currentlyReadingBooks,
-  otherBooks,
-  onSwitchBook,
+  canOpenTeacherSnapshot,
+  teacherSnapshotHref,
 }: BookHubHeroProps) {
   return (
     <>
@@ -87,39 +80,16 @@ export default function BookHubHero({
           ) : null}
         </div>
 
-        <div className="mt-4 max-w-sm">
-          <div className="mb-1 text-xs uppercase tracking-wide text-stone-500">
-            Switch Book
+        {canOpenTeacherSnapshot ? (
+          <div className="mt-4">
+            <Link
+              href={teacherSnapshotHref}
+              className="inline-flex rounded-xl bg-purple-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-purple-800"
+            >
+              Teacher Snapshot
+            </Link>
           </div>
-
-          <select
-            value={selectedUserBookId}
-            onChange={(e) => onSwitchBook(e.target.value)}
-            className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700"
-          >
-            <option value="all-book-hubs">All Book Hubs</option>
-
-            {currentlyReadingBooks.length > 0 ? (
-              <optgroup label="Currently Reading">
-                {currentlyReadingBooks.map((bookOption) => (
-                  <option key={bookOption.id} value={bookOption.id}>
-                    {bookOption.title}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-
-            {otherBooks.length > 0 ? (
-              <optgroup label="All Books">
-                {otherBooks.map((bookOption) => (
-                  <option key={bookOption.id} value={bookOption.id}>
-                    {bookOption.title}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-          </select>
-        </div>
+        ) : null}
       </div>
     </>
   );

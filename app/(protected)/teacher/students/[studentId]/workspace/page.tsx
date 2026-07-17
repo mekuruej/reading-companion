@@ -173,6 +173,11 @@ function learningTaskTypeLabel(taskType: string) {
   return "Learning task";
 }
 
+function taskStatusLabel(task: ActiveLearningTask) {
+  if (task.due_on) return `Assigned · due ${formatDate(task.due_on)}`;
+  return `Assigned · ${formatDate(task.created_at)}`;
+}
+
 function workspaceContext(studentId: string) {
   return `from=student-workspace&studentId=${encodeURIComponent(studentId)}`;
 }
@@ -998,7 +1003,7 @@ export default function StudentWorkspacePage() {
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black text-stone-950">Active Follow-Up</h2>
           <p className="mt-1 text-sm text-stone-500">
-            Live Lesson reviews, book requests, and finished-book ratings for this student.
+            Live Lesson reviews, assigned tasks, book requests, and finished-book ratings for this student.
           </p>
 
           <div className="mt-4 space-y-3">
@@ -1023,6 +1028,50 @@ export default function StudentWorkspacePage() {
                 </Link>
               </article>
             ))}
+
+            {activeLearningTasks.map((task) => {
+              const linkedBook = taskBooks.find((book) => book.id === task.user_book_id);
+              const taskHref = task.user_book_id
+                ? `/books/${encodeURIComponent(task.user_book_id)}?${workspaceContext(studentId)}`
+                : null;
+
+              return (
+                <article
+                  key={task.id}
+                  className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-stone-950">{task.title}</p>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                      Task · {learningTaskTypeLabel(task.task_type)} · {taskStatusLabel(task)}
+                    </p>
+                    {linkedBook || task.instructions ? (
+                      <p className="mt-1 line-clamp-2 text-xs text-stone-600">
+                        {linkedBook ? `${linkedBook.title}` : ""}
+                        {linkedBook && task.instructions ? " · " : ""}
+                        {task.instructions ?? ""}
+                      </p>
+                    ) : null}
+                  </div>
+                  {taskHref ? (
+                    <Link
+                      href={taskHref}
+                      className="rounded-xl bg-emerald-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-emerald-800"
+                    >
+                      Open Book
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openTaskModal}
+                      className="rounded-xl bg-emerald-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-emerald-800"
+                    >
+                      Manage Task
+                    </button>
+                  )}
+                </article>
+              );
+            })}
 
             {data.bookRequests.map((request) => {
               const displayTitle =
@@ -1077,6 +1126,7 @@ export default function StudentWorkspacePage() {
           </div>
 
           {data.needsAttention.length === 0 &&
+          activeLearningTasks.length === 0 &&
           data.bookRequests.length === 0 &&
           data.ratingFollowUps.length === 0 ? (
             <p className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">

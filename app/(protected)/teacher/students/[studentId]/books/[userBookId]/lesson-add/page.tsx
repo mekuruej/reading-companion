@@ -52,6 +52,9 @@ type LiveLessonSession = {
   review_deferred_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
+  stopping_page_number: number | null;
+  stopping_text: string | null;
+  stopping_point_saved_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -105,6 +108,14 @@ type JishoCandidate = {
 type TeacherFollowAlongMatch =
   | { status: "unchecked" | "loading" | "none" | "duplicate"; teacherBookId: null; message: string }
   | { status: "found"; teacherBookId: string; message: string };
+
+type LiveLessonStoppingPoint = {
+  sessionId: string;
+  pageNumber: number | null;
+  endingText: string | null;
+  savedAt: string | null;
+  status: string | null;
+};
 
 const INITIAL_DICTIONARY_CHOICE_LIMIT = 2;
 
@@ -160,6 +171,17 @@ function formatDateTime(value: string | number | null | undefined) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+  });
+}
+
+function formatShortDateTime(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
   });
 }
 
@@ -389,6 +411,11 @@ export default function LiveLessonAddWordPage() {
       message: "",
     });
   const [showMyFollowAlong, setShowMyFollowAlong] = useState(false);
+  const [latestStoppingPoint, setLatestStoppingPoint] =
+    useState<LiveLessonStoppingPoint | null>(null);
+  const [checkpointOpen, setCheckpointOpen] = useState(false);
+  const [stoppingPageDraft, setStoppingPageDraft] = useState("");
+  const [stoppingTextDraft, setStoppingTextDraft] = useState("");
 
   const key = teacherId ? storageKey(teacherId, studentId, userBookId) : "";
   const book = firstBook(studentBook?.books ?? null);
@@ -415,6 +442,8 @@ export default function LiveLessonAddWordPage() {
     session?.status === "completed";
   const readyCount = reviewDrafts.filter(draftReady).length;
   const canShowMyFollowAlong = teacherFollowAlongMatch.status === "found";
+  const canSaveStoppingPoint =
+    stoppingPageDraft.trim() !== "" || stoppingTextDraft.trim() !== "";
 
   useEffect(() => {
     void loadContextAndRestore();
@@ -481,6 +510,7 @@ export default function LiveLessonAddWordPage() {
     return data as {
       session: LiveLessonSession | null;
       words: CapturedWord[];
+      latestStoppingPoint: LiveLessonStoppingPoint | null;
     };
   }
 
@@ -511,9 +541,13 @@ export default function LiveLessonAddWordPage() {
 
     clearPersistedSession(nextKey);
     skipNextPersistRef.current = true;
-    return data as {
+    const restored = data as {
       session: LiveLessonSession | null;
       words: CapturedWord[];
+    };
+    return {
+      ...restored,
+      latestStoppingPoint: null,
     };
   }
 
@@ -579,6 +613,10 @@ export default function LiveLessonAddWordPage() {
     setReviewDrafts([]);
     setRestoredOlderSession(false);
     setShowMyFollowAlong(false);
+    setLatestStoppingPoint(null);
+    setCheckpointOpen(false);
+    setStoppingPageDraft("");
+    setStoppingTextDraft("");
     setTeacherFollowAlongMatch({
       status: "unchecked",
       teacherBookId: null,
@@ -709,6 +747,7 @@ export default function LiveLessonAddWordPage() {
       setCapturedWords(restored.words ?? []);
       setReviewDrafts((restored.words ?? []).map(wordToDraft));
       setBulkSelectedIds((restored.words ?? []).map((item) => item.id));
+      setLatestStoppingPoint(restored.latestStoppingPoint ?? null);
       setSessionReady(true);
       window.setTimeout(() => wordInputRef.current?.focus(), 0);
     } catch (error: any) {
@@ -858,7 +897,32 @@ export default function LiveLessonAddWordPage() {
     setNotice(`Applied location to ${bulkSelectedIds.length} item${bulkSelectedIds.length === 1 ? "" : "s"}.`);
   }
 
-  async function transitionSession(action: "end-adding" | "review-later" | "finish-review") {
+  function openStoppingPointPrompt() {
+    if (!session) {
+      setMessage("Add at least one word before ending this Live Lesson session.");
+      return;
+    }
+
+    if (capturedWords.length === 0) {
+      setMessage("Add at least one word before ending this Live Lesson session.");
+      return;
+    }
+
+    setMessage("");
+    setNotice("");
+    setStoppingPageDraft(currentPage);
+    setStoppingTextDraft("");
+    setCheckpointOpen(true);
+  }
+
+  async function transitionSession(
+    action: "end-adding" | "review-later" | "finish-review",
+    checkpoint?: {
+      saveStoppingPoint?: boolean;
+      stoppingPageNumber?: string;
+      stoppingText?: string;
+    }
+  ) {
     if (!session) {
       setMessage("Add at least one word before ending this Live Lesson session.");
       return;
@@ -887,6 +951,7 @@ export default function LiveLessonAddWordPage() {
           userBookId,
           sessionId: session.id,
           words: reviewDrafts,
+          ...(checkpoint ?? {}),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -900,6 +965,23 @@ export default function LiveLessonAddWordPage() {
       setCapturedWords(nextWords);
       setReviewDrafts(nextWords.map(wordToDraft));
       setBulkSelectedIds(nextWords.map((item) => item.id));
+      if (data.latestStoppingPoint !== undefined) {
+        setLatestStoppingPoint(data.latestStoppingPoint ?? null);
+      } else if (action === "end-adding" && checkpoint?.saveStoppingPoint) {
+        const cleanStoppingPage = checkpoint.stoppingPageNumber?.trim() ?? "";
+        setLatestStoppingPoint({
+          sessionId: nextSession.id,
+          pageNumber: cleanStoppingPage && Number.isInteger(Number(cleanStoppingPage))
+            ? Number(cleanStoppingPage)
+            : null,
+          endingText: checkpoint.stoppingText?.trim() || null,
+          savedAt: nextSession.stopping_point_saved_at,
+          status: nextSession.status,
+        });
+      }
+      if (action === "end-adding") {
+        setCheckpointOpen(false);
+      }
 
       if (key && action !== "end-adding") {
         clearPersistedSession(key);
@@ -1042,8 +1124,8 @@ export default function LiveLessonAddWordPage() {
             {!isReviewStage ? (
               <button
                 type="button"
-                onClick={() => void transitionSession("end-adding")}
-                disabled={reviewSaving || capturedWords.length === 0}
+                onClick={openStoppingPointPrompt}
+                disabled={reviewSaving || checkpointOpen || capturedWords.length === 0}
                 className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 shadow-sm hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {reviewSaving ? "Opening review..." : "End Adding Words"}
@@ -1105,6 +1187,37 @@ export default function LiveLessonAddWordPage() {
           </div>
         ) : null}
 
+        {latestStoppingPoint && !checkpointOpen ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+            {latestStoppingPoint.pageNumber != null && latestStoppingPoint.endingText ? (
+              <>
+                <span className="font-black">
+                  Last lesson ended on page {latestStoppingPoint.pageNumber} at:
+                </span>
+                <span className="mt-1 block text-stone-800">
+                  「{latestStoppingPoint.endingText}」
+                </span>
+              </>
+            ) : latestStoppingPoint.pageNumber != null ? (
+              <span className="font-black">
+                Last lesson ended on page {latestStoppingPoint.pageNumber}.
+              </span>
+            ) : latestStoppingPoint.endingText ? (
+              <>
+                <span className="font-black">Last lesson ended at:</span>
+                <span className="mt-1 block text-stone-800">
+                  「{latestStoppingPoint.endingText}」
+                </span>
+              </>
+            ) : null}
+            {formatShortDateTime(latestStoppingPoint.savedAt) ? (
+              <span className="mt-1 block text-xs font-semibold text-amber-800">
+                Saved {formatShortDateTime(latestStoppingPoint.savedAt)}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
         {message ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-800">
             {message}
@@ -1115,6 +1228,97 @@ export default function LiveLessonAddWordPage() {
           <div className="rounded-2xl border border-stone-200 bg-white p-4 text-sm leading-6 text-stone-700 shadow-sm">
             {notice}
           </div>
+        ) : null}
+
+        {checkpointOpen && !isReviewStage ? (
+          <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">
+                  End of Lesson
+                </p>
+                <h2 className="mt-1 text-xl font-black text-stone-950">
+                  Where did you stop today?
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-stone-600">
+                  Save a quick checkpoint for next time, or skip and go straight to review.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (reviewSaving) return;
+                  setCheckpointOpen(false);
+                  setMessage("");
+                  window.setTimeout(() => wordInputRef.current?.focus({ preventScroll: true }), 0);
+                }}
+                disabled={reviewSaving}
+                className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 shadow-sm hover:bg-amber-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-[160px_1fr]">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-amber-900">
+                  Page
+                </span>
+                <input
+                  type="number"
+                  value={stoppingPageDraft}
+                  onChange={(event) => setStoppingPageDraft(event.target.value)}
+                  disabled={reviewSaving}
+                  placeholder="Optional"
+                  className="w-full rounded-xl border border-amber-200 bg-white px-3 py-3 text-base font-semibold text-stone-950 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100 disabled:bg-stone-100"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-amber-900">
+                  Ending text
+                </span>
+                <input
+                  value={stoppingTextDraft}
+                  onChange={(event) => setStoppingTextDraft(event.target.value.slice(0, 500))}
+                  disabled={reviewSaving}
+                  maxLength={500}
+                  placeholder="Optional short phrase from where the lesson ended"
+                  className="w-full rounded-xl border border-amber-200 bg-white px-3 py-3 text-base text-stone-950 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100 disabled:bg-stone-100"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  void transitionSession("end-adding", {
+                    saveStoppingPoint: true,
+                    stoppingPageNumber: stoppingPageDraft,
+                    stoppingText: stoppingTextDraft,
+                  })
+                }
+                disabled={reviewSaving || !canSaveStoppingPoint}
+                className="rounded-xl bg-stone-950 px-4 py-2 text-sm font-black text-white shadow-sm hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reviewSaving ? "Saving..." : "Save stopping point"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void transitionSession("end-adding")}
+                disabled={reviewSaving}
+                className="rounded-xl border border-amber-200 bg-white px-4 py-2 text-sm font-bold text-stone-700 shadow-sm hover:bg-amber-100 disabled:opacity-50"
+              >
+                Skip
+              </button>
+              {!canSaveStoppingPoint ? (
+                <span className="text-xs font-semibold text-amber-800">
+                  Add a page or ending text, or skip.
+                </span>
+              ) : null}
+            </div>
+          </section>
         ) : null}
 
         {!isReviewStage ? (

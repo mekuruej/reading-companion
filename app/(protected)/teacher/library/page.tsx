@@ -1,7 +1,8 @@
 // Teacher Library
 //
-// Teacher-only lesson prep shelf. Each Teacher Book links to a user_books row
-// for personal library/study history, while prep content stays in teacher_book_items.
+// Teacher-use working view. Each Teacher Book links to a teacher-owned
+// user_books row for personal library/study history, while prep content stays
+// in teacher_book_items.
 
 "use client";
 
@@ -166,6 +167,7 @@ export default function TeacherLibraryPage() {
         `
         )
         .eq("teacher_id", user.id)
+        .or("teacher_use_status.is.null,teacher_use_status.neq.do_not_use")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -251,12 +253,13 @@ export default function TeacherLibraryPage() {
             teacher_id: teacherId,
             book_id: bookId,
             user_book_id: linkedUserBookId,
+            teacher_use_status: "want_to_test",
           },
           { onConflict: "teacher_id,book_id" }
         );
 
       if (error) throw error;
-      setMessage("Book added to Teacher Library.");
+      setMessage("Book marked for teaching. It remains in My Library for your reader history.");
       setBookSearch("");
       setSearchResults([]);
       await loadTeacherLibrary();
@@ -287,7 +290,7 @@ export default function TeacherLibraryPage() {
           Teacher Books
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-          Manage the books you read and prepare for lessons. Progress and study history will count toward My Mekuru Library, while teaching prep stays in the Teacher Workspace.
+          Mark books from My Library for teaching. Progress, saved words, and reader history stay in My Library; teaching prep stays in the Teacher Workspace.
         </p>
       </section>
 
@@ -308,9 +311,9 @@ export default function TeacherLibraryPage() {
       ) : (
         <>
           <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-black text-stone-900">Add a teaching book</h2>
+            <h2 className="text-xl font-black text-stone-900">Use a book for teaching</h2>
             <p className="mt-1 text-sm text-stone-500">
-              Search the shared catalog and add a book to your teacher-only prep shelf.
+              Search the shared catalog. If the book is not already in My Library, Mekuru adds it there first, then marks it for teacher use.
             </p>
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -371,10 +374,10 @@ export default function TeacherLibraryPage() {
                         className="self-center rounded-2xl border border-stone-900 bg-white px-4 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {alreadyAdded
-                          ? "Added"
+                          ? "Marked for Teaching"
                           : addingBookId === book.id
                             ? "Adding..."
-                            : "Add"}
+                            : "Use for Teaching"}
                       </button>
                     </div>
                   );
@@ -385,9 +388,9 @@ export default function TeacherLibraryPage() {
 
           <section className="mt-6">
             <div className="mb-3">
-              <h2 className="text-xl font-black text-stone-900">My Teacher Books</h2>
+              <h2 className="text-xl font-black text-stone-900">Books Marked for Teaching</h2>
               <p className="mt-1 text-sm text-stone-500">
-                Open a book to continue reading, study vocabulary, or prepare teaching support.
+                Open a teaching workspace. These books also remain in My Library as your reader books.
               </p>
             </div>
 

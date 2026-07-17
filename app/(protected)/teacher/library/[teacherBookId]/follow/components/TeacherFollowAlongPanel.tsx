@@ -228,6 +228,7 @@ export function TeacherFollowAlongPanel({
   const [message, setMessage] = useState("");
   const [teacherBook, setTeacherBook] = useState<TeacherBookRow | null>(null);
   const [items, setItems] = useState<TeacherFollowAlongItem[]>([]);
+  const [missingReaderLink, setMissingReaderLink] = useState(false);
   const [supportMode, setSupportMode] = useState<SupportMode>("full");
   const [pageIndex, setPageIndex] = useState(0);
   const [jumpPageInput, setJumpPageInput] = useState("");
@@ -240,6 +241,7 @@ export function TeacherFollowAlongPanel({
   async function loadFollowAlong() {
     setLoading(true);
     setMessage("");
+    setMissingReaderLink(false);
 
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -315,6 +317,8 @@ export function TeacherFollowAlongPanel({
         readerVocabItems = ((wordRows ?? []) as ReaderVocabWord[])
           .filter(hasUsefulReaderVocabSupport)
           .map(readerWordToFollowAlongItem);
+      } else {
+        setMissingReaderLink(true);
       }
 
       const { data: itemRows, error: itemsError } = await supabase
@@ -546,6 +550,18 @@ export function TeacherFollowAlongPanel({
       {isEmbedded ? null : (
         <TeacherFollowAlongBookBar teacherBookId={teacherBookId} book={book} />
       )}
+
+      {missingReaderLink ? (
+        <div
+          className={
+            isEmbedded
+              ? "rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900"
+              : "rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900"
+          }
+        >
+          Reader vocabulary is unavailable because this Teacher Book is not linked to a proven My Library copy. Run the teacher-book reader-link diagnostic and repair with the existing link migration before using reader words here.
+        </div>
+      ) : null}
 
       <ReadAlongSupportModeTabs
         supportMode={supportMode}

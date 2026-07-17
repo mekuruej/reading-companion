@@ -7,7 +7,7 @@ type AddBookActionRowProps = {
 
 export default function AddBookActionRow({
   addLoading,
-  addLabel = "Add to my library",
+  addLabel = "Add to My Library",
   onAdd,
   onCancel,
 }: AddBookActionRowProps) {

@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -206,6 +207,9 @@ export default function TeacherReadingSnapshotPage() {
       finished: 0,
       stopped: 0,
     });
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [canMarkForTeaching, setCanMarkForTeaching] = useState(false);
+  const [markingForTeaching, setMarkingForTeaching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -219,6 +223,8 @@ export default function TeacherReadingSnapshotPage() {
       setMessage("");
       setRow(null);
       setTeacherBook(null);
+      setCurrentUserId(null);
+      setCanMarkForTeaching(false);
       setSessions([]);
       setVocabCount(null);
       setCommunitySignals([]);
@@ -238,6 +244,8 @@ export default function TeacherReadingSnapshotPage() {
         setLoading(false);
         return;
       }
+
+      setCurrentUserId(user.id);
 
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
@@ -290,6 +298,12 @@ export default function TeacherReadingSnapshotPage() {
       const loadedRow = userBookData as unknown as UserBook;
       const superTeacher = isSuperTeacher(profile);
       let allowed = loadedRow.user_id === user.id || superTeacher;
+      const teacherCanUseOwnReaderBook =
+        loadedRow.user_id === user.id &&
+        (profile?.role === "teacher" ||
+          profile?.role === "super_teacher" ||
+          profile?.is_super_teacher === true ||
+          profile?.is_super_teacher === "true");
 
       if (!allowed && profile?.role === "teacher" && loadedRow.user_id) {
         const { data: teacherStudent, error: teacherStudentError } = await supabase
@@ -319,6 +333,7 @@ export default function TeacherReadingSnapshotPage() {
       setCanAccess(true);
       setAccessChecked(true);
       setRow(loadedRow);
+      setCanMarkForTeaching(teacherCanUseOwnReaderBook);
 
       const [
         teacherBookResult,
@@ -447,6 +462,41 @@ export default function TeacherReadingSnapshotPage() {
       cancelled = true;
     };
   }, [userBookId]);
+
+  async function markReaderBookForTeaching() {
+    if (!row || !currentUserId || !canMarkForTeaching) return;
+
+    setMarkingForTeaching(true);
+    setMessage("");
+
+    try {
+      const { data, error } = await supabase
+        .from("teacher_books")
+        .upsert(
+          {
+            teacher_id: currentUserId,
+            book_id: row.book_id,
+            user_book_id: row.id,
+            teacher_use_status: "want_to_test",
+          },
+          { onConflict: "teacher_id,book_id" }
+        )
+        .select("id, user_book_id, teacher_use_status, teacher_use_note")
+        .single();
+
+      if (error) throw error;
+
+      setTeacherBook((data as TeacherBook) ?? null);
+      setMessage(
+        "This reader book is now marked for teaching. Your reader history and vocabulary stayed in My Library."
+      );
+    } catch (error: any) {
+      console.error("Error marking reader book for teaching:", error);
+      setMessage(error?.message ?? "Could not mark this book for teaching.");
+    } finally {
+      setMarkingForTeaching(false);
+    }
+  }
 
   const book = row?.books ?? null;
   const realSessions = useMemo(
@@ -589,32 +639,43 @@ export default function TeacherReadingSnapshotPage() {
     .filter((item): item is TeacherSnapshotCommunityAdvice => Boolean(item.text))
     .slice(0, 3);
 
-  const teacherBookId = teacherBook?.id ?? null;
-  const teacherActions: TeacherSnapshotAction[] = [
-    {
-      label: "Open Teacher Book Workspace",
-      href: teacherBookId ? `/teacher/library/${teacherBookId}/book-workspace` : "#",
-      disabled: !teacherBookId,
-    },
-    {
-      label: "Open Teacher Follow-Along",
-      href: teacherBookId ? `/teacher/library/${teacherBookId}/follow` : "#",
-      disabled: !teacherBookId,
-    },
-    {
-      label: "Open Teaching Prep",
-      href: teacherBookId ? `/teacher/library/${teacherBookId}` : "#",
-      disabled: !teacherBookId,
-    },
-  ];
+  const activeTeacherBook =
+    teacherBook?.teacher_use_status === "do_not_use" ? null : teacherBook;
+  const teacherBookId = activeTeacherBook?.id ?? null;
+  const primaryAction: TeacherSnapshotAction | null = teacherBookId
+    ? {
+      label: "Open Teacher Workspace",
+      href: `/teacher/library/${teacherBookId}/book-workspace`,
+    }
+    : canMarkForTeaching
+      ? {
+        label: markingForTeaching ? "Marking for Teaching..." : "Use for Teaching",
+        href: "#",
+        disabled: markingForTeaching,
+        buttonTone: "primary" as const,
+        onClick: markReaderBookForTeaching,
+      }
+      : null;
+  const teacherActions: TeacherSnapshotAction[] = teacherBookId
+    ? [
+      {
+        label: "Teacher Follow-Along",
+        href: `/teacher/library/${teacherBookId}/follow`,
+      },
+      {
+        label: "Teaching Prep",
+        href: `/teacher/library/${teacherBookId}`,
+      },
+    ]
+    : [];
   const readerActions: TeacherSnapshotAction[] = [
-    { label: "Open Reader Book Hub", href: `/books/${userBookId}` },
-    { label: "Open Book Stats", href: `/books/${userBookId}/stats` },
-    { label: "Open My Reader Vocab", href: `/books/${userBookId}/words` },
-    { label: "Open Study Flashcards", href: `/books/${userBookId}/study` },
-    { label: "Open Saved Word Reading", href: `/books/${userBookId}/readalong` },
+    { label: "Add Word", href: `/books/${userBookId}/add-word` },
+    { label: "Book Stats", href: `/books/${userBookId}/stats` },
+    { label: "Reader Vocab", href: `/books/${userBookId}/words` },
+    { label: "Flashcards", href: `/books/${userBookId}/study` },
+    { label: "Saved Word Reading", href: `/books/${userBookId}/readalong` },
     {
-      label: "Open Curiosity Reading",
+      label: "Curiosity Reading",
       href: `/books/${userBookId}/curiosity-reading`,
     },
   ];
@@ -641,36 +702,43 @@ export default function TeacherReadingSnapshotPage() {
 
   return (
     <TeacherSnapshotShell>
+      <Link
+        href={`/books/${userBookId}`}
+        className="inline-flex w-fit text-sm font-bold text-stone-600 transition hover:text-stone-950"
+      >
+        ← Back to Reader Book Hub
+      </Link>
+
       <TeacherSnapshotHeader
         title={book?.title || "Untitled book"}
         author={book?.author ?? null}
         coverUrl={book?.cover_url ?? null}
-        readerBookHref={`/books/${userBookId}`}
+        statusLabel={
+          activeTeacherBook
+            ? teacherUseStatusLabel(activeTeacherBook.teacher_use_status)
+            : null
+        }
       />
 
-      <TeacherSnapshotSection
-        title="My Progress"
-        description="Your own reader history for this book, with listening time included in total time."
-      >
-        <TeacherSnapshotStatGrid stats={progressStats} />
-      </TeacherSnapshotSection>
+      {message ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900 shadow-sm">
+          {message}
+        </div>
+      ) : null}
 
       <TeacherSnapshotSection
-        title="Teaching Fit"
-        description="Teacher-side use status, note, and the existing recommended level for this reader copy."
+        title="Actions"
       >
-        <TeacherSnapshotTeachingFit
-          statusLabel={teacherUseStatusLabel(teacherBook?.teacher_use_status)}
-          note={teacherBook?.teacher_use_note ?? null}
-          recommendedLevel={row.recommended_level}
-          recommendedLevelDescription={readerLevelDescription(row.recommended_level)}
-          hasTeacherBook={Boolean(teacherBook)}
+        <TeacherSnapshotActions
+          primaryAction={primaryAction}
+          teacherActions={teacherActions}
+          readerActions={readerActions}
         />
       </TeacherSnapshotSection>
 
       <TeacherSnapshotSection
-        title="Community Reader Fit"
-        description="Based on anonymous reader-fit signals from readers who shared recommendations."
+        title="Community Fit"
+        description="Anonymous reader-fit signals shared by readers."
       >
         <TeacherSnapshotCommunityFit
           stats={communityFitStats}
@@ -680,17 +748,30 @@ export default function TeacherReadingSnapshotPage() {
       </TeacherSnapshotSection>
 
       <TeacherSnapshotSection
+        title="Teaching Fit"
+        description="Teacher-side use status, note, and the existing recommended level for this reader copy."
+      >
+        <TeacherSnapshotTeachingFit
+          statusLabel={teacherUseStatusLabel(activeTeacherBook?.teacher_use_status)}
+          note={activeTeacherBook?.teacher_use_note ?? null}
+          recommendedLevel={row.recommended_level}
+          recommendedLevelDescription={readerLevelDescription(row.recommended_level)}
+          hasTeacherBook={Boolean(activeTeacherBook)}
+        />
+      </TeacherSnapshotSection>
+
+      <TeacherSnapshotSection
+        title="My Progress"
+        description="Your own reader history for this book, with listening time included in total time."
+      >
+        <TeacherSnapshotStatGrid stats={progressStats} compact />
+      </TeacherSnapshotSection>
+
+      <TeacherSnapshotSection
         title="Student Progress"
         description="Linked students with their own copy of this same book."
       >
         <TeacherSnapshotStudentProgress summary={studentSummary} />
-      </TeacherSnapshotSection>
-
-      <TeacherSnapshotSection title="Actions">
-        <TeacherSnapshotActions
-          teacherActions={teacherActions}
-          readerActions={readerActions}
-        />
       </TeacherSnapshotSection>
     </TeacherSnapshotShell>
   );
