@@ -27,9 +27,6 @@ import {
 } from "./components/LibraryStatusBanners";
 import {
   formatRelativeDate,
-  getMonthOptions,
-  getMonthRange,
-  ymdInTimeZone,
   abilityCheckReminderHiddenToday,
   abilityCheckReminderUnlocked,
   getTodayKey,
@@ -39,9 +36,7 @@ import {
   pendingBookRequestsAlertHidden,
   pendingBookRequestsSignature,
   unlockAbilityCheckReminder,
-  dateFromYmd,
   isListeningFormat,
-  ymdToDayNumber,
 } from "./helpers";
 import {
   isAbilityCheckClaimInDailyPool,
@@ -127,15 +122,6 @@ type ReadingSessionStats = {
   lastEngagedAt: string | null; // ✅ NEW
 };
 
-type MonthlyLibraryStats = {
-  pagesRead: number;
-  daysRead: number;
-  totalTimeMinutes: number;
-  totalWordsLookedUp: number;
-  currentRunDays: number;
-  longestRunDays: number;
-};
-
 type LibrarySortMode =
   | "status"
   | "title"
@@ -171,7 +157,6 @@ export default function BooksPage() {
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
-  const [myTimeZone, setMyTimeZone] = useState("Asia/Tokyo");
 
   const [bookRequests, setBookRequests] = useState<any[]>([]);
   const [dismissedPendingBookRequestsSignature, setDismissedPendingBookRequestsSignature] =
@@ -204,20 +189,6 @@ export default function BooksPage() {
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<LibrarySortMode>("status");
 
-  const [selectedMonth] = useState<string>(
-    getMonthOptions(12)[0]?.value ?? ""
-  );
-
-  const [monthlyStats, setMonthlyStats] = useState<MonthlyLibraryStats>({
-    pagesRead: 0,
-    daysRead: 0,
-    totalTimeMinutes: 0,
-    totalWordsLookedUp: 0,
-    currentRunDays: 0,
-    longestRunDays: 0,
-  });
-
-  const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(false);
   const [abilityCheckReminderEnabled, setAbilityCheckReminderEnabled] = useState(true);
   const [abilityCheckReminderCount, setAbilityCheckReminderCount] = useState(0);
   const [abilityCheckReminderLoading, setAbilityCheckReminderLoading] = useState(false);
@@ -241,174 +212,6 @@ export default function BooksPage() {
   const libraryContextLabel = isViewingStudentLibrary
     ? `Student Library · ${viewingLabel}`
     : null;
-
-  async function loadMonthlyLibraryStats(
-    userId: string,
-    monthValue: string,
-    timeZone = "Asia/Tokyo"
-  ) {
-    setMonthlyStatsLoading(true);
-
-    try {
-      const { startStr, endStr } = getMonthRange(monthValue);
-
-      const { data: allUserBooksRows, error: userBooksErr } = await supabase
-        .from("user_books")
-        .select(`
-        id,
-        finished_at,
-        dnf_at,
-        books:book_id (
-          title,
-          book_type
-        )
-      `)
-        .eq("user_id", userId);
-
-      if (userBooksErr) {
-        console.error("Error loading user_books for monthly stats:", userBooksErr);
-        setMonthlyStats({
-          pagesRead: 0,
-          daysRead: 0,
-          totalTimeMinutes: 0,
-          totalWordsLookedUp: 0,
-          currentRunDays: 0,
-          longestRunDays: 0,
-        });
-        return;
-      }
-
-      const userBookIds = (allUserBooksRows ?? []).map((r: any) => r.id).filter(Boolean);
-
-      if (userBookIds.length === 0) {
-        setMonthlyStats({
-          pagesRead: 0,
-          daysRead: 0,
-          totalTimeMinutes: 0,
-          totalWordsLookedUp: 0,
-          currentRunDays: 0,
-          longestRunDays: 0,
-        });
-        return;
-      }
-
-      const [
-        { data: sessionRows, error: sessionErr },
-        { data: wordRows, error: wordErr },
-      ] = await Promise.all([
-        supabase
-          .from("user_book_reading_sessions")
-          .select("user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler")
-          .in("user_book_id", userBookIds)
-          .gte("read_on", startStr)
-          .lt("read_on", endStr),
-
-        supabase
-          .from("user_book_words")
-          .select("user_book_id, created_at, surface, meaning")
-          .in("user_book_id", userBookIds)
-          .gte("created_at", `${startStr}T00:00:00`)
-          .lt("created_at", `${endStr}T00:00:00`),
-      ]);
-
-      if (sessionErr) {
-        console.error("Error loading reading sessions for monthly stats:", sessionErr);
-      }
-
-      if (wordErr) {
-        console.error("Error loading words for monthly stats:", wordErr);
-      }
-
-      const sessions = ((sessionRows ?? []) as any[]).filter((s) => !s.is_filler);
-      const words = wordRows ?? [];
-
-      const uniqueWordSet = new Set<string>();
-      const engagedDays = new Set<string>();
-
-      for (const w of words as any[]) {
-        const surface = (w.surface ?? "").trim();
-        const meaning = (w.meaning ?? "").trim();
-        if (!surface && !meaning) continue;
-
-        uniqueWordSet.add(`${surface}|||${meaning}`);
-        const createdAt = (w.created_at as string | null) ?? "";
-        if (createdAt) {
-          const localCreatedDay = ymdInTimeZone(createdAt, timeZone);
-          if (localCreatedDay) {
-            engagedDays.add(localCreatedDay);
-          }
-        }
-      }
-
-      const totalWordsLookedUp = uniqueWordSet.size;
-
-      let pagesRead = 0;
-      let totalTimeMinutes = 0;
-
-      for (const s of sessions as any[]) {
-        if (s.read_on) engagedDays.add(s.read_on);
-
-        const startPage = Number(s.start_page);
-        const endPage = Number(s.end_page);
-        const minutes = s.minutes_read == null ? null : Number(s.minutes_read);
-
-        if (minutes != null && Number.isFinite(minutes) && minutes > 0) {
-          totalTimeMinutes += minutes;
-        }
-
-        if (Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage) {
-          pagesRead += endPage - startPage + 1;
-        }
-      }
-
-      const sortedEngagedDays = Array.from(engagedDays).sort((a, b) =>
-        a.localeCompare(b)
-      );
-
-      let longestRunDays = 0;
-      let runBeingCounted = 0;
-      let previousDayValue: number | null = null;
-
-      for (const day of sortedEngagedDays) {
-        const dayValue = ymdToDayNumber(day);
-
-        if (previousDayValue != null && dayValue === previousDayValue + 1) {
-          runBeingCounted += 1;
-        } else {
-          runBeingCounted = 1;
-        }
-
-        if (runBeingCounted > longestRunDays) {
-          longestRunDays = runBeingCounted;
-        }
-
-        previousDayValue = dayValue;
-      }
-
-      let currentRunDays = 0;
-      const todayInTimeZone = ymdInTimeZone(new Date(), timeZone);
-
-      if (todayInTimeZone) {
-        let cursor = ymdToDayNumber(todayInTimeZone);
-
-        while (engagedDays.has(new Date(cursor * 86400000).toISOString().slice(0, 10))) {
-          currentRunDays += 1;
-          cursor -= 1;
-        }
-      }
-
-      setMonthlyStats({
-        pagesRead,
-        daysRead: engagedDays.size,
-        totalTimeMinutes,
-        totalWordsLookedUp,
-        currentRunDays,
-        longestRunDays,
-      });
-    } finally {
-      setMonthlyStatsLoading(false);
-    }
-  }
 
   async function loadAbilityCheckReminder(userId: string) {
     setAbilityCheckReminderLoading(true);
@@ -1201,8 +1004,6 @@ export default function BooksPage() {
 
       if (cancelled) return;
 
-      setMyTimeZone((meProfile as any)?.time_zone || "Asia/Tokyo");
-
       const role = (meProfile?.role as ProfileRole | null) ?? "member";
       const superTeacherFlag = Boolean((meProfile as any)?.is_super_teacher);
 
@@ -1351,16 +1152,6 @@ export default function BooksPage() {
       createdBy: isViewingStudentLibrary ? meId : null,
     });
   }, [viewingUserId, meId, isTeacher]);
-
-  useEffect(() => {
-    if (!viewingUserId || !meId || !selectedMonth) return;
-
-    // Regular members should only load their own private monthly stats.
-    // Teachers can load the viewed learner's stats when RLS allows it.
-    const targetUserId = isTeacher ? viewingUserId : meId;
-
-    loadMonthlyLibraryStats(targetUserId, selectedMonth, myTimeZone);
-  }, [viewingUserId, meId, isTeacher, selectedMonth, myTimeZone]);
 
   useEffect(() => {
     const hiddenToday = abilityCheckReminderHiddenToday();
