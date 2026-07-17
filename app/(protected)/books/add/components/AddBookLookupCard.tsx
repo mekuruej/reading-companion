@@ -5,6 +5,7 @@ type AddBookLookupCardProps = {
     lookupLoading: boolean;
     lookupDisabled?: boolean;
     libraryLabel?: string;
+    languageLabel?: string;
     onIsbnChange: (value: string) => void;
     onLookup: () => void;
     children?: ReactNode;
@@ -15,6 +16,7 @@ export default function AddBookLookupCard({
     lookupLoading,
     lookupDisabled = false,
     libraryLabel = "your library",
+    languageLabel,
     onIsbnChange,
     onLookup,
     children,
@@ -26,7 +28,7 @@ export default function AddBookLookupCard({
             </p>
 
             <h1 className="mt-2 text-2xl font-black text-stone-950">
-                Add a Japanese book by ISBN-13
+                Add {languageLabel ? `a ${languageLabel} book` : "a book"} by ISBN-13
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-stone-600">

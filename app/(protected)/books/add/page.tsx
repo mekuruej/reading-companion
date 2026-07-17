@@ -38,6 +38,7 @@ type LookupBook = {
     needs_review?: boolean;
     found_existing_book?: boolean;
     existing_book_id?: string | null;
+    language_code?: string | null;
 };
 
 type BookSearchResult = {
@@ -54,7 +55,27 @@ type BookSearchResult = {
     allow_missing_publisher?: boolean | null;
     missing_info_cleared_at?: string | null;
     needs_review?: boolean | null;
+    language_code?: string | null;
 };
+
+function normalizeLanguageCode(value: string | null | undefined) {
+    const normalized = (value ?? "").trim().toLowerCase();
+    if (!normalized) return null;
+    if (normalized === "ja" || normalized === "japanese" || normalized === "日本語") return "ja";
+    if (normalized === "en" || normalized === "english" || normalized === "英語") return "en";
+    return null;
+}
+
+function languageLabel(value: string | null | undefined) {
+    const code = normalizeLanguageCode(value);
+    if (code === "ja") return "Japanese";
+    if (code === "en") return "English";
+    return "";
+}
+
+function isSuperTeacherFlag(value: unknown) {
+    return value === true || value === "true";
+}
 
 function getDisplayAuthor(book: LookupBook) {
     return (
@@ -106,6 +127,9 @@ export default function AddBookPage() {
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+    const [currentRole, setCurrentRole] = useState<string | null>(null);
+    const [currentIsSuperTeacher, setCurrentIsSuperTeacher] = useState(false);
+    const [currentTargetLanguage, setCurrentTargetLanguage] = useState<string | null>(null);
     const [targetUsername, setTargetUsername] = useState<string | null>(null);
     const [targetDisplayName, setTargetDisplayName] = useState<string | null>(null);
     const [lookupLoading, setLookupLoading] = useState(false);
@@ -140,13 +164,16 @@ export default function AddBookPage() {
 
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("id, username")
+                .select("id, username, role, is_super_teacher, target_language")
                 .eq("id", user.id)
                 .maybeSingle();
 
             if (!alive) return;
 
             setCurrentUsername((profile as any)?.username ?? null);
+            setCurrentRole((profile as any)?.role ?? null);
+            setCurrentIsSuperTeacher(isSuperTeacherFlag((profile as any)?.is_super_teacher));
+            setCurrentTargetLanguage((profile as any)?.target_language ?? null);
         }
 
         void loadCurrentUser();
@@ -214,6 +241,16 @@ export default function AddBookPage() {
         : currentUsername
         ? `/users/${currentUsername}/books`
         : "/books";
+    const isTeacherFacingUser = currentRole === "teacher" || currentRole === "super_teacher" || currentIsSuperTeacher;
+    const learnerTargetLanguageCode = normalizeLanguageCode(currentTargetLanguage);
+    const learnerTargetLanguageLabel = languageLabel(currentTargetLanguage);
+    const learnerLanguageMissing = !isTeacherFacingUser && !learnerTargetLanguageCode;
+
+    function isMismatchedForLearner(languageCode: string | null | undefined) {
+        if (isTeacherFacingUser) return false;
+        if (!learnerTargetLanguageCode) return true;
+        return normalizeLanguageCode(languageCode) !== learnerTargetLanguageCode;
+    }
 
     async function handleLookup() {
         setError("");
@@ -381,6 +418,7 @@ export default function AddBookPage() {
                     isbn13: book.isbn13,
                     mode: "add_to_library",
                     targetUserId: targetLibraryUserId,
+                    intendedLanguageCode: learnerTargetLanguageCode,
                 }),
             });
 
@@ -442,6 +480,7 @@ export default function AddBookPage() {
                 body: JSON.stringify({
                     bookId,
                     targetUserId: targetLibraryUserId,
+                    intendedLanguageCode: learnerTargetLanguageCode,
                 }),
             });
 
@@ -554,6 +593,7 @@ export default function AddBookPage() {
                         mode: "add_to_library",
                         targetUserId: targetLibraryUserId,
                         allowPendingPlaceholder: true,
+                        intendedLanguageCode: learnerTargetLanguageCode,
                     }),
                 });
 
@@ -594,6 +634,8 @@ export default function AddBookPage() {
     const displayAuthor = book ? getDisplayAuthor(book) : "";
     const publishedDate = book ? getPublishedDate(book) : null;
     const pageCount = book ? getPageCount(book) : null;
+    const previewLanguageMismatch =
+        !!book?.found_existing_book && isMismatchedForLearner(book.language_code);
     const isNewToMekuru =
         !!book &&
         book.found_existing_book !== true &&
@@ -608,11 +650,40 @@ export default function AddBookPage() {
 
     return (
         <main className="mx-auto max-w-3xl px-4 py-8">
+            {!isTeacherFacingUser ? (
+                <section className="mb-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                        Current learning language
+                    </p>
+                    {learnerTargetLanguageCode ? (
+                        <p className="mt-2 text-sm leading-6 text-stone-700">
+                            You can add books in{" "}
+                            <span className="font-black text-stone-950">
+                                {learnerTargetLanguageLabel}
+                            </span>
+                            . Books in another language need a teacher or super-teacher to add them.
+                        </p>
+                    ) : (
+                        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                            Please set your learning language before adding books. You can update it in{" "}
+                            <a
+                                href="/community/profile/settings"
+                                className="font-black underline underline-offset-2"
+                            >
+                                Profile Settings
+                            </a>
+                            .
+                        </div>
+                    )}
+                </section>
+            ) : null}
+
             <AddBookLookupCard
                 isbn={isbn}
                 lookupLoading={lookupLoading}
-                lookupDisabled={!isbn.trim()}
+                lookupDisabled={!isbn.trim() || learnerLanguageMissing}
                 libraryLabel={targetLibraryLabel}
+                languageLabel={isTeacherFacingUser ? undefined : learnerTargetLanguageLabel}
                 onIsbnChange={(value) => {
                     setIsbn(value);
                     setLibraryNotice(null);
@@ -668,7 +739,7 @@ export default function AddBookPage() {
                     <button
                         type="button"
                         onClick={() => void handleBookSearch()}
-                        disabled={bookSearchLoading || !bookSearch.trim()}
+                        disabled={bookSearchLoading || !bookSearch.trim() || learnerLanguageMissing}
                         className="rounded-2xl bg-stone-900 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
                     >
                         {bookSearchLoading ? "Searching..." : "Search"}
@@ -697,6 +768,8 @@ export default function AddBookPage() {
                         {bookSearchResults.map((result) => {
                             const missingFields = missingGlobalBookFields(result);
                             const canAddExisting = isBookCompleteEnoughToAdd(result);
+                            const languageMismatch = isMismatchedForLearner(result.language_code);
+                            const canAddThisExistingBook = canAddExisting && !languageMismatch;
 
                             return (
                                 <div
@@ -742,7 +815,17 @@ export default function AddBookPage() {
                                                     Needs review
                                                 </span>
                                             )}
+                                            {languageMismatch ? (
+                                                <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-red-700">
+                                                    Different language
+                                                </span>
+                                            ) : null}
                                         </div>
+                                        {languageMismatch ? (
+                                            <p className="mt-2 text-xs leading-5 text-red-700">
+                                                This book is not in your current learning language.
+                                            </p>
+                                        ) : null}
                                         {!canAddExisting ? (
                                             <p className="mt-2 text-xs leading-5 text-amber-800">
                                                 Missing: {missingFields.length > 0 ? missingFields.join(", ") : "review approval"}.
@@ -755,11 +838,13 @@ export default function AddBookPage() {
                                             <button
                                                 type="button"
                                                 onClick={() => void handleAddExistingBook(result.id)}
-                                                disabled={addingExistingBookId === result.id}
+                                                disabled={addingExistingBookId === result.id || !canAddThisExistingBook}
                                                 className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
                                             >
                                                 {addingExistingBookId === result.id
                                                     ? "Adding..."
+                                                    : languageMismatch
+                                                    ? "Wrong language"
                                                     : isStudentDestination
                                                     ? "Add to Student Library"
                                                     : isOtherUserDestination
@@ -800,8 +885,14 @@ export default function AddBookPage() {
                     isNewToMekuru={isNewToMekuru}
                     libraryLabel={targetLibraryLabel}
                 >
+                    {previewLanguageMismatch ? (
+                        <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700">
+                            This book is not in your current learning language.
+                        </p>
+                    ) : null}
                     <AddBookActionRow
                         addLoading={addLoading}
+                        disabled={previewLanguageMismatch || learnerLanguageMissing}
                         addLabel={
                             isStudentDestination
                                 ? "Add to Student Library"

@@ -1,5 +1,6 @@
 type AddBookActionRowProps = {
   addLoading: boolean;
+  disabled?: boolean;
   addLabel?: string;
   onAdd: () => void;
   onCancel: () => void;
@@ -7,6 +8,7 @@ type AddBookActionRowProps = {
 
 export default function AddBookActionRow({
   addLoading,
+  disabled = false,
   addLabel = "Add to My Library",
   onAdd,
   onCancel,
@@ -16,7 +18,7 @@ export default function AddBookActionRow({
       <button
         type="button"
         onClick={onAdd}
-        disabled={addLoading}
+        disabled={addLoading || disabled}
         className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {addLoading ? "Adding..." : addLabel}

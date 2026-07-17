@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
 );
 
 const BOOK_BASE_SELECT =
-  "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count";
+  "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count, language_code";
 const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
 
 function isMissingColumnError(error: any) {
@@ -39,12 +39,65 @@ function isSuperTeacherFlag(value: unknown) {
 async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, role, is_super_teacher")
+    .select("id, role, is_super_teacher, target_language")
     .eq("id", userId)
     .maybeSingle();
 
   if (error) throw error;
-  return data as { id: string; role?: string | null; is_super_teacher?: boolean | string | null } | null;
+  return data as {
+    id: string;
+    role?: string | null;
+    is_super_teacher?: boolean | string | null;
+    target_language?: string | null;
+  } | null;
+}
+
+function isTeacherFacingProfile(
+  profile: { role?: string | null; is_super_teacher?: boolean | string | null } | null
+) {
+  return (
+    profile?.role === "teacher" ||
+    profile?.role === "super_teacher" ||
+    isSuperTeacherFlag(profile?.is_super_teacher)
+  );
+}
+
+function normalizeLanguageCode(value: string | null | undefined) {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "ja" || normalized === "japanese" || normalized === "日本語") {
+    return "ja";
+  }
+  if (normalized === "en" || normalized === "english" || normalized === "英語") {
+    return "en";
+  }
+  return null;
+}
+
+function validateLearnerBookLanguage({
+  actorProfile,
+  bookLanguageCode,
+}: {
+  actorProfile: {
+    role?: string | null;
+    is_super_teacher?: boolean | string | null;
+    target_language?: string | null;
+  } | null;
+  bookLanguageCode: string | null | undefined;
+}) {
+  if (isTeacherFacingProfile(actorProfile)) return null;
+
+  const targetLanguageCode = normalizeLanguageCode(actorProfile?.target_language);
+  if (!targetLanguageCode) {
+    return "Please set your learning language before adding books.";
+  }
+
+  const normalizedBookLanguageCode = normalizeLanguageCode(bookLanguageCode);
+  if (normalizedBookLanguageCode !== targetLanguageCode) {
+    return "This book is not in your current learning language.";
+  }
+
+  return null;
 }
 
 async function canAddToTargetUser({
@@ -156,6 +209,15 @@ export async function POST(request: Request) {
 
   if (!book) {
     return NextResponse.json({ error: "Book not found." }, { status: 404 });
+  }
+
+  const languageError = validateLearnerBookLanguage({
+    actorProfile,
+    bookLanguageCode: (book as any).language_code,
+  });
+
+  if (languageError) {
+    return NextResponse.json({ error: languageError }, { status: 403 });
   }
 
   const missingFields = missingGlobalBookFields(book);

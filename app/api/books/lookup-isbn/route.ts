@@ -21,11 +21,12 @@ type LookupResponse = {
   found_existing_book: boolean;
   existing_book_id: string | null;
   needs_review: boolean;
+  language_code: string | null;
 };
 
 type ExternalMetadata = Omit<
   LookupResponse,
-  "isbn13" | "found_existing_book" | "existing_book_id" | "needs_review"
+  "isbn13" | "found_existing_book" | "existing_book_id" | "needs_review" | "language_code"
 >;
 
 const EMPTY_EXTERNAL_METADATA: ExternalMetadata = {
@@ -100,7 +101,7 @@ async function lookupMekuruBook(isbn13: string): Promise<LookupResponse | null> 
   const { data, error } = await supabaseAdmin
     .from("books")
     .select(
-      "id, title, author, cover_url, publisher, published_date, page_count, isbn13, book_type"
+      "id, title, author, cover_url, publisher, published_date, page_count, isbn13, book_type, language_code"
     )
     .eq("isbn13", isbn13)
     .maybeSingle();
@@ -127,6 +128,7 @@ async function lookupMekuruBook(isbn13: string): Promise<LookupResponse | null> 
     found_existing_book: true,
     existing_book_id: cleanString(data.id),
     needs_review: false,
+    language_code: cleanString(data.language_code),
   };
 }
 
@@ -229,6 +231,7 @@ function responseFromExternal(isbn13: string, metadata: ExternalMetadata): Looku
     found_existing_book: false,
     existing_book_id: null,
     needs_review: true,
+    language_code: null,
   };
 }
 
