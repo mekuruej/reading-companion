@@ -37,6 +37,8 @@ import {
   pendingBookRequestsSignature,
   unlockAbilityCheckReminder,
   isListeningFormat,
+  getLibraryItemStatusLabel,
+  sortLibraryItems,
 } from "./helpers";
 import {
   isAbilityCheckClaimInDailyPool,
@@ -1225,111 +1227,13 @@ export default function BooksPage() {
   const dnf = validRows.filter((r) => !!r.dnf_at);
 
   const sortedValidRows = useMemo(() => {
-    return sortLibraryItems(validRows);
+    return sortLibraryItems(validRows, sortMode, readingStatsByUserBookId);
   }, [validRows, sortMode, readingStatsByUserBookId]);
 
   const gridClass =
     "grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
 
-
-  function getStatusOrder(row: UserBookRow) {
-    if (row.started_at && !row.finished_at && !row.dnf_at) return 0;
-    if (!row.started_at && !row.finished_at && !row.dnf_at) return 1;
-    if (row.finished_at && !row.dnf_at) return 2;
-    if (row.dnf_at) return 3;
-    return 4;
-  }
-
-  function getStatusLabel(row: UserBookRow) {
-    if (row.finished_at && !row.dnf_at) return "Finished";
-    if (row.dnf_at) return "DNF";
-    if (row.started_at) return "In progress";
-    return "Not started";
-  }
-
-  function compareNullableNumber(
-    aValue: number | null | undefined,
-    bValue: number | null | undefined,
-    direction: "asc" | "desc"
-  ) {
-    const aHasValue = typeof aValue === "number" && Number.isFinite(aValue);
-    const bHasValue = typeof bValue === "number" && Number.isFinite(bValue);
-
-    if (!aHasValue && !bHasValue) return 0;
-    if (!aHasValue) return 1;
-    if (!bHasValue) return -1;
-
-    return direction === "asc" ? aValue - bValue : bValue - aValue;
-  }
-
-  function sortLibraryItems(items: UserBookRow[]) {
-    const copy = [...items];
-
-    copy.sort((a, b) => {
-      const aBook = a.books;
-      const bBook = b.books;
-      if (!aBook || !bBook) return 0;
-
-      if (sortMode === "title") {
-        return aBook.title.localeCompare(bBook.title);
-      }
-
-      if (sortMode === "last_engaged") {
-        const aDate = readingStatsByUserBookId[a.id]?.lastEngagedAt
-          ? new Date(readingStatsByUserBookId[a.id].lastEngagedAt!).getTime()
-          : 0;
-
-        const bDate = readingStatsByUserBookId[b.id]?.lastEngagedAt
-          ? new Date(readingStatsByUserBookId[b.id].lastEngagedAt!).getTime()
-          : 0;
-
-        return bDate - aDate;
-      }
-
-      if (sortMode === "last_read") {
-        const aDate = a.finished_at ? new Date(a.finished_at).getTime() : 0;
-        const bDate = b.finished_at ? new Date(b.finished_at).getTime() : 0;
-        return bDate - aDate;
-      }
-
-      if (sortMode === "rating_high") {
-        return compareNullableNumber(a.rating_overall, b.rating_overall, "desc");
-      }
-
-      if (sortMode === "rating_low") {
-        return compareNullableNumber(a.rating_overall, b.rating_overall, "asc");
-      }
-
-      if (sortMode === "difficulty_high") {
-        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "desc");
-      }
-
-      if (sortMode === "difficulty_low") {
-        return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "asc");
-      }
-
-      if (sortMode === "pace_fast") {
-        return compareNullableNumber(
-          readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
-          readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
-          "asc"
-        );
-      }
-
-      if (sortMode === "pace_slow") {
-        return compareNullableNumber(
-          readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
-          readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
-          "desc"
-        );
-      }
-
-      return getStatusOrder(a) - getStatusOrder(b);
-    });
-
-    return copy;
-  }
 
   function renderBookCard(row: UserBookRow) {
     const liveLessonHref = isViewingStudentLibrary
@@ -1358,7 +1262,7 @@ export default function BooksPage() {
       <LibraryBookRow
         key={row.id}
         row={row}
-        status={getStatusLabel(row)}
+        status={getLibraryItemStatusLabel(row)}
         onOpen={() => router.push(`/books/${row.id}`)}
         secondaryActionHref={liveLessonHref}
         secondaryActionLabel="Live Lesson Add Word"

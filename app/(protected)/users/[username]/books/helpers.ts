@@ -186,3 +186,136 @@ export function isListeningFormat(value: string | null | undefined) {
 export function dateFromYmd(value: string) {
   return new Date(`${value}T00:00:00`);
 }
+
+export type LibrarySortMode =
+  | "status"
+  | "title"
+  | "last_engaged"
+  | "last_read"
+  | "rating_high"
+  | "rating_low"
+  | "difficulty_high"
+  | "difficulty_low"
+  | "pace_fast"
+  | "pace_slow";
+
+export type LibraryReadingStats = {
+  averageMinutesPerPage: number | null;
+  lastEngagedAt: string | null;
+};
+
+type SortableLibraryBook = {
+  title: string;
+};
+
+type SortableLibraryItem = {
+  id: string;
+  started_at: string | null;
+  finished_at: string | null;
+  dnf_at: string | null;
+  rating_overall?: number | null;
+  rating_difficulty?: number | null;
+  books: SortableLibraryBook | null;
+};
+
+export function getLibraryItemStatusLabel(row: SortableLibraryItem) {
+  if (row.finished_at && !row.dnf_at) return "Finished";
+  if (row.dnf_at) return "DNF";
+  if (row.started_at) return "In progress";
+  return "Not started";
+}
+
+function getLibraryItemStatusOrder(row: SortableLibraryItem) {
+  if (row.started_at && !row.finished_at && !row.dnf_at) return 0;
+  if (!row.started_at && !row.finished_at && !row.dnf_at) return 1;
+  if (row.finished_at && !row.dnf_at) return 2;
+  if (row.dnf_at) return 3;
+  return 4;
+}
+
+function compareNullableNumber(
+  aValue: number | null | undefined,
+  bValue: number | null | undefined,
+  direction: "asc" | "desc"
+) {
+  const aHasValue = typeof aValue === "number" && Number.isFinite(aValue);
+  const bHasValue = typeof bValue === "number" && Number.isFinite(bValue);
+
+  if (!aHasValue && !bHasValue) return 0;
+  if (!aHasValue) return 1;
+  if (!bHasValue) return -1;
+
+  return direction === "asc" ? aValue - bValue : bValue - aValue;
+}
+
+export function sortLibraryItems<T extends SortableLibraryItem>(
+  items: T[],
+  sortMode: LibrarySortMode,
+  readingStatsByUserBookId: Record<string, LibraryReadingStats>
+) {
+  const copy = [...items];
+
+  copy.sort((a, b) => {
+    const aBook = a.books;
+    const bBook = b.books;
+    if (!aBook || !bBook) return 0;
+
+    if (sortMode === "title") {
+      return aBook.title.localeCompare(bBook.title);
+    }
+
+    if (sortMode === "last_engaged") {
+      const aDate = readingStatsByUserBookId[a.id]?.lastEngagedAt
+        ? new Date(readingStatsByUserBookId[a.id].lastEngagedAt!).getTime()
+        : 0;
+
+      const bDate = readingStatsByUserBookId[b.id]?.lastEngagedAt
+        ? new Date(readingStatsByUserBookId[b.id].lastEngagedAt!).getTime()
+        : 0;
+
+      return bDate - aDate;
+    }
+
+    if (sortMode === "last_read") {
+      const aDate = a.finished_at ? new Date(a.finished_at).getTime() : 0;
+      const bDate = b.finished_at ? new Date(b.finished_at).getTime() : 0;
+      return bDate - aDate;
+    }
+
+    if (sortMode === "rating_high") {
+      return compareNullableNumber(a.rating_overall, b.rating_overall, "desc");
+    }
+
+    if (sortMode === "rating_low") {
+      return compareNullableNumber(a.rating_overall, b.rating_overall, "asc");
+    }
+
+    if (sortMode === "difficulty_high") {
+      return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "desc");
+    }
+
+    if (sortMode === "difficulty_low") {
+      return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "asc");
+    }
+
+    if (sortMode === "pace_fast") {
+      return compareNullableNumber(
+        readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
+        readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
+        "asc"
+      );
+    }
+
+    if (sortMode === "pace_slow") {
+      return compareNullableNumber(
+        readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
+        readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
+        "desc"
+      );
+    }
+
+    return getLibraryItemStatusOrder(a) - getLibraryItemStatusOrder(b);
+  });
+
+  return copy;
+}
