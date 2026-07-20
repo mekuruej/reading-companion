@@ -1650,7 +1650,12 @@ export default function LibraryStudyPage() {
   const [practiceColorFilter, setPracticeColorFilter] =
     useState<PracticeColorFilter>("all");
 
-  const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
+  const [checked, setChecked] = useState<null | {
+    ok: boolean;
+    correct: string;
+    userAnswer?: string;
+    pendingSelfCheck?: boolean;
+  }>(null);
   const [typingInput, setTypingInput] = useState("");
   const [typingInstructionOverride, setTypingInstructionOverride] = useState<string | null>(null);
   const [typingCorrectionComplete, setTypingCorrectionComplete] = useState(false);
@@ -1668,7 +1673,9 @@ export default function LibraryStudyPage() {
   const currentInstructionText = typingInstructionOverride
     ? typingInstructionOverride
     : checked
-      ? checked.ok || typingCorrectionComplete
+      ? checked.pendingSelfCheck
+        ? "Compare your answer with the saved meaning, then choose how you did."
+        : checked.ok || typingCorrectionComplete
         ? "Great! Next word comes automatically."
         : activeStudyMode === "reading_typing"
           ? "Not quite. Retype the reading."
@@ -2525,6 +2532,31 @@ export default function LibraryStudyPage() {
     });
   }
 
+  function handleMeaningSelfCheck(ok: boolean) {
+    if (!currentCard || !checked?.pendingSelfCheck) return;
+
+    recordCurrentStudyEvent(
+      ok ? "correct" : "incorrect",
+      ok,
+      "meaning_typing"
+    );
+
+    void saveTypedGateProgress("meaning", ok);
+
+    if (ok) {
+      setChecked({
+        ok: true,
+        correct: checked.correct,
+        userAnswer: checked.userAnswer,
+      });
+      setTypingCorrectionComplete(false);
+      return;
+    }
+
+    markStudyCardSeen(currentCard);
+    nextCardWithoutMarkingSeen();
+  }
+
   function canComeBackLater(card: StudyCard | undefined) {
     return (
       card?.colorStatus.color === "yellow" &&
@@ -3048,6 +3080,8 @@ export default function LibraryStudyPage() {
     setTypingInstructionOverride(null);
 
     if (checked && !checked.ok) {
+      if (checked.pendingSelfCheck) return;
+
       const correctionOk =
         activeStudyMode === "reading_typing"
           ? normalizeKana(typingInput) === normalizeKana(checked.correct)
@@ -3086,7 +3120,15 @@ export default function LibraryStudyPage() {
     }
 
     if (currentStudyMode === "meaning_typing") {
-      queueMeaningReview(currentCard, typingInput.trim(), correct, currentStudyMode, ok);
+      setChecked({
+        ok: false,
+        correct,
+        userAnswer: typingInput.trim(),
+        pendingSelfCheck: true,
+      });
+      setTypingInput("");
+      if (typingInputRef.current) typingInputRef.current.value = "";
+      return;
     }
 
     if (!ok) {
@@ -3454,7 +3496,10 @@ export default function LibraryStudyPage() {
                     event.preventDefault();
                     event.stopPropagation();
 
-                    if (!checked || !checked.ok) {
+                    if (
+                      !checked ||
+                      (activeStudyMode === "reading_typing" && !checked.ok)
+                    ) {
                       checkTypingSingle();
                     }
                   }}
@@ -3469,6 +3514,7 @@ export default function LibraryStudyPage() {
                   correctionComplete={typingCorrectionComplete}
                   isMeaningCheck={activeStudyMode === "meaning_typing"}
                   card={currentCard}
+                  onMeaningSelfCheck={handleMeaningSelfCheck}
                 />
               ) : null}
             </div>

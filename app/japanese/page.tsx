@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 
-const SHOW_READING_COMPANION_CARD = false;
+const SHOW_READING_COMPANION_CARD = true;
 
 export default function MekuruHomepage() {
     return (
@@ -63,10 +63,9 @@ export default function MekuruHomepage() {
                     </h1>
                     <p className="mx-auto max-w-2xl text-base leading-7 text-[#4f473d]">
                         You&apos;re not alone in finding kanji, complex sentences, or large amounts of vocabulary overwhelming.
-                        <br />I help learners work through real texts in English to help you understand what&apos;s happening, point
-                        out grammar you may easily miss alone, and build your confidence page by page.
+                        <br />I help learners work through real Japanese texts using English explanations to help you understand what's happening, notice grammar you might easily miss on your own, and build your confidence page by page.
                     </p>
-                    <p className="text-sm text-[#6b6257]">ページをめくって、話しまくろう！</p>
+                    <p className="text-l text-[#6b6257]">ページをめくって、話しまくろう！</p>
                 </section>
 
                 <section className="space-y-3">
@@ -91,7 +90,7 @@ export default function MekuruHomepage() {
                         what&apos;s actually happening.
                     </p>
                     <ul className="space-y-2 text-base text-[#4f473d]">
-                        <li>• Ask all the questions you&apos;re actually thinking and get understandable answers from someone who went through the same troubles</li>
+                        <li>• Ask all the questions you're actually thinking and get clear answers from someone who went through the same struggles.</li>
                         <li>• Work through difficult sentences step by step</li>
                         <li>• Understand why something is confusing and not just what it means</li>
                         <li>• Build real understanding, not just memorization</li>
@@ -104,8 +103,11 @@ export default function MekuruHomepage() {
                             rel="noopener noreferrer"
                             className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
                         >
-                            Book a Free Trial Lesson
+                            Book a Free Introductory Session
                         </a>
+                        <p className="mt-3 text-sm text-stone-600">
+                            We&apos;ll get to know each other, read together, and discuss the best plan for your Japanese reading goals.
+                        </p>
                     </div>
                 </section>
 
@@ -114,7 +116,7 @@ export default function MekuruHomepage() {
                     <p className="text-base leading-7 text-[#4f473d]">
                         We work through real Japanese texts together, focusing on understanding rather than rushing through material.
                         Some students prefer to translate every sentence or paragraph together, some prefer that I read first, and
-                        some prefer to try first. Whatever works best for that student.
+                        some prefer to try first. Whatever works best for you.
                     </p>
                     <p className="text-base leading-7 text-[#4f473d]">
                         My lessons focus on reading and understanding Japanese. Many students choose to combine this with conversation
@@ -126,79 +128,71 @@ export default function MekuruHomepage() {
                         kanji or longer texts, this approach can still work well.
                     </p>
                     <p className="text-base leading-7 text-[#4f473d]">
-                        Students are also welcome to join small JLPT study sessions focused on grammar and JLPT-style reading, if it
-                        fits your schedule. These are not traditional lessons. We work through the textbook together as a group and the
-                        teacher is there to help if you get stuck. Students must have their own copy of the textbook.
-                    </p>
-                    <p className="text-base leading-7 text-[#4f473d]">
                         I offer a variety of lesson plans, so there are options for different schedules and budgets.
                     </p>
                 </section>
 
                 <section className="mt-16 space-y-4">
-                    <h2 className="text-2xl font-semibold">Pricing</h2>
-                    <div className="space-y-4 text-sm text-stone-700">
-                        <div>
-                            <p className="font-medium">Term Plan — 16 Lessons</p>
-                            <p>16 lessons (approx. 4/month)</p>
-                            <p className="mt-1">¥64,000 per term</p>
-                            <p className="text-xs text-stone-500">Approx. ¥4,000 per lesson</p>
-                        </div>
-                        <div>
-                            <p className="font-medium">Flexible Plan — 12 Lessons</p>
-                            <p>12 lessons (approx. 3/month)</p>
-                            <p className="mt-1">¥54,000 per term</p>
-                            <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
-                        </div>
-                        <div>
-                            <p className="font-medium">Light Plan — 8 Lessons</p>
-                            <p>8 lessons (approx. 2/month)</p>
-                            <p className="mt-1">¥36,000 per term</p>
-                            <p className="text-xs text-stone-500">Approx. ¥4,500 per lesson</p>
-                        </div>
+                    <h2 className="text-2xl font-semibold">Tuition</h2>
+
+                    <div className="space-y-3 text-stone-700">
+                        <p>
+                            <span className="font-medium">Term payments</span> from <strong>¥19,000 per term</strong>
+                        </p>
+
+                        <p>
+                            <span className="font-medium">Monthly installments</span> from <strong>¥5,000 per month</strong>
+                        </p>
                     </div>
-                    <p className="text-xs text-stone-500">Monthly and annual payment options are also available.</p>
+
+                    <p className="text-sm text-stone-600">
+                        Four lesson plans are available to fit different schedules and budgets.
+                    </p>
+
+                    <p className="text-xs text-stone-500">
+                        Detailed pricing is provided after your free trial session.
+                    </p>
                 </section>
 
                 <div className="mx-auto mt-12 max-w-3xl px-6">
                     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6">
                         <h3 className="text-base font-semibold text-stone-900">Included with Every Lesson</h3>
                         <p className="mt-2 text-sm text-stone-700">
-                            All students get access to the Mekuru Reading Companion — a private tool designed to support your reading
+                            All students get access to the Mekuru Reading App — a private tool designed to support your reading
                             outside of lessons.
                         </p>
                         {SHOW_READING_COMPANION_CARD ? (
                             <>
-                            <ul className="mt-4 space-y-2 text-sm text-stone-700">
-                                <li>• Review words saved during your lessons</li>
-                                <li>• Save your own words while reading (optional)</li>
-                                <li>• Track your reading progress over time</li>
-                                <li>• Study vocabulary in context</li>
-                                <li>• Prepare readings between lessons</li>
-                            </ul>
-                            <div className="mt-6">
-                                <p className="mb-2 text-xs text-stone-500">Inside the Mekuru Reading Companion</p>
-                                <img
-                                    src="/app-preview.jpg"
-                                    alt="Mekuru Reading Companion preview"
-                                    className="rounded-xl border border-stone-200 shadow-sm"
-                                />
-                                <p className="mt-2 text-xs text-stone-500">Track your reading, review vocabulary, and study between lessons.</p>
-                            </div>
-                            <p className="mt-2 text-xs leading-5 text-stone-500">
-                                Not currently taking lessons? MEKURU app access is still limited while I continue
-                                developing the system, but independent Japanese readers can join the future beta
-                                waitlist.
-                            </p>
+                                <ul className="mt-4 space-y-2 text-sm text-stone-700">
+                                    <li>• Review words saved during your lessons</li>
+                                    <li>• Save your own words while reading (optional)</li>
+                                    <li>• Track your reading progress over time</li>
+                                    <li>• Study vocabulary in context</li>
+                                    <li>• Prepare readings between lessons</li>
+                                </ul>
+                                <div className="mt-6">
+                                    <p className="mb-2 text-xs text-stone-500">Inside the Mekuru Reading Companion</p>
+                                    <img
+                                        src="/app-preview.jpg"
+                                        alt="Mekuru Reading Companion preview"
+                                        className="rounded-xl border border-stone-200 shadow-sm"
+                                    />
+                                    <p className="mt-2 text-xs text-stone-500">Track your reading, review vocabulary, and study between lessons.</p>
+                                </div>
+                                <p className="mt-2 text-xs leading-5 text-stone-500">
+                                    Not currently taking lessons? MEKURU app access is still limited while I continue
+                                    developing the system, but independent Japanese readers can join the future beta
+                                    waitlist.
+                                </p>
 
-                            <a
-                                href="https://forms.gle/5QLgohvkNvDBzTuH9"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-3 inline-flex rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
-                            >
-                                Join the beta waitlist
-                            </a>
+                                <a
+                                    href="https://forms.gle/5QLgohvkNvDBzTuH9"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-3 inline-flex rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
+                                >
+                                    Join the beta waitlist
+                                </a>
                             </>
                         ) : null}
                     </div>
@@ -218,7 +212,7 @@ export default function MekuruHomepage() {
                             I&apos;ve now been in Japan for over 16 years.
                         </p>
                         <p className="text-base leading-7 text-[#4f473d]">
-                            I didn&apos;t start learning Japanese when I was young. I came to it later, and for the most part, I had to
+                            I didn't start learning Japanese until I was an adult. I came to it later, and for the most part, I had to
                             figure it out on my own.
                         </p>
                         <p className="text-base leading-7 text-[#4f473d]">
@@ -239,7 +233,7 @@ export default function MekuruHomepage() {
                         </p>
                         <p className="text-base leading-7 text-[#4f473d]">
                             My background is in music, which taught me the importance of consistency and showing up even when things
-                            feel difficult. And with my over 16 years of teaching English, I know that while a teacher may have certain
+                            feel difficult. And with over 17 years of teaching English, I know that while a teacher may have certain
                             things they want to teach, it&apos;s essential to approach them differently depending on the student.
                         </p>
                         <p className="text-base leading-7 text-[#4f473d]">
@@ -256,7 +250,7 @@ export default function MekuruHomepage() {
                         rel="noopener noreferrer"
                         className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
                     >
-                        Book a Free Trial Lesson
+                        Book a Free Introductory Session
                     </a>
                 </div>
 
@@ -278,7 +272,7 @@ export default function MekuruHomepage() {
 
                 <section className="space-y-3 pt-4 text-center">
                     <h2 className="text-2xl font-semibold">You don&apos;t have to figure this out alone.</h2>
-                    <p className="text-base text-[#4f473d]">If this approach feels right, feel free to reach out!</p>
+                    <p className="text-base text-[#4f473d]">If this approach feels like a good fit for you, I'd love to hear from you.</p>
                 </section>
                 <section className="mt-12 rounded-3xl border border-stone-200 bg-white/80 p-5 text-center shadow-sm">
                     <p className="text-sm font-semibold text-stone-900">

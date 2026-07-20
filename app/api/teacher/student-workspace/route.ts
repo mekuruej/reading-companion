@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  canTeacherAccessStudent,
+  ensureStudentLessonBook,
+  StudentLessonBookError,
+} from "@/lib/teacher/studentLessonBooks";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,24 +73,19 @@ async function authorizeTeacherForStudent(actorId: string, studentId: string) {
     };
   }
 
-  if (!isSuperTeacher(profile)) {
-    const { data: link, error: linkError } = await supabaseAdmin
-      .from("teacher_students")
-      .select("teacher_id")
-      .eq("teacher_id", actorId)
-      .eq("student_id", studentId)
-      .is("archived_at", null)
-      .maybeSingle();
+  const canAccess = await canTeacherAccessStudent({
+    supabase: supabaseAdmin,
+    teacherId: actorId,
+    studentId,
+    teacherProfile: profile,
+  });
 
-    if (linkError) throw linkError;
-
-    if (!link) {
-      return {
-        ok: false as const,
-        error: "You do not have access to this student.",
-        status: 403,
-      };
-    }
+  if (!canAccess) {
+    return {
+      ok: false as const,
+      error: "You do not have access to this student.",
+      status: 403,
+    };
   }
 
   return { ok: true as const, profile };
@@ -105,6 +105,44 @@ async function ensureStudentBook(studentId: string, userBookId: string) {
   }
 
   return true;
+}
+
+async function findOrCreateStudentBook(studentId: string, bookId: string) {
+  const { data: book, error: bookError } = await supabaseAdmin
+    .from("books")
+    .select("id")
+    .eq("id", bookId)
+    .maybeSingle();
+
+  if (bookError) throw bookError;
+  if (!book) {
+    return { error: "Book could not be found.", status: 404 as const };
+  }
+
+  const { data: existingUserBook, error: existingUserBookError } = await supabaseAdmin
+    .from("user_books")
+    .select("id")
+    .eq("user_id", studentId)
+    .eq("book_id", bookId)
+    .maybeSingle();
+
+  if (existingUserBookError) throw existingUserBookError;
+  if (existingUserBook?.id) {
+    return { userBookId: existingUserBook.id as string, createdUserBook: false };
+  }
+
+  const { data: insertedUserBook, error: insertUserBookError } = await supabaseAdmin
+    .from("user_books")
+    .insert({
+      user_id: studentId,
+      book_id: bookId,
+    })
+    .select("id")
+    .single();
+
+  if (insertUserBookError) throw insertUserBookError;
+
+  return { userBookId: insertedUserBook.id as string, createdUserBook: true };
 }
 
 function readingStatus(row: any) {
@@ -486,11 +524,12 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => null);
     const studentId = typeof body?.studentId === "string" ? body.studentId.trim() : "";
-    const userBookId = typeof body?.userBookId === "string" ? body.userBookId.trim() : "";
+    let userBookId = typeof body?.userBookId === "string" ? body.userBookId.trim() : "";
+    const bookId = typeof body?.bookId === "string" ? body.bookId.trim() : "";
 
-    if (!studentId || !userBookId) {
+    if (!studentId || (!userBookId && !bookId)) {
       return NextResponse.json(
-        { error: "studentId and userBookId are required." },
+        { error: "studentId and userBookId or bookId are required." },
         { status: 400 }
       );
     }
@@ -503,38 +542,40 @@ export async function POST(request: Request) {
       );
     }
 
-    const belongsToStudent = await ensureStudentBook(studentId, userBookId);
-    if (!belongsToStudent) {
-      return NextResponse.json(
-        { error: "This book does not belong to that student." },
-        { status: 403 }
-      );
+    let createdUserBook = false;
+    if (!userBookId && bookId) {
+      const studentBook = await findOrCreateStudentBook(studentId, bookId);
+
+      if ("error" in studentBook) {
+        return NextResponse.json(
+          { error: studentBook.error },
+          { status: studentBook.status }
+        );
+      }
+
+      userBookId = studentBook.userBookId;
+      createdUserBook = studentBook.createdUserBook;
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("teacher_student_lesson_books")
-      .upsert(
-        {
-          teacher_id: auth.user.id,
-          student_id: studentId,
-          user_book_id: userBookId,
-          status: "active",
-          added_at: new Date().toISOString(),
-          removed_at: null,
-        },
-        { onConflict: "teacher_id,student_id,user_book_id" }
-      )
-      .select("id")
-      .single();
+    const lessonBook = await ensureStudentLessonBook({
+      supabase: supabaseAdmin,
+      teacherId: auth.user.id,
+      studentId,
+      userBookId,
+      teacherProfile: authorization.profile,
+    });
 
-    if (error) throw error;
-
-    return NextResponse.json({ ok: true, relationshipId: data.id });
+    return NextResponse.json({
+      ok: true,
+      relationshipId: lessonBook.relationshipId,
+      userBookId: lessonBook.userBookId,
+      createdUserBook,
+    });
   } catch (error: any) {
     console.error("Student Workspace add error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not add this lesson book." },
-      { status: 500 }
+      { status: error instanceof StudentLessonBookError ? error.status : 500 }
     );
   }
 }

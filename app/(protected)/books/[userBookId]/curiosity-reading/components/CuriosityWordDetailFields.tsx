@@ -35,6 +35,7 @@ type CuriosityWordDetailFieldsProps = {
   locationPlaceholder?: string;
   locationHelpText?: string;
   allowPercentLocation?: boolean;
+  saveAreaWarning?: string;
 };
 
 export default function CuriosityWordDetailFields({
@@ -58,6 +59,7 @@ export default function CuriosityWordDetailFields({
   locationPlaceholder = "Page",
   locationHelpText,
   allowPercentLocation = false,
+  saveAreaWarning,
 }: CuriosityWordDetailFieldsProps) {
   return (
     <>
@@ -201,6 +203,10 @@ export default function CuriosityWordDetailFields({
           </span>
         ) : null}
       </div>
+
+      {saveAreaWarning ? (
+        <p className="text-xs leading-5 text-amber-600">{saveAreaWarning}</p>
+      ) : null}
     </>
   );
 }

@@ -9,10 +9,18 @@ type LookupBookPreviewCardProps = {
   publishedDate?: string | null;
   pageCount?: number | string | null;
   isbn13: string;
+  languageCode?: string | null;
   isNewToMekuru: boolean;
   libraryLabel?: string;
   children?: ReactNode;
 };
+
+function languageLabel(value: string | null | undefined) {
+  const code = (value ?? "").trim().toLowerCase();
+  if (code === "ja") return "Japanese";
+  if (code === "en") return "English";
+  return code ? code.toUpperCase() : null;
+}
 
 export default function LookupBookPreviewCard({
   title,
@@ -23,10 +31,13 @@ export default function LookupBookPreviewCard({
   publishedDate,
   pageCount,
   isbn13,
+  languageCode,
   isNewToMekuru,
   libraryLabel = "your library",
   children,
 }: LookupBookPreviewCardProps) {
+  const displayLanguage = languageLabel(languageCode);
+
   return (
     <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-5 sm:flex-row">
@@ -89,6 +100,13 @@ export default function LookupBookPreviewCard({
               <span className="font-bold text-stone-800">ISBN:</span>{" "}
               {isbn13}
             </p>
+
+            {displayLanguage ? (
+              <p>
+                <span className="font-bold text-stone-800">Language:</span>{" "}
+                {displayLanguage}
+              </p>
+            ) : null}
           </div>
 
           {isNewToMekuru ? (

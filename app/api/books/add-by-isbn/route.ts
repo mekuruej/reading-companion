@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-import { lookupBookByIsbn13 } from "@/lib/books/bookLookup";
+import { lookupNormalizedExternalBookByIsbn13 } from "@/lib/books/bookLookup";
 import { normalizeIsbn13 } from "@/lib/books/isbn";
+import {
+  ensureStudentLessonBook,
+  StudentLessonBookError,
+} from "@/lib/teacher/studentLessonBooks";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -138,14 +142,33 @@ export async function POST(request: Request) {
   const isbn13 = normalizeIsbn13(body?.isbn13 ?? body?.isbn ?? "");
   const mode = body?.mode === "global_only" ? "global_only" : "add_to_library";
   const allowPendingPlaceholder = body?.allowPendingPlaceholder === true;
+  const context = typeof body?.context === "string" ? body.context.trim() : "";
+  const studentId = typeof body?.studentId === "string" ? body.studentId.trim() : "";
   const targetUserId =
     typeof body?.targetUserId === "string" && body.targetUserId.trim()
       ? body.targetUserId.trim()
       : auth.user.id;
+  const isStudentLessonBookContext = context === "student-lesson-book";
+  const shouldLinkStudentLessonBook =
+    isStudentLessonBookContext && !allowPendingPlaceholder;
 
   if (!isbn13) {
     return NextResponse.json(
       { error: "Please enter a valid ISBN-13." },
+      { status: 400 }
+    );
+  }
+
+  if (isStudentLessonBookContext && (!studentId || targetUserId !== studentId)) {
+    return NextResponse.json(
+      { error: "Student lesson book context is incomplete." },
+      { status: 400 }
+    );
+  }
+
+  if (isStudentLessonBookContext && mode === "global_only") {
+    return NextResponse.json(
+      { error: "Student lesson book context cannot use global-only add mode." },
       { status: 400 }
     );
   }
@@ -213,9 +236,9 @@ export async function POST(request: Request) {
   }
 
   if (!bookId) {
-    const lookupResult = await lookupBookByIsbn13(isbn13);
+    const lookupResult = await lookupNormalizedExternalBookByIsbn13(isbn13);
 
-    if (!lookupResult) {
+    if (!lookupResult?.title) {
       if (!allowPendingPlaceholder || mode === "global_only") {
         return NextResponse.json(
           {
@@ -272,10 +295,7 @@ export async function POST(request: Request) {
     if (bookId) {
       // The explicit pending-placeholder path created the minimal global book above.
     } else {
-      const authorDisplay =
-        lookupResult.authors.length > 0
-          ? lookupResult.authors.join("、")
-          : null;
+      const authorDisplay = lookupResult.author_display;
 
       let { data: insertedBook, error: insertBookError } = await supabaseAdmin
         .from("books")
@@ -283,11 +303,11 @@ export async function POST(request: Request) {
           isbn13: lookupResult.isbn13,
           title: lookupResult.title,
           author: authorDisplay,
-          cover_url: lookupResult.coverUrl,
+          cover_url: lookupResult.cover_url,
           publisher: lookupResult.publisher,
-          published_date: lookupResult.publishedDate,
-          page_count: lookupResult.pageCount,
-          metadata_source: lookupResult.source,
+          published_date: lookupResult.published_date,
+          page_count: lookupResult.page_count,
+          metadata_source: lookupResult.metadata_source,
           needs_review: true,
           ...(!actorIsTeacherFacing && learnerTargetLanguageCode
             ? { language_code: learnerTargetLanguageCode }
@@ -303,10 +323,10 @@ export async function POST(request: Request) {
             isbn13: lookupResult.isbn13,
             title: lookupResult.title,
             author: authorDisplay,
-            cover_url: lookupResult.coverUrl,
+            cover_url: lookupResult.cover_url,
             publisher: lookupResult.publisher,
-            published_date: lookupResult.publishedDate,
-            page_count: lookupResult.pageCount,
+            published_date: lookupResult.published_date,
+            page_count: lookupResult.page_count,
             ...(!actorIsTeacherFacing && learnerTargetLanguageCode
               ? { language_code: learnerTargetLanguageCode }
               : {}),
@@ -358,10 +378,33 @@ export async function POST(request: Request) {
   }
 
   if (existingUserBook) {
+    let lessonBook = null;
+
+    if (shouldLinkStudentLessonBook) {
+      try {
+        lessonBook = await ensureStudentLessonBook({
+          supabase: supabaseAdmin,
+          teacherId: auth.user.id,
+          studentId,
+          userBookId: existingUserBook.id,
+          teacherProfile: actorProfile,
+        });
+      } catch (error) {
+        if (error instanceof StudentLessonBookError) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status }
+          );
+        }
+        throw error;
+      }
+    }
+
     return NextResponse.json({
       userBookId: existingUserBook.id,
       bookId,
       alreadyInLibrary: true,
+      lessonBook,
     });
   }
 
@@ -383,9 +426,32 @@ export async function POST(request: Request) {
     );
   }
 
+  let lessonBook = null;
+
+  if (shouldLinkStudentLessonBook) {
+    try {
+      lessonBook = await ensureStudentLessonBook({
+        supabase: supabaseAdmin,
+        teacherId: auth.user.id,
+        studentId,
+        userBookId: insertedUserBook.id,
+        teacherProfile: actorProfile,
+      });
+    } catch (error) {
+      if (error instanceof StudentLessonBookError) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: error.status }
+        );
+      }
+      throw error;
+    }
+  }
+
   return NextResponse.json({
     userBookId: insertedUserBook.id,
     bookId,
     alreadyInLibrary: false,
+    lessonBook,
   });
 }

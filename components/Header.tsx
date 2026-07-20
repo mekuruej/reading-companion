@@ -491,24 +491,6 @@ export default function Header() {
               ) : null}
             </div>
             {showTeacherLink ? (
-              <Link
-                href="/teacher/students"
-                className={`rounded-full border px-3 py-1.5 transition ${teacherStudentsActive
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
-                onClick={() => {
-                  setShowLibraryMenu(false);
-                  setShowDiscoveryMenu(false);
-                  setShowStudyMenu(false);
-                  setShowTeacherMenu(false);
-                  setShowProfileMenu(false);
-                }}
-              >
-                Students
-              </Link>
-            ) : null}
-            {showTeacherLink ? (
               <div
                 className="relative order-last flex basis-full justify-center md:order-none md:block md:basis-auto"
                 ref={teacherMenuRef}

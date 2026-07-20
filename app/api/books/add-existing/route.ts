@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  ensureStudentLessonBook,
+  StudentLessonBookError,
+} from "@/lib/teacher/studentLessonBooks";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -174,13 +178,23 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const bookId = typeof body?.bookId === "string" ? body.bookId.trim() : "";
+  const context = typeof body?.context === "string" ? body.context.trim() : "";
+  const studentId = typeof body?.studentId === "string" ? body.studentId.trim() : "";
   const targetUserId =
     typeof body?.targetUserId === "string" && body.targetUserId.trim()
       ? body.targetUserId.trim()
       : auth.user.id;
+  const isStudentLessonBookContext = context === "student-lesson-book";
 
   if (!bookId) {
     return NextResponse.json({ error: "bookId is required." }, { status: 400 });
+  }
+
+  if (isStudentLessonBookContext && (!studentId || targetUserId !== studentId)) {
+    return NextResponse.json(
+      { error: "Student lesson book context is incomplete." },
+      { status: 400 }
+    );
   }
 
   const actorProfile = await getProfile(auth.user.id);
@@ -248,10 +262,33 @@ export async function POST(request: Request) {
   }
 
   if (existingUserBook) {
+    let lessonBook = null;
+
+    if (isStudentLessonBookContext) {
+      try {
+        lessonBook = await ensureStudentLessonBook({
+          supabase: supabaseAdmin,
+          teacherId: auth.user.id,
+          studentId,
+          userBookId: existingUserBook.id,
+          teacherProfile: actorProfile,
+        });
+      } catch (error) {
+        if (error instanceof StudentLessonBookError) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status }
+          );
+        }
+        throw error;
+      }
+    }
+
     return NextResponse.json({
       userBookId: existingUserBook.id,
       bookId,
       alreadyInLibrary: true,
+      lessonBook,
     });
   }
 
@@ -272,9 +309,32 @@ export async function POST(request: Request) {
     );
   }
 
+  let lessonBook = null;
+
+  if (isStudentLessonBookContext) {
+    try {
+      lessonBook = await ensureStudentLessonBook({
+        supabase: supabaseAdmin,
+        teacherId: auth.user.id,
+        studentId,
+        userBookId: insertedUserBook.id,
+        teacherProfile: actorProfile,
+      });
+    } catch (error) {
+      if (error instanceof StudentLessonBookError) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: error.status }
+        );
+      }
+      throw error;
+    }
+  }
+
   return NextResponse.json({
     userBookId: insertedUserBook.id,
     bookId,
     alreadyInLibrary: false,
+    lessonBook,
   });
 }

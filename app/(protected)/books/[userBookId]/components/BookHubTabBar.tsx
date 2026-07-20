@@ -2,10 +2,23 @@ import type { ReactNode } from "react";
 
 type BookHubTab = "bookInfo" | "reading" | "story" | "reflection";
 
+type BookHubTabItem = {
+  id: BookHubTab;
+  label: string;
+};
+
 type BookHubTabBarProps = {
   activeTab: BookHubTab;
+  tabs?: BookHubTabItem[];
   onTabChange: (tab: BookHubTab) => void;
 };
+
+const DEFAULT_BOOK_HUB_TABS: BookHubTabItem[] = [
+  { id: "reflection", label: "Reading Reflection" },
+  { id: "reading", label: "Reading Sessions" },
+  { id: "story", label: "Story Notes" },
+  { id: "bookInfo", label: "Book Info" },
+];
 
 function FilingTab({
   active,
@@ -34,39 +47,22 @@ function FilingTab({
 
 export default function BookHubTabBar({
   activeTab,
+  tabs = DEFAULT_BOOK_HUB_TABS,
   onTabChange,
 }: BookHubTabBarProps) {
   return (
     <div className="mt-2">
       <div className="mb-4 w-full border-b border-stone-400 px-2">
         <div className="flex flex-wrap items-end gap-3">
-          <FilingTab
-            active={activeTab === "reflection"}
-            onClick={() => onTabChange("reflection")}
-          >
-            Reading Reflection
-          </FilingTab>
-
-          <FilingTab
-            active={activeTab === "reading"}
-            onClick={() => onTabChange("reading")}
-          >
-            Reading Sessions
-          </FilingTab>
-
-          <FilingTab
-            active={activeTab === "story"}
-            onClick={() => onTabChange("story")}
-          >
-            Story Notes
-          </FilingTab>
-
-          <FilingTab
-            active={activeTab === "bookInfo"}
-            onClick={() => onTabChange("bookInfo")}
-          >
-            Book Info
-          </FilingTab>
+          {tabs.map((tab) => (
+            <FilingTab
+              key={tab.id}
+              active={activeTab === tab.id}
+              onClick={() => onTabChange(tab.id)}
+            >
+              {tab.label}
+            </FilingTab>
+          ))}
         </div>
       </div>
     </div>

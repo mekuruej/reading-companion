@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import TeacherLearningTaskModal from "../../components/TeacherLearningTaskModal";
@@ -22,6 +22,7 @@ type LessonBook = {
   addedAt: string | null;
   book: {
     id: string;
+    bookId: string | null;
     title: string;
     author: string | null;
     coverUrl: string | null;
@@ -184,12 +185,12 @@ function workspaceContext(studentId: string) {
 
 export default function StudentWorkspacePage() {
   const params = useParams<{ studentId: string }>();
+  const searchParams = useSearchParams();
   const studentId = params?.studentId ?? "";
 
   const [data, setData] = useState<WorkspacePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [chooserOpen, setChooserOpen] = useState(false);
   const [mutatingUserBookId, setMutatingUserBookId] = useState<string | null>(null);
   const [lessonDayEditing, setLessonDayEditing] = useState(false);
   const [lessonDayDraft, setLessonDayDraft] = useState("");
@@ -224,9 +225,15 @@ export default function StudentWorkspacePage() {
     : "/teacher/students";
   const addBookHref = `/books/add?destination=student&targetUserId=${encodeURIComponent(
     studentId
-  )}&from=student-workspace`;
+  )}&context=student-lesson-book&from=student-workspace`;
+  const notice = searchParams.get("notice");
+  const workspaceNotice =
+    notice === "lesson-book-existing"
+      ? `The book was already in ${studentName}'s Library and has been added to Active Lesson Books.`
+      : notice === "lesson-book-added"
+      ? `The book has been added to ${studentName}'s Library and Active Lesson Books.`
+      : "";
 
-  const addableBooks = useMemo(() => data?.eligibleBooks ?? [], [data?.eligibleBooks]);
   const taskBooks = useMemo(() => {
     if (!data) return [];
 
@@ -357,22 +364,6 @@ export default function StudentWorkspacePage() {
     if (!studentId) return;
     void loadActiveLearningTasks();
   }, [studentId]);
-
-  async function addLessonBook(userBookId: string) {
-    setMutatingUserBookId(userBookId);
-    setMessage("");
-
-    try {
-      await apiFetch("POST", { studentId, userBookId });
-      setChooserOpen(false);
-      await loadWorkspace();
-    } catch (error: any) {
-      console.error("Error adding lesson book:", error);
-      setMessage(error?.message ?? "Could not add this lesson book.");
-    } finally {
-      setMutatingUserBookId(null);
-    }
-  }
 
   async function removeLessonBook(book: LessonBook) {
     const ok = window.confirm(
@@ -846,50 +837,9 @@ export default function StudentWorkspacePage() {
           </section>
         ) : null}
 
-        {chooserOpen ? (
-          <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-lg font-black text-stone-950">Add Lesson Book</h2>
-                <p className="mt-1 text-sm leading-6 text-stone-600">
-                  Choose a book already in {studentName}'s library, or add a new book to their library first.
-                </p>
-              </div>
-              <Link
-                href={addBookHref}
-                className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-bold text-stone-700 hover:bg-white"
-              >
-                Add New Book to Student Library
-              </Link>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {addableBooks.map((book) => (
-                <button
-                  key={book.id}
-                  type="button"
-                  onClick={() => void addLessonBook(book.id)}
-                  disabled={mutatingUserBookId === book.id}
-                  className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3 text-left transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {book.coverUrl ? (
-                    <img src={book.coverUrl} alt="" className="h-16 w-11 rounded object-cover shadow-sm" />
-                  ) : (
-                    <div className="h-16 w-11 rounded bg-stone-200" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-stone-900">{book.title}</p>
-                    <p className="truncate text-xs text-stone-500">{book.author || book.statusLabel}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {addableBooks.length === 0 ? (
-              <p className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
-                Every book in this student's library is already active here. Add a new book to their library, then return and choose it here.
-              </p>
-            ) : null}
+        {workspaceNotice ? (
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+            {workspaceNotice}
           </section>
         ) : null}
 
@@ -901,13 +851,12 @@ export default function StudentWorkspacePage() {
                 Active lesson books for this teacher-student workspace.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setChooserOpen((value) => !value)}
+            <Link
+              href={addBookHref}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-stone-800"
             >
               Add Lesson Book
-            </button>
+            </Link>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -995,7 +944,7 @@ export default function StudentWorkspacePage() {
 
           {data.activeLessonBooks.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-6 text-sm leading-6 text-stone-600">
-              No lesson books are active in this workspace yet. Add a book from the student's library to start using the lesson tools here.
+              No lesson books are active in this workspace yet. Add a lesson book to find an existing catalog book, look one up by ISBN, or request a missing edition.
             </div>
           ) : null}
         </section>

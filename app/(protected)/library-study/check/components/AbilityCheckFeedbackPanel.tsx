@@ -9,10 +9,13 @@ type AbilityCheckFeedbackPanelProps = {
   checked: {
     ok: boolean;
     correct: string;
+    userAnswer?: string;
+    pendingSelfCheck?: boolean;
   };
   correctionComplete?: boolean;
   isMeaningCheck: boolean;
   card: AbilityCheckFeedbackCard | undefined;
+  onMeaningSelfCheck?: (ok: boolean) => void;
 };
 
 export default function AbilityCheckFeedbackPanel({
@@ -20,10 +23,55 @@ export default function AbilityCheckFeedbackPanel({
   correctionComplete = false,
   isMeaningCheck,
   card,
+  onMeaningSelfCheck,
 }: AbilityCheckFeedbackPanelProps) {
   return (
     <div className="mt-2 w-full max-w-sm text-center text-sm">
-      {checked.ok && isMeaningCheck ? (
+      {checked.pendingSelfCheck && isMeaningCheck ? (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-left text-sky-950 shadow-sm">
+          <div className="text-center text-sm font-black uppercase tracking-wide text-sky-700">
+            Self-check meaning
+          </div>
+
+          <div className="mt-3 grid gap-2">
+            <div className="rounded-xl bg-white/80 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-500">
+                Your answer
+              </div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {checked.userAnswer || "—"}
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white/80 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-500">
+                Saved meaning
+              </div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {checked.correct}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => onMeaningSelfCheck?.(true)}
+              className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+            >
+              I got it
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onMeaningSelfCheck?.(false)}
+              className="rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-black text-rose-700 transition hover:bg-rose-50"
+            >
+              I missed it
+            </button>
+          </div>
+        </div>
+      ) : checked.ok && isMeaningCheck ? (
         <div className="relative overflow-hidden rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-violet-950 shadow-sm">
           <span className="pointer-events-none absolute left-5 top-4 h-2 w-2 animate-[purpleBurst_900ms_ease-out_forwards] rounded-full bg-violet-400 shadow-[0_0_0_0_rgba(139,92,246,0.6)]" />
           <span className="pointer-events-none absolute right-8 top-5 h-1.5 w-1.5 animate-[purpleBurst_1000ms_ease-out_120ms_forwards] rounded-full bg-fuchsia-300 shadow-[0_0_0_0_rgba(217,70,239,0.55)]" />

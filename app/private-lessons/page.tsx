@@ -130,7 +130,7 @@ export default function MekuruPrivateLessonsPage() {
             </p>
             <div className="pt-2">
               <button className="rounded-full bg-[#2f2a24] px-5 py-3 text-sm text-white hover:opacity-90">
-                Book a Lesson
+                Book a Free Introductory Session
               </button>
             </div>
           </div>

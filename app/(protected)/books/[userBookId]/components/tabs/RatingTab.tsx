@@ -39,6 +39,7 @@ type RatingTabProps = {
   setRatingOverall: (value: string) => void;
 
   profileLevel: string;
+  isEnglishBook?: boolean;
   bookType: string | null;
   ratingDifficulty: string;
   setRatingDifficulty: (value: string) => void;
@@ -167,6 +168,7 @@ export default function RatingTab({
   ratingOverall,
   setRatingOverall,
   profileLevel,
+  isEnglishBook = false,
   bookType,
   ratingDifficulty,
   setRatingDifficulty,
@@ -220,7 +222,9 @@ export default function RatingTab({
                       {currentLevelInfo.value} · {currentLevelInfo.label}
                     </div>
                     <div className="mt-1 text-xs text-stone-500">
-                      {currentLevelInfo.cefr} · {currentLevelInfo.jlpt}
+                      {isEnglishBook
+                        ? currentLevelInfo.cefr
+                        : `${currentLevelInfo.cefr} · ${currentLevelInfo.jlpt}`}
                     </div>
                   </div>
                 ) : (

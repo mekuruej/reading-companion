@@ -10,6 +10,8 @@
 // 4. User confirms "Add to my library."
 // 5. A separate server-controlled route creates/uses the global book row.
 
+export type BookMetadataSource = "mekuru" | "openbd" | "google_books" | "open_library" | "none";
+
 export type BookLookupResult = {
   isbn13: string;
   title: string;
@@ -22,6 +24,25 @@ export type BookLookupResult = {
   coverUrl: string | null;
   source: "openbd" | "google_books" | "open_library";
   sourceId: string | null;
+};
+
+export type NormalizedBookLookupResult = {
+  isbn13: string;
+  title: string | null;
+  subtitle: string | null;
+  author_display: string | null;
+  authors: string[];
+  cover_url: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  page_count: number | null;
+  description: string | null;
+  metadata_source: BookMetadataSource;
+  source_id: string | null;
+  found_existing_book: boolean;
+  existing_book_id: string | null;
+  needs_review: boolean;
+  language_code: string | null;
 };
 
 type GoogleBooksResponse = {
@@ -128,6 +149,82 @@ function cleanNumber(value: unknown) {
   return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
 }
 
+function authorDisplay(authors: string[]) {
+  return authors.length > 0 ? authors.join("、") : null;
+}
+
+function openLibraryCoverUrl(isbn13: string) {
+  return `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg?default=false`;
+}
+
+function normalizedFromExternalLookup(
+  result: BookLookupResult
+): NormalizedBookLookupResult {
+  return {
+    isbn13: result.isbn13,
+    title: result.title,
+    subtitle: result.subtitle,
+    author_display: authorDisplay(result.authors),
+    authors: result.authors,
+    cover_url: result.coverUrl,
+    publisher: result.publisher,
+    published_date: result.publishedDate,
+    page_count: result.pageCount,
+    description: result.description,
+    metadata_source: result.source,
+    source_id: result.sourceId,
+    found_existing_book: false,
+    existing_book_id: null,
+    needs_review: true,
+    language_code: null,
+  };
+}
+
+export function normalizedLookupFromExistingBook({
+  id,
+  isbn13,
+  title,
+  subtitle = null,
+  author,
+  cover_url,
+  publisher,
+  published_date,
+  page_count,
+  language_code,
+}: {
+  id: string | null | undefined;
+  isbn13: string;
+  title: string | null | undefined;
+  subtitle?: string | null | undefined;
+  author: string | null | undefined;
+  cover_url: string | null | undefined;
+  publisher: string | null | undefined;
+  published_date: string | null | undefined;
+  page_count: number | string | null | undefined;
+  language_code: string | null | undefined;
+}): NormalizedBookLookupResult {
+  const authors = cleanAuthors([author]);
+
+  return {
+    isbn13,
+    title: title?.trim() || null,
+    subtitle: subtitle?.trim() || null,
+    author_display: author?.trim() || null,
+    authors,
+    cover_url: cleanCoverUrl(cover_url),
+    publisher: publisher?.trim() || null,
+    published_date: published_date?.trim() || null,
+    page_count: cleanNumber(page_count),
+    description: null,
+    metadata_source: "mekuru",
+    source_id: id ?? null,
+    found_existing_book: true,
+    existing_book_id: id ?? null,
+    needs_review: false,
+    language_code: language_code?.trim() || null,
+  };
+}
+
 async function lookupOpenBdByIsbn13(isbn13: string): Promise<BookLookupResult | null> {
   const data = await fetchJson<OpenBdResponse>(
     `https://api.openbd.jp/v1/get?isbn=${encodeURIComponent(isbn13)}`
@@ -212,8 +309,7 @@ async function lookupOpenLibraryAuthorName(authorKey: string) {
 }
 
 async function getOpenLibraryCoverUrl(isbn13: string) {
-  const coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg?default=false`;
-
+  const coverUrl = openLibraryCoverUrl(isbn13);
   const response = await fetch(coverUrl, {
     method: "HEAD",
     next: {
@@ -284,4 +380,39 @@ export async function lookupBookByIsbn13(isbn13: string) {
   }
 
   return lookupOpenLibraryByIsbn13(isbn13);
+}
+
+async function lookupOpenLibraryCoverOnlyByIsbn13(
+  isbn13: string
+): Promise<NormalizedBookLookupResult | null> {
+  const coverUrl = await getOpenLibraryCoverUrl(isbn13);
+  if (!coverUrl) return null;
+
+  return {
+    isbn13,
+    title: null,
+    subtitle: null,
+    author_display: null,
+    authors: [],
+    cover_url: coverUrl,
+    publisher: null,
+    published_date: null,
+    page_count: null,
+    description: null,
+    metadata_source: "open_library",
+    source_id: `/isbn/${isbn13}`,
+    found_existing_book: false,
+    existing_book_id: null,
+    needs_review: true,
+    language_code: null,
+  };
+}
+
+export async function lookupNormalizedExternalBookByIsbn13(isbn13: string) {
+  const lookupResult = await lookupBookByIsbn13(isbn13);
+  if (lookupResult) {
+    return normalizedFromExternalLookup(lookupResult);
+  }
+
+  return lookupOpenLibraryCoverOnlyByIsbn13(isbn13);
 }

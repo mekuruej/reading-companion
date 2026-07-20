@@ -71,7 +71,7 @@ export default function AbilityCheckTypingPrompt({
           autoComplete="off"
           spellCheck={false}
           className="w-full rounded border px-4 py-3 text-base"
-          disabled={!!checked && checked.ok}
+          disabled={!!checked && (checked.ok || !isReadingMode)}
         />
 
         {instructionText ? (

@@ -10,6 +10,8 @@ import AddBookMessagePanel from "./components/AddBookMessagePanel";
 import AddBookLibraryNotice from "./components/AddBookLibraryNotice";
 import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
 import AddBookActionRow from "./components/AddBookActionRow";
+import AddBookDestinationSummary from "./components/AddBookDestinationSummary";
+import AddBookCatalogResult from "./components/AddBookCatalogResult";
 
 type LookupBook = {
     isbn13: string;
@@ -121,6 +123,7 @@ export default function AddBookPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const destination = searchParams.get("destination") ?? "";
+    const addBookContext = searchParams.get("context") ?? "";
     const targetUserIdParam = searchParams.get("targetUserId")?.trim() ?? "";
 
     const [isbn, setIsbn] = useState("");
@@ -148,6 +151,8 @@ export default function AddBookPage() {
         detail?: string;
         userBookId?: string;
         bookId?: string;
+        returnLabel?: string;
+        returnHref?: string;
     } | null>(null);
 
     useEffect(() => {
@@ -234,6 +239,21 @@ export default function AddBookPage() {
         : isOtherUserDestination
         ? "user library"
         : "your library";
+    const destinationKind = isStudentDestination
+        ? "student"
+        : isOtherUserDestination
+        ? "user"
+        : "self";
+    const destinationDisplayName =
+        isStudentDestination || isOtherUserDestination ? targetDisplayName : null;
+    const isStudentLessonBookContext =
+        addBookContext === "student-lesson-book" && isStudentDestination;
+    const studentWorkspaceHref = `/teacher/students/${encodeURIComponent(
+        targetUserIdParam
+    )}/workspace`;
+    const studentLessonContextDescription = isStudentLessonBookContext
+        ? "This book will also be added to Active Lesson Books."
+        : null;
     const targetLibraryHref = isStudentDestination
         ? targetUsername
             ? `/users/${targetUsername}/books`
@@ -250,6 +270,35 @@ export default function AddBookPage() {
         if (isTeacherFacingUser) return false;
         if (!learnerTargetLanguageCode) return true;
         return normalizeLanguageCode(languageCode) !== learnerTargetLanguageCode;
+    }
+
+    function studentLessonBookPayload() {
+        if (!isStudentLessonBookContext) return {};
+        return {
+            context: "student-lesson-book",
+            studentId: targetUserIdParam,
+        };
+    }
+
+    function handleSuccessfulAdd(data: any) {
+        if (isStudentLessonBookContext) {
+            const notice = data?.alreadyInLibrary
+                ? "lesson-book-existing"
+                : "lesson-book-added";
+            router.push(`${studentWorkspaceHref}?notice=${notice}`);
+            return;
+        }
+
+        if (data?.alreadyInLibrary) {
+            setLibraryNotice({
+                message: `This book is already in ${targetLibraryShortLabel}.`,
+                detail: "We found the existing copy.",
+                userBookId: data.userBookId,
+            });
+            return;
+        }
+
+        router.push(targetLibraryHref);
     }
 
     async function handleLookup() {
@@ -419,6 +468,7 @@ export default function AddBookPage() {
                     mode: "add_to_library",
                     targetUserId: targetLibraryUserId,
                     intendedLanguageCode: learnerTargetLanguageCode,
+                    ...studentLessonBookPayload(),
                 }),
             });
 
@@ -436,16 +486,7 @@ export default function AddBookPage() {
                 return;
             }
 
-            if (data.alreadyInLibrary) {
-                setLibraryNotice({
-                    message: `This book is already in ${targetLibraryShortLabel}.`,
-                    detail: "We found the existing copy.",
-                    userBookId: data.userBookId,
-                });
-                return;
-            }
-
-            router.push(targetLibraryHref);
+            handleSuccessfulAdd(data);
         } catch (addError) {
             console.error("Add book failed:", addError);
             setError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
@@ -481,6 +522,7 @@ export default function AddBookPage() {
                     bookId,
                     targetUserId: targetLibraryUserId,
                     intendedLanguageCode: learnerTargetLanguageCode,
+                    ...studentLessonBookPayload(),
                 }),
             });
 
@@ -491,16 +533,7 @@ export default function AddBookPage() {
                 return;
             }
 
-            if (data.alreadyInLibrary) {
-                setLibraryNotice({
-                    message: `This book is already in ${targetLibraryShortLabel}.`,
-                    detail: "We found the existing copy.",
-                    userBookId: data.userBookId,
-                });
-                return;
-            }
-
-            router.push(targetLibraryHref);
+            handleSuccessfulAdd(data);
         } catch (addError) {
             console.error("Add existing book failed:", addError);
             setBookSearchError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
@@ -610,8 +643,12 @@ export default function AddBookPage() {
             if (pendingUserBookId) {
                 setLibraryNotice({
                     message: `Book request sent and a pending copy was added to ${targetLibraryShortLabel}.`,
-                    detail: "You can start using it now. An admin can fill in the book details later.",
-                    userBookId: pendingUserBookId,
+                    detail: isStudentLessonBookContext
+                        ? "An admin can fill in the book details later. Active Lesson Books will be linked after a real catalog book is ready."
+                        : "You can start using it now. An admin can fill in the book details later.",
+                    userBookId: isStudentLessonBookContext ? undefined : pendingUserBookId,
+                    returnLabel: isStudentLessonBookContext ? "Back to Student Workspace" : undefined,
+                    returnHref: isStudentLessonBookContext ? studentWorkspaceHref : undefined,
                 });
             }
             setRequestMessage(
@@ -650,6 +687,12 @@ export default function AddBookPage() {
 
     return (
         <main className="mx-auto max-w-3xl px-4 py-8">
+            <AddBookDestinationSummary
+                destinationKind={destinationKind}
+                displayName={destinationDisplayName}
+                contextDescription={studentLessonContextDescription}
+            />
+
             {!isTeacherFacingUser ? (
                 <section className="mb-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
@@ -703,6 +746,12 @@ export default function AddBookPage() {
                         detail={libraryNotice.detail}
                         userBookId={libraryNotice.userBookId}
                         onOpenBook={(userBookId) => router.push(`/books/${userBookId}`)}
+                        returnLabel={libraryNotice.returnLabel}
+                        onReturn={
+                            libraryNotice.returnHref
+                                ? () => router.push(libraryNotice.returnHref as string)
+                                : undefined
+                        }
                     />
                 ) : null}
             </AddBookLookupCard>
@@ -769,102 +818,27 @@ export default function AddBookPage() {
                             const missingFields = missingGlobalBookFields(result);
                             const canAddExisting = isBookCompleteEnoughToAdd(result);
                             const languageMismatch = isMismatchedForLearner(result.language_code);
-                            const canAddThisExistingBook = canAddExisting && !languageMismatch;
+                            const addLabel = languageMismatch
+                                ? "Wrong language"
+                                : isStudentDestination
+                                ? "Add to Student Library"
+                                : isOtherUserDestination
+                                ? "Add to User Library"
+                                : "Add to My Library";
 
                             return (
-                                <div
+                                <AddBookCatalogResult
                                     key={result.id}
-                                    className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:flex-row"
-                                >
-                                    {result.cover_url ? (
-                                        <img
-                                            src={result.cover_url}
-                                            alt=""
-                                            className="h-24 w-16 shrink-0 rounded-xl object-cover shadow-sm"
-                                        />
-                                    ) : (
-                                        <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-stone-200 px-2 text-center text-[10px] font-bold text-stone-500">
-                                            No cover
-                                        </div>
-                                    )}
-
-                                    <div className="min-w-0 flex-1">
-                                        <h3 className="text-base font-black text-stone-900">
-                                            {result.title || "Untitled book"}
-                                        </h3>
-                                        <p className="mt-1 text-sm text-stone-600">
-                                            {result.author || "Author not listed"}
-                                        </p>
-                                        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                                            {result.book_type ? (
-                                                <span className="rounded-full border border-stone-200 bg-white px-2 py-1 text-stone-600">
-                                                    {result.book_type}
-                                                </span>
-                                            ) : null}
-                                            {result.isbn13 ? (
-                                                <span className="rounded-full border border-stone-200 bg-white px-2 py-1 text-stone-600">
-                                                    ISBN {result.isbn13}
-                                                </span>
-                                            ) : null}
-                                            {canAddExisting ? (
-                                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
-                                                    Ready to add
-                                                </span>
-                                            ) : (
-                                                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">
-                                                    Needs review
-                                                </span>
-                                            )}
-                                            {languageMismatch ? (
-                                                <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-red-700">
-                                                    Different language
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                        {languageMismatch ? (
-                                            <p className="mt-2 text-xs leading-5 text-red-700">
-                                                This book is not in your current learning language.
-                                            </p>
-                                        ) : null}
-                                        {!canAddExisting ? (
-                                            <p className="mt-2 text-xs leading-5 text-amber-800">
-                                                Missing: {missingFields.length > 0 ? missingFields.join(", ") : "review approval"}.
-                                            </p>
-                                        ) : null}
-                                    </div>
-
-                                    <div className="flex shrink-0 flex-col gap-2 sm:w-40">
-                                        {canAddExisting ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => void handleAddExistingBook(result.id)}
-                                                disabled={addingExistingBookId === result.id || !canAddThisExistingBook}
-                                                className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
-                                            >
-                                                {addingExistingBookId === result.id
-                                                    ? "Adding..."
-                                                    : languageMismatch
-                                                    ? "Wrong language"
-                                                    : isStudentDestination
-                                                    ? "Add to Student Library"
-                                                    : isOtherUserDestination
-                                                    ? "Add to User Library"
-                                                    : "Add to My Library"}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => void handleRequestBook(result)}
-                                                disabled={requestLoading && requestingBookId === result.id}
-                                                className="rounded-2xl border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 transition hover:bg-amber-50 disabled:opacity-50"
-                                            >
-                                                {requestLoading && requestingBookId === result.id
-                                                    ? "Sending..."
-                                                    : "Request review"}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
+                                    result={result}
+                                    missingFields={missingFields}
+                                    canAddExisting={canAddExisting}
+                                    languageMismatch={languageMismatch}
+                                    adding={addingExistingBookId === result.id}
+                                    requestLoading={requestLoading && requestingBookId === result.id}
+                                    addLabel={addLabel}
+                                    onAdd={() => void handleAddExistingBook(result.id)}
+                                    onRequestReview={() => void handleRequestBook(result)}
+                                />
                             );
                         })}
                     </div>
@@ -882,6 +856,7 @@ export default function AddBookPage() {
                     publishedDate={publishedDate}
                     pageCount={pageCount}
                     isbn13={book.isbn13}
+                    languageCode={book.language_code}
                     isNewToMekuru={isNewToMekuru}
                     libraryLabel={targetLibraryLabel}
                 >

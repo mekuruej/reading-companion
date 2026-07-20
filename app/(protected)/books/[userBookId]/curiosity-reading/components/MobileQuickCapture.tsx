@@ -30,6 +30,7 @@ type MobileQuickCaptureProps = {
   quickError: string | null;
   savedNotice: string;
   canSaveWord: boolean;
+  selectedCandidateId: string | null;
   candidates: MobileQuickCaptureCandidate[];
   lastAddedWord: MobileQuickCaptureWord | null;
   inputRef: RefObject<HTMLInputElement | null>;
@@ -54,6 +55,7 @@ export default function MobileQuickCapture({
   quickError,
   savedNotice,
   canSaveWord,
+  selectedCandidateId,
   candidates,
   lastAddedWord,
   inputRef,
@@ -65,7 +67,8 @@ export default function MobileQuickCapture({
   onSaveWord,
   onDeleteLastWord,
 }: MobileQuickCaptureProps) {
-  const hasCandidateDetails = canSaveWord && Boolean(reading.trim() || meaning.trim());
+  const hasSelectedResult = Boolean(selectedCandidateId);
+  const hasCandidateDetails = hasSelectedResult && Boolean(reading.trim() || meaning.trim());
 
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -107,13 +110,10 @@ export default function MobileQuickCapture({
           </p>
         ) : null}
 
-        {candidates.length > 1 ? (
+        {candidates.length > 0 ? (
           <div className="mt-3 max-h-44 space-y-2 overflow-y-auto pr-1">
             {candidates.map((candidate) => {
-              const selected =
-                surface === candidate.surface &&
-                reading === candidate.reading &&
-                meaning === candidate.meaning;
+              const selected = selectedCandidateId === candidate.id;
 
               return (
                 <button
@@ -170,7 +170,7 @@ export default function MobileQuickCapture({
             </>
           ) : (
             <p className="text-stone-500">
-              Search for a word, choose a result if needed, then save it to this book.
+              Search for a word, choose a result, then save it to this book.
             </p>
           )}
         </div>
@@ -179,7 +179,7 @@ export default function MobileQuickCapture({
           Add page and chapter details later on computer or tablet.
         </p>
 
-        {canSaveWord ? (
+        {hasSelectedResult && canSaveWord ? (
           <button
             type="button"
             onClick={onSaveWord}

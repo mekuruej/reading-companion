@@ -343,6 +343,8 @@ export function CuriosityReadingExperience({
     Record<string, LibraryStudyWordColorInfo>
   >({});
   const [quickLookupCandidates, setQuickLookupCandidates] = useState<QuickLookupCandidate[]>([]);
+  const [selectedQuickLookupCandidateId, setSelectedQuickLookupCandidateId] =
+    useState<string | null>(null);
   const [savedQuickNotice, setSavedQuickNotice] = useState("");
   const [lastSavedWordContext, setLastSavedWordContext] =
     useState<LastSavedWordContext | null>(null);
@@ -970,6 +972,7 @@ export function CuriosityReadingExperience({
     setHideKanjiInReadingSupport(false);
     setQuickError(null);
     setQuickLookupCandidates([]);
+    setSelectedQuickLookupCandidateId(null);
     setMessage("");
     if (!options.preserveSavedNotice) {
       setSavedQuickNotice("");
@@ -1073,6 +1076,7 @@ export function CuriosityReadingExperience({
           pageOrder: null,
         }));
         setQuickLookupCandidates([]);
+        setSelectedQuickLookupCandidateId(null);
         setQuickError("No result found.");
         return;
       }
@@ -1096,6 +1100,7 @@ export function CuriosityReadingExperience({
         pageOrder: null,
       });
       setQuickLookupCandidates(candidates);
+      setSelectedQuickLookupCandidateId(null);
       setMessage(
         candidates.length > 1
           ? "Loaded the first result. If your book uses a different reading, choose it below."
@@ -1117,15 +1122,21 @@ export function CuriosityReadingExperience({
         pageOrder: null,
       }));
       setQuickLookupCandidates([]);
+      setSelectedQuickLookupCandidateId(null);
       setQuickError("Could not pull word data.");
     } finally {
       setQuickLoading(false);
     }
   }
 
-  async function saveQuickWord() {
+  async function saveQuickWord(options: { requireSelectedLookup?: boolean } = {}) {
     if (isEnglishBook) {
       await saveEnglishQuickWord();
+      return;
+    }
+
+    if (options.requireSelectedLookup && !selectedQuickLookupCandidateId) {
+      setQuickError("Search and choose a result before saving.");
       return;
     }
 
@@ -1902,6 +1913,7 @@ export function CuriosityReadingExperience({
                 quickPreview.meaning.trim() &&
                 !quickPreview.isCustomMeaning
               )}
+              selectedCandidateId={selectedQuickLookupCandidateId}
               candidates={quickLookupCandidates}
               lastAddedWord={quickSessionWords[0] ?? null}
               inputRef={quickWordInputRef}
@@ -1920,6 +1932,7 @@ export function CuriosityReadingExperience({
                   pageOrder: null,
                 }));
                 setSavedQuickNotice("");
+                setSelectedQuickLookupCandidateId(null);
                 if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
               }}
               onSearch={() => void pullQuickWord()}
@@ -1940,6 +1953,7 @@ export function CuriosityReadingExperience({
                   meaning: candidate.meaning,
                   isCustomMeaning: candidate.isCustomMeaning,
                 }));
+                setSelectedQuickLookupCandidateId(candidate.id);
                 setQuickError(null);
               }}
               onMeaningChoiceChange={(index, meaning) =>
@@ -1950,7 +1964,7 @@ export function CuriosityReadingExperience({
                   isCustomMeaning: false,
                 }))
               }
-              onSaveWord={() => void saveQuickWord()}
+              onSaveWord={() => void saveQuickWord({ requireSelectedLookup: true })}
               onDeleteLastWord={(id) => void deleteQuickWordById(id)}
             />
           )}
@@ -2147,6 +2161,11 @@ export function CuriosityReadingExperience({
               locationPlaceholder={isListeningMode ? "p. 42 or 37%" : "Page"}
               locationHelpText={isListeningMode ? "Use a page if you have the book open, or a Kindle/audio percent as a listening note. Percent is not saved as a page." : undefined}
               allowPercentLocation={isListeningMode}
+              saveAreaWarning={
+                isRunning || isPaused
+                  ? "Timer is active. If you leave or refresh the page, you may lose your session."
+                  : undefined
+              }
             />
               </>
             )}

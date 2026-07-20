@@ -695,6 +695,12 @@ export default function BookHubPage() {
   const [saving, setSaving] = useState(false);
 
   const [activeTab, setActiveTab] = useState<HubTab>("reflection");
+  const isEnglishBook = row?.books?.language_code === "en";
+  useEffect(() => {
+    if (isEnglishBook && activeTab === "story") {
+      setActiveTab("reading");
+    }
+  }, [activeTab, isEnglishBook]);
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
   const [lastSavedWordPage, setLastSavedWordPage] = useState<number | null>(null);
@@ -5126,6 +5132,38 @@ export default function BookHubPage() {
   }
 
   const relatedLinksArr = Array.isArray(book.related_links) ? book.related_links : [];
+  const bookHubTabs = isEnglishBook
+    ? [
+      { id: "reflection" as const, label: "Reading Reflection" },
+      { id: "reading" as const, label: "Reading Sessions" },
+      { id: "bookInfo" as const, label: "Book Info" },
+    ]
+    : [
+      { id: "reflection" as const, label: "Reading Reflection" },
+      { id: "reading" as const, label: "Reading Sessions" },
+      { id: "story" as const, label: "Story Notes" },
+      { id: "bookInfo" as const, label: "Book Info" },
+    ];
+  const readingAddWordActions = [
+    {
+      id: "curiosity",
+      href: `/books/${encodeURIComponent(row.id)}/curiosity-reading`,
+      label: "Add from reading",
+      description: "Use Curiosity Reading when you stop to look up and save words.",
+    },
+    {
+      id: "listening",
+      href: `/books/${encodeURIComponent(row.id)}/listening`,
+      label: "Add from listening",
+      description: "Use Listening when you stop to look up and save heard words.",
+    },
+    {
+      id: "bulk",
+      href: `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}`,
+      label: "Bulk Add",
+      description: "Add several words to this book at once.",
+    },
+  ].filter((action) => !isEnglishBook || action.id !== "bulk");
 
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
@@ -5324,7 +5362,11 @@ export default function BookHubPage() {
                 </div>
               </div>
 
-              <BookHubTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+              <BookHubTabBar
+                activeTab={activeTab}
+                tabs={bookHubTabs}
+                onTabChange={setActiveTab}
+              />
 
               {activeTab === "bookInfo" && (
                 <div className="space-y-4">
@@ -5448,35 +5490,18 @@ export default function BookHubPage() {
                     <div className="mb-3 text-sm font-semibold text-stone-900">Add Words</div>
 
                     <div className="grid gap-3 md:grid-cols-3">
-                      <a
-                        href={`/books/${encodeURIComponent(row.id)}/curiosity-reading`}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        Add from reading
-                        <p className="mt-1 text-sm text-stone-500">
-                          Use Curiosity Reading when you stop to look up and save words.
-                        </p>
-                      </a>
-
-                      <a
-                        href={`/books/${encodeURIComponent(row.id)}/listening`}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        Add from listening
-                        <p className="mt-1 text-sm text-stone-500">
-                          Use Listening when you stop to look up and save heard words.
-                        </p>
-                      </a>
-
-                      <a
-                        href={`/vocab/bulk?userBookId=${encodeURIComponent(row.id)}`}
-                        className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                      >
-                        Bulk Add
-                        <p className="mt-1 text-sm text-stone-500">
-                          Add several words to this book at once.
-                        </p>
-                      </a>
+                      {readingAddWordActions.map((action) => (
+                        <a
+                          key={action.id}
+                          href={action.href}
+                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
+                        >
+                          {action.label}
+                          <p className="mt-1 text-sm text-stone-500">
+                            {action.description}
+                          </p>
+                        </a>
+                      ))}
                     </div>
                   </div>
                   <ReadingTab
@@ -5532,7 +5557,7 @@ export default function BookHubPage() {
                 </div>
               )}
 
-              {activeTab === "story" && (
+              {!isEnglishBook && activeTab === "story" && (
                 <div className="space-y-4">
                   {canUseStoryNotes ? (
                     <StoryTab
@@ -5629,6 +5654,7 @@ export default function BookHubPage() {
                     ratingOverall={ratingOverall}
                     setRatingOverall={setRatingOverall}
                     profileLevel={profileLevel}
+                    isEnglishBook={isEnglishBook}
                     bookType={book?.book_type ?? null}
                     ratingDifficulty={ratingDifficulty}
                     setRatingDifficulty={setRatingDifficulty}
