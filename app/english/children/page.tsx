@@ -138,26 +138,29 @@ export default function EnglishChildrenPage() {
         </section>
 
         <section className="mt-16 space-y-4">
-          <h2 className="text-2xl font-semibold">Tuition</h2>
+          <h2 className="text-2xl font-semibold">料金について</h2>
 
           <div className="space-y-3 text-stone-700">
             <p>
-              <span className="font-medium">Term payments</span> from{" "}
-              <strong>¥**** per term</strong>
+              <strong>1ターム ¥38,000</strong>
             </p>
 
             <p>
-              <span className="font-medium">Monthly installments</span> from{" "}
-              <strong>¥**** per month</strong>
+              <strong>週1回30分・全15回のレッスン</strong>
+            </p>
+
+            <p>
+              <span className="italic">または</span>{" "}
+              <strong>月額¥10,000 × 4回払い</strong>
             </p>
           </div>
 
           <p className="text-sm text-stone-600">
-            Four lesson plans are available to fit different schedules and budgets.
+            スケジュールやご予算に合わせて、4つのレッスンプランをご用意しています。
           </p>
 
           <p className="text-xs text-stone-500">
-            Detailed pricing is provided after your free trial session.
+            詳しい料金は体験レッスン後にご案内します。
           </p>
         </section>
 

@@ -135,26 +135,26 @@ export default function EnglishAdultsPage() {
         </section>
 
         <section className="mt-16 space-y-4">
-          <h2 className="text-2xl font-semibold">Tuition</h2>
+          <h2 className="text-2xl font-semibold">料金について</h2>
 
           <div className="space-y-3 text-stone-700">
             <p>
-              <span className="font-medium">Term payments</span> from{" "}
-              <strong>¥8,000 per term</strong>
+              <span className="font-medium">ターム払い</span>は{" "}
+              <strong>1ターム¥8,000から</strong>
             </p>
 
             <p>
-              <span className="font-medium">Monthly installments</span> from{" "}
-              <strong>¥4,000 per month</strong>
+              <span className="font-medium">月払い</span>は{" "}
+              <strong>月¥4,000から</strong>
             </p>
           </div>
 
           <p className="text-sm text-stone-600">
-            Four lesson plans are available to fit different schedules and budgets.
+            スケジュールやご予算に合わせて、4つのレッスンプランをご用意しています。
           </p>
 
           <p className="text-xs text-stone-500">
-            Detailed pricing is provided after your free trial session.
+            詳しい料金は体験レッスン後にご案内します。
           </p>
         </section>
 
