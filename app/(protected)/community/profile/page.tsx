@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileRow = {
@@ -14,6 +15,11 @@ type ProfileRow = {
   target_language: string | null;
   level: string | null;
   role: string | null;
+  is_super_teacher: boolean | null;
+  app_access_type: string | null;
+  app_access_expires_at: string | null;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
 };
 
 type PublicProfileRow = {
@@ -38,6 +44,15 @@ const profileActions = [
 
 function firstInitial(name: string) {
   return (name.trim()[0] ?? "M").toUpperCase();
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 export default function ProfileHubPage() {
@@ -72,7 +87,9 @@ export default function ProfileHubPage() {
         const [profileResult, publicProfileResult] = await Promise.all([
           supabase
             .from("profiles")
-            .select("display_name, username, native_language, target_language, level, role")
+            .select(
+              "display_name, username, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at"
+            )
             .eq("id", user.id)
             .maybeSingle<ProfileRow>(),
           supabase
@@ -112,6 +129,8 @@ export default function ProfileHubPage() {
     publicNameChoice === "username"
       ? username || displayName || "My Mekuru Profile"
       : displayName || username || "My Mekuru Profile";
+  const appAccessStatus = profile ? getAppAccessStatus(profile) : null;
+  const trialEndsAt = appAccessStatus?.trialEndsAt ?? profile?.app_access_expires_at ?? null;
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-6">
@@ -145,6 +164,46 @@ export default function ProfileHubPage() {
 
           </div>
         </div>
+
+        {appAccessStatus ? (
+          <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+              App Access
+            </p>
+            {appAccessStatus.isTrialActive ? (
+              <>
+                <h2 className="mt-2 text-xl font-black text-stone-950">
+                  Full-access trial active
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  {appAccessStatus.daysRemaining === 1
+                    ? "1 day remaining"
+                    : `${appAccessStatus.daysRemaining ?? 0} days remaining`}
+                  {trialEndsAt ? `, through ${formatDate(trialEndsAt)}.` : "."}
+                </p>
+              </>
+            ) : appAccessStatus.hasFullAccess ? (
+              <>
+                <h2 className="mt-2 text-xl font-black text-stone-950">
+                  Full access active
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  Your full MEKURU learning tools are available.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="mt-2 text-xl font-black text-stone-950">
+                  Free access
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  Your library and reading records remain available. Full-access study tools
+                  unlock again when a trial, lesson, or paid access grant is active.
+                </p>
+              </>
+            )}
+          </section>
+        ) : null}
 
         <div className="mt-5">
           <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">

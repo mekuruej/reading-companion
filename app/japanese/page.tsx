@@ -173,7 +173,7 @@ export default function MekuruHomepage() {
                                 <div className="mt-6">
                                     <p className="mb-2 text-xs text-stone-500">Inside the Mekuru Reading Companion</p>
                                     <img
-                                        src="/app-preview.jpg"
+                                        src="/app-preview.png"
                                         alt="Mekuru Reading Companion preview"
                                         className="rounded-xl border border-stone-200 shadow-sm"
                                     />

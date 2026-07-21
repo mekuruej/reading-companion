@@ -42,6 +42,7 @@ export default function ProfileSetupPage() {
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("Japanese");
   const [level, setLevel] = useState("");
+  const [shouldInitializeTrial, setShouldInitializeTrial] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -64,7 +65,9 @@ export default function ProfileSetupPage() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("display_name, username, native_language, target_language, level")
+        .select(
+          "display_name, username, native_language, target_language, level, app_access_type, trial_started_at"
+        )
         .eq("id", user.id)
         .maybeSingle();
 
@@ -80,6 +83,7 @@ export default function ProfileSetupPage() {
       setUsername(profile?.username ?? "");
       setTargetLanguage(profile?.target_language ?? "Japanese");
       setLevel(profile?.level ?? "");
+      setShouldInitializeTrial(!profile || (!profile.app_access_type && !profile.trial_started_at));
 
       const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
       if (
@@ -160,6 +164,17 @@ export default function ProfileSetupPage() {
         return;
       }
 
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+      const trialFields = shouldInitializeTrial
+        ? {
+            app_access_type: "trial",
+            app_access_expires_at: trialEndsAt.toISOString(),
+            trial_started_at: now.toISOString(),
+            trial_ends_at: trialEndsAt.toISOString(),
+          }
+        : {};
+
       const { error } = await supabase.from("profiles").upsert(
         {
           id: user.id,
@@ -168,6 +183,7 @@ export default function ProfileSetupPage() {
           native_language: selectedNativeLanguage,
           target_language: targetLanguage.trim(),
           level: level.trim(),
+          ...trialFields,
         },
         { onConflict: "id" }
       );

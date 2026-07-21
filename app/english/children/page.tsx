@@ -138,29 +138,26 @@ export default function EnglishChildrenPage() {
         </section>
 
         <section className="mt-16 space-y-4">
-          <h2 className="text-2xl font-semibold">料金について</h2>
-          <div className="space-y-4 text-sm text-stone-700">
-            <div>
-              <p className="font-medium">Term Plan — 16 Lessons</p>
-              <p>16 lessons（約4回/月）</p>
-              <p className="mt-1">¥**** per term</p>
-              <p className="text-xs text-stone-500">Approx. ¥**** per lesson</p>
-            </div>
-            <div>
-              <p className="font-medium">Flexible Plan — 12 Lessons</p>
-              <p>12 lessons（約3回/月）</p>
-              <p className="mt-1">¥**** per term</p>
-              <p className="text-xs text-stone-500">Approx. ¥**** per lesson</p>
-            </div>
-            <div>
-              <p className="font-medium">Light Plan — 8 Lessons</p>
-              <p>8 lessons（約2回/月）</p>
-              <p className="mt-1">¥**** per term</p>
-              <p className="text-xs text-stone-500">Approx. ¥**** per lesson</p>
-            </div>
+          <h2 className="text-2xl font-semibold">Tuition</h2>
+
+          <div className="space-y-3 text-stone-700">
+            <p>
+              <span className="font-medium">Term payments</span> from{" "}
+              <strong>¥**** per term</strong>
+            </p>
+
+            <p>
+              <span className="font-medium">Monthly installments</span> from{" "}
+              <strong>¥**** per month</strong>
+            </p>
           </div>
+
+          <p className="text-sm text-stone-600">
+            Four lesson plans are available to fit different schedules and budgets.
+          </p>
+
           <p className="text-xs text-stone-500">
-            料金は現在確認中です。表示している金額は仮のプレースホルダーです。
+            Detailed pricing is provided after your free trial session.
           </p>
         </section>
 

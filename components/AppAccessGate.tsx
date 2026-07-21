@@ -12,6 +12,19 @@ type Props = {
   children: React.ReactNode;
 };
 
+type AccessProfileRow = {
+  role?: string | null;
+  is_super_teacher?: boolean | string | null;
+  app_access_type?: string | null;
+  app_access_expires_at?: string | null;
+  trial_started_at?: string | null;
+  trial_ends_at?: string | null;
+};
+
+function isMissingColumnError(error: any) {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+
 export default function AppAccessGate({ children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,11 +56,26 @@ export default function AppAccessGate({ children }: Props) {
           return;
         }
 
-        const { data: profile, error } = await supabase
+        const profileResult = await supabase
           .from("profiles")
-          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+          .select(
+            "role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at"
+          )
           .eq("id", session.user.id)
           .maybeSingle();
+        let profile = profileResult.data as AccessProfileRow | null;
+        let error = profileResult.error;
+
+        if (isMissingColumnError(error)) {
+          const fallback = await supabase
+            .from("profiles")
+            .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+            .eq("id", session.user.id)
+            .maybeSingle();
+
+          profile = fallback.data as AccessProfileRow | null;
+          error = fallback.error;
+        }
 
         if (error) {
           console.error("Error checking app access:", error);

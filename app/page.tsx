@@ -85,7 +85,7 @@ export default function HomePage() {
             >
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.25em] text-slate-500">
-                  Japanese
+                  Japanese Reading Lesson
                 </p>
                 <h3 className="mt-3 text-2xl font-black leading-tight text-slate-950">
                   Read real Japanese with support
@@ -107,20 +107,19 @@ export default function HomePage() {
             >
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.25em] text-slate-500">
-                  English
+                  英語レッスン
                 </p>
                 <h3 className="mt-3 text-2xl font-black leading-tight text-slate-950">
-                  Build English through stories and conversation
+                  物語と会話で英語を育てる
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                  English lessons for Japanese speakers, using stories, books,
-                  personal experiences, and conversation to build natural
-                  communication.
+                  日本語話者向けの英語レッスンです。物語や本、自分の経験について
+                  話しながら、自然なコミュニケーション力を育てます。
                 </p>
               </div>
 
               <p className="mt-6 text-sm font-bold text-slate-950 group-hover:underline">
-                English through stories & conversation →
+                英語レッスンを見る →
               </p>
             </Link>
 

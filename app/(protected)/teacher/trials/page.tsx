@@ -72,6 +72,10 @@ export default function TeacherTrialsPage() {
   const [loading, setLoading] = useState(true);
   const [trialBooks, setTrialBooks] = useState<TrialPrepBook[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantingTrial, setGrantingTrial] = useState(false);
+  const [grantMessage, setGrantMessage] = useState("");
+  const [grantError, setGrantError] = useState("");
 
   async function loadTrialBooks() {
     setLoading(true);
@@ -130,6 +134,63 @@ export default function TeacherTrialsPage() {
     void loadTrialBooks();
   }, []);
 
+  async function grantTrialAccess() {
+    setGrantMessage("");
+    setGrantError("");
+
+    const email = grantEmail.trim();
+    if (!email) {
+      setGrantError("Enter the user's email first.");
+      return;
+    }
+
+    setGrantingTrial(true);
+
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.access_token) {
+        setGrantError("Please sign in again before granting a trial.");
+        return;
+      }
+
+      const response = await fetch("/api/teacher/access/grant-trial", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setGrantError(payload?.error ?? "Could not grant the trial right now.");
+        return;
+      }
+
+      const trialEndsAt = payload?.trialEndsAt
+        ? new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }).format(new Date(payload.trialEndsAt))
+        : "21 days from now";
+
+      setGrantMessage(`21-day full-access trial granted through ${trialEndsAt}.`);
+      setGrantEmail("");
+    } catch (err: any) {
+      console.error("Error granting trial access:", err);
+      setGrantError(err?.message ?? "Could not grant the trial right now.");
+    } finally {
+      setGrantingTrial(false);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -164,6 +225,53 @@ export default function TeacherTrialsPage() {
           {error}
         </section>
       ) : null}
+
+      <section className="mt-6 rounded-3xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-700">
+          App Access
+        </p>
+        <div className="mt-2 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <h2 className="text-xl font-black text-violet-950">
+              Grant a 21-day full-access trial
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-violet-900/80">
+              Use this for beta readers or book-club students who have already signed up.
+              Their library and reading records remain safe when the trial expires.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="email"
+              value={grantEmail}
+              onChange={(event) => setGrantEmail(event.target.value)}
+              placeholder="student@example.com"
+              className="w-full min-w-0 rounded-2xl border border-violet-200 bg-white px-4 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 sm:w-72"
+            />
+            <button
+              type="button"
+              onClick={grantTrialAccess}
+              disabled={grantingTrial}
+              className="rounded-2xl bg-violet-700 px-4 py-2 text-sm font-black text-white shadow-sm hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-300"
+            >
+              {grantingTrial ? "Granting..." : "Grant Trial"}
+            </button>
+          </div>
+        </div>
+
+        {grantMessage ? (
+          <p className="mt-3 rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700">
+            {grantMessage}
+          </p>
+        ) : null}
+
+        {grantError ? (
+          <p className="mt-3 rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700">
+            {grantError}
+          </p>
+        ) : null}
+      </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
