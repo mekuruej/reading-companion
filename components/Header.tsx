@@ -228,7 +228,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
-                    Book Hub Index
+                    Book Hubs
                   </Link>
 
                   <Link
@@ -239,7 +239,7 @@ export default function Header() {
                       }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
-                    Vocab List Index
+                    Vocabulary Archive
                   </Link>
                 </div>
               ) : null}
