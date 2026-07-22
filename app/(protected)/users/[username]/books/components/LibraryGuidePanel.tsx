@@ -63,9 +63,13 @@ export default function LibraryGuidePanel({
         onClick={() => onNavigate("/trial-ended")}
         className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
       >
-        <div className="text-sm font-black text-slate-950">Want to Save Words from Your Books?</div>
+        <div className="text-sm font-black text-slate-950">
+          Wanna Save Word
+          <br />
+          From your Books?
+        </div>
         <p className="mt-1 text-xs leading-5 text-slate-600">
-          With Reading Access, you can save vocabulary, see color progress, and build toward Ability Check.
+          Joining Reading Access allows you to save vocabulary, create flashcards with your vocabulary, and generate stats from your books.
         </p>
       </button>
     </>
