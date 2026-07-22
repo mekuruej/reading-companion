@@ -102,6 +102,7 @@ export default function BookStudyPage() {
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [canUseBookStudy, setCanUseBookStudy] = useState(false);
   const [accessReason, setAccessReason] = useState<string>("free");
+  const [hasSavedWords, setHasSavedWords] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -118,7 +119,10 @@ export default function BookStudyPage() {
         if (authError) throw authError;
 
         if (!user) {
-          if (mounted) setCanUseBookStudy(false);
+          if (mounted) {
+            setCanUseBookStudy(false);
+            setHasSavedWords(false);
+          }
           return;
         }
 
@@ -142,11 +146,24 @@ export default function BookStudyPage() {
           setCanUseBookStudy(featureAccess.canUseBookStudy);
           setAccessReason(appStatus.reason);
         }
+
+        const { data: savedWordRows, error: savedWordError } = await supabase
+          .from("user_book_words")
+          .select("id")
+          .limit(1);
+
+        if (savedWordError) {
+          console.error("Error checking saved vocabulary:", savedWordError);
+          if (mounted) setHasSavedWords(false);
+        } else if (mounted) {
+          setHasSavedWords((savedWordRows ?? []).length > 0);
+        }
       } catch (error) {
         console.error("Error loading Book Study access:", error);
         if (mounted) {
           setCanUseBookStudy(false);
           setAccessReason("free");
+          setHasSavedWords(false);
         }
       } finally {
         if (mounted) setLoadingAccess(false);
@@ -195,7 +212,7 @@ export default function BookStudyPage() {
               Book tracking is still available
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-              Flashcards and saved-word review return with Reading Access. For now, you can keep reading, logging time, checking basic book stats, and opening your read-only vocabulary archive.
+              Flashcards and saved-word review return with Reading Access. For now, you can keep reading, logging time, and checking basic book stats{hasSavedWords ? ", plus open your read-only vocabulary archive" : ""}.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               <Link
@@ -204,12 +221,14 @@ export default function BookStudyPage() {
               >
                 My Library
               </Link>
-              <Link
-                href="/library/vocab-list-index"
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Vocabulary Archive
-              </Link>
+              {hasSavedWords ? (
+                <Link
+                  href="/library/vocab-list-index"
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Vocabulary Archive
+                </Link>
+              ) : null}
             </div>
           </section>
         ) : (

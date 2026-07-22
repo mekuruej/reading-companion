@@ -67,6 +67,7 @@ export default function SimpleTimedSessionPage({
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccessBook, setCanAccessBook] = useState(false);
     const [accessMessage, setAccessMessage] = useState("");
+    const [hasSavedWords, setHasSavedWords] = useState(false);
 
     const [sessionDate, setSessionDate] = useState("");
     const [sessionStartPage, setSessionStartPage] = useState("");
@@ -95,6 +96,7 @@ export default function SimpleTimedSessionPage({
             setAccessChecked(false);
             setCanAccessBook(false);
             setAccessMessage("");
+            setHasSavedWords(false);
 
             const {
                 data: { user },
@@ -182,6 +184,20 @@ export default function SimpleTimedSessionPage({
             setAccessChecked(true);
             setBookTitle(book?.title ?? "Untitled book");
             setBookCover(book?.cover_url ?? "");
+
+            const { data: savedWordRows, error: savedWordError } = await supabase
+                .from("user_book_words")
+                .select("id")
+                .eq("user_book_id", userBookId)
+                .limit(1);
+
+            if (savedWordError) {
+                console.error("Error checking timed session saved words:", savedWordError);
+                setHasSavedWords(false);
+            } else {
+                setHasSavedWords((savedWordRows ?? []).length > 0);
+            }
+
             setLoading(false);
         }
 
@@ -552,15 +568,17 @@ export default function SimpleTimedSessionPage({
                         </button>
 
                         <div className="flex flex-wrap gap-2 sm:justify-end">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
-                                }}
-                                className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                            >
-                                Vocabulary Archive
-                            </button>
+                            {hasSavedWords ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                                    }}
+                                    className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+                                >
+                                    Vocabulary Archive
+                                </button>
+                            ) : null}
 
                             <button
                                 type="button"

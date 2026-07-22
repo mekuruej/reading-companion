@@ -9,6 +9,7 @@ type BookHubActionGridProps = {
     canUseSavedWordReading: boolean;
     canUseStudyFlashcards: boolean;
     canUseVocabularyList: boolean;
+    hasSavedWords: boolean;
 
     onCuriosityReading: () => void;
     onFluidReadingExtensive: () => void;
@@ -106,6 +107,7 @@ export default function BookHubActionGrid({
     canUseSavedWordReading,
     canUseStudyFlashcards,
     canUseVocabularyList,
+    hasSavedWords,
     onCuriosityReading,
     onFluidReadingExtensive,
     onFluidReadingJustReading,
@@ -133,13 +135,15 @@ export default function BookHubActionGrid({
                         onClick={onListening}
                     />
 
-                    <ActionButton
-                        title="Vocabulary"
-                        subtitle="Archive"
-                        description="View saved words for this book and export CSV."
-                        className="bg-stone-50 hover:bg-stone-100"
-                        onClick={onVocabularyList}
-                    />
+                    {hasSavedWords ? (
+                        <ActionButton
+                            title="Vocabulary"
+                            subtitle="Archive"
+                            description="View saved words for this book and export CSV."
+                            className="bg-stone-50 hover:bg-stone-100"
+                            onClick={onVocabularyList}
+                        />
+                    ) : null}
                 </div>
             </div>
         );
@@ -191,14 +195,16 @@ export default function BookHubActionGrid({
                     onClick={onStudyFlashcards}
                 />
 
-                <ActionButton
-                    title="Vocabulary"
-                    subtitle="List"
-                    description="Open the saved words and vocabulary tools for this book."
-                    className="bg-emerald-50 hover:bg-emerald-100"
-                    locked={!canUseVocabularyList}
-                    onClick={onVocabularyList}
-                />
+                {hasSavedWords ? (
+                    <ActionButton
+                        title="Vocabulary"
+                        subtitle="List"
+                        description="Open the saved words and vocabulary tools for this book."
+                        className="bg-emerald-50 hover:bg-emerald-100"
+                        locked={!canUseVocabularyList}
+                        onClick={onVocabularyList}
+                    />
+                ) : null}
             </div>
         </div>
     );

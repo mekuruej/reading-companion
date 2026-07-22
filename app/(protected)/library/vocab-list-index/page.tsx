@@ -12,7 +12,9 @@ export default function VocabListIndexPage() {
       title="Open a Vocabulary Archive"
       description="Choose a book to view saved words and export CSV. Editing tools stay with Reading Access."
       actionLabel="Vocabulary Archive"
+      emptyText="No saved words yet."
       accent="stone"
+      requireSavedWords
       hrefForBook={(userBookId) => `/books/${userBookId}/words`}
     />
   );

@@ -22,6 +22,10 @@ type LibraryBookRow = {
     books: BookInfo | BookInfo[] | null;
 };
 
+type SavedWordCountRow = {
+    user_book_id: string | null;
+};
+
 type LibraryBookActionIndexProps = {
     eyebrow: string;
     title: string;
@@ -32,6 +36,7 @@ type LibraryBookActionIndexProps = {
     backLabel?: string;
     emptyText?: string;
     accent?: "stone" | "rose" | "emerald" | "sky" | "violet" | "amber" | "indigo";
+    requireSavedWords?: boolean;
     hrefForBook: (userBookId: string) => string;
 };
 
@@ -195,6 +200,7 @@ export default function LibraryBookActionIndex({
     backLabel = "Back to Library",
     emptyText = "No books in this section yet.",
     accent = "stone",
+    requireSavedWords = false,
     hrefForBook,
 }: LibraryBookActionIndexProps) {
     const [loading, setLoading] = useState(true);
@@ -249,7 +255,27 @@ export default function LibraryBookActionIndex({
 
                 if (!isMounted) return;
 
-                setRows((data ?? []) as LibraryBookRow[]);
+                let nextRows = (data ?? []) as LibraryBookRow[];
+
+                if (requireSavedWords && nextRows.length > 0) {
+                    const userBookIds = nextRows.map((row) => row.id);
+                    const { data: wordRows, error: wordError } = await supabase
+                        .from("user_book_words")
+                        .select("user_book_id")
+                        .in("user_book_id", userBookIds);
+
+                    if (wordError) throw wordError;
+
+                    const userBookIdsWithWords = new Set(
+                        ((wordRows ?? []) as SavedWordCountRow[])
+                            .map((row) => row.user_book_id)
+                            .filter((id): id is string => Boolean(id))
+                    );
+
+                    nextRows = nextRows.filter((row) => userBookIdsWithWords.has(row.id));
+                }
+
+                setRows(nextRows);
             } catch (error: any) {
                 console.error("Error loading library book action index:", {
                     message: error?.message,
@@ -273,7 +299,7 @@ export default function LibraryBookActionIndex({
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [requireSavedWords]);
 
     const filteredRows = useMemo(() => {
         const cleanSearch = search.trim().toLowerCase();

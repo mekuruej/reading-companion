@@ -5293,6 +5293,7 @@ export default function BookHubPage() {
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
+                hasSavedWords={(uniqueLookupCount ?? 0) > 0}
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/curiosity-reading`);

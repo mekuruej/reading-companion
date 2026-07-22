@@ -48,6 +48,7 @@ export default function StudyToolsPage() {
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [accessReason, setAccessReason] = useState<string>("free");
+  const [hasSavedWords, setHasSavedWords] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -67,6 +68,7 @@ export default function StudyToolsPage() {
           if (mounted) {
             setHasFullAccess(false);
             setAccessReason("free");
+            setHasSavedWords(false);
           }
           return;
         }
@@ -87,11 +89,24 @@ export default function StudyToolsPage() {
           setHasFullAccess(status.hasFullAccess);
           setAccessReason(status.reason);
         }
+
+        const { data: savedWordRows, error: savedWordError } = await supabase
+          .from("user_book_words")
+          .select("id")
+          .limit(1);
+
+        if (savedWordError) {
+          console.error("Error checking saved vocabulary:", savedWordError);
+          if (mounted) setHasSavedWords(false);
+        } else if (mounted) {
+          setHasSavedWords((savedWordRows ?? []).length > 0);
+        }
       } catch (error) {
         console.error("Error loading Study Hub access:", error);
         if (mounted) {
           setHasFullAccess(false);
           setAccessReason("free");
+          setHasSavedWords(false);
         }
       } finally {
         if (mounted) setLoadingAccess(false);
@@ -140,7 +155,7 @@ export default function StudyToolsPage() {
               Your reading life stays here
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-              Your library, book tracking, reading timers, basic book stats, and read-only vocabulary archive remain available. Full study tools return with Reading Access.
+              Your library, book tracking, reading timers, and basic book stats remain available. {hasSavedWords ? "Your read-only vocabulary archive is still here too. " : ""}Full study tools return with Reading Access.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               <Link
@@ -155,12 +170,14 @@ export default function StudyToolsPage() {
               >
                 Book Hubs
               </Link>
-              <Link
-                href="/library/vocab-list-index"
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Vocabulary Archive
-              </Link>
+              {hasSavedWords ? (
+                <Link
+                  href="/library/vocab-list-index"
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Vocabulary Archive
+                </Link>
+              ) : null}
             </div>
           </section>
         ) : (

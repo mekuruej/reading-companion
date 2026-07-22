@@ -41,6 +41,7 @@ export default function AdvancedStudyPage() {
     const [loadingAccess, setLoadingAccess] = useState(true);
     const [canUseAdvancedStudy, setCanUseAdvancedStudy] = useState(false);
     const [accessReason, setAccessReason] = useState<string>("free");
+    const [hasSavedWords, setHasSavedWords] = useState(false);
     const accessTitle = accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
 
     useEffect(() => {
@@ -56,6 +57,7 @@ export default function AdvancedStudyPage() {
                     if (mounted) {
                         setCanUseAdvancedStudy(false);
                         setAccessReason("free");
+                        setHasSavedWords(false);
                         setLoadingAccess(false);
                     }
                     return;
@@ -80,11 +82,24 @@ export default function AdvancedStudyPage() {
                     setAccessReason(appStatus.reason);
                     setLoadingAccess(false);
                 }
+
+                const { data: savedWordRows, error: savedWordError } = await supabase
+                    .from("user_book_words")
+                    .select("id")
+                    .limit(1);
+
+                if (savedWordError) {
+                    console.error("Failed to check saved vocabulary", savedWordError);
+                    if (mounted) setHasSavedWords(false);
+                } else if (mounted) {
+                    setHasSavedWords((savedWordRows ?? []).length > 0);
+                }
             } catch (error) {
                 console.error("Failed to load study access", error);
                 if (mounted) {
                     setCanUseAdvancedStudy(false);
                     setAccessReason("free");
+                    setHasSavedWords(false);
                     setLoadingAccess(false);
                 }
             }
@@ -131,8 +146,7 @@ export default function AdvancedStudyPage() {
                         </h2>
                         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
                             Advanced vocabulary study is part of Reading Access. You can still
-                            track books, log reading time, view basic stats, and open your saved
-                            vocabulary as a read-only archive with CSV export.
+                            track books, log reading time, and view basic stats{hasSavedWords ? ", plus open your saved vocabulary as a read-only archive with CSV export" : ""}.
                         </p>
                         <div className="mt-5 flex flex-wrap gap-3">
                             <Link
@@ -141,12 +155,14 @@ export default function AdvancedStudyPage() {
                             >
                                 My Library
                             </Link>
-                            <Link
-                                href="/library/vocab-list-index"
-                                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
-                            >
-                                Vocabulary Archive
-                            </Link>
+                            {hasSavedWords ? (
+                                <Link
+                                    href="/library/vocab-list-index"
+                                    className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                                >
+                                    Vocabulary Archive
+                                </Link>
+                            ) : null}
                         </div>
                     </section>
                 ) : (

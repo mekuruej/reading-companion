@@ -14,6 +14,7 @@ export default function Header() {
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
+  const [hasSavedWords, setHasSavedWords] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
@@ -42,6 +43,7 @@ export default function Header() {
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
+          setHasSavedWords(false);
           return;
         }
 
@@ -59,6 +61,18 @@ export default function Header() {
         setProfileIsSuperTeacher(!!profile?.is_super_teacher);
         setHasFullAccess(profile ? getAppAccessStatus(profile).hasFullAccess : false);
 
+        const { data: savedWordRows, error: savedWordError } = await supabase
+          .from("user_book_words")
+          .select("id")
+          .limit(1);
+
+        if (savedWordError) {
+          console.error("Failed to check saved vocabulary for header:", savedWordError);
+          setHasSavedWords(false);
+        } else {
+          setHasSavedWords((savedWordRows ?? []).length > 0);
+        }
+
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to load header data:", error);
@@ -66,6 +80,7 @@ export default function Header() {
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
+          setHasSavedWords(false);
         }
       }
     }
@@ -231,16 +246,18 @@ export default function Header() {
                     Book Hubs
                   </Link>
 
-                  <Link
-                    href="/library/vocab-list-index"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowLibraryMenu(false)}
-                  >
-                    Vocabulary Archive
-                  </Link>
+                  {hasSavedWords ? (
+                    <Link
+                      href="/library/vocab-list-index"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowLibraryMenu(false)}
+                    >
+                      Vocabulary Archive
+                    </Link>
+                  ) : null}
                 </div>
               ) : null}
             </div>
