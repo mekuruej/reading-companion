@@ -1,11 +1,76 @@
 type LibraryGuidePanelProps = {
   // Route decisions stay in page.tsx; this panel only displays guide buttons.
   onNavigate: (path: string) => void;
+  hasFullAccess: boolean;
+  hasSavedWords: boolean;
 };
 
 export default function LibraryGuidePanel({
   onNavigate,
+  hasFullAccess,
+  hasSavedWords,
 }: LibraryGuidePanelProps) {
+  const freeActions = (
+    <>
+      <button
+        type="button"
+        onClick={() => onNavigate("/books/add")}
+        className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
+      >
+        <div className="text-sm font-black text-slate-950">Add Book</div>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Add a new book to your library.
+        </p>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onNavigate("/library/just-reading-index")}
+        className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
+      >
+        <div className="text-sm font-black text-slate-950">Reading Timer</div>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Track a simple reading session.
+        </p>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onNavigate("/library/just-listening-index")}
+        className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
+      >
+        <div className="text-sm font-black text-slate-950">Listening Timer</div>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Track listening time for a book or audiobook.
+        </p>
+      </button>
+
+      {hasSavedWords ? (
+        <button
+          type="button"
+          onClick={() => onNavigate("/library/vocab-list-index")}
+          className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
+        >
+          <div className="text-sm font-black text-slate-950">Vocabulary Archive</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            View saved words and export CSV.
+          </p>
+        </button>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => onNavigate("/trial-ended")}
+        className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
+      >
+        <div className="text-sm font-black text-slate-950">Save Words from Books</div>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Reading Access adds vocabulary saving, color progress, and Ability Check.
+        </p>
+      </button>
+    </>
+  );
+
   return (
     <div className="mb-8 w-full">
       <details className="rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm md:hidden">
@@ -13,7 +78,8 @@ export default function LibraryGuidePanel({
           How do I use this Library on my phone?
         </summary>
 
-        <div className="mt-4 grid gap-3">
+        {hasFullAccess ? (
+          <div className="mt-4 grid gap-3">
           <button
             type="button"
             onClick={() => onNavigate("/books/add")}
@@ -54,7 +120,7 @@ export default function LibraryGuidePanel({
           >
             <div className="text-sm font-black text-slate-950">Listen</div>
             <p className="mt-1 text-xs leading-5 text-slate-600">
-              Track listening time and save words as you go.
+              Track listening time for a book or audiobook.
             </p>
           </button>
 
@@ -79,7 +145,10 @@ export default function LibraryGuidePanel({
               Review words from your books.
             </p>
           </button>
-        </div>
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-3">{freeActions}</div>
+        )}
       </details>
 
       <details className="hidden max-w-[1200px] rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm md:block">
@@ -87,12 +156,14 @@ export default function LibraryGuidePanel({
           How do I use this library?
         </summary>
 
-        <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
-          After requesting a book and adding it to your library, you can choose
-          how you want to read, study, listen, or review.
-        </p>
+        {hasFullAccess ? (
+          <>
+            <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
+              After requesting a book and adding it to your library, you can choose
+              how you want to read, study, listen, or review.
+            </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="grid gap-3">
             <button
               type="button"
@@ -144,7 +215,7 @@ export default function LibraryGuidePanel({
                 Listen
               </div>
               <p className="mt-1 truncate text-xs text-slate-600">
-                Track listening time and save words as you go.
+                Track listening time for a book or audiobook.
               </p>
             </button>
           </div>
@@ -176,7 +247,20 @@ export default function LibraryGuidePanel({
               </p>
             </button>
           </div>
-        </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
+              Use your library as a simple reading tracker. Add books, time your
+              reading or listening, and keep your reading records in one place.
+            </p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {freeActions}
+            </div>
+          </>
+        )}
       </details>
     </div>
   );

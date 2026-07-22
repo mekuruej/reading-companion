@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import {
   getLibraryStudyEncounterStageCounts,
 } from "@/lib/libraryStudyColor";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
@@ -157,6 +158,7 @@ export default function BooksPage() {
   const [meId, setMeId] = useState<string>("");
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
+  const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
 
@@ -208,6 +210,13 @@ export default function BooksPage() {
 
   const isViewingOwnLibrary =
     !!viewingUserId && !!meId && viewingUserId === meId;
+  const hasSavedWordsInLibrary = useMemo(
+    () =>
+      Object.values(readingStatsByUserBookId).some(
+        (stats) => (stats.wordsLookedUp ?? 0) > 0
+      ),
+    [readingStatsByUserBookId]
+  );
 
   const libraryOwnerLabel = isViewingStudentLibrary ? `${viewingLabel}’s` : "My";
 
@@ -996,7 +1005,7 @@ export default function BooksPage() {
 
       const { data: meProfile, error: meProfileErr } = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, username, time_zone")
+        .select("role, is_super_teacher, username, time_zone, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
         .eq("id", user.id)
         .single();
 
@@ -1011,6 +1020,7 @@ export default function BooksPage() {
 
       setMyRole(role);
       setIsSuperTeacher(superTeacherFlag);
+      setHasFullLearningAccess(meProfile ? getAppAccessStatus(meProfile).hasFullAccess : false);
 
       if (role === "super_teacher" || superTeacherFlag) {
         await loadPendingBookRequests();
@@ -1414,7 +1424,11 @@ export default function BooksPage() {
           <LearningTasksErrorBanner message={learningTasksError} />
         ) : null}
 
-        <LibraryGuidePanel onNavigate={(path) => router.push(path)} />
+        <LibraryGuidePanel
+          hasFullAccess={hasFullLearningAccess || isTeacher}
+          hasSavedWords={hasSavedWordsInLibrary}
+          onNavigate={(path) => router.push(path)}
+        />
 
         {false && isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">

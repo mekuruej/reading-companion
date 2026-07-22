@@ -137,10 +137,10 @@ export default function BookHubActionGrid({
 
                     {hasSavedWords ? (
                         <ActionButton
-                            title="Vocabulary"
-                            subtitle="Archive"
+                            title="Vocabulary Archive"
+                            subtitle="Saved Words"
                             description="View saved words for this book and export CSV."
-                            className="bg-stone-50 hover:bg-stone-100"
+                            className="bg-violet-50 hover:bg-violet-100"
                             onClick={onVocabularyList}
                         />
                     ) : null}
