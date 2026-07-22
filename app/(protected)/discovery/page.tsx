@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { BOOK_TYPE_OPTIONS, bookTypeTitleLabel } from "@/lib/books/bookTypes";
 import DiscoveryHubHeader from "./components/DiscoveryHubHeader";
 import DiscoveryErrorBanner from "./components/DiscoveryErrorBanner";
 import DiscoveryCardGrid from "./components/DiscoveryCardGrid";
@@ -118,11 +119,7 @@ function effectiveReaderLevel(
 }
 
 function bookTypeLabel(value: string | null | undefined) {
-  if (!value) return "book";
-  return value
-    .split(/[_-]/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return bookTypeTitleLabel(value, "book");
 }
 
 function formatReaderLevel(value: string | null | undefined) {
@@ -310,7 +307,7 @@ export default function DiscoveryHubPage() {
   }, []);
 
   const bookTypeOptions = useMemo(() => {
-    const types = new Set<string>();
+    const types = new Set<string>(BOOK_TYPE_OPTIONS.map((option) => option.value));
 
     for (const row of ratingRows) {
       const book = firstBook(row);

@@ -1,3 +1,6 @@
+const TRIAL_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSdOLSjK2XmYrajjWCuX2OFxvTXmzmdzJDOstr9x4A9cLYOnuA/viewform?usp=header";
+
 export default function MekuruPrivateLessonsPage() {
   return (
     <div className="min-h-screen bg-[#f8f5ef] text-[#2f2a24]">
@@ -129,9 +132,14 @@ export default function MekuruPrivateLessonsPage() {
               If this sounds like the kind of approach you have been looking for, you are welcome to join.
             </p>
             <div className="pt-2">
-              <button className="rounded-full bg-[#2f2a24] px-5 py-3 text-sm text-white hover:opacity-90">
+              <a
+                href={TRIAL_FORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block rounded-full border border-stone-900 bg-white px-5 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
+              >
                 Book a Free Introductory Session
-              </button>
+              </a>
             </div>
           </div>
         </section>

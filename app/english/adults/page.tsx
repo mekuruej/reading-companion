@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 
+const TRIAL_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSdOLSjK2XmYrajjWCuX2OFxvTXmzmdzJDOstr9x4A9cLYOnuA/viewform?usp=header";
+
 export default function EnglishAdultsPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-950">
@@ -58,12 +61,14 @@ export default function EnglishAdultsPage() {
             アメリカ出身の英語講師として、17年以上日本で英語を教えてきました。
           </p>
           <div className="pt-4">
-            <button
-              type="button"
-              className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
+            <a
+              href={TRIAL_FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
             >
-              体験レッスン事前フォームへ
-            </button>
+              体験レッスンについて相談する
+            </a>
           </div>
           <p className="mx-auto max-w-2xl text-sm leading-6 text-[#6b6257]">
             まずは、現在の英語レベルや学習目的、ご希望について、簡単な事前フォームにご回答ください。
@@ -183,12 +188,14 @@ export default function EnglishAdultsPage() {
         </section>
 
         <div className="pt-2 text-center">
-          <button
-            type="button"
-            className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
+          <a
+            href={TRIAL_FORM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
           >
             体験レッスン事前フォームへ
-          </button>
+          </a>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#6b6257]">
             まずは、現在の英語レベルや学習目的、ご希望について、簡単な事前フォームにご回答ください。
             内容を確認後、体験レッスンの日程をご予約いただけるリンクをメールでお送りします。

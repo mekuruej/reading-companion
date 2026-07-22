@@ -20,6 +20,7 @@ import StoryTab from "./components/tabs/StoryTab";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import { BOOK_TYPE_OPTIONS, bookTypeLabel as formatBookTypeLabel } from "@/lib/books/bookTypes";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
@@ -269,22 +270,6 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
   }
 }
 
-const BOOK_TYPE_OPTIONS = [
-  { value: "picture_book", label: "Picture Book" },
-  { value: "early_reader", label: "Early Reader" },
-  { value: "chapter_book", label: "Chapter Book" },
-  { value: "middle_grade", label: "Middle Grade" },
-  { value: "ya", label: "YA" },
-  { value: "novel", label: "Novel" },
-  { value: "short_story", label: "Short Story" },
-  { value: "manga", label: "Manga" },
-  { value: "nonfiction", label: "Nonfiction" },
-  { value: "essay", label: "Essay" },
-  { value: "memoir", label: "Memoir" },
-  { value: "textbook", label: "Textbook" },
-  { value: "other", label: "Other" },
-] as const;
-
 const GENRE_OPTIONS = [
   { value: "fantasy", label: "Fantasy" },
   { value: "science_fiction", label: "Science Fiction" },
@@ -517,9 +502,7 @@ function formatTypeLabel(value: string | null | undefined) {
 }
 
 function bookTypeLabel(value: string | null | undefined) {
-  return (
-    BOOK_TYPE_OPTIONS.find((opt) => opt.value === value)?.label ?? "—"
-  );
+  return formatBookTypeLabel(value);
 }
 
 function isDuplicateBookIsbnError(error: unknown) {

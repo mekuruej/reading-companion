@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
 
 export type TeacherRatingBookCardItem = {
   id: string;
@@ -36,11 +37,7 @@ function formatDate(value: string | null) {
 }
 
 function bookTypeLabel(value: string | null) {
-  if (!value) return "Book";
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return bookTypeTitleLabel(value);
 }
 
 function dnfReasonLabel(value: string | null) {

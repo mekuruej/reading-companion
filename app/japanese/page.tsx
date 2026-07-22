@@ -4,6 +4,8 @@
 import Link from "next/link";
 
 const SHOW_READING_COMPANION_CARD = true;
+const TRIAL_FORM_URL =
+    "https://docs.google.com/forms/d/e/1FAIpQLSdOLSjK2XmYrajjWCuX2OFxvTXmzmdzJDOstr9x4A9cLYOnuA/viewform?usp=header";
 
 export default function MekuruHomepage() {
     return (
@@ -98,10 +100,10 @@ export default function MekuruHomepage() {
                     </ul>
                     <div className="pt-6 text-center">
                         <a
-                            href="https://scheduler.zoom.us/mekuru/free-trial-japanese-reading-lesson"
+                            href={TRIAL_FORM_URL}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
+                            className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                         >
                             Book a Free Introductory Session
                         </a>
@@ -245,10 +247,10 @@ export default function MekuruHomepage() {
 
                 <div className="pt-2 text-center">
                     <a
-                        href="https://scheduler.zoom.us/mekuru/free-trial-japanese-reading-lesson"
+                        href={TRIAL_FORM_URL}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-block rounded-2xl bg-stone-900 px-6 py-3 text-sm font-medium text-white hover:bg-stone-700"
+                        className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                     >
                         Book a Free Introductory Session
                     </a>

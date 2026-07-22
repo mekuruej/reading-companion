@@ -20,22 +20,11 @@ import { TeacherBookFindCreateFields } from "./components/TeacherBookFindCreateF
 import { TeacherBookFindCreatePanel } from "./components/TeacherBookFindCreatePanel";
 import { TeacherBookInfoSection } from "./components/TeacherBookInfoSection";
 import { TeacherBookAddPageShell } from "./components/TeacherBookAddPageShell";
+import { BOOK_TYPE_OPTIONS as SHARED_BOOK_TYPE_OPTIONS, bookTypeLabel as formatBookTypeLabel } from "@/lib/books/bookTypes";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
-    { value: "picture_book", label: "Picture book" },
-    { value: "early_reader", label: "Early reader" },
-    { value: "chapter_book", label: "Chapter book" },
-    { value: "middle_grade", label: "Middle grade" },
-    { value: "ya", label: "YA" },
-    { value: "novel", label: "Novel" },
-    { value: "short_story", label: "Short Story" },
-    { value: "manga", label: "Manga" },
-    { value: "nonfiction", label: "Nonfiction" },
-    { value: "essay", label: "Essay" },
-    { value: "memoir", label: "Memoir" },
-    { value: "textbook", label: "Textbook" },
-    { value: "other", label: "Other" },
+    ...SHARED_BOOK_TYPE_OPTIONS,
 ];
 
 type BookRow = {
@@ -128,7 +117,7 @@ function metadataSourceLabel(value: IsbnLookupPreview["metadata_source"]) {
 }
 
 function bookTypeLabel(value: string | null | undefined) {
-    return BOOK_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? "—";
+    return formatBookTypeLabel(value);
 }
 
 function messageTone(message: string): "neutral" | "success" | "error" {

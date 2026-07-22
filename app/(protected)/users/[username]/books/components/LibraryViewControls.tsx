@@ -1,3 +1,5 @@
+import { BOOK_TYPE_OPTIONS } from "@/lib/books/bookTypes";
+
 type LibraryViewMode = "cover" | "list";
 
 type LibrarySortMode =
@@ -60,19 +62,11 @@ export default function LibraryViewControls({
           className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
         >
           <option value="all">Book Type</option>
-          <option value="picture_book">Picture Book</option>
-          <option value="early_reader">Early Reader</option>
-          <option value="chapter_book">Chapter Book</option>
-          <option value="middle_grade">Middle Grade</option>
-          <option value="ya">YA</option>
-          <option value="novel">Novel</option>
-          <option value="short_story">Short Story</option>
-          <option value="manga">Manga</option>
-          <option value="nonfiction">Nonfiction</option>
-          <option value="essay">Essay</option>
-          <option value="memoir">Memoir</option>
-          <option value="textbook">Textbook</option>
-          <option value="other">Other</option>
+          {BOOK_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
 
         <select

@@ -88,6 +88,8 @@ function bookTypeLabel(value: string | null | undefined) {
       return "YA";
     case "novel":
       return "Novel";
+    case "light_novel":
+      return "Light Novel";
     case "short_story":
       return "Short Story";
     case "manga":

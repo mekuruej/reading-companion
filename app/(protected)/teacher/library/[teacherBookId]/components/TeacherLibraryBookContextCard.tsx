@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
 
 type TeacherLibraryBookContextBook = {
   title: string | null;
@@ -103,12 +104,7 @@ export default function TeacherLibraryBookContextCard({
   showAddMore,
   onAddMore,
 }: TeacherLibraryBookContextCardProps) {
-  const typeLabel = book?.book_type
-    ? book.book_type
-      .split(/[_-]/)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ")
-    : "Book";
+  const typeLabel = bookTypeTitleLabel(book?.book_type);
   const findLinks = whereToFindLinks(book);
 
   return (

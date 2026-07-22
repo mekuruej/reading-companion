@@ -1,18 +1,4 @@
-const BOOK_TYPE_OPTIONS = [
-  { value: "picture_book", label: "Picture Book" },
-  { value: "early_reader", label: "Early Reader" },
-  { value: "chapter_book", label: "Chapter Book" },
-  { value: "middle_grade", label: "Middle Grade" },
-  { value: "ya", label: "YA" },
-  { value: "novel", label: "Novel" },
-  { value: "short_story", label: "Short Story" },
-  { value: "manga", label: "Manga" },
-  { value: "nonfiction", label: "Nonfiction" },
-  { value: "essay", label: "Essay" },
-  { value: "memoir", label: "Memoir" },
-  { value: "textbook", label: "Textbook" },
-  { value: "other", label: "Other" },
-] as const;
+import { bookTypeLabel as formatBookTypeLabel } from "@/lib/books/bookTypes";
 
 const DIFFICULTY_OPTIONS = [
   { value: 1, label: "Very easy" },
@@ -45,7 +31,7 @@ function stars5(value: number | null) {
 }
 
 function bookTypeLabel(value: string | null | undefined) {
-  return BOOK_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? "—";
+  return formatBookTypeLabel(value);
 }
 
 type DifficultyFieldProps = {

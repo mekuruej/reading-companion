@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { BOOK_TYPE_OPTIONS, bookTypeTitleLabel } from "@/lib/books/bookTypes";
 import FindBooksPageHeader from "./components/FindBooksPageHeader";
 import FindBooksErrorBanner from "./components/FindBooksErrorBanner";
 import FindBooksResultsState from "./components/FindBooksResultsState";
@@ -93,11 +94,7 @@ function cleanReaderAdvice(value: string | null | undefined) {
 }
 
 function bookTypeLabel(value: string | null | undefined) {
-  if (!value) return "Book";
-  return value
-    .split(/[_-]/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return bookTypeTitleLabel(value);
 }
 
 function formatReaderLevel(value: string | null | undefined) {
@@ -234,7 +231,7 @@ export default function FindBooksPage() {
   }, []);
 
   const bookTypeOptions = useMemo(() => {
-    const types = new Set<string>();
+    const types = new Set<string>(BOOK_TYPE_OPTIONS.map((option) => option.value));
     for (const row of ratingRows) {
       const book = firstBook(row);
       const type = row.book_type ?? book?.book_type ?? null;

@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
 
 type TrialPrepBook = {
   id: string;
@@ -61,11 +62,7 @@ function getBook(bookRow: TrialPrepBook["books"]) {
 }
 
 function formatBookType(value: string | null | undefined) {
-  if (!value) return "Trial text";
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return bookTypeTitleLabel(value, "Trial text");
 }
 
 export default function TeacherTrialsPage() {

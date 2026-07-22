@@ -1,3 +1,5 @@
+import { bookTypeLabel } from "@/lib/books/bookTypes";
+
 type CatalogBookResult = {
   id: string;
   title: string | null;
@@ -65,7 +67,7 @@ export default function AddBookCatalogResult({
         <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
           {result.book_type ? (
             <span className="rounded-full border border-stone-200 bg-white px-2 py-1 text-stone-600">
-              {result.book_type}
+              {bookTypeLabel(result.book_type)}
             </span>
           ) : null}
           {result.isbn13 ? (

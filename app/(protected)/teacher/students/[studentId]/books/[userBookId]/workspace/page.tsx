@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
 
 type TeacherUseStatus =
   | "want_to_test"
@@ -111,11 +112,7 @@ function teacherUseStatusBadgeClass(status: TeacherUseStatus | null | undefined)
 }
 
 function bookTypeLabel(value: string | null | undefined) {
-  if (!value) return "Book";
-  return value
-    .split(/[_-]/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return bookTypeTitleLabel(value);
 }
 
 function statusLabel(userBook: StudentUserBook | null) {

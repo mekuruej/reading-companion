@@ -139,6 +139,7 @@ function bookTypeLabel(value: string | null | undefined) {
     ya: "YA",
     adult: "Adult",
     novel: "Novels",
+    light_novel: "Light Novels",
     manga: "Manga",
     graded_reader: "Graded readers",
     nonfiction: "Nonfiction",
