@@ -5143,12 +5143,6 @@ export default function BookHubPage() {
       description: "Use Curiosity Reading when you stop to look up and save words.",
     },
     {
-      id: "listening",
-      href: `/books/${encodeURIComponent(row.id)}/listening`,
-      label: "Add from listening",
-      description: "Use Listening when you stop to look up and save heard words.",
-    },
-    {
       id: "bulk",
       href: `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}`,
       label: "Bulk Add",

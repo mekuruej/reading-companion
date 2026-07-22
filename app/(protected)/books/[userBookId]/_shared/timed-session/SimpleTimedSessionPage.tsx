@@ -559,7 +559,7 @@ export default function SimpleTimedSessionPage({
                                 }}
                                 className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
                             >
-                                Vocab List
+                                Vocabulary Archive
                             </button>
 
                             <button

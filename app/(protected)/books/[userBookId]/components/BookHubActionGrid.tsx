@@ -118,16 +118,16 @@ export default function BookHubActionGrid({
             <div className="pb-2">
                 <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     <ActionButton
-                        title="Just Reading"
-                        subtitle="(Timer)"
+                        title="Reading Timer"
+                        subtitle="Just Reading"
                         description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         onClick={onFluidReadingJustReading}
                     />
 
                     <ActionButton
-                        title="Listening"
-                        subtitle="(Timer)"
+                        title="Listening Timer"
+                        subtitle="Just Listening"
                         description={["Listen to the audiobook", "and log your listening time."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         onClick={onListening}
@@ -175,9 +175,9 @@ export default function BookHubActionGrid({
                 />
 
                 <ActionButton
-                    title="Listening"
-                    subtitle="(Ear Training)"
-                    description={["Listen to the audiobook", "and log words you hear."]}
+                    title="Listening Timer"
+                    subtitle="Just Listening"
+                    description={["Listen to the audiobook", "and log your listening time."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onListening}
                 />

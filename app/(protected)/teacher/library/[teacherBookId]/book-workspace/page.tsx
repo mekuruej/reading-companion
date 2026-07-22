@@ -353,9 +353,9 @@ export default function TeacherBookWorkspacePage() {
         tone: "purple",
       },
       {
-        title: "Listening",
-        subtitle: "Ear Training",
-        description: "Listen to the book and log words you hear.",
+        title: "Listening Timer",
+        subtitle: "Just Listening",
+        description: "Listen to the book and log listening time.",
         href: `/books/${encodedUserBookId}/listening`,
         tone: "purple",
       },
