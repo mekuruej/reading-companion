@@ -1,7 +1,21 @@
 // Study Hub
 //
 
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { supabase } from "@/lib/supabaseClient";
+
+type ProfileAccessRow = {
+  role: string | null;
+  is_super_teacher: boolean | null;
+  app_access_type: string | null;
+  app_access_expires_at: string | null;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
+};
 
 const studyPaths = [
   {
@@ -31,6 +45,69 @@ const studyPaths = [
 ];
 
 export default function StudyToolsPage() {
+  const [loadingAccess, setLoadingAccess] = useState(true);
+  const [hasFullAccess, setHasFullAccess] = useState(false);
+  const [accessReason, setAccessReason] = useState<string>("free");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadAccess() {
+      setLoadingAccess(true);
+
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) throw authError;
+
+        if (!user) {
+          if (mounted) {
+            setHasFullAccess(false);
+            setAccessReason("free");
+          }
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+          .eq("id", user.id)
+          .maybeSingle<ProfileAccessRow>();
+
+        if (profileError) throw profileError;
+
+        const status = profile
+          ? getAppAccessStatus(profile)
+          : { hasFullAccess: false, reason: "free" };
+
+        if (mounted) {
+          setHasFullAccess(status.hasFullAccess);
+          setAccessReason(status.reason);
+        }
+      } catch (error) {
+        console.error("Error loading Study Hub access:", error);
+        if (mounted) {
+          setHasFullAccess(false);
+          setAccessReason("free");
+        }
+      } finally {
+        if (mounted) setLoadingAccess(false);
+      }
+    }
+
+    void loadAccess();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const accessTitle =
+    accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
+
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
       <div className="mx-auto max-w-5xl">
@@ -48,6 +125,45 @@ export default function StudyToolsPage() {
           </p>
         </div>
 
+        {loadingAccess ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <p className="text-sm font-semibold text-slate-600">
+              Loading reading access...
+            </p>
+          </section>
+        ) : !hasFullAccess ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+              {accessTitle}
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Your reading life stays here
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+              Your library, book tracking, reading timers, basic book stats, and read-only vocabulary archive remain available. Full study tools return with Reading Access.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <Link
+                href="/books"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                My Library
+              </Link>
+              <Link
+                href="/library/book-hubs"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Book Hubs
+              </Link>
+              <Link
+                href="/library/vocab-list-index"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Vocabulary Archive
+              </Link>
+            </div>
+          </section>
+        ) : (
         <div className="grid gap-5 md:grid-cols-3">
           {studyPaths.map((path) => (
             <Link
@@ -74,7 +190,9 @@ export default function StudyToolsPage() {
             </Link>
           ))}
         </div>
+        )}
 
+        {hasFullAccess ? (
         <div className="mt-6 rounded-3xl border border-slate-200 bg-white/75 p-5 text-center shadow-sm">
           <p className="text-sm font-semibold text-slate-700">
             Not sure where to go?
@@ -89,6 +207,7 @@ export default function StudyToolsPage() {
             books. Book Study uses Mekuru’s full-access saved-word tools.
           </p>
         </div>
+        ) : null}
       </div>
     </main>
   );

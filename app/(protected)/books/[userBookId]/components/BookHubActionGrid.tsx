@@ -4,6 +4,7 @@
 "use client";
 
 type BookHubActionGridProps = {
+    hasFullAccess: boolean;
     canUseCuriosityReading: boolean;
     canUseSavedWordReading: boolean;
     canUseStudyFlashcards: boolean;
@@ -100,6 +101,7 @@ function ActionButton({
 }
 
 export default function BookHubActionGrid({
+    hasFullAccess,
     canUseCuriosityReading,
     canUseSavedWordReading,
     canUseStudyFlashcards,
@@ -111,6 +113,38 @@ export default function BookHubActionGrid({
     onStudyFlashcards,
     onVocabularyList,
 }: BookHubActionGridProps) {
+    if (!hasFullAccess) {
+        return (
+            <div className="pb-2">
+                <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                    <ActionButton
+                        title="Just Reading"
+                        subtitle="(Timer)"
+                        description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
+                        className="bg-violet-50 hover:bg-violet-100"
+                        onClick={onFluidReadingJustReading}
+                    />
+
+                    <ActionButton
+                        title="Listening"
+                        subtitle="(Timer)"
+                        description={["Listen to the audiobook", "and log your listening time."]}
+                        className="bg-violet-50 hover:bg-violet-100"
+                        onClick={onListening}
+                    />
+
+                    <ActionButton
+                        title="Vocabulary"
+                        subtitle="Archive"
+                        description="View saved words for this book and export CSV."
+                        className="bg-stone-50 hover:bg-stone-100"
+                        onClick={onVocabularyList}
+                    />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="pb-2">
             <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">

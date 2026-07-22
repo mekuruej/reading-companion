@@ -8,10 +8,10 @@ import LibraryBookActionIndex from "@/components/library/LibraryBookActionIndex"
 export default function VocabListIndexPage() {
   return (
     <LibraryBookActionIndex
-      eyebrow="Saved Vocabulary"
-      title="Open a Vocab List"
-      description="Choose a book to review or edit the words saved from that book."
-      actionLabel="Vocab List"
+      eyebrow="Vocabulary Archive"
+      title="Open a Vocabulary Archive"
+      description="Choose a book to view saved words and export CSV. Editing tools stay with Reading Access."
+      actionLabel="Vocabulary Archive"
       accent="stone"
       hrefForBook={(userBookId) => `/books/${userBookId}/words`}
     />

@@ -58,6 +58,7 @@ export default function EnglishAdultsPage() {
             {"大人のための\nプライベート\n英会話レッスン"}
           </h2>
           <p className="mx-auto max-w-2xl text-base leading-7 text-[#4f473d]">
+            大人の方の英会話を中心に、意欲のある高校生の英語リーディングもサポートしています。
             アメリカ出身の英語講師として、17年以上日本で英語を教えてきました。
           </p>
           <div className="pt-4">
@@ -77,6 +78,16 @@ export default function EnglishAdultsPage() {
         </section>
 
         <section className="space-y-4">
+          <h2 className="text-2xl font-semibold">For High School Students</h2>
+          <p className="text-base leading-7 text-[#4f473d]">
+            Students preparing for Eiken Pre-2, Grade 2, and above often discover that vocabulary and grammar alone are no longer enough. Reading longer passages with confidence becomes an essential skill.
+          </p>
+          <p className="text-base leading-7 text-[#4f473d]">
+            Together we&apos;ll read English books and passages, discuss what we&apos;ve read, build vocabulary naturally, and strengthen reading comprehension in a relaxed, supportive environment.
+          </p>
+        </section>
+
+        <section className="space-y-4">
           <h2 className="text-2xl font-semibold">たくさん話すことを大切にした英会話レッスンです。</h2>
           <p className="text-base leading-7 text-[#4f473d]">
             私は、英語はたくさん話すことで少しずつ身についていくと考えています。
@@ -89,7 +100,7 @@ export default function EnglishAdultsPage() {
             少しずつ自信を育てていきます。
           </p>
           <p className="text-base leading-7 text-[#4f473d]">
-            文法の勉強や英検対策、英語についてわからないことがあれば、お気軽にご相談ください。
+            文法の質問や英語についてわからないことがあれば、お気軽にご相談ください。
           </p>
           <p className="text-base leading-7 text-[#4f473d]">
             お持ちの教材や宿題、レッスンで聞きたい英語の質問を持ち込んでいただくこともできます。
@@ -106,6 +117,7 @@ export default function EnglishAdultsPage() {
             <ul className="mt-4 space-y-2 text-sm leading-6 text-[#4f473d]">
               <li>• リラックスして話せる雰囲気</li>
               <li>• 会話を中心にしたレッスン</li>
+              <li>• 高校生向けの英語リーディング</li>
               <li>• レベルや目的に合わせた内容</li>
               <li>• 必要なときは日本語で説明やサポート</li>
             </ul>
@@ -114,7 +126,8 @@ export default function EnglishAdultsPage() {
             <h3 className="text-lg font-semibold text-stone-900">持ち込みできる内容</h3>
             <ul className="mt-4 space-y-2 text-sm leading-6 text-[#4f473d]">
               <li>• 文法の質問</li>
-              <li>• 英検対策</li>
+              <li>• 読んでみたい英語の本や文章</li>
+              <li>• 英検などで気になる問題</li>
               <li>• 宿題やお持ちの教材</li>
               <li>• 英語について気になっていること</li>
             </ul>
@@ -126,7 +139,7 @@ export default function EnglishAdultsPage() {
           <div className="space-y-4 text-sm text-stone-700">
             <div>
               <p className="font-medium">対象</p>
-              <p>大人向け</p>
+              <p>大人・意欲のある高校生</p>
             </div>
             <div>
               <p className="font-medium">レッスン形式</p>
@@ -177,7 +190,7 @@ export default function EnglishAdultsPage() {
             </p>
             <p className="text-base leading-7 text-[#4f473d]">
               一人ひとりに合う学び方は違います。たくさん自由に話したい方もいれば、
-              文法や英検、教材を使ったサポートがある方が安心できる方もいます。
+              文法や英検などで気になる問題を少し確認できる方が安心できる方もいます。
             </p>
             <p className="text-base leading-7 text-[#4f473d]">
               継続して英語を使うことで、自信は少しずつ育っていきます。

@@ -226,6 +226,9 @@ export default function StudentWorkspacePage() {
   const addBookHref = `/books/add?destination=student&targetUserId=${encodeURIComponent(
     studentId
   )}&context=student-lesson-book&from=student-workspace`;
+  const addLibraryBookHref = `/books/add?destination=student&targetUserId=${encodeURIComponent(
+    studentId
+  )}&from=student-workspace`;
   const notice = searchParams.get("notice");
   const workspaceNotice =
     notice === "lesson-book-existing"
@@ -716,18 +719,17 @@ export default function StudentWorkspacePage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={openTaskModal}
-                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-900 shadow-sm hover:bg-emerald-100"
-                >
-                  Assign Task
-                </button>
                 <Link
                   href={studentLibraryHref}
                   className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-bold text-stone-700 shadow-sm hover:bg-stone-50"
                 >
-                  View Full Student Library
+                  View Library
+                </Link>
+                <Link
+                  href={addLibraryBookHref}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-900 shadow-sm hover:bg-emerald-100"
+                >
+                  Add Book to Library
                 </Link>
               </div>
             </div>

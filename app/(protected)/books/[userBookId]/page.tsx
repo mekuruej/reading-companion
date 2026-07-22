@@ -669,6 +669,7 @@ export default function BookHubPage() {
   const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
   const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
   const [canSeeVocabularySummary, setCanSeeVocabularySummary] = useState(false);
+  const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
 
   const isTeacher = myRole === "teacher";
   const isTeacherContext = isTeacher || isSuperTeacher;
@@ -684,6 +685,11 @@ export default function BookHubPage() {
       setActiveTab("reading");
     }
   }, [activeTab, isEnglishBook]);
+  useEffect(() => {
+    if (!loading && !isEnglishBook && activeTab === "story" && !canUseStoryNotes) {
+      setActiveTab("reading");
+    }
+  }, [activeTab, canUseStoryNotes, isEnglishBook, loading]);
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
   const [lastSavedWordPage, setLastSavedWordPage] = useState<number | null>(null);
@@ -3410,6 +3416,7 @@ export default function BookHubPage() {
     setCanUseStudyFlashcards(false);
     setCanUseVocabularyList(false);
     setCanSeeVocabularySummary(false);
+    setHasFullLearningAccess(false);
     setStudentWorkspaceBackContext(null);
 
     const {
@@ -3475,6 +3482,7 @@ export default function BookHubPage() {
       canUseFullAccessFeature(featureAccess, "vocabulary_list")
     );
     setCanSeeVocabularySummary(featureAccess.canSeeVocabularyColors);
+    setHasFullLearningAccess(featureAccess.hasFullAccess);
 
     const bookHubSelect = `
         id,
@@ -5124,7 +5132,7 @@ export default function BookHubPage() {
     : [
       { id: "reflection" as const, label: "Reading Reflection" },
       { id: "reading" as const, label: "Reading Sessions" },
-      { id: "story" as const, label: "Story Notes" },
+      ...(canUseStoryNotes ? [{ id: "story" as const, label: "Story Notes" }] : []),
       { id: "bookInfo" as const, label: "Book Info" },
     ];
   const readingAddWordActions = [
@@ -5286,6 +5294,7 @@ export default function BookHubPage() {
                 saveNoticeTone={saveNoticeTone}
               />
               <BookHubActionGrid
+                hasFullAccess={hasFullLearningAccess}
                 canUseCuriosityReading={canUseCuriosityReading}
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
@@ -5469,6 +5478,7 @@ export default function BookHubPage() {
 
               {activeTab === "reading" && (
                 <div className="space-y-4">
+                  {hasFullLearningAccess ? (
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Add Words</div>
 
@@ -5487,6 +5497,7 @@ export default function BookHubPage() {
                       ))}
                     </div>
                   </div>
+                  ) : null}
                   <ReadingTab
                     row={row}
                     book={book}

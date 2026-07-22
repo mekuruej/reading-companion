@@ -8,8 +8,11 @@ import { supabase } from "@/lib/supabaseClient";
 
 type ProfileAccessRow = {
   role: string | null;
+  is_super_teacher: boolean | null;
   app_access_type: string | null;
   app_access_expires_at: string | null;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
 };
 
 const bookStudyTools = [
@@ -98,6 +101,7 @@ function BookStudyToolCard({
 export default function BookStudyPage() {
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [canUseBookStudy, setCanUseBookStudy] = useState(false);
+  const [accessReason, setAccessReason] = useState<string>("free");
 
   useEffect(() => {
     let mounted = true;
@@ -120,7 +124,7 @@ export default function BookStudyPage() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("role, app_access_type, app_access_expires_at")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
           .eq("id", user.id)
           .maybeSingle<ProfileAccessRow>();
 
@@ -128,16 +132,22 @@ export default function BookStudyPage() {
 
         const appStatus = profile
           ? getAppAccessStatus(profile)
-          : { hasFullAccess: false };
+          : { hasFullAccess: false, reason: "free" };
         const featureAccess = getFeatureAccess({
           role: profile?.role,
           hasFullAccess: appStatus.hasFullAccess,
         });
 
-        if (mounted) setCanUseBookStudy(featureAccess.canUseBookStudy);
+        if (mounted) {
+          setCanUseBookStudy(featureAccess.canUseBookStudy);
+          setAccessReason(appStatus.reason);
+        }
       } catch (error) {
         console.error("Error loading Book Study access:", error);
-        if (mounted) setCanUseBookStudy(false);
+        if (mounted) {
+          setCanUseBookStudy(false);
+          setAccessReason("free");
+        }
       } finally {
         if (mounted) setLoadingAccess(false);
       }
@@ -150,7 +160,8 @@ export default function BookStudyPage() {
     };
   }, []);
 
-  const lockStudyTools = loadingAccess || !canUseBookStudy;
+  const accessTitle =
+    accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -169,23 +180,57 @@ export default function BookStudyPage() {
           </p>
         </div>
 
+        {loadingAccess ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <p className="text-sm font-semibold text-slate-600">
+              Loading reading access...
+            </p>
+          </section>
+        ) : !canUseBookStudy ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+              {accessTitle}
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Book tracking is still available
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+              Flashcards and saved-word review return with Reading Access. For now, you can keep reading, logging time, checking basic book stats, and opening your read-only vocabulary archive.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <Link
+                href="/books"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                My Library
+              </Link>
+              <Link
+                href="/library/vocab-list-index"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Vocabulary Archive
+              </Link>
+            </div>
+          </section>
+        ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {bookStudyTools.map((tool) => (
             <BookStudyToolCard
               key={tool.href}
               tool={tool}
-              locked={lockStudyTools}
+              locked={loadingAccess}
             />
           ))}
         </div>
+        )}
 
+        {canUseBookStudy ? (
         <div className="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-5 text-center shadow-sm">
           <p className="text-sm font-semibold text-slate-700">
-            {canUseBookStudy
-              ? "Book Study uses Mekuru’s full-access saved-word tools."
-              : "Book Study is a full-access saved-word area. Book tracking, reflections, and reading timers are still available."}
+            Book Study uses Mekuru’s full-access saved-word tools.
           </p>
         </div>
+        ) : null}
 
         <div className="mt-6 text-center">
           <Link

@@ -6,12 +6,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function Header() {
   const [username, setUsername] = useState<string | null>(null);
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
+  const [hasFullAccess, setHasFullAccess] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
@@ -39,12 +41,13 @@ export default function Header() {
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
+          setHasFullAccess(false);
           return;
         }
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("username, role, is_super_teacher")
+          .select("username, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -54,6 +57,7 @@ export default function Header() {
         setUsername(profile?.username ?? null);
         setProfileRole(profile?.role ?? null);
         setProfileIsSuperTeacher(!!profile?.is_super_teacher);
+        setHasFullAccess(profile ? getAppAccessStatus(profile).hasFullAccess : false);
 
       } catch (error) {
         if (!cancelled) {
@@ -61,6 +65,7 @@ export default function Header() {
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
+          setHasFullAccess(false);
         }
       }
     }
@@ -135,6 +140,7 @@ export default function Header() {
     pathname.startsWith("/teacher/testing");
   const showTeacherLink =
     profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher;
+  const showFullAccessNavigation = hasFullAccess || showTeacherLink;
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -239,6 +245,7 @@ export default function Header() {
               ) : null}
             </div>
 
+            {showFullAccessNavigation ? (
             <div className="relative" ref={studyMenuRef}>
               <Link
                 href="/library-study"
@@ -326,7 +333,9 @@ export default function Header() {
                 </div>
               ) : null}
             </div>
+            ) : null}
 
+            {showFullAccessNavigation ? (
             <div className="relative" ref={discoveryMenuRef}>
               <Link
                 href="/discovery"
@@ -409,7 +418,9 @@ export default function Header() {
                 </div>
               ) : null}
             </div>
+            ) : null}
 
+            {showFullAccessNavigation ? (
             <div className="relative" ref={profileMenuRef}>
               <Link
                 href="/community"
@@ -490,6 +501,7 @@ export default function Header() {
                 </div>
               ) : null}
             </div>
+            ) : null}
             {showTeacherLink ? (
               <div
                 className="relative order-last flex basis-full justify-center md:order-none md:block md:basis-auto"
