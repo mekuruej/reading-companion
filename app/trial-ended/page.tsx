@@ -22,15 +22,22 @@ export default function TrialEndedPage() {
           </a>
 
           <a
-            href="/"
+            href="mailto:mekuru.ej@gmail.com"
             className="inline-block rounded-2xl border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50"
           >
-            Back to homepage
+            Email Mekuru
           </a>
         </div>
 
         <p className="mt-4 text-sm text-stone-500">
-          Interested in continuing with full access? Reach out and I’ll help you get set up.
+          Interested in continuing with full access? Email{" "}
+          <a
+            href="mailto:mekuru.ej@gmail.com"
+            className="font-medium text-stone-700 underline underline-offset-2 hover:text-stone-900"
+          >
+            mekuru.ej@gmail.com
+          </a>{" "}
+          and I’ll help you get set up.
         </p>
       </div>
     </main>
