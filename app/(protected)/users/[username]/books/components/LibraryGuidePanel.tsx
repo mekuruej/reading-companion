@@ -69,7 +69,7 @@ export default function LibraryGuidePanel({
           From your Books?
         </div>
         <p className="mt-1 text-xs leading-5 text-slate-600">
-          Joining Reading Access allows you to save vocabulary, create flashcards with your vocabulary, and generate stats from your books.
+          Join <strong>Reading Access</strong> to save vocabulary, make flashcards, and see book stats.
         </p>
       </button>
     </>
