@@ -116,6 +116,8 @@ type ReadingTabProps = {
     inputValue: string;
     setInputValue: (v: string) => void;
   }>;
+  onOpenListeningSession?: () => void;
+  listeningSessionButtonLabel?: string;
 };
 
 export default function ReadingTab({
@@ -175,6 +177,8 @@ export default function ReadingTab({
   progressModeLabel,
 
   DateField,
+  onOpenListeningSession,
+  listeningSessionButtonLabel = "Listening Timer",
 }: ReadingTabProps) {
   const [isEditingDates, setIsEditingDates] = useState(false);
   const usePercentMode = progressMode === "percent" && book.page_count != null && book.page_count > 0;
@@ -470,7 +474,18 @@ export default function ReadingTab({
       </div>
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="mb-3 text-sm font-semibold text-stone-900">Reading Sessions</div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-stone-900">Reading Sessions</div>
+          {onOpenListeningSession ? (
+            <button
+              type="button"
+              onClick={onOpenListeningSession}
+              className="rounded-2xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-800 shadow-sm transition hover:bg-stone-100"
+            >
+              {listeningSessionButtonLabel}
+            </button>
+          ) : null}
+        </div>
 
         {readingSessions.length === 0 ? (
           <div className="text-sm text-stone-500">No sessions yet.</div>

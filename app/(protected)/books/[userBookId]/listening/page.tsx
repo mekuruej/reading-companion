@@ -1,24 +1,27 @@
-// Listening Timer
+// Listening
 //
 
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
 import { supabase } from "@/lib/supabaseClient";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
+import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
 
 export default function ListeningPage() {
-  const router = useRouter();
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [canSaveWordsWhileListening, setCanSaveWordsWhileListening] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function redirectFullAccessUsers() {
+    async function loadListeningAccess() {
       const {
         data: { user },
         error: userError,
@@ -52,20 +55,26 @@ export default function ListeningPage() {
 
       if (cancelled) return;
 
-      if (!profileError && profile && getAppAccessStatus(profile).hasFullAccess) {
-        router.replace(`/books/${encodeURIComponent(userBookId)}?tab=reading&sessionMode=listening`);
-        return;
+      if (!profileError && profile) {
+        const appAccessStatus = getAppAccessStatus(profile);
+        const featureAccess = getFeatureAccess({
+          role: profile.role ?? null,
+          isSuperTeacher: profile.is_super_teacher,
+          hasFullAccess: appAccessStatus.hasFullAccess,
+        });
+
+        setCanSaveWordsWhileListening(canUseFullAccessFeature(featureAccess, "add_word"));
       }
 
       setCheckingAccess(false);
     }
 
-    void redirectFullAccessUsers();
+    void loadListeningAccess();
 
     return () => {
       cancelled = true;
     };
-  }, [router, userBookId]);
+  }, [userBookId]);
 
   if (checkingAccess) {
     return (
@@ -75,6 +84,10 @@ export default function ListeningPage() {
         </div>
       </main>
     );
+  }
+
+  if (canSaveWordsWhileListening) {
+    return <CuriosityReadingExperience experienceMode="listening" />;
   }
 
   return (

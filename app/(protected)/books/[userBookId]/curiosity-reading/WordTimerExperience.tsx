@@ -471,7 +471,7 @@ export function CuriosityReadingExperience({
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+        .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -484,7 +484,8 @@ export function CuriosityReadingExperience({
         : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
 
       const featureAccess = getFeatureAccess({
-        role: profile?.is_super_teacher ? "super_teacher" : profile?.role ?? null,
+        role: profile?.role ?? null,
+        isSuperTeacher: profile?.is_super_teacher,
 
         // For this first pass, anyone who currently has app access keeps
         // full learning access. Later, when expired trials become free users,

@@ -5327,11 +5327,6 @@ export default function BookHubPage() {
                 }}
                 onListening={() => {
                   if (!confirmLeaveIfTimerActive()) return;
-                  if (hasFullLearningAccess || isTeacher) {
-                    setSessionMode("listening");
-                    setActiveTab("reading");
-                    return;
-                  }
                   router.push(`/books/${row.id}/listening`);
                 }}
                 onStudyFlashcards={() => {
@@ -5566,6 +5561,13 @@ export default function BookHubPage() {
                     formatTypeLabel={formatTypeLabel}
                     progressModeLabel={progressModeLabel}
                     DateField={DateField}
+                    onOpenListeningSession={() => {
+                      if (!confirmLeaveIfTimerActive()) return;
+                      router.push(`/books/${row.id}/listening`);
+                    }}
+                    listeningSessionButtonLabel={
+                      hasFullLearningAccess || isTeacher ? "Listening + Words" : "Listening Timer"
+                    }
                   />
                 </div>
               )}

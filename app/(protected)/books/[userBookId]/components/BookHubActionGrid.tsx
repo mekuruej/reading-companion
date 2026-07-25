@@ -179,9 +179,9 @@ export default function BookHubActionGrid({
                 />
 
                 <ActionButton
-                    title="Listening Timer"
-                    subtitle="Just Listening"
-                    description={["Listen to the audiobook", "and log your listening time."]}
+                    title="Listening"
+                    subtitle="(Save Heard Words)"
+                    description={["Listen while saving vocab", "and log listening time."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onListening}
                 />
