@@ -24,13 +24,6 @@ export default function TrialEndedPage() {
           >
             Go to my Library
           </a>
-
-          <a
-            href="mailto:mekuru.ej@gmail.com"
-            className="inline-block rounded-2xl border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50"
-          >
-            Email Mekuru
-          </a>
         </div>
 
         <p className="mt-4 text-sm text-stone-500">

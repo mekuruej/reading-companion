@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import {
   canUseFullAccessFeature,
@@ -3434,11 +3434,24 @@ export default function BookHubPage() {
 
     setUserId(user.id);
 
-    const { data: meProfile, error: meProfileErr } = await supabase
+    const meProfileResult = await supabase
       .from("profiles")
-      .select("role, is_super_teacher, level, app_access_type, app_access_expires_at")
+      .select("role, is_super_teacher, level, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
       .eq("id", user.id)
       .single();
+    let meProfile: any = meProfileResult.data;
+    let meProfileErr = meProfileResult.error;
+
+    if (isMissingAppAccessColumnError(meProfileErr)) {
+      const fallbackResult = await supabase
+        .from("profiles")
+        .select("role, is_super_teacher, level")
+        .eq("id", user.id)
+        .single();
+
+      meProfile = fallbackResult.data;
+      meProfileErr = fallbackResult.error;
+    }
 
     if (meProfileErr) {
       console.error("Error loading profile role:", meProfileErr);
@@ -3458,6 +3471,8 @@ export default function BookHubPage() {
         role: currentProfileIsSuperTeacher ? "super_teacher" : currentProfileRole,
         app_access_type: (meProfile as any).app_access_type,
         app_access_expires_at: (meProfile as any).app_access_expires_at,
+        trial_started_at: (meProfile as any).trial_started_at,
+        trial_ends_at: (meProfile as any).trial_ends_at,
       })
       : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
 
@@ -5288,7 +5303,7 @@ export default function BookHubPage() {
                 saveNoticeTone={saveNoticeTone}
               />
               <BookHubActionGrid
-                hasFullAccess={hasFullLearningAccess}
+                hasFullAccess={hasFullLearningAccess || isTeacher}
                 canUseCuriosityReading={canUseCuriosityReading}
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}

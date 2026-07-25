@@ -36,9 +36,22 @@ type AppAccessStatus = {
     | "trial";
 };
 
+const FULL_ACCESS_TYPES = new Set([
+  "student",
+  "reading_access",
+  "lesson_access",
+  "paid",
+  "book_club",
+  "full_access",
+]);
+
+export function isMissingAppAccessColumnError(error: any) {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+
 export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
   const role = profile.role ?? "";
-  const accessType = profile.app_access_type ?? "";
+  const accessType = (profile.app_access_type ?? "").trim().toLowerCase();
   const trialEndsAt = profile.trial_ends_at ?? null;
   const expiresAt = profile.app_access_expires_at ?? trialEndsAt;
 
@@ -86,6 +99,10 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
 
   if (accessType === "none" || accessType === "inactive") {
     return status({ hasAccess: false, hasFullAccess: false, reason: accessType });
+  }
+
+  if (FULL_ACCESS_TYPES.has(accessType)) {
+    return status({ hasAccess: true, hasFullAccess: true, reason: "active" });
   }
 
   if (!expiresAt) {

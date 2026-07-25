@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import {
   getLibraryStudyEncounterStageCounts,
 } from "@/lib/libraryStudyColor";
-import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
@@ -1003,11 +1003,24 @@ export default function BooksPage() {
 
       setMeId(user.id);
 
-      const { data: meProfile, error: meProfileErr } = await supabase
+      const meProfileResult = await supabase
         .from("profiles")
         .select("role, is_super_teacher, username, time_zone, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
         .eq("id", user.id)
         .single();
+      let meProfile: any = meProfileResult.data;
+      let meProfileErr = meProfileResult.error;
+
+      if (isMissingAppAccessColumnError(meProfileErr)) {
+        const fallbackResult = await supabase
+          .from("profiles")
+          .select("role, is_super_teacher, username, time_zone")
+          .eq("id", user.id)
+          .single();
+
+        meProfile = fallbackResult.data;
+        meProfileErr = fallbackResult.error;
+      }
 
       if (meProfileErr) {
         logSbError("Error loading my profile role:", meProfileErr);

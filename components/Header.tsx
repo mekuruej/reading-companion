@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function Header() {
@@ -47,11 +47,24 @@ export default function Header() {
           return;
         }
 
-        const { data: profile, error: profileError } = await supabase
+        const profileResult = await supabase
           .from("profiles")
           .select("username, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
           .eq("id", user.id)
           .maybeSingle();
+        let profile: any = profileResult.data;
+        let profileError = profileResult.error;
+
+        if (isMissingAppAccessColumnError(profileError)) {
+          const fallbackResult = await supabase
+            .from("profiles")
+            .select("username, role, is_super_teacher")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          profile = fallbackResult.data;
+          profileError = fallbackResult.error;
+        }
 
         if (cancelled) return;
 
