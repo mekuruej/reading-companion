@@ -342,37 +342,49 @@ export default function Header() {
                     Foundation Sets
                   </Link>
 
-                  <Link
-                    href={canUseLearningStudy ? "/library-study/book-study" : "/library-study"}
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/book-study" ||
-                      pathname === "/library-study/book-flashcards"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowStudyMenu(false)}
-                  >
-                    Book Study{canUseLearningStudy ? "" : " 🔒"}
-                    {!canUseLearningStudy ? (
-                      <span className="block text-xs text-stone-500">Reading Access</span>
-                    ) : null}
-                  </Link>
+                  {canUseLearningStudy ? (
+                    <Link
+                      href="/library-study/book-study"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/book-study" ||
+                        pathname === "/library-study/book-flashcards"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowStudyMenu(false)}
+                    >
+                      Book Study
+                    </Link>
+                  ) : (
+                    <div className="block cursor-default rounded-xl px-3 py-2 text-sm leading-tight text-stone-400">
+                      Book Study 🔒
+                      <span className="block text-xs text-stone-500">
+                        Reading Access
+                      </span>
+                    </div>
+                  )}
 
-                  <Link
-                    href={canUseLearningStudy ? "/library-study/advanced" : "/library-study"}
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
-                      pathname === "/library-study/check" ||
-                      pathname === "/library-study/practice" ||
-                      pathname === "/library-study/word-sky"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowStudyMenu(false)}
-                  >
-                    Advanced Study{canUseLearningStudy ? "" : " 🔒"}
-                    {!canUseLearningStudy ? (
-                      <span className="block text-xs text-stone-500">Reading Access</span>
-                    ) : null}
-                  </Link>
+                  {canUseLearningStudy ? (
+                    <Link
+                      href="/library-study/advanced"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
+                          pathname === "/library-study/check" ||
+                          pathname === "/library-study/practice" ||
+                          pathname === "/library-study/word-sky"
+                          ? "bg-stone-100 font-medium text-stone-900"
+                          : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowStudyMenu(false)}
+                    >
+                      Advanced Study
+                    </Link>
+                  ) : (
+                    <div className="block cursor-default rounded-xl px-3 py-2 text-sm leading-tight text-stone-400">
+                      Advanced Study 🔒
+                      <span className="block text-xs text-stone-500">
+                        Reading Access
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
