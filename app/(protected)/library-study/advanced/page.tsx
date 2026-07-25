@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import VocabularyGrowthCycleSection from "./components/VocabularyGrowthCycleSection";
-import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -18,21 +18,21 @@ type ProfileAccessRow = {
 
 const advancedTools = [
     {
-        title: "Book Flashcards",
-        href: "/library-study/book-flashcards",
-        eyebrow: "Targeted Study",
-        className: "border-indigo-200 bg-indigo-50 text-indigo-950",
+        title: "Ability Check",
+        href: "/library-study/check",
+        eyebrow: "Smart gates",
+        className: "border-emerald-200 bg-emerald-50 text-emerald-950",
     },
     {
-        title: "Saved Words Review",
+        title: "Library Review",
         href: "/library-study/practice",
         eyebrow: "Across books",
         className: "border-sky-200 bg-sky-50 text-sky-950",
     },
     {
-        title: "久しぶり Review",
-        href: "/library-study/practice?color=purple",
-        eyebrow: "Mastered words",
+        title: "Word Sky",
+        href: "/library-study/word-sky",
+        eyebrow: "Word growth",
         className: "border-violet-200 bg-violet-50 text-violet-950",
     },
 ];
@@ -63,17 +63,33 @@ export default function AdvancedStudyPage() {
                     return;
                 }
 
-                const { data: profile } = await supabase
+                const profileResult = await supabase
                     .from("profiles")
                     .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
                     .eq("id", user.id)
                     .maybeSingle<ProfileAccessRow>();
+                let profile: any = profileResult.data;
+                let profileError = profileResult.error;
+
+                if (isMissingAppAccessColumnError(profileError)) {
+                    const fallbackResult = await supabase
+                        .from("profiles")
+                        .select("role, is_super_teacher")
+                        .eq("id", user.id)
+                        .maybeSingle();
+
+                    profile = fallbackResult.data;
+                    profileError = fallbackResult.error;
+                }
+
+                if (profileError) throw profileError;
 
                 const appStatus = profile
                     ? getAppAccessStatus(profile)
                     : { hasFullAccess: false, reason: "free" as const };
                 const featureAccess = getFeatureAccess({
                     role: profile?.role,
+                    isSuperTeacher: profile?.is_super_teacher,
                     hasFullAccess: appStatus.hasFullAccess,
                 });
 
@@ -206,10 +222,10 @@ export default function AdvancedStudyPage() {
                                 </p>
 
                                 <p className="mt-3 text-sm leading-7 text-slate-700">
-                                    Full-access study tools apply this idea to your saved words with
-                                    Book Flashcards, Saved Words Review, Ability Check, and color
-                                    movement. The colors are not grades; they are gentle signals for
-                                    where a word is in its noticing cycle.
+                                    Advanced Study applies this idea across your saved words with
+                                    Library Review, Ability Check, Word Sky, and color movement.
+                                    The colors are not grades; they are gentle signals for where a
+                                    word is in its noticing cycle.
                                 </p>
                             </div>
                         </details>
@@ -244,7 +260,7 @@ export default function AdvancedStudyPage() {
                             </div>
 
                             <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-950">
-                                Ability Check opens from your Library page when enough cards are ready.
+                                Book-specific flashcards live in Book Study. These tools work across your library.
                             </p>
                         </section>
 

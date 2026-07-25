@@ -22,6 +22,7 @@ export type FeatureAccessReason =
 
 export type FeatureAccessInput = {
   role?: MekuruRole;
+  isSuperTeacher?: boolean | string | null;
 
   // Use this when another helper has already decided the user has full access.
   hasFullAccess?: boolean;
@@ -82,7 +83,8 @@ export type FeatureAccess = {
 };
 
 export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
-  const isAdmin = input.role === "super_teacher" || input.role === "admin";
+  const isSuperTeacher = input.isSuperTeacher === true || input.isSuperTeacher === "true";
+  const isAdmin = input.role === "super_teacher" || input.role === "admin" || isSuperTeacher;
   const isTeacher = input.role === "teacher" || isAdmin;
 
   // Keep super_teacher as the technical role for now.

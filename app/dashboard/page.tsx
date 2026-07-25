@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/lib/supabaseClient";
-import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import DashboardBackground from "./components/DashboardBackground";
 import DashboardLoadingCard from "./components/DashboardLoadingCard";
 import ReaderRolesSection from "./components/ReaderRolesSection";
@@ -151,11 +151,24 @@ export default function DashboardPage() {
     }
 
     async function routeSignedInUser(userId: string, shouldOpenLibraryAfterLogin: boolean) {
-      const { data: profile, error } = await supabase
+      const profileResult = await supabase
         .from("profiles")
         .select("username, display_name, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
         .eq("id", userId)
         .maybeSingle<ProfileBasics>();
+      let profile: any = profileResult.data;
+      let error = profileResult.error;
+
+      if (isMissingAppAccessColumnError(error)) {
+        const fallbackResult = await supabase
+          .from("profiles")
+          .select("username, display_name, native_language, target_language, level, role, is_super_teacher")
+          .eq("id", userId)
+          .maybeSingle();
+
+        profile = fallbackResult.data;
+        error = fallbackResult.error;
+      }
 
       if (!alive) return true;
 
@@ -226,9 +239,9 @@ export default function DashboardPage() {
       const params = new URLSearchParams(window.location.search);
       const shouldOpenLibraryAfterLogin = params.get(POST_LOGIN_PARAM) === POST_LOGIN_VALUE;
 
-      if (event === "SIGNED_IN" && session?.user && shouldOpenLibraryAfterLogin) {
+      if (event === "SIGNED_IN" && session?.user) {
         setUserId(session.user.id);
-        void routeSignedInUser(session.user.id, true);
+        void routeSignedInUser(session.user.id, shouldOpenLibraryAfterLogin);
         return;
       }
 

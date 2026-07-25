@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileAccessRow = {
@@ -25,30 +25,73 @@ const studyPaths = [
     description:
       "Practice kana, kanji readings, and basic vocabulary sets. Good for simple, low-pressure study.",
     className: "border-sky-200 bg-sky-50 text-sky-950",
+    requiresReadingAccess: false,
   },
   {
     title: "Book Study",
     href: "/library-study/book-study",
     eyebrow: "Saved words",
     description:
-      "Study the words you saved from your books with focused book flashcards or free saved-word review.",
+      "Choose one book and study the saved words from that book with focused flashcards.",
     className: "border-indigo-200 bg-indigo-50 text-indigo-950",
+    lockedDescription:
+      "Reading Access opens one-book saved-word study and book flashcards.",
+    requiresReadingAccess: true,
   },
   {
     title: "Advanced Study",
     href: "/library-study/advanced",
-    eyebrow: "Vocabulary growth cycle",
+    eyebrow: "Smart review",
     description:
-      "Use Mekuru’s full saved-word cycle: save words from books, study them, follow colors, check ability, and notice them again while reading.",
-    className: "border-indigo-200 bg-indigo-50 text-indigo-950",
+      "Use cross-library smart review with Ability Check, Library Review, and Advanced Word Sky.",
+    lockedDescription:
+      "Reading Access opens the smart vocabulary growth cycle when these tools are ready for your library.",
+    className: "border-violet-200 bg-violet-50 text-violet-950",
+    requiresReadingAccess: true,
   },
 ];
+
+function StudyPathCard({
+  path,
+  locked,
+}: {
+  path: (typeof studyPaths)[number];
+  locked: boolean;
+}) {
+  return (
+    <Link
+      href={locked ? "/trial-ended" : path.href}
+      className={`group relative rounded-3xl border p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${path.className}`}
+    >
+      {locked ? (
+        <div className="absolute right-4 top-4 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-xs font-black shadow-sm">
+          Reading Access
+        </div>
+      ) : null}
+
+      <div className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
+        {path.eyebrow}
+      </div>
+
+      <div className="mt-3 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black">{path.title}</h2>
+          <p className="mt-2 text-sm leading-6 opacity-80">
+            {locked ? path.lockedDescription : path.description}
+          </p>
+        </div>
+
+        <span className="rounded-full bg-white/80 px-3 py-1 text-sm font-black shadow-sm transition group-hover:bg-white">
+          {locked ? "Info" : "→"}
+        </span>
+      </div>
+    </Link>
+  );
+}
 
 export default function StudyToolsPage() {
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [hasFullAccess, setHasFullAccess] = useState(false);
-  const [accessReason, setAccessReason] = useState<string>("free");
-  const [hasSavedWords, setHasSavedWords] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -67,17 +110,28 @@ export default function StudyToolsPage() {
         if (!user) {
           if (mounted) {
             setHasFullAccess(false);
-            setAccessReason("free");
-            setHasSavedWords(false);
           }
           return;
         }
 
-        const { data: profile, error: profileError } = await supabase
+        const profileResult = await supabase
           .from("profiles")
           .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
           .eq("id", user.id)
           .maybeSingle<ProfileAccessRow>();
+        let profile: any = profileResult.data;
+        let profileError = profileResult.error;
+
+        if (isMissingAppAccessColumnError(profileError)) {
+          const fallbackResult = await supabase
+            .from("profiles")
+            .select("role, is_super_teacher")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          profile = fallbackResult.data;
+          profileError = fallbackResult.error;
+        }
 
         if (profileError) throw profileError;
 
@@ -87,26 +141,11 @@ export default function StudyToolsPage() {
 
         if (mounted) {
           setHasFullAccess(status.hasFullAccess);
-          setAccessReason(status.reason);
-        }
-
-        const { data: savedWordRows, error: savedWordError } = await supabase
-          .from("user_book_words")
-          .select("id")
-          .limit(1);
-
-        if (savedWordError) {
-          console.error("Error checking saved vocabulary:", savedWordError);
-          if (mounted) setHasSavedWords(false);
-        } else if (mounted) {
-          setHasSavedWords((savedWordRows ?? []).length > 0);
         }
       } catch (error) {
         console.error("Error loading Study Hub access:", error);
         if (mounted) {
           setHasFullAccess(false);
-          setAccessReason("free");
-          setHasSavedWords(false);
         }
       } finally {
         if (mounted) setLoadingAccess(false);
@@ -119,9 +158,6 @@ export default function StudyToolsPage() {
       mounted = false;
     };
   }, []);
-
-  const accessTitle =
-    accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -136,7 +172,7 @@ export default function StudyToolsPage() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Choose a study path. Foundation Sets are for kana, kanji, and basic vocabulary practice, Book Study is for everyday saved-word study, and Advanced Study explains Mekuru’s full vocabulary growth cycle.
+            Choose a study path. Foundation Sets are for kana, kanji, and basic vocabulary practice, Book Study is for one-book saved-word study, and Advanced Study is for the smart vocabulary growth cycle.
           </p>
         </div>
 
@@ -146,65 +182,14 @@ export default function StudyToolsPage() {
               Loading reading access...
             </p>
           </section>
-        ) : !hasFullAccess ? (
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-              {accessTitle}
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">
-              Your reading life stays here
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-              Your library, book tracking, reading timers, and basic book stats remain available. {hasSavedWords ? "Your read-only vocabulary archive is still here too. " : ""}Full study tools return with Reading Access.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <Link
-                href="/books"
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                My Library
-              </Link>
-              <Link
-                href="/library/book-hubs"
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Book Hubs
-              </Link>
-              {hasSavedWords ? (
-                <Link
-                  href="/library/vocab-list-index"
-                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Vocabulary Archive
-                </Link>
-              ) : null}
-            </div>
-          </section>
         ) : (
         <div className="grid gap-5 md:grid-cols-3">
           {studyPaths.map((path) => (
-            <Link
+            <StudyPathCard
               key={path.href}
-              href={path.href}
-              className={`group rounded-3xl border p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${path.className}`}
-            >
-              <div className="text-xs font-black uppercase tracking-[0.18em] opacity-60">
-                {path.eyebrow}
-              </div>
-
-              <div className="mt-3 flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black">{path.title}</h2>
-                  <p className="mt-2 text-sm leading-6 opacity-80">
-                    {path.description}
-                  </p>
-                </div>
-
-                <span className="rounded-full bg-white/80 px-3 py-1 text-sm font-black shadow-sm transition group-hover:bg-white">
-                  →
-                </span>
-              </div>
-            </Link>
+              path={path}
+              locked={path.requiresReadingAccess && !hasFullAccess}
+            />
           ))}
         </div>
         )}
@@ -220,8 +205,8 @@ export default function StudyToolsPage() {
           </p>
 
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Choose Book Study when you want to study saved words from your
-            books. Book Study uses Mekuru’s full-access saved-word tools.
+            Choose Book Study when you want flashcards from one specific book.
+            Choose Advanced Study for Library Review, Ability Check, and Word Sky.
           </p>
         </div>
         ) : null}
