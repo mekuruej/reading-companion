@@ -3789,6 +3789,10 @@ export default function BookHubPage() {
     ) {
       setActiveTab(normalizedTab);
     }
+
+    if (params.get("sessionMode") === "listening") {
+      setSessionMode("listening");
+    }
   }, []);
 
   useEffect(() => {
@@ -5323,6 +5327,11 @@ export default function BookHubPage() {
                 }}
                 onListening={() => {
                   if (!confirmLeaveIfTimerActive()) return;
+                  if (hasFullLearningAccess || isTeacher) {
+                    setSessionMode("listening");
+                    setActiveTab("reading");
+                    return;
+                  }
                   router.push(`/books/${row.id}/listening`);
                 }}
                 onStudyFlashcards={() => {

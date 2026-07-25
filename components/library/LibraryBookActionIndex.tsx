@@ -20,6 +20,7 @@ type LibraryBookRow = {
     dnf_at: string | null;
     created_at: string | null;
     books: BookInfo | BookInfo[] | null;
+    hasSavedWords?: boolean;
 };
 
 type SavedWordCountRow = {
@@ -39,6 +40,8 @@ type LibraryBookActionIndexProps = {
     requireSavedWords?: boolean;
     hrefForBook: (userBookId: string) => string;
 };
+
+const SAVED_WORD_PAGE_SIZE = 1000;
 
 function getBook(row: LibraryBookRow): BookInfo | null {
     if (!row.books) return null;
@@ -60,6 +63,34 @@ function isFinished(row: LibraryBookRow) {
 
 function isCurrentlyReading(row: LibraryBookRow) {
     return row.status === "reading" && !isFinished(row);
+}
+
+async function loadUserBookIdsWithSavedWords(userBookIds: string[]) {
+    const idsWithWords = new Set<string>();
+    let from = 0;
+
+    while (true) {
+        const to = from + SAVED_WORD_PAGE_SIZE - 1;
+        const { data, error } = await supabase
+            .from("user_book_words")
+            .select("user_book_id")
+            .in("user_book_id", userBookIds)
+            .order("user_book_id", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to);
+
+        if (error) throw error;
+
+        const rows = (data ?? []) as SavedWordCountRow[];
+        rows.forEach((row) => {
+            if (row.user_book_id) idsWithWords.add(row.user_book_id);
+        });
+
+        if (rows.length < SAVED_WORD_PAGE_SIZE) break;
+        from += SAVED_WORD_PAGE_SIZE;
+    }
+
+    return idsWithWords;
 }
 
 function themeClasses(
@@ -121,6 +152,7 @@ function BookSection({
     hrefForBook,
     cardClass,
     actionClass,
+    requireSavedWords,
 }: {
     title: string;
     books: LibraryBookRow[];
@@ -129,6 +161,7 @@ function BookSection({
     hrefForBook: (userBookId: string) => string;
     cardClass: string;
     actionClass: string;
+    requireSavedWords: boolean;
 }) {
     return (
         <section className="mt-7">
@@ -143,6 +176,52 @@ function BookSection({
                     {books.map((row) => {
                         const bookTitle = getBookTitle(row);
                         const coverUrl = getBookCover(row);
+                        const disabled = requireSavedWords && !row.hasSavedWords;
+                        const cardContent = (
+                            <div className="flex gap-3">
+                                <div className="h-28 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-100">
+                                    {coverUrl ? (
+                                        <img
+                                            src={coverUrl}
+                                            alt={`${bookTitle} cover`}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] text-slate-400">
+                                            No cover
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                        {actionLabel}
+                                    </div>
+
+                                    <h3 className="mt-2 line-clamp-3 text-s font-semibold leading-snug text-slate-950">
+                                        {bookTitle}
+                                    </h3>
+
+                                    <div
+                                        className={`mt-3 text-xs font-semibold ${disabled ? "text-slate-400" : actionClass}`}
+                                    >
+                                        {disabled ? "No saved words yet" : "Open →"}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+
+                        if (disabled) {
+                            return (
+                                <div
+                                    key={row.id}
+                                    aria-disabled="true"
+                                    className={`overflow-hidden rounded-3xl border p-3 shadow-sm opacity-45 grayscale ${cardClass}`}
+                                >
+                                    {cardContent}
+                                </div>
+                            );
+                        }
 
                         return (
                             <Link
@@ -150,37 +229,7 @@ function BookSection({
                                 href={hrefForBook(row.id)}
                                 className={`group overflow-hidden rounded-3xl border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${cardClass}`}
                             >
-                                <div className="flex gap-3">
-                                    <div className="h-28 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-100">
-                                        {coverUrl ? (
-                                            <img
-                                                src={coverUrl}
-                                                alt={`${bookTitle} cover`}
-                                                className="h-full w-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] text-slate-400">
-                                                No cover
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
-                                            {actionLabel}
-                                        </div>
-
-                                        <h3 className="mt-2 line-clamp-3 text-s font-semibold leading-snug text-slate-950">
-                                            {bookTitle}
-                                        </h3>
-
-                                        <div
-                                            className={`mt-3 text-xs font-semibold ${actionClass}`}
-                                        >
-                                            Open →
-                                        </div>
-                                    </div>
-                                </div>
+                                {cardContent}
                             </Link>
                         );
                     })}
@@ -259,20 +308,12 @@ export default function LibraryBookActionIndex({
 
                 if (requireSavedWords && nextRows.length > 0) {
                     const userBookIds = nextRows.map((row) => row.id);
-                    const { data: wordRows, error: wordError } = await supabase
-                        .from("user_book_words")
-                        .select("user_book_id")
-                        .in("user_book_id", userBookIds);
+                    const userBookIdsWithWords = await loadUserBookIdsWithSavedWords(userBookIds);
 
-                    if (wordError) throw wordError;
-
-                    const userBookIdsWithWords = new Set(
-                        ((wordRows ?? []) as SavedWordCountRow[])
-                            .map((row) => row.user_book_id)
-                            .filter((id): id is string => Boolean(id))
-                    );
-
-                    nextRows = nextRows.filter((row) => userBookIdsWithWords.has(row.id));
+                    nextRows = nextRows.map((row) => ({
+                        ...row,
+                        hasSavedWords: userBookIdsWithWords.has(row.id),
+                    }));
                 }
 
                 setRows(nextRows);
@@ -398,6 +439,7 @@ export default function LibraryBookActionIndex({
                     hrefForBook={hrefForBook}
                     cardClass={theme.card}
                     actionClass={theme.action}
+                    requireSavedWords={requireSavedWords}
                 />
 
                 <BookSection
@@ -408,6 +450,7 @@ export default function LibraryBookActionIndex({
                     hrefForBook={hrefForBook}
                     cardClass={theme.card}
                     actionClass={theme.action}
+                    requireSavedWords={requireSavedWords}
                 />
 
                 <BookSection
@@ -418,6 +461,7 @@ export default function LibraryBookActionIndex({
                     hrefForBook={hrefForBook}
                     cardClass={theme.card}
                     actionClass={theme.action}
+                    requireSavedWords={requireSavedWords}
                 />
             </div>
         </main>

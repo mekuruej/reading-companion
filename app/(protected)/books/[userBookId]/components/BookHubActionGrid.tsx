@@ -154,7 +154,7 @@ export default function BookHubActionGrid({
             <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <ActionButton
                     title="Curiosity Reading"
-                    subtitle="(Intensive)"
+                    subtitle="(Intensive Reading)"
                     description={["Read while saving vocab", "and log a slower, mindful session."]}
                     className="bg-sky-50 hover:bg-sky-100"
                     locked={!canUseCuriosityReading}
@@ -163,7 +163,7 @@ export default function BookHubActionGrid({
 
                 <ActionButton
                     title="Supported Reading"
-                    subtitle="(Extensive Reading with Saved Words)"
+                    subtitle="(Reread and time your session with light support)"
                     description={["Review reading with light support", "from words you already saved."]}
                     className="bg-emerald-50 hover:bg-emerald-100"
                     locked={!canUseSavedWordReading}
@@ -172,7 +172,7 @@ export default function BookHubActionGrid({
 
                 <ActionButton
                     title="Just Reading"
-                    subtitle="(Extensive Fluid Reading)"
+                    subtitle="(Extensive Reading Timer)"
                     description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onFluidReadingJustReading}

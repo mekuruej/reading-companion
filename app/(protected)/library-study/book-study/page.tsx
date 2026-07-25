@@ -30,7 +30,7 @@ function BookStudyFreeState({ hasSavedWords, accessReason }: { hasSavedWords: bo
             Book tracking is still available
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            Book Study uses saved words from individual books. With your current access, you can keep reading, log time, and check basic book stats{hasSavedWords ? ", plus open your read-only vocabulary archive" : ""}.
+            Book Study uses saved words from individual books. With your current access, you can keep reading, log time, and check basic book stats{hasSavedWords ? ", plus open your read-only vocabulary lists" : ""}.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link
@@ -44,7 +44,7 @@ function BookStudyFreeState({ hasSavedWords, accessReason }: { hasSavedWords: bo
                 href="/library/vocab-list-index"
                 className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
-                Vocabulary Archive
+                Vocabulary Lists
               </Link>
             ) : null}
           </div>
@@ -152,7 +152,7 @@ export default function BookStudyPage() {
     return (
       <main className="min-h-screen bg-slate-100 px-4 py-5 sm:px-5 sm:py-8">
         <div className="mx-auto max-w-6xl text-sm text-slate-600">
-          Loading Book Study...
+          Loading Book Flashcards...
         </div>
       </main>
     );
@@ -164,7 +164,7 @@ export default function BookStudyPage() {
 
   return (
     <LibraryBookActionIndex
-      eyebrow="Book Study"
+      eyebrow="Book Flashcards"
       title="Open Book Flashcards"
       description="Choose a book to study its saved vocabulary with flashcards."
       actionLabel="Book Flashcards"

@@ -333,21 +333,21 @@ export default function TeacherBookWorkspacePage() {
     return [
       {
         title: "Curiosity Reading",
-        subtitle: "Intensive",
+        subtitle: "Intensive Reading",
         description: "Read while saving vocabulary and logging a slower session.",
         href: `/books/${encodedUserBookId}/curiosity-reading`,
         tone: "blue",
       },
       {
         title: "Saved Word Reading",
-        subtitle: "Extensive Reading with Saved Words",
-        description: "Reread with light support from your saved reader words and reader session tracking.",
+        subtitle: "Reading with Saved Word Support",
+        description: "Reread and time your session with light support.",
         href: `/books/${encodedUserBookId}/readalong`,
         tone: "green",
       },
       {
         title: "Just Reading",
-        subtitle: "Extensive Fluid Reading",
+        subtitle: "Extensive Reading Timer",
         description: "Read without support or lookups and log your time.",
         href: `/books/${encodedUserBookId}/just-reading`,
         tone: "purple",

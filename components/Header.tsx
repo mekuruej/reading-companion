@@ -274,7 +274,7 @@ export default function Header() {
                         }`}
                       onClick={() => setShowLibraryMenu(false)}
                     >
-                      Vocabulary Archive
+                      Vocabulary Lists
                     </Link>
                   ) : null}
                 </div>
@@ -344,8 +344,7 @@ export default function Header() {
                   <Link
                     href="/library-study/book-study"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/book-study" ||
-                        pathname === "/library-study/book-flashcards" ||
-                        pathname === "/library-study/practice"
+                        pathname === "/library-study/book-flashcards"
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
                       }`}
@@ -358,6 +357,7 @@ export default function Header() {
                     href="/library-study/advanced"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
                         pathname === "/library-study/check" ||
+                        pathname === "/library-study/practice" ||
                         pathname === "/library-study/word-sky"
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
