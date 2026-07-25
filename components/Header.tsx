@@ -55,7 +55,15 @@ export default function Header() {
 
         if (cancelled) return;
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          setUsername(null);
+          setProfileRole(null);
+          setProfileIsSuperTeacher(false);
+          setHasFullAccess(false);
+          setHasSavedWords(false);
+          return;
+        }
+
         setUsername(profile?.username ?? null);
         setProfileRole(profile?.role ?? null);
         setProfileIsSuperTeacher(!!profile?.is_super_teacher);
@@ -67,7 +75,6 @@ export default function Header() {
           .limit(1);
 
         if (savedWordError) {
-          console.error("Failed to check saved vocabulary for header:", savedWordError);
           setHasSavedWords(false);
         } else {
           setHasSavedWords((savedWordRows ?? []).length > 0);
@@ -75,7 +82,6 @@ export default function Header() {
 
       } catch (error) {
         if (!cancelled) {
-          console.error("Failed to load header data:", error);
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);

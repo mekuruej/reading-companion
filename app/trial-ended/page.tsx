@@ -3,14 +3,18 @@ export default function TrialEndedPage() {
     <main className="mx-auto max-w-2xl px-6 py-16">
       <div className="rounded-3xl border border-stone-200 bg-stone-50 p-8 shadow-sm">
         <h1 className="text-2xl font-semibold text-stone-900">
-          Your full-access trial has ended
+          Your Reading Access trial has ended
         </h1>
 
         <p className="mt-4 text-base leading-7 text-stone-700">
-          Your library, reading records, and profile are still here. MEKURU now
-          keeps free reading features available after a trial ends; only
-          full-access study tools pause until another trial, lesson, or paid
-          access grant is active.
+          Your library, reading records, and saved vocabulary archive are still
+          here.
+        </p>
+
+        <p className="mt-4 text-base leading-7 text-stone-700">
+          Free reading features are still available. To keep saving new words,
+          seeing color progress, using Word Sky, and building toward Ability
+          Check, continue with Reading Access.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -30,7 +34,7 @@ export default function TrialEndedPage() {
         </div>
 
         <p className="mt-4 text-sm text-stone-500">
-          Interested in continuing with full access? Email{" "}
+          Interested in continuing? Email{" "}
           <a
             href="mailto:mekuru.ej@gmail.com"
             className="font-medium text-stone-700 underline underline-offset-2 hover:text-stone-900"
