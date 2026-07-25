@@ -174,7 +174,9 @@ export default function Header() {
     pathname.startsWith("/teacher/testing");
   const showTeacherLink =
     profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher;
+
   const showFullAccessNavigation = hasFullAccess || showTeacherLink;
+  const canUseLearningStudy = showFullAccessNavigation;
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -341,7 +343,7 @@ export default function Header() {
                   </Link>
 
                   <Link
-                    href="/library-study/book-study"
+                    href={canUseLearningStudy ? "/library-study/book-study" : "/library-study"}
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/book-study" ||
                       pathname === "/library-study/book-flashcards"
                       ? "bg-stone-100 font-medium text-stone-900"
@@ -349,11 +351,14 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Book Study
+                    Book Study{canUseLearningStudy ? "" : " 🔒"}
+                    {!canUseLearningStudy ? (
+                      <span className="block text-xs text-stone-500">Reading Access</span>
+                    ) : null}
                   </Link>
 
                   <Link
-                    href="/library-study/advanced"
+                    href={canUseLearningStudy ? "/library-study/advanced" : "/library-study"}
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
                       pathname === "/library-study/check" ||
                       pathname === "/library-study/practice" ||
@@ -363,7 +368,10 @@ export default function Header() {
                       }`}
                     onClick={() => setShowStudyMenu(false)}
                   >
-                    Advanced Study
+                    Advanced Study{canUseLearningStudy ? "" : " 🔒"}
+                    {!canUseLearningStudy ? (
+                      <span className="block text-xs text-stone-500">Reading Access</span>
+                    ) : null}
                   </Link>
                 </div>
               ) : null}
