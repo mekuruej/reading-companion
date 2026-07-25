@@ -9,9 +9,9 @@ import { useRouter } from "next/navigation";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/lib/supabaseClient";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
 import DashboardBackground from "./components/DashboardBackground";
 import DashboardLoadingCard from "./components/DashboardLoadingCard";
-import DashboardBackButton from "./components/DashboardBackButton";
 import ReaderRolesSection from "./components/ReaderRolesSection";
 import DashboardWarmupPanel from "./components/DashboardWarmupPanel";
 import SignedInDashboardCard from "./components/SignedInDashboardCard";
@@ -22,6 +22,7 @@ const POST_LOGIN_PARAM = "after_login";
 const POST_LOGIN_VALUE = "library";
 const PROFILE_SETUP_TARGET = "/community/profile/setup";
 const WARMUP_WORD_COUNT = 4;
+const WARMUP_ENABLED_STORAGE_KEY = "mekuru-dashboard-word-warmup-enabled";
 
 type WarmupWord = {
   surface: string;
@@ -108,6 +109,12 @@ type ProfileBasics = {
   native_language: string | null;
   target_language: string | null;
   level: string | null;
+  role: string | null;
+  is_super_teacher: boolean | null;
+  app_access_type: string | null;
+  app_access_expires_at: string | null;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
 };
 
 function isProfileReady(profile: ProfileBasics | null) {
@@ -128,14 +135,25 @@ export default function DashboardPage() {
   const [warmupWords, setWarmupWords] = useState<WarmupWord[]>([]);
   const [warmupLoading, setWarmupLoading] = useState(true);
   const [warmupClaimKeys, setWarmupClaimKeys] = useState<Set<string>>(new Set());
+  const [canUseDashboardWarmup, setCanUseDashboardWarmup] = useState(false);
+  const [dashboardWarmupEnabled, setDashboardWarmupEnabled] = useState(true);
 
   useEffect(() => {
     let alive = true;
 
+    try {
+      const savedWarmupSetting = window.localStorage.getItem(WARMUP_ENABLED_STORAGE_KEY);
+      if (savedWarmupSetting === "false") {
+        setDashboardWarmupEnabled(false);
+      }
+    } catch (error) {
+      console.warn("Dashboard warm-up preference did not load:", error);
+    }
+
     async function routeSignedInUser(userId: string, shouldOpenLibraryAfterLogin: boolean) {
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("username, display_name, native_language, target_language, level")
+        .select("username, display_name, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
         .eq("id", userId)
         .maybeSingle<ProfileBasics>();
 
@@ -143,10 +161,13 @@ export default function DashboardPage() {
 
       if (error) {
         console.error("Error checking dashboard profile:", error);
+        setCanUseDashboardWarmup(false);
         setIsLoggedIn(true);
         setCheckingSession(false);
         return true;
       }
+
+      setCanUseDashboardWarmup(profile ? getAppAccessStatus(profile).hasFullAccess : false);
 
       if (!isProfileReady(profile ?? null)) {
         router.replace(PROFILE_SETUP_TARGET);
@@ -188,6 +209,7 @@ export default function DashboardPage() {
         if (routed) return;
       } else {
         setUserId(null);
+        setCanUseDashboardWarmup(false);
       }
 
       setIsLoggedIn(Boolean(session?.user));
@@ -211,6 +233,9 @@ export default function DashboardPage() {
       }
 
       setUserId(session?.user?.id ?? null);
+      if (!session?.user?.id) {
+        setCanUseDashboardWarmup(false);
+      }
       setIsLoggedIn(Boolean(session?.user));
       setCheckingSession(false);
     });
@@ -226,6 +251,13 @@ export default function DashboardPage() {
 
     async function loadWarmupWordsAndClaims() {
       if (!userId) {
+        setWarmupWords([]);
+        setWarmupClaimKeys(new Set());
+        setWarmupLoading(false);
+        return;
+      }
+
+      if (!canUseDashboardWarmup || !dashboardWarmupEnabled) {
         setWarmupWords([]);
         setWarmupClaimKeys(new Set());
         setWarmupLoading(false);
@@ -284,7 +316,17 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [canUseDashboardWarmup, dashboardWarmupEnabled, userId]);
+
+  function setWarmupEnabledPreference(enabled: boolean) {
+    setDashboardWarmupEnabled(enabled);
+
+    try {
+      window.localStorage.setItem(WARMUP_ENABLED_STORAGE_KEY, String(enabled));
+    } catch (error) {
+      console.warn("Dashboard warm-up preference did not save:", error);
+    }
+  }
 
   async function claimWarmupWord(word: WarmupWord) {
     if (!userId) return;
@@ -348,21 +390,28 @@ export default function DashboardPage() {
             <DashboardLoadingCard />
           </section>
         ) : isLoggedIn ? (
-          <SignedInDashboardCard onOpenLibrary={() => router.push("/books")}>
-            {warmupLoading ? (
-              <div className="relative mt-4 flex h-44 items-center justify-center overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50">
-                <p className="text-sm font-medium text-sky-800">
-                  Loading your Word Sky...
-                </p>
-              </div>
-            ) : (
-              <DashboardWarmupPanel
-                words={warmupWords}
-                claimedKeys={warmupClaimKeys}
-                getKey={(word) => studyIdentityKey(word.surface, word.reading)}
-                onToggleWord={claimWarmupWord}
-              />
-            )}
+          <SignedInDashboardCard
+            showWarmup={canUseDashboardWarmup}
+            warmupEnabled={dashboardWarmupEnabled}
+            onWarmupEnabledChange={setWarmupEnabledPreference}
+            onOpenLibrary={() => router.push("/books")}
+          >
+            {canUseDashboardWarmup && dashboardWarmupEnabled ? (
+              warmupLoading ? (
+                <div className="relative mt-4 flex h-44 items-center justify-center overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50">
+                  <p className="text-sm font-medium text-sky-800">
+                    Loading word warm-up...
+                  </p>
+                </div>
+              ) : (
+                <DashboardWarmupPanel
+                  words={warmupWords}
+                  claimedKeys={warmupClaimKeys}
+                  getKey={(word) => studyIdentityKey(word.surface, word.reading)}
+                  onToggleWord={claimWarmupWord}
+                />
+              )
+            ) : null}
           </SignedInDashboardCard>
         ) : (
           <>
@@ -390,10 +439,6 @@ export default function DashboardPage() {
             <ReaderRolesSection />
           </>
         )}
-
-        <div className="flex w-full justify-center">
-          <DashboardBackButton onBack={() => router.push("/")} />
-        </div>
       </div>
 
       <style jsx>{`

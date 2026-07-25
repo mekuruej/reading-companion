@@ -2,11 +2,17 @@ import type { ReactNode } from "react";
 
 type SignedInDashboardCardProps = {
   onOpenLibrary: () => void;
+  showWarmup?: boolean;
+  warmupEnabled?: boolean;
+  onWarmupEnabledChange?: (enabled: boolean) => void;
   children?: ReactNode;
 };
 
 export default function SignedInDashboardCard({
   onOpenLibrary,
+  showWarmup = true,
+  warmupEnabled = true,
+  onWarmupEnabledChange,
   children,
 }: SignedInDashboardCardProps) {
   return (
@@ -20,19 +26,39 @@ export default function SignedInDashboardCard({
           ページをめくって、話しまくろう！
         </p>
 
-        <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/80 p-4 shadow-inner">
-          <div className="text-left">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
-              Word warm-up
-            </p>
+        {showWarmup ? (
+          <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/80 p-4 shadow-inner">
+            <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
+                  Word warm-up
+                </p>
 
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Tap a few words you can read.
-            </p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  This helps move words you can read toward Ability Check, which can open more study options.
+                </p>
+              </div>
+
+              <label className="inline-flex shrink-0 items-center gap-2 rounded-full border border-sky-100 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={warmupEnabled}
+                  onChange={(event) => onWarmupEnabledChange?.(event.target.checked)}
+                  className="h-4 w-4 accent-sky-600"
+                />
+                Show
+              </label>
+            </div>
+
+            {warmupEnabled ? (
+              children
+            ) : (
+              <p className="mt-4 rounded-2xl border border-sky-100 bg-white/75 px-3 py-3 text-sm text-slate-500">
+                Word warm-up is hidden on this device.
+              </p>
+            )}
           </div>
-
-          {children}
-        </div>
+        ) : null}
 
         <button
           type="button"
