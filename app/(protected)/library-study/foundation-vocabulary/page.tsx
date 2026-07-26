@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import MultipleChoiceAnswerPanel from "@/app/(protected)/books/[userBookId]/study/components/MultipleChoiceAnswerPanel";
 import Row from "@/app/(protected)/books/[userBookId]/study/components/StudyCardFieldRow";
 import StudyFlashcardShell from "@/app/(protected)/books/[userBookId]/study/components/StudyFlashcardShell";
@@ -23,6 +24,113 @@ const FOUNDATION_MODE_OPTIONS = [
 ];
 
 const AUTO_FORWARD_MS = 1200;
+
+const KANA_TO_ROMAJI = [
+  ["きょ", "kyo"],
+  ["きゅ", "kyu"],
+  ["きゃ", "kya"],
+  ["ぎょ", "gyo"],
+  ["ぎゅ", "gyu"],
+  ["ぎゃ", "gya"],
+  ["しょ", "sho"],
+  ["しゅ", "shu"],
+  ["しゃ", "sha"],
+  ["じょ", "jo"],
+  ["じゅ", "ju"],
+  ["じゃ", "ja"],
+  ["ちょ", "cho"],
+  ["ちゅ", "chu"],
+  ["ちゃ", "cha"],
+  ["にょ", "nyo"],
+  ["にゅ", "nyu"],
+  ["にゃ", "nya"],
+  ["ひょ", "hyo"],
+  ["ひゅ", "hyu"],
+  ["ひゃ", "hya"],
+  ["びょ", "byo"],
+  ["びゅ", "byu"],
+  ["びゃ", "bya"],
+  ["ぴょ", "pyo"],
+  ["ぴゅ", "pyu"],
+  ["ぴゃ", "pya"],
+  ["みょ", "myo"],
+  ["みゅ", "myu"],
+  ["みゃ", "mya"],
+  ["りょ", "ryo"],
+  ["りゅ", "ryu"],
+  ["りゃ", "rya"],
+  ["あ", "a"],
+  ["い", "i"],
+  ["う", "u"],
+  ["え", "e"],
+  ["お", "o"],
+  ["か", "ka"],
+  ["き", "ki"],
+  ["く", "ku"],
+  ["け", "ke"],
+  ["こ", "ko"],
+  ["が", "ga"],
+  ["ぎ", "gi"],
+  ["ぐ", "gu"],
+  ["げ", "ge"],
+  ["ご", "go"],
+  ["さ", "sa"],
+  ["し", "shi"],
+  ["す", "su"],
+  ["せ", "se"],
+  ["そ", "so"],
+  ["ざ", "za"],
+  ["じ", "ji"],
+  ["ず", "zu"],
+  ["ぜ", "ze"],
+  ["ぞ", "zo"],
+  ["た", "ta"],
+  ["ち", "chi"],
+  ["つ", "tsu"],
+  ["て", "te"],
+  ["と", "to"],
+  ["だ", "da"],
+  ["ぢ", "ji"],
+  ["づ", "zu"],
+  ["で", "de"],
+  ["ど", "do"],
+  ["な", "na"],
+  ["に", "ni"],
+  ["ぬ", "nu"],
+  ["ね", "ne"],
+  ["の", "no"],
+  ["は", "ha"],
+  ["ひ", "hi"],
+  ["ふ", "fu"],
+  ["へ", "he"],
+  ["ほ", "ho"],
+  ["ば", "ba"],
+  ["び", "bi"],
+  ["ぶ", "bu"],
+  ["べ", "be"],
+  ["ぼ", "bo"],
+  ["ぱ", "pa"],
+  ["ぴ", "pi"],
+  ["ぷ", "pu"],
+  ["ぺ", "pe"],
+  ["ぽ", "po"],
+  ["ま", "ma"],
+  ["み", "mi"],
+  ["む", "mu"],
+  ["め", "me"],
+  ["も", "mo"],
+  ["や", "ya"],
+  ["ゆ", "yu"],
+  ["よ", "yo"],
+  ["ら", "ra"],
+  ["り", "ri"],
+  ["る", "ru"],
+  ["れ", "re"],
+  ["ろ", "ro"],
+  ["わ", "wa"],
+  ["を", "wo"],
+  ["ん", "n"],
+] as const;
 
 function shuffleArray<T>(items: T[]) {
   const copy = [...items];
@@ -45,6 +153,48 @@ function readingAnswersMatch(input: string, correctReading: string) {
   return normalizeKanaReading(input) === normalizeKanaReading(correctReading);
 }
 
+function kanaToRomaji(reading: string) {
+  const normalized = normalizeKanaReading(reading);
+  let output = "";
+  let index = 0;
+
+  while (index < normalized.length) {
+    const current = normalized[index];
+
+    if (current === "っ") {
+      const nextMatch = KANA_TO_ROMAJI.find(([kana]) =>
+        normalized.slice(index + 1).startsWith(kana)
+      );
+      output += nextMatch ? nextMatch[1][0] : "";
+      index += 1;
+      continue;
+    }
+
+    const match = KANA_TO_ROMAJI.find(([kana]) =>
+      normalized.slice(index).startsWith(kana)
+    );
+
+    if (match) {
+      output += match[1];
+      index += match[0].length;
+      continue;
+    }
+
+    output += current;
+    index += 1;
+  }
+
+  return output;
+}
+
+function readingInputExample(reading: string) {
+  return `You can type ${reading} or ${kanaToRomaji(reading)}.`;
+}
+
+function isComposingEnter(event: ReactKeyboardEvent<HTMLInputElement>) {
+  return event.nativeEvent.isComposing || event.keyCode === 229;
+}
+
 function buildOptions(correct: string, pool: string[]) {
   const seen = new Set([correct]);
   const distractors = shuffleArray(pool.filter((item) => item && !seen.has(item))).slice(0, 3);
@@ -63,6 +213,7 @@ export default function FoundationVocabularyPage() {
   const [wasCorrect, setWasCorrect] = useState<boolean | null>(null);
   const [correctionInput, setCorrectionInput] = useState("");
   const [correctionFeedback, setCorrectionFeedback] = useState<string | null>(null);
+  const [correctionAccepted, setCorrectionAccepted] = useState(false);
   const [typedInput, setTypedInput] = useState("");
   const [typedFeedback, setTypedFeedback] = useState<null | { ok: boolean; message: string }>(null);
   const [readyForNextCard, setReadyForNextCard] = useState(false);
@@ -70,6 +221,8 @@ export default function FoundationVocabularyPage() {
   const [inputResetKey, setInputResetKey] = useState(0);
   const correctionInputRef = useRef<HTMLInputElement | null>(null);
   const typedInputRef = useRef<HTMLInputElement | null>(null);
+  const submitTypedAfterCompositionRef = useRef(false);
+  const submitCorrectionAfterCompositionRef = useRef(false);
 
   const card = JLPT_N5_FOUNDATION_VOCABULARY[order[sessionIndex] ?? 0];
   const complete = sessionIndex >= order.length;
@@ -86,6 +239,7 @@ export default function FoundationVocabularyPage() {
   const cardSuccessfullyCompleted =
     (mode === "COMPLETE" && revealStep >= 2) ||
     ((mode === "READING_MC" || mode === "MEANING_MC") && answered && wasCorrect === true) ||
+    ((mode === "READING_MC" || mode === "MEANING_MC") && correctionAccepted) ||
     (mode === "TYPING_READING" && readyForNextCard);
 
   function resetCardState() {
@@ -95,6 +249,7 @@ export default function FoundationVocabularyPage() {
     setWasCorrect(null);
     setCorrectionInput("");
     setCorrectionFeedback(null);
+    setCorrectionAccepted(false);
     setTypedInput("");
     setTypedFeedback(null);
     setReadyForNextCard(false);
@@ -154,10 +309,10 @@ export default function FoundationVocabularyPage() {
     setWasCorrect(correct);
   }
 
-  function checkTypedReadingAnswer() {
+  function checkTypedReadingAnswer(inputOverride?: string) {
     if (!card || readyForNextCard) return;
 
-    const input = typedInput.trim();
+    const input = (inputOverride ?? typedInput).trim();
     if (!input) return;
 
     const correct = readingAnswersMatch(input, card.reading);
@@ -177,10 +332,10 @@ export default function FoundationVocabularyPage() {
     setReadyForNextCard(false);
   }
 
-  function checkCorrectionAnswer() {
+  function checkCorrectionAnswer(inputOverride?: string) {
     if (!card) return;
 
-    const input = correctionInput.trim();
+    const input = (inputOverride ?? correctionInput).trim();
     if (!input) return;
 
     const correct =
@@ -194,12 +349,66 @@ export default function FoundationVocabularyPage() {
 
     if (!correct) {
       setCorrectionInput("");
+      setCorrectionAccepted(false);
       setCorrectionFeedback("Try typing the correct answer once.");
       return;
     }
 
-    setCorrectionFeedback(null);
+    setCorrectionAccepted(true);
+    setCorrectionFeedback(
+      autoForwardPaused ? "Good. Use Next when you are ready." : "Good. Next card coming..."
+    );
     setCorrectionInput("");
+  }
+
+  function handleTypedInputEnter(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+
+    if (isComposingEnter(event)) {
+      submitTypedAfterCompositionRef.current = true;
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (readyForNextCard) {
+      goNext();
+      return;
+    }
+
+    checkTypedReadingAnswer();
+  }
+
+  function handleTypedCompositionEnd() {
+    if (!submitTypedAfterCompositionRef.current) return;
+
+    submitTypedAfterCompositionRef.current = false;
+    window.setTimeout(() => {
+      checkTypedReadingAnswer(typedInputRef.current?.value ?? typedInput);
+    }, 0);
+  }
+
+  function handleCorrectionInputEnter(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+
+    if (isComposingEnter(event)) {
+      submitCorrectionAfterCompositionRef.current = true;
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    checkCorrectionAnswer();
+  }
+
+  function handleCorrectionCompositionEnd() {
+    if (!submitCorrectionAfterCompositionRef.current) return;
+
+    submitCorrectionAfterCompositionRef.current = false;
+    window.setTimeout(() => {
+      checkCorrectionAnswer(correctionInputRef.current?.value ?? correctionInput);
+    }, 0);
   }
 
   useEffect(() => {
@@ -209,6 +418,31 @@ export default function FoundationVocabularyPage() {
     const timer = window.setTimeout(goNext, AUTO_FORWARD_MS);
     return () => window.clearTimeout(timer);
   }, [cardSuccessfullyCompleted, autoForwardPaused, sessionIndex]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const isTypingTarget =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      if (isTypingTarget || answered) return;
+      if (mode !== "READING_MC" && mode !== "MEANING_MC") return;
+
+      const optionIndex = Number(event.key) - 1;
+      if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex > 3) return;
+
+      const option = (mode === "READING_MC" ? readingOptions : meaningOptions)[optionIndex];
+      if (!option) return;
+
+      event.preventDefault();
+      handleAnswer(option);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [answered, meaningOptions, mode, readingOptions]);
 
   if (complete) {
     return (
@@ -314,25 +548,14 @@ export default function FoundationVocabularyPage() {
                   typedFeedback={typedFeedback}
                   readyForNextCard={readyForNextCard}
                   placeholder="Type the reading"
-                  feedbackHelpText="Try the reading again, or use Next to move on."
+                  feedbackHelpText={`${readingInputExample(card.reading)} Next is only there if you need to move on.`}
                   typedInputRef={typedInputRef}
                   onTypedInputChange={(value) => {
                     setTypedInput(value);
                     if (!readyForNextCard) setTypedFeedback(null);
                   }}
-                  onTypedInputKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      event.stopPropagation();
-
-                      if (readyForNextCard) {
-                        goNext();
-                        return;
-                      }
-
-                      checkTypedReadingAnswer();
-                    }
-                  }}
+                  onTypedInputKeyDown={handleTypedInputEnter}
+                  onTypedInputCompositionEnd={handleTypedCompositionEnd}
                   autoAdvancePaused={autoForwardPaused}
                   onToggleAutoAdvancePaused={() =>
                     setAutoForwardPaused((current) => !current)
@@ -400,6 +623,17 @@ export default function FoundationVocabularyPage() {
                   correctionFeedback={correctionFeedback}
                   correctionInputRef={correctionInputRef}
                   correctionPlaceholder={mode === "READING_MC" ? "Type the reading" : "Type the meaning"}
+                  correctionTitle={
+                    mode === "READING_MC"
+                      ? "Type the reading to continue."
+                      : "Type one word from the correct answer to continue."
+                  }
+                  correctionHelpText={
+                    mode === "READING_MC"
+                      ? readingInputExample(card.reading)
+                      : undefined
+                  }
+                  correctionAnswerDisplay={mode === "READING_MC" ? card.reading : undefined}
                   isOptionCorrect={(option) =>
                     isReadingAnswerMode(mode)
                       ? readingAnswersMatch(option, card.reading)
@@ -409,15 +643,12 @@ export default function FoundationVocabularyPage() {
                   onCorrectionInputChange={(value) => {
                     setCorrectionInput(value);
                     setCorrectionFeedback(null);
+                    setCorrectionAccepted(false);
                   }}
-                  onCorrectionInputKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      checkCorrectionAnswer();
-                    }
-                  }}
+                  onCorrectionInputKeyDown={handleCorrectionInputEnter}
+                  onCorrectionInputCompositionEnd={handleCorrectionCompositionEnd}
                   onCheckCorrection={checkCorrectionAnswer}
+                  correctionFeedbackOk={correctionAccepted}
                   autoAdvancePaused={autoForwardPaused}
                   onToggleAutoAdvancePaused={() =>
                     setAutoForwardPaused((current) => !current)
@@ -472,9 +703,12 @@ export default function FoundationVocabularyPage() {
               onClick={goNext}
               className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
             >
-              {cardSuccessfullyCompleted && autoForwardPaused ? "Next" : "Known"}
+              Next
             </button>
           </div>
+          <p className="mt-3 text-center text-xs font-medium text-slate-400">
+            Previous and Next are manual safeguards only. They do not mark words known or change study progress.
+          </p>
         </section>
       </div>
     </main>

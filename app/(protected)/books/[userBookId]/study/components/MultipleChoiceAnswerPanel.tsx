@@ -1,4 +1,4 @@
-import type { KeyboardEvent, RefObject } from "react";
+import type { CompositionEvent, KeyboardEvent, RefObject } from "react";
 
 type MultipleChoiceAnswerPanelProps = {
   answerPrompt: string;
@@ -11,10 +11,15 @@ type MultipleChoiceAnswerPanelProps = {
   correctionFeedback: string | null;
   correctionInputRef: RefObject<HTMLInputElement | null>;
   correctionPlaceholder: string;
+  correctionTitle?: string;
+  correctionHelpText?: string;
+  correctionAnswerDisplay?: string;
+  correctionFeedbackOk?: boolean;
   isOptionCorrect: (option: string) => boolean;
   onSelectOption: (option: string) => void;
   onCorrectionInputChange: (value: string) => void;
   onCorrectionInputKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onCorrectionInputCompositionEnd?: (event: CompositionEvent<HTMLInputElement>) => void;
   onCheckCorrection: () => void;
   autoAdvancePaused?: boolean;
   onToggleAutoAdvancePaused?: () => void;
@@ -35,14 +40,23 @@ export default function MultipleChoiceAnswerPanel({
   correctionFeedback,
   correctionInputRef,
   correctionPlaceholder,
+  correctionTitle,
+  correctionHelpText,
+  correctionAnswerDisplay,
+  correctionFeedbackOk = false,
   isOptionCorrect,
   onSelectOption,
   onCorrectionInputChange,
   onCorrectionInputKeyDown,
+  onCorrectionInputCompositionEnd,
   onCheckCorrection,
   autoAdvancePaused = false,
   onToggleAutoAdvancePaused,
 }: MultipleChoiceAnswerPanelProps) {
+  const hasCustomCorrectionCopy = Boolean(
+    correctionTitle || correctionHelpText || correctionAnswerDisplay
+  );
+
   return (
     <div className="w-full max-w-md pt-2">
       <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
@@ -114,9 +128,29 @@ export default function MultipleChoiceAnswerPanel({
 
           {!wasCorrect ? (
             <div className="mt-3 space-y-2">
-              <p className="text-xs text-slate-500">
-                Type one word from the answer to continue.
-              </p>
+              {hasCustomCorrectionCopy ? (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-black text-slate-700">
+                    {correctionTitle ?? "Type one word from the correct answer to continue."}
+                  </p>
+
+                  {correctionAnswerDisplay ? (
+                    <p className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-2xl font-black leading-none text-slate-950">
+                      {correctionAnswerDisplay}
+                    </p>
+                  ) : null}
+
+                  {correctionHelpText ? (
+                    <p className="text-sm font-bold text-slate-600">
+                      {correctionHelpText}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  Type one word from the correct answer to continue.
+                </p>
+              )}
 
               <div className="flex gap-2">
                 <input
@@ -125,6 +159,7 @@ export default function MultipleChoiceAnswerPanel({
                   value={correctionInput}
                   onChange={(event) => onCorrectionInputChange(event.target.value)}
                   onKeyDown={onCorrectionInputKeyDown}
+                  onCompositionEnd={onCorrectionInputCompositionEnd}
                   autoCorrect="off"
                   autoCapitalize="none"
                   autoComplete="off"
@@ -147,7 +182,9 @@ export default function MultipleChoiceAnswerPanel({
               </div>
 
               {correctionFeedback ? (
-                <p className="text-xs text-red-700">{correctionFeedback}</p>
+                <p className={`text-xs ${correctionFeedbackOk ? "text-green-700" : "text-red-700"}`}>
+                  {correctionFeedback}
+                </p>
               ) : null}
             </div>
           ) : null}

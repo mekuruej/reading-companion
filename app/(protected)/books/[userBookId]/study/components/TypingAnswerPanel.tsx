@@ -1,4 +1,4 @@
-import type { KeyboardEvent, RefObject } from "react";
+import type { CompositionEvent, KeyboardEvent, RefObject } from "react";
 
 type TypedFeedback = {
   ok: boolean;
@@ -17,6 +17,7 @@ type TypingAnswerPanelProps = {
   typedInputRef: RefObject<HTMLInputElement | null>;
   onTypedInputChange: (value: string) => void;
   onTypedInputKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onTypedInputCompositionEnd?: (event: CompositionEvent<HTMLInputElement>) => void;
   autoAdvancePaused?: boolean;
   onToggleAutoAdvancePaused?: () => void;
 };
@@ -33,6 +34,7 @@ export default function TypingAnswerPanel({
   typedInputRef,
   onTypedInputChange,
   onTypedInputKeyDown,
+  onTypedInputCompositionEnd,
   autoAdvancePaused = false,
   onToggleAutoAdvancePaused,
 }: TypingAnswerPanelProps) {
@@ -57,6 +59,7 @@ export default function TypingAnswerPanel({
           value={typedInput}
           onChange={(event) => onTypedInputChange(event.target.value)}
           onKeyDown={onTypedInputKeyDown}
+          onCompositionEnd={onTypedInputCompositionEnd}
           inputMode="text"
           autoCorrect="off"
           autoCapitalize="none"
