@@ -183,10 +183,7 @@ export default function AdvancedStudyPage() {
                     </section>
                 ) : (
                     <>
-                        <details
-                            open
-                            className="group rounded-3xl border border-sky-200 bg-white p-6 text-slate-900 shadow-sm"
-                        >
+                        <details className="group rounded-3xl border border-sky-200 bg-white p-6 text-slate-900 shadow-sm">
                             <summary className="cursor-pointer list-none">
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
