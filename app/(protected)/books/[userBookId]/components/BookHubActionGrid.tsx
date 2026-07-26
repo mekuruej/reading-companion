@@ -15,6 +15,7 @@ type BookHubActionGridProps = {
     onFluidReadingExtensive: () => void;
     onFluidReadingJustReading: () => void;
     onListening: () => void;
+    onAboutBook: () => void;
     onStudyFlashcards: () => void;
     onVocabularyList: () => void;
 };
@@ -112,6 +113,7 @@ export default function BookHubActionGrid({
     onFluidReadingExtensive,
     onFluidReadingJustReading,
     onListening,
+    onAboutBook,
     onStudyFlashcards,
     onVocabularyList,
 }: BookHubActionGridProps) {
@@ -133,6 +135,13 @@ export default function BookHubActionGrid({
                         description={["Listen to the audiobook", "and log your listening time."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         onClick={onListening}
+                    />
+
+                    <ActionButton
+                        title="About This Book"
+                        description="See the author, publisher, format, level, and book details."
+                        className="bg-violet-50 hover:bg-violet-100"
+                        onClick={onAboutBook}
                     />
 
                     {hasSavedWords ? (
@@ -184,6 +193,13 @@ export default function BookHubActionGrid({
                     description={["Listen while saving vocab", "and log listening time."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onListening}
+                />
+
+                <ActionButton
+                    title="About This Book"
+                    description="See the author, publisher, format, level, and book details."
+                    className="bg-violet-50 hover:bg-violet-100"
+                    onClick={onAboutBook}
                 />
 
                 <ActionButton
