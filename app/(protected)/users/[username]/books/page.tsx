@@ -1368,7 +1368,7 @@ export default function BooksPage() {
 
         <MobileVersionNotice />
 
-        {showAbilityCheckReminder ? (
+        {showAbilityCheckReminder && (hasFullLearningAccess || isTeacher) ? (
           <AbilityCheckReminderBanner
             abilityCheckReminderCount={abilityCheckReminderCount}
             minDueCards={ABILITY_CHECK_REMINDER_MIN_DUE_CARDS}
