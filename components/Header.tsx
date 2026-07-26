@@ -14,7 +14,6 @@ export default function Header() {
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
-  const [hasSavedWords, setHasSavedWords] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
@@ -43,13 +42,12 @@ export default function Header() {
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
-          setHasSavedWords(false);
           return;
         }
 
         const profileResult = await supabase
           .from("profiles")
-          .select("username, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+          .select("username, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at")
           .eq("id", user.id)
           .maybeSingle();
         let profile: any = profileResult.data;
@@ -73,7 +71,6 @@ export default function Header() {
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
-          setHasSavedWords(false);
           return;
         }
 
@@ -82,24 +79,12 @@ export default function Header() {
         setProfileIsSuperTeacher(!!profile?.is_super_teacher);
         setHasFullAccess(profile ? getAppAccessStatus(profile).hasFullAccess : false);
 
-        const { data: savedWordRows, error: savedWordError } = await supabase
-          .from("user_book_words")
-          .select("id")
-          .limit(1);
-
-        if (savedWordError) {
-          setHasSavedWords(false);
-        } else {
-          setHasSavedWords((savedWordRows ?? []).length > 0);
-        }
-
       } catch (error) {
         if (!cancelled) {
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
-          setHasSavedWords(false);
         }
       }
     }
@@ -267,18 +252,16 @@ export default function Header() {
                     Book Hubs
                   </Link>
 
-                  {hasSavedWords ? (
-                    <Link
-                      href="/library/vocab-list-index"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowLibraryMenu(false)}
-                    >
-                      Vocabulary Lists
-                    </Link>
-                  ) : null}
+                  <Link
+                    href="/library/vocab-list-index"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowLibraryMenu(false)}
+                  >
+                    Vocabulary Lists
+                  </Link>
                 </div>
               ) : null}
             </div>
@@ -367,11 +350,11 @@ export default function Header() {
                     <Link
                       href="/library-study/advanced"
                       className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
-                          pathname === "/library-study/check" ||
-                          pathname === "/library-study/practice" ||
-                          pathname === "/library-study/word-sky"
-                          ? "bg-stone-100 font-medium text-stone-900"
-                          : "text-stone-700 hover:bg-stone-50"
+                        pathname === "/library-study/check" ||
+                        pathname === "/library-study/practice" ||
+                        pathname === "/library-study/word-sky"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
                         }`}
                       onClick={() => setShowStudyMenu(false)}
                     >
