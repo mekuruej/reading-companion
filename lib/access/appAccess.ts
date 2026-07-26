@@ -25,15 +25,15 @@ type AppAccessStatus = {
   isTrialExpired: boolean;
 
   reason:
-    | "staff"
-    | "free"
-    | "inactive"
-    | "none"
-    | "expired"
-    | "no_expiration"
-    | "invalid_expiration"
-    | "active"
-    | "trial";
+  | "staff"
+  | "free"
+  | "inactive"
+  | "none"
+  | "expired"
+  | "no_expiration"
+  | "invalid_expiration"
+  | "active"
+  | "trial";
 };
 
 const FULL_ACCESS_TYPES = new Set([
@@ -106,7 +106,7 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
   }
 
   if (!expiresAt) {
-    return status({ hasAccess: true, hasFullAccess: true, reason: "no_expiration" });
+    return status({ hasAccess: true, hasFullAccess: false, reason: "no_expiration" });
   }
 
   const expiry = new Date(expiresAt).getTime();
