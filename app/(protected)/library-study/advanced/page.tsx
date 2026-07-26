@@ -5,6 +5,12 @@ import { useEffect, useState } from "react";
 import VocabularyGrowthCycleSection from "./components/VocabularyGrowthCycleSection";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import {
+    calculateAdvancedStudyReadiness,
+    type AdvancedStudyReadinessProgressRow,
+    type AdvancedStudyReadinessResult,
+    type AdvancedStudyReadinessSummaryRow,
+} from "@/lib/study/advancedStudyReadiness";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileAccessRow = {
@@ -15,6 +21,22 @@ type ProfileAccessRow = {
     trial_started_at: string | null;
     trial_ends_at: string | null;
 };
+
+type LearningSettingsRow = {
+    red_stages: number | null;
+    orange_stages: number | null;
+    yellow_stages: number | null;
+};
+
+const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
+    red_stages: 1,
+    orange_stages: 1,
+    yellow_stages: 1,
+};
+
+function formatReadyScore(value: number) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
 
 const advancedTools = [
     {
@@ -42,7 +64,16 @@ export default function AdvancedStudyPage() {
     const [canUseAdvancedStudy, setCanUseAdvancedStudy] = useState(false);
     const [accessReason, setAccessReason] = useState<string>("free");
     const [hasSavedWords, setHasSavedWords] = useState(false);
+    const [readiness, setReadiness] = useState<AdvancedStudyReadinessResult | null>(null);
+    const [readinessLoading, setReadinessLoading] = useState(false);
+    const [readinessError, setReadinessError] = useState<string | null>(null);
+    const [isTrialAccess, setIsTrialAccess] = useState(false);
+    const [isStaffAccess, setIsStaffAccess] = useState(false);
     const accessTitle = accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
+    const showAdvancedTools = canUseAdvancedStudy && (
+        isStaffAccess ||
+        (!isTrialAccess && (readiness?.abilityCheckReady ?? false))
+    );
 
     useEffect(() => {
         let mounted = true;
@@ -58,6 +89,10 @@ export default function AdvancedStudyPage() {
                         setCanUseAdvancedStudy(false);
                         setAccessReason("free");
                         setHasSavedWords(false);
+                        setReadiness(null);
+                        setReadinessError(null);
+                        setIsTrialAccess(false);
+                        setIsStaffAccess(false);
                         setLoadingAccess(false);
                     }
                     return;
@@ -87,6 +122,8 @@ export default function AdvancedStudyPage() {
                 const appStatus = profile
                     ? getAppAccessStatus(profile)
                     : { hasFullAccess: false, reason: "free" as const };
+                const staffAccess = appStatus.reason === "staff";
+                const trialAccess = appStatus.reason === "trial";
                 const featureAccess = getFeatureAccess({
                     role: profile?.role,
                     isSuperTeacher: profile?.is_super_teacher,
@@ -96,7 +133,63 @@ export default function AdvancedStudyPage() {
                 if (mounted) {
                     setCanUseAdvancedStudy(featureAccess.canUseAdvancedStudy);
                     setAccessReason(appStatus.reason);
+                    setIsTrialAccess(trialAccess);
+                    setIsStaffAccess(staffAccess);
                     setLoadingAccess(false);
+                }
+
+                if (featureAccess.canUseAdvancedStudy) {
+                    if (mounted) {
+                        setReadinessLoading(true);
+                        setReadinessError(null);
+                    }
+
+                    const { data: settingsRow, error: settingsError } = await supabase
+                        .from("user_learning_settings")
+                        .select("red_stages, orange_stages, yellow_stages")
+                        .eq("user_id", user.id)
+                        .maybeSingle<LearningSettingsRow>();
+
+                    if (settingsError) {
+                        console.warn("Advanced Study readiness is using default settings:", settingsError);
+                    }
+
+                    const { data: summaryRows, error: summaryError } = await supabase
+                        .from("user_library_word_summaries")
+                        .select("study_identity_key, surface, reading, meaning, total_encounter_count, hidden_encounter_count")
+                        .eq("user_id", user.id)
+                        .limit(5000)
+                        .returns<AdvancedStudyReadinessSummaryRow[]>();
+
+                    if (summaryError) {
+                        throw summaryError;
+                    }
+
+                    const { data: progressRows, error: progressError } = await supabase
+                        .from("user_library_word_progress")
+                        .select("study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, reading_gate_attempts, mastered")
+                        .eq("user_id", user.id)
+                        .eq("definition_key", "")
+                        .limit(20000)
+                        .returns<AdvancedStudyReadinessProgressRow[]>();
+
+                    if (progressError) {
+                        console.warn("Advanced Study readiness is using summary colors without progress:", progressError);
+                    }
+
+                    const nextReadiness = calculateAdvancedStudyReadiness({
+                        summaries: summaryRows ?? [],
+                        progressRows: progressError ? [] : progressRows ?? [],
+                        settings: {
+                            ...DEFAULT_LEARNING_SETTINGS,
+                            ...(settingsError ? {} : settingsRow ?? {}),
+                        },
+                    });
+
+                    if (mounted) {
+                        setReadiness(nextReadiness);
+                        setReadinessLoading(false);
+                    }
                 }
 
                 const { data: savedWordRows, error: savedWordError } = await supabase
@@ -116,6 +209,11 @@ export default function AdvancedStudyPage() {
                     setCanUseAdvancedStudy(false);
                     setAccessReason("free");
                     setHasSavedWords(false);
+                    setReadiness(null);
+                    setReadinessLoading(false);
+                    setReadinessError("Could not load Advanced Study readiness.");
+                    setIsTrialAccess(false);
+                    setIsStaffAccess(false);
                     setLoadingAccess(false);
                 }
             }
@@ -183,6 +281,78 @@ export default function AdvancedStudyPage() {
                     </section>
                 ) : (
                     <>
+                        {readinessLoading ? (
+                            <section className="rounded-3xl border border-slate-200 bg-white p-5 text-center text-sm font-semibold text-slate-600 shadow-sm">
+                                Loading Advanced Study readiness...
+                            </section>
+                        ) : readinessError ? (
+                            <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold leading-6 text-amber-950 shadow-sm">
+                                Advanced Study readiness could not load right now. Your saved words and colors are still here.
+                            </section>
+                        ) : readiness ? (
+                            <section className="rounded-3xl border border-violet-200 bg-white p-6 text-slate-900 shadow-sm">
+                                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">
+                                    {showAdvancedTools ? "Advanced Study readiness" : "Advanced Study is forming"}
+                                </p>
+                                <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-slate-950">
+                                            {formatReadyScore(readiness.readyScore)} / {readiness.abilityCheckTarget} words ready for Ability Check
+                                        </h2>
+                                        <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+                                            {showAdvancedTools
+                                                ? "Ability Check is ready. Your word colors are already active, and advanced tools can help you check and review words across your library."
+                                                : "Your word colors are already starting. Keep saving and studying words from your books. Once enough words are ready, MEKURU will open Ability Check."}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
+                                        {readiness.eligibleWordCount} tracked word{readiness.eligibleWordCount === 1 ? "" : "s"}
+                                    </div>
+                                </div>
+
+                                <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                        className="h-full rounded-full bg-violet-500"
+                                        style={{
+                                            width: `${Math.min(100, (readiness.readyScore / readiness.abilityCheckTarget) * 100)}%`,
+                                        }}
+                                    />
+                                </div>
+
+                                <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+                                    Library Review opens after a larger review pool forms: {formatReadyScore(readiness.readyScore)} / {readiness.libraryReviewTarget}.
+                                </p>
+
+                                <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                                    <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">Red {readiness.colorCounts.red}</span>
+                                    <span className="rounded-full bg-orange-50 px-3 py-1.5 text-orange-800">Orange {readiness.colorCounts.orange}</span>
+                                    <span className="rounded-full bg-yellow-100 px-3 py-1.5 text-amber-900">Yellow {readiness.colorCounts.yellow}</span>
+                                    <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-800">Green {readiness.colorCounts.green}</span>
+                                    <span className="rounded-full bg-sky-50 px-3 py-1.5 text-sky-800">Blue {readiness.colorCounts.blue}</span>
+                                    <span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-800">Purple {readiness.colorCounts.purple}</span>
+                                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">Grey {readiness.colorCounts.grey}</span>
+                                </div>
+
+                                {!showAdvancedTools ? (
+                                    <div className="mt-5 flex flex-wrap gap-3">
+                                        <Link
+                                            href="/library-study/book-study"
+                                            className="rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-950 transition hover:bg-indigo-100"
+                                        >
+                                            Book Study
+                                        </Link>
+                                        <Link
+                                            href="/library-study/word-sky"
+                                            className="rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-black text-violet-950 transition hover:bg-violet-100"
+                                        >
+                                            Word Sky warm-up
+                                        </Link>
+                                    </div>
+                                ) : null}
+                            </section>
+                        ) : null}
+
                         <details className="group rounded-3xl border border-sky-200 bg-white p-6 text-slate-900 shadow-sm">
                             <summary className="cursor-pointer list-none">
                                 <div className="flex items-center justify-between gap-4">
@@ -227,6 +397,7 @@ export default function AdvancedStudyPage() {
                             </div>
                         </details>
 
+                        {showAdvancedTools ? (
                         <section className="mt-4">
                             <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
                                 Quick study jumps
@@ -260,6 +431,7 @@ export default function AdvancedStudyPage() {
                                 Book-specific flashcards live in Book Study. These tools work across your library.
                             </p>
                         </section>
+                        ) : null}
 
                         <VocabularyGrowthCycleSection />
 
