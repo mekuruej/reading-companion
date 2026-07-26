@@ -316,7 +316,8 @@ export default function Header() {
                     href="/library-study/characters"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/characters" ||
                       pathname === "/library-study/kana" ||
-                      pathname === "/library-study/kanji"
+                      pathname === "/library-study/kanji" ||
+                      pathname === "/library-study/foundation-vocabulary"
                       ? "bg-stone-100 font-medium text-stone-900"
                       : "text-stone-700 hover:bg-stone-50"
                       }`}
