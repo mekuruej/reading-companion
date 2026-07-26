@@ -3,8 +3,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import MultipleChoiceAnswerPanel from "@/app/(protected)/books/[userBookId]/study/components/MultipleChoiceAnswerPanel";
 import Row from "@/app/(protected)/books/[userBookId]/study/components/StudyCardFieldRow";
 import StudyFlashcardShell from "@/app/(protected)/books/[userBookId]/study/components/StudyFlashcardShell";
@@ -81,6 +80,10 @@ export default function FoundationVocabularyPage() {
     () => buildOptions(card?.meaning ?? "", JLPT_N5_FOUNDATION_VOCABULARY.map((word) => word.meaning)),
     [card]
   );
+  const cardSuccessfullyCompleted =
+    (mode === "COMPLETE" && revealStep >= 2) ||
+    ((mode === "READING_MC" || mode === "MEANING_MC") && answered && wasCorrect === true) ||
+    (mode === "TYPING_READING" && readyForNextCard);
 
   function resetCardState() {
     setRevealStep(0);
@@ -132,9 +135,7 @@ export default function FoundationVocabularyPage() {
     if (mode !== "COMPLETE") return;
     if (revealStep < 2) {
       setRevealStep((current) => current + 1);
-      return;
     }
-    goNext();
   }
 
   function handleAnswer(option: string) {
@@ -194,18 +195,17 @@ export default function FoundationVocabularyPage() {
       return;
     }
 
-    setCorrectionFeedback("Good. Moving to the next card...");
-    window.setTimeout(goNext, 500);
+    setCorrectionFeedback(null);
+    setCorrectionInput("");
   }
 
   useEffect(() => {
-    if (mode !== "TYPING_READING") return;
-    if (!readyForNextCard) return;
+    if (!cardSuccessfullyCompleted) return;
     if (autoForwardPaused) return;
 
     const timer = window.setTimeout(goNext, AUTO_FORWARD_MS);
     return () => window.clearTimeout(timer);
-  }, [mode, readyForNextCard, autoForwardPaused, sessionIndex]);
+  }, [cardSuccessfullyCompleted, autoForwardPaused, sessionIndex]);
 
   if (complete) {
     return (
@@ -280,7 +280,10 @@ export default function FoundationVocabularyPage() {
           />
         </div>
 
-        <StudyFlashcardShell isClickable={mode === "COMPLETE"} onReveal={handleReveal}>
+        <StudyFlashcardShell
+          isClickable={mode === "COMPLETE" && !cardSuccessfullyCompleted}
+          onReveal={handleReveal}
+        >
           <div className="absolute left-4 top-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 shadow-sm">
             <div className="text-xs font-medium leading-none">N5</div>
           </div>
@@ -412,6 +415,10 @@ export default function FoundationVocabularyPage() {
                     }
                   }}
                   onCheckCorrection={checkCorrectionAnswer}
+                  autoAdvancePaused={autoForwardPaused}
+                  onToggleAutoAdvancePaused={() =>
+                    setAutoForwardPaused((current) => !current)
+                  }
                 />
               </>
             )}
@@ -419,6 +426,21 @@ export default function FoundationVocabularyPage() {
         </StudyFlashcardShell>
 
         <section className="mt-4 w-full rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold text-slate-500">
+              {autoForwardPaused
+                ? "Auto-forward paused. Use Next when you are ready."
+                : "Auto-forward is on after correct or completed cards."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setAutoForwardPaused((current) => !current)}
+              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              {autoForwardPaused ? "Resume Auto-forward" : "Pause Auto-forward"}
+            </button>
+          </div>
+
           <div className="grid gap-2 sm:grid-cols-4">
             <button
               type="button"
@@ -447,7 +469,7 @@ export default function FoundationVocabularyPage() {
               onClick={goNext}
               className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
             >
-              Known
+              {cardSuccessfullyCompleted && autoForwardPaused ? "Next" : "Known"}
             </button>
           </div>
         </section>
