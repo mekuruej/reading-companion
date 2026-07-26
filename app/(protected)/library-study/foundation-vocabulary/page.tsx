@@ -11,6 +11,7 @@ import StudyModePanel from "@/app/(protected)/books/[userBookId]/study/component
 import StudyProgressPanel from "@/app/(protected)/books/[userBookId]/study/components/StudyProgressPanel";
 import TypingAnswerPanel from "@/app/(protected)/books/[userBookId]/study/components/TypingAnswerPanel";
 import { JLPT_N5_FOUNDATION_VOCABULARY } from "@/lib/foundationVocabulary";
+import { normalizeKanaReading } from "@/lib/kanaInput";
 
 type FoundationMode = "COMPLETE" | "READING_MC" | "MEANING_MC" | "TYPING_READING";
 
@@ -32,14 +33,16 @@ function shuffleArray<T>(items: T[]) {
   return copy;
 }
 
-function normalizeKana(value: string) {
-  return value.trim().replace(/[ァ-ヶ]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
-}
-
 function normalizeMeaning(value: string) {
   return value.trim().toLowerCase();
+}
+
+function isReadingAnswerMode(mode: FoundationMode) {
+  return mode === "READING_MC" || mode === "TYPING_READING";
+}
+
+function readingAnswersMatch(input: string, correctReading: string) {
+  return normalizeKanaReading(input) === normalizeKanaReading(correctReading);
 }
 
 function buildOptions(correct: string, pool: string[]) {
@@ -142,8 +145,8 @@ export default function FoundationVocabularyPage() {
     if (!card || answered) return;
 
     const correct =
-      mode === "READING_MC"
-        ? normalizeKana(option) === normalizeKana(card.reading)
+      isReadingAnswerMode(mode)
+        ? readingAnswersMatch(option, card.reading)
         : normalizeMeaning(option) === normalizeMeaning(card.meaning);
 
     setSelected(option);
@@ -157,7 +160,7 @@ export default function FoundationVocabularyPage() {
     const input = typedInput.trim();
     if (!input) return;
 
-    const correct = normalizeKana(input) === normalizeKana(card.reading);
+    const correct = readingAnswersMatch(input, card.reading);
 
     if (correct) {
       setTypedFeedback({ ok: true, message: `Correct: ${card.reading}` });
@@ -181,8 +184,8 @@ export default function FoundationVocabularyPage() {
     if (!input) return;
 
     const correct =
-      mode === "READING_MC"
-        ? normalizeKana(input) === normalizeKana(card.reading)
+      isReadingAnswerMode(mode)
+        ? readingAnswersMatch(input, card.reading)
         : card.meaning
             .split(";")
             .map((part) => normalizeMeaning(part))
@@ -398,8 +401,8 @@ export default function FoundationVocabularyPage() {
                   correctionInputRef={correctionInputRef}
                   correctionPlaceholder={mode === "READING_MC" ? "Type the reading" : "Type the meaning"}
                   isOptionCorrect={(option) =>
-                    mode === "READING_MC"
-                      ? normalizeKana(option) === normalizeKana(card.reading)
+                    isReadingAnswerMode(mode)
+                      ? readingAnswersMatch(option, card.reading)
                       : normalizeMeaning(option) === normalizeMeaning(card.meaning)
                   }
                   onSelectOption={handleAnswer}
