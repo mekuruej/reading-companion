@@ -6,8 +6,6 @@ type AppAccessProfile = {
   is_super_teacher?: boolean | string | null;
   app_access_type?: string | null;
   app_access_expires_at?: string | null;
-  trial_started_at?: string | null;
-  trial_ends_at?: string | null;
 };
 
 type AppAccessStatus = {
@@ -18,8 +16,6 @@ type AppAccessStatus = {
   // Free users can enter the app, but this should be false.
   hasFullAccess: boolean;
   accessType: string;
-  trialStartedAt: string | null;
-  trialEndsAt: string | null;
   daysRemaining: number | null;
   isTrialActive: boolean;
   isTrialExpired: boolean;
@@ -52,13 +48,12 @@ export function isMissingAppAccessColumnError(error: any) {
 export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
   const role = profile.role ?? "";
   const accessType = (profile.app_access_type ?? "").trim().toLowerCase();
-  const trialEndsAt = profile.trial_ends_at ?? null;
-  const expiresAt = profile.app_access_expires_at ?? trialEndsAt;
+  const expiresAt = profile.app_access_expires_at ?? null;
 
   function status(
     values: Omit<
       AppAccessStatus,
-      "accessType" | "trialStartedAt" | "trialEndsAt" | "daysRemaining" | "isTrialActive" | "isTrialExpired"
+      "accessType" | "daysRemaining" | "isTrialActive" | "isTrialExpired"
     >
   ): AppAccessStatus {
     const expiry = expiresAt ? new Date(expiresAt).getTime() : null;
@@ -71,8 +66,6 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
     return {
       ...values,
       accessType,
-      trialStartedAt: profile.trial_started_at ?? null,
-      trialEndsAt,
       daysRemaining,
       isTrialActive: isTrial && values.hasFullAccess,
       isTrialExpired: isTrial && !values.hasFullAccess && values.reason === "expired",

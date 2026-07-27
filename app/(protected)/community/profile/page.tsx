@@ -18,8 +18,6 @@ type ProfileRow = {
   is_super_teacher: boolean | null;
   app_access_type: string | null;
   app_access_expires_at: string | null;
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
 };
 
 type PublicProfileRow = {
@@ -88,7 +86,7 @@ export default function ProfileHubPage() {
           supabase
             .from("profiles")
             .select(
-              "display_name, username, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at"
+              "display_name, username, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at"
             )
             .eq("id", user.id)
             .maybeSingle<ProfileRow>(),
@@ -130,7 +128,7 @@ export default function ProfileHubPage() {
       ? username || displayName || "My Mekuru Profile"
       : displayName || username || "My Mekuru Profile";
   const appAccessStatus = profile ? getAppAccessStatus(profile) : null;
-  const trialEndsAt = appAccessStatus?.trialEndsAt ?? profile?.app_access_expires_at ?? null;
+  const trialEndsAt = profile?.app_access_expires_at ?? null;
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-6">

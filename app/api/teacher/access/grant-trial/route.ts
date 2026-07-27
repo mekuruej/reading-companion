@@ -156,13 +156,9 @@ export async function POST(request: Request) {
     .update({
       app_access_type: "trial",
       app_access_expires_at: trialEndsAt.toISOString(),
-      trial_started_at: now.toISOString(),
-      trial_ends_at: trialEndsAt.toISOString(),
     })
     .eq("id", targetUserId)
-    .select(
-      "id, display_name, username, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at"
-    )
+    .select("id, display_name, username, app_access_type, app_access_expires_at")
     .maybeSingle();
 
   if (error) {

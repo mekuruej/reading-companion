@@ -113,8 +113,6 @@ type ProfileBasics = {
   is_super_teacher: boolean | null;
   app_access_type: string | null;
   app_access_expires_at: string | null;
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
 };
 
 function isProfileReady(profile: ProfileBasics | null) {
@@ -153,7 +151,7 @@ export default function DashboardPage() {
     async function routeSignedInUser(userId: string, shouldOpenLibraryAfterLogin: boolean) {
       const profileResult = await supabase
         .from("profiles")
-        .select("username, display_name, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+        .select("username, display_name, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at")
         .eq("id", userId)
         .maybeSingle<ProfileBasics>();
       let profile: any = profileResult.data;

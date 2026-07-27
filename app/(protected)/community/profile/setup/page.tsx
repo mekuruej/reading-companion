@@ -66,7 +66,7 @@ export default function ProfileSetupPage() {
       const { data: profile, error } = await supabase
         .from("profiles")
         .select(
-          "display_name, username, native_language, target_language, level, app_access_type, trial_started_at"
+          "display_name, username, native_language, target_language, level, app_access_type"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -83,7 +83,7 @@ export default function ProfileSetupPage() {
       setUsername(profile?.username ?? "");
       setTargetLanguage(profile?.target_language ?? "Japanese");
       setLevel(profile?.level ?? "");
-      setShouldInitializeTrial(!profile || (!profile.app_access_type && !profile.trial_started_at));
+      setShouldInitializeTrial(!profile || !profile.app_access_type);
 
       const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
       if (
@@ -164,14 +164,11 @@ export default function ProfileSetupPage() {
         return;
       }
 
-      const now = new Date();
-      const trialEndsAt = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+      const trialEndsAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
       const trialFields = shouldInitializeTrial
         ? {
             app_access_type: "trial",
             app_access_expires_at: trialEndsAt.toISOString(),
-            trial_started_at: now.toISOString(),
-            trial_ends_at: trialEndsAt.toISOString(),
           }
         : {};
 

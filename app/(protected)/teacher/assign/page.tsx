@@ -29,7 +29,7 @@ import { TeacherAssignActionPanel } from "./components/TeacherAssignActionPanel"
 type ProfileRow = {
   id: string;
   display_name: string | null;
-  level: string | null; // "beginner" | "intermediate" | "advanced" etc
+  level: string | null; // "Level 1" through "Level 10", or null
   is_public: boolean | null;
   created_at: string | null;
   role?: string | null;
