@@ -4,7 +4,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { bookTypeLabel } from "@/lib/books/bookTypes";
@@ -106,11 +106,13 @@ function formatReadingFormat(value: string | null | undefined) {
 function formatEditionFormat(value: string | null | undefined) {
   switch (value) {
     case "bunko":
-      return "Bunkobon";
+      return "文庫本";
+    case "shinsho":
+      return "新書";
     case "tankobon_hardcover":
-      return "Tankobon Hardcover";
+      return "単行本 (hardcover)";
     case "tankobon_softcover":
-      return "Tankobon Softcover";
+      return "単行本 (softcover)";
     case "paperback":
       return "Paperback";
     case "hardcover":
@@ -122,6 +124,26 @@ function formatEditionFormat(value: string | null | undefined) {
     default:
       return null;
   }
+}
+
+function formatBookFormat(book: Book, row: UserBook) {
+  return formatEditionFormat(book.edition_format) ?? formatReadingFormat(row.format_type);
+}
+
+function inferBookstoreSection(book: Book) {
+  const format = book.edition_format;
+  const type = book.book_type;
+
+  if (format === "bunko") return "文庫 / paperback fiction shelves";
+  if (format === "shinsho") return "新書 shelves";
+  if (format === "tankobon_hardcover" || format === "tankobon_softcover") {
+    return "単行本 / general fiction shelves";
+  }
+  if (type === "light_novel") return "ライトノベル shelves";
+  if (type === "manga") return "漫画 shelves";
+  if (type === "picture_book") return "絵本 shelves";
+  if (type === "nonfiction" || type === "essay" || type === "memoir") return "nonfiction / essay shelves";
+  return null;
 }
 
 function formatLanguage(value: string | null | undefined) {
@@ -191,6 +213,101 @@ function DetailCard({ label, value }: { label: string; value: string | number | 
       <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">{label}</p>
       <p className="mt-2 text-lg font-black text-stone-950">{value}</p>
     </div>
+  );
+}
+
+function FormatHighlightCard({
+  label,
+  value,
+  tone = "stone",
+}: {
+  label: string;
+  value: string | number | null | undefined;
+  tone?: "amber" | "rose" | "sky" | "stone";
+}) {
+  if (value == null || String(value).trim().length === 0) return null;
+
+  const toneClass =
+    tone === "amber"
+      ? "border-amber-200 bg-amber-50 text-amber-950"
+      : tone === "rose"
+        ? "border-rose-200 bg-rose-50 text-rose-950"
+        : tone === "sky"
+          ? "border-sky-200 bg-sky-50 text-sky-950"
+          : "border-stone-200 bg-white text-stone-950";
+
+  return (
+    <div className={`rounded-3xl border p-5 shadow-sm ${toneClass}`}>
+      <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">{label}</p>
+      <p className="mt-2 text-2xl font-black leading-tight">{value}</p>
+    </div>
+  );
+}
+
+function ProfileSection({
+  eyebrow,
+  title,
+  description,
+  children,
+  className = "",
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-sm ${className}`}>
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">{eyebrow}</p>
+      <h2 className="mt-2 text-2xl font-black text-stone-950">{title}</h2>
+      {description ? (
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">{description}</p>
+      ) : null}
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function CreatorCard({
+  eyebrow,
+  name,
+  reading,
+  imageUrl,
+  fallbackInitial,
+  imageAlt,
+  note,
+  imageClassName,
+}: {
+  eyebrow: string;
+  name: string;
+  reading?: string | null;
+  imageUrl?: string | null;
+  fallbackInitial: string;
+  imageAlt: string;
+  note: string;
+  imageClassName?: string;
+}) {
+  return (
+    <article className="rounded-[2rem] border border-white/70 bg-white p-6 shadow-sm">
+      <div className="flex items-center gap-4">
+        <SafeProfileImage
+          src={imageUrl}
+          alt={imageAlt}
+          initials={fallbackInitial}
+          className="h-20 w-20 shrink-0 rounded-3xl"
+          imageClassName={imageClassName}
+        />
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">{eyebrow}</p>
+          <h2 className="mt-1 text-2xl font-black text-stone-950">{name}</h2>
+          {reading ? (
+            <p className="mt-1 text-sm font-semibold text-stone-500">{reading}</p>
+          ) : null}
+        </div>
+      </div>
+      <p className="mt-5 text-sm leading-6 text-stone-600">{note}</p>
+    </article>
   );
 }
 
@@ -409,18 +526,26 @@ export default function AboutBookPage() {
 
   const heroFacts = [
     bookTypeLabel(book.book_type),
+    formatBookFormat(book, row),
     formatLanguage(book.language_code),
     book.page_count ? `${book.page_count} pages` : null,
     publishedYear(book.published_date),
   ].filter(Boolean);
 
+  const bookFormat = formatBookFormat(book, row);
+  const isbn = book.isbn13 || book.isbn;
+  const bookstoreSection = inferBookstoreSection(book);
+  const synopsis = null;
+  const learnerReadingNotes: string[] = [];
+  const similarBooks: Array<{ title: string; href: string }> = [];
+
   const details = [
     { label: "Book Type", value: bookTypeLabel(book.book_type) },
+    { label: "Book Format", value: bookFormat },
     { label: "Language", value: formatLanguage(book.language_code) },
     { label: "Pages", value: book.page_count },
     { label: "Published", value: book.published_date },
-    { label: "ISBN", value: book.isbn13 || book.isbn },
-    { label: "Edition", value: formatEditionFormat(book.edition_format) },
+    { label: "ISBN", value: isbn },
     { label: "Reading Format", value: formatReadingFormat(row.format_type) },
     { label: "Reader Level", value: row.reader_level },
     { label: "Recommended Level", value: row.recommended_level },
@@ -490,57 +615,97 @@ export default function AboutBookPage() {
           </div>
         </section>
 
-        <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_1fr]">
-          <article className="rounded-[2rem] border border-white/70 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <SafeProfileImage
-                src={authorImageUrl}
-                alt={book.author ? `${book.author} photo` : "Author photo"}
-                initials={cleanInitial(book.author || book.author_english_name)}
-                className="h-20 w-20 shrink-0 rounded-3xl"
-              />
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Author</p>
-                <h2 className="mt-1 text-2xl font-black text-stone-950">
-                  {book.author || book.author_english_name || "Author not listed yet"}
-                </h2>
-                {book.author_reading ? (
-                  <p className="mt-1 text-sm font-semibold text-stone-500">{book.author_reading}</p>
-                ) : null}
-              </div>
-            </div>
-            <p className="mt-5 text-sm leading-6 text-stone-600">
-              Author information can be added later. For now, this profile shows the stored book metadata already in MEKURU.
-            </p>
-          </article>
-
-          <article className="rounded-[2rem] border border-white/70 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <SafeProfileImage
-                src={publisherImageUrl}
-                alt={book.publisher ? `${book.publisher} logo` : "Publisher logo"}
-                initials={cleanInitial(book.publisher)}
-                className="h-20 w-20 shrink-0 rounded-3xl"
-                imageClassName="object-contain bg-white p-2"
-              />
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">Publisher</p>
-                <h2 className="mt-1 text-2xl font-black text-stone-950">
-                  {book.publisher || "Publisher not listed yet"}
-                </h2>
-                {book.publisher_reading ? (
-                  <p className="mt-1 text-sm font-semibold text-stone-500">{book.publisher_reading}</p>
-                ) : null}
-              </div>
-            </div>
-            <p className="mt-5 text-sm leading-6 text-stone-600">
-              Publisher information can be added later. Stored publisher images are shown here when available.
-            </p>
-          </article>
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FormatHighlightCard
+            label="Book Type"
+            value={bookTypeLabel(book.book_type)}
+            tone="amber"
+          />
+          <FormatHighlightCard
+            label="Book Format"
+            value={bookFormat}
+            tone="rose"
+          />
+          <FormatHighlightCard
+            label="Edition Note"
+            value={book.edition_note}
+            tone="sky"
+          />
+          <FormatHighlightCard
+            label="ISBN"
+            value={isbn}
+            tone="stone"
+          />
         </section>
 
-        <section className="mt-6 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">Book Details</p>
+        <section className="mt-6 rounded-[2rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+            Bookstore hint
+          </p>
+          <div className="mt-3 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-end">
+            <div>
+              <h2 className="text-2xl font-black text-stone-950">
+                Look for this format when searching in Japanese bookstores.
+              </h2>
+              <div className="mt-4 grid gap-2 text-sm font-semibold leading-6 text-stone-700 sm:grid-cols-2">
+                <p>Title: {book.title ?? "Untitled book"}</p>
+                {book.author ? <p>Author: {book.author}</p> : null}
+                {book.publisher ? <p>Publisher: {book.publisher}</p> : null}
+                {isbn ? <p>ISBN: {isbn}</p> : null}
+                {bookFormat ? <p>Format: {bookFormat}</p> : null}
+                {bookstoreSection ? <p>Likely section: {bookstoreSection}</p> : null}
+              </div>
+            </div>
+            <div className="rounded-3xl border border-amber-200 bg-white/80 p-5">
+              <p className="text-sm font-black text-stone-950">
+                Search cue
+              </p>
+              <p className="mt-2 text-sm leading-6 text-stone-600">
+                Try the title with the author, ISBN, or format label. Japanese editions can move between 文庫本, 単行本, 新書, and ebook listings.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {synopsis ? (
+          <ProfileSection
+            eyebrow="Synopsis"
+            title="What This Book Is About"
+            description="A learner-facing overview can live here once MEKURU has a stored synopsis."
+          >
+            <p className="text-sm leading-7 text-stone-700">{synopsis}</p>
+          </ProfileSection>
+        ) : null}
+
+        <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_1fr]">
+          <CreatorCard
+            eyebrow="Author"
+            name={book.author || book.author_english_name || "Author not listed yet"}
+            reading={book.author_reading}
+            imageUrl={authorImageUrl}
+            fallbackInitial={cleanInitial(book.author || book.author_english_name)}
+            imageAlt={book.author ? `${book.author} photo` : "Author photo"}
+            note="Author bio can be added later. For now, this profile shows the stored author metadata already in MEKURU."
+          />
+
+          <CreatorCard
+            eyebrow="Publisher"
+            name={book.publisher || "Publisher not listed yet"}
+            reading={book.publisher_reading}
+            imageUrl={publisherImageUrl}
+            fallbackInitial={cleanInitial(book.publisher)}
+            imageAlt={book.publisher ? `${book.publisher} logo` : "Publisher logo"}
+            imageClassName="object-contain bg-white p-2"
+            note="Publisher or imprint description can be added later. Stored publisher images are shown here when available."
+          />
+        </section>
+
+        <ProfileSection
+          eyebrow="Book Details"
+          title="Edition and Reading Details"
+          description="These details use the current stored book metadata and reader copy information."
+          className="mt-6"
+        >
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {details.map((detail) => (
               <DetailCard key={detail.label} label={detail.label} value={detail.value} />
@@ -553,7 +718,45 @@ export default function AboutBookPage() {
               <p className="mt-2 text-sm leading-7 text-stone-700">{book.edition_note}</p>
             </div>
           ) : null}
-        </section>
+        </ProfileSection>
+
+        {learnerReadingNotes.length > 0 ? (
+          <ProfileSection
+            eyebrow="Reading Notes"
+            title="Learner-Facing Notes"
+            description="Notes for readers can live here later without mixing them into private Story Notes."
+            className="mt-6"
+          >
+            <div className="space-y-3">
+              {learnerReadingNotes.map((note) => (
+                <p key={note} className="rounded-3xl border border-white/70 bg-white/85 p-5 text-sm leading-7 text-stone-700 shadow-sm">
+                  {note}
+                </p>
+              ))}
+            </div>
+          </ProfileSection>
+        ) : null}
+
+        {similarBooks.length > 0 ? (
+          <ProfileSection
+            eyebrow="Similar Books"
+            title="Books With a Similar Feel"
+            description="This section is ready for future book recommendations once MEKURU has a stored source."
+            className="mt-6"
+          >
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {similarBooks.map((similar) => (
+                <Link
+                  key={similar.href}
+                  href={similar.href}
+                  className="rounded-3xl border border-white/70 bg-white/85 p-5 text-sm font-black text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  {similar.title}
+                </Link>
+              ))}
+            </div>
+          </ProfileSection>
+        ) : null}
 
         {(book.translator || book.illustrator || book.genre || book.audience_category || relatedLinks.length > 0) ? (
           <section className="mt-6 grid gap-5 lg:grid-cols-2">
