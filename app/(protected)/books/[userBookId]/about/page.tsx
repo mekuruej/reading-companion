@@ -45,6 +45,12 @@ type Book = {
   illustrator_reading: string | null;
   publisher_reading: string | null;
   related_links: any | null;
+  synopsis_en: string | null;
+  author_bio_en: string | null;
+  publisher_note_en: string | null;
+  bookstore_hint_en: string | null;
+  book_profile_source_label: string | null;
+  book_profile_source_url: string | null;
 };
 
 type UserBook = {
@@ -285,7 +291,7 @@ function CreatorCard({
   imageUrl?: string | null;
   fallbackInitial: string;
   imageAlt: string;
-  note: string;
+  note?: string | null;
   imageClassName?: string;
 }) {
   return (
@@ -306,7 +312,9 @@ function CreatorCard({
           ) : null}
         </div>
       </div>
-      <p className="mt-5 text-sm leading-6 text-stone-600">{note}</p>
+      {note ? (
+        <p className="mt-5 text-sm leading-6 text-stone-600">{note}</p>
+      ) : null}
     </article>
   );
 }
@@ -402,7 +410,13 @@ export default function AboutBookPage() {
             translator_reading,
             illustrator_reading,
             publisher_reading,
-            related_links
+            related_links,
+            synopsis_en,
+            author_bio_en,
+            publisher_note_en,
+            bookstore_hint_en,
+            book_profile_source_label,
+            book_profile_source_url
           )
         `;
 
@@ -535,7 +549,12 @@ export default function AboutBookPage() {
   const bookFormat = formatBookFormat(book, row);
   const isbn = book.isbn13 || book.isbn;
   const bookstoreSection = inferBookstoreSection(book);
-  const synopsis = null;
+  const synopsis = book.synopsis_en?.trim() || null;
+  const authorBio = book.author_bio_en?.trim() || null;
+  const publisherNote = book.publisher_note_en?.trim() || null;
+  const bookstoreHint = book.bookstore_hint_en?.trim() || null;
+  const sourceLabel = book.book_profile_source_label?.trim() || null;
+  const sourceUrl = book.book_profile_source_url?.trim() || null;
   const learnerReadingNotes: string[] = [];
   const similarBooks: Array<{ title: string; href: string }> = [];
 
@@ -640,13 +659,18 @@ export default function AboutBookPage() {
 
         <section className="mt-6 rounded-[2rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-            Bookstore hint
+            Find This Book
           </p>
           <div className="mt-3 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-end">
             <div>
               <h2 className="text-2xl font-black text-stone-950">
                 Look for this format when searching in Japanese bookstores.
               </h2>
+              {bookstoreHint ? (
+                <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-stone-700">
+                  {bookstoreHint}
+                </p>
+              ) : null}
               <div className="mt-4 grid gap-2 text-sm font-semibold leading-6 text-stone-700 sm:grid-cols-2">
                 <p>Title: {book.title ?? "Untitled book"}</p>
                 {book.author ? <p>Author: {book.author}</p> : null}
@@ -661,7 +685,9 @@ export default function AboutBookPage() {
                 Search cue
               </p>
               <p className="mt-2 text-sm leading-6 text-stone-600">
-                Try the title with the author, ISBN, or format label. Japanese editions can move between 文庫本, 単行本, 新書, and ebook listings.
+                {bookstoreHint
+                  ? "Use the stored hint with the title, author, ISBN, or format label when searching."
+                  : "Try the title with the author, ISBN, or format label. Japanese editions can move between 文庫本, 単行本, 新書, and ebook listings."}
               </p>
             </div>
           </div>
@@ -671,7 +697,6 @@ export default function AboutBookPage() {
           <ProfileSection
             eyebrow="Synopsis"
             title="What This Book Is About"
-            description="A learner-facing overview can live here once MEKURU has a stored synopsis."
           >
             <p className="text-sm leading-7 text-stone-700">{synopsis}</p>
           </ProfileSection>
@@ -685,7 +710,7 @@ export default function AboutBookPage() {
             imageUrl={authorImageUrl}
             fallbackInitial={cleanInitial(book.author || book.author_english_name)}
             imageAlt={book.author ? `${book.author} photo` : "Author photo"}
-            note="Author bio can be added later. For now, this profile shows the stored author metadata already in MEKURU."
+            note={authorBio ?? "Author information can be added later."}
           />
 
           <CreatorCard
@@ -696,7 +721,7 @@ export default function AboutBookPage() {
             fallbackInitial={cleanInitial(book.publisher)}
             imageAlt={book.publisher ? `${book.publisher} logo` : "Publisher logo"}
             imageClassName="object-contain bg-white p-2"
-            note="Publisher or imprint description can be added later. Stored publisher images are shown here when available."
+            note={publisherNote ?? "Publisher or imprint information can be added later."}
           />
         </section>
 
@@ -794,6 +819,24 @@ export default function AboutBookPage() {
               </div>
             ) : null}
           </section>
+        ) : null}
+
+        {(sourceLabel || sourceUrl) ? (
+          <p className="mt-6 text-center text-xs font-semibold text-stone-500">
+            Profile source:{" "}
+            {sourceUrl ? (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-black text-stone-700 underline-offset-4 hover:underline"
+              >
+                {sourceLabel || "Source"}
+              </a>
+            ) : (
+              <span className="font-black text-stone-700">{sourceLabel}</span>
+            )}
+          </p>
         ) : null}
       </div>
     </main>
