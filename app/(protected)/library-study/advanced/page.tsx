@@ -128,6 +128,7 @@ export default function AdvancedStudyPage() {
                     role: profile?.role,
                     isSuperTeacher: profile?.is_super_teacher,
                     hasFullAccess: appStatus.hasFullAccess,
+                    isTrialActive: appStatus.reason === "trial",
                 });
 
                 if (mounted) {
@@ -302,6 +303,8 @@ export default function AdvancedStudyPage() {
                                         <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
                                             {showAdvancedTools
                                                 ? "Ability Check is ready. Your word colors are already active, and advanced tools can help you check and review words across your library."
+                                                : isTrialAccess
+                                                    ? "During your trial, your word colors can begin while you build vocabulary from books. Ability Check and Library Review are part of paid Advanced Study."
                                                 : "Your word colors are already starting. Keep saving and studying words from your books. Once enough words are ready, MEKURU will open Ability Check."}
                                         </p>
                                     </div>
@@ -321,7 +324,9 @@ export default function AdvancedStudyPage() {
                                 </div>
 
                                 <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
-                                    Library Review opens after a larger review pool forms: {formatReadyScore(readiness.readyScore)} / {readiness.libraryReviewTarget}.
+                                    {isTrialAccess
+                                        ? `Library Review opens with paid Advanced Study after a larger review pool forms: ${formatReadyScore(readiness.readyScore)} / ${readiness.libraryReviewTarget}.`
+                                        : `Library Review opens after a larger review pool forms: ${formatReadyScore(readiness.readyScore)} / ${readiness.libraryReviewTarget}.`}
                                 </p>
 
                                 <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">

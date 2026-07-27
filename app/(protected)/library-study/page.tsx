@@ -54,18 +54,20 @@ const studyPaths = [
 function StudyPathCard({
   path,
   locked,
+  trialForming = false,
 }: {
   path: (typeof studyPaths)[number];
   locked: boolean;
+  trialForming?: boolean;
 }) {
   return (
     <Link
       href={locked ? "/trial-ended" : path.href}
       className={`group relative rounded-3xl border p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${path.className}`}
     >
-      {locked ? (
+      {locked || trialForming ? (
         <div className="absolute right-4 top-4 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-xs font-black shadow-sm">
-          Reading Access
+          {trialForming ? "Forming" : "Reading Access"}
         </div>
       ) : null}
 
@@ -77,7 +79,9 @@ function StudyPathCard({
         <div>
           <h2 className="text-2xl font-black">{path.title}</h2>
           <p className="mt-2 text-sm leading-6 opacity-80">
-            {locked ? path.lockedDescription : path.description}
+            {trialForming
+              ? "During your trial, you can see your Advanced Study progress. Ability Check and Library Review open with paid Reading Access."
+              : locked ? path.lockedDescription : path.description}
           </p>
         </div>
 
@@ -92,6 +96,7 @@ function StudyPathCard({
 export default function StudyToolsPage() {
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [hasFullAccess, setHasFullAccess] = useState(false);
+  const [isTrialAccess, setIsTrialAccess] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -110,6 +115,7 @@ export default function StudyToolsPage() {
         if (!user) {
           if (mounted) {
             setHasFullAccess(false);
+            setIsTrialAccess(false);
           }
           return;
         }
@@ -141,11 +147,13 @@ export default function StudyToolsPage() {
 
         if (mounted) {
           setHasFullAccess(status.hasFullAccess);
+          setIsTrialAccess(status.reason === "trial");
         }
       } catch (error) {
         console.error("Error loading Study Hub access:", error);
         if (mounted) {
           setHasFullAccess(false);
+          setIsTrialAccess(false);
         }
       } finally {
         if (mounted) setLoadingAccess(false);
@@ -189,12 +197,13 @@ export default function StudyToolsPage() {
               key={path.href}
               path={path}
               locked={path.requiresReadingAccess && !hasFullAccess}
+              trialForming={isTrialAccess && path.href === "/library-study/advanced"}
             />
           ))}
         </div>
         )}
 
-        {hasFullAccess ? (
+        {hasFullAccess && !isTrialAccess ? (
         <div className="mt-6 rounded-3xl border border-slate-200 bg-white/75 p-5 text-center shadow-sm">
           <p className="text-sm font-semibold text-slate-700">
             Not sure where to go?

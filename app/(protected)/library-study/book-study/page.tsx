@@ -111,6 +111,7 @@ export default function BookStudyPage() {
           role: profile?.role,
           isSuperTeacher: profile?.is_super_teacher,
           hasFullAccess: appStatus.hasFullAccess,
+          isTrialActive: appStatus.reason === "trial",
         });
 
         if (mounted) {

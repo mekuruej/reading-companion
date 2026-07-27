@@ -664,11 +664,8 @@ export default function BookWordsPage() {
 
         const featureAccess = getFeatureAccess({
           role: meProfile?.is_super_teacher ? "super_teacher" : meProfile?.role ?? null,
-
-          // For this first pass, anyone who currently has app access keeps
-          // full learning access. Later, when expired trials become free users,
-          // we can separate "can enter app" from "has full learning access."
           hasFullAccess: appAccessStatus.hasFullAccess,
+          isTrialActive: appAccessStatus.reason === "trial",
         });
 
         const canUseVocabularyList = canUseFullAccessFeature(

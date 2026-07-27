@@ -8,7 +8,6 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
-import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
 import BookStatsErrorState from "./components/BookStatsErrorState";
@@ -276,12 +275,18 @@ export default function BookStatsPage() {
             const featureAccess = getFeatureAccess({
                 role: roleForAccess,
                 hasFullAccess: appStatus.hasFullAccess,
+                isTrialActive: appStatus.reason === "trial",
             });
 
-            const canViewVocabularyStats = canUseFullAccessFeature(
-                featureAccess,
-                "vocabulary_stats"
-            );
+            if (featureAccess.isTrial) {
+                setAccessMessage("Deep Book Stats are part of paid Reading Access. During your trial, use the Book Hub to track reading, listening, saved words, and word colors.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
+                setLoading(false);
+                return;
+            }
+
+            const canViewVocabularyStats = featureAccess.canUseBookStats;
 
             setCanSeeVocabularyStats(canViewVocabularyStats);
             let canAccess =

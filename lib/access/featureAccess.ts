@@ -37,6 +37,8 @@ export type FeatureAccess = {
   accessLevel: FeatureAccessLevel;
   accessReason: FeatureAccessReason;
   hasFullAccess: boolean;
+  hasPaidAccess: boolean;
+  isTrial: boolean;
   isTeacher: boolean;
   isAdmin: boolean;
 
@@ -57,6 +59,10 @@ export type FeatureAccess = {
   canUseVocabularyStudy: boolean;
   canUseBookStudy: boolean;
   canUseAdvancedStudy: boolean;
+  canUseReadingAccessStep1: boolean;
+  canUseTrialLessonTools: boolean;
+  canUsePaidReaderTools: boolean;
+  canUseAdvancedStudyStep2: boolean;
   canSeeVocabularyColors: boolean;
   canUseTeacherTools: boolean;
   canUseAdminTools: boolean;
@@ -72,9 +78,13 @@ export type FeatureAccess = {
   canUseVocabularyList: boolean;
   canUseStudyFlashcards: boolean;
   canUseAbilityCheck: boolean;
+  canUseLibraryReview: boolean;
+  canUseBulkAdd: boolean;
+  canUseListeningWordCapture: boolean;
   canUseVocabTools: boolean;
   canUseStoryNotes: boolean;
   canUseVocabularyStats: boolean;
+  canUseBookStats: boolean;
   canUseReadingColors: boolean;
 
   // Demo/preview behavior
@@ -86,15 +96,22 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
   const isSuperTeacher = input.isSuperTeacher === true || input.isSuperTeacher === "true";
   const isAdmin = input.role === "super_teacher" || input.role === "admin" || isSuperTeacher;
   const isTeacher = input.role === "teacher" || isAdmin;
+  const isTrial = !isTeacher && input.isTrialActive === true;
+  const hasPaidAccess =
+    isTeacher ||
+    (!isTrial &&
+      (input.hasFullAccess === true ||
+        input.isPaidActive === true ||
+        input.isBookClubAccessActive === true));
 
   // Keep super_teacher as the technical role for now.
   // In feature-access language, super_teacher means admin-level access.
   const hasFullAccess =
     isTeacher ||
-    input.hasFullAccess === true ||
-    input.isTrialActive === true ||
-    input.isPaidActive === true ||
-    input.isBookClubAccessActive === true;
+    isTrial ||
+    hasPaidAccess;
+  const canUseReadingAccessStep1 = isTeacher || isTrial || hasPaidAccess;
+  const canUseAdvancedStudyStep2 = hasPaidAccess;
 
   const accessReason: FeatureAccessReason = isAdmin
     ? "admin"
@@ -122,6 +139,8 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
     accessLevel,
     accessReason,
     hasFullAccess,
+    hasPaidAccess,
+    isTrial,
     isTeacher,
     isAdmin,
 
@@ -141,10 +160,14 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
     canUseFreeStudy: true,
     canUseBookTracking: true,
     canUseReadingTimers: true,
-    canUseVocabularyStudy: hasFullAccess,
-    canUseBookStudy: hasFullAccess,
-    canUseAdvancedStudy: hasFullAccess,
-    canSeeVocabularyColors: hasFullAccess,
+    canUseVocabularyStudy: canUseReadingAccessStep1,
+    canUseBookStudy: canUseReadingAccessStep1,
+    canUseAdvancedStudy: canUseReadingAccessStep1,
+    canUseReadingAccessStep1,
+    canUseTrialLessonTools: isTrial,
+    canUsePaidReaderTools: hasPaidAccess,
+    canUseAdvancedStudyStep2,
+    canSeeVocabularyColors: canUseReadingAccessStep1,
     canUseTeacherTools: isTeacher,
     canUseAdminTools: isAdmin,
 
@@ -155,16 +178,20 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
     canUseFindNextBook: true,
 
     // Full-access vocabulary/study features.
-    canUseCuriosityReading: hasFullAccess,
-    canUseSavedWordReading: hasFullAccess,
-    canSaveVocabulary: hasFullAccess,
-    canUseVocabularyList: hasFullAccess,
-    canUseStudyFlashcards: hasFullAccess,
-    canUseAbilityCheck: hasFullAccess,
-    canUseVocabTools: hasFullAccess,
-    canUseStoryNotes: hasFullAccess,
-    canUseVocabularyStats: hasFullAccess,
-    canUseReadingColors: hasFullAccess,
+    canUseCuriosityReading: canUseReadingAccessStep1,
+    canUseSavedWordReading: canUseReadingAccessStep1,
+    canSaveVocabulary: canUseReadingAccessStep1,
+    canUseVocabularyList: canUseReadingAccessStep1,
+    canUseStudyFlashcards: canUseReadingAccessStep1,
+    canUseAbilityCheck: canUseAdvancedStudyStep2,
+    canUseLibraryReview: canUseAdvancedStudyStep2,
+    canUseBulkAdd: hasPaidAccess,
+    canUseListeningWordCapture: hasPaidAccess,
+    canUseVocabTools: hasPaidAccess,
+    canUseStoryNotes: hasPaidAccess,
+    canUseVocabularyStats: hasPaidAccess,
+    canUseBookStats: hasPaidAccess,
+    canUseReadingColors: canUseReadingAccessStep1,
 
     // Free users can see examples of the learning engine,
     // but not use real saved-vocabulary/study functionality.

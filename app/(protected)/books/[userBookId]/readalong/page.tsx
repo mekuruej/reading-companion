@@ -301,10 +301,8 @@ export default function ReadAlongPage() {
                 role: (profile as any)?.is_super_teacher
                     ? "super_teacher"
                     : (profile as any)?.role ?? null,
-
-                // First pass: anyone who currently has app access keeps full saved-word reading access.
-                // Later, expired trials can enter free reading pages while this saved-word support page locks.
                 hasFullAccess: appAccessStatus.hasFullAccess,
+                isTrialActive: appAccessStatus.reason === "trial",
             });
 
             const canUseSavedWordReadingNow = canUseFullAccessFeature(

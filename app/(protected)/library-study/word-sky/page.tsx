@@ -305,6 +305,7 @@ export default function WordSkyPage() {
         const featureAccess = getFeatureAccess({
           role: roleForAccess,
           hasFullAccess: appStatus.hasFullAccess,
+          isTrialActive: appStatus.reason === "trial",
         });
 
         if (!featureAccess.canUseAdvancedStudy) {

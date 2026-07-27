@@ -370,11 +370,8 @@ export default function AddWordPage() {
 
       const featureAccess = getFeatureAccess({
         role: profile?.is_super_teacher ? "super_teacher" : profile?.role ?? null,
-
-        // For this first pass, anyone who currently has app access keeps
-        // full vocabulary access. Later, when expired trials become free users,
-        // we can separate "can enter app" from "has full learning access."
         hasFullAccess: appAccessStatus.hasFullAccess,
+        isTrialActive: appAccessStatus.reason === "trial",
       });
 
       setCanUseAddWord(canUseFullAccessFeature(featureAccess, "add_word"));

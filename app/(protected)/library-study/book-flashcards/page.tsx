@@ -103,11 +103,12 @@ export default function BookFlashcardsIndexPage() {
 
         const appStatus = profile
           ? getAppAccessStatus(profile)
-          : { hasFullAccess: false };
+          : { hasFullAccess: false, reason: "free" as const };
         const featureAccess = getFeatureAccess({
           role: profile?.role,
           isSuperTeacher: profile?.is_super_teacher,
           hasFullAccess: appStatus.hasFullAccess,
+          isTrialActive: appStatus.reason === "trial",
         });
 
         if (mounted) {

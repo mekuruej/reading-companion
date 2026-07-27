@@ -670,6 +670,7 @@ export default function BookHubPage() {
   const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
   const [canSeeVocabularySummary, setCanSeeVocabularySummary] = useState(false);
   const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
+  const [isTrialLearningAccess, setIsTrialLearningAccess] = useState(false);
 
   const isTeacher = myRole === "teacher";
   const isAdmin = myRole === "admin";
@@ -3482,7 +3483,8 @@ export default function BookHubPage() {
       role: currentProfileIsSuperTeacher ? "super_teacher" : currentProfileRole,
 
       // Book Hub stays free, but these two tabs use full-access saved-vocab/private-note tools.
-      hasFullAccess: appAccessStatus.hasFullAccess
+      hasFullAccess: appAccessStatus.hasFullAccess,
+      isTrialActive: appAccessStatus.reason === "trial",
     });
 
     setCanUseStoryNotes(canUseFullAccessFeature(featureAccess, "story_notes"));
@@ -3500,6 +3502,7 @@ export default function BookHubPage() {
     );
     setCanSeeVocabularySummary(featureAccess.canSeeVocabularyColors);
     setHasFullLearningAccess(featureAccess.hasFullAccess);
+    setIsTrialLearningAccess(featureAccess.isTrial);
 
     const bookHubSelect = `
         id,
@@ -5317,6 +5320,7 @@ export default function BookHubPage() {
               />
               <BookHubActionGrid
                 hasFullAccess={hasFullLearningAccess || isTeacher}
+                isTrialAccess={isTrialLearningAccess}
                 canUseCuriosityReading={canUseCuriosityReading}
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
@@ -5505,7 +5509,7 @@ export default function BookHubPage() {
 
               {activeTab === "reading" && (
                 <div className="space-y-4">
-                  {hasFullLearningAccess ? (
+                  {hasFullLearningAccess && !isTrialLearningAccess ? (
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="mb-3 text-sm font-semibold text-stone-900">Add Words</div>
 
@@ -5579,7 +5583,7 @@ export default function BookHubPage() {
                       router.push(`/books/${row.id}/listening`);
                     }}
                     listeningSessionButtonLabel={
-                      hasFullLearningAccess || isTeacher ? "Listening + Words" : "Listening Timer"
+                      hasFullLearningAccess && !isTrialLearningAccess || isTeacher ? "Listening + Words" : "Listening Timer"
                     }
                   />
                 </div>
@@ -5587,7 +5591,7 @@ export default function BookHubPage() {
 
               {!isEnglishBook && activeTab === "story" && (
                 <div className="space-y-4">
-                  {canUseStoryNotes ? (
+                  {canUseStoryNotes && !isTrialLearningAccess ? (
                     <StoryTab
                       storyTab={storyTab}
                       setStoryTab={setStoryTab}

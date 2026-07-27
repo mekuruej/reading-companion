@@ -486,11 +486,8 @@ export function CuriosityReadingExperience({
       const featureAccess = getFeatureAccess({
         role: profile?.role ?? null,
         isSuperTeacher: profile?.is_super_teacher,
-
-        // For this first pass, anyone who currently has app access keeps
-        // full learning access. Later, when expired trials become free users,
-        // we can separate "can enter app" from "has full learning access."
         hasFullAccess: appAccessStatus.hasFullAccess,
+        isTrialActive: appAccessStatus.reason === "trial",
       });
 
       setCanUseCuriosityReading(canUseFullAccessFeature(featureAccess, fullAccessFeature));

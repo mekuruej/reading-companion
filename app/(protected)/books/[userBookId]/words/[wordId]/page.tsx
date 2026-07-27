@@ -373,6 +373,7 @@ export default function WordDetailPage() {
       const featureAccess = getFeatureAccess({
         role: meProfile?.is_super_teacher ? "super_teacher" : meProfile?.role ?? null,
         hasFullAccess: appAccessStatus.hasFullAccess,
+        isTrialActive: appAccessStatus.reason === "trial",
       });
       const canUseVocabularyList = canUseFullAccessFeature(
         featureAccess,

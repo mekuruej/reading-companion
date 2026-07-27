@@ -58,7 +58,7 @@ export function canUseFullAccessFeature(
       return featureAccess.canUseAbilityCheck;
 
     case "library_review":
-      return featureAccess.canUseAdvancedStudy;
+      return featureAccess.canUseLibraryReview;
 
     case "vocab_tools":
       return featureAccess.canUseVocabTools;

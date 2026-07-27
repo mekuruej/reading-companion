@@ -1633,6 +1633,7 @@ export default function LibraryStudyPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [canUseAbilityCheck, setCanUseAbilityCheck] = useState(false);
   const [fullAccessLocked, setFullAccessLocked] = useState(false);
+  const [trialAccessLocked, setTrialAccessLocked] = useState(false);
 
   const [allCards, setAllCards] = useState<StudyCard[]>([]);
   const [deck, setDeck] = useState<StudyCard[]>([]);
@@ -1838,10 +1839,8 @@ export default function LibraryStudyPage() {
         const featureAccess = getFeatureAccess({
           role: profile?.is_super_teacher ? "super_teacher" : profile?.role ?? null,
 
-          // For this first pass, anyone who currently has app access keeps
-          // full learning access. Later, when expired trials become free users,
-          // we can separate "can enter app" from "has full learning access."
           hasFullAccess: appAccessStatus.hasFullAccess,
+          isTrialActive: appAccessStatus.reason === "trial",
         });
 
         const canUseAbilityCheckNow = canUseFullAccessFeature(
@@ -1850,6 +1849,7 @@ export default function LibraryStudyPage() {
         );
 
         setCanUseAbilityCheck(canUseAbilityCheckNow);
+        setTrialAccessLocked(featureAccess.isTrial && !canUseAbilityCheckNow);
 
         if (!canUseAbilityCheckNow) {
           setAllCards([]);
@@ -3212,8 +3212,12 @@ export default function LibraryStudyPage() {
 
     return (
       <AbilityCheckFullAccessLockedState
-        title={copy.title}
-        message={copy.message}
+        title={trialAccessLocked ? "Ability Check is part of paid Advanced Study" : copy.title}
+        message={
+          trialAccessLocked
+            ? "During your trial, you can build vocabulary, use Book Study, and see your word colors begin. Ability Check opens after paid access and enough vocabulary is ready."
+            : copy.message
+        }
         onBackToLibrary={() => router.push("/books")}
         onViewStats={() => router.push("/community/stats")}
       />

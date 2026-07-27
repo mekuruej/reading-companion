@@ -14,6 +14,7 @@ export default function Header() {
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
+  const [isTrialAccess, setIsTrialAccess] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
@@ -42,6 +43,7 @@ export default function Header() {
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
+          setIsTrialAccess(false);
           return;
         }
 
@@ -71,13 +73,16 @@ export default function Header() {
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
+          setIsTrialAccess(false);
           return;
         }
 
         setUsername(profile?.username ?? null);
         setProfileRole(profile?.role ?? null);
         setProfileIsSuperTeacher(!!profile?.is_super_teacher);
-        setHasFullAccess(profile ? getAppAccessStatus(profile).hasFullAccess : false);
+        const accessStatus = profile ? getAppAccessStatus(profile) : null;
+        setHasFullAccess(accessStatus?.hasFullAccess ?? false);
+        setIsTrialAccess(accessStatus?.reason === "trial");
 
       } catch (error) {
         if (!cancelled) {
@@ -85,6 +90,7 @@ export default function Header() {
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
+          setIsTrialAccess(false);
         }
       }
     }
@@ -160,8 +166,9 @@ export default function Header() {
   const showTeacherLink =
     profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher;
 
-  const showFullAccessNavigation = hasFullAccess || showTeacherLink;
-  const canUseLearningStudy = showFullAccessNavigation;
+  const showFullAccessNavigation = (hasFullAccess && !isTrialAccess) || showTeacherLink;
+  const canUseLearningStudy = hasFullAccess || showTeacherLink;
+  const canUseAdvancedStudyNavigation = showFullAccessNavigation;
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -347,7 +354,7 @@ export default function Header() {
                     </div>
                   )}
 
-                  {canUseLearningStudy ? (
+                  {canUseAdvancedStudyNavigation ? (
                     <Link
                       href="/library-study/advanced"
                       className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library-study/advanced" ||
@@ -363,9 +370,9 @@ export default function Header() {
                     </Link>
                   ) : (
                     <div className="block cursor-default rounded-xl px-3 py-2 text-sm leading-tight text-stone-400">
-                      Advanced Study 🔒
+                      {isTrialAccess ? "Advanced Study forming" : "Advanced Study 🔒"}
                       <span className="block text-xs text-stone-500">
-                        Reading Access
+                        {isTrialAccess ? "Paid Reading Access" : "Reading Access"}
                       </span>
                     </div>
                   )}

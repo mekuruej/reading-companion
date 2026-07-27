@@ -1177,6 +1177,7 @@ export default function LibraryStudyPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
   const [fullAccessLocked, setFullAccessLocked] = useState(false);
+  const [trialAccessLocked, setTrialAccessLocked] = useState(false);
 
   const [libraryReviewCards, setLibraryReviewCards] = useState<StudyCard[]>([]);
   const [practiceDeck, setPracticeDeck] = useState<StudyCard[]>([]);
@@ -1283,9 +1284,8 @@ export default function LibraryStudyPage() {
         const featureAccess = getFeatureAccess({
           role: superTeacherFlag ? "super_teacher" : role,
 
-          // First pass: Library Review uses the same full-access bucket as Ability Check
-          // because both are saved-vocabulary study features.
           hasFullAccess: appAccessStatus.hasFullAccess,
+          isTrialActive: appAccessStatus.reason === "trial",
         });
 
         const canUseLibraryReviewNow = canUseFullAccessFeature(
@@ -1294,6 +1294,7 @@ export default function LibraryStudyPage() {
         );
 
         setCanUseLibraryReview(canUseLibraryReviewNow);
+        setTrialAccessLocked(featureAccess.isTrial && !canUseLibraryReviewNow);
 
         if (!canUseLibraryReviewNow) {
           setOwnedUserBookIds([]);
@@ -1985,7 +1986,11 @@ export default function LibraryStudyPage() {
 
     return (
       <LibraryReviewFullAccessLockedState
-        message={copy.message}
+        message={
+          trialAccessLocked
+            ? "During your trial, you can build vocabulary, use Book Study, and see your word colors begin. Library Review is part of paid Advanced Study."
+            : copy.message
+        }
         onBackToLibrary={() => router.push("/books")}
         onViewReadingStats={() => router.push("/community/stats")}
       />

@@ -290,11 +290,16 @@ export default function BulkVocabPage() {
         const featureAccess = getFeatureAccess({
           role: roleForAccess,
           hasFullAccess: appStatus.hasFullAccess,
+          isTrialActive: appStatus.reason === "trial",
         });
 
-        if (!featureAccess.canSaveVocabulary) {
+        if (!featureAccess.canUseBulkAdd) {
           if (!cancelled) {
-            setMessage("❌ Bulk vocabulary saving is available with full learning access.");
+            setMessage(
+              featureAccess.isTrial
+                ? "❌ Bulk Add is not part of trial access. During a trial, save words from Curiosity Reading or the regular Add Word page."
+                : "❌ Bulk vocabulary saving is available with paid Reading Access."
+            );
             setAuthorizedUserBookId("");
           }
           return;
