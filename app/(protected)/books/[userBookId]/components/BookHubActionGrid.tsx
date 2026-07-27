@@ -195,8 +195,8 @@ export default function BookHubActionGrid({
                     />
 
                     <ActionButton
-                        title="Curiosity Reading"
-                        subtitle="Save Words"
+                        title="Save Words"
+                        subtitle="Curiosity Reading"
                         description={["Read while saving vocab", "and log a slower, mindful session."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         locked={!canUseCuriosityReading}
@@ -269,8 +269,8 @@ export default function BookHubActionGrid({
                 />
 
                 <ActionButton
-                    title="Curiosity Reading"
-                    subtitle="Save Words"
+                    title="Save Words"
+                    subtitle="Curiosity Reading"
                     description={["Read while saving vocab", "and log a slower, mindful session."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     locked={!canUseCuriosityReading}
