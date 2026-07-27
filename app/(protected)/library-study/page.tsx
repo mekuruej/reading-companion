@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileAccessRow = {
@@ -13,8 +14,6 @@ type ProfileAccessRow = {
   is_super_teacher: boolean | null;
   app_access_type: string | null;
   app_access_expires_at: string | null;
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
 };
 
 const studyPaths = [
@@ -97,6 +96,8 @@ export default function StudyToolsPage() {
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [isTrialAccess, setIsTrialAccess] = useState(false);
+  const [canUseBookStudy, setCanUseBookStudy] = useState(false);
+  const [canUseAdvancedStudyStep2, setCanUseAdvancedStudyStep2] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -116,13 +117,15 @@ export default function StudyToolsPage() {
           if (mounted) {
             setHasFullAccess(false);
             setIsTrialAccess(false);
+            setCanUseBookStudy(false);
+            setCanUseAdvancedStudyStep2(false);
           }
           return;
         }
 
         const profileResult = await supabase
           .from("profiles")
-          .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", user.id)
           .maybeSingle<ProfileAccessRow>();
         let profile: any = profileResult.data;
@@ -143,17 +146,28 @@ export default function StudyToolsPage() {
 
         const status = profile
           ? getAppAccessStatus(profile)
-          : { hasFullAccess: false, reason: "free" };
+          : { hasFullAccess: false, reason: "free", isTrialActive: false };
+        const featureAccess = getFeatureAccess({
+          role: profile?.role,
+          isSuperTeacher: profile?.is_super_teacher,
+          hasFullAccess: status.hasFullAccess,
+          isTrialActive: status.isTrialActive,
+          isPaidActive: status.hasFullAccess && status.reason !== "trial",
+        });
 
         if (mounted) {
-          setHasFullAccess(status.hasFullAccess);
-          setIsTrialAccess(status.reason === "trial");
+          setHasFullAccess(featureAccess.hasFullAccess);
+          setIsTrialAccess(featureAccess.isTrial);
+          setCanUseBookStudy(featureAccess.canUseBookStudy);
+          setCanUseAdvancedStudyStep2(featureAccess.canUseAdvancedStudyStep2);
         }
       } catch (error) {
         console.error("Error loading Study Hub access:", error);
         if (mounted) {
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setCanUseBookStudy(false);
+          setCanUseAdvancedStudyStep2(false);
         }
       } finally {
         if (mounted) setLoadingAccess(false);
@@ -196,7 +210,13 @@ export default function StudyToolsPage() {
             <StudyPathCard
               key={path.href}
               path={path}
-              locked={path.requiresReadingAccess && !hasFullAccess}
+              locked={
+                path.href === "/library-study/book-study"
+                  ? !canUseBookStudy
+                  : path.href === "/library-study/advanced"
+                    ? !canUseAdvancedStudyStep2
+                    : path.requiresReadingAccess && !hasFullAccess
+              }
               trialForming={isTrialAccess && path.href === "/library-study/advanced"}
             />
           ))}
