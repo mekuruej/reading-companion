@@ -19,13 +19,11 @@ export default function Header() {
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
   const [showTeacherMenu, setShowTeacherMenu] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const pathname = usePathname();
   const libraryMenuRef = useRef<HTMLDivElement | null>(null);
   const discoveryMenuRef = useRef<HTMLDivElement | null>(null);
   const studyMenuRef = useRef<HTMLDivElement | null>(null);
   const teacherMenuRef = useRef<HTMLDivElement | null>(null);
-  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,9 +120,6 @@ export default function Header() {
         setShowTeacherMenu(false);
       }
 
-      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
-        setShowProfileMenu(false);
-      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -144,7 +139,6 @@ export default function Header() {
   const studySectionActive =
     pathname.startsWith("/library-study") ||
     pathname.startsWith("/kanji-reading-study");
-  const profileSectionActive = pathname.startsWith("/community");
   const teacherSectionActive = pathname.startsWith("/teacher");
   const teacherStudentsActive = pathname === "/teacher/students" || pathname.startsWith("/teacher/students/");
   const teacherLessonPrepActive =
@@ -201,7 +195,6 @@ export default function Header() {
                   setShowLibraryMenu(false);
                   setShowDiscoveryMenu(false);
                   setShowStudyMenu(false);
-                  setShowProfileMenu(false);
                 }}
               >
                 Library
@@ -213,7 +206,6 @@ export default function Header() {
                   setShowLibraryMenu((prev) => !prev);
                   setShowDiscoveryMenu(false);
                   setShowStudyMenu(false);
-                  setShowProfileMenu(false);
                 }}
                 className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${librarySectionActive
                   ? "border-stone-900 bg-stone-900 text-white"
@@ -284,7 +276,6 @@ export default function Header() {
                   setShowStudyMenu(false);
                   setShowLibraryMenu(false);
                   setShowDiscoveryMenu(false);
-                  setShowProfileMenu(false);
                 }}
               >
                 Study
@@ -296,7 +287,6 @@ export default function Header() {
                   setShowStudyMenu((prev) => !prev);
                   setShowLibraryMenu(false);
                   setShowDiscoveryMenu(false);
-                  setShowProfileMenu(false);
                 }}
                 className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${studySectionActive
                   ? "border-stone-900 bg-stone-900 text-white"
@@ -392,7 +382,6 @@ export default function Header() {
                     setShowDiscoveryMenu(false);
                     setShowLibraryMenu(false);
                     setShowStudyMenu(false);
-                    setShowProfileMenu(false);
                   }}
                 >
                   Discovery
@@ -404,7 +393,6 @@ export default function Header() {
                     setShowDiscoveryMenu((prev) => !prev);
                     setShowLibraryMenu(false);
                     setShowStudyMenu(false);
-                    setShowProfileMenu(false);
                   }}
                   className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${discoverySectionActive
                     ? "border-stone-900 bg-stone-900 text-white"
@@ -449,104 +437,11 @@ export default function Header() {
                       Dictionary
                     </Link>
 
-                    <Link
-                      href="/discovery/word-history"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname.startsWith("/discovery/word-history")
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowDiscoveryMenu(false)}
-                    >
-                      Word History
-                    </Link>
-
                   </div>
                 ) : null}
               </div>
             ) : null}
 
-            {showFullAccessNavigation ? (
-              <div className="relative" ref={profileMenuRef}>
-                <Link
-                  href="/community"
-                  className={`rounded-full border px-3 py-1.5 transition md:hidden ${profileSectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                    }`}
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    setShowLibraryMenu(false);
-                    setShowDiscoveryMenu(false);
-                    setShowStudyMenu(false);
-                  }}
-                >
-                  Community
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu((prev) => !prev);
-                    setShowLibraryMenu(false);
-                    setShowDiscoveryMenu(false);
-                    setShowStudyMenu(false);
-                  }}
-                  className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${profileSectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                    }`}
-                >
-                  Community
-                </button>
-
-                {showProfileMenu ? (
-                  <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
-                    <Link
-                      href="/community"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowProfileMenu(false)}
-                    >
-                      Community Hub
-                    </Link>
-
-                    <Link
-                      href="/community/profile"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/profile" || pathname.startsWith("/community/profile/")
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowProfileMenu(false)}
-                    >
-                      My Profile
-                    </Link>
-
-                    <Link
-                      href="/community/stats"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowProfileMenu(false)}
-                    >
-                      My Stats
-                    </Link>
-                    <Link
-                      href="/community/book-clubs"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/book-clubs"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowProfileMenu(false)}
-                    >
-                      Book Clubs
-                    </Link>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
             {showTeacherLink ? (
               <div
                 className="relative order-last flex basis-full justify-center md:order-none md:block md:basis-auto"
@@ -563,7 +458,6 @@ export default function Header() {
                     setShowDiscoveryMenu(false);
                     setShowStudyMenu(false);
                     setShowTeacherMenu(false);
-                    setShowProfileMenu(false);
                   }}
                 >
                   Teacher Hub
@@ -576,7 +470,6 @@ export default function Header() {
                     setShowLibraryMenu(false);
                     setShowDiscoveryMenu(false);
                     setShowStudyMenu(false);
-                    setShowProfileMenu(false);
                   }}
                   className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${teacherSectionActive
                     ? "border-stone-900 bg-stone-900 text-white"

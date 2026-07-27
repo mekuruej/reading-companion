@@ -79,20 +79,12 @@ const discoveryCards = [
     className: "border-violet-200 bg-violet-50 text-violet-950",
   },
   {
-    title: "Dictionary",
+    title: "Dictionary / Word Explorer",
     href: "/discovery/dictionary",
-    eyebrow: "Look up words",
+    eyebrow: "Words you search",
     description:
-      "Search Japanese words, readings, meanings, kanji, and related vocabulary.",
+      "Look up a word and see where you saved it in your books.",
     className: "border-sky-200 bg-sky-50 text-sky-950",
-  },
-  {
-    title: "Word History",
-    href: "/discovery/word-history",
-    eyebrow: "Words you have met",
-    description:
-      "Search across words you have saved from books and see where you met them.",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-950",
   },
 ];
 
@@ -415,7 +407,7 @@ export default function DiscoveryHubPage() {
         <DiscoveryHubHeader
           eyebrow="Mekuru Discovery"
           title="Discovery Hub"
-          description="Look up words, revisit your word history, and find books through anonymous community ratings."
+          description="Find book inspiration, search reader-fit book signals, and look up words you meet in your reading."
         />
 
         <DiscoveryErrorBanner message={errorMsg} />

@@ -10,11 +10,6 @@ import { supabase } from "@/lib/supabaseClient";
 import DictionaryHeader from "./components/DictionaryHeader";
 import DictionaryErrorMessage from "./components/DictionaryErrorMessage";
 import DictionarySearchForm from "./components/DictionarySearchForm";
-import DictionaryMeaningsList from "./components/DictionaryMeaningsList";
-import DictionaryEntryBadges from "./components/DictionaryEntryBadges";
-import DictionaryKanjiInfoPanel from "./components/DictionaryKanjiInfoPanel";
-import DictionaryRelatedKanjiWordsPanel from "./components/DictionaryRelatedKanjiWordsPanel";
-import DictionaryWordHistoryLink from "./components/DictionaryWordHistoryLink";
 import DictionaryResultCard from "./components/DictionaryResultCard";
 
 type DictionaryEntry = {
@@ -54,6 +49,18 @@ type LibraryWordSummaryRow = {
   total_encounter_count: number | null;
 };
 
+type DictionaryPersonalHistoryItem = {
+  id: string;
+  bookTitle: string;
+  userBookId: string;
+  meaning: string | null;
+  meaningChoiceIndex: number | null;
+  pageNumber: number | null;
+  chapterNumber: number | null;
+  chapterName: string | null;
+  createdAt: string | null;
+};
+
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   red_stages: 1,
   orange_stages: 1,
@@ -90,6 +97,14 @@ function getUniqueKanji(surface: string) {
   return Array.from(new Set(surface.match(/[\u3400-\u9FFF]/g) || []));
 }
 
+function chapterDisplay(chapterNumber: number | null, chapterName: string | null) {
+  const parts = [
+    chapterNumber != null ? `Chapter ${chapterNumber}` : null,
+    chapterName?.trim() || null,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
 export default function DictionaryPage() {
   const searchParams = useSearchParams();
   const initialWord = searchParams.get("word") ?? "";
@@ -104,6 +119,8 @@ export default function DictionaryPage() {
   const [learningSettings, setLearningSettings] =
     useState<LearningSettingsRow>(DEFAULT_LEARNING_SETTINGS);
   const [summaryCountsByKey, setSummaryCountsByKey] = useState<Record<string, number>>({});
+  const [personalHistoryByKey, setPersonalHistoryByKey] =
+    useState<Record<string, DictionaryPersonalHistoryItem[]>>({});
 
   useEffect(() => {
     if (!initialWord) return;
@@ -194,6 +211,7 @@ export default function DictionaryPage() {
     setErrorMsg(null);
     setResults([]);
     setSummaryCountsByKey({});
+    setPersonalHistoryByKey({});
 
     try {
       const {
@@ -301,6 +319,69 @@ export default function DictionaryPage() {
         next[row.study_identity_key] = row.total_encounter_count ?? 0;
       }
       setSummaryCountsByKey(next);
+
+      const surfaces = Array.from(
+        new Set(entries.map((entry) => entry.word).filter(Boolean))
+      );
+
+      if (surfaces.length === 0) {
+        setPersonalHistoryByKey({});
+        return;
+      }
+
+      const { data: savedRows, error: savedError } = await supabase
+        .from("user_book_words")
+        .select(
+          `
+            id,
+            user_book_id,
+            surface,
+            reading,
+            meaning,
+            meaning_choice_index,
+            page_number,
+            chapter_number,
+            chapter_name,
+            created_at,
+            user_books!inner (
+              user_id,
+              books:book_id (
+                title
+              )
+            )
+          `
+        )
+        .in("surface", surfaces)
+        .eq("user_books.user_id", user.id)
+        .or("hidden.is.null,hidden.eq.false")
+        .order("created_at", { ascending: false });
+
+      if (savedError) throw savedError;
+
+      const nextHistory: Record<string, DictionaryPersonalHistoryItem[]> = {};
+      for (const row of savedRows ?? []) {
+        const item = row as any;
+        const key = studyIdentityKey(item.surface, item.reading);
+        if (!keys.includes(key)) continue;
+
+        const bookJoin = Array.isArray(item.user_books) ? item.user_books[0] : item.user_books;
+        const book = Array.isArray(bookJoin?.books) ? bookJoin.books[0] : bookJoin?.books;
+        const historyItem: DictionaryPersonalHistoryItem = {
+          id: item.id,
+          userBookId: item.user_book_id,
+          bookTitle: book?.title ?? "(unknown book)",
+          meaning: item.meaning ?? null,
+          meaningChoiceIndex: item.meaning_choice_index ?? null,
+          pageNumber: item.page_number ?? null,
+          chapterNumber: item.chapter_number ?? null,
+          chapterName: item.chapter_name ?? null,
+          createdAt: item.created_at ?? null,
+        };
+
+        nextHistory[key] = [...(nextHistory[key] ?? []), historyItem];
+      }
+
+      setPersonalHistoryByKey(nextHistory);
     } catch (error) {
       console.warn("Could not load dictionary library statuses:", error);
     }
@@ -309,8 +390,8 @@ export default function DictionaryPage() {
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 pb-10 pt-15">
       <DictionaryHeader
-        title="Dictionary"
-        description="Look up a word directly. When you want to know where you met it, jump over to Word History."
+        title="Dictionary / Word Explorer"
+        description="Look up a word and see where you have saved it in your books."
       />
 
       <DictionarySearchForm
@@ -343,6 +424,8 @@ export default function DictionaryPage() {
               isKanjiLoading={extraLoadingWord === entry.word}
               kanjiMeta={kanjiMetaByWord[entry.word] ?? []}
               kanjiGroups={kanjiGroupsByWord[entry.word] ?? []}
+              personalHistory={personalHistoryByKey[key] ?? []}
+              chapterDisplay={chapterDisplay}
             />
           );
         })}

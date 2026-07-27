@@ -46,17 +46,6 @@ const mySpaceCards = [
   },
 ];
 
-const communityCards = [
-  {
-    title: "Book Clubs",
-    href: "/community/book-clubs",
-    eyebrow: "Coming soon",
-    description:
-      "Future shared reading spaces for groups, guided reading, and book-based community events.",
-    className: "border-amber-200 bg-amber-50 text-amber-950",
-  },
-];
-
 function formatAverage(value: number | null) {
   if (value == null || !Number.isFinite(value)) return "—";
   return value.toFixed(1);
@@ -410,20 +399,6 @@ export default function CommunityHubPage() {
           </section>
         ) : null}
 
-        <section>
-          <div className="mb-3">
-            <h2 className="text-lg font-black text-slate-900">Community Tools</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Shared reading features can live here as they grow.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {communityCards.map((card) => (
-              <HubCard key={card.href} {...card} />
-            ))}
-          </div>
-        </section>
       </div>
     </main>
   );

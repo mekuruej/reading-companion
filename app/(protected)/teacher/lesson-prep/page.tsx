@@ -46,12 +46,6 @@ const prepCards: PrepCard[] = [
     eyebrow: "Book materials",
     description: "Manage books, notes, vocabulary, and reusable reading support for teaching.",
   },
-  {
-    title: "Book Clubs",
-    href: "/teacher/clubs?from=lesson-prep",
-    eyebrow: "Groups",
-    description: "Plan club groups, weekly readings, and shared support materials.",
-  },
 ];
 
 function isSuperTeacherFlag(value: unknown) {
