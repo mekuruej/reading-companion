@@ -5,8 +5,8 @@ import {
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
 
-export const ABILITY_CHECK_READY_SCORE_TARGET = 100;
-export const LIBRARY_REVIEW_READY_SCORE_TARGET = 200;
+export const ABILITY_CHECK_TRACKED_WORD_TARGET = 100;
+export const LIBRARY_REVIEW_TRACKED_WORD_TARGET = 200;
 
 export type AdvancedStudyReadinessSummaryRow = {
   study_identity_key?: string | null;
@@ -31,8 +31,8 @@ export type AdvancedStudyReadinessColorCounts = Record<LibraryStudyColor, number
 
 export type AdvancedStudyReadinessResult = {
   readyScore: number;
-  abilityCheckTarget: typeof ABILITY_CHECK_READY_SCORE_TARGET;
-  libraryReviewTarget: typeof LIBRARY_REVIEW_READY_SCORE_TARGET;
+  abilityCheckTarget: typeof ABILITY_CHECK_TRACKED_WORD_TARGET;
+  libraryReviewTarget: typeof LIBRARY_REVIEW_TRACKED_WORD_TARGET;
   colorCounts: AdvancedStudyReadinessColorCounts;
   abilityCheckReady: boolean;
   libraryReviewReady: boolean;
@@ -146,11 +146,11 @@ export function calculateAdvancedStudyReadiness({
 
   return {
     readyScore,
-    abilityCheckTarget: ABILITY_CHECK_READY_SCORE_TARGET,
-    libraryReviewTarget: LIBRARY_REVIEW_READY_SCORE_TARGET,
+    abilityCheckTarget: ABILITY_CHECK_TRACKED_WORD_TARGET,
+    libraryReviewTarget: LIBRARY_REVIEW_TRACKED_WORD_TARGET,
     colorCounts,
-    abilityCheckReady: readyScore >= ABILITY_CHECK_READY_SCORE_TARGET,
-    libraryReviewReady: readyScore >= LIBRARY_REVIEW_READY_SCORE_TARGET,
+    abilityCheckReady: eligibleWordCount >= ABILITY_CHECK_TRACKED_WORD_TARGET,
+    libraryReviewReady: eligibleWordCount >= LIBRARY_REVIEW_TRACKED_WORD_TARGET,
     eligibleWordCount,
   };
 }

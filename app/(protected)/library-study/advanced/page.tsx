@@ -69,10 +69,15 @@ export default function AdvancedStudyPage() {
     const [readinessError, setReadinessError] = useState<string | null>(null);
     const [isTrialAccess, setIsTrialAccess] = useState(false);
     const [isStaffAccess, setIsStaffAccess] = useState(false);
+    const [canUseAbilityCheck, setCanUseAbilityCheck] = useState(false);
+    const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
     const accessTitle = accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
-    const showAdvancedTools = canUseAdvancedStudy && (
+    const abilityCheckAvailable = canUseAbilityCheck && !isTrialAccess && (isStaffAccess || (readiness?.abilityCheckReady ?? false));
+    const libraryReviewAvailable = canUseLibraryReview && !isTrialAccess && (isStaffAccess || (readiness?.libraryReviewReady ?? false));
+    const showAdvancedTools = canUseAdvancedStudy && !isTrialAccess && (
         isStaffAccess ||
-        (!isTrialAccess && (readiness?.abilityCheckReady ?? false))
+        abilityCheckAvailable ||
+        libraryReviewAvailable
     );
 
     useEffect(() => {
@@ -93,6 +98,8 @@ export default function AdvancedStudyPage() {
                         setReadinessError(null);
                         setIsTrialAccess(false);
                         setIsStaffAccess(false);
+                        setCanUseAbilityCheck(false);
+                        setCanUseLibraryReview(false);
                         setLoadingAccess(false);
                     }
                     return;
@@ -136,6 +143,8 @@ export default function AdvancedStudyPage() {
                     setAccessReason(appStatus.reason);
                     setIsTrialAccess(trialAccess);
                     setIsStaffAccess(staffAccess);
+                    setCanUseAbilityCheck(featureAccess.canUseAbilityCheck);
+                    setCanUseLibraryReview(featureAccess.canUseLibraryReview);
                     setLoadingAccess(false);
                 }
 
@@ -215,6 +224,8 @@ export default function AdvancedStudyPage() {
                     setReadinessError("Could not load Advanced Study readiness.");
                     setIsTrialAccess(false);
                     setIsStaffAccess(false);
+                    setCanUseAbilityCheck(false);
+                    setCanUseLibraryReview(false);
                     setLoadingAccess(false);
                 }
             }
@@ -293,19 +304,21 @@ export default function AdvancedStudyPage() {
                         ) : readiness ? (
                             <section className="rounded-3xl border border-violet-200 bg-white p-6 text-slate-900 shadow-sm">
                                 <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">
-                                    {showAdvancedTools ? "Advanced Study readiness" : "Advanced Study is forming"}
+                                    {showAdvancedTools ? "Advanced Study is available" : "Advanced Study is forming"}
                                 </p>
                                 <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                     <div>
                                         <h2 className="text-2xl font-black text-slate-950">
-                                            {formatReadyScore(readiness.readyScore)} / {readiness.abilityCheckTarget} words ready for Ability Check
+                                            {showAdvancedTools
+                                                ? "Advanced Study is available."
+                                                : `${readiness.eligibleWordCount} / ${readiness.abilityCheckTarget} tracked words for Ability Check`}
                                         </h2>
                                         <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
                                             {showAdvancedTools
-                                                ? "Ability Check is ready. Your word colors are already active, and advanced tools can help you check and review words across your library."
+                                                ? `You have ${readiness.eligibleWordCount} tracked words. ${formatReadyScore(readiness.readyScore)} words are strongly marked by color, which helps show the shape of your review pool.`
                                                 : isTrialAccess
                                                     ? "During your trial, your word colors can begin while you build vocabulary from books. Ability Check and Library Review are part of paid Advanced Study."
-                                                : "Your word colors are already starting. Keep saving and studying words from your books. Once enough words are ready, MEKURU will open Ability Check."}
+                                                : "Add more words from your books to make Ability Check and Library Review more useful. Your word colors can already begin before Advanced Study is fully useful."}
                                         </p>
                                     </div>
 
@@ -318,16 +331,22 @@ export default function AdvancedStudyPage() {
                                     <div
                                         className="h-full rounded-full bg-violet-500"
                                         style={{
-                                            width: `${Math.min(100, (readiness.readyScore / readiness.abilityCheckTarget) * 100)}%`,
+                                            width: `${Math.min(100, (readiness.eligibleWordCount / readiness.abilityCheckTarget) * 100)}%`,
                                         }}
                                     />
                                 </div>
 
                                 <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
-                                    {isTrialAccess
-                                        ? `Library Review opens with paid Advanced Study after a larger review pool forms: ${formatReadyScore(readiness.readyScore)} / ${readiness.libraryReviewTarget}.`
-                                        : `Library Review opens after a larger review pool forms: ${formatReadyScore(readiness.readyScore)} / ${readiness.libraryReviewTarget}.`}
+                                    {libraryReviewAvailable
+                                        ? `Library Review is available. You have ${readiness.eligibleWordCount} tracked words, and ${formatReadyScore(readiness.readyScore)} are strongly marked by color.`
+                                        : isTrialAccess
+                                            ? `Library Review is part of paid Advanced Study. Your color-marked review pool is ${formatReadyScore(readiness.readyScore)} strongly marked words.`
+                                            : `Library Review becomes more useful around ${readiness.libraryReviewTarget} tracked words. You have ${readiness.eligibleWordCount} / ${readiness.libraryReviewTarget}.`}
                                 </p>
+
+                                <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm font-semibold leading-6 text-violet-950">
+                                    Color-marked review pool: {formatReadyScore(readiness.readyScore)} strongly marked word{readiness.readyScore === 1 ? "" : "s"}.
+                                </div>
 
                                 <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
                                     <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">Red {readiness.colorCounts.red}</span>
@@ -409,7 +428,12 @@ export default function AdvancedStudyPage() {
                             </p>
 
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                {advancedTools.map((tool) => (
+                                {advancedTools.filter((tool) => {
+                                    if (isStaffAccess) return true;
+                                    if (tool.title === "Ability Check") return abilityCheckAvailable;
+                                    if (tool.title === "Library Review") return libraryReviewAvailable;
+                                    return true;
+                                }).map((tool) => (
                                     <Link
                                         key={tool.href}
                                         href={tool.href}
