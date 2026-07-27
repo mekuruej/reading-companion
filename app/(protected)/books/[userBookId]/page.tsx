@@ -5323,7 +5323,9 @@ export default function BookHubPage() {
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
+                canUseStoryNotes={!isEnglishBook && canUseStoryNotes}
                 hasSavedWords={(uniqueLookupCount ?? 0) > 0}
+                showReflectionPrompt={showBookHubReflectionPrompt}
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/curiosity-reading`);
@@ -5351,6 +5353,22 @@ export default function BookHubPage() {
                 onVocabularyList={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/words`);
+                }}
+                onStoryNotes={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  setActiveTab("story");
+                }}
+                onReadingSessions={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  setActiveTab("reading");
+                }}
+                onBookStats={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/stats`);
+                }}
+                onReadingReflection={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  openReadingReflection();
                 }}
               />
 

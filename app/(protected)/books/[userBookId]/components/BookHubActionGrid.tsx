@@ -10,7 +10,9 @@ type BookHubActionGridProps = {
     canUseSavedWordReading: boolean;
     canUseStudyFlashcards: boolean;
     canUseVocabularyList: boolean;
+    canUseStoryNotes?: boolean;
     hasSavedWords: boolean;
+    showReflectionPrompt?: boolean;
 
     onCuriosityReading: () => void;
     onFluidReadingExtensive: () => void;
@@ -19,6 +21,10 @@ type BookHubActionGridProps = {
     onAboutBook: () => void;
     onStudyFlashcards: () => void;
     onVocabularyList: () => void;
+    onStoryNotes?: () => void;
+    onReadingSessions?: () => void;
+    onBookStats?: () => void;
+    onReadingReflection?: () => void;
 };
 
 function ActionButton({
@@ -120,7 +126,9 @@ export default function BookHubActionGrid({
     canUseSavedWordReading,
     canUseStudyFlashcards,
     canUseVocabularyList,
+    canUseStoryNotes = false,
     hasSavedWords,
+    showReflectionPrompt = false,
     onCuriosityReading,
     onFluidReadingExtensive,
     onFluidReadingJustReading,
@@ -128,6 +136,10 @@ export default function BookHubActionGrid({
     onAboutBook,
     onStudyFlashcards,
     onVocabularyList,
+    onStoryNotes,
+    onReadingSessions,
+    onBookStats,
+    onReadingReflection,
 }: BookHubActionGridProps) {
     if (!hasFullAccess && !isTrialAccess) {
         return (
@@ -291,31 +303,73 @@ export default function BookHubActionGrid({
                     />
                 ) : null}
 
+                {canUseStoryNotes && onStoryNotes ? (
+                    <ActionButton
+                        title="Story Notes"
+                        description="Track characters, plot, setting, and cultural notes."
+                        className="bg-sky-50 hover:bg-sky-100"
+                        onClick={onStoryNotes}
+                        size="secondary"
+                    />
+                ) : null}
+
                 <ActionButton
                     title="Just Reading"
                     subtitle="Reading Timer"
                     description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
-                    className="bg-sky-50 hover:bg-sky-100"
+                    className="bg-emerald-50 hover:bg-emerald-100"
                     onClick={onFluidReadingJustReading}
                     size="secondary"
                 />
 
                 <ActionButton
-                    title="Listening Timer"
+                    title="Listening"
                     subtitle="Save Heard Words"
                     description={["Listen while saving vocab", "and log listening time."]}
-                    className="bg-emerald-50 hover:bg-emerald-100"
+                    className="bg-sky-50 hover:bg-sky-100"
                     onClick={onListening}
                     size="secondary"
                 />
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                {onReadingSessions ? (
+                    <ActionButton
+                        title="Reading Sessions"
+                        description="Review pages, time, and reading history for this book."
+                        className="bg-yellow-50 hover:bg-yellow-100"
+                        onClick={onReadingSessions}
+                    />
+                ) : null}
 
                 <ActionButton
                     title="About This Book"
                     description="See the author, publisher, format, level, and book details."
-                    className="bg-sky-50 hover:bg-sky-100"
+                    className="bg-orange-50 hover:bg-orange-100"
                     onClick={onAboutBook}
-                    size="secondary"
                 />
+
+                {onBookStats ? (
+                    <ActionButton
+                        title="Book Stats"
+                        description="Open deeper stats for this book."
+                        className="bg-yellow-50 hover:bg-yellow-100"
+                        onClick={onBookStats}
+                    />
+                ) : null}
+
+                {onReadingReflection ? (
+                    <ActionButton
+                        title={showReflectionPrompt ? "Write your Reading Reflection" : "Reading Reflection"}
+                        description={
+                            showReflectionPrompt
+                                ? "Finished this book? Add your reflection while it is fresh."
+                                : "Open your private reading reflection and review."
+                        }
+                        className={showReflectionPrompt ? "bg-orange-100 hover:bg-orange-200" : "bg-orange-50 hover:bg-orange-100"}
+                        onClick={onReadingReflection}
+                    />
+                ) : null}
             </div>
         </div>
     );

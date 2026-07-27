@@ -261,6 +261,18 @@ export default function Header() {
                   >
                     Vocabulary Lists
                   </Link>
+
+                  <Link
+                    href="/community/profile"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/profile" ||
+                      pathname.startsWith("/community/profile/")
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowLibraryMenu(false)}
+                  >
+                    My Reading Profile
+                  </Link>
                 </div>
               ) : null}
             </div>
