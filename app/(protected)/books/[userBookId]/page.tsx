@@ -3439,7 +3439,7 @@ export default function BookHubPage() {
 
     const meProfileResult = await supabase
       .from("profiles")
-      .select("role, is_super_teacher, level, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+      .select("role, is_super_teacher, level, app_access_type, app_access_expires_at")
       .eq("id", user.id)
       .single();
     let meProfile: any = meProfileResult.data;
@@ -3474,8 +3474,6 @@ export default function BookHubPage() {
         role: currentProfileIsSuperTeacher ? "super_teacher" : currentProfileRole,
         app_access_type: (meProfile as any).app_access_type,
         app_access_expires_at: (meProfile as any).app_access_expires_at,
-        trial_started_at: (meProfile as any).trial_started_at,
-        trial_ends_at: (meProfile as any).trial_ends_at,
       })
       : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
 
