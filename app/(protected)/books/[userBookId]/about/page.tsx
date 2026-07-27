@@ -177,6 +177,32 @@ function firstPerson(record: PersonRecord | null | undefined) {
   return person ?? null;
 }
 
+function looksLikeUrl(value: string | null | undefined) {
+  const clean = value?.trim() ?? "";
+  return /^https?:\/\//i.test(clean) || /^www\./i.test(clean);
+}
+
+function friendlyExternalLinkLabel(href: string, preferredLabel?: string | null) {
+  const cleanPreferred = preferredLabel?.trim();
+  if (cleanPreferred && !looksLikeUrl(cleanPreferred)) return cleanPreferred;
+
+  try {
+    const url = new URL(href);
+    const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+
+    if (host === "amazon.co.jp" || host.endsWith(".amazon.co.jp")) return "Amazon Japan";
+    if (host === "amazon.com" || host.endsWith(".amazon.com")) return "Amazon";
+    if (host.includes("rakuten")) return "Rakuten";
+    if (host.includes("honto")) return "Honto";
+    if (host.includes("kinokuniya")) return "Kinokuniya";
+    if (host.includes("bookwalker")) return "BookWalker";
+
+    return host || "Source link";
+  } catch {
+    return "Source link";
+  }
+}
+
 function SafeProfileImage({
   src,
   alt,
@@ -555,6 +581,9 @@ export default function AboutBookPage() {
   const bookstoreHint = book.bookstore_hint_en?.trim() || null;
   const sourceLabel = book.book_profile_source_label?.trim() || null;
   const sourceUrl = book.book_profile_source_url?.trim() || null;
+  const profileSourceLabel = sourceUrl
+    ? friendlyExternalLinkLabel(sourceUrl, sourceLabel)
+    : sourceLabel;
   const learnerReadingNotes: string[] = [];
   const similarBooks: Array<{ title: string; href: string }> = [];
 
@@ -801,17 +830,18 @@ export default function AboutBookPage() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   {relatedLinks.map((link: any, index: number) => {
                     const href = typeof link === "string" ? link : link?.url;
-                    const label = typeof link === "string" ? `Link ${index + 1}` : link?.label || link?.title || `Link ${index + 1}`;
                     if (!href) return null;
+                    const rawLabel = typeof link === "string" ? null : link?.label || link?.title;
+                    const label = friendlyExternalLinkLabel(href, href === sourceUrl ? sourceLabel : rawLabel);
                     return (
                       <a
                         key={`${href}-${index}`}
                         href={href}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-black text-stone-700 transition hover:bg-stone-100"
+                        className="inline-flex max-w-full items-center rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-black text-stone-700 transition hover:bg-stone-100"
                       >
-                        {label}
+                        <span className="truncate">{label} ↗</span>
                       </a>
                     );
                   })}
@@ -829,12 +859,12 @@ export default function AboutBookPage() {
                 href={sourceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="font-black text-stone-700 underline-offset-4 hover:underline"
+                className="inline-flex max-w-full items-center rounded-full border border-stone-200 bg-white/70 px-3 py-1 font-black text-stone-700 transition hover:bg-white"
               >
-                {sourceLabel || "Source"}
+                <span className="truncate">{profileSourceLabel || "Source link"} ↗</span>
               </a>
             ) : (
-              <span className="font-black text-stone-700">{sourceLabel}</span>
+              <span className="font-black text-stone-700">{profileSourceLabel}</span>
             )}
           </p>
         ) : null}

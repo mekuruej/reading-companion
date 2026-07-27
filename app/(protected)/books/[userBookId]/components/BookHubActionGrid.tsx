@@ -178,7 +178,7 @@ export default function BookHubActionGrid({
                         title="Follow-Along"
                         subtitle="Supported Reading"
                         description={["Reread with saved-word support", "and log your reading time."]}
-                        className="bg-emerald-50 hover:bg-emerald-100"
+                        className="bg-violet-50 hover:bg-violet-100"
                         locked={!canUseSavedWordReading}
                         onClick={onFluidReadingExtensive}
                         size="primary"
@@ -188,7 +188,7 @@ export default function BookHubActionGrid({
                         title="Review Words"
                         subtitle="Flashcards"
                         description="Review the words saved from this book."
-                        className="bg-sky-50 hover:bg-sky-100"
+                        className="bg-violet-50 hover:bg-violet-100"
                         locked={!canUseStudyFlashcards}
                         onClick={onStudyFlashcards}
                         size="primary"
@@ -198,7 +198,7 @@ export default function BookHubActionGrid({
                         title="Curiosity Reading"
                         subtitle="Save Words"
                         description={["Read while saving vocab", "and log a slower, mindful session."]}
-                        className="bg-sky-50 hover:bg-sky-100"
+                        className="bg-violet-50 hover:bg-violet-100"
                         locked={!canUseCuriosityReading}
                         onClick={onCuriosityReading}
                         size="primary"
@@ -219,7 +219,7 @@ export default function BookHubActionGrid({
                         title="Reading Timer"
                         subtitle="Just Reading"
                         description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
-                        className="bg-violet-50 hover:bg-violet-100"
+                        className="bg-sky-50 hover:bg-sky-100"
                         onClick={onFluidReadingJustReading}
                         size="secondary"
                     />
@@ -228,7 +228,7 @@ export default function BookHubActionGrid({
                         title="Listening Timer"
                         subtitle="Just Listening"
                         description={["Listen to the audiobook", "and log your listening time."]}
-                        className="bg-violet-50 hover:bg-violet-100"
+                        className="bg-emerald-50 hover:bg-emerald-100"
                         onClick={onListening}
                         size="secondary"
                     />
@@ -236,7 +236,7 @@ export default function BookHubActionGrid({
                     <ActionButton
                         title="About This Book"
                         description="See the author, publisher, format, level, and book details."
-                        className="bg-violet-50 hover:bg-violet-100"
+                        className="bg-sky-50 hover:bg-sky-100"
                         onClick={onAboutBook}
                         size="secondary"
                     />
@@ -252,7 +252,7 @@ export default function BookHubActionGrid({
                     title="Follow-Along"
                     subtitle="Supported Reading"
                     description={["Review reading with light support", "from words you already saved."]}
-                    className="bg-emerald-50 hover:bg-emerald-100"
+                    className="bg-violet-50 hover:bg-violet-100"
                     locked={!canUseSavedWordReading}
                     onClick={onFluidReadingExtensive}
                     size="primary"
@@ -262,7 +262,7 @@ export default function BookHubActionGrid({
                     title="Review Words"
                     subtitle="Flashcards"
                     description="Review the words you saved from this book."
-                    className="bg-sky-50 hover:bg-sky-100"
+                    className="bg-violet-50 hover:bg-violet-100"
                     locked={!canUseStudyFlashcards}
                     onClick={onStudyFlashcards}
                     size="primary"
@@ -272,7 +272,7 @@ export default function BookHubActionGrid({
                     title="Curiosity Reading"
                     subtitle="Save Words"
                     description={["Read while saving vocab", "and log a slower, mindful session."]}
-                    className="bg-sky-50 hover:bg-sky-100"
+                    className="bg-violet-50 hover:bg-violet-100"
                     locked={!canUseCuriosityReading}
                     onClick={onCuriosityReading}
                     size="primary"
@@ -295,7 +295,7 @@ export default function BookHubActionGrid({
                     title="Just Reading"
                     subtitle="Reading Timer"
                     description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
-                    className="bg-violet-50 hover:bg-violet-100"
+                    className="bg-sky-50 hover:bg-sky-100"
                     onClick={onFluidReadingJustReading}
                     size="secondary"
                 />
@@ -304,7 +304,7 @@ export default function BookHubActionGrid({
                     title="Listening Timer"
                     subtitle="Save Heard Words"
                     description={["Listen while saving vocab", "and log listening time."]}
-                    className="bg-violet-50 hover:bg-violet-100"
+                    className="bg-emerald-50 hover:bg-emerald-100"
                     onClick={onListening}
                     size="secondary"
                 />
@@ -312,7 +312,7 @@ export default function BookHubActionGrid({
                 <ActionButton
                     title="About This Book"
                     description="See the author, publisher, format, level, and book details."
-                    className="bg-violet-50 hover:bg-violet-100"
+                    className="bg-sky-50 hover:bg-sky-100"
                     onClick={onAboutBook}
                     size="secondary"
                 />
