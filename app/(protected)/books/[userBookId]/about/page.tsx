@@ -136,22 +136,6 @@ function formatBookFormat(book: Book, row: UserBook) {
   return formatEditionFormat(book.edition_format) ?? formatReadingFormat(row.format_type);
 }
 
-function inferBookstoreSection(book: Book) {
-  const format = book.edition_format;
-  const type = book.book_type;
-
-  if (format === "bunko") return "文庫 / paperback fiction shelves";
-  if (format === "shinsho") return "新書 shelves";
-  if (format === "tankobon_hardcover" || format === "tankobon_softcover") {
-    return "単行本 / general fiction shelves";
-  }
-  if (type === "light_novel") return "ライトノベル shelves";
-  if (type === "manga") return "漫画 shelves";
-  if (type === "picture_book") return "絵本 shelves";
-  if (type === "nonfiction" || type === "essay" || type === "memoir") return "nonfiction / essay shelves";
-  return null;
-}
-
 function formatLanguage(value: string | null | undefined) {
   switch (value) {
     case "ja":
@@ -574,7 +558,6 @@ export default function AboutBookPage() {
 
   const bookFormat = formatBookFormat(book, row);
   const isbn = book.isbn13 || book.isbn;
-  const bookstoreSection = inferBookstoreSection(book);
   const synopsis = book.synopsis_en?.trim() || null;
   const authorBio = book.author_bio_en?.trim() || null;
   const publisherNote = book.publisher_note_en?.trim() || null;
@@ -686,41 +669,19 @@ export default function AboutBookPage() {
           />
         </section>
 
-        <section className="mt-6 rounded-[2rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-            Find This Book
-          </p>
-          <div className="mt-3 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-end">
-            <div>
-              <h2 className="text-2xl font-black text-stone-950">
-                Look for this format when searching in Japanese bookstores.
-              </h2>
-              {bookstoreHint ? (
-                <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-stone-700">
-                  {bookstoreHint}
-                </p>
-              ) : null}
-              <div className="mt-4 grid gap-2 text-sm font-semibold leading-6 text-stone-700 sm:grid-cols-2">
-                <p>Title: {book.title ?? "Untitled book"}</p>
-                {book.author ? <p>Author: {book.author}</p> : null}
-                {book.publisher ? <p>Publisher: {book.publisher}</p> : null}
-                {isbn ? <p>ISBN: {isbn}</p> : null}
-                {bookFormat ? <p>Format: {bookFormat}</p> : null}
-                {bookstoreSection ? <p>Likely section: {bookstoreSection}</p> : null}
-              </div>
-            </div>
-            <div className="rounded-3xl border border-amber-200 bg-white/80 p-5">
-              <p className="text-sm font-black text-stone-950">
-                Search cue
-              </p>
-              <p className="mt-2 text-sm leading-6 text-stone-600">
-                {bookstoreHint
-                  ? "Use the stored hint with the title, author, ISBN, or format label when searching."
-                  : "Try the title with the author, ISBN, or format label. Japanese editions can move between 文庫本, 単行本, 新書, and ebook listings."}
-              </p>
-            </div>
-          </div>
-        </section>
+        {bookstoreHint ? (
+          <section className="mt-6 rounded-[2rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+              Find This Book
+            </p>
+            <h2 className="mt-3 text-2xl font-black text-stone-950">
+              Bookstore hint
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-stone-700">
+              {bookstoreHint}
+            </p>
+          </section>
+        ) : null}
 
         {synopsis ? (
           <ProfileSection
