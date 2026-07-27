@@ -12,8 +12,6 @@ type ProfileAccessRow = {
   is_super_teacher: boolean | string | null;
   app_access_type: string | null;
   app_access_expires_at: string | null;
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
 };
 
 function BookStudyFreeState({ hasSavedWords, accessReason }: { hasSavedWords: boolean; accessReason: string }) {
@@ -85,7 +83,7 @@ export default function BookStudyPage() {
 
         const profileResult = await supabase
           .from("profiles")
-          .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", user.id)
           .maybeSingle<ProfileAccessRow>();
         let profile: any = profileResult.data;
