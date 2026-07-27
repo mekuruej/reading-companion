@@ -501,98 +501,8 @@ function formatTypeLabel(value: string | null | undefined) {
   }
 }
 
-function editionFormatLabel(value: string | null | undefined) {
-  switch (value) {
-    case "bunko":
-      return "Bunkobon (Pocket-sized book)";
-    case "tankobon_hardcover":
-      return "Tankobon (Hardcover)";
-    case "tankobon_softcover":
-      return "Tankobon (Softcover)";
-    case "paperback":
-      return "Paperback";
-    case "hardcover":
-      return "Hardcover";
-    case "ebook":
-      return "Ebook";
-    case "other":
-      return "Other";
-    default:
-      return "—";
-  }
-}
-
 function bookTypeLabel(value: string | null | undefined) {
   return formatBookTypeLabel(value);
-}
-
-function BookHubAboutSection({
-  book,
-  row,
-}: {
-  book: Book;
-  row: UserBook;
-}) {
-  const details = [
-    { label: "Author", value: book.author },
-    { label: "Translator", value: book.translator },
-    { label: "Illustrator", value: book.illustrator },
-    { label: "Publisher", value: book.publisher },
-    { label: "Book Type", value: bookTypeLabel(book.book_type) },
-    { label: "Reader Level", value: row.reader_level },
-    { label: "Recommended Level", value: row.recommended_level },
-    { label: "Reading Format", value: formatTypeLabel(row.format_type) },
-    { label: "Edition Format", value: editionFormatLabel(book.edition_format) },
-    { label: "Language", value: book.language_code?.toUpperCase() },
-    { label: "Pages", value: book.page_count },
-    { label: "Published", value: book.published_date },
-    { label: "ISBN", value: book.isbn13 || book.isbn },
-  ].filter((item) => item.value != null && String(item.value).trim().length > 0 && item.value !== "—");
-
-  return (
-    <section
-      id="about-this-book"
-      className="scroll-mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-4"
-    >
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-        About This Book
-      </p>
-      <h2 className="mt-2 text-xl font-black text-stone-950">
-        Book details
-      </h2>
-      <p className="mt-2 text-sm leading-6 text-stone-600">
-        See the author, publisher, format, level, and book details.
-      </p>
-
-      {details.length > 0 ? (
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {details.map((item) => (
-            <div key={item.label} className="rounded-xl border border-stone-200 bg-white px-4 py-3">
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-                {item.label}
-              </dt>
-              <dd className="mt-1 text-sm font-semibold text-stone-900">
-                {item.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="mt-4 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-600">
-          Book details are still being added.
-        </p>
-      )}
-
-      {book.edition_note ? (
-        <div className="mt-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-            Edition Note
-          </p>
-          <p className="mt-1 text-sm leading-6 text-stone-700">{book.edition_note}</p>
-        </div>
-      ) : null}
-    </section>
-  );
 }
 
 function isDuplicateBookIsbnError(error: unknown) {
@@ -5295,12 +5205,6 @@ export default function BookHubPage() {
     !!favoriteQuotes.trim() ||
     !!memorableWords.trim();
   const showBookHubReflectionPrompt = !!finishedAt && !hasReadingReflection;
-  const scrollToAboutBook = () => {
-    document.getElementById("about-this-book")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -5434,7 +5338,10 @@ export default function BookHubPage() {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/listening`);
                 }}
-                onAboutBook={scrollToAboutBook}
+                onAboutBook={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/about`);
+                }}
                 onStudyFlashcards={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/study`);
@@ -5479,8 +5386,6 @@ export default function BookHubPage() {
                 tabs={bookHubTabs}
                 onTabChange={setActiveTab}
               />
-
-              <BookHubAboutSection book={book} row={row} />
 
               {canViewBookInfoTab && activeTab === "bookInfo" && (
                 <div className="space-y-4">
