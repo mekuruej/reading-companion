@@ -5,6 +5,7 @@
 
 type BookHubActionGridProps = {
     hasFullAccess: boolean;
+    isTrialAccess?: boolean;
     canUseCuriosityReading: boolean;
     canUseSavedWordReading: boolean;
     canUseStudyFlashcards: boolean;
@@ -28,6 +29,7 @@ function ActionButton({
     onClick,
     locked = false,
     lockedLabel = "Full access",
+    size = "normal",
 }: {
     title: string;
     subtitle?: string;
@@ -36,7 +38,15 @@ function ActionButton({
     onClick: () => void | Promise<void>;
     locked?: boolean;
     lockedLabel?: string;
+    size?: "normal" | "primary" | "secondary";
 }) {
+    const sizeClass =
+        size === "primary"
+            ? "min-h-[156px] px-5 py-5"
+            : size === "secondary"
+                ? "min-h-[112px] px-3 py-3"
+                : "px-3.5 py-3";
+
     return (
         <button
             type="button"
@@ -45,7 +55,8 @@ function ActionButton({
             aria-disabled={locked}
             title={locked ? `${title} is a full-access feature.` : undefined}
             className={[
-                "relative rounded-xl border border-stone-900 px-3.5 py-3 text-center shadow-sm transition-all",
+                "relative rounded-xl border border-stone-900 text-center shadow-sm transition-all",
+                sizeClass,
                 locked
                     ? "cursor-not-allowed bg-stone-100 text-stone-400 opacity-60 grayscale"
                     : `hover:-translate-y-[1px] hover:shadow-md ${className}`,
@@ -59,7 +70,7 @@ function ActionButton({
 
             <div
                 className={[
-                    "text-base font-semibold sm:text-lg",
+                    size === "primary" ? "text-lg font-black sm:text-xl" : "text-base font-semibold sm:text-lg",
                     locked ? "text-stone-500" : "text-stone-900",
                 ].join(" ")}
             >
@@ -70,10 +81,10 @@ function ActionButton({
                 <div
                     className={[
                         "font-semibold",
-                        locked ? "text-stone-500" : "text-stone-900",
-                        subtitle.startsWith("(") ? "text-xs sm:text-sm" : "text-base sm:text-lg",
-                    ].join(" ")}
-                >
+                    locked ? "text-stone-500" : "text-stone-900",
+                    subtitle.startsWith("(") || size === "secondary" ? "text-xs sm:text-sm" : "text-base sm:text-lg",
+                ].join(" ")}
+            >
                     {subtitle}
                 </div>
             ) : null}
@@ -104,6 +115,7 @@ function ActionButton({
 
 export default function BookHubActionGrid({
     hasFullAccess,
+    isTrialAccess = false,
     canUseCuriosityReading,
     canUseSavedWordReading,
     canUseStudyFlashcards,
@@ -158,41 +170,143 @@ export default function BookHubActionGrid({
         );
     }
 
+    if (isTrialAccess) {
+        return (
+            <div className="pb-2">
+                <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                    <ActionButton
+                        title="Follow-Along"
+                        subtitle="Supported Reading"
+                        description={["Reread with saved-word support", "and log your reading time."]}
+                        className="bg-emerald-50 hover:bg-emerald-100"
+                        locked={!canUseSavedWordReading}
+                        onClick={onFluidReadingExtensive}
+                        size="primary"
+                    />
+
+                    <ActionButton
+                        title="Review Words"
+                        subtitle="Flashcards"
+                        description="Review the words saved from this book."
+                        className="bg-sky-50 hover:bg-sky-100"
+                        locked={!canUseStudyFlashcards}
+                        onClick={onStudyFlashcards}
+                        size="primary"
+                    />
+
+                    <ActionButton
+                        title="Curiosity Reading"
+                        subtitle="Save Words"
+                        description={["Read while saving vocab", "and log a slower, mindful session."]}
+                        className="bg-sky-50 hover:bg-sky-100"
+                        locked={!canUseCuriosityReading}
+                        onClick={onCuriosityReading}
+                        size="primary"
+                    />
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <ActionButton
+                        title="Vocabulary List"
+                        description="Open the saved words for this book."
+                        className="bg-emerald-50 hover:bg-emerald-100"
+                        locked={!canUseVocabularyList}
+                        onClick={onVocabularyList}
+                        size="secondary"
+                    />
+
+                    <ActionButton
+                        title="Reading Timer"
+                        subtitle="Just Reading"
+                        description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
+                        className="bg-violet-50 hover:bg-violet-100"
+                        onClick={onFluidReadingJustReading}
+                        size="secondary"
+                    />
+
+                    <ActionButton
+                        title="Listening Timer"
+                        subtitle="Just Listening"
+                        description={["Listen to the audiobook", "and log your listening time."]}
+                        className="bg-violet-50 hover:bg-violet-100"
+                        onClick={onListening}
+                        size="secondary"
+                    />
+
+                    <ActionButton
+                        title="About This Book"
+                        description="See the author, publisher, format, level, and book details."
+                        className="bg-violet-50 hover:bg-violet-100"
+                        onClick={onAboutBook}
+                        size="secondary"
+                    />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="pb-2">
             <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <ActionButton
-                    title="Curiosity Reading"
-                    subtitle="(Intensive Reading)"
-                    description={["Read while saving vocab", "and log a slower, mindful session."]}
-                    className="bg-sky-50 hover:bg-sky-100"
-                    locked={!canUseCuriosityReading}
-                    onClick={onCuriosityReading}
-                />
-
-                <ActionButton
-                    title="Supported Reading"
-                    subtitle="(Reread and time your session with light support)"
+                    title="Follow-Along"
+                    subtitle="Supported Reading"
                     description={["Review reading with light support", "from words you already saved."]}
                     className="bg-emerald-50 hover:bg-emerald-100"
                     locked={!canUseSavedWordReading}
                     onClick={onFluidReadingExtensive}
+                    size="primary"
                 />
+
+                <ActionButton
+                    title="Review Words"
+                    subtitle="Flashcards"
+                    description="Review the words you saved from this book."
+                    className="bg-sky-50 hover:bg-sky-100"
+                    locked={!canUseStudyFlashcards}
+                    onClick={onStudyFlashcards}
+                    size="primary"
+                />
+
+                <ActionButton
+                    title="Curiosity Reading"
+                    subtitle="Save Words"
+                    description={["Read while saving vocab", "and log a slower, mindful session."]}
+                    className="bg-sky-50 hover:bg-sky-100"
+                    locked={!canUseCuriosityReading}
+                    onClick={onCuriosityReading}
+                    size="primary"
+                />
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                {hasSavedWords ? (
+                    <ActionButton
+                        title="Vocabulary List"
+                        description="Open the saved words and vocabulary tools for this book."
+                        className="bg-emerald-50 hover:bg-emerald-100"
+                        locked={!canUseVocabularyList}
+                        onClick={onVocabularyList}
+                        size="secondary"
+                    />
+                ) : null}
 
                 <ActionButton
                     title="Just Reading"
-                    subtitle="(Extensive Reading Timer)"
+                    subtitle="Reading Timer"
                     description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onFluidReadingJustReading}
+                    size="secondary"
                 />
 
                 <ActionButton
-                    title="Listening"
-                    subtitle="(Save Heard Words)"
+                    title="Listening Timer"
+                    subtitle="Save Heard Words"
                     description={["Listen while saving vocab", "and log listening time."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onListening}
+                    size="secondary"
                 />
 
                 <ActionButton
@@ -200,27 +314,8 @@ export default function BookHubActionGrid({
                     description="See the author, publisher, format, level, and book details."
                     className="bg-violet-50 hover:bg-violet-100"
                     onClick={onAboutBook}
+                    size="secondary"
                 />
-
-                <ActionButton
-                    title="Study"
-                    subtitle="Flashcards"
-                    description="Review the words you saved from this book."
-                    className="bg-sky-50 hover:bg-sky-100"
-                    locked={!canUseStudyFlashcards}
-                    onClick={onStudyFlashcards}
-                />
-
-                {hasSavedWords ? (
-                    <ActionButton
-                        title="Vocabulary"
-                        subtitle="List"
-                        description="Open the saved words and vocabulary tools for this book."
-                        className="bg-emerald-50 hover:bg-emerald-100"
-                        locked={!canUseVocabularyList}
-                        onClick={onVocabularyList}
-                    />
-                ) : null}
             </div>
         </div>
     );
