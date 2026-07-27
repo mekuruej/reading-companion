@@ -11,7 +11,6 @@ export type TeacherSnapshotAction = {
 type TeacherSnapshotActionsProps = {
   primaryAction: TeacherSnapshotAction | null;
   teacherActions: TeacherSnapshotAction[];
-  readerActions: TeacherSnapshotAction[];
 };
 
 function ActionLink({
@@ -59,24 +58,10 @@ function ActionLink({
 export default function TeacherSnapshotActions({
   primaryAction,
   teacherActions,
-  readerActions,
 }: TeacherSnapshotActionsProps) {
   return (
     <div className="flex flex-col items-start gap-4">
       {primaryAction ? <ActionLink action={primaryAction} primary /> : null}
-
-      {readerActions.length > 0 ? (
-        <div className="flex flex-col items-start gap-2">
-          <span className="px-1 text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-            Reader Tools
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            {readerActions.map((action) => (
-              <ActionLink key={action.label} action={action} />
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       {teacherActions.length > 0 ? (
         <div className="flex flex-col items-start gap-2">

@@ -207,9 +207,6 @@ export default function TeacherReadingSnapshotPage() {
       finished: 0,
       stopped: 0,
     });
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [canMarkForTeaching, setCanMarkForTeaching] = useState(false);
-  const [markingForTeaching, setMarkingForTeaching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,8 +220,6 @@ export default function TeacherReadingSnapshotPage() {
       setMessage("");
       setRow(null);
       setTeacherBook(null);
-      setCurrentUserId(null);
-      setCanMarkForTeaching(false);
       setSessions([]);
       setVocabCount(null);
       setCommunitySignals([]);
@@ -244,8 +239,6 @@ export default function TeacherReadingSnapshotPage() {
         setLoading(false);
         return;
       }
-
-      setCurrentUserId(user.id);
 
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
@@ -298,12 +291,6 @@ export default function TeacherReadingSnapshotPage() {
       const loadedRow = userBookData as unknown as UserBook;
       const superTeacher = isSuperTeacher(profile);
       let allowed = loadedRow.user_id === user.id || superTeacher;
-      const teacherCanUseOwnReaderBook =
-        loadedRow.user_id === user.id &&
-        (profile?.role === "teacher" ||
-          profile?.role === "super_teacher" ||
-          profile?.is_super_teacher === true ||
-          profile?.is_super_teacher === "true");
 
       if (!allowed && profile?.role === "teacher" && loadedRow.user_id) {
         const { data: teacherStudent, error: teacherStudentError } = await supabase
@@ -333,7 +320,6 @@ export default function TeacherReadingSnapshotPage() {
       setCanAccess(true);
       setAccessChecked(true);
       setRow(loadedRow);
-      setCanMarkForTeaching(teacherCanUseOwnReaderBook);
 
       const [
         teacherBookResult,
@@ -462,41 +448,6 @@ export default function TeacherReadingSnapshotPage() {
       cancelled = true;
     };
   }, [userBookId]);
-
-  async function markReaderBookForTeaching() {
-    if (!row || !currentUserId || !canMarkForTeaching) return;
-
-    setMarkingForTeaching(true);
-    setMessage("");
-
-    try {
-      const { data, error } = await supabase
-        .from("teacher_books")
-        .upsert(
-          {
-            teacher_id: currentUserId,
-            book_id: row.book_id,
-            user_book_id: row.id,
-            teacher_use_status: "want_to_test",
-          },
-          { onConflict: "teacher_id,book_id" }
-        )
-        .select("id, user_book_id, teacher_use_status, teacher_use_note")
-        .single();
-
-      if (error) throw error;
-
-      setTeacherBook((data as TeacherBook) ?? null);
-      setMessage(
-        "This reader book is now marked for teaching. Your reader history and vocabulary stayed in My Library."
-      );
-    } catch (error: any) {
-      console.error("Error marking reader book for teaching:", error);
-      setMessage(error?.message ?? "Could not mark this book for teaching.");
-    } finally {
-      setMarkingForTeaching(false);
-    }
-  }
 
   const book = row?.books ?? null;
   const realSessions = useMemo(
@@ -647,15 +598,7 @@ export default function TeacherReadingSnapshotPage() {
       label: "Open Teacher Workspace",
       href: `/teacher/library/${teacherBookId}/book-workspace`,
     }
-    : canMarkForTeaching
-      ? {
-        label: markingForTeaching ? "Marking for Teaching..." : "Use for Teaching",
-        href: "#",
-        disabled: markingForTeaching,
-        buttonTone: "primary" as const,
-        onClick: markReaderBookForTeaching,
-      }
-      : null;
+    : null;
   const teacherActions: TeacherSnapshotAction[] = teacherBookId
     ? [
       {
@@ -668,17 +611,7 @@ export default function TeacherReadingSnapshotPage() {
       },
     ]
     : [];
-  const readerActions: TeacherSnapshotAction[] = [
-    { label: "Add Word", href: `/books/${userBookId}/add-word` },
-    { label: "Book Stats", href: `/books/${userBookId}/stats` },
-    { label: "Reader Vocab", href: `/books/${userBookId}/words` },
-    { label: "Flashcards", href: `/books/${userBookId}/study` },
-    { label: "Saved Word Reading", href: `/books/${userBookId}/readalong` },
-    {
-      label: "Curiosity Reading",
-      href: `/books/${userBookId}/curiosity-reading`,
-    },
-  ];
+  const hasTeacherActions = Boolean(primaryAction) || teacherActions.length > 0;
 
   if (loading || !accessChecked) {
     return (
@@ -726,15 +659,14 @@ export default function TeacherReadingSnapshotPage() {
         </div>
       ) : null}
 
-      <TeacherSnapshotSection
-        title="Actions"
-      >
-        <TeacherSnapshotActions
-          primaryAction={primaryAction}
-          teacherActions={teacherActions}
-          readerActions={readerActions}
-        />
-      </TeacherSnapshotSection>
+      {hasTeacherActions ? (
+        <TeacherSnapshotSection title="Teaching Workflow">
+          <TeacherSnapshotActions
+            primaryAction={primaryAction}
+            teacherActions={teacherActions}
+          />
+        </TeacherSnapshotSection>
+      ) : null}
 
       <TeacherSnapshotSection
         title="Community Fit"
