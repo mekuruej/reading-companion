@@ -17,7 +17,7 @@ export default function DictionaryRelatedKanjiWordsPanel({
   groups,
 }: DictionaryRelatedKanjiWordsPanelProps) {
   return (
-    <div className="mt-4 rounded-xl border p-4">
+    <div className="rounded-xl border p-4">
       <div className="mb-2 text-sm font-semibold">
         Words Using These Kanji
       </div>

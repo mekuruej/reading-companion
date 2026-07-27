@@ -96,69 +96,73 @@ export default function DictionaryResultCard({
         isCommon={entry.isCommon}
       />
 
-      <DictionaryKanjiInfoPanel
-        isLoading={isKanjiLoading}
-        kanjiMeta={kanjiMeta}
-      />
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)] lg:items-start">
+        <div className="space-y-4">
+          <DictionaryKanjiInfoPanel
+            isLoading={isKanjiLoading}
+            kanjiMeta={kanjiMeta}
+          />
 
-      <DictionaryRelatedKanjiWordsPanel groups={kanjiGroups} />
-
-      <section className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-black text-stone-900">Saved in your books</h3>
-            <p className="mt-1 text-xs leading-5 text-stone-500">
-              This is saved vocabulary history, not a complete lookup log.
-            </p>
-            <Link
-              href="/library/vocab-list-index"
-              className="mt-2 inline-flex text-xs font-bold text-sky-700 hover:text-sky-900"
-            >
-              Open Vocabulary Lists →
-            </Link>
-          </div>
-
-          <div className="flex gap-2 text-xs font-bold text-stone-600">
-            <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1">
-              {personalHistory.length} saved
-            </span>
-            <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1">
-              {uniqueBookCount} {uniqueBookCount === 1 ? "book" : "books"}
-            </span>
-          </div>
+          <DictionaryRelatedKanjiWordsPanel groups={kanjiGroups} />
         </div>
 
-        {personalHistory.length > 0 ? (
-          <div className="mt-3 space-y-2">
-            {personalHistory.slice(0, 6).map((item) => {
-              const chapter = chapterDisplay(item.chapterNumber, item.chapterName);
-              const location = [
-                chapter || null,
-                item.pageNumber != null ? `p. ${item.pageNumber}` : null,
-              ].filter(Boolean).join(" · ");
+        <section className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-black text-stone-900">Saved in your books</h3>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                This is saved vocabulary history, not a complete lookup log.
+              </p>
+              <Link
+                href="/library/vocab-list-index"
+                className="mt-2 inline-flex text-xs font-bold text-sky-700 hover:text-sky-900"
+              >
+                Open Vocabulary Lists →
+              </Link>
+            </div>
 
-              return (
-                <div key={item.id} className="rounded-xl border border-stone-200 bg-white p-3">
-                  <div className="text-sm font-bold text-stone-900">{item.bookTitle}</div>
-                  {location ? (
-                    <div className="mt-1 text-xs font-medium text-stone-500">{location}</div>
-                  ) : null}
-                  {item.meaning ? (
-                    <div className="mt-2 text-sm leading-6 text-stone-600">
-                      {item.meaningChoiceIndex != null ? `Def ${item.meaningChoiceIndex + 1}: ` : ""}
-                      {item.meaning}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+            <div className="flex gap-2 text-xs font-bold text-stone-600">
+              <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1">
+                {personalHistory.length} saved
+              </span>
+              <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1">
+                {uniqueBookCount} {uniqueBookCount === 1 ? "book" : "books"}
+              </span>
+            </div>
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-stone-500">
-            You have not saved {entry.word || fallbackWord} in your book vocabulary yet.
-          </p>
-        )}
-      </section>
+
+          {personalHistory.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {personalHistory.slice(0, 6).map((item) => {
+                const chapter = chapterDisplay(item.chapterNumber, item.chapterName);
+                const location = [
+                  chapter || null,
+                  item.pageNumber != null ? `p. ${item.pageNumber}` : null,
+                ].filter(Boolean).join(" · ");
+
+                return (
+                  <div key={item.id} className="rounded-xl border border-stone-200 bg-white p-3">
+                    <div className="text-sm font-bold text-stone-900">{item.bookTitle}</div>
+                    {location ? (
+                      <div className="mt-1 text-xs font-medium text-stone-500">{location}</div>
+                    ) : null}
+                    {item.meaning ? (
+                      <div className="mt-2 text-sm leading-6 text-stone-600">
+                        {item.meaningChoiceIndex != null ? `Def ${item.meaningChoiceIndex + 1}: ` : ""}
+                        {item.meaning}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-stone-500">
+              You have not saved {entry.word || fallbackWord} in your book vocabulary yet.
+            </p>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

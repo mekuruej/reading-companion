@@ -14,7 +14,7 @@ export default function DictionaryKanjiInfoPanel({
   kanjiMeta,
 }: DictionaryKanjiInfoPanelProps) {
   return (
-    <div className="mt-4 rounded-xl border p-4">
+    <div className="rounded-xl border p-4">
       <div className="mb-2 text-sm font-semibold">Kanji Info</div>
 
       {isLoading ? (

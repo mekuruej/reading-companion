@@ -434,7 +434,18 @@ export default function Header() {
                         }`}
                       onClick={() => setShowDiscoveryMenu(false)}
                     >
-                      Dictionary
+                      Dictionary/Word History
+                    </Link>
+
+                    <Link
+                      href="/community/stats"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats" || pathname.startsWith("/community/stats/")
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowDiscoveryMenu(false)}
+                    >
+                      Stats
                     </Link>
 
                   </div>
