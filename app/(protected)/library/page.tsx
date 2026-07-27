@@ -1,7 +1,18 @@
 // Library Hub
 //
 
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+type TrialBannerState = {
+  daysRemaining: number | null;
+  formattedDate: string;
+} | null;
 
 const libraryCards = [
   {
@@ -34,6 +45,75 @@ const libraryCards = [
   },
 ];
 
+function formatTrialEndDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function TrialCountdownBanner() {
+  const [trialBanner, setTrialBanner] = useState<TrialBannerState>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTrialBanner() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("app_access_type, app_access_expires_at")
+        .eq("id", user.id)
+        .maybeSingle<{
+          app_access_type: string | null;
+          app_access_expires_at: string | null;
+        }>();
+
+      if (cancelled || error) return;
+
+      const accessType = data?.app_access_type?.trim().toLowerCase();
+      const expiresAt = data?.app_access_expires_at;
+      if (accessType !== "trial" || !expiresAt) return;
+
+      const expiry = new Date(expiresAt);
+      const msRemaining = expiry.getTime() - Date.now();
+      if (Number.isNaN(expiry.getTime()) || msRemaining <= 0) return;
+
+      setTrialBanner({
+        daysRemaining: msRemaining < DAY_MS ? null : Math.ceil(msRemaining / DAY_MS),
+        formattedDate: formatTrialEndDate(expiry),
+      });
+    }
+
+    void loadTrialBanner();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!trialBanner) return null;
+
+  return (
+    <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-center shadow-sm">
+      <p className="text-sm font-black text-amber-950">
+        {trialBanner.daysRemaining == null
+          ? "Trial access: less than 1 day left"
+          : `Trial access: ${trialBanner.daysRemaining} ${trialBanner.daysRemaining === 1 ? "day" : "days"} left`}
+      </p>
+      <p className="mt-1 text-xs font-semibold text-amber-800">
+        Your trial ends on {trialBanner.formattedDate}.
+      </p>
+    </section>
+  );
+}
+
 export default function LibraryHubPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -51,6 +131,8 @@ export default function LibraryHubPage() {
             Find your books, book spaces, and saved vocabulary.
           </p>
         </div>
+
+        <TrialCountdownBanner />
 
         <div className="grid gap-4 md:grid-cols-2">
           {libraryCards.map((card) => (
