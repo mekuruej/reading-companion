@@ -50,6 +50,8 @@ import {
   type AbilityCheckSummaryRow,
 } from "./abilityCheckHelpers";
 
+const DAY_MS = 1000 * 60 * 60 * 24;
+
 type Book = {
   id: string;
   title: string;
@@ -86,6 +88,11 @@ type UserBookRow = {
 };
 
 type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
+
+type TrialBannerState = {
+  daysRemaining: number | null;
+  formattedDate: string;
+} | null;
 
 type StudentOption = {
   id: string;
@@ -139,6 +146,32 @@ type LibrarySortMode =
 
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
 
+function formatTrialEndDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function getActiveTrialBannerState(
+  appAccessType: string | null | undefined,
+  appAccessExpiresAt: string | null | undefined
+): TrialBannerState {
+  if (appAccessType?.trim().toLowerCase() !== "trial" || !appAccessExpiresAt) {
+    return null;
+  }
+
+  const expiry = new Date(appAccessExpiresAt);
+  const msRemaining = expiry.getTime() - Date.now();
+  if (Number.isNaN(expiry.getTime()) || msRemaining <= 0) return null;
+
+  return {
+    daysRemaining: msRemaining < DAY_MS ? null : Math.ceil(msRemaining / DAY_MS),
+    formattedDate: formatTrialEndDate(expiry),
+  };
+}
+
 export default function BooksPage() {
   const router = useRouter();
   const params = useParams<{ username: string }>();
@@ -159,6 +192,7 @@ export default function BooksPage() {
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
+  const [trialBanner, setTrialBanner] = useState<TrialBannerState>(null);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [viewingUserId, setViewingUserId] = useState<string>("");
 
@@ -995,6 +1029,7 @@ export default function BooksPage() {
       if (userError || !user) {
         if (!cancelled) {
           setRows([]);
+          setTrialBanner(null);
         }
         return;
       }
@@ -1005,7 +1040,7 @@ export default function BooksPage() {
 
       const meProfileResult = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, username, time_zone, app_access_type, app_access_expires_at, trial_started_at")
+        .select("role, is_super_teacher, username, time_zone, app_access_type, app_access_expires_at")
         .eq("id", user.id)
         .single();
       let meProfile: any = meProfileResult.data;
@@ -1033,7 +1068,16 @@ export default function BooksPage() {
 
       setMyRole(role);
       setIsSuperTeacher(superTeacherFlag);
-      setHasFullLearningAccess(meProfile ? getAppAccessStatus(meProfile).hasFullAccess : false);
+      const appAccessStatus = meProfile
+        ? getAppAccessStatus(meProfile)
+        : { hasFullAccess: false };
+      setHasFullLearningAccess(appAccessStatus.hasFullAccess);
+      setTrialBanner(
+        getActiveTrialBannerState(
+          (meProfile as any)?.app_access_type,
+          (meProfile as any)?.app_access_expires_at
+        )
+      );
 
       if (role === "super_teacher" || superTeacherFlag) {
         await loadPendingBookRequests();
@@ -1295,6 +1339,7 @@ export default function BooksPage() {
 
   const showAbilityCheckReminder =
     viewingUserId === meId &&
+    !trialBanner &&
     abilityCheckReminderEnabled &&
     abilityCheckReminderHasUnlocked &&
     !abilityCheckReminderLoading &&
@@ -1367,6 +1412,19 @@ export default function BooksPage() {
         </LibraryHeader>
 
         <MobileVersionNotice />
+
+        {trialBanner ? (
+          <section className="mb-5 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-center shadow-sm">
+            <p className="text-sm font-black text-amber-950">
+              {trialBanner.daysRemaining == null
+                ? "Trial access: less than 1 day left"
+                : `Trial access: ${trialBanner.daysRemaining} ${trialBanner.daysRemaining === 1 ? "day" : "days"} left`}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-amber-800">
+              Your trial ends on {trialBanner.formattedDate}.
+            </p>
+          </section>
+        ) : null}
 
         {showAbilityCheckReminder && (hasFullLearningAccess || isTeacher) ? (
           <AbilityCheckReminderBanner
