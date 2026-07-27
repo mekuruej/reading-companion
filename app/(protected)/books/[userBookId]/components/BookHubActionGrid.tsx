@@ -129,7 +129,7 @@ export default function BookHubActionGrid({
     onStudyFlashcards,
     onVocabularyList,
 }: BookHubActionGridProps) {
-    if (!hasFullAccess) {
+    if (!hasFullAccess && !isTrialAccess) {
         return (
             <div className="pb-2">
                 <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
