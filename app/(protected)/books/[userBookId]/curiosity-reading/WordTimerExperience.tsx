@@ -471,7 +471,7 @@ export function CuriosityReadingExperience({
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+        .select("role, is_super_teacher, app_access_type, app_access_expires_at")
         .eq("id", user.id)
         .maybeSingle();
 
