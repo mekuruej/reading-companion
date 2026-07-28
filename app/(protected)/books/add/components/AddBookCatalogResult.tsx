@@ -7,6 +7,7 @@ type CatalogBookResult = {
   cover_url: string | null;
   book_type: string | null;
   isbn13: string | null;
+  asin: string | null;
   language_code?: string | null;
 };
 
@@ -73,6 +74,11 @@ export default function AddBookCatalogResult({
           {result.isbn13 ? (
             <span className="rounded-full border border-stone-200 bg-white px-2 py-1 text-stone-600">
               ISBN {result.isbn13}
+            </span>
+          ) : null}
+          {result.asin ? (
+            <span className="rounded-full border border-stone-200 bg-white px-2 py-1 text-stone-600">
+              ASIN {result.asin}
             </span>
           ) : null}
           {displayLanguage ? (

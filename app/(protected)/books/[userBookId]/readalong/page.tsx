@@ -8,6 +8,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import {
     canUseFullAccessFeature,
     getFullAccessRequiredCopy,
@@ -271,6 +272,12 @@ export default function ReadAlongPage() {
                 setAccessChecked(true);
                 setCanAccessBook(false);
                 setLoading(false);
+                return;
+            }
+
+            const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
+            if (trackerMode.isEnglishNativeTrackerBook) {
+                router.replace(`/books/${userBookId}`);
                 return;
             }
 

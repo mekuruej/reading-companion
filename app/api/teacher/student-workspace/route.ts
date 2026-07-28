@@ -433,6 +433,7 @@ export async function GET(request: Request) {
         title,
         author,
         isbn13,
+        asin,
         status,
         created_at,
         user_id
@@ -500,6 +501,7 @@ export async function GET(request: Request) {
         title: request.title ?? null,
         author: request.author ?? null,
         isbn13: request.isbn13 ?? null,
+        asin: request.asin ?? null,
         status: request.status ?? null,
         createdAt: request.created_at ?? null,
         userId: request.user_id ?? null,

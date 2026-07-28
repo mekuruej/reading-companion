@@ -51,6 +51,7 @@ type StudentBookRequest = {
   title: string | null;
   author: string | null;
   isbn13: string | null;
+  asin: string | null;
   status: string | null;
   createdAt: string | null;
   userId: string | null;
@@ -1027,6 +1028,7 @@ export default function StudentWorkspacePage() {
             {data.bookRequests.map((request) => {
               const displayTitle =
                 String(request.title ?? "").trim() ||
+                String(request.asin ?? "").trim() ||
                 String(request.isbn13 ?? "").trim() ||
                 "Untitled book request";
 
@@ -1043,6 +1045,7 @@ export default function StudentWorkspacePage() {
                     <p className="mt-1 text-xs text-stone-600">
                       {request.author ? `Author: ${request.author}` : "Author: —"}
                       {request.isbn13 ? ` · ISBN: ${request.isbn13}` : ""}
+                      {request.asin ? ` · ASIN: ${request.asin}` : ""}
                     </p>
                   </div>
                   <Link

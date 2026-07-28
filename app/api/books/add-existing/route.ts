@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 );
 
 const BOOK_BASE_SELECT =
-  "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count, language_code";
+  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, language_code";
 const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
 
 function isMissingColumnError(error: any) {
@@ -139,7 +139,9 @@ function missingGlobalBookFields(book: any) {
 
   const missing: string[] = [];
   if (!String(book?.title ?? "").trim()) missing.push("title");
-  if (!book?.allow_missing_isbn && !String(book?.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!book?.allow_missing_isbn && !String(book?.isbn13 ?? "").trim() && !String(book?.asin ?? "").trim()) {
+    missing.push("ISBN-13 or ASIN");
+  }
   if (!String(book?.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book?.book_type ?? "").trim()) missing.push("book type");
   if (!String(book?.author ?? "").trim()) missing.push("author");

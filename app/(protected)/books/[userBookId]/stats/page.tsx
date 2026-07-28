@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
 import BookStatsErrorState from "./components/BookStatsErrorState";
@@ -21,6 +22,7 @@ type Book = {
     title_reading: string | null;
     cover_url: string | null;
     book_type: string | null;
+    language_code: string | null;
     page_count: number | null;
 };
 
@@ -121,6 +123,7 @@ export default function BookStatsPage() {
     const [sessions, setSessions] = useState<ReadingSession[]>([]);
     const [wordCount, setWordCount] = useState<number | null>(null);
     const [canSeeVocabularyStats, setCanSeeVocabularyStats] = useState(false);
+    const [isEnglishNativeTrackerBook, setIsEnglishNativeTrackerBook] = useState(false);
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccessBook, setCanAccessBook] = useState(false);
     const [accessMessage, setAccessMessage] = useState("");
@@ -137,6 +140,7 @@ export default function BookStatsPage() {
             setCanAccessBook(false);
             setAccessMessage("");
             setCanSeeVocabularyStats(false);
+            setIsEnglishNativeTrackerBook(false);
             setWordCount(null);
 
             const {
@@ -178,6 +182,7 @@ export default function BookStatsPage() {
             title_reading,
             cover_url,
             book_type,
+            language_code,
             page_count
           )
         `)
@@ -213,17 +218,6 @@ export default function BookStatsPage() {
                 isTrialActive: appStatus.reason === "trial",
             });
 
-            if (featureAccess.isTrial) {
-                setAccessMessage("Deep Book Stats are part of paid Reading Access. During your trial, use the Book Hub to track reading, listening, saved words, and word colors.");
-                setAccessChecked(true);
-                setCanAccessBook(false);
-                setLoading(false);
-                return;
-            }
-
-            const canViewVocabularyStats = featureAccess.canUseBookStats;
-
-            setCanSeeVocabularyStats(canViewVocabularyStats);
             let canAccess =
                 ownerUserId === user.id ||
                 isSuperTeacher;
@@ -251,6 +245,33 @@ export default function BookStatsPage() {
                 return;
             }
 
+            const { data: ownerProfile, error: ownerProfileError } = await supabase
+                .from("profiles")
+                .select("native_language")
+                .eq("id", ownerUserId)
+                .maybeSingle();
+
+            if (ownerProfileError) {
+                console.error("Error loading book stats owner profile:", ownerProfileError);
+            }
+
+            const trackerBook = getIsEnglishNativeTrackerBook({
+                bookLanguageCode: loadedRow.books?.language_code ?? null,
+                ownerNativeLanguage: ownerProfile?.native_language ?? null,
+            });
+
+            if (featureAccess.isTrial && !trackerBook) {
+                setAccessMessage("Deep Book Stats are part of paid Reading Access. During your trial, use the Book Hub to track reading, listening, saved words, and word colors.");
+                setAccessChecked(true);
+                setCanAccessBook(false);
+                setLoading(false);
+                return;
+            }
+
+            const canViewVocabularyStats = featureAccess.canUseBookStats && !trackerBook;
+
+            setCanSeeVocabularyStats(canViewVocabularyStats);
+            setIsEnglishNativeTrackerBook(trackerBook);
             setCanAccessBook(true);
             setAccessChecked(true);
             setRow(loadedRow);
@@ -471,7 +492,7 @@ export default function BookStatsPage() {
 
                 {totalTrackedMinutes > 0 && (
                     <StatsSection title="Time by Mode">
-                        {curiosityMinutes > 0 && (
+                        {!isEnglishNativeTrackerBook && curiosityMinutes > 0 && (
                             <StatCard
                                 label="Curiosity Reading"
                                 value={formatMinutes(curiosityMinutes)}
@@ -481,9 +502,9 @@ export default function BookStatsPage() {
 
                         {fluidMinutes > 0 && (
                             <StatCard
-                                label="Fluid Reading"
+                                label={isEnglishNativeTrackerBook ? "Reading" : "Fluid Reading"}
                                 value={formatMinutes(fluidMinutes)}
-                                note="Saved support + just reading"
+                                note={isEnglishNativeTrackerBook ? "Timed reading sessions" : "Saved support + just reading"}
                             />
                         )}
 
@@ -491,7 +512,7 @@ export default function BookStatsPage() {
                             <StatCard
                                 label="Listening"
                                 value={formatMinutes(listeningMinutes)}
-                                note="Ear training"
+                                note={isEnglishNativeTrackerBook ? "Timed listening sessions" : "Ear training"}
                             />
                         )}
 
@@ -505,7 +526,7 @@ export default function BookStatsPage() {
 
                 {(overallMinPerPage != null ||
                     pagesPerHour != null ||
-                    curiosityPageStats != null ||
+                    (!isEnglishNativeTrackerBook && curiosityPageStats != null) ||
                     fluidPageStats != null) && (
                         <StatsSection title="Pace">
                             {overallMinPerPage != null && (
@@ -524,7 +545,7 @@ export default function BookStatsPage() {
                                 />
                             )}
 
-                            {curiosityPageStats != null && (
+                            {!isEnglishNativeTrackerBook && curiosityPageStats != null && (
                                 <StatCard
                                     label="Curiosity Min/Page"
                                     value={curiosityPageStats.toFixed(2)}

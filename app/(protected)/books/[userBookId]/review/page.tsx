@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
@@ -17,6 +18,7 @@ type BookRow = {
   title_reading: string | null;
   author: string | null;
   cover_url: string | null;
+  language_code: string | null;
 };
 
 type UserBookRow = {
@@ -26,8 +28,25 @@ type UserBookRow = {
   my_review: string | null;
   favorite_quotes: string | null;
   memorable_words: string | null;
+  rating_overall: number | null;
   books: BookRow | null;
 };
+
+function favoriteQuoteTextToInputs(value: string | null | undefined) {
+  const text = value?.trim() ?? "";
+  if (!text) return [""];
+
+  const pieces = text.includes("\n\n")
+    ? text.split(/\n{2,}/)
+    : text.split(/\n/);
+
+  const quotes = pieces.map((piece) => piece.trim()).filter(Boolean);
+  return quotes.length > 0 ? quotes : [""];
+}
+
+function favoriteQuoteInputsToText(values: string[]) {
+  return values.map((value) => value.trim()).filter(Boolean).join("\n\n");
+}
 
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
@@ -43,8 +62,10 @@ export default function ReviewNotesPage() {
   const [row, setRow] = useState<UserBookRow | null>(null);
   const [notes, setNotes] = useState("");
   const [myReview, setMyReview] = useState("");
-  const [favoriteQuotes, setFavoriteQuotes] = useState("");
+  const [favoriteQuoteInputs, setFavoriteQuoteInputs] = useState<string[]>([""]);
   const [memorableWords, setMemorableWords] = useState("");
+  const [ratingOverall, setRatingOverall] = useState("");
+  const [isEnglishNativeTrackerBook, setIsEnglishNativeTrackerBook] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
@@ -54,6 +75,7 @@ export default function ReviewNotesPage() {
       setLoading(true);
       setAccessMessage("");
       setSaveMessage("");
+      setIsEnglishNativeTrackerBook(false);
 
       const {
         data: { user },
@@ -129,11 +151,13 @@ export default function ReviewNotesPage() {
           my_review,
           favorite_quotes,
           memorable_words,
+          rating_overall,
           books (
             title,
             title_reading,
             author,
-            cover_url
+            cover_url,
+            language_code
           )
         `
         )
@@ -164,11 +188,28 @@ export default function ReviewNotesPage() {
         return;
       }
 
+      const { data: ownerProfile, error: ownerProfileError } = await supabase
+        .from("profiles")
+        .select("native_language")
+        .eq("id", loadedRow.user_id)
+        .maybeSingle();
+
+      if (ownerProfileError) {
+        console.error("Error loading Review & Notes owner profile:", ownerProfileError);
+      }
+
       setRow(loadedRow);
       setNotes(loadedRow.notes ?? "");
       setMyReview(loadedRow.my_review ?? "");
-      setFavoriteQuotes(loadedRow.favorite_quotes ?? "");
+      setFavoriteQuoteInputs(favoriteQuoteTextToInputs(loadedRow.favorite_quotes));
       setMemorableWords(loadedRow.memorable_words ?? "");
+      setRatingOverall(loadedRow.rating_overall == null ? "" : String(loadedRow.rating_overall));
+      setIsEnglishNativeTrackerBook(
+        getIsEnglishNativeTrackerBook({
+          bookLanguageCode: loadedRow.books?.language_code ?? null,
+          ownerNativeLanguage: ownerProfile?.native_language ?? null,
+        })
+      );
       setLoading(false);
     }
 
@@ -185,13 +226,16 @@ export default function ReviewNotesPage() {
     setSaving(true);
     setSaveMessage("");
 
+    const nextFavoriteQuotes = favoriteQuoteInputsToText(favoriteQuoteInputs);
+
     const { error } = await supabase
       .from("user_books")
       .update({
         notes: notes.trim() || null,
         my_review: myReview.trim() || null,
-        favorite_quotes: favoriteQuotes.trim() || null,
+        favorite_quotes: nextFavoriteQuotes || null,
         memorable_words: memorableWords.trim() || null,
+        ...(isEnglishNativeTrackerBook ? { rating_overall: ratingOverall ? Number(ratingOverall) : null } : {}),
       })
       .eq("id", row.id);
 
@@ -209,8 +253,13 @@ export default function ReviewNotesPage() {
             ...prev,
             notes: notes.trim() || null,
             my_review: myReview.trim() || null,
-            favorite_quotes: favoriteQuotes.trim() || null,
+            favorite_quotes: nextFavoriteQuotes || null,
             memorable_words: memorableWords.trim() || null,
+            rating_overall: isEnglishNativeTrackerBook
+              ? ratingOverall
+                ? Number(ratingOverall)
+                : null
+              : prev.rating_overall,
           }
         : prev
     );
@@ -238,6 +287,20 @@ export default function ReviewNotesPage() {
   }
 
   const book = row.books;
+  const updateFavoriteQuote = (index: number, value: string) => {
+    setFavoriteQuoteInputs((prev) =>
+      prev.map((quote, quoteIndex) => (quoteIndex === index ? value : quote))
+    );
+  };
+  const addFavoriteQuote = () => {
+    setFavoriteQuoteInputs((prev) => [...prev, ""]);
+  };
+  const removeFavoriteQuote = (index: number) => {
+    setFavoriteQuoteInputs((prev) => {
+      const next = prev.filter((_, quoteIndex) => quoteIndex !== index);
+      return next.length > 0 ? next : [""];
+    });
+  };
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -274,13 +337,43 @@ export default function ReviewNotesPage() {
                 <p className="mt-2 text-sm font-semibold text-stone-600">{book.author}</p>
               ) : null}
               <p className="mt-4 max-w-2xl text-sm leading-6 text-stone-600">
-                Keep a private review, favorite quotes, and the thoughts you want to remember.
+                Keep a private review, memorable quotes, and the thoughts you want to remember.
               </p>
             </div>
           </div>
         </section>
 
         <section className="space-y-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+          {isEnglishNativeTrackerBook ? (
+            <div>
+              <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRatingOverall(String(value))}
+                    className={[
+                      "rounded-full border px-4 py-2 text-sm font-black transition",
+                      ratingOverall === String(value)
+                        ? "border-amber-400 bg-amber-100 text-amber-950"
+                        : "border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100",
+                    ].join(" ")}
+                  >
+                    {value}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setRatingOverall("")}
+                  className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-500 hover:bg-stone-50"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <label className="block">
             <span className="text-sm font-semibold text-stone-900">My Review</span>
             <textarea
@@ -302,15 +395,47 @@ export default function ReviewNotesPage() {
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-sm font-semibold text-stone-900">Favorite Quotes</span>
-              <textarea
-                value={favoriteQuotes}
-                onChange={(event) => setFavoriteQuotes(event.target.value)}
-                className="mt-2 min-h-[140px] w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
-                placeholder="One quote per line works nicely."
-              />
-            </label>
+            <div className="block">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-stone-900">Memorable Quotes</span>
+                <button
+                  type="button"
+                  onClick={addFavoriteQuote}
+                  className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-800 transition hover:bg-violet-100"
+                >
+                  Add quote
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {favoriteQuoteInputs.map((quote, index) => (
+                  <div
+                    key={index}
+                    className="rounded-2xl border border-stone-200 bg-stone-50 p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
+                        Quote {index + 1}
+                      </span>
+                      {favoriteQuoteInputs.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeFavoriteQuote(index)}
+                          className="text-xs font-semibold text-stone-500 hover:text-rose-700"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    <textarea
+                      value={quote}
+                      onChange={(event) => updateFavoriteQuote(index, event.target.value)}
+                      className="min-h-[92px] w-full rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+                      placeholder="Add one quote you want to remember."
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <label className="block">
               <span className="text-sm font-semibold text-stone-900">Memorable Words</span>

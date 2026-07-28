@@ -577,6 +577,7 @@ export default function BooksPage() {
         title,
         author,
         isbn13,
+        asin,
         status,
         created_at,
         user_id,

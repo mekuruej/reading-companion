@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import {
   canUseFullAccessFeature,
   getFullAccessRequiredCopy,
@@ -645,6 +646,12 @@ export default function BookFlashcardsPage() {
           setChapterOptions([]);
           setPageOptions([]);
           setLoading(false);
+          return;
+        }
+
+        const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
+        if (trackerMode.isEnglishNativeTrackerBook) {
+          router.replace(`/books/${userBookId}`);
           return;
         }
 

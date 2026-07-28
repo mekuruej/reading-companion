@@ -19,6 +19,8 @@ import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import { BOOK_TYPE_OPTIONS, bookTypeLabel as formatBookTypeLabel } from "@/lib/books/bookTypes";
+import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
+import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
@@ -70,6 +72,7 @@ type Book = {
   series_total: number | null;
   isbn: string | null;
   isbn13: string | null;
+  asin: string | null;
   publisher: string | null;
 
   author_image_url: string | null;
@@ -502,7 +505,7 @@ function bookTypeLabel(value: string | null | undefined) {
   return formatBookTypeLabel(value);
 }
 
-function isDuplicateBookIsbnError(error: unknown) {
+function isDuplicateBookIdentifierError(error: unknown) {
   const code = (error as { code?: string } | null)?.code;
   const message = String((error as { message?: string } | null)?.message ?? "");
 
@@ -510,7 +513,9 @@ function isDuplicateBookIsbnError(error: unknown) {
     code === "23505" &&
     (message.includes("books_isbn13_unique") ||
       message.includes("books_isbn_unique") ||
-      message.toLowerCase().includes("isbn"))
+      message.includes("books_asin_unique_ci") ||
+      message.toLowerCase().includes("isbn") ||
+      message.toLowerCase().includes("asin"))
   );
 }
 
@@ -657,6 +662,7 @@ export default function BookHubPage() {
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
   const [profileLevel, setProfileLevel] = useState<string>("");
   const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
+  const [bookHubOwnerNativeLanguage, setBookHubOwnerNativeLanguage] = useState<string | null>(null);
   const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
     useState<StudentWorkspaceBackContext | null>(null);
 
@@ -721,6 +727,7 @@ export default function BookHubPage() {
   const [seriesTotal, setSeriesTotal] = useState<string>("");
   const [isbn, setIsbn] = useState<string>("");
   const [isbn13, setIsbn13] = useState<string>("");
+  const [asin, setAsin] = useState<string>("");
 
   const [authorName, setAuthorName] = useState<string>("");
   const [translatorName, setTranslatorName] = useState<string>("");
@@ -1002,12 +1009,16 @@ export default function BookHubPage() {
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
   const book = row?.books ?? null;
+  const isEnglishNativeTrackerBook = getIsEnglishNativeTrackerBook({
+    bookLanguageCode: book?.language_code ?? null,
+    ownerNativeLanguage: bookHubOwnerNativeLanguage,
+  });
   const isOwnBookHub = !!row?.user_id && !!userId && row.user_id === userId;
   const canUseMyReviewNotes =
     (isOwnBookHub && (hasFullLearningAccess || isTrialLearningAccess || isTeacherContext || isAdmin)) ||
     isSuperTeacher ||
     isAdmin;
-  const canCompleteReadingReflection = !!finishedAt && !dnfAt;
+  const canCompleteReadingReflection = !!finishedAt && !dnfAt && !isEnglishNativeTrackerBook;
 
   useEffect(() => {
     if (!canCompleteReadingReflection) {
@@ -3449,6 +3460,7 @@ export default function BookHubPage() {
     setCanSeeVocabularySummary(false);
     setHasFullLearningAccess(false);
     setStudentWorkspaceBackContext(null);
+    setBookHubOwnerNativeLanguage(null);
 
     const {
       data: { session },
@@ -3583,6 +3595,7 @@ export default function BookHubPage() {
           series_total,
           isbn,
           isbn13,
+          asin,
           publisher,
           publisher_id,
           published_date,
@@ -3661,11 +3674,12 @@ export default function BookHubPage() {
     setRow(r);
 
     setBookHubOwnerName("");
+    let loadedOwnerNativeLanguage: string | null = null;
 
-    if (r.user_id && r.user_id !== user.id) {
+    if (r.user_id) {
       const { data: ownerProfile, error: ownerProfileError } = await supabase
         .from("profiles")
-        .select("display_name, username")
+        .select("display_name, username, native_language")
         .eq("id", r.user_id)
         .maybeSingle();
 
@@ -3673,9 +3687,14 @@ export default function BookHubPage() {
         console.error("Error loading Book Hub owner profile:", ownerProfileError);
       }
 
-      setBookHubOwnerName(
-        ownerProfile?.display_name || ownerProfile?.username || "Student"
-      );
+      loadedOwnerNativeLanguage = ownerProfile?.native_language ?? null;
+      setBookHubOwnerNativeLanguage(loadedOwnerNativeLanguage);
+
+      if (r.user_id !== user.id) {
+        setBookHubOwnerName(
+          ownerProfile?.display_name || ownerProfile?.username || "Student"
+        );
+      }
     }
 
     const workspaceBackContext = await resolveStudentWorkspaceBackContext({
@@ -3747,6 +3766,7 @@ export default function BookHubPage() {
     setSeriesTotal(b?.series_total != null ? String(b.series_total) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
+    setAsin(b?.asin ?? "");
 
     setAuthorName(b?.author ?? "");
     setTranslatorName(b?.translator ?? "");
@@ -3781,7 +3801,12 @@ export default function BookHubPage() {
 
     await loadCommunityContributions(b?.id ?? "", user.id, b ?? undefined);
 
-    if (featureAccess.canSeeVocabularyColors) {
+    const loadedIsEnglishNativeTrackerBook = getIsEnglishNativeTrackerBook({
+      bookLanguageCode: b?.language_code ?? null,
+      ownerNativeLanguage: loadedOwnerNativeLanguage,
+    });
+
+    if (featureAccess.canSeeVocabularyColors && !loadedIsEnglishNativeTrackerBook) {
       await loadUniqueLookupCount(r.id);
     } else {
       setUniqueLookupCount(null);
@@ -3909,6 +3934,7 @@ export default function BookHubPage() {
     setSeriesTotal(b?.series_total != null ? String(b.series_total) : "");
     setIsbn(b?.isbn ?? "");
     setIsbn13(b?.isbn13 ?? "");
+    setAsin(b?.asin ?? "");
 
     setAuthorName(b?.author ?? "");
     setTranslatorName(b?.translator ?? "");
@@ -4295,13 +4321,10 @@ export default function BookHubPage() {
       const { error: userBookError } = await supabase
         .from("user_books")
         .update({
-          my_review: myReview.trim() || null,
           reader_advice: readerAdvice.trim().slice(0, 160) || null,
           rating_overall: ro,
           rating_difficulty: rd,
           reader_level: reflectionReaderLevel,
-          favorite_quotes: favoriteQuotes.trim() || null,
-          memorable_words: memorableWords.trim() || null,
         })
         .eq("id", row.id);
 
@@ -4485,6 +4508,14 @@ export default function BookHubPage() {
       })
       .eq("id", row.id);
 
+    const normalizedAsin = normalizeAsin(asin);
+
+    if (normalizedAsin && !isValidAsin(normalizedAsin)) {
+      setError("Amazon ASIN must be exactly 10 letters or numbers.");
+      setSaving(false);
+      return;
+    }
+
     const bookUpdatePayload = {
       title_reading: titleReading || null,
       author: authorName || null,
@@ -4504,6 +4535,7 @@ export default function BookHubPage() {
       series_total,
       isbn: isbn || null,
       isbn13: isbn13 || null,
+      asin: normalizedAsin,
       publisher_reading: publisherReading || null,
       publisher_image_url: publisherImg || null,
       related_links,
@@ -4525,8 +4557,8 @@ export default function BookHubPage() {
     let bookSaveWarning: string | null = null;
     let finalBookError = bRes.error;
 
-    if (finalBookError && isDuplicateBookIsbnError(finalBookError)) {
-      const { isbn: _isbn, isbn13: _isbn13, ...bookUpdateWithoutIsbn } = bookUpdatePayload;
+    if (finalBookError && isDuplicateBookIdentifierError(finalBookError)) {
+      const { isbn: _isbn, isbn13: _isbn13, asin: _asin, ...bookUpdateWithoutIsbn } = bookUpdatePayload;
       const retryResult = await supabase
         .from("books")
         .update(bookUpdateWithoutIsbn)
@@ -4535,7 +4567,7 @@ export default function BookHubPage() {
       finalBookError = retryResult.error;
       if (!finalBookError) {
         bookSaveWarning =
-          "Saved book details, but kept the existing ISBN because that ISBN already belongs to another book record.";
+          "Saved book details, but kept the existing ISBN/ASIN because that identifier already belongs to another book record.";
       }
     }
 
@@ -5313,6 +5345,7 @@ export default function BookHubPage() {
                 daysEngagedLabel={bookHubDaysEngagedLabel}
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
+                showVocabularyStats={!isEnglishNativeTrackerBook}
               />
 
               <BookHubActionPrompt />
@@ -5333,6 +5366,7 @@ export default function BookHubPage() {
                 canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
                 canUseStoryNotes={!isEnglishBook && canUseStoryNotes}
                 hasSavedWords={(uniqueLookupCount ?? 0) > 0}
+                isEnglishNativeTrackerBook={isEnglishNativeTrackerBook}
                 showReflectionPrompt={showBookHubReflectionPrompt}
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
@@ -5384,70 +5418,96 @@ export default function BookHubPage() {
                 } : undefined}
               />
 
-              <section
-                id="reading-reflection"
-                className={[
-                  "scroll-mt-6 overflow-hidden rounded-3xl border border-violet-300 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 p-5 shadow-sm shadow-violet-100/70 transition",
-                  highlightReadingReflection ? "animate-pulse shadow-lg shadow-violet-200" : "",
-                ].join(" ")}
-              >
-                <div className="mb-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                  <div>
-                    <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
-                      Reading Reflection
-                    </p>
-                    <h2 className="mt-3 text-3xl font-black text-stone-950 sm:text-4xl">
-                      Reading Reflection
-                    </h2>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
-                      Help other readers find their next book.
-                    </p>
+              {isEnglishNativeTrackerBook ? (
+                <section className="overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 px-5 py-4 shadow-sm shadow-violet-100/70">
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                    <div>
+                      <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
+                        Native-Language Tracker
+                      </p>
+                      <h2 className="mt-2 text-2xl font-black text-stone-950 sm:text-3xl">
+                        This book is in your native language.
+                      </h2>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
+                        MEKURU keeps this Book Hub focused on reading time, listening time, sessions,
+                        stats, and your private review. Language-learning actions are hidden here,
+                        and Reading Reflection will not appear for native-language books.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
+                      Use Review & Notes when you want to remember what you thought about the book.
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {!isEnglishNativeTrackerBook ? (
+                <section
+                  id="reading-reflection"
+                  className={[
+                    "scroll-mt-6 overflow-hidden rounded-3xl border border-violet-300 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 p-5 shadow-sm shadow-violet-100/70 transition",
+                    highlightReadingReflection ? "animate-pulse shadow-lg shadow-violet-200" : "",
+                  ].join(" ")}
+                >
+                  <div className="mb-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                    <div>
+                      <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
+                        Reading Reflection
+                      </p>
+                      <h2 className="mt-3 text-3xl font-black text-stone-950 sm:text-4xl">
+                        Reading Reflection
+                      </h2>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
+                        Help other readers find their next book.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
+                      {canCompleteReadingReflection
+                        ? "Tell future-you and future readers what this book was like."
+                        : "After the book is marked finished, the reflection will appear here."}
+                    </div>
                   </div>
 
-                  <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
-                    {canCompleteReadingReflection
-                      ? "Tell future-you and future readers what this book was like."
-                      : "After the book is marked finished, the reflection will appear here."}
-                  </div>
-                </div>
-
-                {canCompleteReadingReflection ? (
-                  <RatingTab
-                    mode="readingReflection"
-                    row={row}
-                    onSaveReflection={saveReadingReflectionFields}
-                    saving={saving}
-                    isEditingReflection={isEditingReflection}
-                    onEditReflection={() => setEditingTab("reflection")}
-                    onCancel={cancelEdits}
-                    myReview={myReview}
-                    setMyReview={setMyReview}
-                    readerAdvice={readerAdvice}
-                    setReaderAdvice={setReaderAdvice}
-                    ratingOverall={ratingOverall}
-                    setRatingOverall={setRatingOverall}
-                    profileLevel={profileLevel}
-                    isEnglishBook={isEnglishBook}
-                    bookType={book?.book_type ?? null}
-                    ratingDifficulty={ratingDifficulty}
-                    setRatingDifficulty={setRatingDifficulty}
-                    favoriteQuotes={favoriteQuotes}
-                    setFavoriteQuotes={setFavoriteQuotes}
-                    memorableWords={memorableWords}
-                    setMemorableWords={setMemorableWords}
-                    genre={genre}
-                    setGenre={setGenre}
-                    triggerWarnings={triggerWarnings}
-                    setTriggerWarnings={setTriggerWarnings}
-                    sharedGenres={sharedGenres}
-                    sharedContentNotes={sharedContentNotes}
-                    genreLabel={genreLabel}
-                    GENRE_OPTIONS={GENRE_OPTIONS}
-                    StarRatingField={StarRatingField}
-                    DifficultyField={DifficultyField}
-                  />
-                ) : null}
-              </section>
+                  {canCompleteReadingReflection ? (
+                    <RatingTab
+                      mode="readingReflection"
+                      row={row}
+                      onSaveReflection={saveReadingReflectionFields}
+                      saving={saving}
+                      isEditingReflection={isEditingReflection}
+                      onEditReflection={() => setEditingTab("reflection")}
+                      onCancel={cancelEdits}
+                      myReview={myReview}
+                      setMyReview={setMyReview}
+                      readerAdvice={readerAdvice}
+                      setReaderAdvice={setReaderAdvice}
+                      ratingOverall={ratingOverall}
+                      setRatingOverall={setRatingOverall}
+                      profileLevel={profileLevel}
+                      isEnglishBook={isEnglishBook}
+                      bookType={book?.book_type ?? null}
+                      ratingDifficulty={ratingDifficulty}
+                      setRatingDifficulty={setRatingDifficulty}
+                      favoriteQuotes={favoriteQuotes}
+                      setFavoriteQuotes={setFavoriteQuotes}
+                      memorableWords={memorableWords}
+                      setMemorableWords={setMemorableWords}
+                      genre={genre}
+                      setGenre={setGenre}
+                      triggerWarnings={triggerWarnings}
+                      setTriggerWarnings={setTriggerWarnings}
+                      sharedGenres={sharedGenres}
+                      sharedContentNotes={sharedContentNotes}
+                      genreLabel={genreLabel}
+                      GENRE_OPTIONS={GENRE_OPTIONS}
+                      StarRatingField={StarRatingField}
+                      DifficultyField={DifficultyField}
+                    />
+                  ) : null}
+                </section>
+              ) : null}
 
               <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 text-center">
                 <div className="flex flex-wrap justify-center gap-2">
@@ -5539,6 +5599,8 @@ export default function BookHubPage() {
                     setIsbn={setIsbn}
                     isbn13={isbn13}
                     setIsbn13={setIsbn13}
+                    asin={asin}
+                    setAsin={setAsin}
                     authorName={authorName}
                     authorEnglishName={authorEnglishName}
                     setAuthorEnglishName={setAuthorEnglishName}

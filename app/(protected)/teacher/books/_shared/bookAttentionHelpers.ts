@@ -4,6 +4,7 @@ export type GlobalBookRow = {
   id: string;
   title: string | null;
   isbn13: string | null;
+  asin: string | null;
   cover_url: string | null;
   book_type: string | null;
   author: string | null;
@@ -24,7 +25,9 @@ export function missingGlobalBookFields(book: GlobalBookRow) {
 
   const missing: string[] = [];
   if (!String(book.title ?? "").trim()) missing.push("title");
-  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim() && !String(book.asin ?? "").trim()) {
+    missing.push("ISBN-13 or ASIN");
+  }
   if (!String(book.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book.book_type ?? "").trim()) missing.push("book type");
   if (!String(book.author ?? "").trim()) missing.push("author");

@@ -12,6 +12,7 @@ type BookDetails = {
   series_total?: number | string | null;
   isbn?: string | null;
   isbn13?: string | null;
+  asin?: string | null;
 };
 
 type Option = {
@@ -48,6 +49,8 @@ type BookInfoDetailsSectionProps = {
   setIsbn: (value: string) => void;
   isbn13: string;
   setIsbn13: (value: string) => void;
+  asin: string;
+  setAsin: (value: string) => void;
   coverUrl: string;
   setCoverUrl: (value: string) => void;
 
@@ -92,6 +95,8 @@ export default function BookInfoDetailsSection({
   setIsbn,
   isbn13,
   setIsbn13,
+  asin,
+  setAsin,
   coverUrl,
   setCoverUrl,
   bookTypeLabel,
@@ -102,6 +107,7 @@ export default function BookInfoDetailsSection({
     { value: "paperback", label: "Paperback" },
     { value: "hardcover", label: "Hardcover" },
     { value: "ebook", label: "Ebook" },
+    { value: "audiobook", label: "Audiobook" },
     { value: "other", label: "Other" },
   ];
   const japaneseEditionFormatOptions = [
@@ -109,6 +115,7 @@ export default function BookInfoDetailsSection({
     { value: "tankobon_hardcover", label: "Tankobon (Hardcover)" },
     { value: "tankobon_softcover", label: "Tankobon (Softcover)" },
     { value: "ebook", label: "Ebook" },
+    { value: "audiobook", label: "Audiobook" },
     { value: "other", label: "Other" },
   ];
   const editionFormatOptions =
@@ -271,6 +278,15 @@ export default function BookInfoDetailsSection({
           inputValue={isbn13}
           setInputValue={setIsbn13}
           placeholder="ISBN-13"
+        />
+
+        <Detail
+          label="Amazon ASIN"
+          value={book.asin}
+          editing={isEditingBookInfo}
+          inputValue={asin}
+          setInputValue={setAsin}
+          placeholder="e.g. B0D4V5K3M8"
         />
       </div>
 

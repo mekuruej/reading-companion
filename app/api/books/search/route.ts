@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
 );
 
 const BOOK_BASE_SELECT =
-  "id, title, author, cover_url, book_type, isbn13, publisher, published_date, page_count, language_code";
+  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, language_code";
 const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
 
 function isMissingColumnError(error: any) {
@@ -59,6 +59,9 @@ async function searchBooksByTerm(term: string) {
   ]);
 
   const titleReadingResponse = await runBookSearch("title_reading", escaped);
+  const asinResponse = /^[A-Za-z0-9]{10}$/.test(term.trim())
+    ? await runBookSearch("asin", escaped.toUpperCase())
+    : { data: [], error: null };
 
   const errors = [titleResponse.error, authorResponse.error].filter(Boolean);
 
@@ -70,6 +73,7 @@ async function searchBooksByTerm(term: string) {
     ...(titleResponse.data ?? []),
     ...(authorResponse.data ?? []),
     ...(titleReadingResponse.error ? [] : titleReadingResponse.data ?? []),
+    ...(asinResponse.error ? [] : asinResponse.data ?? []),
   ];
 }
 

@@ -12,6 +12,7 @@ type BookHubProgressSummaryProps = {
   daysEngagedLabel: string;
   savedWordsPerPageLabel: string;
   averageMinutesPerPageLabel: string;
+  showVocabularyStats?: boolean;
 };
 
 export default function BookHubProgressSummary({
@@ -25,6 +26,7 @@ export default function BookHubProgressSummary({
   daysEngagedLabel,
   savedWordsPerPageLabel,
   averageMinutesPerPageLabel,
+  showVocabularyStats = true,
 }: BookHubProgressSummaryProps) {
   const showLastDetailLine = lastSavedWordLabel || lastChapterLabel || lastPageLabel;
 
@@ -83,18 +85,20 @@ export default function BookHubProgressSummary({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-3 ${showVocabularyStats ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <BookHubStatCard
           label="Days Engaged"
           value={daysEngagedLabel}
           caption="Reading or listening"
         />
 
-        <BookHubStatCard
-          label="Saved Words/Page"
-          value={savedWordsPerPageLabel}
-          caption="Saved-word load"
-        />
+        {showVocabularyStats ? (
+          <BookHubStatCard
+            label="Saved Words/Page"
+            value={savedWordsPerPageLabel}
+            caption="Saved-word load"
+          />
+        ) : null}
 
         <BookHubStatCard
           label="Avg Min/Page"

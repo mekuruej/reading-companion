@@ -21,6 +21,7 @@ import { TeacherBookFindCreatePanel } from "./components/TeacherBookFindCreatePa
 import { TeacherBookInfoSection } from "./components/TeacherBookInfoSection";
 import { TeacherBookAddPageShell } from "./components/TeacherBookAddPageShell";
 import { BOOK_TYPE_OPTIONS as SHARED_BOOK_TYPE_OPTIONS, bookTypeLabel as formatBookTypeLabel } from "@/lib/books/bookTypes";
+import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 
 const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
@@ -33,6 +34,7 @@ type BookRow = {
     title_reading: string | null;
     isbn: string | null;
     isbn13: string | null;
+    asin: string | null;
     cover_url: string | null;
     genre: string | null;
     book_type: string | null;
@@ -88,6 +90,8 @@ type BookRequestRow = {
     title: string | null;
     author: string | null;
     isbn13: string | null;
+    asin: string | null;
+    edition_format: string | null;
     status: string | null;
     created_at: string | null;
 };
@@ -207,7 +211,8 @@ function requestTitleNeedsManualResearch(request: BookRequestRow | null) {
     if (!request) return false;
     const title = (request.title ?? "").trim();
     const isbn = (request.isbn13 ?? "").trim();
-    return !title || title === `ISBN ${isbn}` || title === "Book details pending";
+    const asin = (request.asin ?? "").trim();
+    return !title || title === `ISBN ${isbn}` || title === `Amazon ASIN ${asin}` || title === "Book details pending";
 }
 
 async function rejectBookRequestWithSession(requestId: string) {
@@ -257,6 +262,7 @@ export default function TeacherAddBookPage() {
     const [titleReading, setTitleReading] = useState("");
     const [isbn, setIsbn] = useState("");
     const [isbn13, setIsbn13] = useState("");
+    const [asin, setAsin] = useState("");
     const [coverUrl, setCoverUrl] = useState("");
     const [bookType, setBookType] = useState("");
 
@@ -311,7 +317,8 @@ export default function TeacherAddBookPage() {
         if (!coverUrl.trim()) missing.push("Cover");
         if (!bookType.trim()) missing.push("Book type");
         if (!author.trim()) missing.push("Author");
-        if (!isbn13.trim() && !allowMissingIsbn) missing.push("ISBN-13");
+        const normalizedAsin = normalizeAsin(asin);
+        if (!isbn13.trim() && !normalizedAsin && !allowMissingIsbn) missing.push("ISBN-13 or ASIN");
         if (!publisher.trim() && !allowMissingPublisher) missing.push("Publisher");
         if (!publishedDate.trim()) missing.push("Published date");
         if (!pageCount.trim()) missing.push("Page count");
@@ -323,6 +330,7 @@ export default function TeacherAddBookPage() {
         coverUrl,
         bookType,
         author,
+        asin,
         isbn13,
         publisher,
         publishedDate,
@@ -384,6 +392,7 @@ export default function TeacherAddBookPage() {
         title_reading,
         isbn,
         isbn13,
+        asin,
         cover_url,
         genre,
         book_type,
@@ -431,6 +440,7 @@ export default function TeacherAddBookPage() {
         setTitleReading(data.title_reading ?? "");
         setIsbn(data.isbn ?? "");
         setIsbn13(data.isbn13 ?? "");
+        setAsin(data.asin ?? "");
         setCoverUrl(data.cover_url ?? "");
         setBookType(data.book_type ?? "");
         setEditionFormat(data.edition_format ?? "");
@@ -557,7 +567,7 @@ export default function TeacherAddBookPage() {
     async function loadBookRequest(id: string) {
         const { data, error } = await supabase
             .from("book_requests")
-            .select("id, title, author, isbn13, status, created_at")
+            .select("id, title, author, isbn13, asin, edition_format, status, created_at")
             .eq("id", id)
             .maybeSingle<BookRequestRow>();
 
@@ -575,12 +585,15 @@ export default function TeacherAddBookPage() {
 
         const requestTitle = (data.title ?? "").trim();
         const requestIsbn = (data.isbn13 ?? "").trim();
+        const requestAsin = (data.asin ?? "").trim();
 
         if (requestTitle && requestTitle !== `ISBN ${requestIsbn}`) {
             setTitle(requestTitle);
         }
 
         if (requestIsbn) setIsbn13(requestIsbn);
+        if (requestAsin) setAsin(requestAsin);
+        if (data.edition_format) setEditionFormat(data.edition_format);
         if (data.author) setAuthor(data.author);
     }
 
@@ -591,6 +604,7 @@ export default function TeacherAddBookPage() {
         setTitle("");
         setIsbn("");
         setIsbn13("");
+        setAsin("");
         setCoverUrl("");
         setBookType("");
         setEditionFormat("");
@@ -681,6 +695,7 @@ export default function TeacherAddBookPage() {
         }
 
         const cleanIsbn13 = isbn13.replace(/[^0-9Xx]/g, "");
+        const normalizedAsin = normalizeAsin(asin);
         const isManualRequest = Boolean(bookRequest);
 
         if (cleanIsbn13 && cleanIsbn13.length !== 13) {
@@ -688,20 +703,44 @@ export default function TeacherAddBookPage() {
             return;
         }
 
+        if (normalizedAsin && !isValidAsin(normalizedAsin)) {
+            setMessage("Amazon ASIN must be exactly 10 letters or numbers.");
+            return;
+        }
+
         setSaving(true);
 
         try {
-            const existingLookup = cleanIsbn13
+            const existingIsbnLookup = cleanIsbn13
                 ? await supabase
                     .from("books")
                     .select("id, title")
                     .eq("isbn13", cleanIsbn13)
                     .maybeSingle()
                 : { data: null, error: null };
-            const existingBook = existingLookup.data;
-            const existingError = existingLookup.error;
+            const existingAsinLookup = normalizedAsin
+                ? await supabase
+                    .from("books")
+                    .select("id, title")
+                    .ilike("asin", normalizedAsin)
+                    .maybeSingle()
+                : { data: null, error: null };
+            const existingBook = existingIsbnLookup.data ?? existingAsinLookup.data;
+            const existingError = existingIsbnLookup.error ?? existingAsinLookup.error;
 
             if (existingError) throw existingError;
+
+            if (
+                existingIsbnLookup.data &&
+                existingAsinLookup.data &&
+                existingIsbnLookup.data.id !== existingAsinLookup.data.id
+            ) {
+                setMessage(
+                    "ISBN-13 and ASIN match different existing book records. Please review these editions manually."
+                );
+                setSaving(false);
+                return;
+            }
 
             if (existingBook) {
                 await loadBook(existingBook.id);
@@ -718,6 +757,7 @@ export default function TeacherAddBookPage() {
                     title_reading: cleanText(titleReading),
                     author: cleanText(author),
                     isbn13: cleanIsbn13 || null,
+                    asin: normalizedAsin,
                     edition_format: cleanText(editionFormat),
                     edition_note: cleanText(editionNote),
                 })
@@ -877,9 +917,15 @@ export default function TeacherAddBookPage() {
         }
 
         const cleanIsbn13 = isbn13.replace(/[^0-9Xx]/g, "");
+        const normalizedAsin = normalizeAsin(asin);
 
         if (cleanIsbn13 && cleanIsbn13.length !== 13) {
             setMessage("Please enter a valid ISBN-13, or leave ISBN blank for a no-ISBN manual entry.");
+            return;
+        }
+
+        if (normalizedAsin && !isValidAsin(normalizedAsin)) {
+            setMessage("Amazon ASIN must be exactly 10 letters or numbers.");
             return;
         }
 
@@ -906,6 +952,7 @@ export default function TeacherAddBookPage() {
                     title_reading: cleanText(titleReading),
                     isbn: cleanText(isbn),
                     isbn13: cleanIsbn13 || null,
+                    asin: normalizedAsin,
                     cover_url: cleanText(coverUrl),
                     book_type: cleanText(bookType),
 
@@ -985,6 +1032,8 @@ export default function TeacherAddBookPage() {
                     title={bookRequest.title}
                     author={bookRequest.author}
                     isbn13={bookRequest.isbn13}
+                    asin={bookRequest.asin}
+                    editionFormat={bookRequest.edition_format}
                     status={bookRequest.status}
                     saving={saving}
                     onReject={rejectBookRequest}
@@ -999,6 +1048,7 @@ export default function TeacherAddBookPage() {
                         title={title}
                         titleReading={titleReading}
                         isbn13={isbn13}
+                        asin={asin}
                         isBookRequest={Boolean(bookRequest)}
                         titleNeedsManualResearch={requestTitleNeedsManualResearch(bookRequest)}
                         onTitleChange={setTitle}
@@ -1008,11 +1058,13 @@ export default function TeacherAddBookPage() {
                             setIsbnLookupError("");
                             setIsbnLookupPreview(null);
                         }}
+                        onAsinChange={setAsin}
                     />
 
                     <TeacherBookFindCreateActions
                         isbnLookupLoading={isbnLookupLoading}
                         hasIsbnValue={Boolean(isbn13.trim())}
+                        hasAsinValue={Boolean(asin.trim())}
                         saving={saving}
                         isBookRequest={Boolean(bookRequest)}
                         isbnLookupError={isbnLookupError}
@@ -1071,6 +1123,8 @@ export default function TeacherAddBookPage() {
                         setIsbn={setIsbn}
                         isbn13={isbn13}
                         setIsbn13={setIsbn13}
+                        asin={asin}
+                        setAsin={setAsin}
                         authorName={author}
                         authorEnglishName={authorEnglishName}
                         setAuthorEnglishName={setAuthorEnglishName}

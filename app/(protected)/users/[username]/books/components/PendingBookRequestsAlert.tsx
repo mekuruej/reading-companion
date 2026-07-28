@@ -3,6 +3,7 @@ type PendingBookRequest = {
   title: string | null;
   author: string | null;
   isbn13: string | null;
+  asin: string | null;
   created_at: string | null;
   profiles: {
     display_name: string | null;
@@ -61,6 +62,10 @@ export default function PendingBookRequestsAlert({
 
             <div className="mt-1 text-xs text-stone-600">
               {request.isbn13 ? `ISBN: ${request.isbn13}` : "ISBN: —"}
+            </div>
+
+            <div className="mt-1 text-xs text-stone-600">
+              {request.asin ? `ASIN: ${request.asin}` : "ASIN: —"}
             </div>
 
             <div className="mt-3 flex gap-2">

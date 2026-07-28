@@ -33,6 +33,7 @@ type Book = {
   series_total?: number | null;
   isbn: string | null;
   isbn13: string | null;
+  asin: string | null;
   publisher: string | null;
   publisher_id?: string | null;
   published_date: string | null;
@@ -253,7 +254,7 @@ function FormatHighlightCard({
 }: {
   label: string;
   value: string | number | null | undefined;
-  tone?: "amber" | "rose" | "sky" | "stone";
+  tone?: "amber" | "rose" | "sky" | "violet" | "stone";
 }) {
   if (value == null || String(value).trim().length === 0) return null;
 
@@ -264,6 +265,8 @@ function FormatHighlightCard({
         ? "border-rose-200 bg-rose-50 text-rose-950"
         : tone === "sky"
           ? "border-sky-200 bg-sky-50 text-sky-950"
+          : tone === "violet"
+            ? "border-violet-200 bg-violet-50 text-violet-950"
           : "border-stone-200 bg-white text-stone-950";
 
   return (
@@ -459,6 +462,7 @@ export default function AboutBookPage() {
             series_total,
             isbn,
             isbn13,
+            asin,
             publisher,
             publisher_id,
             published_date,
@@ -734,6 +738,11 @@ export default function AboutBookPage() {
             label="ISBN"
             value={isbn}
             tone="stone"
+          />
+          <FormatHighlightCard
+            label="Amazon ASIN"
+            value={book.asin}
+            tone="violet"
           />
         </section>
 

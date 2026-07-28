@@ -1,6 +1,7 @@
 type TeacherBookFindCreateActionsProps = {
     isbnLookupLoading: boolean;
     hasIsbnValue: boolean;
+    hasAsinValue: boolean;
     saving: boolean;
     isBookRequest: boolean;
     isbnLookupError: string;
@@ -12,6 +13,7 @@ type TeacherBookFindCreateActionsProps = {
 export function TeacherBookFindCreateActions({
     isbnLookupLoading,
     hasIsbnValue,
+    hasAsinValue,
     saving,
     isBookRequest,
     isbnLookupError,
@@ -42,6 +44,8 @@ export function TeacherBookFindCreateActions({
                             ? "Create Manual Book Entry"
                             : hasIsbnValue
                                 ? "Create / Load by ISBN"
+                                : hasAsinValue
+                                  ? "Create / Load by ASIN"
                                 : "Create Manual Book Entry"}
                 </button>
 

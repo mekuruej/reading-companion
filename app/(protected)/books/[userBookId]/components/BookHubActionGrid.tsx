@@ -13,6 +13,7 @@ type BookHubActionGridProps = {
     canUseBulkAdd?: boolean;
     canUseStoryNotes?: boolean;
     hasSavedWords: boolean;
+    isEnglishNativeTrackerBook?: boolean;
     showReflectionPrompt?: boolean;
 
     onCuriosityReading: () => void;
@@ -131,6 +132,7 @@ export default function BookHubActionGrid({
     canUseBulkAdd = false,
     canUseStoryNotes = false,
     hasSavedWords,
+    isEnglishNativeTrackerBook = false,
     showReflectionPrompt = false,
     onCuriosityReading,
     onFluidReadingExtensive,
@@ -145,6 +147,69 @@ export default function BookHubActionGrid({
     onBookStats,
     onReadingReflection,
 }: BookHubActionGridProps) {
+    if (isEnglishNativeTrackerBook) {
+        return (
+            <div className="pb-2">
+                <div className="mt-6 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(25%-0.375rem)]">
+                    <ActionButton
+                        title="Just Reading"
+                        subtitle="Reading Timer"
+                        description={["Fluid Reading: read without support", "or lookups, and log your time."]}
+                        className="bg-emerald-50 hover:bg-emerald-100"
+                        onClick={onFluidReadingJustReading}
+                        size="secondary"
+                    />
+
+                    <ActionButton
+                        title="Listening"
+                        description={["Listen to this book", "and log listening time."]}
+                        className="bg-sky-50 hover:bg-sky-100"
+                        onClick={onListening}
+                        size="secondary"
+                    />
+
+                    {onReadingSessions ? (
+                        <ActionButton
+                            title="Reading Sessions"
+                            description="Edit session records, dates, and reading history for this book."
+                            className="bg-emerald-50 hover:bg-emerald-100"
+                            onClick={onReadingSessions}
+                            size="secondary"
+                        />
+                    ) : null}
+
+                    <ActionButton
+                        title="About This Book"
+                        description="See the author, publisher, format, level, and book details."
+                        className="bg-sky-50 hover:bg-sky-100"
+                        onClick={onAboutBook}
+                        size="secondary"
+                    />
+                </div>
+
+                <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(33.333%-0.375rem)]">
+                    {onBookStats ? (
+                        <ActionButton
+                            title="Book Stats"
+                            description="Open time, pages, sessions, and progress for this book."
+                            className="bg-yellow-50 hover:bg-yellow-100"
+                            onClick={onBookStats}
+                        />
+                    ) : null}
+
+                    {onReadingReflection ? (
+                        <ActionButton
+                            title="Review & Notes"
+                            description="Keep a private review, memorable quotes, and thoughts you want to remember."
+                            className="bg-orange-50 hover:bg-orange-100"
+                            onClick={onReadingReflection}
+                        />
+                    ) : null}
+                </div>
+            </div>
+        );
+    }
+
     if (!hasFullAccess && !isTrialAccess) {
         return (
             <div className="pb-2">
@@ -261,7 +326,7 @@ export default function BookHubActionGrid({
                     {onReadingReflection ? (
                         <ActionButton
                             title="Review & Notes"
-                            description="Keep a private review, favorite quotes, and thoughts you want to remember."
+                            description="Keep a private review, memorable quotes, and thoughts you want to remember."
                             className="bg-emerald-50 hover:bg-emerald-100"
                             onClick={onReadingReflection}
                             size="secondary"
@@ -376,7 +441,7 @@ export default function BookHubActionGrid({
                 {onReadingReflection ? (
                     <ActionButton
                         title="Review & Notes"
-                        description="Keep a private review, favorite quotes, and thoughts you want to remember."
+                        description="Keep a private review, memorable quotes, and thoughts you want to remember."
                         className="bg-orange-50 hover:bg-orange-100"
                         onClick={onReadingReflection}
                     />

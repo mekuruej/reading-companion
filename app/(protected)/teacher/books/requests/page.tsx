@@ -14,6 +14,8 @@ type PendingBookRequest = {
   title: string | null;
   author: string | null;
   isbn13: string | null;
+  asin: string | null;
+  edition_format: string | null;
   status: string | null;
   created_at: string | null;
   requestedBy: string;
@@ -50,6 +52,8 @@ export default function TeacherBookRequestsPage() {
           title,
           author,
           isbn13,
+          asin,
+          edition_format,
           status,
           created_at,
           profiles:user_id (
@@ -73,6 +77,8 @@ export default function TeacherBookRequestsPage() {
             title: request.title ?? null,
             author: request.author ?? null,
             isbn13: request.isbn13 ?? null,
+            asin: request.asin ?? null,
+            edition_format: request.edition_format ?? null,
             status: request.status ?? null,
             created_at: request.created_at ?? null,
             requestedBy: profile?.display_name || profile?.username || "Unknown reader",
@@ -134,6 +140,7 @@ export default function TeacherBookRequestsPage() {
         {requests.map((request) => {
           const displayTitle =
             String(request.title ?? "").trim() ||
+            String(request.asin ?? "").trim() ||
             String(request.isbn13 ?? "").trim() ||
             "Untitled book request";
 
@@ -145,6 +152,8 @@ export default function TeacherBookRequestsPage() {
                   <div className="mt-2 grid gap-1 text-sm text-stone-600 sm:grid-cols-2">
                     <p><span className="font-semibold text-stone-800">Author:</span> {request.author || "—"}</p>
                     <p><span className="font-semibold text-stone-800">ISBN:</span> {request.isbn13 || "—"}</p>
+                    <p><span className="font-semibold text-stone-800">ASIN:</span> {request.asin || "—"}</p>
+                    <p><span className="font-semibold text-stone-800">Format:</span> {request.edition_format || "—"}</p>
                     <p><span className="font-semibold text-stone-800">Requested by:</span> {request.requestedBy}</p>
                     <p><span className="font-semibold text-stone-800">Status:</span> {request.status || "pending"}</p>
                   </div>

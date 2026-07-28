@@ -2,6 +2,8 @@ type TeacherBookRequestPanelProps = {
     title: string | null;
     author: string | null;
     isbn13: string | null;
+    asin: string | null;
+    editionFormat: string | null;
     status: string | null;
     saving: boolean;
     onReject: () => void;
@@ -11,6 +13,8 @@ export function TeacherBookRequestPanel({
     title,
     author,
     isbn13,
+    asin,
+    editionFormat,
     status,
     saving,
     onReject,
@@ -41,6 +45,14 @@ export function TeacherBookRequestPanel({
                 <div>
                     <dt className="font-semibold text-stone-600">ISBN</dt>
                     <dd className="text-stone-900">{isbn13 || "—"}</dd>
+                </div>
+                <div>
+                    <dt className="font-semibold text-stone-600">Amazon ASIN</dt>
+                    <dd className="text-stone-900">{asin || "—"}</dd>
+                </div>
+                <div>
+                    <dt className="font-semibold text-stone-600">Requested format</dt>
+                    <dd className="text-stone-900">{editionFormat || "—"}</dd>
                 </div>
                 <div>
                     <dt className="font-semibold text-stone-600">Status</dt>

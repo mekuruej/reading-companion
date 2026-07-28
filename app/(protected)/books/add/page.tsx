@@ -12,6 +12,7 @@ import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
 import AddBookActionRow from "./components/AddBookActionRow";
 import AddBookDestinationSummary from "./components/AddBookDestinationSummary";
 import AddBookCatalogResult from "./components/AddBookCatalogResult";
+import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 
 type LookupBook = {
     isbn13: string;
@@ -50,6 +51,7 @@ type BookSearchResult = {
     cover_url: string | null;
     book_type: string | null;
     isbn13: string | null;
+    asin: string | null;
     publisher: string | null;
     published_date: string | null;
     page_count: number | null;
@@ -105,7 +107,9 @@ function missingGlobalBookFields(book: BookSearchResult) {
 
     const missing: string[] = [];
     if (!String(book.title ?? "").trim()) missing.push("title");
-    if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
+    if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim() && !String(book.asin ?? "").trim()) {
+        missing.push("ISBN-13 or ASIN");
+    }
     if (!String(book.cover_url ?? "").trim()) missing.push("cover");
     if (!String(book.book_type ?? "").trim()) missing.push("book type");
     if (!String(book.author ?? "").trim()) missing.push("author");
@@ -127,6 +131,8 @@ export default function AddBookPage() {
     const targetUserIdParam = searchParams.get("targetUserId")?.trim() ?? "";
 
     const [isbn, setIsbn] = useState("");
+    const [asin, setAsin] = useState("");
+    const [asinEditionFormat, setAsinEditionFormat] = useState("");
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
@@ -136,6 +142,7 @@ export default function AddBookPage() {
     const [targetUsername, setTargetUsername] = useState<string | null>(null);
     const [targetDisplayName, setTargetDisplayName] = useState<string | null>(null);
     const [lookupLoading, setLookupLoading] = useState(false);
+    const [asinLookupLoading, setAsinLookupLoading] = useState(false);
     const [addLoading, setAddLoading] = useState(false);
     const [requestLoading, setRequestLoading] = useState(false);
     const [requestingBookId, setRequestingBookId] = useState<string | null>(null);
@@ -377,6 +384,52 @@ export default function AddBookPage() {
         }
     }
 
+    async function handleAsinLookup() {
+        const normalizedAsin = normalizeAsin(asin);
+        setError("");
+        setBookSearchError("");
+        setBook(null);
+        setBookSearchResults([]);
+        setCanRequestBook(false);
+        setLibraryNotice(null);
+
+        if (!normalizedAsin || !isValidAsin(normalizedAsin)) {
+            setError("Amazon ASIN must be exactly 10 letters or numbers.");
+            return;
+        }
+
+        setAsin(normalizedAsin);
+        setAsinLookupLoading(true);
+
+        try {
+            const { data, error: asinSearchError } = await supabase
+                .from("books")
+                .select(
+                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code"
+                )
+                .ilike("asin", normalizedAsin)
+                .limit(1)
+                .maybeSingle();
+
+            if (asinSearchError) throw asinSearchError;
+
+            if (data) {
+                setBookSearchResults([data as BookSearchResult]);
+                return;
+            }
+
+            setCanRequestBook(true);
+            setError(
+                "MEKURU does not have that Amazon ASIN yet. Add the title below if you know it, then request this Amazon edition for review."
+            );
+        } catch (lookupError) {
+            console.error("ASIN lookup failed:", lookupError);
+            setError("Something went wrong while checking that ASIN.");
+        } finally {
+            setAsinLookupLoading(false);
+        }
+    }
+
     async function handleBookSearch() {
         const query = bookSearch.trim();
         setLibraryNotice(null);
@@ -544,13 +597,20 @@ export default function AddBookPage() {
 
     async function handleRequestBook(bookToRequest?: BookSearchResult) {
         const cleanIsbn = (bookToRequest?.isbn13 ?? isbn).replace(/[\s-]/g, "").trim();
+        const requestAsin = normalizeAsin(bookToRequest ? bookToRequest.asin : asin);
+        const requestEditionFormat = requestAsin ? asinEditionFormat.trim() : "";
         const requestTitle = (bookToRequest?.title ?? bookSearch).trim();
         const requestAuthor = (bookToRequest?.author ?? "").trim();
-        const isFallbackRequest = !!bookToRequest || (!!bookSearch.trim() && !cleanIsbn);
+        const isFallbackRequest = !!bookToRequest || (!!bookSearch.trim() && !cleanIsbn) || !!requestAsin;
         const setRequestMessage = isFallbackRequest ? setBookSearchError : setError;
 
-        if (!cleanIsbn && !requestTitle) {
-            setRequestMessage("Search for a title or enter an ISBN before requesting review.");
+        if (requestAsin && !isValidAsin(requestAsin)) {
+            setRequestMessage("Amazon ASIN must be exactly 10 letters or numbers.");
+            return;
+        }
+
+        if (!cleanIsbn && !requestAsin && !requestTitle) {
+            setRequestMessage("Search for a title, enter an ISBN, or enter an Amazon ASIN before requesting review.");
             return;
         }
 
@@ -576,13 +636,16 @@ export default function AddBookPage() {
 
             let existingPendingRequest: { id: string } | null = null;
 
-            if (cleanIsbn) {
+            if (cleanIsbn || requestAsin) {
                 const { data, error: existingPendingRequestError } = await supabase
                     .from("book_requests")
                     .select("id")
                     .eq("user_id", user.id)
                     .or("status.eq.pending,status.is.null")
-                    .eq("isbn13", cleanIsbn)
+                    .or([
+                        cleanIsbn ? `isbn13.eq.${cleanIsbn}` : "",
+                        requestAsin ? `asin.eq.${requestAsin}` : "",
+                    ].filter(Boolean).join(","))
                     .limit(1)
                     .maybeSingle();
 
@@ -598,9 +661,11 @@ export default function AddBookPage() {
 
             const { error: requestError } = await supabase.from("book_requests").insert({
                 user_id: user.id,
-                title: requestTitle || (cleanIsbn ? "Book details pending" : null),
+                title: requestTitle || (requestAsin ? `Amazon ASIN ${requestAsin}` : cleanIsbn ? "Book details pending" : null),
                 author: requestAuthor || null,
                 isbn13: cleanIsbn || null,
+                asin: requestAsin,
+                edition_format: requestEditionFormat || null,
                 status: "pending",
             });
 
@@ -723,15 +788,25 @@ export default function AddBookPage() {
 
             <AddBookLookupCard
                 isbn={isbn}
+                asin={asin}
+                asinEditionFormat={asinEditionFormat}
                 lookupLoading={lookupLoading}
+                asinLookupLoading={asinLookupLoading}
                 lookupDisabled={!isbn.trim() || learnerLanguageMissing}
+                asinLookupDisabled={!asin.trim() || learnerLanguageMissing}
                 libraryLabel={targetLibraryLabel}
                 languageLabel={isTeacherFacingUser ? undefined : learnerTargetLanguageLabel}
                 onIsbnChange={(value) => {
                     setIsbn(value);
                     setLibraryNotice(null);
                 }}
+                onAsinChange={(value) => {
+                    setAsin(value);
+                    setLibraryNotice(null);
+                }}
+                onAsinEditionFormatChange={setAsinEditionFormat}
                 onLookup={handleLookup}
+                onAsinLookup={handleAsinLookup}
             >
                 <AddBookMessagePanel
                     message={error}
@@ -799,7 +874,7 @@ export default function AddBookPage() {
                     <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                         <p>{bookSearchError}</p>
 
-                        {canRequestBook && bookSearch.trim() ? (
+                        {canRequestBook && (bookSearch.trim() || normalizeAsin(asin)) ? (
                             <button
                                 type="button"
                                 onClick={() => void handleRequestBook()}

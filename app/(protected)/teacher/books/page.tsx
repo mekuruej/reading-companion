@@ -26,6 +26,7 @@ type GlobalBookRow = {
   id: string;
   title: string | null;
   isbn13: string | null;
+  asin: string | null;
   cover_url: string | null;
   book_type: string | null;
   author: string | null;
@@ -42,6 +43,8 @@ type PendingBookRequest = {
   title: string | null;
   author: string | null;
   isbn13: string | null;
+  asin: string | null;
+  edition_format: string | null;
   status: string | null;
   created_at: string | null;
   requestedBy: string;
@@ -52,7 +55,9 @@ function missingGlobalBookFields(book: GlobalBookRow) {
 
   const missing: string[] = [];
   if (!String(book.title ?? "").trim()) missing.push("title");
-  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim()) missing.push("ISBN-13");
+  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim() && !String(book.asin ?? "").trim()) {
+    missing.push("ISBN-13 or ASIN");
+  }
   if (!String(book.cover_url ?? "").trim()) missing.push("cover");
   if (!String(book.book_type ?? "").trim()) missing.push("book type");
   if (!String(book.author ?? "").trim()) missing.push("author");
@@ -197,7 +202,7 @@ export default function TeacherBooksQueuePage() {
       const { data: globalBooks, error: globalBooksError } = await supabase
         .from("books")
         .select(
-          "id, title, isbn13, cover_url, book_type, author, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+          "id, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
         )
         .order("title", { ascending: true });
 
@@ -228,6 +233,8 @@ export default function TeacherBooksQueuePage() {
           title,
           author,
           isbn13,
+          asin,
+          edition_format,
           status,
           created_at,
           profiles:user_id (
@@ -254,6 +261,8 @@ export default function TeacherBooksQueuePage() {
           title: request.title ?? null,
           author: request.author ?? null,
           isbn13: request.isbn13 ?? null,
+          asin: request.asin ?? null,
+          edition_format: request.edition_format ?? null,
           status: request.status ?? null,
           created_at: request.created_at ?? null,
           requestedBy,
@@ -376,6 +385,7 @@ export default function TeacherBooksQueuePage() {
         {pendingRequests.map((request) => {
           const displayTitle =
             String(request.title ?? "").trim() ||
+            String(request.asin ?? "").trim() ||
             String(request.isbn13 ?? "").trim() ||
             "Untitled book request";
 
@@ -392,6 +402,14 @@ export default function TeacherBooksQueuePage() {
                     <p>
                       <span className="font-semibold text-stone-800">ISBN:</span>{" "}
                       {request.isbn13 || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-stone-800">ASIN:</span>{" "}
+                      {request.asin || "—"}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-stone-800">Format:</span>{" "}
+                      {request.edition_format || "—"}
                     </p>
                     <p>
                       <span className="font-semibold text-stone-800">Requested by:</span>{" "}

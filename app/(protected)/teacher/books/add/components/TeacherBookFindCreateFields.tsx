@@ -2,22 +2,26 @@ type TeacherBookFindCreateFieldsProps = {
     title: string;
     titleReading: string;
     isbn13: string;
+    asin: string;
     isBookRequest: boolean;
     titleNeedsManualResearch: boolean;
     onTitleChange: (value: string) => void;
     onTitleReadingChange: (value: string) => void;
     onIsbn13Change: (value: string) => void;
+    onAsinChange: (value: string) => void;
 };
 
 export function TeacherBookFindCreateFields({
     title,
     titleReading,
     isbn13,
+    asin,
     isBookRequest,
     titleNeedsManualResearch,
     onTitleChange,
     onTitleReadingChange,
     onIsbn13Change,
+    onAsinChange,
 }: TeacherBookFindCreateFieldsProps) {
     return (
         <div className="mt-5 grid gap-5 md:grid-cols-3">
@@ -63,6 +67,21 @@ export function TeacherBookFindCreateFields({
                 <input
                     value={isbn13}
                     onChange={(event) => onIsbn13Change(event.target.value)}
+                    className="w-full rounded-xl border border-slate-500 px-4 py-3"
+                />
+            </div>
+
+            <div>
+                <label className="mb-1 block text-sm font-semibold">
+                    Amazon ASIN{" "}
+                    <span className="font-normal text-stone-500">
+                        (optional; 10 letters/numbers)
+                    </span>
+                </label>
+                <input
+                    value={asin}
+                    onChange={(event) => onAsinChange(event.target.value)}
+                    placeholder="B0D4V5K3M8"
                     className="w-full rounded-xl border border-slate-500 px-4 py-3"
                 />
             </div>

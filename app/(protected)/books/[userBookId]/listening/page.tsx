@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
@@ -29,6 +30,16 @@ export default function ListeningPage() {
       if (cancelled) return;
 
       if (userError || !user || !userBookId) {
+        setCheckingAccess(false);
+        return;
+      }
+
+      const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
+
+      if (cancelled) return;
+
+      if (trackerMode.isEnglishNativeTrackerBook) {
+        setCanSaveWordsWhileListening(false);
         setCheckingAccess(false);
         return;
       }

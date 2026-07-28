@@ -48,6 +48,7 @@ type BookRow = {
   page_count: number | null;
   book_type: string | null;
   isbn13: string | null;
+  asin: string | null;
   publisher: string | null;
   allow_missing_isbn?: boolean | null;
   allow_missing_publisher?: boolean | null;
@@ -97,13 +98,13 @@ function missingBookInfo(book: BookRow | undefined) {
   if (!book.cover_url) missing.push("cover");
   if (!book.page_count) missing.push("page count");
   if (!book.book_type) missing.push("book type");
-  if (!book.allow_missing_isbn && !book.isbn13) missing.push("ISBN");
+  if (!book.allow_missing_isbn && !book.isbn13 && !book.asin) missing.push("ISBN or ASIN");
   if (!book.allow_missing_publisher && !book.publisher) missing.push("publisher");
   return missing;
 }
 
 function bookSearchText(book: BookRow) {
-  return [book.title, book.author, book.isbn13, book.publisher, book.book_type]
+  return [book.title, book.author, book.isbn13, book.asin, book.publisher, book.book_type]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -261,7 +262,7 @@ export default function AssignBookPage() {
         // Load books
         const { data: bookRows, error: bErr } = await supabase
           .from("books")
-          .select("id, title, author, cover_url, page_count, book_type, isbn13, publisher, allow_missing_isbn, allow_missing_publisher")
+          .select("id, title, author, cover_url, page_count, book_type, isbn13, asin, publisher, allow_missing_isbn, allow_missing_publisher")
           .order("title", { ascending: true });
 
         if (bErr) throw bErr;
@@ -292,6 +293,7 @@ export default function AssignBookPage() {
               page_count,
               book_type,
               isbn13,
+              asin,
               publisher,
               allow_missing_isbn,
               allow_missing_publisher
@@ -365,6 +367,7 @@ export default function AssignBookPage() {
               page_count,
               book_type,
               isbn13,
+              asin,
               publisher,
               allow_missing_isbn,
               allow_missing_publisher

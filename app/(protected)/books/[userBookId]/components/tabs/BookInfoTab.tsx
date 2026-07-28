@@ -32,6 +32,7 @@ type Book = {
   series_total?: number | null;
   isbn: string | null;
   isbn13: string | null;
+  asin: string | null;
   publisher: string | null;
   published_date: string | null;
   author_image_url: string | null;
@@ -127,6 +128,8 @@ type BookInfoTabProps = {
   setIsbn: (value: string) => void;
   isbn13: string;
   setIsbn13: (value: string) => void;
+  asin: string;
+  setAsin: (value: string) => void;
 
   authorName: string;
   authorEnglishName: string;
@@ -261,6 +264,8 @@ export default function BookInfoTab({
   setIsbn,
   isbn13,
   setIsbn13,
+  asin,
+  setAsin,
 
   authorName,
   authorEnglishName,
@@ -1004,6 +1009,8 @@ export default function BookInfoTab({
         setIsbn={setIsbn}
         isbn13={isbn13}
         setIsbn13={setIsbn13}
+        asin={asin}
+        setAsin={setAsin}
         coverUrl={coverUrl}
         setCoverUrl={setCoverUrl}
         bookTypeLabel={bookTypeLabel}

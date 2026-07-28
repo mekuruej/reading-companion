@@ -77,19 +77,6 @@ type RatingTabProps = {
   }>;
 };
 
-const READER_LEVEL_OPTIONS = [
-  { value: "Level 1", label: "Absolute Beginner", cefr: "Pre-A1", jlpt: "Before N5" },
-  { value: "Level 2", label: "Beginner 1", cefr: "A1", jlpt: "Early N5" },
-  { value: "Level 3", label: "Beginner 2", cefr: "A1+", jlpt: "Solid N5" },
-  { value: "Level 4", label: "Upper Beginner", cefr: "A2", jlpt: "N4 entry" },
-  { value: "Level 5", label: "Pre-Intermediate", cefr: "A2+", jlpt: "Solid N4" },
-  { value: "Level 6", label: "Intermediate 1", cefr: "B1", jlpt: "N3 entry" },
-  { value: "Level 7", label: "Intermediate 2", cefr: "B1+", jlpt: "Solid N3" },
-  { value: "Level 8", label: "Upper Intermediate", cefr: "B2-ish", jlpt: "N2 entry" },
-  { value: "Level 9", label: "Advanced", cefr: "B2+", jlpt: "Solid N2 / N1 entry" },
-  { value: "Level 10", label: "Upper Advanced", cefr: "C1-ish", jlpt: "Solid N1+" },
-] as const;
-
 const READER_ADVICE_MAX_LENGTH = 120;
 
 function ReflectionUseNote({
@@ -169,8 +156,6 @@ export default function RatingTab({
   setReaderAdvice,
   ratingOverall,
   setRatingOverall,
-  profileLevel,
-  isEnglishBook = false,
   bookType,
   ratingDifficulty,
   setRatingDifficulty,
@@ -189,8 +174,6 @@ export default function RatingTab({
   StarRatingField,
   DifficultyField,
 }: RatingTabProps) {
-  const currentLevelInfo =
-    READER_LEVEL_OPTIONS.find((option) => option.value === profileLevel) ?? null;
   const showReadingReflection = mode === "readingReflection";
   const showMyReview = mode === "myReview";
 
@@ -218,38 +201,13 @@ export default function RatingTab({
               Reader Difficulty
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="rounded border bg-white p-3 text-sm">
-                <div className="text-stone-600">Reader level from profile</div>
-                {currentLevelInfo ? (
-                  <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
-                    <div className="font-medium text-stone-900">
-                      {currentLevelInfo.value} · {currentLevelInfo.label}
-                    </div>
-                    <div className="mt-1 text-xs text-stone-500">
-                      {isEnglishBook
-                        ? currentLevelInfo.cefr
-                        : `${currentLevelInfo.cefr} · ${currentLevelInfo.jlpt}`}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 font-medium text-stone-900">
-                    {profileLevel ? profileLevel.replace(/_/g, " ") : "—"}
-                  </div>
-                )}
-                <div className="mt-3 text-xs leading-5 text-stone-500">
-                  Reader level comes from your profile. Change it in Profile Settings if needed.
-                </div>
-              </div>
-
-              <DifficultyField
-                value={row.rating_difficulty}
-                editing={isEditingReflection}
-                bookType={bookType}
-                inputValue={ratingDifficulty}
-                setInputValue={setRatingDifficulty}
-              />
-            </div>
+            <DifficultyField
+              value={row.rating_difficulty}
+              editing={isEditingReflection}
+              bookType={bookType}
+              inputValue={ratingDifficulty}
+              setInputValue={setRatingDifficulty}
+            />
           </div>
 
           <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -358,7 +316,7 @@ export default function RatingTab({
             {!isEditingReflection ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded border bg-white p-3 text-sm">
-                  <div className="text-stone-600">Favorite Quotes</div>
+                  <div className="text-stone-600">Memorable Quotes</div>
                   <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
                     {favoriteQuotes.trim() ? favoriteQuotes : "—"}
                   </div>
@@ -374,11 +332,11 @@ export default function RatingTab({
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded border bg-white p-3 text-sm">
-                  <div className="mb-2 text-stone-600">Favorite Quotes</div>
+                  <div className="mb-2 text-stone-600">Memorable Quotes</div>
                   <textarea
                     value={favoriteQuotes}
                     onChange={(e) => setFavoriteQuotes(e.target.value)}
-                    placeholder="Add favorite quotes here…"
+                    placeholder="Add memorable quotes here..."
                     className="min-h-[140px] w-full rounded border p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
                   />
                   <div className="mt-2 text-xs text-stone-500">
