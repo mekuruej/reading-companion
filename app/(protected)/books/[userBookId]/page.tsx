@@ -669,6 +669,7 @@ export default function BookHubPage() {
   const [canSeeVocabularySummary, setCanSeeVocabularySummary] = useState(false);
   const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
   const [isTrialLearningAccess, setIsTrialLearningAccess] = useState(false);
+  const [highlightReadingReflection, setHighlightReadingReflection] = useState(false);
 
   const isTeacher = myRole === "teacher";
   const isAdmin = myRole === "admin";
@@ -679,7 +680,7 @@ export default function BookHubPage() {
   const [editingTab, setEditingTab] = useState<EditingPanel | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<HubTab>("reflection");
+  const [activeTab, setActiveTab] = useState<HubTab>("bookInfo");
   const isEnglishBook = row?.books?.language_code === "en";
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
@@ -1001,6 +1002,26 @@ export default function BookHubPage() {
   const started = useMemo(() => safeDate(row?.started_at ?? null), [row?.started_at]);
   const finished = useMemo(() => safeDate(row?.finished_at ?? null), [row?.finished_at]);
   const book = row?.books ?? null;
+  const isOwnBookHub = !!row?.user_id && !!userId && row.user_id === userId;
+  const canUseMyReviewNotes =
+    (isOwnBookHub && (hasFullLearningAccess || isTrialLearningAccess || isTeacherContext || isAdmin)) ||
+    isSuperTeacher ||
+    isAdmin;
+  const canCompleteReadingReflection = !!finishedAt && !dnfAt;
+
+  useEffect(() => {
+    if (!canCompleteReadingReflection) {
+      setHighlightReadingReflection(false);
+      return;
+    }
+
+    setHighlightReadingReflection(true);
+    const timeout = window.setTimeout(() => {
+      setHighlightReadingReflection(false);
+    }, 10000);
+
+    return () => window.clearTimeout(timeout);
+  }, [canCompleteReadingReflection]);
 
   const visualReadingSessions = useMemo(() => {
     return realReadingSessions.filter(
@@ -1654,47 +1675,24 @@ export default function BookHubPage() {
   async function saveCommunityContributions(bookId: string, currentUserId: string | null) {
     if (!bookId || !currentUserId) return;
 
-    const nextGenres = dedupeCommunityTags(parseCommunityTags(genre));
     const nextNotes = dedupeCommunityTags(parseCommunityTags(triggerWarnings));
 
-    const [currentGenreRows, currentNoteRows] = await Promise.all([
-      supabase
-        .from("book_genres")
-        .select("genre")
-        .eq("book_id", bookId)
-        .eq("user_id", currentUserId),
-      supabase
-        .from("book_content_notes")
-        .select("content_note")
-        .eq("book_id", bookId)
-        .eq("user_id", currentUserId),
-    ]);
+    const currentNoteRows = await supabase
+      .from("book_content_notes")
+      .select("content_note")
+      .eq("book_id", bookId)
+      .eq("user_id", currentUserId);
 
-    if (currentGenreRows.error) throw currentGenreRows.error;
     if (currentNoteRows.error) throw currentNoteRows.error;
 
-    const existingGenres = new Set((currentGenreRows.data ?? []).map((row: any) => row.genre));
     const existingNotes = new Set(
       (currentNoteRows.data ?? []).map((row: any) => row.content_note)
     );
 
-    const nextGenreSet = new Set(nextGenres);
     const nextNoteSet = new Set(nextNotes);
 
-    const genresToDelete = Array.from(existingGenres).filter((value) => !nextGenreSet.has(value));
     const notesToDelete = Array.from(existingNotes).filter((value) => !nextNoteSet.has(value));
-    const genresToInsert = nextGenres.filter((value) => !existingGenres.has(value));
     const notesToInsert = nextNotes.filter((value) => !existingNotes.has(value));
-
-    if (genresToDelete.length > 0) {
-      const { error } = await supabase
-        .from("book_genres")
-        .delete()
-        .eq("book_id", bookId)
-        .eq("user_id", currentUserId)
-        .in("genre", genresToDelete);
-      if (error) throw error;
-    }
 
     if (notesToDelete.length > 0) {
       const { error } = await supabase
@@ -1703,17 +1701,6 @@ export default function BookHubPage() {
         .eq("book_id", bookId)
         .eq("user_id", currentUserId)
         .in("content_note", notesToDelete);
-      if (error) throw error;
-    }
-
-    if (genresToInsert.length > 0) {
-      const { error } = await supabase.from("book_genres").insert(
-        genresToInsert.map((value) => ({
-          book_id: bookId,
-          user_id: currentUserId,
-          genre: value,
-        }))
-      );
       if (error) throw error;
     }
 
@@ -1726,9 +1713,62 @@ export default function BookHubPage() {
         }))
       );
       if (error) throw error;
+
+      const otherSuggestions = notesToInsert.filter((value) =>
+        value.toLowerCase().startsWith("other:")
+      );
+
+      if (otherSuggestions.length > 0) {
+        await notifyOtherContentNoteSuggestions(otherSuggestions);
+      }
     }
 
     await loadCommunityContributions(bookId, currentUserId, row?.books ?? undefined);
+  }
+
+  async function notifyOtherContentNoteSuggestions(suggestions: string[]) {
+    if (!row?.id || suggestions.length === 0) return;
+
+    const { data: superTeachers, error: superTeacherError } = await supabase
+      .from("profiles")
+      .select("id, role, is_super_teacher")
+      .or("role.eq.super_teacher,is_super_teacher.eq.true");
+
+    if (superTeacherError) {
+      console.error("Error finding super teachers for content note suggestion:", superTeacherError);
+      return;
+    }
+
+    const recipientIds = Array.from(
+      new Set(
+        ((superTeachers ?? []) as any[])
+          .map((profile) => profile.id)
+          .filter(Boolean)
+      )
+    );
+
+    if (recipientIds.length === 0) return;
+
+    const title = row.books?.title ?? "this book";
+    const suggestionText = suggestions
+      .map((value) => value.replace(/^other:\s*/i, "").trim())
+      .filter(Boolean)
+      .join(", ");
+
+    const message = `Other content note suggested for ${title}\n\nSuggestion: ${suggestionText}`;
+
+    const { error: alertError } = await supabase.from("user_alerts").insert(
+      recipientIds.map((recipientId) => ({
+        user_id: recipientId,
+        user_book_id: row.id,
+        type: "book_flag",
+        message,
+      }))
+    );
+
+    if (alertError) {
+      console.error("Error creating content note suggestion alert:", alertError);
+    }
   }
 
   async function saveKanjiWord(vocabId: number) {
@@ -3138,10 +3178,9 @@ export default function BookHubPage() {
   }
 
   function openReadingReflection() {
-    setActiveTab("reflection");
     window.requestAnimationFrame(() => {
       document
-        .getElementById("reader-difficulty-section")
+        .getElementById("reading-reflection")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
@@ -3777,22 +3816,20 @@ export default function BookHubPage() {
     } else if (normalizedTab === "reading") {
       router.replace(`/books/${userBookId}/sessions`);
     } else if (normalizedTab === "bookInfo") {
-      setActiveTab(canViewBookInfoTab ? "bookInfo" : "reflection");
+      setActiveTab("bookInfo");
     } else if (
       normalizedTab === "reflection"
     ) {
-      setActiveTab(normalizedTab);
+      if (canUseMyReviewNotes) router.replace(`/books/${userBookId}/review`);
     }
 
     if (params.get("sessionMode") === "listening") {
       setSessionMode("listening");
     }
-  }, [canViewBookInfoTab, router, userBookId]);
+  }, [canUseMyReviewNotes, router, userBookId]);
 
   useEffect(() => {
-    if (!canViewBookInfoTab && activeTab === "bookInfo") {
-      setActiveTab("reflection");
-    }
+    if (!canViewBookInfoTab && activeTab === "bookInfo") return;
   }, [activeTab, canViewBookInfoTab]);
 
   useEffect(() => {
@@ -5144,11 +5181,9 @@ export default function BookHubPage() {
   const relatedLinksArr = Array.isArray(book.related_links) ? book.related_links : [];
   const bookHubTabs = isEnglishBook
     ? [
-      { id: "reflection" as const, label: "Reading Reflection" },
       ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info\nEditing" }] : []),
     ]
     : [
-      { id: "reflection" as const, label: "Reading Reflection" },
       ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info\nEditing" }] : []),
     ];
   const isViewingStudentBookHub =
@@ -5177,7 +5212,7 @@ export default function BookHubPage() {
     !!ratingDifficulty.trim() ||
     !!favoriteQuotes.trim() ||
     !!memorableWords.trim();
-  const showBookHubReflectionPrompt = !!finishedAt && !hasReadingReflection;
+  const showBookHubReflectionPrompt = canCompleteReadingReflection && !hasReadingReflection;
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -5243,7 +5278,7 @@ export default function BookHubPage() {
                 wouldRetry={wouldRetry}
                 showStartButton={showBookHubStartButton}
                 showFinishDnfButtons={showBookHubFinishDnfButtons}
-                showReflectionPrompt={showBookHubReflectionPrompt}
+                showReflectionLink={canCompleteReadingReflection}
                 shouldNudgeStartBook={shouldNudgeStartBook}
                 shouldNudgeFinishBook={shouldNudgeFinishBook}
                 canFillBeginningPages={canFillBeginningPages}
@@ -5343,11 +5378,76 @@ export default function BookHubPage() {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/stats`);
                 }}
-                onReadingReflection={() => {
+                onReadingReflection={canUseMyReviewNotes ? () => {
                   if (!confirmLeaveIfTimerActive()) return;
-                  openReadingReflection();
-                }}
+                  router.push(`/books/${row.id}/review`);
+                } : undefined}
               />
+
+              <section
+                id="reading-reflection"
+                className={[
+                  "scroll-mt-6 overflow-hidden rounded-3xl border border-violet-300 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 p-5 shadow-sm shadow-violet-100/70 transition",
+                  highlightReadingReflection ? "animate-pulse shadow-lg shadow-violet-200" : "",
+                ].join(" ")}
+              >
+                <div className="mb-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div>
+                    <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
+                      Reading Reflection
+                    </p>
+                    <h2 className="mt-3 text-3xl font-black text-stone-950 sm:text-4xl">
+                      Reading Reflection
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
+                      Help other readers find their next book.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
+                    {canCompleteReadingReflection
+                      ? "Tell future-you and future readers what this book was like."
+                      : "After the book is marked finished, the reflection will appear here."}
+                  </div>
+                </div>
+
+                {canCompleteReadingReflection ? (
+                  <RatingTab
+                    mode="readingReflection"
+                    row={row}
+                    onSaveReflection={saveReadingReflectionFields}
+                    saving={saving}
+                    isEditingReflection={isEditingReflection}
+                    onEditReflection={() => setEditingTab("reflection")}
+                    onCancel={cancelEdits}
+                    myReview={myReview}
+                    setMyReview={setMyReview}
+                    readerAdvice={readerAdvice}
+                    setReaderAdvice={setReaderAdvice}
+                    ratingOverall={ratingOverall}
+                    setRatingOverall={setRatingOverall}
+                    profileLevel={profileLevel}
+                    isEnglishBook={isEnglishBook}
+                    bookType={book?.book_type ?? null}
+                    ratingDifficulty={ratingDifficulty}
+                    setRatingDifficulty={setRatingDifficulty}
+                    favoriteQuotes={favoriteQuotes}
+                    setFavoriteQuotes={setFavoriteQuotes}
+                    memorableWords={memorableWords}
+                    setMemorableWords={setMemorableWords}
+                    genre={genre}
+                    setGenre={setGenre}
+                    triggerWarnings={triggerWarnings}
+                    setTriggerWarnings={setTriggerWarnings}
+                    sharedGenres={sharedGenres}
+                    sharedContentNotes={sharedContentNotes}
+                    genreLabel={genreLabel}
+                    GENRE_OPTIONS={GENRE_OPTIONS}
+                    StarRatingField={StarRatingField}
+                    DifficultyField={DifficultyField}
+                  />
+                ) : null}
+              </section>
 
               <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 text-center">
                 <div className="flex flex-wrap justify-center gap-2">
@@ -5378,11 +5478,13 @@ export default function BookHubPage() {
                 </div>
               </div>
 
-              <BookHubTabBar
-                activeTab={activeTab}
-                tabs={bookHubTabs}
-                onTabChange={setActiveTab}
-              />
+              {bookHubTabs.length > 0 ? (
+                <BookHubTabBar
+                  activeTab={activeTab}
+                  tabs={bookHubTabs}
+                  onTabChange={setActiveTab}
+                />
+              ) : null}
 
               {canViewBookInfoTab && activeTab === "bookInfo" && (
                 <div className="space-y-4">
@@ -5500,43 +5602,6 @@ export default function BookHubPage() {
                 </div>
               )}
 
-              {activeTab === "reflection" && (
-                <div id="reading-reflection-panel" className="space-y-4 scroll-mt-6">
-                  <RatingTab
-                    row={row}
-                    onSaveReflection={saveReadingReflectionFields}
-                    saving={saving}
-                    isEditingReflection={isEditingReflection}
-                    onEditReflection={() => setEditingTab("reflection")}
-                    onCancel={cancelEdits}
-                    myReview={myReview}
-                    setMyReview={setMyReview}
-                    readerAdvice={readerAdvice}
-                    setReaderAdvice={setReaderAdvice}
-                    ratingOverall={ratingOverall}
-                    setRatingOverall={setRatingOverall}
-                    profileLevel={profileLevel}
-                    isEnglishBook={isEnglishBook}
-                    bookType={book?.book_type ?? null}
-                    ratingDifficulty={ratingDifficulty}
-                    setRatingDifficulty={setRatingDifficulty}
-                    favoriteQuotes={favoriteQuotes}
-                    setFavoriteQuotes={setFavoriteQuotes}
-                    memorableWords={memorableWords}
-                    setMemorableWords={setMemorableWords}
-                    genre={genre}
-                    setGenre={setGenre}
-                    triggerWarnings={triggerWarnings}
-                    setTriggerWarnings={setTriggerWarnings}
-                    sharedGenres={sharedGenres}
-                    sharedContentNotes={sharedContentNotes}
-                    genreLabel={genreLabel}
-                    GENRE_OPTIONS={GENRE_OPTIONS}
-                    StarRatingField={StarRatingField}
-                    DifficultyField={DifficultyField}
-                  />
-                </div>
-              )}
             </div>
 
             {showWordExplorer ? (

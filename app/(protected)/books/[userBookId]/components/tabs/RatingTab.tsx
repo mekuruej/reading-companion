@@ -22,6 +22,7 @@ type UserBook = {
 
 type RatingTabProps = {
   row: UserBook;
+  mode?: "readingReflection" | "myReview";
 
   onSaveReflection: () => void | Promise<void>;
   saving?: boolean;
@@ -156,6 +157,7 @@ function ReflectionControls({
 
 export default function RatingTab({
   row,
+  mode = "readingReflection",
   onSaveReflection,
   saving = false,
   isEditingReflection,
@@ -189,9 +191,12 @@ export default function RatingTab({
 }: RatingTabProps) {
   const currentLevelInfo =
     READER_LEVEL_OPTIONS.find((option) => option.value === profileLevel) ?? null;
+  const showReadingReflection = mode === "readingReflection";
+  const showMyReview = mode === "myReview";
 
   return (
     <div className="space-y-6">
+      {showReadingReflection ? (
       <section id="reader-difficulty-section" className="space-y-3 scroll-mt-6">
         <ReflectionUseNote label="Public contribution">
           Your answers help other readers discover books in Find Your Next Book. Your responses may contribute to public book information, but they are not publicly connected to you as a person.
@@ -309,7 +314,9 @@ export default function RatingTab({
           </div>
         </div>
       </section>
+      ) : null}
 
+      {showMyReview ? (
       <section className="space-y-3">
         <ReflectionUseNote label="Private">
           This information is just for your own reading history. In the future, Mekuru may offer an optional way to share reviews, but your review is private unless you explicitly choose otherwise.
@@ -396,10 +403,12 @@ export default function RatingTab({
           </div>
         </div>
       </section>
+      ) : null}
 
+      {showReadingReflection ? (
       <section className="space-y-3">
         <ReflectionUseNote label="Helps Mekuru">
-          These answers help Mekuru improve book information and reading data. They may appear as shared book tags, but they are not shown as your personal review or publicly attached to you.
+          These notes help future readers know what to expect before starting this book.
         </ReflectionUseNote>
 
         <div className="space-y-3 rounded-3xl border border-stone-300 bg-white p-4 shadow-sm">
@@ -420,6 +429,8 @@ export default function RatingTab({
 
             <CommunityTab
               singleEditMode
+              showIntro={false}
+              showGenres={false}
               editing={isEditingReflection}
               isEditingGenres={false}
               isEditingContentNotes={false}
@@ -440,6 +451,7 @@ export default function RatingTab({
           </div>
         </div>
       </section>
+      ) : null}
     </div>
   );
 }

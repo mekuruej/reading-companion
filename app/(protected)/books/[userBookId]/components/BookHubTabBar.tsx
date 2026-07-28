@@ -14,7 +14,6 @@ type BookHubTabBarProps = {
 };
 
 const DEFAULT_BOOK_HUB_TABS: BookHubTabItem[] = [
-  { id: "reflection", label: "Reading Reflection" },
   { id: "bookInfo", label: "Book Info\nEditing" },
 ];
 

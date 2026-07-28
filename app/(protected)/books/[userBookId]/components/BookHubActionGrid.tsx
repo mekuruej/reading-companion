@@ -152,7 +152,7 @@ export default function BookHubActionGrid({
                     <ActionButton
                         title="Reading Timer"
                         subtitle="Just Reading"
-                        description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
+                        description={["Fluid Reading: read without support", "or lookups, and log your time."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         onClick={onFluidReadingJustReading}
                     />
@@ -193,7 +193,7 @@ export default function BookHubActionGrid({
                     <ActionButton
                         title="Follow-Along"
                         subtitle="Supported Reading"
-                        description={["Reread with saved-word support", "and log your reading time."]}
+                        description={["Fluid Reading: reread with", "saved-word support and log your time."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         locked={!canUseSavedWordReading}
                         onClick={onFluidReadingExtensive}
@@ -212,8 +212,8 @@ export default function BookHubActionGrid({
 
                     <ActionButton
                         title="Save Words"
-                        subtitle="Curiosity Reading"
-                        description={["Read while saving vocab", "and log a slower, mindful session."]}
+                        subtitle="Look up Words and Read"
+                        description={["Curiosity Reading: save vocab", "while logging a slower session."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         locked={!canUseCuriosityReading}
                         onClick={onCuriosityReading}
@@ -234,7 +234,7 @@ export default function BookHubActionGrid({
                     <ActionButton
                         title="Reading Timer"
                         subtitle="Just Reading"
-                        description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
+                        description={["Fluid Reading: read without support", "or lookups, and log your time."]}
                         className="bg-sky-50 hover:bg-sky-100"
                         onClick={onFluidReadingJustReading}
                         size="secondary"
@@ -257,6 +257,16 @@ export default function BookHubActionGrid({
                         onClick={onAboutBook}
                         size="secondary"
                     />
+
+                    {onReadingReflection ? (
+                        <ActionButton
+                            title="Review & Notes"
+                            description="Keep a private review, favorite quotes, and thoughts you want to remember."
+                            className="bg-emerald-50 hover:bg-emerald-100"
+                            onClick={onReadingReflection}
+                            size="secondary"
+                        />
+                    ) : null}
                 </div>
             </div>
         );
@@ -268,7 +278,7 @@ export default function BookHubActionGrid({
                 <ActionButton
                     title="Follow-Along"
                     subtitle="Supported Reading"
-                    description={["Review reading with light support", "from words you already saved."]}
+                    description={["Fluid Reading: review with light support", "from words you already saved."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     locked={!canUseSavedWordReading}
                     onClick={onFluidReadingExtensive}
@@ -287,8 +297,8 @@ export default function BookHubActionGrid({
 
                 <ActionButton
                     title="Save Words"
-                    subtitle="Curiosity Reading"
-                    description={["Read while saving vocab", "and log a slower, mindful session."]}
+                    subtitle="Look up Words and Read"
+                    description={["Curiosity Reading: save vocab", "while logging a slower session."]}
                     className="bg-violet-50 hover:bg-violet-100"
                     locked={!canUseCuriosityReading}
                     onClick={onCuriosityReading}
@@ -296,7 +306,7 @@ export default function BookHubActionGrid({
                 />
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(25%-0.375rem)]">
                 {hasSavedWords ? (
                     <ActionButton
                         title="Vocabulary List"
@@ -321,7 +331,7 @@ export default function BookHubActionGrid({
                 <ActionButton
                     title="Just Reading"
                     subtitle="Reading Timer"
-                    description={["Read without support or lookups.", "Just enjoy the book and log your time."]}
+                    description={["Fluid Reading: read without support", "or lookups, and log your time."]}
                     className="bg-emerald-50 hover:bg-emerald-100"
                     onClick={onFluidReadingJustReading}
                     size="secondary"
@@ -337,7 +347,7 @@ export default function BookHubActionGrid({
                 />
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(25%-0.375rem)] xl:[&>button]:w-[calc(20%-0.4rem)]">
                 <ActionButton
                     title="About This Book"
                     description="See the author, publisher, format, level, and book details."
@@ -365,13 +375,9 @@ export default function BookHubActionGrid({
 
                 {onReadingReflection ? (
                     <ActionButton
-                        title={showReflectionPrompt ? "Write your Reading Reflection" : "Reading Reflection"}
-                        description={
-                            showReflectionPrompt
-                                ? "Finished this book? Add your reflection while it is fresh."
-                                : "Open your private reading reflection and review."
-                        }
-                        className={showReflectionPrompt ? "bg-orange-100 hover:bg-orange-200" : "bg-orange-50 hover:bg-orange-100"}
+                        title="Review & Notes"
+                        description="Keep a private review, favorite quotes, and thoughts you want to remember."
+                        className="bg-orange-50 hover:bg-orange-100"
                         onClick={onReadingReflection}
                     />
                 ) : null}

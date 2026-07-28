@@ -13,6 +13,8 @@ type CommunityTabProps = {
   isEditingContentNotes: boolean;
   singleEditMode?: boolean;
   editing?: boolean;
+  showIntro?: boolean;
+  showGenres?: boolean;
   saving: boolean;
   onEditGenres: () => void;
   onEditContentNotes: () => void;
@@ -27,6 +29,20 @@ type CommunityTabProps = {
   genreLabel: (value: string | null | undefined) => string;
   GENRE_OPTIONS: readonly Option[];
 };
+
+const CONTENT_NOTE_OPTIONS = [
+  "grief",
+  "bullying",
+  "violence",
+  "illness",
+  "death",
+  "family conflict",
+  "romance",
+  "scary scenes",
+  "war",
+  "discrimination",
+  "Other",
+] as const;
 
 function parseTagList(value: string) {
   return value
@@ -93,6 +109,8 @@ export default function CommunityTab({
   isEditingContentNotes,
   singleEditMode = false,
   editing,
+  showIntro = true,
+  showGenres = true,
   saving,
   onEditGenres,
   onEditContentNotes,
@@ -115,6 +133,17 @@ export default function CommunityTab({
     (value) => !isKnownGenre(value, GENRE_OPTIONS)
   );
   const isOtherSelected = selectedGenres.includes("other") || customGenres.length > 0;
+  const contentNoteOptions = dedupeTags([
+    ...CONTENT_NOTE_OPTIONS,
+    ...contentNotes,
+    ...sharedContentNotes.map((note) => note.value),
+  ]);
+  const otherContentNote = contentNotes.find((note) =>
+    note.toLowerCase().startsWith("other:")
+  );
+  const isOtherContentNoteSelected =
+    contentNotes.includes("Other") || !!otherContentNote;
+  const otherContentNoteText = otherContentNote?.replace(/^other:\s*/i, "") ?? "";
 
   const toggleGenre = (value: string) => {
     if (value === "other") {
@@ -144,17 +173,51 @@ export default function CommunityTab({
     setGenre(joinTags([...standardGenres, ...(customValues.length ? customValues : ["other"])]));
   };
 
+  const toggleContentNote = (value: string) => {
+    if (value === "Other") {
+      const next = isOtherContentNoteSelected
+        ? contentNotes.filter(
+            (item) => item !== "Other" && !item.toLowerCase().startsWith("other:")
+          )
+        : [...contentNotes, "Other"];
+
+      setTriggerWarnings(joinTags(next));
+      return;
+    }
+
+    const next = contentNotes.includes(value)
+      ? contentNotes.filter((item) => item !== value)
+      : [...contentNotes, value];
+
+    setTriggerWarnings(joinTags(next));
+  };
+
+  const setOtherContentNoteText = (value: string) => {
+    const otherValue = value.trim() ? `Other: ${value.trim()}` : "Other";
+    const next = [
+      ...contentNotes.filter(
+        (item) => item !== "Other" && !item.toLowerCase().startsWith("other:")
+      ),
+      otherValue,
+    ];
+
+    setTriggerWarnings(joinTags(next));
+  };
+
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      {showIntro ? (
+        <div className="rounded-2xl border border-stone-200 bg-white p-4">
         <div className="text-sm font-semibold text-stone-900">Shared with other readers</div>
         <p className="mt-1 text-sm leading-6 text-stone-600">
           Genres and content notes are community tags. What you add here will show up for
           everyone reading this book.
         </p>
-      </div>
+        </div>
+      ) : null}
 
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+      {showGenres ? (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-stone-900">Genres</div>
           {!singleEditMode ? (
@@ -238,7 +301,8 @@ export default function CommunityTab({
             ) : null}
           </div>
         )}
-      </div>
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -290,16 +354,40 @@ export default function CommunityTab({
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-stone-600">
-              Add your own short reader-facing notes. They will appear as shared tags for everyone.
+              Select anything a future reader may want to know before starting this book.
             </p>
-            <textarea
-              value={triggerWarnings}
-              onChange={(e) => setTriggerWarnings(e.target.value)}
-              placeholder="Examples: grief, bullying, violence"
-              className="min-h-[96px] w-full rounded-xl border border-stone-300 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-            />
+            <div className="flex flex-wrap gap-2">
+              {contentNoteOptions.map((option) => (
+                <TagChip
+                  key={option}
+                  label={option}
+                  selected={
+                    option === "Other"
+                      ? isOtherContentNoteSelected
+                      : contentNotes.includes(option)
+                  }
+                  onClick={() => toggleContentNote(option)}
+                />
+              ))}
+            </div>
+            {isOtherContentNoteSelected ? (
+              <div className="rounded-xl border border-amber-200 bg-white p-3">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Other content note suggestion
+                </label>
+                <input
+                  value={otherContentNoteText}
+                  onChange={(event) => setOtherContentNoteText(event.target.value)}
+                  placeholder="What should be added to the list?"
+                  className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                />
+                <div className="mt-2 text-xs text-stone-500">
+                  This lets Mekuru know a new content-note option may be useful.
+                </div>
+              </div>
+            ) : null}
             <div className="text-xs text-stone-500">
-              Separate notes with commas or new lines.
+              Select multiple notes if needed. Tap a selected note again to remove it.
             </div>
           </div>
         )}

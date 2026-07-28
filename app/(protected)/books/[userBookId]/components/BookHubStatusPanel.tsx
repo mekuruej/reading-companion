@@ -9,7 +9,7 @@ type BookHubStatusPanelProps = {
 
   showStartButton: boolean;
   showFinishDnfButtons: boolean;
-  showReflectionPrompt: boolean;
+  showReflectionLink: boolean;
 
   shouldNudgeStartBook: boolean;
   shouldNudgeFinishBook: boolean;
@@ -73,7 +73,7 @@ export default function BookHubStatusPanel({
   wouldRetry,
   showStartButton,
   showFinishDnfButtons,
-  showReflectionPrompt,
+  showReflectionLink,
   shouldNudgeStartBook,
   shouldNudgeFinishBook,
   canFillBeginningPages,
@@ -174,17 +174,17 @@ export default function BookHubStatusPanel({
         </p>
       </div>
 
-      {showReflectionPrompt ? (
+      {showReflectionLink ? (
         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
           <div className="text-sm font-semibold text-amber-950">
-            Finished! Add a reflection while the book is fresh.
+            Finished! Your Reading Reflection is ready.
           </div>
           <button
             type="button"
             onClick={onOpenReflection}
             className="mt-3 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600"
           >
-            Go to Reading Reflection
+            Go to Reading Reflection ↓
           </button>
         </div>
       ) : null}
