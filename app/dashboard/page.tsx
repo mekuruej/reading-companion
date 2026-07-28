@@ -231,7 +231,7 @@ export default function DashboardPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!alive) return;
 
       const params = new URLSearchParams(window.location.search);
@@ -239,7 +239,11 @@ export default function DashboardPage() {
 
       if (event === "SIGNED_IN" && session?.user) {
         setUserId(session.user.id);
-        void routeSignedInUser(session.user.id, shouldOpenLibraryAfterLogin);
+        const routed = await routeSignedInUser(session.user.id, shouldOpenLibraryAfterLogin);
+        if (!alive || routed) return;
+
+        setIsLoggedIn(true);
+        setCheckingSession(false);
         return;
       }
 
