@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type BookHubTab = "bookInfo" | "reading" | "story" | "reflection";
+type BookHubTab = "bookInfo" | "reflection";
 
 type BookHubTabItem = {
   id: BookHubTab;
@@ -15,9 +15,7 @@ type BookHubTabBarProps = {
 
 const DEFAULT_BOOK_HUB_TABS: BookHubTabItem[] = [
   { id: "reflection", label: "Reading Reflection" },
-  { id: "reading", label: "Reading Sessions" },
-  { id: "story", label: "Story Notes" },
-  { id: "bookInfo", label: "Book Info" },
+  { id: "bookInfo", label: "Book Info\nEditing" },
 ];
 
 function FilingTab({
@@ -35,6 +33,7 @@ function FilingTab({
       onClick={onClick}
       className={[
         "relative -mb-px rounded-t-2xl border px-5 py-3 text-base font-semibold transition-all",
+        "whitespace-pre-line leading-tight",
         active
           ? "z-10 border-stone-600 border-b-white bg-stone-700 text-white shadow-sm"
           : "border-stone-300 bg-stone-200 text-stone-700 hover:bg-stone-300",

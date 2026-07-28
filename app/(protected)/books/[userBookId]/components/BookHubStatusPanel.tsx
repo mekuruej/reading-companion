@@ -170,7 +170,7 @@ export default function BookHubStatusPanel({
         ) : null}
 
         <p className="mt-2 text-xs text-stone-500">
-          You can edit these in the Reading Tab.
+          You can edit these in the Reading Sessions card.
         </p>
       </div>
 

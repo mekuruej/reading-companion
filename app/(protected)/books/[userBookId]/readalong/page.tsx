@@ -771,7 +771,7 @@ export default function ReadAlongPage() {
         setIsPaused(false);
         setSessionMinutesRead("");
         clearPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
-        setTimerSaveMessage("Your fluid reading session has been saved in the Reading Tab.");
+        setTimerSaveMessage("Your fluid reading session has been saved in Reading Sessions.");
 
         setTimeout(() => {
             setTimerSaveMessage("");

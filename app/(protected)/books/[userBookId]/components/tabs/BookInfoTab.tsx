@@ -976,33 +976,6 @@ export default function BookInfoTab({
 
   return (
     <div className="space-y-6">
-      {userBookId ? (
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          <div className="mb-3 text-sm font-semibold text-stone-900">History & Stats</div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <a
-              href={`/vocab/explore?userBookId=${encodeURIComponent(userBookId)}`}
-              className="block rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-            >
-              My Word History in This Book
-              <p className="mt-1 text-sm text-stone-500">
-                See where you met words in this book and how you saved them.
-              </p>
-            </a>
-
-            <a
-              href={`/books/${encodeURIComponent(userBookId)}/stats`}
-              className="block rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-            >
-              Book Stats
-              <p className="mt-1 text-sm text-stone-500">
-                See progress, pace, time, and reading patterns.
-              </p>
-            </a>
-          </div>
-        </div>
-      ) : null}
-
       <BookInfoDetailsSection
         book={book}
         canEditBookInfo={canEditBookInfo}

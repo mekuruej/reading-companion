@@ -14,7 +14,6 @@ import BookStatsErrorState from "./components/BookStatsErrorState";
 import StatCard from "./components/StatCard";
 import StatsSection from "./components/StatsSection";
 import BookStatsHeader from "./components/BookStatsHeader";
-import DifficultyNeighborhoodPanel from "./components/DifficultyNeighborhoodPanel";
 
 type Book = {
     id: string;
@@ -47,14 +46,6 @@ type ReadingSession = {
     session_mode: string | null;
 };
 
-type ComparisonBook = {
-    id: string;
-    rating_difficulty: number | null;
-    books: {
-        book_type: string | null;
-    } | null;
-};
-
 function formatMinutes(total: number | null) {
     if (!total || total <= 0) return "—";
 
@@ -66,41 +57,6 @@ function formatMinutes(total: number | null) {
     return `${hours}h ${minutes}m`;
 }
 
-function bookTypeLabel(value: string | null | undefined) {
-    switch (value) {
-        case "picture_book":
-            return "picture books";
-        case "early_reader":
-            return "early readers";
-        case "chapter_book":
-            return "chapter books";
-        case "middle_grade":
-            return "middle grade books";
-        case "ya":
-            return "YA books";
-        case "novel":
-            return "novels";
-        case "light_novel":
-            return "Light Novel books";
-        case "short_story":
-            return "short stories";
-        case "manga":
-            return "manga";
-        case "nonfiction":
-            return "nonfiction books";
-        case "essay":
-            return "essays";
-        case "memoir":
-            return "memoirs";
-        case "textbook":
-            return "textbooks";
-        case "other":
-            return "books of this type";
-        default:
-            return "books of this type";
-    }
-}
-
 function statusLabel(row: UserBook | null) {
     if (!row) return "—";
     if (row.dnf_at) return "DNF";
@@ -109,69 +65,49 @@ function statusLabel(row: UserBook | null) {
     return "Not started";
 }
 
-function difficultyText(value: number | null) {
-    switch (value) {
-        case 1:
-            return "Very easy";
-        case 2:
-            return "Pretty comfortable";
-        case 3:
-            return "Challenging but manageable";
-        case 4:
-            return "Hard, but doable";
-        case 5:
-            return "Extremely difficult";
-        default:
-            return "Not rated yet";
-    }
-}
+function WordHistoryCard({
+    wordCount,
+    onOpen,
+}: {
+    wordCount: number | null;
+    onOpen: () => void;
+}) {
+    return (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                        Word History
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black text-stone-950">
+                        Your Words in This Book
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-stone-700">
+                        Look up a word to see where it appeared in this book, and review the words you looked up most.
+                    </p>
+                </div>
 
-function difficultyNeighborhood(percentHarderThan: number | null) {
-    if (percentHarderThan == null) {
-        return {
-            label: "Not enough data yet",
-            colorClass: "border-stone-200 bg-stone-50 text-stone-800",
-            note: "Rate more books of this type to see where this one sits.",
-        };
-    }
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="rounded-2xl border border-white/80 bg-white px-4 py-3 text-center shadow-sm">
+                        <p className="text-2xl font-black text-stone-950">
+                            {wordCount ?? "—"}
+                        </p>
+                        <p className="text-xs font-black uppercase tracking-wide text-stone-500">
+                            saved words
+                        </p>
+                    </div>
 
-    if (percentHarderThan >= 80) {
-        return {
-            label: "Mountain Book",
-            colorClass: "border-rose-200 bg-rose-50 text-rose-900",
-            note: "This one sits near the harder end of your shelf.",
-        };
-    }
-
-    if (percentHarderThan >= 60) {
-        return {
-            label: "Tough Climb",
-            colorClass: "border-orange-200 bg-orange-50 text-orange-900",
-            note: "This book felt harder than most of your books of this type.",
-        };
-    }
-
-    if (percentHarderThan >= 40) {
-        return {
-            label: "In the Neighborhood",
-            colorClass: "border-yellow-200 bg-yellow-50 text-yellow-900",
-            note: "This book sits around the middle of your books of this type.",
-        };
-    }
-
-    if (percentHarderThan >= 20) {
-        return {
-            label: "Comfortable Read",
-            colorClass: "border-emerald-200 bg-emerald-50 text-emerald-900",
-            note: "This book felt easier than many of your books of this type.",
-        };
-    }
-
-    return {
-        label: "Gentle Read",
-        colorClass: "border-sky-200 bg-sky-50 text-sky-900",
-        note: "This one sits near the gentler end of your shelf.",
-    };
+                    <button
+                        type="button"
+                        onClick={onOpen}
+                        className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+                    >
+                        Open Word History →
+                    </button>
+                </div>
+            </div>
+        </section>
+    );
 }
 
 export default function BookStatsPage() {
@@ -185,7 +121,6 @@ export default function BookStatsPage() {
     const [sessions, setSessions] = useState<ReadingSession[]>([]);
     const [wordCount, setWordCount] = useState<number | null>(null);
     const [canSeeVocabularyStats, setCanSeeVocabularyStats] = useState(false);
-    const [comparisonBooks, setComparisonBooks] = useState<ComparisonBook[]>([]);
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccessBook, setCanAccessBook] = useState(false);
     const [accessMessage, setAccessMessage] = useState("");
@@ -357,27 +292,6 @@ export default function BookStatsPage() {
                 setWordCount(wordCountResult.count ?? 0);
             }
 
-            const { data: comparisonData, error: comparisonError } = await supabase
-                .from("user_books")
-                .select(`
-          id,
-          rating_difficulty,
-          books (
-            book_type
-          )
-        `)
-                .eq("user_id", loadedRow.user_id)
-                .not("rating_difficulty", "is", null);
-
-            if (cancelled) return;
-
-            if (comparisonError) {
-                console.error("Error loading difficulty comparison:", comparisonError);
-                setComparisonBooks([]);
-            } else {
-                setComparisonBooks((comparisonData as unknown as ComparisonBook[]) ?? []);
-            }
-
             setLoading(false);
         }
 
@@ -493,50 +407,6 @@ export default function BookStatsPage() {
         return pages > 0 ? minutes / pages : null;
     }, [fluidSessions]);
 
-    const difficultyComparison = useMemo(() => {
-        if (!row || row.rating_difficulty == null || !book?.book_type) {
-            return {
-                sampleSize: 0,
-                percentHarderThan: null as number | null,
-            };
-        }
-
-        const sameTypeRatedBooks = comparisonBooks.filter((item) => {
-            return (
-                item.id !== row.id &&
-                item.rating_difficulty != null &&
-                item.books?.book_type === book.book_type
-            );
-        });
-
-        if (sameTypeRatedBooks.length < 3) {
-            return {
-                sampleSize: sameTypeRatedBooks.length,
-                percentHarderThan: null as number | null,
-            };
-        }
-
-        // Difficulty scale: 1 = easiest, 5 = hardest.
-        // This book is "harder than" books with a lower/easier rating.
-        const easierBooks = sameTypeRatedBooks.filter(
-            (item) =>
-                item.rating_difficulty != null &&
-                item.rating_difficulty < (row.rating_difficulty as number)
-        );
-
-        const percentHarderThan = Math.round(
-            (easierBooks.length / sameTypeRatedBooks.length) * 100
-        );
-
-        return {
-            sampleSize: sameTypeRatedBooks.length,
-            percentHarderThan,
-        };
-    }, [row, book?.book_type, comparisonBooks]);
-
-    const neighborhood = difficultyNeighborhood(difficultyComparison.percentHarderThan);
-    const typeLabel = bookTypeLabel(book?.book_type);
-
     if (loading) {
         return <BookStatsLoadingState />;
     }
@@ -573,14 +443,16 @@ export default function BookStatsPage() {
                     onOpenVocabList={() => router.push(`/books/${userBookId}/words`)}
                 />
 
-                <DifficultyNeighborhoodPanel
-                    neighborhood={neighborhood}
-                    percentHarderThan={difficultyComparison.percentHarderThan}
-                    sampleSize={difficultyComparison.sampleSize}
-                    typeLabel={typeLabel}
-                    ratingDifficulty={row.rating_difficulty}
-                    ratingText={difficultyText(row.rating_difficulty)}
-                />
+                {canSeeVocabularyStats ? (
+                    <WordHistoryCard
+                        wordCount={wordCount}
+                        onOpen={() =>
+                            router.push(
+                                `/vocab/explore?userBookId=${encodeURIComponent(userBookId)}`
+                            )
+                        }
+                    />
+                ) : null}
 
                 <StatsSection title="Progress Snapshot">
                     <StatCard label="Status" value={statusLabel(row)} />

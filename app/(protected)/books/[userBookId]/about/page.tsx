@@ -68,6 +68,8 @@ type UserBook = {
 type ProfileRow = {
   role: string | null;
   is_super_teacher: boolean | string | null;
+  app_access_type?: string | null;
+  app_access_expires_at?: string | null;
 };
 
 type PersonRecord = {
@@ -86,6 +88,12 @@ type PersonRecord = {
         image_url: string | null;
       }>
     | null;
+};
+
+type BookRatingAverages = {
+  signalCount: number;
+  difficultyAverage: number | null;
+  entertainmentAverage: number | null;
 };
 
 function isSuperTeacherFlag(value: unknown) {
@@ -150,6 +158,23 @@ function formatLanguage(value: string | null | undefined) {
 function publishedYear(value: string | null | undefined) {
   if (!value) return null;
   return value.slice(0, 4);
+}
+
+function formatSeriesBadge(book: Book) {
+  if (!book.series_number) return null;
+  return book.series_total
+    ? `Series ${book.series_number} / ${book.series_total}`
+    : `Series ${book.series_number}`;
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function formatAverageRating(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "-";
+  return value.toFixed(1);
 }
 
 function cleanInitial(value: string | null | undefined) {
@@ -221,17 +246,6 @@ function SafeProfileImage({
   );
 }
 
-function DetailCard({ label, value }: { label: string; value: string | number | null | undefined }) {
-  if (value == null || String(value).trim().length === 0) return null;
-
-  return (
-    <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">{label}</p>
-      <p className="mt-2 text-lg font-black text-stone-950">{value}</p>
-    </div>
-  );
-}
-
 function FormatHighlightCard({
   label,
   value,
@@ -256,6 +270,41 @@ function FormatHighlightCard({
     <div className={`rounded-3xl border p-5 shadow-sm ${toneClass}`}>
       <p className="text-xs font-black uppercase tracking-[0.18em] opacity-60">{label}</p>
       <p className="mt-2 text-2xl font-black leading-tight">{value}</p>
+    </div>
+  );
+}
+
+function AverageRatingCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | null;
+  tone: "amber" | "sky";
+}) {
+  const hasValue = value != null && Number.isFinite(value);
+  const safeValue = hasValue ? Math.max(0, Math.min(5, value)) : 0;
+  const roundedValue = hasValue ? Math.round(safeValue) : 0;
+  const colorClass = tone === "amber" ? "text-amber-500" : "text-sky-500";
+
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+            {label}
+          </p>
+          <p className="mt-2 text-3xl font-black text-stone-950">
+            {formatAverageRating(value)}
+            <span className="text-base text-stone-400"> / 5</span>
+          </p>
+        </div>
+        <div className={`text-lg leading-none tracking-[0.08em] ${hasValue ? colorClass : "text-stone-200"}`}>
+          {"*".repeat(roundedValue)}
+          <span className="text-stone-200">{"*".repeat(5 - roundedValue)}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -344,6 +393,7 @@ export default function AboutBookPage() {
   const [row, setRow] = useState<UserBook | null>(null);
   const [authorImageUrl, setAuthorImageUrl] = useState<string | null>(null);
   const [publisherImageUrl, setPublisherImageUrl] = useState<string | null>(null);
+  const [ratingAverages, setRatingAverages] = useState<BookRatingAverages | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -369,7 +419,7 @@ export default function AboutBookPage() {
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, is_super_teacher")
+          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
           .eq("id", user.id)
           .maybeSingle<ProfileRow>();
 
@@ -507,10 +557,42 @@ export default function AboutBookPage() {
           nextPublisherImage = publisher?.logo_url ?? nextPublisherImage;
         }
 
+        let nextRatingAverages: BookRatingAverages | null = null;
+        if (book?.id) {
+          const { data: ratingSignals, error: ratingSignalsError } = await supabase
+            .from("public_book_recommendation_signals")
+            .select("difficulty_rating, entertainment_rating")
+            .eq("book_id", book.id);
+
+          if (ratingSignalsError) {
+            console.warn("Could not load book rating averages:", ratingSignalsError);
+          } else {
+            const rows = (ratingSignals ?? []) as Array<{
+              difficulty_rating: number | null;
+              entertainment_rating: number | null;
+            }>;
+
+            nextRatingAverages = {
+              signalCount: rows.length,
+              difficultyAverage: average(
+                rows
+                  .map((signal) => signal.difficulty_rating)
+                  .filter((value): value is number => value != null)
+              ),
+              entertainmentAverage: average(
+                rows
+                  .map((signal) => signal.entertainment_rating)
+                  .filter((value): value is number => value != null)
+              ),
+            };
+          }
+        }
+
         if (!cancelled) {
           setRow(loadedRow);
           setAuthorImageUrl(nextAuthorImage);
           setPublisherImageUrl(nextPublisherImage);
+          setRatingAverages(nextRatingAverages);
           setLoading(false);
         }
       } catch (err) {
@@ -548,14 +630,6 @@ export default function AboutBookPage() {
     return <AccessDeniedMessage message={error ?? "This book could not be found."} />;
   }
 
-  const heroFacts = [
-    bookTypeLabel(book.book_type),
-    formatBookFormat(book, row),
-    formatLanguage(book.language_code),
-    book.page_count ? `${book.page_count} pages` : null,
-    publishedYear(book.published_date),
-  ].filter(Boolean);
-
   const bookFormat = formatBookFormat(book, row);
   const isbn = book.isbn13 || book.isbn;
   const synopsis = book.synopsis_en?.trim() || null;
@@ -570,19 +644,6 @@ export default function AboutBookPage() {
   const learnerReadingNotes: string[] = [];
   const similarBooks: Array<{ title: string; href: string }> = [];
 
-  const details = [
-    { label: "Book Type", value: bookTypeLabel(book.book_type) },
-    { label: "Book Format", value: bookFormat },
-    { label: "Language", value: formatLanguage(book.language_code) },
-    { label: "Pages", value: book.page_count },
-    { label: "Published", value: book.published_date },
-    { label: "ISBN", value: isbn },
-    { label: "Reading Format", value: formatReadingFormat(row.format_type) },
-    { label: "Reader Level", value: row.reader_level },
-    { label: "Recommended Level", value: row.recommended_level },
-    { label: "Series", value: book.series_number ? `${book.series_number}${book.series_total ? ` / ${book.series_total}` : ""}` : null },
-  ];
-
   return (
     <main className="min-h-screen bg-[#f5efe7] px-5 py-8 text-stone-950">
       <div className="mx-auto max-w-6xl">
@@ -590,57 +651,64 @@ export default function AboutBookPage() {
           href={`/books/${row.id}`}
           className="inline-flex text-sm font-black text-stone-600 transition hover:text-stone-950"
         >
-          &larr; Back to Book Hub
+          &larr; Back to Reader Book Hub
         </Link>
 
-        <section className="mt-5 overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-sm">
-          <div className="relative bg-gradient-to-br from-amber-100 via-rose-50 to-sky-100 p-6 md:p-10">
-            <div className="grid gap-8 md:grid-cols-[230px_minmax(0,1fr)] md:items-end">
-              <div className="mx-auto w-48 md:w-full">
-                {book.cover_url ? (
-                  <img
-                    src={book.cover_url}
-                    alt={`${book.title ?? "Book"} cover`}
-                    className="aspect-[2/3] w-full rounded-3xl object-cover shadow-2xl ring-1 ring-black/10"
-                  />
-                ) : (
-                  <div className="flex aspect-[2/3] w-full items-center justify-center rounded-3xl bg-stone-200 text-center text-sm font-black text-stone-500 shadow-xl">
-                    No cover yet
-                  </div>
-                )}
-              </div>
+        <section className="mt-5 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+          <div className="grid gap-0 md:grid-cols-[140px_1fr]">
+            <div className="bg-stone-200">
+              {book.cover_url ? (
+                <img
+                  src={book.cover_url}
+                  alt={`${book.title ?? "Book"} cover`}
+                  className="h-full min-h-[190px] w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full min-h-[190px] items-center justify-center px-4 text-center text-xs font-semibold text-stone-500">
+                  No cover
+                </div>
+              )}
+            </div>
 
+            <div className="flex flex-col justify-center gap-4 p-6 sm:p-8">
               <div>
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-stone-600 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-400">
                     About This Book
-                  </span>
-                  <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-white shadow-sm">
-                    {statusLabel(row)}
-                  </span>
+                  </p>
                 </div>
 
-                <h1 className="text-4xl font-black leading-tight text-stone-950 md:text-6xl">
+                <h1 className="mt-2 text-3xl font-black leading-tight text-stone-950 sm:text-4xl">
                   {book.title ?? "Untitled book"}
                 </h1>
 
                 {book.title_reading ? (
-                  <p className="mt-3 text-lg font-semibold text-stone-600">{book.title_reading}</p>
+                  <p className="mt-2 text-sm font-semibold text-stone-500">
+                    {book.title_reading}
+                  </p>
                 ) : null}
 
-                <p className="mt-5 text-2xl font-black text-stone-800">
+                <p className="mt-3 text-base font-semibold text-stone-700">
                   {book.author || book.author_english_name || "Author not listed yet"}
                 </p>
 
-                {heroFacts.length > 0 ? (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {heroFacts.map((fact) => (
-                      <span key={fact} className="rounded-full bg-white/75 px-4 py-2 text-sm font-black text-stone-700 shadow-sm">
-                        {fact}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {formatLanguage(book.language_code) ? (
+                    <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-bold text-stone-600">
+                      {formatLanguage(book.language_code)}
+                    </span>
+                  ) : null}
+                  {publishedYear(book.published_date) ? (
+                    <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-bold text-stone-600">
+                      {publishedYear(book.published_date)}
+                    </span>
+                  ) : null}
+                  {formatSeriesBadge(book) ? (
+                    <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-bold text-stone-600">
+                      {formatSeriesBadge(book)}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
@@ -658,8 +726,8 @@ export default function AboutBookPage() {
             tone="rose"
           />
           <FormatHighlightCard
-            label="Edition Note"
-            value={book.edition_note}
+            label="Pages"
+            value={book.page_count ? `${book.page_count} pages` : null}
             tone="sky"
           />
           <FormatHighlightCard
@@ -668,6 +736,28 @@ export default function AboutBookPage() {
             tone="stone"
           />
         </section>
+
+        {ratingAverages && ratingAverages.signalCount > 0 ? (
+          <ProfileSection
+            eyebrow="Reader Averages"
+            title="How Readers Rated This Book"
+            description={`Average from ${ratingAverages.signalCount} reader signal${ratingAverages.signalCount === 1 ? "" : "s"}.`}
+            className="mt-6"
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <AverageRatingCard
+                label={`${bookTypeLabel(book.book_type)} Difficulty`}
+                value={ratingAverages.difficultyAverage}
+                tone="sky"
+              />
+              <AverageRatingCard
+                label="Entertainment"
+                value={ratingAverages.entertainmentAverage}
+                tone="amber"
+              />
+            </div>
+          </ProfileSection>
+        ) : null}
 
         {bookstoreHint ? (
           <section className="mt-6 rounded-[2rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
@@ -683,14 +773,15 @@ export default function AboutBookPage() {
           </section>
         ) : null}
 
-        {synopsis ? (
-          <ProfileSection
-            eyebrow="Synopsis"
-            title="What This Book Is About"
-          >
-            <p className="text-sm leading-7 text-stone-700">{synopsis}</p>
-          </ProfileSection>
-        ) : null}
+        <ProfileSection
+          eyebrow="Synopsis"
+          title="What This Book Is About"
+          className="mt-6"
+        >
+          <p className="text-sm leading-7 text-stone-700">
+            {synopsis ?? "A synopsis can be added later."}
+          </p>
+        </ProfileSection>
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_1fr]">
           <CreatorCard
@@ -714,26 +805,6 @@ export default function AboutBookPage() {
             note={publisherNote ?? "Publisher or imprint information can be added later."}
           />
         </section>
-
-        <ProfileSection
-          eyebrow="Book Details"
-          title="Edition and Reading Details"
-          description="These details use the current stored book metadata and reader copy information."
-          className="mt-6"
-        >
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {details.map((detail) => (
-              <DetailCard key={detail.label} label={detail.label} value={detail.value} />
-            ))}
-          </div>
-
-          {book.edition_note ? (
-            <div className="mt-5 rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">Edition Note</p>
-              <p className="mt-2 text-sm leading-7 text-stone-700">{book.edition_note}</p>
-            </div>
-          ) : null}
-        </ProfileSection>
 
         {learnerReadingNotes.length > 0 ? (
           <ProfileSection

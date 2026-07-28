@@ -13,10 +13,8 @@ import {
   getFullAccessRequiredCopy,
 } from "@/lib/access/requireFullAccess";
 import BookInfoTab from "./components/tabs/BookInfoTab";
-import ReadingTab from "./components/tabs/ReadingTab";
 import RatingTab from "./components/tabs/RatingTab";
 import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
-import StoryTab from "./components/tabs/StoryTab";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
@@ -33,7 +31,6 @@ import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
 import Detail from "./components/Detail";
 import PersonRow from "./components/PersonRow";
-import DateField from "./components/DateField";
 import StarRatingField from "./components/StarRatingField";
 import DifficultyField from "./components/DifficultyField";
 import {
@@ -144,7 +141,7 @@ type ReadingSession = {
   session_mode: string | null;
 };
 
-type HubTab = "bookInfo" | "reading" | "story" | "reflection";
+type HubTab = "bookInfo" | "reflection";
 type EditingPanel =
   | HubTab
   | "bookInfoDetails"
@@ -668,6 +665,7 @@ export default function BookHubPage() {
   const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
   const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
   const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
+  const [canUseBulkAdd, setCanUseBulkAdd] = useState(false);
   const [canSeeVocabularySummary, setCanSeeVocabularySummary] = useState(false);
   const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
   const [isTrialLearningAccess, setIsTrialLearningAccess] = useState(false);
@@ -683,16 +681,6 @@ export default function BookHubPage() {
 
   const [activeTab, setActiveTab] = useState<HubTab>("reflection");
   const isEnglishBook = row?.books?.language_code === "en";
-  useEffect(() => {
-    if (isEnglishBook && activeTab === "story") {
-      setActiveTab("reading");
-    }
-  }, [activeTab, isEnglishBook]);
-  useEffect(() => {
-    if (!loading && !isEnglishBook && activeTab === "story" && !canUseStoryNotes) {
-      setActiveTab("reading");
-    }
-  }, [activeTab, canUseStoryNotes, isEnglishBook, loading]);
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
   const [lastSavedWordPage, setLastSavedWordPage] = useState<number | null>(null);
@@ -3346,7 +3334,7 @@ export default function BookHubPage() {
     setTimerSaveMessage(
       editingReadingSessionId
         ? "Your session has been updated."
-        : "Your session has been saved in the Reading Tab."
+        : "Your session has been saved in Reading Sessions."
     );
     setTimeout(() => setTimerSaveMessage(""), 4000);
 
@@ -3418,6 +3406,7 @@ export default function BookHubPage() {
     setCanUseSavedWordReading(false);
     setCanUseStudyFlashcards(false);
     setCanUseVocabularyList(false);
+    setCanUseBulkAdd(false);
     setCanSeeVocabularySummary(false);
     setHasFullLearningAccess(false);
     setStudentWorkspaceBackContext(null);
@@ -3498,6 +3487,7 @@ export default function BookHubPage() {
     setCanUseVocabularyList(
       canUseFullAccessFeature(featureAccess, "vocabulary_list")
     );
+    setCanUseBulkAdd(featureAccess.canUseBulkAdd);
     setCanSeeVocabularySummary(featureAccess.canSeeVocabularyColors);
     setHasFullLearningAccess(featureAccess.hasFullAccess);
     setIsTrialLearningAccess(featureAccess.isTrial);
@@ -3761,8 +3751,6 @@ export default function BookHubPage() {
       setLastSavedChapter("");
     }
     await loadReadingSessions(r.id);
-    await loadChapterSummaries(r.id);
-    await loadCharacters(r.id);
     await loadSavedKanjiDefaults(r.id);
     setKanjiMapQueue([]);
 
@@ -3784,11 +3772,13 @@ export default function BookHubPage() {
         ? "bookInfo"
         : requestedTab;
 
-    if (normalizedTab === "bookInfo") {
+    if (normalizedTab === "story") {
+      router.replace(`/books/${userBookId}/story`);
+    } else if (normalizedTab === "reading") {
+      router.replace(`/books/${userBookId}/sessions`);
+    } else if (normalizedTab === "bookInfo") {
       setActiveTab(canViewBookInfoTab ? "bookInfo" : "reflection");
     } else if (
-      normalizedTab === "reading" ||
-      normalizedTab === "story" ||
       normalizedTab === "reflection"
     ) {
       setActiveTab(normalizedTab);
@@ -3797,7 +3787,7 @@ export default function BookHubPage() {
     if (params.get("sessionMode") === "listening") {
       setSessionMode("listening");
     }
-  }, [canViewBookInfoTab]);
+  }, [canViewBookInfoTab, router, userBookId]);
 
   useEffect(() => {
     if (!canViewBookInfoTab && activeTab === "bookInfo") {
@@ -5155,30 +5145,12 @@ export default function BookHubPage() {
   const bookHubTabs = isEnglishBook
     ? [
       { id: "reflection" as const, label: "Reading Reflection" },
-      { id: "reading" as const, label: "Reading Sessions" },
-      ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info" }] : []),
+      ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info\nEditing" }] : []),
     ]
     : [
       { id: "reflection" as const, label: "Reading Reflection" },
-      { id: "reading" as const, label: "Reading Sessions" },
-      ...(canUseStoryNotes ? [{ id: "story" as const, label: "Story Notes" }] : []),
-      ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info" }] : []),
+      ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info\nEditing" }] : []),
     ];
-  const readingAddWordActions = [
-    {
-      id: "curiosity",
-      href: `/books/${encodeURIComponent(row.id)}/curiosity-reading`,
-      label: "Add from reading",
-      description: "Use Curiosity Reading when you stop to look up and save words.",
-    },
-    {
-      id: "bulk",
-      href: `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}`,
-      label: "Bulk Add",
-      description: "Add several words to this book at once.",
-    },
-  ].filter((action) => !isEnglishBook || action.id !== "bulk");
-
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
   const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
@@ -5323,6 +5295,7 @@ export default function BookHubPage() {
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
+                canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
                 canUseStoryNotes={!isEnglishBook && canUseStoryNotes}
                 hasSavedWords={(uniqueLookupCount ?? 0) > 0}
                 showReflectionPrompt={showBookHubReflectionPrompt}
@@ -5354,13 +5327,17 @@ export default function BookHubPage() {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/words`);
                 }}
+                onBulkAdd={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/vocab/bulk?userBookId=${encodeURIComponent(row.id)}`);
+                }}
                 onStoryNotes={() => {
                   if (!confirmLeaveIfTimerActive()) return;
-                  setActiveTab("story");
+                  router.push(`/books/${row.id}/story`);
                 }}
                 onReadingSessions={() => {
                   if (!confirmLeaveIfTimerActive()) return;
-                  setActiveTab("reading");
+                  router.push(`/books/${row.id}/sessions`);
                 }}
                 onBookStats={() => {
                   if (!confirmLeaveIfTimerActive()) return;
@@ -5520,169 +5497,6 @@ export default function BookHubPage() {
                     Detail={Detail}
                     PersonRow={PersonRow}
                   />
-                </div>
-              )}
-
-              {activeTab === "reading" && (
-                <div className="space-y-4">
-                  {hasFullLearningAccess && !isTrialLearningAccess ? (
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-stone-900">Add Words</div>
-
-                    <div className="grid gap-3 md:grid-cols-3">
-                      {readingAddWordActions.map((action) => (
-                        <a
-                          key={action.id}
-                          href={action.href}
-                          className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-100 md:px-5 md:py-4 md:text-base"
-                        >
-                          {action.label}
-                          <p className="mt-1 text-sm text-stone-500">
-                            {action.description}
-                          </p>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                  ) : null}
-                  <ReadingTab
-                    row={row}
-                    book={book}
-                    isEditingThisTab={isEditingThisTab}
-                    formatType={formatType}
-                    setFormatType={setFormatType}
-                    progressMode={progressMode}
-                    setProgressMode={setProgressMode}
-                    showPageNumbers={showPageNumbers}
-                    setShowPageNumbers={setShowPageNumbers}
-                    startedAt={startedAt}
-                    setStartedAt={setStartedAt}
-                    finishedAt={finishedAt}
-                    setFinishedAt={setFinishedAt}
-                    dnfAt={dnfAt}
-                    setDnfAt={setDnfAt}
-                    dnfReason={dnfReason}
-                    setDnfReason={setDnfReason}
-                    dnfNote={dnfNote}
-                    setDnfNote={setDnfNote}
-                    wouldRetry={wouldRetry}
-                    setWouldRetry={setWouldRetry}
-                    started={started}
-                    finished={finished}
-                    sessionDate={sessionDate}
-                    setSessionDate={setSessionDate}
-                    sessionMinutesRead={sessionMinutesRead}
-                    setSessionMinutesRead={setSessionMinutesRead}
-                    sessionMode={sessionMode}
-                    setSessionMode={setSessionMode}
-                    sessionStartPage={sessionStartPage}
-                    setSessionStartPage={setSessionStartPage}
-                    sessionEndPage={sessionEndPage}
-                    setSessionEndPage={setSessionEndPage}
-                    saveReadingSession={saveReadingSession}
-                    saveReadingDates={saveReadingDates}
-                    deleteReadingSession={deleteReadingSession}
-                    editingReadingSessionId={editingReadingSessionId}
-                    startEditingReadingSession={startEditingReadingSession}
-                    cancelEditingReadingSession={cancelEditingReadingSession}
-                    canFillBeginningPages={canFillBeginningPages}
-                    fillBeginningPages={fillBeginningPages}
-                    readingSessions={readingSessions}
-                    visibleReadingSessions={visibleReadingSessions}
-                    showAllSessions={showAllSessions}
-                    renderSessionToggle={renderSessionToggle}
-                    formatTypeLabel={formatTypeLabel}
-                    progressModeLabel={progressModeLabel}
-                    DateField={DateField}
-                    onOpenListeningSession={() => {
-                      if (!confirmLeaveIfTimerActive()) return;
-                      router.push(`/books/${row.id}/listening`);
-                    }}
-                    listeningSessionButtonLabel={
-                      hasFullLearningAccess && !isTrialLearningAccess || isTeacher ? "Listening + Words" : "Listening Timer"
-                    }
-                  />
-                </div>
-              )}
-
-              {!isEnglishBook && activeTab === "story" && (
-                <div className="space-y-4">
-                  {canUseStoryNotes && !isTrialLearningAccess ? (
-                    <StoryTab
-                      storyTab={storyTab}
-                      setStoryTab={setStoryTab}
-
-                      characters={characters}
-                      visibleCharacters={visibleCharacters}
-                      showCharacters={showCharacters}
-                      setShowCharacters={setShowCharacters}
-                      charactersReverseOrder={charactersReverseOrder}
-                      setCharactersReverseOrder={setCharactersReverseOrder}
-                      editingCharacterIds={editingCharacterIds}
-                      savingCharacterIds={savingCharacterIds}
-                      savedCharacterIds={savedCharacterIds}
-                      addCharacter={addCharacter}
-                      updateCharacter={updateCharacter}
-                      startEditingCharacter={startEditingCharacter}
-                      stopEditingCharacter={stopEditingCharacter}
-                      saveCharacter={saveCharacter}
-                      deleteCharacter={deleteCharacter}
-
-                      chapterSummaries={chapterSummaries}
-                      visibleChapterSummaries={visibleChapterSummaries}
-                      showChapterSummaries={showChapterSummaries}
-                      setShowChapterSummaries={setShowChapterSummaries}
-                      chapterReverseOrder={chapterReverseOrder}
-                      setChapterReverseOrder={setChapterReverseOrder}
-                      editingChapterIds={editingChapterIds}
-                      savingChapterIds={savingChapterIds}
-                      savedChapterIds={savedChapterIds}
-                      addChapterSummary={addChapterSummary}
-                      updateChapterSummary={updateChapterSummary}
-                      startEditingChapter={startEditingChapter}
-                      stopEditingChapter={stopEditingChapter}
-                      saveChapterSummary={saveChapterSummary}
-                      deleteChapterSummary={deleteChapterSummary}
-
-                      settingItems={settingItems}
-                      visibleSettingItems={visibleSettingItems}
-                      showSettingItems={showSettingItems}
-                      setShowSettingItems={setShowSettingItems}
-                      settingReverseOrder={settingReverseOrder}
-                      setSettingReverseOrder={setSettingReverseOrder}
-                      editingSettingIds={editingSettingIds}
-                      savingSettingIds={savingSettingIds}
-                      savedSettingIds={savedSettingIds}
-                      addSettingItem={addSettingItem}
-                      updateSettingItem={updateSettingItem}
-                      startEditingSettingItem={startEditingSettingItem}
-                      stopEditingSettingItem={stopEditingSettingItem}
-                      saveSettingItem={saveSettingItem}
-                      deleteSettingItem={deleteSettingItem}
-
-                      culturalItems={culturalItems}
-                      visibleCulturalItems={visibleCulturalItems}
-                      showCulturalItems={showCulturalItems}
-                      setShowCulturalItems={setShowCulturalItems}
-                      culturalReverseOrder={culturalReverseOrder}
-                      setCulturalReverseOrder={setCulturalReverseOrder}
-                      editingCulturalIds={editingCulturalIds}
-                      savingCulturalIds={savingCulturalIds}
-                      savedCulturalIds={savedCulturalIds}
-                      addCulturalItem={addCulturalItem}
-                      updateCulturalItem={updateCulturalItem}
-                      startEditingCulturalItem={startEditingCulturalItem}
-                      stopEditingCulturalItem={stopEditingCulturalItem}
-                      saveCulturalItem={saveCulturalItem}
-                      deleteCulturalItem={deleteCulturalItem}
-                    />
-                  ) : (
-                    <FullAccessBookHubTabPanel
-                      feature="story_notes"
-                      title="Story Notes are a full-access tool"
-                      message="Full access unlocks private character notes, plot notes, setting notes, and cultural notes for this book."
-                    />
-                  )}
                 </div>
               )}
 

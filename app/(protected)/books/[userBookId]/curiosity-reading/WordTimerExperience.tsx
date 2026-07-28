@@ -1645,8 +1645,8 @@ export function CuriosityReadingExperience({
 
     setTimerSaveMessage(
       isListeningMode
-        ? "Your listening session has been saved in the Reading Tab."
-        : "Your curiosity session has been saved in the Reading Tab."
+        ? "Your listening session has been saved in Reading Sessions."
+        : "Your curiosity session has been saved in Reading Sessions."
     );
     window.setTimeout(() => setTimerSaveMessage(""), 4000);
 
