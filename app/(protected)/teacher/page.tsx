@@ -197,6 +197,8 @@ function missingGlobalBookFields(book: GlobalBookRow) {
 }
 
 export default function TeacherHubPage() {
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [canAccessTeacherHub, setCanAccessTeacherHub] = useState(false);
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [teacherAlerts, setTeacherAlerts] = useState<TeacherAlertSummary[]>([]);
@@ -211,6 +213,8 @@ export default function TeacherHubPage() {
       const user = auth?.user;
 
       if (!user || cancelled) {
+        setCanAccessTeacherHub(false);
+        setAccessChecked(true);
         setAlertsLoading(false);
         return;
       }
@@ -222,14 +226,27 @@ export default function TeacherHubPage() {
         .maybeSingle();
 
       if (error || cancelled) {
+        setCanAccessTeacherHub(false);
+        setAccessChecked(true);
         setAlertsLoading(false);
         return;
       }
 
       const hasSuperTeacherAccess =
-        profile?.role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher);
+        profile?.role === "super_teacher" ||
+        profile?.role === "admin" ||
+        isSuperTeacherFlag(profile?.is_super_teacher);
+      const hasTeacherAccess =
+        hasSuperTeacherAccess || profile?.role === "teacher";
 
       setIsSuperTeacher(hasSuperTeacherAccess);
+      setCanAccessTeacherHub(hasTeacherAccess);
+      setAccessChecked(true);
+
+      if (!hasTeacherAccess) {
+        setAlertsLoading(false);
+        return;
+      }
 
       try {
         const { data: teacherLinks } = await supabase
@@ -444,6 +461,34 @@ export default function TeacherHubPage() {
       cancelled = true;
     };
   }, []);
+
+  if (!accessChecked) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <div className="rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm text-stone-500">Loading teacher access...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!canAccessTeacherHub) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <div className="rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+            Teacher access
+          </p>
+          <h1 className="mt-2 text-2xl font-black text-stone-950">
+            Teacher access is required.
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-stone-600">
+            This area is for teachers and staff only.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
