@@ -144,7 +144,7 @@ type LibrarySortMode =
   | "pace_fast"
   | "pace_slow";
 
-const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 1;
+const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
 
 function formatTrialEndDate(date: Date) {
   return new Intl.DateTimeFormat(undefined, {

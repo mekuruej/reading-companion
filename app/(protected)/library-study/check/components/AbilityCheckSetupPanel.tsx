@@ -3,8 +3,10 @@ type AbilityCheckSetupPanelProps = {
   selectedDueCount: number;
   includeKatakanaToday: boolean;
   katakanaDueCount: number;
+  showQueueReset: boolean;
   onIncludeKatakanaTodayChange: (value: boolean) => void;
   onStartDailyCheck: () => void;
+  onResetDueQueue: () => void;
   onBackToLibrary: () => void;
 };
 
@@ -13,8 +15,10 @@ export default function AbilityCheckSetupPanel({
   selectedDueCount,
   includeKatakanaToday,
   katakanaDueCount,
+  showQueueReset,
   onIncludeKatakanaTodayChange,
   onStartDailyCheck,
+  onResetDueQueue,
   onBackToLibrary,
 }: AbilityCheckSetupPanelProps) {
   const hasKatakanaDue = katakanaDueCount > 0;
@@ -95,6 +99,25 @@ export default function AbilityCheckSetupPanel({
             Back to Library
           </button>
         </div>
+
+        {showQueueReset ? (
+          <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
+            <p className="text-sm font-black text-amber-950">
+              Overwhelmed?
+            </p>
+            <p className="mx-auto mt-1 max-w-lg text-sm leading-6 text-amber-900">
+              Reset today&apos;s Ability Check queue to zero. Your saved words and
+              progress will stay unchanged.
+            </p>
+            <button
+              type="button"
+              onClick={onResetDueQueue}
+              className="mt-3 rounded-2xl border border-amber-300 bg-white px-5 py-2.5 text-sm font-black text-amber-950 shadow-sm transition hover:bg-amber-100"
+            >
+              Reset queue to zero
+            </button>
+          </section>
+        ) : null}
       </div>
     </main>
   );

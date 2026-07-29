@@ -212,8 +212,9 @@ const DAILY_CHECK_PLAN_STORAGE_KEY = "library-study-daily-check-plan-by-date";
 
 const DAILY_CHECK_JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const DAILY_CHECK_LEVELS = [...DAILY_CHECK_JLPT_LEVELS, "NON-JLPT"] as const;
-const ABILITY_CHECK_MIN_DUE_CARDS = 1;
+const ABILITY_CHECK_MIN_DUE_CARDS = 10;
 const ABILITY_CHECK_DAILY_CARD_TARGET = 10;
+const ABILITY_CHECK_OVERWHELMED_QUEUE_COUNT = 50;
 const MEANING_LANGUAGE_WARNING =
   "This is a MEANING question. Please type your answers in English.";
 
@@ -2386,6 +2387,22 @@ export default function LibraryStudyPage() {
     resetCardState();
   }
 
+  function resetDueQueueForToday() {
+    const nextSeenTodayIds = new Set(seenTodayIds);
+
+    dueAbilityCheckCards.forEach((card) => {
+      nextSeenTodayIds.add(card.id);
+      nextSeenTodayIds.add(card.studyIdentityKey);
+    });
+
+    saveSeenForToday(nextSeenTodayIds);
+    hideAbilityCheckReminderForToday();
+    setSeenTodayIds(nextSeenTodayIds);
+    setDailyCheckPlan(null);
+    setNotice("Ability Check queue reset for today. Your saved words and progress are unchanged.");
+    resetCardState();
+  }
+
   function resetPracticeReveal() {
     setPracticeRevealStep("word");
   }
@@ -3251,8 +3268,10 @@ export default function LibraryStudyPage() {
         selectedDueCount={selectedDueCount}
         includeKatakanaToday={includeKatakanaToday}
         katakanaDueCount={katakanaDueCount}
+        showQueueReset={allLevelsDueCount >= ABILITY_CHECK_OVERWHELMED_QUEUE_COUNT}
         onIncludeKatakanaTodayChange={setIncludeKatakanaToday}
         onStartDailyCheck={startDailyCheck}
+        onResetDueQueue={resetDueQueueForToday}
         onBackToLibrary={() => router.push("/books")}
       />
     );
