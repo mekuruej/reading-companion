@@ -206,7 +206,9 @@ export default function AssignBookPage() {
         if (meProfileError) throw meProfileError;
 
         const superTeacher =
-          meProfile?.role === "super_teacher" || !!meProfile?.is_super_teacher;
+          meProfile?.role === "super_teacher" ||
+          meProfile?.role === "admin" ||
+          !!meProfile?.is_super_teacher;
         const teacher =
           superTeacher || meProfile?.role === "teacher";
 
@@ -396,6 +398,11 @@ export default function AssignBookPage() {
 
       if (!studentId) return setErrorMsg("Pick a learner.");
 
+      const chosenStudent = selectableProfiles.find((p) => p.id === studentId);
+      if (!chosenStudent) {
+        return setErrorMsg("Pick a learner from your assigned learner list.");
+      }
+
       const { data, error } = await supabase
         .from("user_books")
         .insert({
@@ -416,7 +423,6 @@ export default function AssignBookPage() {
         throw error;
       }
 
-      const chosenStudent = profiles.find((p) => p.id === studentId);
       const chosenBook = books.find((b) => b.id === bookId);
 
       setSuccessMsg(
