@@ -23,6 +23,7 @@ function isSuperTeacherFlag(value: unknown) {
 
 function isSuperTeacher(profile: ProfileRow | null) {
   return (
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
   );

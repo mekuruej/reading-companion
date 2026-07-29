@@ -507,6 +507,11 @@ export default function StudentWorkspacePage() {
       return;
     }
 
+    if (taskLearnerId !== studentId) {
+      setTaskMessage("This task must stay scoped to this student workspace.");
+      return;
+    }
+
     const cleanTitle = taskTitle.trim();
     if (!cleanTitle) {
       setTaskMessage("Add a task title.");
@@ -528,6 +533,11 @@ export default function StudentWorkspacePage() {
 
     if (needsBook && !taskUserBookId) {
       setTaskMessage("Choose a linked book for this task.");
+      return;
+    }
+
+    if (needsBook && !taskBooks.some((book) => book.id === taskUserBookId)) {
+      setTaskMessage("Choose a linked book from this student's workspace.");
       return;
     }
 
