@@ -74,6 +74,7 @@ function isSuperTeacherFlag(value: unknown) {
 
 function isSuperTeacher(profile: ProfileRow | null) {
   return (
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
   );
@@ -1004,6 +1005,22 @@ export async function DELETE(req: Request) {
       return NextResponse.json(
         { error: access.error },
         { status: access.status }
+      );
+    }
+
+    const { data: scopedWord, error: scopedWordError } = await supabaseAdmin
+      .from("user_book_words")
+      .select("id")
+      .eq("id", wordId)
+      .eq("user_book_id", userBookId)
+      .maybeSingle();
+
+    if (scopedWordError) throw scopedWordError;
+
+    if (!scopedWord) {
+      return NextResponse.json(
+        { error: "This word does not belong to that student book." },
+        { status: 403 }
       );
     }
 
