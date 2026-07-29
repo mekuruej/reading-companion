@@ -80,6 +80,7 @@ function firstBook(book: StudentUserBook["books"]) {
 
 function isSuperTeacherRole(profile: any) {
   return (
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
