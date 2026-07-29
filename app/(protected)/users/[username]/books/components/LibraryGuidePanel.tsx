@@ -60,16 +60,17 @@ export default function LibraryGuidePanel({
 
       <button
         type="button"
-        onClick={() => onNavigate("/trial-ended")}
+        onClick={() => onNavigate("/reading-access")}
         className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
       >
         <div className="text-sm font-black text-slate-950">
-          Wanna Save Word
-          <br />
-          From your Books?
+          Want More Reading Tools?
         </div>
         <p className="mt-1 text-xs leading-5 text-slate-600">
-          Join <strong>Reading Access</strong> to save vocabulary, make flashcards, and see book stats.
+          Learn about <strong>Reading Access</strong> for saving vocabulary, practicing flashcards, and keeping your reading tools after trial.
+        </p>
+        <p className="mt-2 text-xs font-black text-violet-700">
+          See Reading Access →
         </p>
       </button>
     </>
