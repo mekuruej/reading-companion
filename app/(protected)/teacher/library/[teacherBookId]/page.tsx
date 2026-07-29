@@ -105,6 +105,16 @@ let draftIdCounter = 0;
 function isTeacherRole(profile: any) {
   return (
     profile?.role === "teacher" ||
+    profile?.role === "admin" ||
+    profile?.role === "super_teacher" ||
+    profile?.is_super_teacher === true ||
+    profile?.is_super_teacher === "true"
+  );
+}
+
+function canAccessAnyTeacherBook(profile: any) {
+  return (
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
@@ -505,6 +515,14 @@ export default function TeacherBookPrepPage() {
         setTeacherBook(null);
         setSavedItems([]);
         setMessage("This teacher book could not be found.");
+        return;
+      }
+
+      if (!canAccessAnyTeacherBook(profile) && teacherBookRow.teacher_id !== user.id) {
+        setCanAccess(false);
+        setTeacherBook(null);
+        setSavedItems([]);
+        setMessage("You do not have access to this teacher book.");
         return;
       }
 
