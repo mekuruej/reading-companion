@@ -5426,7 +5426,8 @@ export default function BookHubPage() {
                         Native-Language Tracker
                       </p>
                       <h2 className="mt-2 text-2xl font-black text-stone-950 sm:text-3xl">
-                        This book is in your native language.
+                        This book is in your
+                        <span className="block">native language.</span>
                       </h2>
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
                         MEKURU keeps this Book Hub focused on reading time, listening time, sessions,
@@ -5442,7 +5443,7 @@ export default function BookHubPage() {
                 </section>
               ) : null}
 
-              {!isEnglishNativeTrackerBook ? (
+              {!isEnglishNativeTrackerBook && (!isTrialLearningAccess || canCompleteReadingReflection) ? (
                 <section
                   id="reading-reflection"
                   className={[

@@ -20,7 +20,6 @@ import WordDictionaryInfoSection from "./components/WordDictionaryInfoSection";
 import BookVocabEditModalShell from "../components/BookVocabEditModalShell";
 import BookVocabEditFormBody from "../components/BookVocabEditFormBody";
 import {
-  fetchLibraryStudyColorInfoByWord,
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
@@ -513,76 +512,61 @@ export default function WordDetailPage() {
     }
   }
 
-  async function loadBookAwareInfo(surface: string, userId: string) {
+  async function loadBookAwareInfo(surface: string) {
     try {
-      const { count: repeatCount, error: rErr } = await supabase
-        .from("user_book_words")
-        .select("id", { count: "exact", head: true })
-        .eq("user_book_id", userBookId)
-        .eq("surface", surface);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (rErr) throw rErr;
-      setRepeatsInThisBook(repeatCount ?? 0);
+      if (!session?.access_token) throw new Error("Missing session.");
+
+      const response = await fetch(`/api/books/${userBookId}/word-context`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ surface }),
+      });
+
+      if (!response.ok) throw new Error(await response.text());
+
+      const payload = (await response.json()) as {
+        repeatCount?: number;
+        seenInstances?: SeenInstance[];
+      };
+
+      setRepeatsInThisBook(payload.repeatCount ?? 0);
+      setSeenInstances(payload.seenInstances ?? []);
     } catch {
       setRepeatsInThisBook(0);
-    }
-
-    try {
-      const { data: seen, error: sErr } = await supabase
-        .from("user_book_words")
-        .select(
-          `
-          id,
-          user_book_id,
-          surface,
-          reading,
-          meaning,
-          meaning_choice_index,
-          page_number,
-          chapter_number,
-          chapter_name,
-          created_at,
-          user_books!inner (
-            user_id,
-            books:book_id (
-              title,
-              cover_url
-            )
-          )
-        `
-        )
-        .eq("surface", surface)
-        .eq("user_books.user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (sErr) throw sErr;
-
-      const normalizedSeen: SeenInstance[] = (seen ?? []).map((row: any) => ({
-        id: row.id,
-        user_book_id: row.user_book_id,
-        surface: row.surface,
-        reading: row.reading ?? null,
-        meaning: row.meaning ?? null,
-        meaning_choice_index: row.meaning_choice_index ?? null,
-        page_number: row.page_number ?? null,
-        chapter_number: row.chapter_number ?? null,
-        chapter_name: row.chapter_name ?? null,
-        created_at: row.created_at,
-        books_title: row.user_books?.books?.title ?? "(unknown book)",
-        books_cover_url: row.user_books?.books?.cover_url ?? null,
-      }));
-
-      setSeenInstances(normalizedSeen);
-    } catch {
       setSeenInstances([]);
     }
   }
 
-  async function loadLibraryColorInfo(surface: string, reading: string | null, userId: string) {
+  async function loadLibraryColorInfo(surface: string, reading: string | null) {
     try {
-      const colorMap = await fetchLibraryStudyColorInfoByWord(supabase, userId, [
-        { surface, reading },
-      ]);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) throw new Error("Missing session.");
+
+      const response = await fetch(`/api/books/${userBookId}/library-colors`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ words: [{ surface, reading }] }),
+      });
+
+      if (!response.ok) throw new Error(await response.text());
+
+      const payload = (await response.json()) as {
+        colors?: Record<string, LibraryStudyWordColorInfo>;
+      };
+      const colorMap = payload.colors ?? {};
       setLibraryColorInfo(colorMap[makeLibraryStudyColorKey(surface, reading)] ?? null);
     } catch {
       setLibraryColorInfo(null);
@@ -600,13 +584,9 @@ export default function WordDetailPage() {
     async function refreshDerivedData() {
       if (!word) return;
 
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) return;
-
-      await loadBookAwareInfo(word.surface, ownerUserId ?? user.id);
+      await loadBookAwareInfo(word.surface);
       if (canUseVocabularyTools) {
-        await loadLibraryColorInfo(word.surface, word.reading, ownerUserId ?? user.id);
+        await loadLibraryColorInfo(word.surface, word.reading);
       } else {
         setLibraryColorInfo(null);
       }

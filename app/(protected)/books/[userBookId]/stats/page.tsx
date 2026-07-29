@@ -112,6 +112,33 @@ function WordHistoryCard({
     );
 }
 
+async function getAccessToken() {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Please sign in again.");
+    return token;
+}
+
+async function loadReadingSessionStats(userBookId: string) {
+    const token = await getAccessToken();
+    const response = await fetch(`/api/books/${userBookId}/reading-sessions`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data?.error ?? "Could not load reading sessions.");
+    }
+
+    return data as {
+        sessions?: ReadingSession[];
+        wordCount?: number | null;
+    };
+}
+
 export default function BookStatsPage() {
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -276,41 +303,18 @@ export default function BookStatsPage() {
             setAccessChecked(true);
             setRow(loadedRow);
 
-            const [{ data: sessionData, error: sessionError }, wordCountResult] =
-                await Promise.all([
-                    supabase
-                        .from("user_book_reading_sessions")
-                        .select(
-                            "id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode"
-                        )
-                        .eq("user_book_id", userBookId)
-                        .order("read_on", { ascending: false })
-                        .order("created_at", { ascending: false }),
+            try {
+                const statsData = await loadReadingSessionStats(userBookId);
 
-                    canViewVocabularyStats
-                        ? supabase
-                            .from("user_book_words")
-                            .select("id", { count: "exact", head: true })
-                            .eq("user_book_id", userBookId)
-                        : Promise.resolve({ count: null, error: null }),
-                ]);
+                if (cancelled) return;
 
-            if (cancelled) return;
-
-            if (sessionError) {
-                console.error("Error loading book sessions:", sessionError);
+                setSessions(statsData.sessions ?? []);
+                setWordCount(canViewVocabularyStats ? statsData.wordCount ?? 0 : null);
+            } catch (statsError) {
+                if (cancelled) return;
+                console.error("Error loading book session stats:", statsError);
                 setSessions([]);
-            } else {
-                setSessions((sessionData as ReadingSession[]) ?? []);
-            }
-
-            if (!canViewVocabularyStats) {
                 setWordCount(null);
-            } else if (wordCountResult.error) {
-                console.error("Error loading word count:", wordCountResult.error);
-                setWordCount(null);
-            } else {
-                setWordCount(wordCountResult.count ?? 0);
             }
 
             setLoading(false);

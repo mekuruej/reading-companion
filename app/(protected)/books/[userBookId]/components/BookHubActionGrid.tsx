@@ -322,16 +322,6 @@ export default function BookHubActionGrid({
                         onClick={onAboutBook}
                         size="secondary"
                     />
-
-                    {onReadingReflection ? (
-                        <ActionButton
-                            title="Review & Notes"
-                            description="Keep a private review, memorable quotes, and thoughts you want to remember."
-                            className="bg-emerald-50 hover:bg-emerald-100"
-                            onClick={onReadingReflection}
-                            size="secondary"
-                        />
-                    ) : null}
                 </div>
             </div>
         );

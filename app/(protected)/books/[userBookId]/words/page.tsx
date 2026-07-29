@@ -27,8 +27,6 @@ import BookVocabEditFormBody from "./components/BookVocabEditFormBody";
 import BookVocabRow from "./components/BookVocabRow";
 import BookVocabMobileCard from "./components/BookVocabMobileCard";
 import {
-  fetchLibraryStudyColorInfoByWord,
-  makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
 import {
@@ -942,16 +940,29 @@ export default function BookWordsPage() {
       }
 
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!user?.id) return;
+      if (!session?.access_token) return;
 
-      const next = await fetchLibraryStudyColorInfoByWord(
-        supabase,
-        user.id,
-        wordsToCheck
-      );
+      const response = await fetch(`/api/books/${userBookId}/library-colors`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ words: wordsToCheck }),
+      });
+
+      if (!response.ok) {
+        console.warn("Could not load vocabulary list library colors:", await response.text());
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        colors?: Record<string, LibraryStudyWordColorInfo>;
+      };
+      const next = payload.colors ?? {};
 
       if (!cancelled) {
         setLibraryColorByWordKey(next);
@@ -963,7 +974,7 @@ export default function BookWordsPage() {
     return () => {
       cancelled = true;
     };
-  }, [words, canUseVocabularyTools]);
+  }, [words, canUseVocabularyTools, userBookId]);
 
   const repeatCounts = useMemo(() => {
     const m = new Map<string, number>();

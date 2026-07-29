@@ -26,7 +26,6 @@ import ReadAlongReaderShell from "../_shared/readalong/ReadAlongReaderShell";
 import ReadAlongWordList from "./components/ReadAlongWordList";
 import ReadAlongAccessDeniedState from "./components/ReadAlongAccessDeniedState";
 import {
-    fetchLibraryStudyColorInfoByWord,
     makeLibraryStudyColorKey,
     type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
@@ -161,6 +160,7 @@ export default function ReadAlongPage() {
         useState<StudentWorkspaceBackContext | null>(null);
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccessBook, setCanAccessBook] = useState(false);
+    const [learnerUserId, setLearnerUserId] = useState<string | null>(null);
     const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
     const [fullAccessLocked, setFullAccessLocked] = useState(false);
     const [accessMessage, setAccessMessage] = useState("");
@@ -200,6 +200,7 @@ export default function ReadAlongPage() {
             setLoading(true);
             setAccessChecked(false);
             setCanAccessBook(false);
+            setLearnerUserId(null);
             setCanUseSavedWordReading(false);
             setFullAccessLocked(false);
             setAccessMessage("");
@@ -296,6 +297,7 @@ export default function ReadAlongPage() {
                 : (userBook as any)?.books;
 
             setCanAccessBook(true);
+            setLearnerUserId(ownerUserId);
             setAccessChecked(true);
             setBookTitle(book?.title ?? "");
             setBookCover(book?.cover_url ?? "");
@@ -366,7 +368,7 @@ export default function ReadAlongPage() {
         let cancelled = false;
 
         async function loadLibraryColors() {
-            if (!canAccessBook) return;
+            if (!canAccessBook || !learnerUserId) return;
 
             const wordsToCheck = words.map((word) => ({
                 surface: word.surface,
@@ -383,60 +385,29 @@ export default function ReadAlongPage() {
             }
 
             const {
-                data: { user },
-            } = await supabase.auth.getUser();
+                data: { session },
+            } = await supabase.auth.getSession();
 
-            if (!user?.id) return;
+            if (!session?.access_token) return;
 
-            const next = await fetchLibraryStudyColorInfoByWord(
-                supabase,
-                user.id,
-                wordsToCheck
-            );
+            const response = await fetch(`/api/books/${userBookId}/library-colors`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ words: wordsToCheck }),
+            });
 
-            if (!cancelled) {
-                setLibraryColorByWordKey(next);
-            }
-        }
-
-        void loadLibraryColors();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [words, canAccessBook]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadLibraryColors() {
-            if (!canAccessBook) return;
-
-            const wordsToCheck = words.map((word) => ({
-                surface: word.surface,
-                reading: word.reading,
-            }));
-
-            const hasAnyLookupWord = wordsToCheck.some(
-                (word) => word.surface?.trim() && word.reading?.trim()
-            );
-
-            if (!hasAnyLookupWord) {
-                setLibraryColorByWordKey({});
+            if (!response.ok) {
+                console.warn("Could not load read along library colors:", await response.text());
                 return;
             }
 
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
-
-            if (!user?.id) return;
-
-            const next = await fetchLibraryStudyColorInfoByWord(
-                supabase,
-                user.id,
-                wordsToCheck
-            );
+            const payload = (await response.json()) as {
+                colors?: Record<string, LibraryStudyWordColorInfo>;
+            };
+            const next = payload.colors ?? {};
 
             if (!cancelled) {
                 setLibraryColorByWordKey(next);
@@ -448,7 +419,7 @@ export default function ReadAlongPage() {
         return () => {
             cancelled = true;
         };
-    }, [words, canAccessBook]);
+    }, [words, canAccessBook, learnerUserId, userBookId]);
 
     const chapterOptions = useMemo(() => {
         const map = new Map<

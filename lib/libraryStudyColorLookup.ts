@@ -140,10 +140,6 @@ export async function fetchLibraryStudyColorInfoByWord(
     pairKeys.has(makeLibraryStudyColorKey(row.surface, row.reading))
   );
 
-  if (summaries.length === 0) {
-    return {};
-  }
-
   const studyIdentityKeys = Array.from(
     new Set(
       summaries

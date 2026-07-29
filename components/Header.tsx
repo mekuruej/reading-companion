@@ -15,6 +15,7 @@ export default function Header() {
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [isTrialAccess, setIsTrialAccess] = useState(false);
+  const [hasSavedVocabulary, setHasSavedVocabulary] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
@@ -42,6 +43,7 @@ export default function Header() {
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setHasSavedVocabulary(false);
           return;
         }
 
@@ -72,6 +74,7 @@ export default function Header() {
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setHasSavedVocabulary(false);
           return;
         }
 
@@ -82,6 +85,16 @@ export default function Header() {
         setHasFullAccess(accessStatus?.hasFullAccess ?? false);
         setIsTrialAccess(accessStatus?.reason === "trial");
 
+        const savedWordsResult = await supabase
+          .from("user_book_words")
+          .select("id", { count: "exact", head: true });
+
+        if (cancelled) return;
+
+        setHasSavedVocabulary(
+          !savedWordsResult.error && (savedWordsResult.count ?? 0) > 0
+        );
+
       } catch (error) {
         if (!cancelled) {
           setUsername(null);
@@ -89,6 +102,7 @@ export default function Header() {
           setProfileIsSuperTeacher(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setHasSavedVocabulary(false);
         }
       }
     }
@@ -163,6 +177,11 @@ export default function Header() {
   const showFullAccessNavigation = (hasFullAccess && !isTrialAccess) || showTeacherLink;
   const canUseLearningStudy = hasFullAccess || showTeacherLink;
   const canUseAdvancedStudyNavigation = showFullAccessNavigation;
+  const isFreeReaderNavigation = !hasFullAccess && !isTrialAccess && !showTeacherLink;
+  const showVocabularyLibraryLink = !isFreeReaderNavigation || hasSavedVocabulary;
+  const vocabularyLibraryLabel = isFreeReaderNavigation
+    ? "Vocabulary Archive"
+    : "Vocabulary Lists";
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -251,16 +270,18 @@ export default function Header() {
                     Book Hubs
                   </Link>
 
-                  <Link
-                    href="/library/vocab-list-index"
-                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
-                      ? "bg-stone-100 font-medium text-stone-900"
-                      : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    onClick={() => setShowLibraryMenu(false)}
-                  >
-                    Vocabulary Lists
-                  </Link>
+                  {showVocabularyLibraryLink ? (
+                    <Link
+                      href="/library/vocab-list-index"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/library/vocab-list-index"
+                        ? "bg-stone-100 font-medium text-stone-900"
+                        : "text-stone-700 hover:bg-stone-50"
+                        }`}
+                      onClick={() => setShowLibraryMenu(false)}
+                    >
+                      {vocabularyLibraryLabel}
+                    </Link>
+                  ) : null}
 
                   <Link
                     href="/community/profile"

@@ -82,6 +82,38 @@ function formatYmd(value: string | null) {
   return value.slice(0, 10);
 }
 
+async function getAccessToken() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Please sign in again.");
+  return token;
+}
+
+async function callReadingSessionsApi(
+  userBookId: string,
+  init: RequestInit = {}
+) {
+  const token = await getAccessToken();
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(`/api/books/${userBookId}/reading-sessions`, {
+    ...init,
+    headers,
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data?.error ?? "Could not update reading sessions.");
+  }
+
+  return data;
+}
+
 export default function ReadingSessionsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params?.userBookId;
@@ -226,20 +258,13 @@ export default function ReadingSessionsPage() {
   }, [userBookId]);
 
   async function loadSessions(id: string) {
-    const { data, error } = await supabase
-      .from("user_book_reading_sessions")
-      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode")
-      .eq("user_book_id", id)
-      .order("read_on", { ascending: false })
-      .order("created_at", { ascending: false });
-
-    if (error) {
+    try {
+      const data = await callReadingSessionsApi(id);
+      setSessions((data.sessions as ReadingSession[]) ?? []);
+    } catch (error) {
       console.error("Error loading reading sessions:", error);
       setSessions([]);
-      return;
     }
-
-    setSessions((data as ReadingSession[]) ?? []);
   }
 
   function startEditingSession(session: ReadingSession) {
@@ -334,29 +359,22 @@ export default function ReadingSessionsPage() {
       session_mode: sessionMode,
     };
 
-    const result = editingSessionId
-      ? await supabase
-          .from("user_book_reading_sessions")
-          .update(payload)
-          .eq("id", editingSessionId)
-          .eq("user_book_id", row.id)
-      : await supabase.from("user_book_reading_sessions").insert(payload);
+    try {
+      const data = await callReadingSessionsApi(row.id, {
+        method: editingSessionId ? "PATCH" : "POST",
+        body: JSON.stringify(editingSessionId ? { id: editingSessionId, ...payload } : payload),
+      });
 
-    if (result.error) {
-      console.error("Error saving reading session:", result.error);
-      alert(`Could not save reading session.\n${result.error.message || "Unknown error"}`);
-      return;
-    }
-
-    if (!row.started_at) {
-      const { error } = await supabase
-        .from("user_books")
-        .update({ status: "reading", started_at: sessionDate })
-        .eq("id", row.id);
-
-      if (!error) {
-        setRow((prev) => (prev ? { ...prev, started_at: sessionDate } : prev));
+      if (data?.userBookPatch?.started_at) {
+        setRow((prev) =>
+          prev ? { ...prev, started_at: data.userBookPatch.started_at } : prev
+        );
+        setStartedAt(formatYmd(data.userBookPatch.started_at));
       }
+    } catch (error: any) {
+      console.error("Error saving reading session:", error);
+      alert(`Could not save reading session.\n${error?.message || "Unknown error"}`);
+      return;
     }
 
     await loadSessions(row.id);
@@ -380,22 +398,23 @@ export default function ReadingSessionsPage() {
           ? "reading"
           : "what_to_read";
 
-    const { error } = await supabase
-      .from("user_books")
-      .update({
-        status,
-        started_at,
-        finished_at,
-        dnf_at,
-        dnf_reason: nextDnfReason,
-        dnf_note: nextDnfNote,
-        would_retry: nextWouldRetry,
-      })
-      .eq("id", row.id);
-
-    if (error) {
+    try {
+      await callReadingSessionsApi(row.id, {
+        method: "PATCH",
+        body: JSON.stringify({
+          kind: "book_dates",
+          status,
+          started_at,
+          finished_at,
+          dnf_at,
+          dnf_reason: nextDnfReason,
+          dnf_note: nextDnfNote,
+          would_retry: nextWouldRetry,
+        }),
+      });
+    } catch (error: any) {
       console.error("Error saving book dates:", error);
-      alert(`Could not save book dates.\n${error.message || "Unknown error"}`);
+      alert(`Could not save book dates.\n${error?.message || "Unknown error"}`);
       return;
     }
 
@@ -421,15 +440,14 @@ export default function ReadingSessionsPage() {
     const ok = window.confirm("Delete this reading session?");
     if (!ok || !row?.id) return;
 
-    const { error } = await supabase
-      .from("user_book_reading_sessions")
-      .delete()
-      .eq("id", id)
-      .eq("user_book_id", row.id);
-
-    if (error) {
+    try {
+      await callReadingSessionsApi(row.id, {
+        method: "DELETE",
+        body: JSON.stringify({ id }),
+      });
+    } catch (error: any) {
       console.error("Error deleting reading session:", error);
-      alert(`Could not delete reading session.\n${error.message || "Unknown error"}`);
+      alert(`Could not delete reading session.\n${error?.message || "Unknown error"}`);
       return;
     }
 

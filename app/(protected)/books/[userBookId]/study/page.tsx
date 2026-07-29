@@ -16,6 +16,10 @@ import {
   computeLibraryStudyColorStatus,
   type LibraryStudyColor,
 } from "@/lib/libraryStudyColor";
+import {
+  makeLibraryStudyColorKey,
+  type LibraryStudyWordColorInfo,
+} from "@/lib/libraryStudyColorLookup";
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
@@ -357,6 +361,9 @@ export default function BookFlashcardsPage() {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
   const [libraryCards, setLibraryCards] = useState<Flashcard[]>([]);
+  const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
+    Record<string, LibraryStudyWordColorInfo>
+  >({});
 
   const [studySet, setStudySet] = useState<StudySet>("READING");
   const studyOnceMode = true;
@@ -491,6 +498,23 @@ export default function BookFlashcardsPage() {
     });
   }
 
+  function getCardColorInfo(card: Flashcard | null | undefined) {
+    if (!card) return null;
+    return libraryColorByWordKey[makeLibraryStudyColorKey(card.word, card.reading)] ?? null;
+  }
+
+  function getCardColorStatus(card: Flashcard) {
+    return (
+      getCardColorInfo(card)?.colorStatus ??
+      computeLibraryStudyColorStatus({ encounterCount: card.totalCount })
+    );
+  }
+
+  function getCardEncounterCount(card: Flashcard | null | undefined) {
+    if (!card) return 0;
+    return getCardColorInfo(card)?.encounterCount ?? card.totalCount;
+  }
+
   useEffect(() => {
     if (!userBookId) return;
 
@@ -555,6 +579,7 @@ export default function BookFlashcardsPage() {
       setCanUseStudyFlashcards(false);
       setFullAccessLocked(false);
       setAccessMessage("");
+      setLibraryColorByWordKey({});
 
       try {
         const { data: userData } = await supabase.auth.getUser();
@@ -688,6 +713,7 @@ export default function BookFlashcardsPage() {
 
         if (loadedLanguageCode === "en") {
           setLibraryCards([]);
+          setLibraryColorByWordKey({});
 
           const today = new Date().toISOString().slice(0, 10);
           const { data: englishWords, error: englishWordsErr } = await supabase
@@ -996,6 +1022,39 @@ export default function BookFlashcardsPage() {
         }
 
         const deduped = Array.from(dedupedMap.values());
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.access_token && deduped.length > 0) {
+          const response = await fetch(`/api/books/${userBookId}/library-colors`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              words: deduped.map((card) => ({
+                surface: card.word,
+                reading: card.reading,
+              })),
+            }),
+          });
+
+          if (response.ok) {
+            const payload = (await response.json()) as {
+              colors?: Record<string, LibraryStudyWordColorInfo>;
+            };
+            setLibraryColorByWordKey(payload.colors ?? {});
+          } else {
+            console.warn("Could not load book flashcard library colors:", await response.text());
+            setLibraryColorByWordKey({});
+          }
+        } else {
+          setLibraryColorByWordKey({});
+        }
+
         setCards(deduped);
         setFilteredCards(deduped);
 
@@ -1074,9 +1133,7 @@ export default function BookFlashcardsPage() {
 
     if (colorSelected.length > 0) {
       result = result.filter((c) =>
-        colorSelected.includes(
-          computeLibraryStudyColorStatus({ encounterCount: c.totalCount }).color
-        )
+        colorSelected.includes(getCardColorStatus(c).color)
       );
     }
 
@@ -1112,7 +1169,17 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setCorrectionInput("");
     setCorrectionFeedback(null);
-  }, [cards, isEnglishBook, jlptSelected, colorSelected, chapterFilter, pageFilter, repeatsOnly, studySet]);
+  }, [
+    cards,
+    isEnglishBook,
+    jlptSelected,
+    colorSelected,
+    chapterFilter,
+    pageFilter,
+    repeatsOnly,
+    studySet,
+    libraryColorByWordKey,
+  ]);
 
   useEffect(() => {
     const order = filteredCards.map((_, i) => i);
@@ -2129,9 +2196,8 @@ export default function BookFlashcardsPage() {
   const showMeaning =
     steps.indexOf("meaning") === -1 ? false : stepIndex >= steps.indexOf("meaning");
 
-  const cardColorStatus = card
-    ? computeLibraryStudyColorStatus({ encounterCount: card.totalCount })
-    : null;
+  const cardColorStatus = card ? getCardColorStatus(card) : null;
+  const cardEncounterCount = getCardEncounterCount(card);
 
   const bookFlashcardsStudyingNowLabel = buildBookFlashcardsStudyingNowLabel({
     studySet,
@@ -2195,7 +2261,7 @@ export default function BookFlashcardsPage() {
           jlpt={card?.jlpt ?? "NON-JLPT"}
           colorStatus={cardColorStatus}
           meaningChoiceIndex={(card?.meaningChoiceIndex ?? 0) as number}
-          totalCount={card?.totalCount ?? 0}
+          totalCount={cardEncounterCount}
         />
         ) : null}
 
