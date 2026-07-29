@@ -51,7 +51,7 @@ const MISSED_GATE_RECHECK_MIN_DAYS = 7;
 const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
 const PRE_READING_WAIT_RECHECK_DAYS = 90;
-const YELLOW_READINESS_COOLDOWN_DAYS = 30;
+const YELLOW_READINESS_COOLDOWN_DAYS = 1;
 
 function isKatakanaOnly(value: string | null | undefined) {
   const text = (value ?? "").trim();
@@ -99,22 +99,14 @@ function isInitialGateSlotDue(
   studyIdentityKey: string,
   now = new Date()
 ) {
-  const recheckDays = regularGateRecheckDays(studyIdentityKey);
-  const releaseOffset =
-    hashString(`${studyIdentityKey}::initial-gate-slot`) % recheckDays;
-
-  return appDayNumber(now) % recheckDays === releaseOffset;
+  return true;
 }
 
 function isInitialYellowReadinessSlotDue(
   studyIdentityKey: string,
   now = new Date()
 ) {
-  const releaseOffset =
-    hashString(`${studyIdentityKey}::initial-yellow-readiness-slot`) %
-    YELLOW_READINESS_COOLDOWN_DAYS;
-
-  return appDayNumber(now) % YELLOW_READINESS_COOLDOWN_DAYS === releaseOffset;
+  return true;
 }
 
 function isYellowReadinessCooldownDue(

@@ -196,7 +196,7 @@ const MISSED_GATE_RECHECK_WINDOW_DAYS = 8;
 const PRE_READING_SOFT_WAIT_RECHECK_DAYS = 30;
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
 const PRE_READING_WAIT_RECHECK_DAYS = 90;
-const YELLOW_READINESS_COOLDOWN_DAYS = 30;
+const YELLOW_READINESS_COOLDOWN_DAYS = 1;
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   red_stages: 1,
@@ -212,7 +212,8 @@ const DAILY_CHECK_PLAN_STORAGE_KEY = "library-study-daily-check-plan-by-date";
 
 const DAILY_CHECK_JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const DAILY_CHECK_LEVELS = [...DAILY_CHECK_JLPT_LEVELS, "NON-JLPT"] as const;
-const ABILITY_CHECK_MIN_DUE_CARDS = 10;
+const ABILITY_CHECK_MIN_DUE_CARDS = 1;
+const ABILITY_CHECK_DAILY_CARD_TARGET = 10;
 const MEANING_LANGUAGE_WARNING =
   "This is a MEANING question. Please type your answers in English.";
 
@@ -697,21 +698,11 @@ function appDayNumber(now = new Date()) {
 }
 
 function isInitialGateSlotDue(card: StudyCard, now = new Date()) {
-  const recheckDays = regularGateRecheckDays(card);
-  const dayNumber = appDayNumber(now);
-  const releaseOffset =
-    hashString(`${card.studyIdentityKey}::initial-gate-slot`) % recheckDays;
-
-  return dayNumber % recheckDays === releaseOffset;
+  return true;
 }
 
 function isInitialYellowReadinessSlotDue(card: StudyCard, now = new Date()) {
-  const dayNumber = appDayNumber(now);
-  const releaseOffset =
-    hashString(`${card.studyIdentityKey}::initial-yellow-readiness-slot`) %
-    YELLOW_READINESS_COOLDOWN_DAYS;
-
-  return dayNumber % YELLOW_READINESS_COOLDOWN_DAYS === releaseOffset;
+  return true;
 }
 
 function lastStudiedTime(card: StudyCard) {
@@ -854,7 +845,7 @@ function buildDailyCheckDeckSource(
 
   const rotatedDue = rankDailyCheckCards(dedupeCardsByStudyIdentity(sessionCards));
 
-  return rotatedDue;
+  return rotatedDue.slice(0, ABILITY_CHECK_DAILY_CARD_TARGET);
 }
 
 function checkSessionSummary(deck: StudyCard[]) {

@@ -110,6 +110,23 @@ function TrialCountdownBanner() {
       <p className="mt-1 text-xs font-semibold text-amber-800">
         Your trial ends on {trialBanner.formattedDate}.
       </p>
+
+      <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-amber-100 bg-white/70 px-4 py-3 text-left shadow-sm">
+        <p className="text-sm font-black text-stone-950">Enjoying MEKURU?</p>
+        <p className="mt-1 text-xs leading-5 text-stone-700">
+          Keep Reading Access after your trial for ¥500/month. Save vocabulary,
+          practice flashcards, use Follow-Along, and keep tracking your reading.
+        </p>
+        <p className="mt-2 text-xs leading-5 text-stone-500">
+          After you join on Ko-fi, your MEKURU access will be updated manually.
+        </p>
+        <Link
+          href="/reading-access"
+          className="mt-3 inline-flex rounded-xl bg-amber-900 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-amber-950"
+        >
+          See Reading Access
+        </Link>
+      </div>
     </section>
   );
 }
