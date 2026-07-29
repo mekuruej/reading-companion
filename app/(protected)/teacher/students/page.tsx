@@ -576,9 +576,13 @@ export default function TeacherStudentsPage() {
 
             const isTeacher =
                 meProfile?.role === "teacher" ||
+                meProfile?.role === "admin" ||
                 meProfile?.role === "super_teacher" ||
                 !!meProfile?.is_super_teacher;
-            const isSuperTeacher = meProfile?.role === "super_teacher" || !!meProfile?.is_super_teacher;
+            const isSuperTeacher =
+                meProfile?.role === "admin" ||
+                meProfile?.role === "super_teacher" ||
+                !!meProfile?.is_super_teacher;
 
             setCanAccess(isTeacher);
             setViewerIsSuperTeacher(isSuperTeacher);
@@ -1016,6 +1020,16 @@ export default function TeacherStudentsPage() {
             return;
         }
 
+        const activeTaskLearner = students.find(
+            (student) =>
+                student.id === taskLearnerId &&
+                student.relationshipStatus !== "past"
+        );
+        if (!activeTaskLearner) {
+            setTaskMessage("Choose a learner from your active student list.");
+            return;
+        }
+
         const cleanTitle = taskTitle.trim();
         if (!cleanTitle) {
             setTaskMessage("Add a task title.");
@@ -1038,6 +1052,15 @@ export default function TeacherStudentsPage() {
 
         if (needsBook && !taskUserBookId) {
             setTaskMessage("Choose a linked book for this task.");
+            return;
+        }
+
+        const learnerBookOptions = taskBooksByStudentId[taskLearnerId] ?? [];
+        if (
+            needsBook &&
+            !learnerBookOptions.some((book) => book.id === taskUserBookId)
+        ) {
+            setTaskMessage("Choose a linked book from this learner's library.");
             return;
         }
 
