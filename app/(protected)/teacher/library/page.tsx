@@ -44,6 +44,7 @@ type TeacherBookRow = {
 function isTeacherRole(profile: any) {
   return (
     profile?.role === "teacher" ||
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
@@ -133,7 +134,7 @@ export default function TeacherLibraryPage() {
 
       if (!isTeacherRole(profile)) {
         setCanAccess(false);
-        setTeacherId(user.id);
+        setTeacherId(null);
         setTeacherBooks([]);
         setMessage("Teacher access is required.");
         return;
@@ -179,6 +180,8 @@ export default function TeacherLibraryPage() {
   }
 
   async function searchBooks() {
+    if (!canAccess) return;
+
     const query = bookSearch.trim();
     if (!query) {
       setSearchResults([]);
@@ -209,7 +212,7 @@ export default function TeacherLibraryPage() {
   }
 
   async function addBookToTeacherLibrary(bookId: string) {
-    if (!teacherId) return;
+    if (!canAccess || !teacherId) return;
 
     setAddingBookId(bookId);
     setMessage("");
