@@ -47,8 +47,6 @@ export default function MobileQuickCapture({
   title,
   description,
   surface,
-  reading,
-  meaning,
   meanings,
   selectedMeaningIndex,
   quickLoading,
@@ -68,7 +66,7 @@ export default function MobileQuickCapture({
   onDeleteLastWord,
 }: MobileQuickCaptureProps) {
   const hasSelectedResult = Boolean(selectedCandidateId);
-  const hasCandidateDetails = hasSelectedResult && Boolean(reading.trim() || meaning.trim());
+  const hasMultipleMeanings = hasSelectedResult && meanings.length > 1;
 
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -122,11 +120,18 @@ export default function MobileQuickCapture({
                   onClick={() => onSelectCandidate(candidate)}
                   className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${
                     selected
-                      ? "border-stone-900 bg-white shadow-sm"
+                      ? "border-emerald-400 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
                       : "border-stone-200 bg-white/80 hover:bg-white"
                   }`}
                 >
-                  <div className="font-black text-stone-900">{candidate.surface}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-black text-stone-900">{candidate.surface}</div>
+                    {selected ? (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-emerald-800">
+                        Selected
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="text-xs text-stone-500">
                     {candidate.reading || "No reading listed"}
                   </div>
@@ -139,41 +144,35 @@ export default function MobileQuickCapture({
           </div>
         ) : null}
 
-        <div className="mt-3 min-h-20 rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm">
-          {hasCandidateDetails ? (
-            <>
-              <div className="font-black text-stone-900">{surface || "Selected word"}</div>
-              <div className="text-stone-500">{reading || "No reading listed"}</div>
-              {meanings.length > 1 ? (
-                <label className="mt-2 block">
-                  <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-                    Meaning to save
-                  </span>
-                  <select
-                    value={selectedMeaningIndex}
-                    onChange={(event) => {
-                      const nextIndex = Number(event.target.value);
-                      onMeaningChoiceChange(nextIndex, meanings[nextIndex] ?? "");
-                    }}
-                    className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900"
-                  >
-                    {meanings.map((candidateMeaning, index) => (
-                      <option key={`${candidateMeaning}-${index}`} value={index}>
-                        {index + 1}. {candidateMeaning || "No meaning listed"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <div className="mt-1 text-stone-700">{meaning || "No meaning listed"}</div>
-              )}
-            </>
-          ) : (
+        {!hasSelectedResult ? (
+          <div className="mt-3 min-h-20 rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm">
             <p className="text-stone-500">
               Search for a word, choose a result, then save it to this book.
             </p>
-          )}
-        </div>
+          </div>
+        ) : null}
+
+        {hasMultipleMeanings ? (
+          <label className="mt-3 block rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm">
+            <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-stone-400">
+              Meaning to save
+            </span>
+            <select
+              value={selectedMeaningIndex}
+              onChange={(event) => {
+                const nextIndex = Number(event.target.value);
+                onMeaningChoiceChange(nextIndex, meanings[nextIndex] ?? "");
+              }}
+              className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900"
+            >
+              {meanings.map((candidateMeaning, index) => (
+                <option key={`${candidateMeaning}-${index}`} value={index}>
+                  {index + 1}. {candidateMeaning || "No meaning listed"}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <p className="mt-2 text-xs leading-5 text-stone-500">
           Add page and chapter details later on computer or tablet.
