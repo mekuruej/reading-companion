@@ -2,18 +2,22 @@ type EnglishReaderAddBookFormProps = {
   title: string;
   author: string;
   isbn13: string;
+  asin: string;
   editionFormat: string;
   editionNote: string;
   externalUrl: string;
   recommendedLevel: string;
   saving: boolean;
+  asinLookupLoading: boolean;
   onTitleChange: (value: string) => void;
   onAuthorChange: (value: string) => void;
   onIsbn13Change: (value: string) => void;
+  onAsinChange: (value: string) => void;
   onEditionFormatChange: (value: string) => void;
   onEditionNoteChange: (value: string) => void;
   onExternalUrlChange: (value: string) => void;
   onRecommendedLevelChange: (value: string) => void;
+  onAsinLookup: () => void;
   onSubmit: () => void;
 };
 
@@ -28,18 +32,22 @@ export default function EnglishReaderAddBookForm({
   title,
   author,
   isbn13,
+  asin,
   editionFormat,
   editionNote,
   externalUrl,
   recommendedLevel,
   saving,
+  asinLookupLoading,
   onTitleChange,
   onAuthorChange,
   onIsbn13Change,
+  onAsinChange,
   onEditionFormatChange,
   onEditionNoteChange,
   onExternalUrlChange,
   onRecommendedLevelChange,
+  onAsinLookup,
   onSubmit,
 }: EnglishReaderAddBookFormProps) {
   return (
@@ -102,6 +110,31 @@ export default function EnglishReaderAddBookForm({
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-stone-800">
+              Amazon ASIN <span className="font-normal text-stone-500">(optional)</span>
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={asin}
+                onChange={(event) => onAsinChange(event.target.value)}
+                placeholder="Kindle/Amazon ASIN"
+                className="min-w-0 flex-1 rounded-xl border border-stone-300 px-4 py-3 text-base text-stone-900 outline-none transition focus:border-stone-500"
+              />
+              <button
+                type="button"
+                onClick={onAsinLookup}
+                disabled={asinLookupLoading || !asin.trim()}
+                className="rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-black text-stone-800 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {asinLookupLoading ? "Checking..." : "Find ASIN"}
+              </button>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-stone-500">
+              Use this for Kindle or Amazon-specific English editions.
+            </p>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-stone-800">
               Edition format <span className="font-normal text-stone-500">(optional)</span>

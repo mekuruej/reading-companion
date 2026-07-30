@@ -146,6 +146,22 @@ function normalizeJlpt(val: string | null | undefined) {
   return "NON-JLPT";
 }
 
+function isReadyForFlashcards(word: {
+  surface?: string | null;
+  reading?: string | null;
+  meaning?: string | null;
+  target_language_code?: string | null;
+}) {
+  const surface = (word.surface ?? "").trim();
+  const reading = (word.reading ?? "").trim();
+  const meaning = (word.meaning ?? "").trim();
+  const targetLanguageCode = (word.target_language_code ?? "").trim();
+
+  if (!surface || !meaning) return false;
+  if (targetLanguageCode === "en") return true;
+  return Boolean(reading);
+}
+
 function chapterDisplayParts(w: WordRow) {
   const num = w.chapter_number;
   const name = (w.chapter_name ?? "").trim();
@@ -493,6 +509,11 @@ export default function BookWordsPage() {
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
       hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
     };
+
+    patch.excluded_from_flashcards = !isReadyForFlashcards({
+      ...editing,
+      ...patch,
+    });
 
     if (editMeaningChoiceIndex == null) {
       patch.meaning_choices = null;
@@ -1233,7 +1254,7 @@ export default function BookWordsPage() {
             bookCover={bookCover}
             totalCount={words.length}
             visibleCount={filteredSorted.length}
-            onOpenBookHub={openBookHub}
+            bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
           />
 
           <BookVocabFilterPanel

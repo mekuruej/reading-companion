@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 import EnglishReaderAddBookForm from "./components/EnglishReaderAddBookForm";
 import EnglishReaderAddBookHeader from "./components/EnglishReaderAddBookHeader";
 import EnglishReaderAddBookStatus from "./components/EnglishReaderAddBookStatus";
@@ -48,6 +49,7 @@ export default function EnglishReaderAddBookPage() {
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [canAccess, setCanAccess] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [asinLookupLoading, setAsinLookupLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
   const [saveResult, setSaveResult] = useState<SaveResult | null>(null);
@@ -55,6 +57,7 @@ export default function EnglishReaderAddBookPage() {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [isbn13, setIsbn13] = useState("");
+  const [asin, setAsin] = useState("");
   const [editionFormat, setEditionFormat] = useState("");
   const [editionNote, setEditionNote] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
@@ -104,11 +107,65 @@ export default function EnglishReaderAddBookPage() {
     }
   }
 
+  async function handleAsinLookup() {
+    const normalizedAsin = normalizeAsin(asin);
+    setMessage("");
+    setSaveResult(null);
+
+    if (!normalizedAsin || !isValidAsin(normalizedAsin)) {
+      setMessageTone("error");
+      setMessage("Amazon ASIN must be exactly 10 letters or numbers.");
+      return;
+    }
+
+    setAsin(normalizedAsin);
+    setAsinLookupLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("books")
+        .select("id, title, author, isbn13, asin, edition_format, edition_note, language_code")
+        .ilike("asin", normalizedAsin)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        setMessageTone("info");
+        setMessage("No existing English book uses that ASIN yet. You can enter the title and create it.");
+        return;
+      }
+
+      if (data.language_code && data.language_code !== "en") {
+        setMessageTone("error");
+        setMessage("That ASIN belongs to a non-English book record. Please review it in the main teacher book tools.");
+        return;
+      }
+
+      setTitle(data.title ?? "");
+      setAuthor(data.author ?? "");
+      setIsbn13(data.isbn13 ?? "");
+      setAsin(data.asin ?? normalizedAsin);
+      setEditionFormat(data.edition_format ?? "");
+      setEditionNote(data.edition_note ?? "");
+      setMessageTone("success");
+      setMessage("Found an existing English book for that ASIN. Review the fields, then add it to your Teacher Library.");
+    } catch (error: any) {
+      console.error("Error checking English Reader ASIN:", error);
+      setMessageTone("error");
+      setMessage(error?.message ?? "Could not check that ASIN.");
+    } finally {
+      setAsinLookupLoading(false);
+    }
+  }
+
   async function handleSave() {
     if (!teacherId) return;
 
     const cleanTitle = title.trim();
     const normalizedIsbn13 = cleanIsbn13(isbn13);
+    const normalizedAsin = normalizeAsin(asin);
     const trimmedEditionNote = editionNote.trim();
     const trimmedExternalUrl = externalUrl.trim();
     const trimmedRecommendedLevel = recommendedLevel.trim();
@@ -128,6 +185,12 @@ export default function EnglishReaderAddBookPage() {
       return;
     }
 
+    if (normalizedAsin && !isValidAsin(normalizedAsin)) {
+      setMessageTone("error");
+      setMessage("Amazon ASIN must be exactly 10 letters or numbers.");
+      return;
+    }
+
     if (
       trimmedExternalUrl &&
       !/^https?:\/\/\S+\.\S+/i.test(trimmedExternalUrl)
@@ -140,24 +203,57 @@ export default function EnglishReaderAddBookPage() {
     setSaving(true);
 
     try {
-      const { data: insertedBook, error: bookError } = await supabase
-        .from("books")
-        .insert({
-          title: cleanTitle,
-          author: cleanText(author),
-          isbn13: normalizedIsbn13 || null,
-          language_code: "en",
-          edition_format: editionFormat || null,
-          edition_note: trimmedEditionNote || null,
-          allow_missing_isbn: !normalizedIsbn13,
-          related_links: relatedLinksForUrl(trimmedExternalUrl),
-        })
-        .select("id")
-        .single();
+      const existingIsbnLookup = normalizedIsbn13
+        ? await supabase
+            .from("books")
+            .select("id, title")
+            .eq("isbn13", normalizedIsbn13)
+            .maybeSingle()
+        : { data: null, error: null };
+      const existingAsinLookup = normalizedAsin
+        ? await supabase
+            .from("books")
+            .select("id, title")
+            .ilike("asin", normalizedAsin)
+            .maybeSingle()
+        : { data: null, error: null };
 
-      if (bookError) throw bookError;
+      if (existingIsbnLookup.error) throw existingIsbnLookup.error;
+      if (existingAsinLookup.error) throw existingAsinLookup.error;
 
-      const bookId = insertedBook.id as string;
+      if (
+        existingIsbnLookup.data &&
+        existingAsinLookup.data &&
+        existingIsbnLookup.data.id !== existingAsinLookup.data.id
+      ) {
+        setMessageTone("error");
+        setMessage("ISBN-13 and ASIN match different existing book records. Please review this in the main teacher book tools.");
+        return;
+      }
+
+      const existingBook = existingIsbnLookup.data ?? existingAsinLookup.data;
+      let bookId = existingBook?.id as string | undefined;
+
+      if (!bookId) {
+        const { data: insertedBook, error: bookError } = await supabase
+          .from("books")
+          .insert({
+            title: cleanTitle,
+            author: cleanText(author),
+            isbn13: normalizedIsbn13 || null,
+            asin: normalizedAsin,
+            language_code: "en",
+            edition_format: editionFormat || null,
+            edition_note: trimmedEditionNote || null,
+            allow_missing_isbn: !normalizedIsbn13 && !normalizedAsin,
+            related_links: relatedLinksForUrl(trimmedExternalUrl),
+          })
+          .select("id")
+          .single();
+
+        if (bookError) throw bookError;
+        bookId = insertedBook.id as string;
+      }
 
       const { data: existingUserBook, error: existingUserBookError } = await supabase
         .from("user_books")
@@ -215,10 +311,11 @@ export default function EnglishReaderAddBookPage() {
         teacherBookId: teacherBook?.id ?? null,
       });
       setMessageTone("success");
-      setMessage("English book created and added to your Teacher Library.");
+      setMessage(existingBook ? "Existing English book added to your Teacher Library." : "English book created and added to your Teacher Library.");
       setTitle("");
       setAuthor("");
       setIsbn13("");
+      setAsin("");
       setEditionFormat("");
       setEditionNote("");
       setExternalUrl("");
@@ -249,18 +346,22 @@ export default function EnglishReaderAddBookPage() {
               title={title}
               author={author}
               isbn13={isbn13}
+              asin={asin}
               editionFormat={editionFormat}
               editionNote={editionNote}
               externalUrl={externalUrl}
               recommendedLevel={recommendedLevel}
               saving={saving}
+              asinLookupLoading={asinLookupLoading}
               onTitleChange={setTitle}
               onAuthorChange={setAuthor}
               onIsbn13Change={setIsbn13}
+              onAsinChange={setAsin}
               onEditionFormatChange={setEditionFormat}
               onEditionNoteChange={setEditionNote}
               onExternalUrlChange={setExternalUrl}
               onRecommendedLevelChange={setRecommendedLevel}
+              onAsinLookup={handleAsinLookup}
               onSubmit={handleSave}
             />
 

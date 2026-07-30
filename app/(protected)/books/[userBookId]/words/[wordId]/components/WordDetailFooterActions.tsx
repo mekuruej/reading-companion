@@ -2,6 +2,7 @@ type WordDetailFooterActionsProps = {
   onBack: () => void;
   hidden: boolean | null;
   onEdit: () => void;
+  onResearch: () => void;
   onHide: () => void;
   onUnhide: () => void;
   onDelete: () => void;
@@ -11,6 +12,7 @@ export default function WordDetailFooterActions({
   onBack,
   hidden,
   onEdit,
+  onResearch,
   onHide,
   onUnhide,
   onDelete,
@@ -31,6 +33,14 @@ export default function WordDetailFooterActions({
           className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700"
         >
           Edit
+        </button>
+
+        <button
+          type="button"
+          onClick={onResearch}
+          className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-800 transition hover:bg-violet-100"
+        >
+          Research Again
         </button>
 
         {hidden ? (

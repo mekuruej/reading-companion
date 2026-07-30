@@ -9,6 +9,7 @@ type Character = {
   name: string;
   reading: string | null;
   role: string | null;
+  first_seen_page_number: number | null;
   notes: string | null;
   sort_order: number;
   created_at: string;
@@ -61,7 +62,7 @@ type StoryTabProps = {
   savedCharacterIds: string[];
 
   addCharacter: () => void;
-  updateCharacter: (id: string, field: keyof Character, value: string) => void;
+  updateCharacter: (id: string, field: keyof Character, value: string | number | null) => void;
   startEditingCharacter: (id: string) => void;
   stopEditingCharacter: (id: string) => void;
   saveCharacter: (item: Character) => Promise<void>;
@@ -282,6 +283,11 @@ export default function StoryTab({
                             {character.name || "—"}
                             {character.reading ? ` · ${character.reading}` : ""}
                           </div>
+                          {character.first_seen_page_number != null ? (
+                            <div className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800">
+                              First seen on page {character.first_seen_page_number}
+                            </div>
+                          ) : null}
                           <div className="text-stone-700">{character.role || "—"}</div>
                           <div className="whitespace-pre-wrap text-stone-700">
                             {character.notes || "—"}
@@ -327,6 +333,22 @@ export default function StoryTab({
                             value={character.role ?? ""}
                             onChange={(e) => updateCharacter(character.id, "role", e.target.value)}
                             placeholder="Role"
+                            className="w-full rounded border px-3 py-2 text-sm"
+                          />
+
+                          <input
+                            type="number"
+                            min="1"
+                            inputMode="numeric"
+                            value={character.first_seen_page_number ?? ""}
+                            onChange={(e) =>
+                              updateCharacter(
+                                character.id,
+                                "first_seen_page_number",
+                                e.target.value.trim() ? Number(e.target.value) : null
+                              )
+                            }
+                            placeholder="First seen on page"
                             className="w-full rounded border px-3 py-2 text-sm"
                           />
 

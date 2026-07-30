@@ -44,6 +44,7 @@ type WordRow = {
   meaning_choice_index: number | null;
   hidden: boolean | null;
   hide_kanji_in_reading_support?: boolean | null;
+  target_language_code?: string | null;
 };
 
 type SeenInstance = {
@@ -73,6 +74,15 @@ type WordNeighbor = {
   hidden: boolean | null;
 };
 
+type JishoCandidate = {
+  id: string;
+  surface: string;
+  reading: string;
+  jlpt: string;
+  isCommon: boolean;
+  meaningChoices: string[];
+};
+
 
 // -------------------------------------------------------------
 // Helpers
@@ -95,6 +105,94 @@ function normalizeJlpt(val: string | null | undefined) {
   const v = (val ?? "").toUpperCase();
   if (v === "N1" || v === "N2" || v === "N3" || v === "N4" || v === "N5") return v;
   return "NON-JLPT";
+}
+
+function extractMeaningChoices(entry: any): string[] {
+  const senses = entry?.senses ?? [];
+  const choices: string[] = [];
+
+  for (const sense of senses) {
+    const definitions: string[] = sense?.english_definitions ?? [];
+    const text = definitions.join("; ").trim();
+    if (text) choices.push(text);
+  }
+
+  const seen = new Set<string>();
+  return choices.filter((choice) => {
+    const key = choice.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isExactJishoMatch(entry: any, query: string) {
+  const cleanQuery = query.trim();
+  if (!cleanQuery) return false;
+
+  if ((entry?.slug ?? "") === cleanQuery) return true;
+
+  const japaneseForms = entry?.japanese ?? [];
+  return japaneseForms.some(
+    (form: any) => (form?.word ?? "") === cleanQuery || (form?.reading ?? "") === cleanQuery
+  );
+}
+
+function buildJishoCandidates(entries: any[], fallbackWord: string): JishoCandidate[] {
+  const exactEntries = entries.filter((entry) => isExactJishoMatch(entry, fallbackWord));
+  const sourceEntries = exactEntries.length > 0 ? exactEntries : entries;
+  const candidates: JishoCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (let index = 0; index < sourceEntries.length; index += 1) {
+    const entry = sourceEntries[index];
+    const japaneseForms = entry?.japanese ?? [];
+    const primaryForm =
+      japaneseForms.find((form: any) => form?.word || form?.reading) ?? japaneseForms[0] ?? {};
+
+    const surface = primaryForm?.word || entry?.slug || fallbackWord;
+    const reading = primaryForm?.reading || "";
+    const meaningChoices = extractMeaningChoices(entry);
+
+    if (meaningChoices.length === 0) continue;
+
+    const candidate: JishoCandidate = {
+      id: `${surface}__${reading || "no-reading"}__${index}`,
+      surface,
+      reading,
+      jlpt: normalizeJlpt(entry?.jlpt?.[0] || ""),
+      isCommon: !!entry?.is_common,
+      meaningChoices,
+    };
+
+    const dedupeKey = [
+      candidate.surface,
+      candidate.reading,
+      candidate.meaningChoices.join("||"),
+    ].join("___");
+
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    candidates.push(candidate);
+  }
+
+  return candidates;
+}
+
+function isReadyForFlashcards(word: {
+  surface?: string | null;
+  reading?: string | null;
+  meaning?: string | null;
+  target_language_code?: string | null;
+}) {
+  const surface = (word.surface ?? "").trim();
+  const reading = (word.reading ?? "").trim();
+  const meaning = (word.meaning ?? "").trim();
+  const targetLanguageCode = (word.target_language_code ?? "").trim();
+
+  if (!surface || !meaning) return false;
+  if (targetLanguageCode === "en") return true;
+  return Boolean(reading);
 }
 
 function chapterDisplay(chNum: number | null, chName: string | null) {
@@ -175,6 +273,12 @@ export default function WordDetailPage() {
   const [repeatsInThisBook, setRepeatsInThisBook] = useState<number>(0);
   const [seenInstances, setSeenInstances] = useState<SeenInstance[]>([]);
   const [libraryColorInfo, setLibraryColorInfo] = useState<LibraryStudyWordColorInfo | null>(null);
+  const [researchOpen, setResearchOpen] = useState(false);
+  const [researchQuery, setResearchQuery] = useState("");
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [researchSavingKey, setResearchSavingKey] = useState<string | null>(null);
+  const [researchError, setResearchError] = useState<string | null>(null);
+  const [researchCandidates, setResearchCandidates] = useState<JishoCandidate[]>([]);
 
 
   function openEdit(w: WordRow) {
@@ -263,6 +367,11 @@ export default function WordDetailPage() {
       hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
     };
 
+    patch.excluded_from_flashcards = !isReadyForFlashcards({
+      ...editing,
+      ...patch,
+    });
+
     if (editMeaningChoiceIndex == null) {
       patch.meaning_choices = null;
       patch.meaning_choice_index = null;
@@ -331,6 +440,103 @@ export default function WordDetailPage() {
       router.push(`/books/${encodeURIComponent(userBookId)}/words`);
     } catch (e: any) {
       alert(e?.message ?? "Failed to delete word");
+    }
+  }
+
+  function openResearch() {
+    if (!word || !canUseVocabularyTools) return;
+    setResearchOpen(true);
+    setResearchQuery(word.surface ?? "");
+    setResearchError(null);
+    setResearchCandidates([]);
+  }
+
+  async function researchWord() {
+    if (!canUseVocabularyTools) return;
+
+    const query = researchQuery.trim();
+    if (!query) {
+      setResearchError("Enter a word to research.");
+      return;
+    }
+
+    setResearchLoading(true);
+    setResearchError(null);
+    setResearchCandidates([]);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) throw new Error("Missing session.");
+
+      const response = await fetch(`/api/jisho?keyword=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Dictionary lookup failed.");
+      }
+
+      const candidates = buildJishoCandidates(payload?.data ?? [], query);
+      setResearchCandidates(candidates);
+      if (candidates.length === 0) {
+        setResearchError("No dictionary meanings found. Try a different spelling or reading.");
+      }
+    } catch (error: any) {
+      setResearchError(error?.message ?? "Could not research this word.");
+    } finally {
+      setResearchLoading(false);
+    }
+  }
+
+  async function useResearchedMeaning(candidate: JishoCandidate, meaningIndex: number) {
+    if (!word || !canUseVocabularyTools) return;
+
+    const meaning = candidate.meaningChoices[meaningIndex]?.trim();
+    if (!meaning) return;
+
+    const savingKey = `${candidate.id}-${meaningIndex}`;
+    setResearchSavingKey(savingKey);
+    setResearchError(null);
+
+    const patch: any = {
+      surface: candidate.surface.trim() || word.surface,
+      reading: candidate.reading.trim() || null,
+      meaning,
+      other_definition: null,
+      jlpt: candidate.jlpt === "NON-JLPT" ? null : candidate.jlpt,
+      is_common: candidate.isCommon,
+      meaning_choices: candidate.meaningChoices,
+      meaning_choice_index: meaningIndex,
+    };
+
+    patch.excluded_from_flashcards = !isReadyForFlashcards({
+      ...word,
+      ...patch,
+    });
+
+    try {
+      const { error } = await supabase
+        .from("user_book_words")
+        .update(patch)
+        .eq("id", word.id)
+        .eq("user_book_id", userBookId);
+
+      if (error) throw error;
+
+      const updatedWord = { ...word, ...patch } as WordRow;
+      setWord(updatedWord);
+      setMeaningChoices(asStringArray(updatedWord.meaning_choices));
+      setResearchOpen(false);
+      setResearchCandidates([]);
+    } catch (error: any) {
+      setResearchError(error?.message ?? "Could not update this saved word.");
+    } finally {
+      setResearchSavingKey(null);
     }
   }
 
@@ -453,7 +659,8 @@ export default function WordDetailPage() {
           meaning_choices,
           meaning_choice_index,
           hidden,
-          hide_kanji_in_reading_support
+          hide_kanji_in_reading_support,
+          target_language_code
         `
         )
         .eq("id", wordId)
@@ -665,12 +872,8 @@ export default function WordDetailPage() {
           bookCover={bookCover}
           chapter={chapter}
           pageNumber={word.page_number}
-          onGoToBookHub={() =>
-            router.push(`/books/${encodeURIComponent(userBookId)}`)
-          }
-          onGoToVocabList={() =>
-            router.push(`/books/${encodeURIComponent(userBookId)}/words`)
-          }
+          bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+          vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
         />
 
         <div className="mb-4 grid gap-2 sm:grid-cols-2">
@@ -738,6 +941,7 @@ export default function WordDetailPage() {
               onBack={() => router.back()}
               hidden={word.hidden}
               onEdit={() => openEdit(word)}
+              onResearch={openResearch}
               onHide={() => hideWord(true)}
               onUnhide={() => hideWord(false)}
               onDelete={() => deleteWord()}
@@ -757,6 +961,109 @@ export default function WordDetailPage() {
             </div>
           )}
         </WordDictionaryInfoSection>
+
+        {researchOpen && canUseVocabularyTools ? (
+          <section className="mb-6 rounded-3xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+                  Research Again
+                </p>
+                <h2 className="mt-2 text-xl font-black text-stone-950">
+                  Choose a better meaning for this sentence
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-700">
+                  Re-check the dictionary while keeping this book context nearby. This updates only
+                  your saved word for this book.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setResearchOpen(false);
+                  setResearchError(null);
+                  setResearchCandidates([]);
+                }}
+                className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-violet-900 transition hover:bg-violet-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+              <input
+                value={researchQuery}
+                onChange={(event) => setResearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void researchWord();
+                }}
+                placeholder="Word or reading"
+                className="min-w-0 rounded-2xl border border-violet-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-violet-400"
+              />
+              <button
+                type="button"
+                onClick={() => void researchWord()}
+                disabled={researchLoading || !researchQuery.trim()}
+                className="rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {researchLoading ? "Researching..." : "Look Up"}
+              </button>
+            </div>
+
+            {researchError ? (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {researchError}
+              </div>
+            ) : null}
+
+            {researchCandidates.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {researchCandidates.map((candidate) => (
+                  <div
+                    key={candidate.id}
+                    className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <h3 className="text-lg font-black text-stone-950">{candidate.surface}</h3>
+                      {candidate.reading ? (
+                        <span className="text-sm font-semibold text-stone-500">
+                          {candidate.reading}
+                        </span>
+                      ) : null}
+                      <span className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-xs font-black text-stone-600">
+                        {candidate.jlpt}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {candidate.meaningChoices.map((candidateMeaning, index) => {
+                        const savingKey = `${candidate.id}-${index}`;
+                        return (
+                          <button
+                            key={`${candidate.id}-${candidateMeaning}-${index}`}
+                            type="button"
+                            onClick={() => void useResearchedMeaning(candidate, index)}
+                            disabled={researchSavingKey != null}
+                            className="block w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-left text-sm transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            <span className="font-black text-violet-700">
+                              Def. {index + 1}
+                            </span>
+                            <span className="ml-2 text-stone-800">{candidateMeaning}</span>
+                            <span className="mt-1 block text-xs font-semibold text-stone-500">
+                              {researchSavingKey === savingKey ? "Saving..." : "Use this meaning"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <WordSeenInSection
           seenInstances={seenInstances}

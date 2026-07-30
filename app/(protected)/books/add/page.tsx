@@ -133,6 +133,8 @@ export default function AddBookPage() {
     const [isbn, setIsbn] = useState("");
     const [asin, setAsin] = useState("");
     const [asinEditionFormat, setAsinEditionFormat] = useState("");
+    const [identifierRequestTitle, setIdentifierRequestTitle] = useState("");
+    const [fallbackRequestFormat, setFallbackRequestFormat] = useState("");
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
@@ -147,6 +149,7 @@ export default function AddBookPage() {
     const [requestLoading, setRequestLoading] = useState(false);
     const [requestingBookId, setRequestingBookId] = useState<string | null>(null);
     const [bookSearch, setBookSearch] = useState("");
+    const [bookSearchAuthor, setBookSearchAuthor] = useState("");
     const [bookSearchResults, setBookSearchResults] = useState<BookSearchResult[]>([]);
     const [bookSearchLoading, setBookSearchLoading] = useState(false);
     const [addingExistingBookId, setAddingExistingBookId] = useState<string | null>(null);
@@ -420,7 +423,7 @@ export default function AddBookPage() {
 
             setCanRequestBook(true);
             setError(
-                "MEKURU does not have that Amazon ASIN yet. Add the title below if you know it, then request this Amazon edition for review."
+                "MEKURU does not have that Amazon ASIN yet. Add the title in the ISBN/ASIN request title box, then request this Amazon edition for review."
             );
         } catch (lookupError) {
             console.error("ASIN lookup failed:", lookupError);
@@ -438,7 +441,7 @@ export default function AddBookPage() {
         setError("");
 
         if (!query) {
-            setBookSearchError("Enter a title or author to search.");
+            setBookSearchError("Enter a title to search.");
             return;
         }
 
@@ -598,9 +601,13 @@ export default function AddBookPage() {
     async function handleRequestBook(bookToRequest?: BookSearchResult) {
         const cleanIsbn = (bookToRequest?.isbn13 ?? isbn).replace(/[\s-]/g, "").trim();
         const requestAsin = normalizeAsin(bookToRequest ? bookToRequest.asin : asin);
-        const requestEditionFormat = requestAsin ? asinEditionFormat.trim() : "";
-        const requestTitle = (bookToRequest?.title ?? bookSearch).trim();
-        const requestAuthor = (bookToRequest?.author ?? "").trim();
+        const requestEditionFormat = requestAsin
+            ? asinEditionFormat.trim()
+            : cleanIsbn
+            ? ""
+            : fallbackRequestFormat.trim();
+        const requestTitle = (bookToRequest?.title ?? (identifierRequestTitle || bookSearch)).trim();
+        const requestAuthor = (bookToRequest?.author ?? bookSearchAuthor).trim();
         const isFallbackRequest = !!bookToRequest || (!!bookSearch.trim() && !cleanIsbn) || !!requestAsin;
         const setRequestMessage = isFallbackRequest ? setBookSearchError : setError;
 
@@ -611,6 +618,11 @@ export default function AddBookPage() {
 
         if (!cleanIsbn && !requestAsin && !requestTitle) {
             setRequestMessage("Search for a title, enter an ISBN, or enter an Amazon ASIN before requesting review.");
+            return;
+        }
+
+        if (!cleanIsbn && !requestAsin && requestTitle && !requestEditionFormat) {
+            setRequestMessage("Choose a format before requesting a title-only book for review.");
             return;
         }
 
@@ -790,6 +802,7 @@ export default function AddBookPage() {
                 isbn={isbn}
                 asin={asin}
                 asinEditionFormat={asinEditionFormat}
+                identifierRequestTitle={identifierRequestTitle}
                 lookupLoading={lookupLoading}
                 asinLookupLoading={asinLookupLoading}
                 lookupDisabled={!isbn.trim() || learnerLanguageMissing}
@@ -805,6 +818,10 @@ export default function AddBookPage() {
                     setLibraryNotice(null);
                 }}
                 onAsinEditionFormatChange={setAsinEditionFormat}
+                onIdentifierRequestTitleChange={(value) => {
+                    setIdentifierRequestTitle(value);
+                    setLibraryNotice(null);
+                }}
                 onLookup={handleLookup}
                 onAsinLookup={handleAsinLookup}
             >
@@ -836,16 +853,16 @@ export default function AddBookPage() {
                     Fallback search
                 </p>
                 <h2 className="mt-2 text-xl font-black text-stone-950">
-                    Search by title or author
+                    Search by title and author
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
-                    Use this when ISBN-13 lookup does not find the book, or when the
-                    book does not have an ISBN. If Mekuru already has a complete
-                    record, you can add it to {targetLibraryLabel}. If details are missing,
-                    send a request so the book can be reviewed.
+                    Use this when you do not have an ISBN or ASIN. If Mekuru already
+                    has a complete record, you can add it to {targetLibraryLabel}. If
+                    details are missing, include the author and format so the book can
+                    be reviewed accurately.
                 </p>
 
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_220px_auto]">
                     <input
                         value={bookSearch}
                         onChange={(event) => {
@@ -856,9 +873,43 @@ export default function AddBookPage() {
                         onKeyDown={(event) => {
                             if (event.key === "Enter") void handleBookSearch();
                         }}
-                        placeholder="Title or author"
+                        placeholder="Title"
                         className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                     />
+
+                    <input
+                        value={bookSearchAuthor}
+                        onChange={(event) => {
+                            setBookSearchAuthor(event.target.value);
+                            setBookSearchError("");
+                            setLibraryNotice(null);
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") void handleBookSearch();
+                        }}
+                        placeholder="Author (optional)"
+                        className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                    />
+
+                    <select
+                        value={fallbackRequestFormat}
+                        onChange={(event) => {
+                            setFallbackRequestFormat(event.target.value);
+                            setBookSearchError("");
+                        }}
+                        className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                    >
+                        <option value="">Format if requested</option>
+                        <option value="bunko">文庫本</option>
+                        <option value="shinsho">新書</option>
+                        <option value="tankobon_softcover">単行本 (softcover)</option>
+                        <option value="tankobon_hardcover">単行本 (hardcover)</option>
+                        <option value="paperback">Paperback</option>
+                        <option value="hardcover">Hardcover</option>
+                        <option value="ebook">Ebook</option>
+                        <option value="audiobook">Audiobook</option>
+                        <option value="other">Other</option>
+                    </select>
 
                     <button
                         type="button"
@@ -869,6 +920,10 @@ export default function AddBookPage() {
                         {bookSearchLoading ? "Searching..." : "Search"}
                     </button>
                 </div>
+
+                <p className="mt-2 text-xs leading-5 text-stone-500">
+                    Title and author are both hugely helpful for keeping book records accurate.
+                </p>
 
                 {bookSearchError ? (
                     <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">

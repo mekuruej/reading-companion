@@ -34,6 +34,7 @@ type Character = {
   name: string;
   reading: string | null;
   role: string | null;
+  first_seen_page_number: number | null;
   notes: string | null;
   sort_order: number;
   created_at: string;
@@ -286,7 +287,7 @@ export default function StoryNotesPage() {
   async function loadCharacters(id: string) {
     const { data, error } = await supabase
       .from("user_book_characters")
-      .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
       .eq("user_book_id", id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
@@ -345,6 +346,7 @@ export default function StoryNotesPage() {
         name: "",
         reading: "",
         role: "",
+        first_seen_page_number: null,
         notes: "",
         sort_order: prev.length,
         created_at: new Date().toISOString(),
@@ -356,7 +358,7 @@ export default function StoryNotesPage() {
     startEditingCharacter(newId);
   }
 
-  function updateCharacter(id: string, field: keyof Character, value: string) {
+  function updateCharacter(id: string, field: keyof Character, value: string | number | null) {
     setCharacters((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
     );
@@ -370,6 +372,11 @@ export default function StoryNotesPage() {
       name: item.name.trim(),
       reading: item.reading?.trim() || null,
       role: item.role?.trim() || null,
+      first_seen_page_number:
+        typeof item.first_seen_page_number === "number" &&
+        Number.isFinite(item.first_seen_page_number)
+          ? Math.max(1, Math.trunc(item.first_seen_page_number))
+          : null,
       notes: item.notes?.trim() || null,
       sort_order: item.sort_order ?? 0,
     };
@@ -386,7 +393,7 @@ export default function StoryNotesPage() {
       const { data, error } = await supabase
         .from("user_book_characters")
         .insert(payload)
-        .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+        .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
         .single();
 
       setSavingCharacterIds((prev) => prev.filter((x) => x !== oldId));
@@ -409,7 +416,7 @@ export default function StoryNotesPage() {
       .from("user_book_characters")
       .update(payload)
       .eq("id", item.id)
-      .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
       .single();
 
     setSavingCharacterIds((prev) => prev.filter((x) => x !== item.id));

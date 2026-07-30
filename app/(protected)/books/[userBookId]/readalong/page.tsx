@@ -57,7 +57,32 @@ type ReadAlongWord = {
     hide_kanji_in_reading_support?: boolean | null;
 };
 
+type JishoCandidate = {
+    id: string;
+    surface: string;
+    reading: string;
+    jlpt: string;
+    isCommon: boolean;
+    meaningChoices: string[];
+    defaultMeaning: string;
+};
+
+type AddAfterDraft = {
+    word: string;
+    reading: string;
+    meaning: string;
+    jlpt: string;
+    isCommon: boolean;
+    meaningChoices: string[];
+    meaningChoiceIndex: number | null;
+    candidates: JishoCandidate[];
+    lookupLoading: boolean;
+    saving: boolean;
+    message: string;
+};
+
 type SupportMode = "full" | "reading" | "meaning";
+type AddWordPlacement = "before" | "after";
 
 type PageChunk = {
     label: string;
@@ -114,6 +139,152 @@ function hasUsefulSupportMeaning(word: Pick<ReadAlongWord, "meaning">) {
     return Boolean(word.meaning?.trim());
 }
 
+function normalizeJlpt(val: string): string {
+    if (!val) return "NON-JLPT";
+    const v = val.toUpperCase();
+
+    if (v.includes("N5")) return "N5";
+    if (v.includes("N4")) return "N4";
+    if (v.includes("N3")) return "N3";
+    if (v.includes("N2")) return "N2";
+    if (v.includes("N1")) return "N1";
+
+    return "NON-JLPT";
+}
+
+function extractMeaningChoices(entry: any): string[] {
+    const senses = entry?.senses ?? [];
+    const choices: string[] = [];
+
+    for (const sense of senses) {
+        const defs: string[] = sense?.english_definitions ?? [];
+        const text = defs.join("; ").trim();
+        if (text) choices.push(text);
+    }
+
+    const seen = new Set<string>();
+    return choices.filter((choice) => {
+        const key = choice.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function isExactJishoMatch(entry: any, query: string) {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return false;
+
+    if ((entry?.slug ?? "") === cleanQuery) return true;
+
+    const japaneseForms = entry?.japanese ?? [];
+    return japaneseForms.some(
+        (form: any) => (form?.word ?? "") === cleanQuery || (form?.reading ?? "") === cleanQuery
+    );
+}
+
+function buildJishoCandidates(entries: any[], fallbackWord: string): JishoCandidate[] {
+    const exactEntries = entries.filter((entry) => isExactJishoMatch(entry, fallbackWord));
+    const sourceEntries = exactEntries.length > 0 ? exactEntries : entries;
+    const candidates: JishoCandidate[] = [];
+    const seen = new Set<string>();
+
+    for (let index = 0; index < sourceEntries.length; index += 1) {
+        const entry = sourceEntries[index];
+        const japaneseForms = entry?.japanese ?? [];
+        const primaryForm =
+            japaneseForms.find((j: any) => j?.word || j?.reading) ?? japaneseForms[0] ?? {};
+        const surface = primaryForm?.word || entry?.slug || fallbackWord;
+        const reading = primaryForm?.reading || "";
+        const meaningChoices = extractMeaningChoices(entry);
+
+        const candidate: JishoCandidate = {
+            id: `${surface}__${reading || "no-reading"}__${index}`,
+            surface,
+            reading,
+            jlpt: normalizeJlpt(entry?.jlpt?.[0] || ""),
+            isCommon: !!entry?.is_common,
+            meaningChoices,
+            defaultMeaning: meaningChoices[0] || "",
+        };
+
+        const dedupeKey = [
+            candidate.surface,
+            candidate.reading,
+            candidate.meaningChoices.join("||"),
+        ].join("___");
+
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        candidates.push(candidate);
+    }
+
+    return candidates;
+}
+
+function hasKanji(text: string) {
+    return /[\p{Script=Han}]/u.test(text);
+}
+
+function isReadyForFlashcards(word: {
+    surface?: string | null;
+    reading?: string | null;
+    meaning?: string | null;
+}) {
+    const surface = (word.surface ?? "").trim();
+    const reading = (word.reading ?? "").trim();
+    const meaning = (word.meaning ?? "").trim();
+
+    return Boolean(surface && reading && meaning);
+}
+
+function sameWordOrderGroup(
+    a: Pick<ReadAlongWord, "chapter_number" | "chapter_name" | "page_number">,
+    b: Pick<ReadAlongWord, "chapter_number" | "chapter_name" | "page_number">
+) {
+    return (
+        (a.chapter_number ?? null) === (b.chapter_number ?? null) &&
+        (a.chapter_name ?? "").trim() === (b.chapter_name ?? "").trim() &&
+        (a.page_number ?? null) === (b.page_number ?? null)
+    );
+}
+
+function makeBlankAddAfterDraft(word = ""): AddAfterDraft {
+    return {
+        word,
+        reading: "",
+        meaning: "",
+        jlpt: "NON-JLPT",
+        isCommon: false,
+        meaningChoices: [],
+        meaningChoiceIndex: null,
+        candidates: [],
+        lookupLoading: false,
+        saving: false,
+        message: "",
+    };
+}
+
+async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
+    const {
+        data: { session },
+    } = await supabase.auth.getSession();
+
+    const response = await fetch("/api/vocabulary-kanji-map/generate", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ vocabulary_cache_id: vocabularyCacheId }),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        console.error("Could not generate vocabulary kanji map:", data?.error ?? response.status);
+    }
+}
+
 export default function ReadAlongPage() {
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -127,6 +298,11 @@ export default function ReadAlongPage() {
     >({});
     const [loading, setLoading] = useState(true);
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
+    const [activeAddAfterWordId, setActiveAddAfterWordId] = useState<string | null>(null);
+    const [activeAddPlacement, setActiveAddPlacement] = useState<AddWordPlacement>("after");
+    const [addAfterDraft, setAddAfterDraft] = useState<AddAfterDraft>(() =>
+        makeBlankAddAfterDraft()
+    );
 
     const [pageIndex, setPageIndex] = useState(0);
     const [jumpPageInput, setJumpPageInput] = useState("");
@@ -1121,6 +1297,541 @@ export default function ReadAlongPage() {
         }
     }
 
+    function openAddAfter(word: ReadAlongWord, placement: AddWordPlacement) {
+        setActiveAddAfterWordId((current) => {
+            if (current === word.id && activeAddPlacement === placement) {
+                setAddAfterDraft(makeBlankAddAfterDraft());
+                return null;
+            }
+
+            setActiveAddPlacement(placement);
+            setAddAfterDraft(makeBlankAddAfterDraft());
+            return word.id;
+        });
+    }
+
+    function applyAddAfterCandidate(candidate: JishoCandidate) {
+        setAddAfterDraft((current) => ({
+            ...current,
+            word: candidate.surface,
+            reading: candidate.reading,
+            meaning: candidate.defaultMeaning,
+            jlpt: candidate.jlpt,
+            isCommon: candidate.isCommon,
+            meaningChoices: candidate.meaningChoices,
+            meaningChoiceIndex: candidate.meaningChoices.length > 0 ? 0 : null,
+            message: "",
+        }));
+    }
+
+    function updateAddAfterMeaning(index: number) {
+        setAddAfterDraft((current) => ({
+            ...current,
+            meaningChoiceIndex: index,
+            meaning: current.meaningChoices[index] ?? current.meaning,
+        }));
+    }
+
+    async function lookupAddAfterWord() {
+        const cleanWord = addAfterDraft.word.trim();
+
+        if (!cleanWord) {
+            setAddAfterDraft((current) => ({
+                ...current,
+                message: "Enter a word first.",
+            }));
+            return;
+        }
+
+        setAddAfterDraft((current) => ({
+            ...current,
+            lookupLoading: true,
+            message: "",
+        }));
+
+        try {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+
+            const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(cleanWord)}`, {
+                headers: session?.access_token
+                    ? { Authorization: `Bearer ${session.access_token}` }
+                    : undefined,
+            });
+
+            if (!res.ok) {
+                setAddAfterDraft((current) => ({
+                    ...current,
+                    candidates: [],
+                    message: "Could not load dictionary data. You can enter it manually.",
+                }));
+                return;
+            }
+
+            const data = await res.json();
+            const candidates = buildJishoCandidates(data?.data ?? [], cleanWord);
+            const first = candidates[0];
+
+            if (!first) {
+                setAddAfterDraft((current) => ({
+                    ...current,
+                    candidates: [],
+                    reading: "",
+                    meaning: "",
+                    jlpt: "NON-JLPT",
+                    isCommon: false,
+                    meaningChoices: [],
+                    meaningChoiceIndex: null,
+                    message: "No dictionary result found. You can enter it manually.",
+                }));
+                return;
+            }
+
+            setAddAfterDraft((current) => ({
+                ...current,
+                word: first.surface,
+                reading: first.reading,
+                meaning: first.defaultMeaning,
+                jlpt: first.jlpt,
+                isCommon: first.isCommon,
+                meaningChoices: first.meaningChoices,
+                meaningChoiceIndex: first.meaningChoices.length > 0 ? 0 : null,
+                candidates,
+                message:
+                    candidates.length > 1
+                        ? "Dictionary loaded. Choose the matching word if needed."
+                        : "Dictionary loaded.",
+            }));
+        } catch (error) {
+            console.error("Follow-Along add-after lookup error:", error);
+            setAddAfterDraft((current) => ({
+                ...current,
+                candidates: [],
+                message: "Could not load dictionary data. You can enter it manually.",
+            }));
+        } finally {
+            setAddAfterDraft((current) => ({
+                ...current,
+                lookupLoading: false,
+            }));
+        }
+    }
+
+    async function renumberGroupWithInsertedWord(
+        anchor: ReadAlongWord,
+        insertedWordId: string,
+        placement: AddWordPlacement
+    ) {
+        let query = supabase
+            .from("user_book_words")
+            .select("id, page_order, created_at, chapter_name")
+            .eq("user_book_id", userBookId);
+
+        if (anchor.chapter_number == null) query = query.is("chapter_number", null);
+        else query = query.eq("chapter_number", anchor.chapter_number);
+
+        if (anchor.page_number == null) query = query.is("page_number", null);
+        else query = query.eq("page_number", anchor.page_number);
+
+        const { data, error } = await query
+            .order("page_order", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true });
+
+        if (error) throw error;
+
+        const anchorChapterName = anchor.chapter_name?.trim() ?? "";
+        const groupRows = (data ?? []).filter(
+            (row) => (row.chapter_name ?? "").trim() === anchorChapterName
+        );
+        const existingRows = groupRows.filter((row) => row.id !== insertedWordId);
+        const anchorIndex = existingRows.findIndex((row) => row.id === anchor.id);
+        const insertedRow = groupRows.find((row) => row.id === insertedWordId);
+
+        if (!insertedRow || anchorIndex < 0) return null;
+
+        const reorderedRows = [...existingRows];
+        reorderedRows.splice(placement === "before" ? anchorIndex : anchorIndex + 1, 0, insertedRow);
+
+        for (let index = 0; index < reorderedRows.length; index += 1) {
+            const row = reorderedRows[index];
+            const nextPageOrder = index + 1;
+
+            if (Number(row.page_order) === nextPageOrder) continue;
+
+            const { error: updateError } = await supabase
+                .from("user_book_words")
+                .update({ page_order: nextPageOrder })
+                .eq("id", row.id)
+                .eq("user_book_id", userBookId);
+
+            if (updateError) throw updateError;
+        }
+
+        return new Map(reorderedRows.map((row, index) => [String(row.id), index + 1]));
+    }
+
+    async function saveAddAfterWord(anchor: ReadAlongWord) {
+        if (!userBookId || !canAccessBook || !canUseSavedWordReading) return;
+
+        const cleanWord = addAfterDraft.word.trim();
+        const cleanReading = addAfterDraft.reading.trim();
+        const cleanMeaning = addAfterDraft.meaning.trim();
+
+        if (!cleanWord || !cleanReading || !cleanMeaning) {
+            setAddAfterDraft((current) => ({
+                ...current,
+                message: "Add the word, reading, and meaning before saving.",
+            }));
+            return;
+        }
+
+        setAddAfterDraft((current) => ({
+            ...current,
+            saving: true,
+            message: "",
+        }));
+
+        try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user) {
+                setAddAfterDraft((current) => ({
+                    ...current,
+                    message: "Please sign in.",
+                }));
+                return;
+            }
+
+            let vocabularyCacheId: number | null = null;
+            const hasVerifiedDictionaryMatch = addAfterDraft.candidates.some(
+                (candidate) =>
+                    candidate.surface === cleanWord &&
+                    candidate.reading === cleanReading &&
+                    candidate.meaningChoices.length > 0
+            );
+
+            if (hasKanji(cleanWord) && cleanReading) {
+                const { data: existingCache, error: cacheLookupError } = await supabase
+                    .from("vocabulary_cache")
+                    .select("id, jlpt, is_common")
+                    .eq("surface", cleanWord)
+                    .eq("reading", cleanReading)
+                    .maybeSingle();
+
+                if (cacheLookupError) throw cacheLookupError;
+
+                const normalizedJlpt = normalizeJlpt(addAfterDraft.jlpt);
+                const cacheMetadata = {
+                    jlpt: normalizedJlpt === "NON-JLPT" ? null : normalizedJlpt,
+                    is_common: !!addAfterDraft.isCommon,
+                };
+
+                if (existingCache?.id) {
+                    vocabularyCacheId = existingCache.id;
+
+                    if ((!existingCache.jlpt && cacheMetadata.jlpt) || existingCache.is_common == null) {
+                        const { error: cacheUpdateError } = await supabase
+                            .from("vocabulary_cache")
+                            .update(cacheMetadata)
+                            .eq("id", existingCache.id);
+
+                        if (cacheUpdateError) {
+                            console.error("Error updating vocabulary cache metadata:", cacheUpdateError);
+                        }
+                    }
+                } else if (hasVerifiedDictionaryMatch) {
+                    const { data: createdCache, error: cacheInsertError } = await supabase
+                        .from("vocabulary_cache")
+                        .insert({
+                            surface: cleanWord,
+                            reading: cleanReading,
+                            ...cacheMetadata,
+                        })
+                        .select("id")
+                        .single();
+
+                    if (cacheInsertError) throw cacheInsertError;
+                    vocabularyCacheId = createdCache.id;
+                }
+            }
+
+            const payload = {
+                user_book_id: userBookId,
+                vocabulary_cache_id: vocabularyCacheId,
+                surface: cleanWord,
+                reading: cleanReading,
+                meaning: cleanMeaning,
+                other_definition: addAfterDraft.meaningChoiceIndex == null ? cleanMeaning : null,
+                meaning_choices: addAfterDraft.meaningChoices,
+                meaning_choice_index: addAfterDraft.meaningChoiceIndex,
+                jlpt: normalizeJlpt(addAfterDraft.jlpt),
+                is_common: !!addAfterDraft.isCommon,
+                page_number: anchor.page_number,
+                page_order:
+                    activeAddPlacement === "before"
+                        ? Math.max(1, anchor.page_order ?? 1)
+                        : (anchor.page_order ?? 0) + 1,
+                chapter_number: anchor.chapter_number,
+                chapter_name: anchor.chapter_name?.trim() || null,
+                hide_kanji_in_reading_support: false,
+                seen_on: todayYmdAppTimeZone(),
+                excluded_from_flashcards: !isReadyForFlashcards({
+                    surface: cleanWord,
+                    reading: cleanReading,
+                    meaning: cleanMeaning,
+                }),
+            };
+
+            const { data: insertedRow, error: insertError } = await supabase
+                .from("user_book_words")
+                .insert(payload)
+                .select(
+                    "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+                )
+                .single();
+
+            if (insertError) throw insertError;
+
+            const pageOrderById = await renumberGroupWithInsertedWord(
+                anchor,
+                insertedRow.id,
+                activeAddPlacement
+            );
+            const insertedWord: ReadAlongWord = {
+                id: String(insertedRow.id),
+                surface: insertedRow.surface ?? cleanWord,
+                reading: insertedRow.reading ?? cleanReading,
+                meaning: insertedRow.meaning ?? cleanMeaning,
+                jlpt: insertedRow.jlpt ?? normalizeJlpt(addAfterDraft.jlpt),
+                meaning_choice_index:
+                    insertedRow.meaning_choice_index == null
+                        ? null
+                        : Number(insertedRow.meaning_choice_index),
+                page_number: insertedRow.page_number ?? anchor.page_number,
+                page_order:
+                    pageOrderById?.get(String(insertedRow.id)) ??
+                    insertedRow.page_order ??
+                    (activeAddPlacement === "before"
+                        ? Math.max(1, anchor.page_order ?? 1)
+                        : (anchor.page_order ?? 0) + 1),
+                chapter_number: insertedRow.chapter_number ?? anchor.chapter_number,
+                chapter_name: insertedRow.chapter_name ?? anchor.chapter_name,
+                hide_kanji_in_reading_support: !!insertedRow.hide_kanji_in_reading_support,
+            };
+
+            setWords((currentWords) => {
+                const withInserted = [
+                    ...currentWords.filter((word) => word.id !== insertedWord.id),
+                    insertedWord,
+                ].map((word) => {
+                    const nextPageOrder = pageOrderById?.get(word.id);
+                    return nextPageOrder ? { ...word, page_order: nextPageOrder } : word;
+                });
+
+                return withInserted.sort((a, b) => {
+                    const aChapter = a.chapter_number ?? Number.MAX_SAFE_INTEGER;
+                    const bChapter = b.chapter_number ?? Number.MAX_SAFE_INTEGER;
+                    if (aChapter !== bChapter) return aChapter - bChapter;
+
+                    const aPage = a.page_number ?? Number.MAX_SAFE_INTEGER;
+                    const bPage = b.page_number ?? Number.MAX_SAFE_INTEGER;
+                    if (aPage !== bPage) return aPage - bPage;
+
+                    const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
+                    const bOrder = b.page_order ?? Number.MAX_SAFE_INTEGER;
+                    if (aOrder !== bOrder) return aOrder - bOrder;
+
+                    return a.id.localeCompare(b.id);
+                });
+            });
+
+            if (vocabularyCacheId && hasKanji(cleanWord)) {
+                await generateVocabularyKanjiMap(vocabularyCacheId);
+            }
+
+            setActiveAddAfterWordId(null);
+            setActiveAddPlacement("after");
+            setAddAfterDraft(makeBlankAddAfterDraft());
+        } catch (error: any) {
+            console.error("Follow-Along add-after save error:", error);
+            setAddAfterDraft((current) => ({
+                ...current,
+                message: error?.message ?? "Could not save this word.",
+            }));
+        } finally {
+            setAddAfterDraft((current) => ({
+                ...current,
+                saving: false,
+            }));
+        }
+    }
+
+    const contextSuffix = studentWorkspaceBackContext
+        ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
+        : "";
+
+    function renderAddAfterPanel(anchor: ReadAlongWord) {
+        const placementLabel = activeAddPlacement === "before" ? "before" : "after";
+        const selectedCandidateId =
+            addAfterDraft.candidates.find(
+                (candidate) =>
+                    candidate.surface === addAfterDraft.word &&
+                    candidate.reading === addAfterDraft.reading &&
+                    candidate.defaultMeaning === addAfterDraft.meaning
+            )?.id ?? "";
+
+        return (
+            <div className="mt-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-violet-800">
+                    Add {placementLabel} {anchor.surface}
+                </p>
+
+                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <input
+                        value={addAfterDraft.word}
+                        onChange={(event) =>
+                            setAddAfterDraft((current) => ({
+                                ...current,
+                                word: event.target.value,
+                                candidates: [],
+                                meaningChoices: [],
+                                meaningChoiceIndex: null,
+                                message: "",
+                            }))
+                        }
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                void lookupAddAfterWord();
+                            }
+                        }}
+                        className="w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
+                        placeholder="Word from this spot"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => void lookupAddAfterWord()}
+                        disabled={addAfterDraft.lookupLoading || addAfterDraft.saving}
+                        className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-violet-800 transition hover:bg-violet-100 disabled:opacity-50"
+                    >
+                        {addAfterDraft.lookupLoading ? "Looking..." : "Lookup"}
+                    </button>
+                </div>
+
+                {addAfterDraft.candidates.length > 1 ? (
+                    <label className="mt-2 block">
+                        <span className="text-xs font-bold text-violet-900">Dictionary match</span>
+                        <select
+                            value={selectedCandidateId}
+                            onChange={(event) => {
+                                const candidate = addAfterDraft.candidates.find(
+                                    (item) => item.id === event.target.value
+                                );
+                                if (candidate) applyAddAfterCandidate(candidate);
+                            }}
+                            className="mt-1 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
+                        >
+                            {addAfterDraft.candidates.map((candidate) => (
+                                <option key={candidate.id} value={candidate.id}>
+                                    {candidate.surface}
+                                    {candidate.reading ? ` (${candidate.reading})` : ""}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                ) : null}
+
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <label className="block">
+                        <span className="text-xs font-bold text-violet-900">Reading</span>
+                        <input
+                            value={addAfterDraft.reading}
+                            onChange={(event) =>
+                                setAddAfterDraft((current) => ({
+                                    ...current,
+                                    reading: event.target.value,
+                                    message: "",
+                                }))
+                            }
+                            className="mt-1 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
+                            placeholder="Reading"
+                        />
+                    </label>
+
+                    {addAfterDraft.meaningChoices.length > 1 ? (
+                        <label className="block">
+                            <span className="text-xs font-bold text-violet-900">Meaning</span>
+                            <select
+                                value={
+                                    addAfterDraft.meaningChoiceIndex == null
+                                        ? ""
+                                        : String(addAfterDraft.meaningChoiceIndex)
+                                }
+                                onChange={(event) => updateAddAfterMeaning(Number(event.target.value))}
+                                className="mt-1 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
+                            >
+                                {addAfterDraft.meaningChoices.map((meaning, index) => (
+                                    <option key={`${meaning}-${index}`} value={index}>
+                                        {meaning}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    ) : null}
+                </div>
+
+                <label className="mt-2 block">
+                    <span className="text-xs font-bold text-violet-900">Meaning to save</span>
+                    <textarea
+                        value={addAfterDraft.meaning}
+                        onChange={(event) =>
+                            setAddAfterDraft((current) => ({
+                                ...current,
+                                meaning: event.target.value,
+                                meaningChoiceIndex: null,
+                                message: "",
+                            }))
+                        }
+                        className="mt-1 min-h-[70px] w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
+                        placeholder="Meaning or nuance"
+                    />
+                </label>
+
+                {addAfterDraft.message ? (
+                    <p className="mt-2 text-xs font-semibold text-violet-900">
+                        {addAfterDraft.message}
+                    </p>
+                ) : null}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => void saveAddAfterWord(anchor)}
+                        disabled={addAfterDraft.saving || addAfterDraft.lookupLoading}
+                        className="rounded-xl bg-violet-700 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white transition hover:bg-violet-800 disabled:opacity-50"
+                    >
+                        {addAfterDraft.saving ? "Saving..." : "Save here"}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setActiveAddAfterWordId(null);
+                            setActiveAddPlacement("after");
+                            setAddAfterDraft(makeBlankAddAfterDraft());
+                        }}
+                        className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-violet-800 transition hover:bg-violet-100"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
             <div className="mx-auto max-w-4xl space-y-4">
@@ -1139,18 +1850,8 @@ export default function ReadAlongPage() {
                     <ReadAlongBookContextCard
                         bookTitle={bookTitle}
                         bookCover={bookCover}
-                        onOpenBookHub={() => {
-                            const contextSuffix = studentWorkspaceBackContext
-                                ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
-                                : "";
-                            router.push(`/books/${encodeURIComponent(userBookId)}${contextSuffix}`);
-                        }}
-                        onOpenVocabList={() => {
-                            const contextSuffix = studentWorkspaceBackContext
-                                ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
-                                : "";
-                            router.push(`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`);
-                        }}
+                        bookHubHref={`/books/${encodeURIComponent(userBookId)}${contextSuffix}`}
+                        vocabListHref={`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`}
                     />
                 ) : null}
 
@@ -1225,6 +1926,11 @@ export default function ReadAlongPage() {
                                 wordRefs.current[wordId] = element;
                             }}
                             onProgressTap={handleProgressTap}
+                            canAddAfter
+                            activeAddAfterWordId={activeAddAfterWordId}
+                            activeAddPlacement={activeAddPlacement}
+                            renderAddAfterPanel={renderAddAfterPanel}
+                            onOpenAddAfter={openAddAfter}
                         />
                     )}
                 </ReadAlongReaderShell>

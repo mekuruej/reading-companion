@@ -48,6 +48,10 @@ function favoriteQuoteInputsToText(values: string[]) {
   return values.map((value) => value.trim()).filter(Boolean).join("\n\n");
 }
 
+function normalizeSavedQuote(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
@@ -301,6 +305,9 @@ export default function ReviewNotesPage() {
       return next.length > 0 ? next : [""];
     });
   };
+  const savedFavoriteQuotes = favoriteQuoteTextToInputs(row.favorite_quotes)
+    .map(normalizeSavedQuote)
+    .filter(Boolean);
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -407,15 +414,32 @@ export default function ReviewNotesPage() {
                 </button>
               </div>
               <div className="mt-2 space-y-2">
-                {favoriteQuoteInputs.map((quote, index) => (
+                {favoriteQuoteInputs.map((quote, index) => {
+                  const normalizedQuote = normalizeSavedQuote(quote);
+                  const quoteIsSaved =
+                    normalizedQuote.length > 0 && savedFavoriteQuotes.includes(normalizedQuote);
+
+                  return (
                   <div
                     key={index}
-                    className="rounded-2xl border border-stone-200 bg-stone-50 p-3"
+                    className={[
+                      "rounded-2xl border p-3 transition",
+                      quoteIsSaved
+                        ? "border-emerald-200 bg-emerald-50 shadow-sm shadow-emerald-100"
+                        : "border-stone-200 bg-stone-50",
+                    ].join(" ")}
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
-                        Quote {index + 1}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
+                          Quote {index + 1}
+                        </span>
+                        {quoteIsSaved ? (
+                          <span className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                            Saved
+                          </span>
+                        ) : null}
+                      </div>
                       {favoriteQuoteInputs.length > 1 ? (
                         <button
                           type="button"
@@ -429,11 +453,17 @@ export default function ReviewNotesPage() {
                     <textarea
                       value={quote}
                       onChange={(event) => updateFavoriteQuote(index, event.target.value)}
-                      className="min-h-[92px] w-full rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+                      className={[
+                        "min-h-[92px] w-full rounded-xl border bg-white p-3 text-sm leading-6 outline-none focus:ring-2",
+                        quoteIsSaved
+                          ? "border-emerald-200 focus:ring-emerald-200"
+                          : "border-stone-200 focus:ring-stone-300",
+                      ].join(" ")}
                       placeholder="Add one quote you want to remember."
                     />
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

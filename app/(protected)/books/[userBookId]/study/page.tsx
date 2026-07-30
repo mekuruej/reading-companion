@@ -2145,8 +2145,8 @@ export default function BookFlashcardsPage() {
         <StudyBookHeader
           bookTitle={bookTitle}
           bookCover={bookCover}
-          onOpenBookHub={openBookHub}
-          onOpenVocabList={openVocabList}
+          bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+          vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
         />
 
         {filterControls ? <div className="w-full max-w-3xl">{filterControls}</div> : null}
@@ -2221,8 +2221,8 @@ export default function BookFlashcardsPage() {
       <StudyBookHeader
         bookTitle={bookTitle}
         bookCover={bookCover}
-        onOpenBookHub={openBookHub}
-        onOpenVocabList={openVocabList}
+        bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+        vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
       />
 
       <div className="mb-7 w-full max-w-3xl space-y-0">

@@ -244,6 +244,22 @@ function hasKanji(text: string) {
   return /[\p{Script=Han}]/u.test(text);
 }
 
+function isReadyForFlashcards(word: {
+  surface?: string | null;
+  reading?: string | null;
+  meaning?: string | null;
+  target_language_code?: string | null;
+}) {
+  const surface = (word.surface ?? "").trim();
+  const reading = (word.reading ?? "").trim();
+  const meaning = (word.meaning ?? "").trim();
+  const targetLanguageCode = (word.target_language_code ?? "").trim();
+
+  if (!surface || !meaning) return false;
+  if (targetLanguageCode === "en") return true;
+  return Boolean(reading);
+}
+
 function readableSupabaseError(error: any) {
   if (!error) return "Unknown Supabase error.";
 
@@ -1220,6 +1236,11 @@ export function CuriosityReadingExperience({
       chapter_number: chapterNum,
       chapter_name: chapterNameTrimmed,
       hide_kanji_in_reading_support: hideKanjiInReadingSupport,
+      excluded_from_flashcards: !isReadyForFlashcards({
+        surface: normalizedSurface,
+        reading: quickPreview.reading,
+        meaning: selectedMeaning,
+      }),
     };
 
     if (!editingExisting) {
@@ -1388,6 +1409,7 @@ export function CuriosityReadingExperience({
       chapter_name: chapterNameTrimmed,
       hide_kanji_in_reading_support: false,
       seen_on: todayYmdAppTimeZone(),
+      excluded_from_flashcards: false,
     };
 
     if (!editingExisting) {
@@ -1739,12 +1761,8 @@ export function CuriosityReadingExperience({
                   ? curiosityProgressLine || "Listening timer + heard words"
                   : curiosityProgressLine
               }
-              onOpenBookHub={() => {
-                router.push(`/books/${encodeURIComponent(userBookId)}`);
-              }}
-              onOpenVocabList={() => {
-                router.push(`/books/${encodeURIComponent(userBookId)}/words`);
-              }}
+              bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+              vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
             />
           ) : null
         ) : (

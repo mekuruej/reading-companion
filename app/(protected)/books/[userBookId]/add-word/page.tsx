@@ -182,6 +182,22 @@ function hasKanji(text: string) {
   return /[\p{Script=Han}]/u.test(text);
 }
 
+function isReadyForFlashcards(word: {
+  surface?: string | null;
+  reading?: string | null;
+  meaning?: string | null;
+  target_language_code?: string | null;
+}) {
+  const surface = (word.surface ?? "").trim();
+  const reading = (word.reading ?? "").trim();
+  const meaning = (word.meaning ?? "").trim();
+  const targetLanguageCode = (word.target_language_code ?? "").trim();
+
+  if (!surface || !meaning) return false;
+  if (targetLanguageCode === "en") return true;
+  return Boolean(reading);
+}
+
 async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
   const {
     data: { session },
@@ -839,6 +855,7 @@ export default function AddWordPage() {
         chapter_name: chapterNameTrimmed,
         hide_kanji_in_reading_support: false,
         seen_on: today,
+        excluded_from_flashcards: false,
       };
 
       if (!editingExisting) {
@@ -1238,6 +1255,11 @@ export default function AddWordPage() {
         chapter_name: chapterNameTrimmed,
         hide_kanji_in_reading_support: hideKanjiInReadingSupport,
         seen_on: today,
+        excluded_from_flashcards: !isReadyForFlashcards({
+          surface: finalSurface,
+          reading: cleanReading,
+          meaning: cleanMeaning,
+        }),
       };
 
       if (!editingExisting) {
@@ -1461,10 +1483,8 @@ export default function AddWordPage() {
             bookTitle={bookTitle}
             bookCover={bookCover}
             contextLine={addWordProgressLine}
-            onOpenBookHub={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-            onOpenVocabList={() =>
-              router.push(`/books/${encodeURIComponent(userBookId)}/words`)
-            }
+            bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+            vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
           />
         ) : (
           <p className="mb-6 text-sm text-gray-500">Loading book info…</p>

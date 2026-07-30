@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 
@@ -18,6 +18,10 @@ type ReadAlongWord = {
   meaning: string | null;
   jlpt?: string | null;
   meaning_choice_index?: number | null;
+  page_number?: number | null;
+  page_order?: number | null;
+  chapter_number?: number | null;
+  chapter_name?: string | null;
   hide_kanji_in_reading_support?: boolean | null;
 };
 
@@ -28,6 +32,13 @@ type ReadAlongWordCardProps = {
   colorInfo: WordColorInfo | null;
   setWordRef: (wordId: string, element: HTMLDivElement | null) => void;
   onProgressTap: () => void;
+  canAddAfter?: boolean;
+  canAddBefore?: boolean;
+  isAddAfterOpen?: boolean;
+  isAddBeforeOpen?: boolean;
+  addAfterPanel?: ReactNode;
+  onOpenAddAfter?: () => void;
+  onOpenAddBefore?: () => void;
 };
 
 function normalizeJlptLabel(jlpt?: string | null) {
@@ -96,6 +107,13 @@ export default function ReadAlongWordCard({
   colorInfo,
   setWordRef,
   onProgressTap,
+  canAddAfter = false,
+  canAddBefore = false,
+  isAddAfterOpen = false,
+  isAddBeforeOpen = false,
+  addAfterPanel = null,
+  onOpenAddAfter,
+  onOpenAddBefore,
 }: ReadAlongWordCardProps) {
   const displaySurface =
     (word.hide_kanji_in_reading_support
@@ -141,6 +159,47 @@ export default function ReadAlongWordCard({
           </div>
         )}
       </div>
+
+      {canAddAfter || canAddBefore ? (
+        <div
+          className="mt-2 flex flex-wrap items-center gap-3"
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          {canAddBefore ? (
+            <button
+              type="button"
+              onClick={onOpenAddBefore}
+              className={[
+                "text-[10px] font-bold uppercase tracking-[0.12em] transition",
+                isAddBeforeOpen
+                  ? "text-violet-800"
+                  : "text-stone-400 hover:text-violet-700",
+              ].join(" ")}
+            >
+              + Add before
+            </button>
+          ) : null}
+          {canAddAfter ? (
+            <button
+              type="button"
+              onClick={onOpenAddAfter}
+              className={[
+                "text-[10px] font-bold uppercase tracking-[0.12em] transition",
+                isAddAfterOpen
+                  ? "text-violet-800"
+                  : "text-stone-400 hover:text-violet-700",
+              ].join(" ")}
+            >
+              + Add after
+            </button>
+          ) : null}
+          {isAddAfterOpen || isAddBeforeOpen ? (
+            <div className="w-full">{addAfterPanel}</div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

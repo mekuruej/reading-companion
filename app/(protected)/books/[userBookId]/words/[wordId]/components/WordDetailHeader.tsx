@@ -1,10 +1,12 @@
+import Link from "next/link";
+
 type WordDetailHeaderProps = {
   bookTitle: string;
   bookCover: string | null;
   chapter: string;
   pageNumber: number | null;
-  onGoToBookHub: () => void;
-  onGoToVocabList: () => void;
+  bookHubHref: string;
+  vocabListHref: string;
 };
 
 export default function WordDetailHeader({
@@ -12,14 +14,13 @@ export default function WordDetailHeader({
   bookCover,
   chapter,
   pageNumber,
-  onGoToBookHub,
-  onGoToVocabList,
+  bookHubHref,
+  vocabListHref,
 }: WordDetailHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-4">
-      <button
-        type="button"
-        onClick={onGoToBookHub}
+      <Link
+        href={bookHubHref}
         className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
         title={`Go to ${bookTitle || "this book"} Book Hub`}
       >
@@ -43,24 +44,22 @@ export default function WordDetailHeader({
             {pageNumber != null ? ` • p. ${pageNumber}` : null}
           </p>
         </div>
-      </button>
+      </Link>
 
       <div className="flex flex-wrap gap-2 sm:justify-end">
-        <button
-          type="button"
-          onClick={onGoToVocabList}
+        <Link
+          href={vocabListHref}
           className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
         >
           Vocab List
-        </button>
+        </Link>
 
-        <button
-          type="button"
-          onClick={onGoToBookHub}
+        <Link
+          href={bookHubHref}
           className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
         >
           Book Hub
-        </button>
+        </Link>
       </div>
     </div>
   );

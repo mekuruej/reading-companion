@@ -1,9 +1,11 @@
+import Link from "next/link";
+
 type BookVocabContextCardProps = {
   bookTitle: string | null;
   bookCover: string | null;
   totalCount: number;
   visibleCount: number;
-  onOpenBookHub: () => void;
+  bookHubHref: string;
 };
 
 // Clickable book summary card for the book-specific vocabulary list.
@@ -14,15 +16,14 @@ export default function BookVocabContextCard({
   bookCover,
   totalCount,
   visibleCount,
-  onOpenBookHub,
+  bookHubHref,
 }: BookVocabContextCardProps) {
   const displayTitle = bookTitle || "Words";
   const titleText = `Go to ${bookTitle || "this book"} Book Hub`;
 
   return (
-    <button
-      type="button"
-      onClick={onOpenBookHub}
+    <Link
+      href={bookHubHref}
       className="flex w-full flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 text-left shadow-sm transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400 sm:flex-row sm:items-center sm:justify-between sm:p-4"
       title={titleText}
     >
@@ -51,6 +52,6 @@ export default function BookVocabContextCard({
       <span className="inline-flex w-fit rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800">
         Book Hub
       </span>
-    </button>
+    </Link>
   );
 }

@@ -464,8 +464,8 @@ export default function BookStatsPage() {
                     bookTitleReading={book?.title_reading ?? null}
                     coverUrl={book?.cover_url ?? null}
                     canOpenVocabList={canSeeVocabularyStats}
-                    onOpenBookHub={() => router.push(`/books/${userBookId}`)}
-                    onOpenVocabList={() => router.push(`/books/${userBookId}/words`)}
+                    bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+                    vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
                 />
 
                 {canSeeVocabularyStats ? (

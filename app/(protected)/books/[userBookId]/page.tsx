@@ -161,6 +161,7 @@ type Character = {
   name: string;
   reading: string | null;
   role: string | null;
+  first_seen_page_number: number | null;
   notes: string | null;
   sort_order: number;
   created_at: string;
@@ -1441,6 +1442,7 @@ export default function BookHubPage() {
         name: "",
         reading: "",
         role: "",
+        first_seen_page_number: null,
         notes: "",
         sort_order: prev.length,
         created_at: new Date().toISOString(),
@@ -1451,7 +1453,7 @@ export default function BookHubPage() {
     setShowCharacters(true);
   }
 
-  function updateCharacter(id: string, field: keyof Character, value: string) {
+  function updateCharacter(id: string, field: keyof Character, value: string | number | null) {
     setCharacters((prev) =>
       prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
     );
@@ -1833,7 +1835,7 @@ export default function BookHubPage() {
   async function loadCharacters(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_characters")
-      .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
       .eq("user_book_id", userBookIdValue)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
@@ -1855,6 +1857,11 @@ export default function BookHubPage() {
       name: item.name.trim(),
       reading: item.reading?.trim() || null,
       role: item.role?.trim() || null,
+      first_seen_page_number:
+        typeof item.first_seen_page_number === "number" &&
+        Number.isFinite(item.first_seen_page_number)
+          ? Math.max(1, Math.trunc(item.first_seen_page_number))
+          : null,
       notes: item.notes?.trim() || null,
       sort_order: item.sort_order ?? 0,
     };
@@ -1872,7 +1879,7 @@ export default function BookHubPage() {
       const { data, error } = await supabase
         .from("user_book_characters")
         .insert(payload)
-        .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+        .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
         .single();
 
       setSavingCharacterIds((prev) => prev.filter((x) => x !== oldId));
@@ -1894,7 +1901,7 @@ export default function BookHubPage() {
       .from("user_book_characters")
       .update(payload)
       .eq("id", item.id)
-      .select("id, user_book_id, name, reading, role, notes, sort_order, created_at, updated_at")
+      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
       .single();
 
     setSavingCharacterIds((prev) => prev.filter((x) => x !== item.id));
@@ -5348,6 +5355,31 @@ export default function BookHubPage() {
                 showVocabularyStats={!isEnglishNativeTrackerBook}
               />
 
+              {isEnglishNativeTrackerBook ? (
+                <section className="overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 px-5 py-4 shadow-sm shadow-violet-100/70">
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                    <div>
+                      <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
+                        Native-Language Tracker
+                      </p>
+                      <h2 className="mt-2 text-2xl font-black text-stone-950 sm:text-3xl">
+                        This book is in your
+                        <span className="block">native language.</span>
+                      </h2>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
+                        MEKURU keeps this Book Hub focused on reading time, listening time, sessions,
+                        stats, and your private review. Language-learning actions are hidden here,
+                        and Reading Reflection will not appear for native-language books.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
+                      Use Review & Notes when you want to remember what you thought about the book.
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
               <BookHubActionPrompt />
 
               <BookHubNotices
@@ -5417,31 +5449,6 @@ export default function BookHubPage() {
                   router.push(`/books/${row.id}/review`);
                 } : undefined}
               />
-
-              {isEnglishNativeTrackerBook ? (
-                <section className="overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 px-5 py-4 shadow-sm shadow-violet-100/70">
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                    <div>
-                      <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
-                        Native-Language Tracker
-                      </p>
-                      <h2 className="mt-2 text-2xl font-black text-stone-950 sm:text-3xl">
-                        This book is in your
-                        <span className="block">native language.</span>
-                      </h2>
-                      <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
-                        MEKURU keeps this Book Hub focused on reading time, listening time, sessions,
-                        stats, and your private review. Language-learning actions are hidden here,
-                        and Reading Reflection will not appear for native-language books.
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
-                      Use Review & Notes when you want to remember what you thought about the book.
-                    </div>
-                  </div>
-                </section>
-              ) : null}
 
               {!isEnglishNativeTrackerBook && (!isTrialLearningAccess || canCompleteReadingReflection) ? (
                 <section

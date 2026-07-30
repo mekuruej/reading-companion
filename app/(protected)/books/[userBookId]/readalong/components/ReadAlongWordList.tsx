@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import ReadAlongWordCard from "./ReadAlongWordCard";
 
@@ -15,6 +15,11 @@ type ReadAlongWordListProps = {
   getColorInfo: (word: ReadAlongWord) => WordColorInfo;
   setWordRef: (wordId: string, element: HTMLDivElement | null) => void;
   onProgressTap: (index: number, wordId: string) => void;
+  canAddAfter?: boolean;
+  activeAddAfterWordId?: string | null;
+  activeAddPlacement?: "before" | "after";
+  renderAddAfterPanel?: (word: ReadAlongWord) => ReactNode;
+  onOpenAddAfter?: (word: ReadAlongWord, placement: "before" | "after") => void;
 };
 
 // List of saved-word support cards for the current Read Along page.
@@ -27,6 +32,11 @@ export default function ReadAlongWordList({
   getColorInfo,
   setWordRef,
   onProgressTap,
+  canAddAfter = false,
+  activeAddAfterWordId = null,
+  activeAddPlacement = "after",
+  renderAddAfterPanel,
+  onOpenAddAfter,
 }: ReadAlongWordListProps) {
   return (
     <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
@@ -43,6 +53,13 @@ export default function ReadAlongWordList({
             colorInfo={colorInfo}
             setWordRef={setWordRef}
             onProgressTap={() => onProgressTap(index, word.id)}
+            canAddAfter={canAddAfter}
+            canAddBefore={canAddAfter && index === 0}
+            isAddAfterOpen={activeAddAfterWordId === word.id && activeAddPlacement === "after"}
+            isAddBeforeOpen={activeAddAfterWordId === word.id && activeAddPlacement === "before"}
+            addAfterPanel={renderAddAfterPanel?.(word)}
+            onOpenAddAfter={() => onOpenAddAfter?.(word, "after")}
+            onOpenAddBefore={() => onOpenAddAfter?.(word, "before")}
           />
         );
       })}
