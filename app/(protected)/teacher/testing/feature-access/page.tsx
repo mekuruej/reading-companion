@@ -76,8 +76,8 @@ const FULL_ACCESS_FEATURES: {
         },
         {
             key: "story_notes",
-            label: "Story Notes",
-            note: "Private story/book notes.",
+            label: "Reading Journal",
+            note: "Private reading journal notes.",
         },
         {
             key: "vocabulary_stats",

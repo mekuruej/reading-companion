@@ -819,7 +819,7 @@ export default function AboutBookPage() {
           <ProfileSection
             eyebrow="Reading Notes"
             title="Learner-Facing Notes"
-            description="Notes for readers can live here later without mixing them into private Story Notes."
+            description="Notes for readers can live here later without mixing them into the private Reading Journal."
             className="mt-6"
           >
             <div className="space-y-3">

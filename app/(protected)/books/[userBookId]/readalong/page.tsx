@@ -25,6 +25,7 @@ import ReadAlongTimerPanel from "./components/ReadAlongTimerPanel";
 import ReadAlongReaderShell from "../_shared/readalong/ReadAlongReaderShell";
 import ReadAlongWordList from "./components/ReadAlongWordList";
 import ReadAlongAccessDeniedState from "./components/ReadAlongAccessDeniedState";
+import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import {
     makeLibraryStudyColorKey,
     type LibraryStudyWordColorInfo,
@@ -83,6 +84,7 @@ type AddAfterDraft = {
 
 type SupportMode = "full" | "reading" | "meaning";
 type AddWordPlacement = "before" | "after";
+type FollowAlongViewMode = "follow-along" | "workspace";
 
 type PageChunk = {
     label: string;
@@ -298,6 +300,7 @@ export default function ReadAlongPage() {
     >({});
     const [loading, setLoading] = useState(true);
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
+    const [viewMode, setViewMode] = useState<FollowAlongViewMode>("follow-along");
     const [activeAddAfterWordId, setActiveAddAfterWordId] = useState<string | null>(null);
     const [activeAddPlacement, setActiveAddPlacement] = useState<AddWordPlacement>("after");
     const [addAfterDraft, setAddAfterDraft] = useState<AddAfterDraft>(() =>
@@ -331,6 +334,7 @@ export default function ReadAlongPage() {
 
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
+    const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
     const [username, setUsername] = useState("");
     const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
         useState<StudentWorkspaceBackContext | null>(null);
@@ -338,6 +342,7 @@ export default function ReadAlongPage() {
     const [canAccessBook, setCanAccessBook] = useState(false);
     const [learnerUserId, setLearnerUserId] = useState<string | null>(null);
     const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
+    const [canUseReadingJournal, setCanUseReadingJournal] = useState(false);
     const [fullAccessLocked, setFullAccessLocked] = useState(false);
     const [accessMessage, setAccessMessage] = useState("");
 
@@ -378,6 +383,7 @@ export default function ReadAlongPage() {
             setCanAccessBook(false);
             setLearnerUserId(null);
             setCanUseSavedWordReading(false);
+            setCanUseReadingJournal(false);
             setFullAccessLocked(false);
             setAccessMessage("");
             setStudentWorkspaceBackContext(null);
@@ -391,6 +397,7 @@ export default function ReadAlongPage() {
                 setAccessChecked(true);
                 setCanAccessBook(false);
                 setCanUseSavedWordReading(false);
+                setCanUseReadingJournal(false);
                 setFullAccessLocked(false);
                 setLoading(false);
                 return;
@@ -407,9 +414,11 @@ export default function ReadAlongPage() {
                 .select(`
                     id,
                     user_id,
+                    favorite_quotes,
                     books:book_id (
                         title,
-                        cover_url
+                        cover_url,
+                        language_code
                     )
                 `)
                 .eq("id", userBookId)
@@ -477,6 +486,7 @@ export default function ReadAlongPage() {
             setAccessChecked(true);
             setBookTitle(book?.title ?? "");
             setBookCover(book?.cover_url ?? "");
+            setFavoriteQuotes((userBook as any)?.favorite_quotes ?? null);
 
             const appAccessStatus = profile
                 ? getAppAccessStatus(profile)
@@ -496,11 +506,15 @@ export default function ReadAlongPage() {
             );
 
             setCanUseSavedWordReading(canUseSavedWordReadingNow);
+            setCanUseReadingJournal(
+                Boolean(featureAccess.canUseStoryNotes && book?.language_code !== "en")
+            );
 
             if (!canUseSavedWordReadingNow) {
                 setWords([]);
                 setLibraryColorByWordKey({});
                 setFullAccessLocked(true);
+                setViewMode("follow-along");
                 setLoading(false);
                 return;
             }
@@ -744,6 +758,10 @@ export default function ReadAlongPage() {
 
     const currentPage = pages[pageIndex] ?? null;
     const currentPageNumber = currentPage?.pageNumber ?? null;
+    const currentPageChapterNumber = currentPage?.words[0]?.chapter_number ?? null;
+    const currentPageChapterLabel = currentPage?.words[0]
+        ? chapterLabelForWord(currentPage.words[0])
+        : selectedChapterLabel;
 
     useEffect(() => {
         if (!hasRestoredSavedPage || currentPageNumber == null) return;
@@ -751,6 +769,11 @@ export default function ReadAlongPage() {
 
         window.localStorage.setItem(savedPageStorageKey, String(currentPageNumber));
     }, [currentPageNumber, hasRestoredSavedPage, savedPageStorageKey]);
+
+    useEffect(() => {
+        if (canUseReadingJournal) return;
+        setViewMode("follow-along");
+    }, [canUseReadingJournal]);
 
     function jumpToPage(pageNum: number) {
         if (!Number.isFinite(pageNum) || pageNum <= 0) return;
@@ -1832,9 +1855,63 @@ export default function ReadAlongPage() {
         );
     }
 
+    const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal;
+    const readerShell = (
+        <ReadAlongReaderShell
+            scrollAreaRef={scrollAreaRef}
+            header={
+                <>
+                    <ReadAlongPageNavigator
+                        pageIndex={pageIndex}
+                        pageCount={pages.length}
+                        jumpPageInput={jumpPageInput}
+                        onJumpPageInputChange={setJumpPageInput}
+                        onJumpToPage={jumpToPage}
+                        onPrevious={goPrev}
+                        onNext={goNext}
+                    />
+
+                    <ReadAlongCurrentPageSummary
+                        currentPageLabel={currentPage?.label ?? "Fluid Reading"}
+                        wordCount={currentPage?.words.length ?? 0}
+                        hasCurrentPage={Boolean(currentPage)}
+                    />
+                </>
+            }
+        >
+            {!currentPage || currentPage.words.length === 0 ? (
+                <ReadAlongEmptyState />
+            ) : (
+                <ReadAlongWordList
+                    words={currentPage.words}
+                    supportMode={supportMode}
+                    fadedThroughIndex={fadedThroughIndex}
+                    getColorInfo={(word) =>
+                        libraryColorByWordKey[
+                        makeLibraryStudyColorKey(word.surface, word.reading)
+                        ] ?? null
+                    }
+                    setWordRef={(wordId, element) => {
+                        wordRefs.current[wordId] = element;
+                    }}
+                    onProgressTap={handleProgressTap}
+                    canAddAfter
+                    activeAddAfterWordId={activeAddAfterWordId}
+                    activeAddPlacement={activeAddPlacement}
+                    renderAddAfterPanel={renderAddAfterPanel}
+                    onOpenAddAfter={openAddAfter}
+                />
+            )}
+        </ReadAlongReaderShell>
+    );
+
     return (
         <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
-            <div className="mx-auto max-w-4xl space-y-4">
+            <div
+                className={`mx-auto space-y-4 ${
+                    showReadingWorkspace ? "max-w-[96rem]" : "max-w-4xl"
+                }`}
+            >
                 {studentWorkspaceBackContext ? (
                     <button
                         type="button"
@@ -1846,6 +1923,36 @@ export default function ReadAlongPage() {
                 ) : null}
 
                 <ReadAlongPageHeader />
+
+                {canUseReadingJournal ? (
+                    <div className="hidden justify-end lg:flex">
+                        <div className="inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode("follow-along")}
+                                className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                                    viewMode === "follow-along"
+                                        ? "bg-stone-900 text-white"
+                                        : "text-stone-600 hover:bg-stone-50"
+                                }`}
+                            >
+                                Follow-Along
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode("workspace")}
+                                className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                                    viewMode === "workspace"
+                                        ? "bg-violet-700 text-white"
+                                        : "text-stone-600 hover:bg-violet-50"
+                                }`}
+                            >
+                                Reading Workspace
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
+
                 {bookTitle ? (
                     <ReadAlongBookContextCard
                         bookTitle={bookTitle}
@@ -1888,52 +1995,25 @@ export default function ReadAlongPage() {
                     onSupportModeChange={setSupportMode}
                 />
 
-                <ReadAlongReaderShell
-                    scrollAreaRef={scrollAreaRef}
-                    header={
-                        <>
-                            <ReadAlongPageNavigator
-                                pageIndex={pageIndex}
-                                pageCount={pages.length}
-                                jumpPageInput={jumpPageInput}
-                                onJumpPageInputChange={setJumpPageInput}
-                                onJumpToPage={jumpToPage}
-                                onPrevious={goPrev}
-                                onNext={goNext}
+                {showReadingWorkspace && learnerUserId ? (
+                    <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] lg:items-start lg:gap-4 lg:space-y-0 xl:grid-cols-[minmax(0,1fr)_minmax(390px,clamp(28rem,34vw,32rem))]">
+                        <div className="min-w-0">{readerShell}</div>
+                        <div className="hidden min-w-0 lg:block">
+                            <ReadingJournalPanel
+                                userBookId={userBookId}
+                                ownerUserId={learnerUserId}
+                                favoriteQuotes={favoriteQuotes}
+                                currentPageNumber={currentPageNumber}
+                                selectedChapterLabel={currentPageChapterLabel}
+                                selectedChapterNumber={currentPageChapterNumber}
+                                compact
+                                onFavoriteQuotesChange={setFavoriteQuotes}
                             />
-
-                            <ReadAlongCurrentPageSummary
-                                currentPageLabel={currentPage?.label ?? "Fluid Reading"}
-                                wordCount={currentPage?.words.length ?? 0}
-                                hasCurrentPage={Boolean(currentPage)}
-                            />
-                        </>
-                    }
-                >
-                    {!currentPage || currentPage.words.length === 0 ? (
-                        <ReadAlongEmptyState />
-                    ) : (
-                        <ReadAlongWordList
-                            words={currentPage.words}
-                            supportMode={supportMode}
-                            fadedThroughIndex={fadedThroughIndex}
-                            getColorInfo={(word) =>
-                                libraryColorByWordKey[
-                                makeLibraryStudyColorKey(word.surface, word.reading)
-                                ] ?? null
-                            }
-                            setWordRef={(wordId, element) => {
-                                wordRefs.current[wordId] = element;
-                            }}
-                            onProgressTap={handleProgressTap}
-                            canAddAfter
-                            activeAddAfterWordId={activeAddAfterWordId}
-                            activeAddPlacement={activeAddPlacement}
-                            renderAddAfterPanel={renderAddAfterPanel}
-                            onOpenAddAfter={openAddAfter}
-                        />
-                    )}
-                </ReadAlongReaderShell>
+                        </div>
+                    </div>
+                ) : (
+                    readerShell
+                )}
             </div>
         </main>
     );

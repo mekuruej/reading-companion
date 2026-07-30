@@ -29,7 +29,7 @@ const FULL_ACCESS_FEATURE_LABELS: Record<FullAccessFeature, string> = {
   ability_check: "Ability Check",
   library_review: "Library Review",
   vocab_tools: "Vocab Tools",
-  story_notes: "Story Notes",
+  story_notes: "Reading Journal",
   vocabulary_stats: "vocabulary stats",
   reading_colors: "reading colors",
 };

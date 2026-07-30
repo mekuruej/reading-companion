@@ -1,7 +1,9 @@
-// Story Tab
+// Reading Journal Tab
 // 
 
-type StoryTabMode = "characters" | "plot" | "setting" | "cultural";
+import ReadingJournalDetectiveTab from "./ReadingJournalDetectiveTab";
+import ReadingJournalQuotesTab from "./ReadingJournalQuotesTab";
+import type { DetectiveEntry, StoryTabMode } from "./readingJournalTypes";
 
 type Character = {
   id: string;
@@ -51,8 +53,32 @@ type StoryTabProps = {
   storyTab: StoryTabMode;
   setStoryTab: (value: StoryTabMode) => void;
 
+  detectiveEntries: DetectiveEntry[];
+  detectiveSearch: string;
+  setDetectiveSearch: (value: string) => void;
+  collapsedDetectiveGroups: string[];
+  expandedDetectiveIds: string[];
+  editingDetectiveIds: string[];
+  savingDetectiveIds: string[];
+  savedDetectiveIds: string[];
+
+  addDetectiveEntry: () => void;
+  updateDetectiveEntry: (
+    id: string,
+    field: keyof DetectiveEntry,
+    value: string | number | null
+  ) => void;
+  startEditingDetectiveEntry: (id: string) => void;
+  stopEditingDetectiveEntry: (id: string) => void;
+  toggleDetectiveEntryExpanded: (id: string) => void;
+  toggleDetectiveGroup: (groupKey: string) => void;
+  saveDetectiveEntry: (entry: DetectiveEntry) => Promise<void>;
+  deleteDetectiveEntry: (id: string) => Promise<void>;
+
   characters: Character[];
   visibleCharacters: Character[];
+  characterSearch: string;
+  setCharacterSearch: (value: string) => void;
   showCharacters: boolean;
   setShowCharacters: (value: boolean) => void;
   charactersReverseOrder: boolean;
@@ -70,6 +96,8 @@ type StoryTabProps = {
 
   chapterSummaries: ChapterSummary[];
   visibleChapterSummaries: ChapterSummary[];
+  plotSearch: string;
+  setPlotSearch: (value: string) => void;
   showChapterSummaries: boolean;
   setShowChapterSummaries: (value: boolean) => void;
   chapterReverseOrder: boolean;
@@ -91,6 +119,8 @@ type StoryTabProps = {
 
   settingItems: SettingItem[];
   visibleSettingItems: SettingItem[];
+  settingSearch: string;
+  setSettingSearch: (value: string) => void;
   showSettingItems: boolean;
   setShowSettingItems: (value: boolean) => void;
   settingReverseOrder: boolean;
@@ -108,6 +138,8 @@ type StoryTabProps = {
 
   culturalItems: CulturalItem[];
   visibleCulturalItems: CulturalItem[];
+  culturalSearch: string;
+  setCulturalSearch: (value: string) => void;
   showCulturalItems: boolean;
   setShowCulturalItems: (value: boolean) => void;
   culturalReverseOrder: boolean;
@@ -122,6 +154,17 @@ type StoryTabProps = {
   stopEditingCulturalItem: (id: string) => void;
   saveCulturalItem: (item: CulturalItem) => Promise<void>;
   deleteCulturalItem: (id: string) => Promise<void>;
+
+  favoriteQuoteInputs: string[];
+  quoteSearch: string;
+  setQuoteSearch: (value: string) => void;
+  savedFavoriteQuotes: string[];
+  savingQuotes: boolean;
+  quotesSaveMessage: string;
+  addFavoriteQuote: () => void;
+  updateFavoriteQuote: (index: number, value: string) => void;
+  removeFavoriteQuote: (index: number) => void;
+  saveFavoriteQuotes: () => Promise<void>;
 };
 
 function StorySubTab({
@@ -152,8 +195,27 @@ export default function StoryTab({
   storyTab,
   setStoryTab,
 
+  detectiveEntries,
+  detectiveSearch,
+  setDetectiveSearch,
+  collapsedDetectiveGroups,
+  expandedDetectiveIds,
+  editingDetectiveIds,
+  savingDetectiveIds,
+  savedDetectiveIds,
+  addDetectiveEntry,
+  updateDetectiveEntry,
+  startEditingDetectiveEntry,
+  stopEditingDetectiveEntry,
+  toggleDetectiveEntryExpanded,
+  toggleDetectiveGroup,
+  saveDetectiveEntry,
+  deleteDetectiveEntry,
+
   characters,
   visibleCharacters,
+  characterSearch,
+  setCharacterSearch,
   showCharacters,
   setShowCharacters,
   charactersReverseOrder,
@@ -170,6 +232,8 @@ export default function StoryTab({
 
   chapterSummaries,
   visibleChapterSummaries,
+  plotSearch,
+  setPlotSearch,
   showChapterSummaries,
   setShowChapterSummaries,
   chapterReverseOrder,
@@ -186,6 +250,8 @@ export default function StoryTab({
 
   settingItems,
   visibleSettingItems,
+  settingSearch,
+  setSettingSearch,
   showSettingItems,
   setShowSettingItems,
   settingReverseOrder,
@@ -202,6 +268,8 @@ export default function StoryTab({
 
   culturalItems,
   visibleCulturalItems,
+  culturalSearch,
+  setCulturalSearch,
   showCulturalItems,
   setShowCulturalItems,
   culturalReverseOrder,
@@ -215,10 +283,68 @@ export default function StoryTab({
   stopEditingCulturalItem,
   saveCulturalItem,
   deleteCulturalItem,
+
+  favoriteQuoteInputs,
+  quoteSearch,
+  setQuoteSearch,
+  savedFavoriteQuotes,
+  savingQuotes,
+  quotesSaveMessage,
+  addFavoriteQuote,
+  updateFavoriteQuote,
+  removeFavoriteQuote,
+  saveFavoriteQuotes,
 }: StoryTabProps) {
+  const cleanCharacterSearch = characterSearch.trim().toLowerCase();
+  const filteredVisibleCharacters = cleanCharacterSearch
+    ? visibleCharacters.filter((character) =>
+        [
+          character.name,
+          character.reading,
+          character.role,
+          character.first_seen_page_number == null ? "" : String(character.first_seen_page_number),
+          character.notes,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(cleanCharacterSearch)
+      )
+    : visibleCharacters;
+
+  const cleanPlotSearch = plotSearch.trim().toLowerCase();
+  const filteredVisibleChapterSummaries = cleanPlotSearch
+    ? visibleChapterSummaries.filter((chapter) =>
+        [
+          chapter.chapter_number == null ? "" : String(chapter.chapter_number),
+          chapter.chapter_title,
+          chapter.summary,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(cleanPlotSearch)
+      )
+    : visibleChapterSummaries;
+
+  const cleanSettingSearch = settingSearch.trim().toLowerCase();
+  const filteredVisibleSettingItems = cleanSettingSearch
+    ? visibleSettingItems.filter((item) =>
+        [item.title, item.details].join(" ").toLowerCase().includes(cleanSettingSearch)
+      )
+    : visibleSettingItems;
+
+  const cleanCulturalSearch = culturalSearch.trim().toLowerCase();
+  const filteredVisibleCulturalItems = cleanCulturalSearch
+    ? visibleCulturalItems.filter((item) =>
+        [item.title, item.details].join(" ").toLowerCase().includes(cleanCulturalSearch)
+      )
+    : visibleCulturalItems;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 pl-2">
+        <StorySubTab active={storyTab === "detective"} onClick={() => setStoryTab("detective")}>
+          Detective
+        </StorySubTab>
         <StorySubTab active={storyTab === "characters"} onClick={() => setStoryTab("characters")}>
           Characters
         </StorySubTab>
@@ -231,7 +357,31 @@ export default function StoryTab({
         <StorySubTab active={storyTab === "cultural"} onClick={() => setStoryTab("cultural")}>
           Cultural
         </StorySubTab>
+        <StorySubTab active={storyTab === "quotes"} onClick={() => setStoryTab("quotes")}>
+          Quotes
+        </StorySubTab>
       </div>
+
+      {storyTab === "detective" && (
+        <ReadingJournalDetectiveTab
+          detectiveEntries={detectiveEntries}
+          detectiveSearch={detectiveSearch}
+          setDetectiveSearch={setDetectiveSearch}
+          collapsedDetectiveGroups={collapsedDetectiveGroups}
+          expandedDetectiveIds={expandedDetectiveIds}
+          editingDetectiveIds={editingDetectiveIds}
+          savingDetectiveIds={savingDetectiveIds}
+          savedDetectiveIds={savedDetectiveIds}
+          addDetectiveEntry={addDetectiveEntry}
+          updateDetectiveEntry={updateDetectiveEntry}
+          startEditingDetectiveEntry={startEditingDetectiveEntry}
+          stopEditingDetectiveEntry={stopEditingDetectiveEntry}
+          toggleDetectiveEntryExpanded={toggleDetectiveEntryExpanded}
+          toggleDetectiveGroup={toggleDetectiveGroup}
+          saveDetectiveEntry={saveDetectiveEntry}
+          deleteDetectiveEntry={deleteDetectiveEntry}
+        />
+      )}
 
       {storyTab === "characters" && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -265,12 +415,21 @@ export default function StoryTab({
             </div>
           </div>
 
+          <input
+            value={characterSearch}
+            onChange={(event) => setCharacterSearch(event.target.value)}
+            placeholder="Search characters..."
+            className="mb-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+          />
+
           {showCharacters ? (
             characters.length === 0 ? (
               <div className="text-sm text-stone-500">No characters yet.</div>
+            ) : filteredVisibleCharacters.length === 0 ? (
+              <div className="text-sm text-stone-500">No characters match this search.</div>
             ) : (
               <div className="space-y-3">
-                {visibleCharacters.map((character) => {
+                {filteredVisibleCharacters.map((character) => {
                   const isEditing = editingCharacterIds.includes(character.id);
                   const isSaving = savingCharacterIds.includes(character.id);
                   const isSaved = savedCharacterIds.includes(character.id);
@@ -430,12 +589,21 @@ export default function StoryTab({
             </div>
           </div>
 
+          <input
+            value={plotSearch}
+            onChange={(event) => setPlotSearch(event.target.value)}
+            placeholder="Search plot notes..."
+            className="mb-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+          />
+
           {showChapterSummaries ? (
             chapterSummaries.length === 0 ? (
               <div className="text-sm text-stone-500">No chapter summaries yet.</div>
+            ) : filteredVisibleChapterSummaries.length === 0 ? (
+              <div className="text-sm text-stone-500">No plot notes match this search.</div>
             ) : (
               <div className="space-y-3">
-                {visibleChapterSummaries.map((chapter) => {
+                {filteredVisibleChapterSummaries.map((chapter) => {
                   const isEditing = editingChapterIds.includes(chapter.id);
                   const isSaving = savingChapterIds.includes(chapter.id);
                   const isSaved = savedChapterIds.includes(chapter.id);
@@ -540,6 +708,7 @@ export default function StoryTab({
 
       {storyTab === "setting" && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          {/* Setting notes currently preserve the existing local-only behavior. */}
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-stone-900">Setting</div>
 
@@ -570,12 +739,21 @@ export default function StoryTab({
             </div>
           </div>
 
+          <input
+            value={settingSearch}
+            onChange={(event) => setSettingSearch(event.target.value)}
+            placeholder="Search setting notes..."
+            className="mb-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+          />
+
           {showSettingItems ? (
             settingItems.length === 0 ? (
               <div className="text-sm text-stone-500">No setting notes yet.</div>
+            ) : filteredVisibleSettingItems.length === 0 ? (
+              <div className="text-sm text-stone-500">No setting notes match this search.</div>
             ) : (
               <div className="space-y-3">
-                {visibleSettingItems.map((item) => {
+                {filteredVisibleSettingItems.map((item) => {
                   const isEditing = editingSettingIds.includes(item.id);
                   const isSaving = savingSettingIds.includes(item.id);
                   const isSaved = savedSettingIds.includes(item.id);
@@ -634,7 +812,7 @@ export default function StoryTab({
                               disabled={isSaving}
                               className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                             >
-                              {isSaving ? "Saving..." : isSaved ? "Saved" : "Save"}
+                              {isSaving ? "Updating..." : isSaved ? "Updated for this session" : "Update"}
                             </button>
 
                             <button
@@ -668,6 +846,7 @@ export default function StoryTab({
 
       {storyTab === "cultural" && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          {/* Cultural notes currently preserve the existing local-only behavior. */}
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-stone-900">Cultural</div>
 
@@ -698,12 +877,21 @@ export default function StoryTab({
             </div>
           </div>
 
+          <input
+            value={culturalSearch}
+            onChange={(event) => setCulturalSearch(event.target.value)}
+            placeholder="Search cultural notes..."
+            className="mb-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+          />
+
           {showCulturalItems ? (
             culturalItems.length === 0 ? (
               <div className="text-sm text-stone-500">No cultural notes yet.</div>
+            ) : filteredVisibleCulturalItems.length === 0 ? (
+              <div className="text-sm text-stone-500">No cultural notes match this search.</div>
             ) : (
               <div className="space-y-3">
-                {visibleCulturalItems.map((item) => {
+                {filteredVisibleCulturalItems.map((item) => {
                   const isEditing = editingCulturalIds.includes(item.id);
                   const isSaving = savingCulturalIds.includes(item.id);
                   const isSaved = savedCulturalIds.includes(item.id);
@@ -762,7 +950,7 @@ export default function StoryTab({
                               disabled={isSaving}
                               className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                             >
-                              {isSaving ? "Saving..." : isSaved ? "Saved" : "Save"}
+                              {isSaving ? "Updating..." : isSaved ? "Updated for this session" : "Update"}
                             </button>
 
                             <button
@@ -792,6 +980,21 @@ export default function StoryTab({
             <div className="text-sm text-stone-500">Hidden.</div>
           )}
         </div>
+      )}
+
+      {storyTab === "quotes" && (
+        <ReadingJournalQuotesTab
+          favoriteQuoteInputs={favoriteQuoteInputs}
+          quoteSearch={quoteSearch}
+          setQuoteSearch={setQuoteSearch}
+          savedFavoriteQuotes={savedFavoriteQuotes}
+          savingQuotes={savingQuotes}
+          quotesSaveMessage={quotesSaveMessage}
+          addFavoriteQuote={addFavoriteQuote}
+          updateFavoriteQuote={updateFavoriteQuote}
+          removeFavoriteQuote={removeFavoriteQuote}
+          saveFavoriteQuotes={saveFavoriteQuotes}
+        />
       )}
     </div>
   );

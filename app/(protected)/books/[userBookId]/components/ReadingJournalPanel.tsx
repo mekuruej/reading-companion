@@ -1,0 +1,708 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import StoryTab from "./tabs/StoryTab";
+import type { StoryTabMode } from "./tabs/readingJournalTypes";
+import { useDetectiveEntries } from "../story/useDetectiveEntries";
+
+type Character = {
+  id: string;
+  user_book_id: string;
+  name: string;
+  reading: string | null;
+  role: string | null;
+  first_seen_page_number: number | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type ChapterSummary = {
+  id: string;
+  user_book_id: string;
+  chapter_number: number | null;
+  chapter_title: string | null;
+  summary: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type SettingItem = {
+  id: string;
+  user_book_id: string;
+  title: string | null;
+  details: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type CulturalItem = {
+  id: string;
+  user_book_id: string;
+  title: string | null;
+  details: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type ReadingJournalPanelProps = {
+  userBookId: string;
+  ownerUserId: string;
+  favoriteQuotes?: string | null;
+  currentPageNumber?: number | null;
+  selectedChapterLabel?: string | null;
+  selectedChapterNumber?: number | null;
+  compact?: boolean;
+  onFavoriteQuotesChange?: (value: string | null) => void;
+};
+
+function favoriteQuoteTextToInputs(value: string | null | undefined) {
+  const text = value?.trim() ?? "";
+  if (!text) return [""];
+
+  const pieces = text.includes("\n\n") ? text.split(/\n{2,}/) : text.split(/\n/);
+  const quotes = pieces.map((piece) => piece.trim()).filter(Boolean);
+  return quotes.length > 0 ? quotes : [""];
+}
+
+function favoriteQuoteInputsToText(values: string[]) {
+  return values.map((value) => value.trim()).filter(Boolean).join("\n\n");
+}
+
+export default function ReadingJournalPanel({
+  userBookId,
+  ownerUserId,
+  favoriteQuotes,
+  currentPageNumber,
+  selectedChapterLabel,
+  selectedChapterNumber,
+  compact = false,
+  onFavoriteQuotesChange,
+}: ReadingJournalPanelProps) {
+  const [storyTab, setStoryTab] = useState<StoryTabMode>("detective");
+  const detective = useDetectiveEntries();
+
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [characterSearch, setCharacterSearch] = useState("");
+  const [showCharacters, setShowCharacters] = useState(true);
+  const [charactersReverseOrder, setCharactersReverseOrder] = useState(false);
+  const [editingCharacterIds, setEditingCharacterIds] = useState<string[]>([]);
+  const [savingCharacterIds, setSavingCharacterIds] = useState<string[]>([]);
+  const [savedCharacterIds, setSavedCharacterIds] = useState<string[]>([]);
+
+  const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
+  const [plotSearch, setPlotSearch] = useState("");
+  const [showChapterSummaries, setShowChapterSummaries] = useState(false);
+  const [chapterReverseOrder, setChapterReverseOrder] = useState(false);
+  const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
+  const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
+  const [savedChapterIds, setSavedChapterIds] = useState<string[]>([]);
+
+  const [settingItems, setSettingItems] = useState<SettingItem[]>([]);
+  const [settingSearch, setSettingSearch] = useState("");
+  const [showSettingItems, setShowSettingItems] = useState(true);
+  const [settingReverseOrder, setSettingReverseOrder] = useState(false);
+  const [editingSettingIds, setEditingSettingIds] = useState<string[]>([]);
+  const [savingSettingIds, setSavingSettingIds] = useState<string[]>([]);
+  const [savedSettingIds, setSavedSettingIds] = useState<string[]>([]);
+
+  const [culturalItems, setCulturalItems] = useState<CulturalItem[]>([]);
+  const [culturalSearch, setCulturalSearch] = useState("");
+  const [showCulturalItems, setShowCulturalItems] = useState(true);
+  const [culturalReverseOrder, setCulturalReverseOrder] = useState(false);
+  const [editingCulturalIds, setEditingCulturalIds] = useState<string[]>([]);
+  const [savingCulturalIds, setSavingCulturalIds] = useState<string[]>([]);
+  const [savedCulturalIds, setSavedCulturalIds] = useState<string[]>([]);
+
+  const [favoriteQuoteInputs, setFavoriteQuoteInputs] = useState<string[]>(() =>
+    favoriteQuoteTextToInputs(favoriteQuotes)
+  );
+  const [quoteSearch, setQuoteSearch] = useState("");
+  const [savingQuotes, setSavingQuotes] = useState(false);
+  const [quotesSaveMessage, setQuotesSaveMessage] = useState("");
+
+  const visibleCharacters = useMemo(() => {
+    const copy = [...characters];
+    return charactersReverseOrder ? copy.reverse() : copy;
+  }, [characters, charactersReverseOrder]);
+
+  const visibleChapterSummaries = useMemo(() => {
+    const copy = [...chapterSummaries];
+    return chapterReverseOrder ? copy.reverse() : copy;
+  }, [chapterSummaries, chapterReverseOrder]);
+
+  const visibleSettingItems = useMemo(() => {
+    const copy = [...settingItems];
+    return settingReverseOrder ? copy.reverse() : copy;
+  }, [settingItems, settingReverseOrder]);
+
+  const visibleCulturalItems = useMemo(() => {
+    const copy = [...culturalItems];
+    return culturalReverseOrder ? copy.reverse() : copy;
+  }, [culturalItems, culturalReverseOrder]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      await Promise.all([
+        detective.loadDetectiveEntries({ userBookId, ownerUserId }),
+        loadCharacters(userBookId, cancelled),
+        loadChapterSummaries(userBookId, cancelled),
+      ]);
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userBookId, ownerUserId]);
+
+  useEffect(() => {
+    setFavoriteQuoteInputs(favoriteQuoteTextToInputs(favoriteQuotes));
+    setQuotesSaveMessage("");
+  }, [favoriteQuotes]);
+
+  async function loadCharacters(id: string, cancelled: boolean) {
+    const { data, error } = await supabase
+      .from("user_book_characters")
+      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
+      .eq("user_book_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (cancelled) return;
+    if (error) {
+      console.error("Error loading characters:", error);
+      setCharacters([]);
+      return;
+    }
+
+    setCharacters((data as Character[]) ?? []);
+  }
+
+  async function loadChapterSummaries(id: string, cancelled: boolean) {
+    const { data, error } = await supabase
+      .from("user_book_chapter_summaries")
+      .select("id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at")
+      .eq("user_book_id", id)
+      .order("sort_order", { ascending: true })
+      .order("chapter_number", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (cancelled) return;
+    if (error) {
+      console.error("Error loading chapter summaries:", error);
+      setChapterSummaries([]);
+      return;
+    }
+
+    setChapterSummaries((data as ChapterSummary[]) ?? []);
+  }
+
+  function startEditingCharacter(id: string) {
+    setEditingCharacterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }
+
+  function stopEditingCharacter(id: string) {
+    setEditingCharacterIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function markCharacterSaved(id: string) {
+    setSavedCharacterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    window.setTimeout(() => {
+      setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
+    }, 1800);
+  }
+
+  function addCharacter() {
+    const newId = `new-character-${Date.now()}`;
+    setCharacters((prev) => [
+      ...prev,
+      {
+        id: newId,
+        user_book_id: userBookId,
+        name: "",
+        reading: "",
+        role: "",
+        first_seen_page_number: null,
+        notes: "",
+        sort_order: prev.length,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]);
+    setShowCharacters(true);
+    startEditingCharacter(newId);
+  }
+
+  function updateCharacter(id: string, field: keyof Character, value: string | number | null) {
+    setCharacters((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  }
+
+  async function saveCharacter(item: Character) {
+    const payload = {
+      user_book_id: userBookId,
+      name: item.name.trim(),
+      reading: item.reading?.trim() || null,
+      role: item.role?.trim() || null,
+      first_seen_page_number:
+        typeof item.first_seen_page_number === "number" && Number.isFinite(item.first_seen_page_number)
+          ? Math.max(1, Math.trunc(item.first_seen_page_number))
+          : null,
+      notes: item.notes?.trim() || null,
+      sort_order: item.sort_order ?? 0,
+    };
+
+    if (!payload.name) {
+      alert("Please enter a character name before saving.");
+      return;
+    }
+
+    setSavingCharacterIds((prev) => [...prev, item.id]);
+
+    if (item.id.startsWith("new-character-")) {
+      const oldId = item.id;
+      const { data, error } = await supabase
+        .from("user_book_characters")
+        .insert(payload)
+        .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
+        .single();
+
+      setSavingCharacterIds((prev) => prev.filter((x) => x !== oldId));
+
+      if (error) {
+        console.error("Error creating character:", error);
+        alert(`Could not save character.\n${error.message}`);
+        return;
+      }
+
+      const saved = data as Character;
+      setCharacters((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
+      setEditingCharacterIds((prev) => prev.map((x) => (x === oldId ? saved.id : x)));
+      stopEditingCharacter(saved.id);
+      markCharacterSaved(saved.id);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_characters")
+      .update(payload)
+      .eq("id", item.id)
+      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
+      .single();
+
+    setSavingCharacterIds((prev) => prev.filter((x) => x !== item.id));
+
+    if (error) {
+      console.error("Error updating character:", error);
+      alert(`Could not update character.\n${error.message}`);
+      return;
+    }
+
+    const saved = data as Character;
+    setCharacters((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
+    stopEditingCharacter(saved.id);
+    markCharacterSaved(saved.id);
+  }
+
+  async function deleteCharacter(id: string) {
+    if (id.startsWith("new-character-")) {
+      setCharacters((prev) => prev.filter((x) => x.id !== id));
+      setSavingCharacterIds((prev) => prev.filter((x) => x !== id));
+      setSavedCharacterIds((prev) => prev.filter((x) => x !== id));
+      return;
+    }
+
+    if (!window.confirm("Delete this character?")) return;
+
+    const { error } = await supabase.from("user_book_characters").delete().eq("id", id);
+    if (error) {
+      console.error("Error deleting character:", error);
+      alert("Could not delete character.");
+      return;
+    }
+
+    setCharacters((prev) => prev.filter((x) => x.id !== id));
+    stopEditingCharacter(id);
+  }
+
+  function startEditingChapter(id: string) {
+    setEditingChapterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }
+
+  function stopEditingChapter(id: string) {
+    setEditingChapterIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function markChapterSaved(id: string) {
+    setSavedChapterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    window.setTimeout(() => {
+      setSavedChapterIds((prev) => prev.filter((x) => x !== id));
+    }, 1800);
+  }
+
+  function addChapterSummary() {
+    const newId = `new-${Date.now()}`;
+    setChapterSummaries((prev) => [
+      ...prev,
+      {
+        id: newId,
+        user_book_id: userBookId,
+        chapter_number: selectedChapterNumber ?? 1,
+        chapter_title: selectedChapterLabel && selectedChapterLabel !== "All chapters" ? selectedChapterLabel : "",
+        summary: "",
+        sort_order: prev.length > 0 ? Math.max(...prev.map((x) => x.sort_order ?? 0)) + 1 : 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]);
+    setShowChapterSummaries(true);
+    startEditingChapter(newId);
+  }
+
+  function updateChapterSummary(id: string, field: keyof ChapterSummary, value: string) {
+    setChapterSummaries((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              [field]:
+                field === "chapter_number" || field === "sort_order"
+                  ? value === ""
+                    ? null
+                    : Number(value)
+                  : value,
+            }
+          : item
+      )
+    );
+  }
+
+  async function saveChapterSummary(item: ChapterSummary) {
+    const payload = {
+      user_book_id: userBookId,
+      chapter_number: item.chapter_number,
+      chapter_title: item.chapter_title?.trim() || null,
+      summary: item.summary.trim(),
+      sort_order: item.sort_order ?? 0,
+    };
+
+    if (!payload.summary) {
+      alert("Please write a short summary before saving.");
+      return;
+    }
+
+    setSavingChapterIds((prev) => [...prev, item.id]);
+
+    if (item.id.startsWith("new-")) {
+      const oldId = item.id;
+      const { data, error } = await supabase
+        .from("user_book_chapter_summaries")
+        .insert(payload)
+        .select("id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at")
+        .single();
+
+      setSavingChapterIds((prev) => prev.filter((x) => x !== oldId));
+
+      if (error) {
+        console.error("Error creating chapter summary:", error);
+        alert("Could not save chapter summary.");
+        return;
+      }
+
+      const saved = data as ChapterSummary;
+      setChapterSummaries((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
+      setEditingChapterIds((prev) => prev.map((x) => (x === oldId ? saved.id : x)));
+      stopEditingChapter(saved.id);
+      markChapterSaved(saved.id);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_chapter_summaries")
+      .update(payload)
+      .eq("id", item.id)
+      .select("id, user_book_id, chapter_number, chapter_title, summary, sort_order, created_at, updated_at")
+      .single();
+
+    setSavingChapterIds((prev) => prev.filter((x) => x !== item.id));
+
+    if (error) {
+      console.error("Error updating chapter summary:", error);
+      alert("Could not update chapter summary.");
+      return;
+    }
+
+    const saved = data as ChapterSummary;
+    setChapterSummaries((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
+    stopEditingChapter(saved.id);
+    markChapterSaved(saved.id);
+  }
+
+  async function deleteChapterSummary(id: string) {
+    if (id.startsWith("new-")) {
+      setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
+      setEditingChapterIds((prev) => prev.filter((x) => x !== id));
+      return;
+    }
+
+    if (!window.confirm("Delete this chapter summary?")) return;
+
+    const { error } = await supabase.from("user_book_chapter_summaries").delete().eq("id", id);
+    if (error) {
+      console.error("Error deleting chapter summary:", error);
+      alert("Could not delete chapter summary.");
+      return;
+    }
+
+    setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
+    stopEditingChapter(id);
+  }
+
+  function addSettingItem() {
+    const id = crypto.randomUUID();
+    setSettingItems((prev) => [
+      ...prev,
+      {
+        id,
+        user_book_id: userBookId,
+        title: "",
+        details: "",
+        sort_order: prev.length,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]);
+    setEditingSettingIds((prev) => [...prev, id]);
+  }
+
+  function addCulturalItem() {
+    const id = crypto.randomUUID();
+    setCulturalItems((prev) => [
+      ...prev,
+      {
+        id,
+        user_book_id: userBookId,
+        title: "",
+        details: "",
+        sort_order: prev.length,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]);
+    setEditingCulturalIds((prev) => [...prev, id]);
+  }
+
+  async function saveFavoriteQuotes() {
+    setSavingQuotes(true);
+    setQuotesSaveMessage("");
+
+    const nextFavoriteQuotes = favoriteQuoteInputsToText(favoriteQuoteInputs);
+    const { error } = await supabase
+      .from("user_books")
+      .update({ favorite_quotes: nextFavoriteQuotes || null })
+      .eq("id", userBookId);
+
+    setSavingQuotes(false);
+
+    if (error) {
+      console.error("Error saving Reading Journal quotes:", error);
+      setQuotesSaveMessage("Could not save quotes.");
+      return;
+    }
+
+    setQuotesSaveMessage("Saved.");
+    onFavoriteQuotesChange?.(nextFavoriteQuotes || null);
+  }
+
+  const panel = (
+    <StoryTab
+      storyTab={storyTab}
+      setStoryTab={setStoryTab}
+      detectiveEntries={detective.detectiveEntries}
+      detectiveSearch={detective.detectiveSearch}
+      setDetectiveSearch={detective.setDetectiveSearch}
+      collapsedDetectiveGroups={detective.collapsedDetectiveGroups}
+      expandedDetectiveIds={detective.expandedDetectiveIds}
+      editingDetectiveIds={detective.editingDetectiveIds}
+      savingDetectiveIds={detective.savingDetectiveIds}
+      savedDetectiveIds={detective.savedDetectiveIds}
+      addDetectiveEntry={() =>
+        detective.addDetectiveEntry(
+          { userBookId, ownerUserId },
+          {
+            pageNumber: currentPageNumber ?? null,
+            chapterLabel:
+              selectedChapterLabel && selectedChapterLabel !== "All chapters"
+                ? selectedChapterLabel
+                : null,
+            chapterNumber: selectedChapterNumber ?? null,
+          }
+        )
+      }
+      updateDetectiveEntry={detective.updateDetectiveEntry}
+      startEditingDetectiveEntry={detective.startEditingDetectiveEntry}
+      stopEditingDetectiveEntry={detective.stopEditingDetectiveEntry}
+      toggleDetectiveEntryExpanded={detective.toggleDetectiveEntryExpanded}
+      toggleDetectiveGroup={detective.toggleDetectiveGroup}
+      saveDetectiveEntry={(entry) =>
+        detective.saveDetectiveEntry(entry, { userBookId, ownerUserId })
+      }
+      deleteDetectiveEntry={(id) =>
+        detective.deleteDetectiveEntry(id, { userBookId, ownerUserId })
+      }
+      characters={characters}
+      visibleCharacters={visibleCharacters}
+      characterSearch={characterSearch}
+      setCharacterSearch={setCharacterSearch}
+      showCharacters={showCharacters}
+      setShowCharacters={setShowCharacters}
+      charactersReverseOrder={charactersReverseOrder}
+      setCharactersReverseOrder={setCharactersReverseOrder}
+      editingCharacterIds={editingCharacterIds}
+      savingCharacterIds={savingCharacterIds}
+      savedCharacterIds={savedCharacterIds}
+      addCharacter={addCharacter}
+      updateCharacter={updateCharacter}
+      startEditingCharacter={startEditingCharacter}
+      stopEditingCharacter={stopEditingCharacter}
+      saveCharacter={saveCharacter}
+      deleteCharacter={deleteCharacter}
+      chapterSummaries={chapterSummaries}
+      visibleChapterSummaries={visibleChapterSummaries}
+      plotSearch={plotSearch}
+      setPlotSearch={setPlotSearch}
+      showChapterSummaries={showChapterSummaries}
+      setShowChapterSummaries={setShowChapterSummaries}
+      chapterReverseOrder={chapterReverseOrder}
+      setChapterReverseOrder={setChapterReverseOrder}
+      editingChapterIds={editingChapterIds}
+      savingChapterIds={savingChapterIds}
+      savedChapterIds={savedChapterIds}
+      addChapterSummary={addChapterSummary}
+      updateChapterSummary={updateChapterSummary}
+      startEditingChapter={startEditingChapter}
+      stopEditingChapter={stopEditingChapter}
+      saveChapterSummary={saveChapterSummary}
+      deleteChapterSummary={deleteChapterSummary}
+      settingItems={settingItems}
+      visibleSettingItems={visibleSettingItems}
+      settingSearch={settingSearch}
+      setSettingSearch={setSettingSearch}
+      showSettingItems={showSettingItems}
+      setShowSettingItems={setShowSettingItems}
+      settingReverseOrder={settingReverseOrder}
+      setSettingReverseOrder={setSettingReverseOrder}
+      editingSettingIds={editingSettingIds}
+      savingSettingIds={savingSettingIds}
+      savedSettingIds={savedSettingIds}
+      addSettingItem={addSettingItem}
+      updateSettingItem={(id, field, value) =>
+        setSettingItems((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+        )
+      }
+      startEditingSettingItem={(id) =>
+        setEditingSettingIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+      }
+      stopEditingSettingItem={(id) =>
+        setEditingSettingIds((prev) => prev.filter((x) => x !== id))
+      }
+      saveSettingItem={async (item) => {
+        setSavingSettingIds((prev) => [...prev, item.id]);
+        setSavingSettingIds((prev) => prev.filter((x) => x !== item.id));
+        setEditingSettingIds((prev) => prev.filter((x) => x !== item.id));
+        setSavedSettingIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
+        window.setTimeout(() => {
+          setSavedSettingIds((prev) => prev.filter((x) => x !== item.id));
+        }, 1800);
+      }}
+      deleteSettingItem={async (id) => setSettingItems((prev) => prev.filter((x) => x.id !== id))}
+      culturalItems={culturalItems}
+      visibleCulturalItems={visibleCulturalItems}
+      culturalSearch={culturalSearch}
+      setCulturalSearch={setCulturalSearch}
+      showCulturalItems={showCulturalItems}
+      setShowCulturalItems={setShowCulturalItems}
+      culturalReverseOrder={culturalReverseOrder}
+      setCulturalReverseOrder={setCulturalReverseOrder}
+      editingCulturalIds={editingCulturalIds}
+      savingCulturalIds={savingCulturalIds}
+      savedCulturalIds={savedCulturalIds}
+      addCulturalItem={addCulturalItem}
+      updateCulturalItem={(id, field, value) =>
+        setCulturalItems((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+        )
+      }
+      startEditingCulturalItem={(id) =>
+        setEditingCulturalIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+      }
+      stopEditingCulturalItem={(id) =>
+        setEditingCulturalIds((prev) => prev.filter((x) => x !== id))
+      }
+      saveCulturalItem={async (item) => {
+        setSavingCulturalIds((prev) => [...prev, item.id]);
+        setSavingCulturalIds((prev) => prev.filter((x) => x !== item.id));
+        setEditingCulturalIds((prev) => prev.filter((x) => x !== item.id));
+        setSavedCulturalIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
+        window.setTimeout(() => {
+          setSavedCulturalIds((prev) => prev.filter((x) => x !== item.id));
+        }, 1800);
+      }}
+      deleteCulturalItem={async (id) => setCulturalItems((prev) => prev.filter((x) => x.id !== id))}
+      favoriteQuoteInputs={favoriteQuoteInputs}
+      quoteSearch={quoteSearch}
+      setQuoteSearch={setQuoteSearch}
+      savedFavoriteQuotes={favoriteQuoteTextToInputs(favoriteQuotes)}
+      savingQuotes={savingQuotes}
+      quotesSaveMessage={quotesSaveMessage}
+      addFavoriteQuote={() => {
+        setFavoriteQuoteInputs((prev) => [...prev, ""]);
+        setQuotesSaveMessage("");
+      }}
+      updateFavoriteQuote={(index, value) => {
+        setFavoriteQuoteInputs((prev) =>
+          prev.map((quote, quoteIndex) => (quoteIndex === index ? value : quote))
+        );
+        setQuotesSaveMessage("");
+      }}
+      removeFavoriteQuote={(index) => {
+        setFavoriteQuoteInputs((prev) => {
+          const next = prev.filter((_, quoteIndex) => quoteIndex !== index);
+          return next.length > 0 ? next : [""];
+        });
+        setQuotesSaveMessage("");
+      }}
+      saveFavoriteQuotes={saveFavoriteQuotes}
+    />
+  );
+
+  if (compact) {
+    return (
+      <aside className="rounded-[2rem] border border-violet-200 bg-white p-3 shadow-sm">
+        <div className="mb-3 px-1">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-500">
+            Reading Workspace
+          </p>
+          <h2 className="mt-1 text-xl font-black text-stone-950">Reading Journal</h2>
+          <p className="mt-1 text-xs leading-5 text-stone-500">
+            Keep notes beside your Follow-Along reader.
+          </p>
+        </div>
+        <div className="max-h-[78vh] overflow-y-auto pr-1">{panel}</div>
+      </aside>
+    );
+  }
+
+  return panel;
+}

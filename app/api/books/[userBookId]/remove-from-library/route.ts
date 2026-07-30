@@ -80,6 +80,7 @@ export async function POST(
     ["study_logs", "user_book_id", userBookId],
     ["user_study_events", "user_book_id", userBookId],
     ["user_alerts", "user_book_id", userBookId],
+    ["user_book_detective_entries", "user_book_id", userBookId],
     ["user_book_characters", "user_book_id", userBookId],
     ["user_book_chapter_summaries", "user_book_id", userBookId],
     ["user_book_reading_sessions", "user_book_id", userBookId],
