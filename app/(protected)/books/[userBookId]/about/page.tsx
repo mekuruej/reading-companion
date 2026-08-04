@@ -202,6 +202,7 @@ function friendlyExternalLinkLabel(href: string, preferredLabel?: string | null)
 
     if (host === "amazon.co.jp" || host.endsWith(".amazon.co.jp")) return "Amazon Japan";
     if (host === "amazon.com" || host.endsWith(".amazon.com")) return "Amazon";
+    if (host === "ehon.alphapolis.co.jp" || host.endsWith(".ehon.alphapolis.co.jp")) return "Ehon Hiroba";
     if (host.includes("rakuten")) return "Rakuten";
     if (host.includes("honto")) return "Honto";
     if (host.includes("kinokuniya")) return "Kinokuniya";

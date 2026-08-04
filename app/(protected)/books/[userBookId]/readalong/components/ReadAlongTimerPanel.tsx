@@ -42,7 +42,7 @@ export default function ReadAlongTimerPanel({
   return (
     <div className="rounded-xl border border-stone-200 bg-white px-3 py-3">
       <div className="mb-2 text-center text-sm text-stone-600">
-        Use the timer to track your fluid reading session, whether you read quietly or with saved word support.
+        Use the timer to track your fluid reading session with saved word support.
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-2">

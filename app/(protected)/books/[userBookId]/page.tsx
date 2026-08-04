@@ -374,6 +374,7 @@ function displayLinkLabel(l: any) {
       const hostname = new URL(safeUrl).hostname.replace(/^www\./, "").toLowerCase();
 
       if (hostname.includes("amazon.")) return "Amazon";
+      if (hostname.includes("ehon.alphapolis.co.jp")) return "Ehon Hiroba";
       if (hostname.includes("bookwalker.")) return "BookWalker";
       if (hostname.includes("kinokuniya.")) return "Kinokuniya";
       if (hostname.includes("rakuten.")) return "Rakuten Books";

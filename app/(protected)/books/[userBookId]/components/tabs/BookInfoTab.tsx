@@ -362,6 +362,10 @@ export default function BookInfoTab({
       placeholder: "https://www.amazon.co.jp/...",
     },
     {
+      label: "Ehon Hiroba",
+      placeholder: "https://ehon.alphapolis.co.jp/...",
+    },
+    {
       label: "BookWalker",
       placeholder: "https://bookwalker.jp/...",
     },

@@ -258,6 +258,11 @@ export default function BooksPage() {
     ? `Student Library · ${viewingLabel}`
     : null;
 
+  const addBookHref =
+    viewingUserId && meId && viewingUserId !== meId
+      ? `/books/add?destination=user&targetUserId=${encodeURIComponent(viewingUserId)}`
+      : "/books/add";
+
   async function loadAbilityCheckReminder(userId: string) {
     setAbilityCheckReminderLoading(true);
 
@@ -1517,7 +1522,7 @@ export default function BooksPage() {
         <LibraryGuidePanel
           hasFullAccess={hasFullLearningAccess || isTeacher}
           hasSavedWords={hasSavedWordsInLibrary}
-          onNavigate={(path) => router.push(path)}
+          onNavigate={(path) => router.push(path === "/books/add" ? addBookHref : path)}
         />
 
         {false && isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
@@ -1646,14 +1651,14 @@ export default function BooksPage() {
 
         {isTeacher ? (
           <>
-            <FloatingAddBookButton onClick={() => router.push("/books/add")} />
+            <FloatingAddBookButton onClick={() => router.push(addBookHref)} />
           </>
         ) : (
           <>
             {isViewingOwnLibrary ? (
               <button
                 type="button"
-                onClick={() => router.push("/books/add")}
+                onClick={() => router.push(addBookHref)}
                 className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
               >
                 + Add a Book

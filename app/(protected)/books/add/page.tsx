@@ -264,7 +264,7 @@ export default function AddBookPage() {
     const studentLessonContextDescription = isStudentLessonBookContext
         ? "This book will also be added to Active Lesson Books."
         : null;
-    const targetLibraryHref = isStudentDestination
+    const targetLibraryHref = isStudentDestination || isOtherUserDestination
         ? targetUsername
             ? `/users/${targetUsername}/books`
             : "/teacher/students"
