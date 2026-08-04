@@ -5369,13 +5369,13 @@ export default function BookHubPage() {
                       </h2>
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
                         MEKURU keeps this Book Hub focused on reading time, listening time, sessions,
-                        stats, and your private review. Language-learning actions are hidden here,
-                        and Reading Reflection will not appear for native-language books.
+                        stats, Reading Journal, and your private review. Language-learning actions are
+                        hidden here, and Reading Reflection will not appear for native-language books.
                       </p>
                     </div>
 
                     <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
-                      Use Review & Notes when you want to remember what you thought about the book.
+                      Use Reading Journal for story details and Review & Notes for your private response.
                     </div>
                   </div>
                 </section>
@@ -5397,7 +5397,7 @@ export default function BookHubPage() {
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
                 canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
-                canUseStoryNotes={!isEnglishBook && canUseStoryNotes}
+                canUseStoryNotes={canUseStoryNotes}
                 hasSavedWords={(uniqueLookupCount ?? 0) > 0}
                 isEnglishNativeTrackerBook={isEnglishNativeTrackerBook}
                 showReflectionPrompt={showBookHubReflectionPrompt}

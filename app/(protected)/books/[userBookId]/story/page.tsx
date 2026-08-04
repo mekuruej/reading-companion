@@ -168,12 +168,6 @@ export default function StoryNotesPage() {
         return;
       }
 
-      if (loadedRow.books?.language_code === "en") {
-        setAccessMessage("Reading Journal is available for Japanese books.");
-        setLoading(false);
-        return;
-      }
-
       setRow(loadedRow);
       setLoading(false);
     }

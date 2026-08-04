@@ -197,6 +197,15 @@ export default function BookHubActionGrid({
                         />
                     ) : null}
 
+                    {canUseStoryNotes && onStoryNotes ? (
+                        <ActionButton
+                            title="Reading Journal"
+                            description="Track detective notes, characters, plot, setting, cultural details, and quotes."
+                            className="bg-sky-50 hover:bg-sky-100"
+                            onClick={onStoryNotes}
+                        />
+                    ) : null}
+
                     {onReadingReflection ? (
                         <ActionButton
                             title="Review & Notes"
