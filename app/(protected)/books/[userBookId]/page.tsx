@@ -161,6 +161,7 @@ type Character = {
   name: string;
   reading: string | null;
   role: string | null;
+  first_seen_location: string | null;
   first_seen_page_number: number | null;
   notes: string | null;
   sort_order: number;
@@ -1443,6 +1444,7 @@ export default function BookHubPage() {
         name: "",
         reading: "",
         role: "",
+        first_seen_location: "",
         first_seen_page_number: null,
         notes: "",
         sort_order: prev.length,
@@ -1836,7 +1838,7 @@ export default function BookHubPage() {
   async function loadCharacters(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_characters")
-      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
+      .select("id, user_book_id, name, reading, role, first_seen_location, first_seen_page_number, notes, sort_order, created_at, updated_at")
       .eq("user_book_id", userBookIdValue)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
@@ -1858,6 +1860,7 @@ export default function BookHubPage() {
       name: item.name.trim(),
       reading: item.reading?.trim() || null,
       role: item.role?.trim() || null,
+      first_seen_location: item.first_seen_location?.trim() || null,
       first_seen_page_number:
         typeof item.first_seen_page_number === "number" &&
         Number.isFinite(item.first_seen_page_number)
@@ -1880,7 +1883,7 @@ export default function BookHubPage() {
       const { data, error } = await supabase
         .from("user_book_characters")
         .insert(payload)
-        .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
+        .select("id, user_book_id, name, reading, role, first_seen_location, first_seen_page_number, notes, sort_order, created_at, updated_at")
         .single();
 
       setSavingCharacterIds((prev) => prev.filter((x) => x !== oldId));
@@ -1902,7 +1905,7 @@ export default function BookHubPage() {
       .from("user_book_characters")
       .update(payload)
       .eq("id", item.id)
-      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
+      .select("id, user_book_id, name, reading, role, first_seen_location, first_seen_page_number, notes, sort_order, created_at, updated_at")
       .single();
 
     setSavingCharacterIds((prev) => prev.filter((x) => x !== item.id));

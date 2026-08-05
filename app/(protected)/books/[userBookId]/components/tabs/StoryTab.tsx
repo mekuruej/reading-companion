@@ -11,6 +11,7 @@ type Character = {
   name: string;
   reading: string | null;
   role: string | null;
+  first_seen_location: string | null;
   first_seen_page_number: number | null;
   notes: string | null;
   sort_order: number;
@@ -102,6 +103,8 @@ type StoryTabProps = {
   setShowChapterSummaries: (value: boolean) => void;
   chapterReverseOrder: boolean;
   setChapterReverseOrder: (value: boolean) => void;
+  expandedChapterIds: string[];
+  toggleChapterExpanded: (id: string) => void;
   editingChapterIds: string[];
   savingChapterIds: string[];
   savedChapterIds: string[];
@@ -191,6 +194,19 @@ function StorySubTab({
   );
 }
 
+function characterFirstAppearance(character: Character) {
+  const location = character.first_seen_location?.trim();
+  if (location) return location;
+  return character.first_seen_page_number == null ? "" : String(character.first_seen_page_number);
+}
+
+function pageNumberFromFlexibleLocation(value: string) {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const pageNumber = Number(trimmed);
+  return Number.isFinite(pageNumber) ? Math.max(1, Math.trunc(pageNumber)) : null;
+}
+
 export default function StoryTab({
   storyTab,
   setStoryTab,
@@ -238,6 +254,8 @@ export default function StoryTab({
   setShowChapterSummaries,
   chapterReverseOrder,
   setChapterReverseOrder,
+  expandedChapterIds,
+  toggleChapterExpanded,
   editingChapterIds,
   savingChapterIds,
   savedChapterIds,
@@ -302,7 +320,7 @@ export default function StoryTab({
           character.name,
           character.reading,
           character.role,
-          character.first_seen_page_number == null ? "" : String(character.first_seen_page_number),
+          characterFirstAppearance(character),
           character.notes,
         ]
           .join(" ")
@@ -433,6 +451,7 @@ export default function StoryTab({
                   const isEditing = editingCharacterIds.includes(character.id);
                   const isSaving = savingCharacterIds.includes(character.id);
                   const isSaved = savedCharacterIds.includes(character.id);
+                  const firstAppearance = characterFirstAppearance(character);
 
                   return (
                     <div key={character.id} className="rounded-xl border bg-white p-4">
@@ -442,9 +461,9 @@ export default function StoryTab({
                             {character.name || "—"}
                             {character.reading ? ` · ${character.reading}` : ""}
                           </div>
-                          {character.first_seen_page_number != null ? (
+                          {firstAppearance ? (
                             <div className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800">
-                              First seen on page {character.first_seen_page_number}
+                              First appearance: {firstAppearance}
                             </div>
                           ) : null}
                           <div className="text-stone-700">{character.role || "—"}</div>
@@ -495,21 +514,29 @@ export default function StoryTab({
                             className="w-full rounded border px-3 py-2 text-sm"
                           />
 
-                          <input
-                            type="number"
-                            min="1"
-                            inputMode="numeric"
-                            value={character.first_seen_page_number ?? ""}
-                            onChange={(e) =>
-                              updateCharacter(
-                                character.id,
-                                "first_seen_page_number",
-                                e.target.value.trim() ? Number(e.target.value) : null
-                              )
-                            }
-                            placeholder="First seen on page"
-                            className="w-full rounded border px-3 py-2 text-sm"
-                          />
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                              First appearance
+                            </span>
+                            <input
+                              type="text"
+                              value={characterFirstAppearance(character)}
+                              onChange={(e) => {
+                                const nextLocation = e.target.value;
+                                updateCharacter(character.id, "first_seen_location", nextLocation);
+                                updateCharacter(
+                                  character.id,
+                                  "first_seen_page_number",
+                                  pageNumberFromFlexibleLocation(nextLocation)
+                                );
+                              }}
+                              placeholder="Page, chapter, percentage, or other location"
+                              className="w-full rounded border px-3 py-2 text-sm"
+                            />
+                            <span className="mt-1 block text-xs text-stone-500">
+                              Page, chapter, percentage, or other location
+                            </span>
+                          </label>
 
                           <textarea
                             value={character.notes ?? ""}
@@ -607,18 +634,31 @@ export default function StoryTab({
                   const isEditing = editingChapterIds.includes(chapter.id);
                   const isSaving = savingChapterIds.includes(chapter.id);
                   const isSaved = savedChapterIds.includes(chapter.id);
+                  const isExpanded = isEditing || expandedChapterIds.includes(chapter.id);
 
                   return (
                     <div key={chapter.id} className="rounded-xl border bg-white p-4">
                       {!isEditing ? (
                         <div className="space-y-2 text-sm">
-                          <div className="font-medium text-stone-900">
-                            Chapter {chapter.chapter_number ?? "—"}
-                            {chapter.chapter_title ? ` · ${chapter.chapter_title}` : ""}
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="font-medium text-stone-900">
+                              Chapter {chapter.chapter_number ?? "—"}
+                              {chapter.chapter_title ? ` · ${chapter.chapter_title}` : ""}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleChapterExpanded(chapter.id)}
+                              className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                            >
+                              {isExpanded ? "Collapse" : "Expand"}
+                            </button>
                           </div>
-                          <div className="whitespace-pre-wrap text-stone-700">
-                            {chapter.summary || "—"}
-                          </div>
+
+                          {isExpanded ? (
+                            <div className="whitespace-pre-wrap text-stone-700">
+                              {chapter.summary || "—"}
+                            </div>
+                          ) : null}
 
                           <div className="flex gap-2">
                             <button

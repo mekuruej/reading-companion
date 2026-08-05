@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import StoryTab from "./tabs/StoryTab";
 import type { StoryTabMode } from "./tabs/readingJournalTypes";
@@ -12,6 +12,7 @@ type Character = {
   name: string;
   reading: string | null;
   role: string | null;
+  first_seen_location: string | null;
   first_seen_page_number: number | null;
   notes: string | null;
   sort_order: number;
@@ -74,6 +75,48 @@ function favoriteQuoteInputsToText(values: string[]) {
   return values.map((value) => value.trim()).filter(Boolean).join("\n\n");
 }
 
+const characterSelectWithFlexibleLocation =
+  "id, user_book_id, name, reading, role, first_seen_location, first_seen_page_number, notes, sort_order, created_at, updated_at";
+const legacyCharacterSelect =
+  "id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at";
+
+function normalizeCharacters(data: any[] | null | undefined): Character[] {
+  return ((data ?? []) as any[]).map((item) => ({
+    ...item,
+    first_seen_location: item.first_seen_location ?? null,
+  })) as Character[];
+}
+
+function isMissingFirstSeenLocationError(error: any) {
+  const text = [
+    error?.message,
+    error?.details,
+    error?.hint,
+    error?.code,
+    typeof error === "string" ? error : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return text.includes("first_seen_location") || text.includes("pgrst204") || text.includes("42703");
+}
+
+function omitFlexibleCharacterLocation<T extends { first_seen_location?: unknown }>(payload: T) {
+  const { first_seen_location: _firstSeenLocation, ...legacyPayload } = payload;
+  return legacyPayload;
+}
+
+function latestChapterSummaryId(items: ChapterSummary[]) {
+  const latest = [...items].sort((a, b) => {
+    const bTime = Date.parse(b.created_at || b.updated_at || "");
+    const aTime = Date.parse(a.created_at || a.updated_at || "");
+    return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+  })[0];
+
+  return latest?.id ?? null;
+}
+
 export default function ReadingJournalPanel({
   userBookId,
   ownerUserId,
@@ -97,11 +140,13 @@ export default function ReadingJournalPanel({
 
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
   const [plotSearch, setPlotSearch] = useState("");
-  const [showChapterSummaries, setShowChapterSummaries] = useState(false);
+  const [showChapterSummaries, setShowChapterSummaries] = useState(true);
   const [chapterReverseOrder, setChapterReverseOrder] = useState(false);
+  const [expandedChapterIds, setExpandedChapterIds] = useState<string[]>([]);
   const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
   const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
   const [savedChapterIds, setSavedChapterIds] = useState<string[]>([]);
+  const initializedExpandedChapterIdsForBookRef = useRef<string | null>(null);
 
   const [settingItems, setSettingItems] = useState<SettingItem[]>([]);
   const [settingSearch, setSettingSearch] = useState("");
@@ -170,21 +215,73 @@ export default function ReadingJournalPanel({
   }, [favoriteQuotes]);
 
   async function loadCharacters(id: string, cancelled: boolean) {
-    const { data, error } = await supabase
-      .from("user_book_characters")
-      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
-      .eq("user_book_id", id)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
+    const query = () =>
+      supabase
+        .from("user_book_characters")
+        .select(characterSelectWithFlexibleLocation)
+        .eq("user_book_id", id)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+    const legacyQuery = () =>
+      supabase
+        .from("user_book_characters")
+        .select(legacyCharacterSelect)
+        .eq("user_book_id", id)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+    const { data, error } = await query();
+    const result =
+      error && isMissingFirstSeenLocationError(error)
+        ? await legacyQuery()
+        : { data, error };
 
     if (cancelled) return;
-    if (error) {
-      console.error("Error loading characters:", error);
+    if (result.error) {
+      console.error("Error loading characters:", result.error);
       setCharacters([]);
       return;
     }
 
-    setCharacters((data as Character[]) ?? []);
+    setCharacters(normalizeCharacters(result.data));
+  }
+
+  async function saveCharacterWithFlexibleLocation(payload: {
+    user_book_id: string;
+    name: string;
+    reading: string | null;
+    role: string | null;
+    first_seen_location: string | null;
+    first_seen_page_number: number | null;
+    notes: string | null;
+    sort_order: number;
+  }, itemId?: string) {
+    const selectColumns = characterSelectWithFlexibleLocation;
+    const legacySelectColumns = legacyCharacterSelect;
+
+    const runSave = (nextPayload: typeof payload | ReturnType<typeof omitFlexibleCharacterLocation>) => {
+      const query = itemId
+        ? supabase.from("user_book_characters").update(nextPayload).eq("id", itemId)
+        : supabase.from("user_book_characters").insert(nextPayload);
+
+      return query.select(selectColumns).single();
+    };
+
+    const runLegacySave = (nextPayload: ReturnType<typeof omitFlexibleCharacterLocation>) => {
+      const query = itemId
+        ? supabase.from("user_book_characters").update(nextPayload).eq("id", itemId)
+        : supabase.from("user_book_characters").insert(nextPayload);
+
+      return query.select(legacySelectColumns).single();
+    };
+
+    const result = await runSave(payload);
+    if (!result.error || !isMissingFirstSeenLocationError(result.error)) {
+      return result;
+    }
+
+    return runLegacySave(omitFlexibleCharacterLocation(payload));
   }
 
   async function loadChapterSummaries(id: string, cancelled: boolean) {
@@ -204,6 +301,11 @@ export default function ReadingJournalPanel({
     }
 
     setChapterSummaries((data as ChapterSummary[]) ?? []);
+    if (initializedExpandedChapterIdsForBookRef.current !== id) {
+      initializedExpandedChapterIdsForBookRef.current = id;
+      const latestId = latestChapterSummaryId((data as ChapterSummary[]) ?? []);
+      setExpandedChapterIds(latestId ? [latestId] : []);
+    }
   }
 
   function startEditingCharacter(id: string) {
@@ -231,6 +333,7 @@ export default function ReadingJournalPanel({
         name: "",
         reading: "",
         role: "",
+        first_seen_location: "",
         first_seen_page_number: null,
         notes: "",
         sort_order: prev.length,
@@ -254,6 +357,7 @@ export default function ReadingJournalPanel({
       name: item.name.trim(),
       reading: item.reading?.trim() || null,
       role: item.role?.trim() || null,
+      first_seen_location: item.first_seen_location?.trim() || null,
       first_seen_page_number:
         typeof item.first_seen_page_number === "number" && Number.isFinite(item.first_seen_page_number)
           ? Math.max(1, Math.trunc(item.first_seen_page_number))
@@ -271,11 +375,7 @@ export default function ReadingJournalPanel({
 
     if (item.id.startsWith("new-character-")) {
       const oldId = item.id;
-      const { data, error } = await supabase
-        .from("user_book_characters")
-        .insert(payload)
-        .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
-        .single();
+      const { data, error } = await saveCharacterWithFlexibleLocation(payload);
 
       setSavingCharacterIds((prev) => prev.filter((x) => x !== oldId));
 
@@ -285,7 +385,7 @@ export default function ReadingJournalPanel({
         return;
       }
 
-      const saved = data as Character;
+      const saved = normalizeCharacters(data ? [data] : [])[0];
       setCharacters((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
       setEditingCharacterIds((prev) => prev.map((x) => (x === oldId ? saved.id : x)));
       stopEditingCharacter(saved.id);
@@ -293,12 +393,7 @@ export default function ReadingJournalPanel({
       return;
     }
 
-    const { data, error } = await supabase
-      .from("user_book_characters")
-      .update(payload)
-      .eq("id", item.id)
-      .select("id, user_book_id, name, reading, role, first_seen_page_number, notes, sort_order, created_at, updated_at")
-      .single();
+    const { data, error } = await saveCharacterWithFlexibleLocation(payload, item.id);
 
     setSavingCharacterIds((prev) => prev.filter((x) => x !== item.id));
 
@@ -308,7 +403,7 @@ export default function ReadingJournalPanel({
       return;
     }
 
-    const saved = data as Character;
+    const saved = normalizeCharacters(data ? [data] : [])[0];
     setCharacters((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
     stopEditingCharacter(saved.id);
     markCharacterSaved(saved.id);
@@ -337,6 +432,7 @@ export default function ReadingJournalPanel({
 
   function startEditingChapter(id: string) {
     setEditingChapterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setExpandedChapterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }
 
   function stopEditingChapter(id: string) {
@@ -366,6 +462,7 @@ export default function ReadingJournalPanel({
       },
     ]);
     setShowChapterSummaries(true);
+    setExpandedChapterIds([newId]);
     startEditingChapter(newId);
   }
 
@@ -422,6 +519,7 @@ export default function ReadingJournalPanel({
       const saved = data as ChapterSummary;
       setChapterSummaries((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
       setEditingChapterIds((prev) => prev.map((x) => (x === oldId ? saved.id : x)));
+      setExpandedChapterIds([saved.id]);
       stopEditingChapter(saved.id);
       markChapterSaved(saved.id);
       return;
@@ -444,6 +542,7 @@ export default function ReadingJournalPanel({
 
     const saved = data as ChapterSummary;
     setChapterSummaries((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
+    setExpandedChapterIds((prev) => (prev.includes(saved.id) ? prev : [...prev, saved.id]));
     stopEditingChapter(saved.id);
     markChapterSaved(saved.id);
   }
@@ -466,6 +565,7 @@ export default function ReadingJournalPanel({
 
     setChapterSummaries((prev) => prev.filter((x) => x.id !== id));
     stopEditingChapter(id);
+    setExpandedChapterIds((prev) => prev.filter((x) => x !== id));
   }
 
   function addSettingItem() {
@@ -585,6 +685,12 @@ export default function ReadingJournalPanel({
       setShowChapterSummaries={setShowChapterSummaries}
       chapterReverseOrder={chapterReverseOrder}
       setChapterReverseOrder={setChapterReverseOrder}
+      expandedChapterIds={expandedChapterIds}
+      toggleChapterExpanded={(id) =>
+        setExpandedChapterIds((prev) =>
+          prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        )
+      }
       editingChapterIds={editingChapterIds}
       savingChapterIds={savingChapterIds}
       savedChapterIds={savedChapterIds}

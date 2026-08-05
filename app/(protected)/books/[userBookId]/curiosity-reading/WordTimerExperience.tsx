@@ -105,6 +105,12 @@ type LastSavedWordContext = {
 
 type WordTimerExperienceMode = "curiosity" | "listening";
 
+export type CuriosityReadingJournalContext = {
+  currentPageNumber: number | null;
+  selectedChapterLabel: string | null;
+  selectedChapterNumber: number | null;
+};
+
 function makeBlankQuickPreview(meta = { page: "", chapterNumber: "", chapterName: "" }): QuickPreview {
   return {
     id: null,
@@ -311,10 +317,12 @@ export function CuriosityReadingExperience({
   experienceMode = "curiosity",
   embedded = false,
   workspaceCompact = false,
+  onReadingJournalContextChange,
 }: {
   experienceMode?: WordTimerExperienceMode;
   embedded?: boolean;
   workspaceCompact?: boolean;
+  onReadingJournalContextChange?: (context: CuriosityReadingJournalContext) => void;
 }) {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -592,6 +600,19 @@ export function CuriosityReadingExperience({
 
     saveQuickMeta(meta);
   }, [quickPreview?.page, quickPreview?.chapterNumber, quickPreview?.chapterName]);
+
+  useEffect(() => {
+    onReadingJournalContextChange?.({
+      currentPageNumber: pageNumberForSavedWordLocation(quickPreview.page, false),
+      selectedChapterLabel: quickPreview.chapterName.trim() || null,
+      selectedChapterNumber: toNullableInt(quickPreview.chapterNumber),
+    });
+  }, [
+    onReadingJournalContextChange,
+    quickPreview.page,
+    quickPreview.chapterName,
+    quickPreview.chapterNumber,
+  ]);
 
   useEffect(() => {
     if (!quickPreview) return;

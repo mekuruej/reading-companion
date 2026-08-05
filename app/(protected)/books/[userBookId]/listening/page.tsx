@@ -189,7 +189,7 @@ export default function ListeningPage() {
       saveSuccessMessage="Your listening session has been saved in Reading Sessions."
       startLocationLabel="Start page optional"
       endLocationLabel="End page optional"
-      sessionLocationNote="Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers."
+      sessionLocationNote="Page numbers are optional. If you leave them blank, only the time will be saved."
       embedded
       workspaceCompact={Boolean(showReadingWorkspace)}
     />
