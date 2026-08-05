@@ -826,7 +826,7 @@ export default function ReadingJournalPanel({
               </p>
               <h2 className="mt-1 text-xl font-black text-stone-950">Reading Journal</h2>
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Keep notes beside your reading session.
+                Keep notes beside your book.
               </p>
             </div>
             {actionLinks}
