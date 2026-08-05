@@ -28,6 +28,7 @@ type SimpleTimedSessionPageProps = {
     startLocationLabel?: string;
     endLocationLabel?: string;
     sessionLocationNote?: string;
+    embedded?: boolean;
 };
 
 function formatTimer(totalSeconds: number) {
@@ -54,6 +55,7 @@ export default function SimpleTimedSessionPage({
     startLocationLabel = "Start page optional",
     endLocationLabel = "End page optional",
     sessionLocationNote = "Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers.",
+    embedded = false,
 }: SimpleTimedSessionPageProps) {
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -497,21 +499,33 @@ export default function SimpleTimedSessionPage({
     }
 
     if (loading) {
-        return (
+        const loadingState = (
+            <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
+                Loading...
+            </div>
+        );
+
+        return embedded ? (
+            loadingState
+        ) : (
             <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
-                    Loading...
-                </div>
+                {loadingState}
             </main>
         );
     }
 
     if (!accessChecked) {
-        return (
+        const loadingState = (
+            <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
+                Loading...
+            </div>
+        );
+
+        return embedded ? (
+            loadingState
+        ) : (
             <main className="min-h-screen bg-stone-50 p-6">
-                <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 text-stone-600 shadow-sm">
-                    Loading...
-                </div>
+                {loadingState}
             </main>
         );
     }
@@ -522,9 +536,8 @@ export default function SimpleTimedSessionPage({
         );
     }
 
-    return (
-        <main className="min-h-screen bg-stone-50 p-6">
-            <div className="mx-auto max-w-4xl space-y-5">
+    const content = (
+        <>
                 <button
                     type="button"
                     onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
@@ -767,6 +780,17 @@ export default function SimpleTimedSessionPage({
                         </div>
                     </div>
                 </section>
+        </>
+    );
+
+    if (embedded) {
+        return <div className="space-y-5">{content}</div>;
+    }
+
+    return (
+        <main className="min-h-screen bg-stone-50 p-6">
+            <div className="mx-auto max-w-4xl space-y-5">
+                {content}
             </div>
         </main>
     );

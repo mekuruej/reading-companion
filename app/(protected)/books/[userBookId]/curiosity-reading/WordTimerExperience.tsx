@@ -308,8 +308,10 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 
 export function CuriosityReadingExperience({
   experienceMode = "curiosity",
+  embedded = false,
 }: {
   experienceMode?: WordTimerExperienceMode;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -1690,11 +1692,17 @@ export function CuriosityReadingExperience({
     ] ?? null;
 
   if (!accessChecked) {
-    return (
+    const loadingState = (
+      <div className="mx-auto max-w-5xl">
+        <p className="text-sm text-gray-500">Loading book info…</p>
+      </div>
+    );
+
+    return embedded ? (
+      loadingState
+    ) : (
       <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-sm text-gray-500">Loading book info…</p>
-        </div>
+        {loadingState}
       </main>
     );
   }
@@ -1747,9 +1755,8 @@ export function CuriosityReadingExperience({
     window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
   }
 
-  return (
-    <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
-      <div className="mx-auto max-w-5xl">
+  const content = (
+      <>
         <CuriosityPageHeader title={pageTitle} description={pageDescription} />
         {userBookId ? (
           bookTitle ? (
@@ -2265,7 +2272,18 @@ export function CuriosityReadingExperience({
           </CuriosityRecentSessionWords>
         </CuriosityAddEditWordCard>
         </div>
+      </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4">{content}</div>;
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-5xl">
+        {content}
       </div>
-    </main >
+    </main>
   );
 }

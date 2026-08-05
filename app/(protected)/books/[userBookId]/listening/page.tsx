@@ -9,14 +9,26 @@ import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
+import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
+
+type ListeningViewMode = "listening" | "workspace";
+type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
+
+function isSuperTeacherFlag(value: unknown) {
+  return value === true || value === "true";
+}
 
 export default function ListeningPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [canSaveWordsWhileListening, setCanSaveWordsWhileListening] = useState(false);
+  const [canUseReadingJournal, setCanUseReadingJournal] = useState(false);
+  const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
+  const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ListeningViewMode>("listening");
 
   useEffect(() => {
     let cancelled = false;
@@ -34,15 +46,37 @@ export default function ListeningPage() {
         return;
       }
 
-      const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
+      const { data: userBook, error: userBookError } = await supabase
+        .from("user_books")
+        .select(
+          `
+          id,
+          user_id,
+          favorite_quotes,
+          books (
+            language_code
+          )
+        `
+        )
+        .eq("id", userBookId)
+        .maybeSingle();
 
       if (cancelled) return;
 
-      if (trackerMode.isEnglishNativeTrackerBook) {
-        setCanSaveWordsWhileListening(false);
+      if (userBookError || !userBook) {
+        if (userBookError) {
+          console.error("Error loading Listening book for workspace access:", userBookError);
+        }
+        setCanUseReadingJournal(false);
+        setJournalOwnerUserId(null);
+        setFavoriteQuotes(null);
         setCheckingAccess(false);
         return;
       }
+
+      const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
+
+      if (cancelled) return;
 
       const profileResult = await supabase
         .from("profiles")
@@ -65,16 +99,51 @@ export default function ListeningPage() {
 
       if (cancelled) return;
 
+      const role = (profile?.role as ProfileRole | null) ?? "member";
+      const isSuperTeacher = role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher);
+      const ownerUserId = (userBook as any).user_id as string | null;
+      let canAccessBook = ownerUserId === user.id || isSuperTeacher || role === "admin";
+
+      if (!canAccessBook && role === "teacher" && ownerUserId) {
+        const { data: teacherStudentLink, error: teacherStudentError } = await supabase
+          .from("teacher_students")
+          .select("id")
+          .eq("teacher_id", user.id)
+          .eq("student_id", ownerUserId)
+          .limit(1)
+          .maybeSingle();
+
+        if (teacherStudentError) {
+          console.error("Error checking Listening workspace teacher access:", teacherStudentError);
+        }
+
+        canAccessBook = !!teacherStudentLink;
+      }
+
       if (!profileError && profile) {
-        const appAccessStatus = getAppAccessStatus(profile);
+        const appAccessStatus = getAppAccessStatus({
+          role: isSuperTeacher ? "super_teacher" : role,
+          app_access_type: profile.app_access_type ?? null,
+          app_access_expires_at: profile.app_access_expires_at ?? null,
+        });
         const featureAccess = getFeatureAccess({
-          role: profile.role ?? null,
+          role: isSuperTeacher ? "super_teacher" : role,
           isSuperTeacher: profile.is_super_teacher,
           hasFullAccess: appAccessStatus.hasFullAccess,
           isTrialActive: appAccessStatus.reason === "trial",
         });
 
-        setCanSaveWordsWhileListening(featureAccess.canUseListeningWordCapture);
+        setCanSaveWordsWhileListening(
+          !trackerMode.isEnglishNativeTrackerBook && featureAccess.canUseListeningWordCapture
+        );
+        setCanUseReadingJournal(Boolean(canAccessBook && ownerUserId && featureAccess.canUseStoryNotes));
+        setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
+        setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
+      } else {
+        setCanSaveWordsWhileListening(false);
+        setCanUseReadingJournal(false);
+        setJournalOwnerUserId(null);
+        setFavoriteQuotes(null);
       }
 
       setCheckingAccess(false);
@@ -87,6 +156,12 @@ export default function ListeningPage() {
     };
   }, [userBookId]);
 
+  useEffect(() => {
+    if (!canUseReadingJournal && viewMode === "workspace") {
+      setViewMode("listening");
+    }
+  }, [canUseReadingJournal, viewMode]);
+
   if (checkingAccess) {
     return (
       <main className="min-h-screen bg-stone-50 p-6">
@@ -97,11 +172,10 @@ export default function ListeningPage() {
     );
   }
 
-  if (canSaveWordsWhileListening) {
-    return <CuriosityReadingExperience experienceMode="listening" />;
-  }
-
-  return (
+  const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal && journalOwnerUserId;
+  const listeningExperience = canSaveWordsWhileListening ? (
+    <CuriosityReadingExperience experienceMode="listening" embedded />
+  ) : (
     <SimpleTimedSessionPage
       sessionMode="listening"
       eyebrow="Listening"
@@ -112,6 +186,75 @@ export default function ListeningPage() {
       startLocationLabel="Start page optional"
       endLocationLabel="End page optional"
       sessionLocationNote="Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers."
+      embedded
     />
+  );
+
+  return (
+    <main
+      className={[
+        "min-h-screen",
+        canSaveWordsWhileListening
+          ? "bg-slate-100 px-3 py-4 sm:px-6 sm:py-8"
+          : "bg-stone-50 p-6",
+      ].join(" ")}
+    >
+      <div
+        className={[
+          "mx-auto space-y-4",
+          showReadingWorkspace
+            ? "max-w-[96rem]"
+            : canSaveWordsWhileListening
+              ? "max-w-5xl"
+              : "max-w-4xl",
+        ].join(" ")}
+      >
+        {canUseReadingJournal ? (
+          <div className="hidden justify-end lg:flex">
+            <div className="inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setViewMode("listening")}
+                className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                  viewMode === "listening"
+                    ? "bg-stone-900 text-white"
+                    : "text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                Listening
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("workspace")}
+                className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                  viewMode === "workspace"
+                    ? "bg-violet-700 text-white"
+                    : "text-stone-600 hover:bg-violet-50"
+                }`}
+              >
+                Reading Workspace
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {showReadingWorkspace && journalOwnerUserId ? (
+          <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] lg:items-start lg:gap-4 lg:space-y-0 xl:grid-cols-[minmax(0,1fr)_minmax(390px,clamp(28rem,34vw,32rem))]">
+            <div className="min-w-0">{listeningExperience}</div>
+            <div className="hidden min-w-0 lg:block">
+              <ReadingJournalPanel
+                userBookId={userBookId}
+                ownerUserId={journalOwnerUserId}
+                favoriteQuotes={favoriteQuotes}
+                compact
+                onFavoriteQuotesChange={setFavoriteQuotes}
+              />
+            </div>
+          </div>
+        ) : (
+          listeningExperience
+        )}
+      </div>
+    </main>
   );
 }
