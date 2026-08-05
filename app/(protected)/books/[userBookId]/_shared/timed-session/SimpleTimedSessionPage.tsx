@@ -759,14 +759,6 @@ export default function SimpleTimedSessionPage({
 
     const content = workspaceCompact ? (
         <>
-            <button
-                type="button"
-                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-                className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-800"
-            >
-                ← {backLabel}
-            </button>
-
             {errorMessage ? (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {errorMessage}
@@ -774,13 +766,13 @@ export default function SimpleTimedSessionPage({
             ) : null}
 
             {showFinishedNav && userBookId && bookTitle ? (
-                <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
                     <button
                         type="button"
                         onClick={() => {
                             router.push(`/books/${encodeURIComponent(userBookId)}`);
                         }}
-                        className="flex min-w-0 items-center gap-3 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
                         title={`Go to ${bookTitle} Book Hub`}
                     >
                         {bookCover ? (
@@ -801,7 +793,7 @@ export default function SimpleTimedSessionPage({
                         </div>
                     </button>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex shrink-0 flex-wrap gap-2">
                         {hasSavedWords ? (
                             <button
                                 type="button"
