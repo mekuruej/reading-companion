@@ -72,6 +72,24 @@ function percentToPage(percent: number | null, pageCount: number | null) {
   return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
 }
 
+function parseListeningProgressInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null, kind: null as "page" | "percent" | null };
+
+  const isPercent = trimmed.includes("%");
+  const isPage = /^p(?:age)?\.?\s*/i.test(trimmed);
+  const normalized = trimmed
+    .replace(/%/g, "")
+    .replace(/^p(?:age)?\.?\s*/i, "")
+    .trim();
+  const numeric = Number(normalized);
+
+  return {
+    value: Number.isFinite(numeric) ? Math.round(numeric) : Number.NaN,
+    kind: isPercent ? "percent" as const : isPage ? "page" as const : null,
+  };
+}
+
 function pageToPercent(page: number | null, pageCount: number | null) {
   if (page == null || !pageCount || pageCount <= 0) return null;
   return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
@@ -295,13 +313,25 @@ export default function ReadingSessionsPage() {
     const usingPercentMode = row.progress_mode === "percent";
     const usingListeningPercentMode =
       sessionMode === "listening" && book?.page_count != null && book.page_count > 0;
+    const listeningEndInput =
+      sessionMode === "listening"
+        ? parseListeningProgressInput(sessionEndPage)
+        : null;
     const endInputIsPercent =
-      sessionMode === "listening" ? usingListeningPercentMode : usingPercentMode;
+      sessionMode === "listening"
+        ? listeningEndInput?.kind === "percent" ||
+          (listeningEndInput?.kind !== "page" && usingListeningPercentMode)
+        : usingPercentMode;
     const parsedStart =
       sessionMode === "listening" || sessionStartPage.trim() === ""
         ? null
         : Number(sessionStartPage);
-    const parsedEnd = sessionEndPage.trim() === "" ? null : Number(sessionEndPage);
+    const parsedEnd =
+      sessionEndPage.trim() === ""
+        ? null
+        : sessionMode === "listening"
+          ? listeningEndInput?.value ?? null
+          : Number(sessionEndPage);
 
     const start =
       usingPercentMode && sessionMode !== "listening"
@@ -309,7 +339,7 @@ export default function ReadingSessionsPage() {
         : parsedStart;
     const end =
       endInputIsPercent
-        ? percentToPage(parsedEnd, book?.page_count ?? null)
+        ? percentToPage(parsedEnd, book?.page_count ?? null) ?? parsedEnd
         : parsedEnd;
     const minutes = sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
 
@@ -336,13 +366,20 @@ export default function ReadingSessionsPage() {
         alert(usingPercentMode ? "End percent must be greater than or equal to start percent." : "End page must be greater than or equal to start page.");
         return;
       }
-    } else if (
-      endInputIsPercent &&
-      parsedEnd !== null &&
-      (!Number.isFinite(parsedEnd) || parsedEnd < 0 || parsedEnd > 100)
-    ) {
-      alert("Listening end percent must be between 0 and 100 if provided.");
-      return;
+    } else {
+      if (
+        endInputIsPercent &&
+        parsedEnd !== null &&
+        (!Number.isFinite(parsedEnd) || parsedEnd < 0 || parsedEnd > 100)
+      ) {
+        alert("Listening end percent must be between 0 and 100 if provided.");
+        return;
+      }
+
+      if (!endInputIsPercent && end !== null && (!Number.isFinite(end) || end <= 0)) {
+        alert("Listening end page must be greater than 0 if provided.");
+        return;
+      }
     }
 
     if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
@@ -687,15 +724,13 @@ export default function ReadingSessionsPage() {
               </>
             ) : (
               <label className="rounded border bg-white p-3 text-sm">
-                <span className="block text-stone-600">
-                  {useListeningPercentMode ? "Listening end percent (optional)" : "Listening end page (optional)"}
-                </span>
+                <span className="block text-stone-600">Up to page or percent (optional)</span>
                 <input
-                  type="number"
-                  min={useListeningPercentMode ? 0 : 1}
-                  max={useListeningPercentMode ? 100 : undefined}
+                  type="text"
+                  inputMode="decimal"
                   value={sessionEndPage}
                   onChange={(event) => setSessionEndPage(event.target.value)}
+                  placeholder={useListeningPercentMode ? "e.g. 18% or p. 42" : "e.g. p. 42 or 18%"}
                   className="mt-1 w-full rounded border px-2 py-1"
                 />
               </label>

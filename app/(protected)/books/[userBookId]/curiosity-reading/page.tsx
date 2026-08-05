@@ -31,6 +31,7 @@ export default function CuriosityReadingPage() {
   const [canUseReadingWorkspace, setCanUseReadingWorkspace] = useState(false);
   const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
   const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
+  const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<CuriosityViewMode>("curiosity");
   const [journalContext, setJournalContext] = useState<CuriosityReadingJournalContext>({
     currentPageNumber: null,
@@ -62,13 +63,14 @@ export default function CuriosityReadingPage() {
         setCanUseReadingWorkspace(false);
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
+        setBookLanguageCode(null);
         setChecking(false);
         return;
       }
 
       const { data: userBook, error: userBookError } = await supabase
         .from("user_books")
-        .select("id, user_id, favorite_quotes")
+        .select("id, user_id, favorite_quotes, books ( language_code )")
         .eq("id", userBookId)
         .maybeSingle();
 
@@ -81,9 +83,15 @@ export default function CuriosityReadingPage() {
         setCanUseReadingWorkspace(false);
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
+        setBookLanguageCode(null);
         setChecking(false);
         return;
       }
+
+      const book = Array.isArray((userBook as any).books)
+        ? (userBook as any).books[0]
+        : (userBook as any).books;
+      setBookLanguageCode(book?.language_code ?? null);
 
       const profileResult = await supabase
         .from("profiles")
@@ -113,6 +121,7 @@ export default function CuriosityReadingPage() {
         setCanUseReadingWorkspace(false);
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
+        setBookLanguageCode(null);
         setChecking(false);
         return;
       }
@@ -249,6 +258,7 @@ export default function CuriosityReadingPage() {
                 selectedChapterLabel={journalContext.selectedChapterLabel}
                 selectedChapterNumber={journalContext.selectedChapterNumber}
                 compact
+                vocabListHref={bookLanguageCode === "en" ? undefined : `/books/${encodeURIComponent(userBookId)}/words`}
                 onFavoriteQuotesChange={setFavoriteQuotes}
               />
             </div>

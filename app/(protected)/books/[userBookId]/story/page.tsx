@@ -251,6 +251,7 @@ export default function StoryNotesPage() {
           userBookId={row.id}
           ownerUserId={row.user_id}
           favoriteQuotes={row.favorite_quotes}
+          vocabListHref={book?.language_code === "en" ? undefined : `/books/${row.id}/words`}
           onFavoriteQuotesChange={(value) =>
             setRow((prev) => (prev ? { ...prev, favorite_quotes: value } : prev))
           }

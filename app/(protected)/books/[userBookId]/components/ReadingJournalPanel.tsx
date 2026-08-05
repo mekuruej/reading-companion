@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import StoryTab from "./tabs/StoryTab";
 import type { StoryTabMode } from "./tabs/readingJournalTypes";
@@ -59,6 +60,7 @@ type ReadingJournalPanelProps = {
   selectedChapterLabel?: string | null;
   selectedChapterNumber?: number | null;
   compact?: boolean;
+  vocabListHref?: string;
   onFavoriteQuotesChange?: (value: string | null) => void;
 };
 
@@ -117,6 +119,14 @@ function latestChapterSummaryId(items: ChapterSummary[]) {
   return latest?.id ?? null;
 }
 
+function nextChapterSummaryNumber(items: ChapterSummary[]) {
+  const chapterNumbers = items
+    .map((item) => item.chapter_number)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+  return chapterNumbers.length > 0 ? Math.max(...chapterNumbers) + 1 : 1;
+}
+
 export default function ReadingJournalPanel({
   userBookId,
   ownerUserId,
@@ -125,6 +135,7 @@ export default function ReadingJournalPanel({
   selectedChapterLabel,
   selectedChapterNumber,
   compact = false,
+  vocabListHref,
   onFavoriteQuotesChange,
 }: ReadingJournalPanelProps) {
   const [storyTab, setStoryTab] = useState<StoryTabMode>("detective");
@@ -453,7 +464,7 @@ export default function ReadingJournalPanel({
       {
         id: newId,
         user_book_id: userBookId,
-        chapter_number: selectedChapterNumber ?? 1,
+        chapter_number: selectedChapterNumber ?? nextChapterSummaryNumber(prev),
         chapter_title: selectedChapterLabel && selectedChapterLabel !== "All chapters" ? selectedChapterLabel : "",
         summary: "",
         sort_order: prev.length > 0 ? Math.max(...prev.map((x) => x.sort_order ?? 0)) + 1 : 0,
@@ -793,22 +804,47 @@ export default function ReadingJournalPanel({
     />
   );
 
+  const actionLinks = vocabListHref ? (
+    <div className="flex flex-wrap gap-2">
+      <Link
+        href={vocabListHref}
+        className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black text-stone-700 transition hover:bg-stone-100"
+      >
+        Vocab List
+      </Link>
+    </div>
+  ) : null;
+
   if (compact) {
     return (
       <aside className="rounded-[2rem] border border-violet-200 bg-white p-3 shadow-sm">
         <div className="mb-3 px-1">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-500">
-            Reading Workspace
-          </p>
-          <h2 className="mt-1 text-xl font-black text-stone-950">Reading Journal</h2>
-          <p className="mt-1 text-xs leading-5 text-stone-500">
-            Keep notes beside your Follow-Along reader.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-500">
+                Reading Workspace
+              </p>
+              <h2 className="mt-1 text-xl font-black text-stone-950">Reading Journal</h2>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Keep notes beside your reading session.
+              </p>
+            </div>
+            {actionLinks}
+          </div>
         </div>
         <div className="max-h-[78vh] overflow-y-auto pr-1">{panel}</div>
       </aside>
     );
   }
 
-  return panel;
+  return (
+    <div className="space-y-4">
+      {actionLinks ? (
+        <div className="flex justify-end">
+          {actionLinks}
+        </div>
+      ) : null}
+      {panel}
+    </div>
+  );
 }

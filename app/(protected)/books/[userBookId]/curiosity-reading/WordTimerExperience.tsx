@@ -136,6 +136,47 @@ function formatTimer(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function percentToPage(percent: number | null, pageCount: number | null) {
+  if (percent == null || !pageCount || pageCount <= 0) return null;
+  const clamped = Math.max(0, Math.min(100, percent));
+  return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
+}
+
+function pageToPercent(page: number | null, pageCount: number | null) {
+  if (page == null || !pageCount || pageCount <= 0) return null;
+  return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
+}
+
+function parseListeningEndpoint(value: string, pageCount: number | null) {
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null, error: null };
+
+  const isPercent = trimmed.includes("%");
+  const normalized = trimmed
+    .replace(/%/g, "")
+    .replace(/^p(?:age)?\.?\s*/i, "")
+    .trim();
+  const numeric = Number(normalized);
+
+  if (!Number.isFinite(numeric)) {
+    return { value: null, error: "Enter a page number or percent, like 42, p. 42, or 18%." };
+  }
+
+  if (isPercent) {
+    if (numeric < 0 || numeric > 100) {
+      return { value: null, error: "Listening percent must be between 0 and 100." };
+    }
+
+    return { value: percentToPage(numeric, pageCount) ?? Math.round(numeric), error: null };
+  }
+
+  if (numeric <= 0) {
+    return { value: null, error: "Listening page must be greater than 0." };
+  }
+
+  return { value: Math.round(numeric), error: null };
+}
+
 function toNullableInt(value: string): number | null {
   const t = (value ?? "").trim();
   if (!t) return null;
@@ -350,6 +391,7 @@ export function CuriosityReadingExperience({
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
   const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
@@ -561,7 +603,7 @@ export function CuriosityReadingExperience({
 
       const { data: book, error: bookError } = await supabase
         .from("books")
-        .select("title, cover_url, language_code")
+        .select("title, cover_url, language_code, page_count")
         .eq("id", userBook.book_id)
         .maybeSingle();
 
@@ -580,6 +622,7 @@ export function CuriosityReadingExperience({
       setBookTitle(book.title ?? "");
       setBookCover(book.cover_url ?? "");
       setBookLanguageCode(book.language_code ?? null);
+      setBookPageCount(book.page_count ?? null);
       setMessage("");
     })();
   }, [fullAccessFeature, userBookId]);
@@ -1595,12 +1638,23 @@ export function CuriosityReadingExperience({
     }
 
     const latest = data?.[0];
-    const nextStart =
+    const latestEndPage =
       latest?.end_page != null && Number.isFinite(Number(latest.end_page))
-        ? String(Number(latest.end_page) + 1)
-        : "";
+        ? Number(latest.end_page)
+        : null;
+    const latestPercent = pageToPercent(latestEndPage, bookPageCount);
+    const nextStart = latestEndPage != null ? String(latestEndPage + 1) : "";
 
-    setSessionStartPage(nextStart);
+    setSessionStartPage(isListeningMode ? "" : nextStart);
+    setSessionEndPage(
+      isListeningMode
+        ? latestPercent != null
+          ? `${latestPercent}%`
+          : latestEndPage != null
+            ? `p. ${latestEndPage}`
+            : ""
+        : ""
+    );
     setShowTimedSessionForm(true);
   }
 
@@ -1622,22 +1676,26 @@ export function CuriosityReadingExperience({
       return;
     }
 
-    if (isListeningMode && hasPageInput && (!Number.isFinite(start) || !Number.isFinite(end))) {
-      setMessage("❌ Fill in both pages, or leave both page fields blank.");
-      return;
+    if (isListeningMode) {
+      const parsedEndpoint = parseListeningEndpoint(endPageText, bookPageCount);
+      if (parsedEndpoint.error) {
+        setMessage(`❌ ${parsedEndpoint.error}`);
+        return;
+      }
+      endPage = parsedEndpoint.value;
     }
 
-    if ((!isListeningMode || hasPageInput) && (start <= 0 || end <= 0)) {
+    if (!isListeningMode && hasPageInput && (start <= 0 || end <= 0)) {
       setMessage("❌ Pages must be greater than 0.");
       return;
     }
 
-    if ((!isListeningMode || hasPageInput) && end < start) {
+    if (!isListeningMode && hasPageInput && end < start) {
       setMessage("❌ End page must be greater than or equal to start page.");
       return;
     }
 
-    if (!isListeningMode || hasPageInput) {
+    if (!isListeningMode) {
       startPage = start;
       endPage = end;
     }
@@ -1786,6 +1844,7 @@ export function CuriosityReadingExperience({
       saveTitle={saveSessionTitle}
       startPageLabel={isListeningMode ? "Start page optional" : "Start page"}
       endPageLabel={isListeningMode ? "End page optional" : "End page"}
+      listeningProgressOnly={isListeningMode}
       isRunning={isRunning}
       isPaused={isPaused}
       elapsed={elapsed}

@@ -28,6 +28,7 @@ export default function ListeningPage() {
   const [canUseReadingJournal, setCanUseReadingJournal] = useState(false);
   const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
   const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
+  const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ListeningViewMode>("listening");
 
   useEffect(() => {
@@ -70,9 +71,15 @@ export default function ListeningPage() {
         setCanUseReadingJournal(false);
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
+        setBookLanguageCode(null);
         setCheckingAccess(false);
         return;
       }
+
+      const book = Array.isArray((userBook as any).books)
+        ? (userBook as any).books[0]
+        : (userBook as any).books;
+      setBookLanguageCode(book?.language_code ?? null);
 
       const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
 
@@ -144,6 +151,7 @@ export default function ListeningPage() {
         setCanUseReadingJournal(false);
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
+        setBookLanguageCode(null);
       }
 
       setCheckingAccess(false);
@@ -189,7 +197,7 @@ export default function ListeningPage() {
       saveSuccessMessage="Your listening session has been saved in Reading Sessions."
       startLocationLabel="Start page optional"
       endLocationLabel="End page optional"
-      sessionLocationNote="Page numbers are optional. If you leave them blank, only the time will be saved."
+      sessionLocationNote="Progress is optional. If you leave it blank, only listening time will be saved."
       embedded
       workspaceCompact={Boolean(showReadingWorkspace)}
     />
@@ -258,6 +266,7 @@ export default function ListeningPage() {
                 ownerUserId={journalOwnerUserId}
                 favoriteQuotes={favoriteQuotes}
                 compact
+                vocabListHref={bookLanguageCode === "en" ? undefined : `/books/${encodeURIComponent(userBookId)}/words`}
                 onFavoriteQuotesChange={setFavoriteQuotes}
               />
             </div>

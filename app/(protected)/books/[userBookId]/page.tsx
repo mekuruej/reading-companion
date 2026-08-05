@@ -565,6 +565,24 @@ function percentToPage(percent: number | null, pageCount: number | null) {
   return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
 }
 
+function parseListeningProgressInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null, kind: null as "page" | "percent" | null };
+
+  const isPercent = trimmed.includes("%");
+  const isPage = /^p(?:age)?\.?\s*/i.test(trimmed);
+  const normalized = trimmed
+    .replace(/%/g, "")
+    .replace(/^p(?:age)?\.?\s*/i, "")
+    .trim();
+  const numeric = Number(normalized);
+
+  return {
+    value: Number.isFinite(numeric) ? Math.round(numeric) : Number.NaN,
+    kind: isPercent ? "percent" as const : isPage ? "page" as const : null,
+  };
+}
+
 function genreLabel(value: string | null | undefined) {
   if (!value) return "—";
   return (
@@ -3230,14 +3248,25 @@ export default function BookHubPage() {
       sessionMode === "listening" &&
       book?.page_count != null &&
       book.page_count > 0;
+    const listeningEndInput =
+      sessionMode === "listening"
+        ? parseListeningProgressInput(sessionEndPage)
+        : null;
     const endInputIsPercent =
-      sessionMode === "listening" ? usingListeningPercentMode : usingPercentMode;
+      sessionMode === "listening"
+        ? listeningEndInput?.kind === "percent" ||
+          (listeningEndInput?.kind !== "page" && usingListeningPercentMode)
+        : usingPercentMode;
     const parsedStart =
       sessionMode === "listening" || sessionStartPage.trim() === ""
         ? null
         : Number(sessionStartPage);
     const parsedEnd =
-      sessionEndPage.trim() === "" ? null : Number(sessionEndPage);
+      sessionEndPage.trim() === ""
+        ? null
+        : sessionMode === "listening"
+          ? listeningEndInput?.value ?? null
+          : Number(sessionEndPage);
 
     const start =
       usingPercentMode && sessionMode !== "listening"
@@ -3246,7 +3275,7 @@ export default function BookHubPage() {
 
     const end =
       endInputIsPercent
-        ? percentToPage(parsedEnd, book?.page_count ?? null)
+        ? percentToPage(parsedEnd, book?.page_count ?? null) ?? parsedEnd
         : parsedEnd;
 
     const minutesFromInput =

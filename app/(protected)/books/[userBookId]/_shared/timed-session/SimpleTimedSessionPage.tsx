@@ -45,6 +45,47 @@ function formatTimer(totalSeconds: number) {
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function percentToPage(percent: number | null, pageCount: number | null) {
+    if (percent == null || !pageCount || pageCount <= 0) return null;
+    const clamped = Math.max(0, Math.min(100, percent));
+    return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
+}
+
+function pageToPercent(page: number | null, pageCount: number | null) {
+    if (page == null || !pageCount || pageCount <= 0) return null;
+    return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
+}
+
+function parseListeningEndpoint(value: string, pageCount: number | null) {
+    const trimmed = value.trim();
+    if (!trimmed) return { value: null, error: null };
+
+    const isPercent = trimmed.includes("%");
+    const normalized = trimmed
+        .replace(/%/g, "")
+        .replace(/^p(?:age)?\.?\s*/i, "")
+        .trim();
+    const numeric = Number(normalized);
+
+    if (!Number.isFinite(numeric)) {
+        return { value: null, error: "Enter a page number or percent, like 42, p. 42, or 18%." };
+    }
+
+    if (isPercent) {
+        if (numeric < 0 || numeric > 100) {
+            return { value: null, error: "Listening percent must be between 0 and 100." };
+        }
+
+        return { value: percentToPage(numeric, pageCount) ?? Math.round(numeric), error: null };
+    }
+
+    if (numeric <= 0) {
+        return { value: null, error: "Listening page must be greater than 0." };
+    }
+
+    return { value: Math.round(numeric), error: null };
+}
+
 export default function SimpleTimedSessionPage({
     sessionMode,
     eyebrow,
@@ -66,6 +107,7 @@ export default function SimpleTimedSessionPage({
     const [loading, setLoading] = useState(true);
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
+    const [bookPageCount, setBookPageCount] = useState<number | null>(null);
     const [showFinishedNav, setShowFinishedNav] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [accessChecked, setAccessChecked] = useState(false);
@@ -133,7 +175,8 @@ export default function SimpleTimedSessionPage({
           user_id,
           books (
             title,
-            cover_url
+            cover_url,
+            page_count
           )
         `)
                 .eq("id", userBookId)
@@ -188,6 +231,7 @@ export default function SimpleTimedSessionPage({
             setAccessChecked(true);
             setBookTitle(book?.title ?? "Untitled book");
             setBookCover(book?.cover_url ?? "");
+            setBookPageCount(book?.page_count ?? null);
 
             const { data: savedWordRows, error: savedWordError } = await supabase
                 .from("user_book_words")
@@ -371,13 +415,23 @@ export default function SimpleTimedSessionPage({
         }
 
         const latest = data?.[0];
-        const nextStart =
+        const latestEndPage =
             latest?.end_page != null && Number.isFinite(Number(latest.end_page))
-                ? String(Number(latest.end_page) + 1)
-                : "";
+                ? Number(latest.end_page)
+                : null;
+        const latestPercent = pageToPercent(latestEndPage, bookPageCount);
+        const nextStart = latestEndPage != null ? String(latestEndPage + 1) : "";
 
-        setSessionStartPage(nextStart);
-        setSessionEndPage(nextStart);
+        setSessionStartPage(sessionMode === "listening" ? "" : nextStart);
+        setSessionEndPage(
+            sessionMode === "listening"
+                ? latestPercent != null
+                    ? `${latestPercent}%`
+                    : latestEndPage != null
+                        ? `p. ${latestEndPage}`
+                        : ""
+                : nextStart
+        );
         setShowTimedSessionForm(true);
     }
 
@@ -396,7 +450,14 @@ export default function SimpleTimedSessionPage({
         let startPageNum: number | null = null;
         let endPageNum: number | null = null;
 
-        if (hasAnyPageInput) {
+        if (sessionMode === "listening") {
+            const parsedEndpoint = parseListeningEndpoint(trimmedEndPage, bookPageCount);
+            if (parsedEndpoint.error) {
+                alert(parsedEndpoint.error);
+                return;
+            }
+            endPageNum = parsedEndpoint.value;
+        } else if (hasAnyPageInput) {
             startPageNum = Number(trimmedStartPage);
             endPageNum = Number(trimmedEndPage);
 
@@ -615,31 +676,48 @@ export default function SimpleTimedSessionPage({
                 Save this session
             </div>
 
-            <div className={workspaceCompact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
+            {sessionMode === "listening" ? (
                 <div>
-                    <div className="mb-1 text-sm text-stone-600">{startLocationLabel}</div>
+                    <div className="mb-1 text-sm text-stone-600">Up to page or percent</div>
                     <input
-                        type="number"
-                        min={1}
-                        value={sessionStartPage}
-                        onChange={(e) => setSessionStartPage(e.target.value)}
-                        placeholder="e.g. 45"
-                        className="w-full rounded-xl border px-3 py-2 text-sm"
-                    />
-                </div>
-
-                <div>
-                    <div className="mb-1 text-sm text-stone-600">{endLocationLabel}</div>
-                    <input
-                        type="number"
-                        min={1}
+                        type="text"
+                        inputMode="decimal"
                         value={sessionEndPage}
                         onChange={(e) => setSessionEndPage(e.target.value)}
-                        placeholder="e.g. 52"
+                        placeholder="e.g. p. 42 or 18%"
                         className="w-full rounded-xl border px-3 py-2 text-sm"
                     />
+                    <div className="mt-1 text-xs text-stone-500">
+                        Optional. Use a page if you have the book open, or a percent for audiobook progress.
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <div className={workspaceCompact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
+                    <div>
+                        <div className="mb-1 text-sm text-stone-600">{startLocationLabel}</div>
+                        <input
+                            type="number"
+                            min={1}
+                            value={sessionStartPage}
+                            onChange={(e) => setSessionStartPage(e.target.value)}
+                            placeholder="e.g. 45"
+                            className="w-full rounded-xl border px-3 py-2 text-sm"
+                        />
+                    </div>
+
+                    <div>
+                        <div className="mb-1 text-sm text-stone-600">{endLocationLabel}</div>
+                        <input
+                            type="number"
+                            min={1}
+                            value={sessionEndPage}
+                            onChange={(e) => setSessionEndPage(e.target.value)}
+                            placeholder="e.g. 52"
+                            className="w-full rounded-xl border px-3 py-2 text-sm"
+                        />
+                    </div>
+                </div>
+            )}
 
             <div className="mt-3 space-y-1 text-sm text-stone-500">
                 <div>Time: {formatTimer(elapsed)}</div>

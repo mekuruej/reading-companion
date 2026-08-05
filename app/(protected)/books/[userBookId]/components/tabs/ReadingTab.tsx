@@ -431,18 +431,13 @@ export default function ReadingTab({
 
           {sessionMode === "listening" && (
             <div className="rounded border bg-white p-3 text-sm">
-              <div className="text-stone-600">
-                {useListeningPercentMode
-                  ? "Listening end percent (optional)"
-                  : "Listening end page (optional)"}
-              </div>
+              <div className="text-stone-600">Up to page or percent (optional)</div>
               <input
-                type="number"
-                min={useListeningPercentMode ? 0 : 1}
-                max={useListeningPercentMode ? 100 : undefined}
+                type="text"
+                inputMode="decimal"
                 value={sessionEndPage}
                 onChange={(e) => setSessionEndPage(e.target.value)}
-                placeholder={useListeningPercentMode ? "e.g. 35" : "e.g. 45"}
+                placeholder={useListeningPercentMode ? "e.g. 18% or p. 42" : "e.g. p. 42 or 18%"}
                 className="mt-1 w-full rounded border px-2 py-1"
               />
               <p className="mt-2 text-xs text-stone-500">

@@ -25,6 +25,7 @@ export default function JustReadingPage() {
     const [canUseReadingJournal, setCanUseReadingJournal] = useState(false);
     const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
     const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
+    const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<JustReadingViewMode>("just-reading");
 
     useEffect(() => {
@@ -39,13 +40,14 @@ export default function JustReadingPage() {
             if (cancelled) return;
 
             if (userError || !user || !userBookId) {
+                setBookLanguageCode(null);
                 setCheckingAccess(false);
                 return;
             }
 
             const { data: userBook, error: userBookError } = await supabase
                 .from("user_books")
-                .select("id, user_id, favorite_quotes")
+                .select("id, user_id, favorite_quotes, books ( language_code )")
                 .eq("id", userBookId)
                 .maybeSingle();
 
@@ -58,9 +60,15 @@ export default function JustReadingPage() {
                 setCanUseReadingJournal(false);
                 setJournalOwnerUserId(null);
                 setFavoriteQuotes(null);
+                setBookLanguageCode(null);
                 setCheckingAccess(false);
                 return;
             }
+
+            const book = Array.isArray((userBook as any).books)
+                ? (userBook as any).books[0]
+                : (userBook as any).books;
+            setBookLanguageCode(book?.language_code ?? null);
 
             const profileResult = await supabase
                 .from("profiles")
@@ -124,6 +132,7 @@ export default function JustReadingPage() {
                 setCanUseReadingJournal(false);
                 setJournalOwnerUserId(null);
                 setFavoriteQuotes(null);
+                setBookLanguageCode(null);
             }
 
             setCheckingAccess(false);
@@ -221,6 +230,7 @@ export default function JustReadingPage() {
                                 ownerUserId={journalOwnerUserId}
                                 favoriteQuotes={favoriteQuotes}
                                 compact
+                                vocabListHref={bookLanguageCode === "en" ? undefined : `/books/${encodeURIComponent(userBookId)}/words`}
                                 onFavoriteQuotesChange={setFavoriteQuotes}
                             />
                         </div>

@@ -2007,6 +2007,7 @@ export default function ReadAlongPage() {
                                 selectedChapterLabel={currentPageChapterLabel}
                                 selectedChapterNumber={currentPageChapterNumber}
                                 compact
+                                vocabListHref={`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`}
                                 onFavoriteQuotesChange={setFavoriteQuotes}
                             />
                         </div>

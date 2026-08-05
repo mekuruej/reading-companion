@@ -20,6 +20,7 @@ type CuriosityTimerPanelProps = {
   saveTitle?: string;
   startPageLabel?: string;
   endPageLabel?: string;
+  listeningProgressOnly?: boolean;
   compact?: boolean;
 };
 
@@ -45,6 +46,7 @@ export default function CuriosityTimerPanel({
   saveTitle = "Save this reading session",
   startPageLabel = "Start page",
   endPageLabel = "End page",
+  listeningProgressOnly = false,
   compact = false,
 }: CuriosityTimerPanelProps) {
   return (
@@ -121,33 +123,50 @@ export default function CuriosityTimerPanel({
             {saveTitle}
           </div>
 
-          <div className={compact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
+          {listeningProgressOnly ? (
             <div>
-              <div className="mb-1 text-sm text-stone-600">{startPageLabel}</div>
+              <div className="mb-1 text-sm text-stone-600">Up to page or percent</div>
               <input
-                type="number"
-                min={1}
-                value={sessionStartPage}
-                onChange={(event) =>
-                  onSessionStartPageChange(event.target.value)
-                }
-                placeholder="e.g. 45"
-                className="w-full rounded border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <div className="mb-1 text-sm text-stone-600">{endPageLabel}</div>
-              <input
-                type="number"
-                min={1}
+                type="text"
+                inputMode="decimal"
                 value={sessionEndPage}
                 onChange={(event) => onSessionEndPageChange(event.target.value)}
-                placeholder="e.g. 52"
+                placeholder="e.g. p. 42 or 18%"
                 className="w-full rounded border px-3 py-2 text-sm"
               />
+              <div className="mt-1 text-xs text-stone-500">
+                Optional. Use a page if you have the book open, or a percent for audiobook progress.
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={compact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
+              <div>
+                <div className="mb-1 text-sm text-stone-600">{startPageLabel}</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={sessionStartPage}
+                  onChange={(event) =>
+                    onSessionStartPageChange(event.target.value)
+                  }
+                  placeholder="e.g. 45"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm text-stone-600">{endPageLabel}</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={sessionEndPage}
+                  onChange={(event) => onSessionEndPageChange(event.target.value)}
+                  placeholder="e.g. 52"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="mt-3 text-sm text-stone-500">
             Time: {formatTimer(elapsed)}
