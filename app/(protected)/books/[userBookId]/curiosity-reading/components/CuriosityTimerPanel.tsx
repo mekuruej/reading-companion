@@ -20,6 +20,7 @@ type CuriosityTimerPanelProps = {
   saveTitle?: string;
   startPageLabel?: string;
   endPageLabel?: string;
+  compact?: boolean;
 };
 
 export default function CuriosityTimerPanel({
@@ -44,15 +45,16 @@ export default function CuriosityTimerPanel({
   saveTitle = "Save this reading session",
   startPageLabel = "Start page",
   endPageLabel = "End page",
+  compact = false,
 }: CuriosityTimerPanelProps) {
   return (
-    <div className="mb-6 rounded-2xl border border-stone-300 bg-white p-4">
+    <div className={compact ? "rounded-2xl border border-stone-300 bg-white p-3" : "mb-6 rounded-2xl border border-stone-300 bg-white p-4"}>
       <div className="mb-2 text-sm font-medium text-stone-900">
         {title}
       </div>
 
-      <div className="mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3">
-        <div className="mb-2 text-center text-sm text-stone-600">
+      <div className={compact ? "mt-3 rounded-xl border border-stone-200 bg-white px-3 py-3" : "mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3"}>
+        <div className={compact ? "mb-2 text-center text-xs leading-5 text-stone-600" : "mb-2 text-center text-sm text-stone-600"}>
           {description}
         </div>
 
@@ -114,12 +116,12 @@ export default function CuriosityTimerPanel({
       </div>
 
       {showTimedSessionForm && !isRunning ? (
-        <div className="mt-4 rounded-2xl border border-stone-300 bg-stone-50 p-4">
+        <div className={compact ? "mt-3 rounded-2xl border border-stone-300 bg-stone-50 p-3" : "mt-4 rounded-2xl border border-stone-300 bg-stone-50 p-4"}>
           <div className="mb-3 text-sm font-medium text-stone-700">
             {saveTitle}
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className={compact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
             <div>
               <div className="mb-1 text-sm text-stone-600">{startPageLabel}</div>
               <input

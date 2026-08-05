@@ -174,7 +174,11 @@ export default function ListeningPage() {
 
   const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal && journalOwnerUserId;
   const listeningExperience = canSaveWordsWhileListening ? (
-    <CuriosityReadingExperience experienceMode="listening" embedded />
+    <CuriosityReadingExperience
+      experienceMode="listening"
+      embedded
+      workspaceCompact={Boolean(showReadingWorkspace)}
+    />
   ) : (
     <SimpleTimedSessionPage
       sessionMode="listening"
@@ -187,6 +191,7 @@ export default function ListeningPage() {
       endLocationLabel="End page optional"
       sessionLocationNote="Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers."
       embedded
+      workspaceCompact={Boolean(showReadingWorkspace)}
     />
   );
 
@@ -238,9 +243,15 @@ export default function ListeningPage() {
           </div>
         ) : null}
 
-        {showReadingWorkspace && journalOwnerUserId ? (
-          <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] lg:items-start lg:gap-4 lg:space-y-0 xl:grid-cols-[minmax(0,1fr)_minmax(390px,clamp(28rem,34vw,32rem))]">
-            <div className="min-w-0">{listeningExperience}</div>
+        <div
+          className={
+            showReadingWorkspace
+              ? "space-y-4 lg:grid lg:grid-cols-[minmax(24rem,30rem)_minmax(0,1fr)] lg:items-start lg:gap-4 lg:space-y-0 xl:grid-cols-[minmax(26rem,32rem)_minmax(0,1fr)]"
+              : "space-y-4"
+          }
+        >
+          <div className="min-w-0">{listeningExperience}</div>
+          {showReadingWorkspace && journalOwnerUserId ? (
             <div className="hidden min-w-0 lg:block">
               <ReadingJournalPanel
                 userBookId={userBookId}
@@ -250,10 +261,8 @@ export default function ListeningPage() {
                 onFavoriteQuotesChange={setFavoriteQuotes}
               />
             </div>
-          </div>
-        ) : (
-          listeningExperience
-        )}
+          ) : null}
+        </div>
       </div>
     </main>
   );

@@ -29,6 +29,7 @@ type SimpleTimedSessionPageProps = {
     endLocationLabel?: string;
     sessionLocationNote?: string;
     embedded?: boolean;
+    workspaceCompact?: boolean;
 };
 
 function formatTimer(totalSeconds: number) {
@@ -56,6 +57,7 @@ export default function SimpleTimedSessionPage({
     endLocationLabel = "End page optional",
     sessionLocationNote = "Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers.",
     embedded = false,
+    workspaceCompact = false,
 }: SimpleTimedSessionPageProps) {
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -536,7 +538,258 @@ export default function SimpleTimedSessionPage({
         );
     }
 
-    const content = (
+    const timerPanel = (
+        <div className={workspaceCompact ? "rounded-2xl border border-stone-200 bg-stone-50 p-4 text-center" : "mt-6 rounded-3xl border border-stone-200 bg-stone-50 p-5 text-center"}>
+            <div className="text-sm font-medium text-stone-500">Timer</div>
+            <div className={workspaceCompact ? "mt-2 text-4xl font-black tracking-tight text-stone-900" : "mt-2 text-6xl font-black tracking-tight text-stone-900"}>
+                {formatTimer(elapsed)}
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                {!isRunning && !isPaused ? (
+                    <button
+                        type="button"
+                        onClick={startTimer}
+                        className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+                    >
+                        Start Timer
+                    </button>
+                ) : null}
+
+                {isRunning ? (
+                    <>
+                        <button
+                            type="button"
+                            onClick={pauseTimer}
+                            className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
+                        >
+                            Pause
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={finishTimer}
+                            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                        >
+                            Finish
+                        </button>
+                    </>
+                ) : null}
+
+                {isPaused ? (
+                    <>
+                        <button
+                            type="button"
+                            onClick={resumeTimer}
+                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+                        >
+                            Resume
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={finishTimer}
+                            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                        >
+                            Finish
+                        </button>
+                    </>
+                ) : null}
+            </div>
+
+            {(isRunning || isPaused) ? (
+                <p className="mt-3 text-xs text-amber-600">
+                    Timer is active. If you leave this page or refresh, you may lose your session.
+                </p>
+            ) : null}
+
+            {timerSaveMessage ? (
+                <p className="mt-3 text-xs text-emerald-600">{timerSaveMessage}</p>
+            ) : null}
+        </div>
+    );
+
+    const saveSessionForm = showTimedSessionForm && !isRunning ? (
+        <div className={workspaceCompact ? "mt-3 rounded-2xl border border-stone-300 bg-white p-4" : "mt-5 rounded-3xl border border-stone-300 bg-white p-5"}>
+            <div className="mb-3 text-sm font-semibold text-stone-800">
+                Save this session
+            </div>
+
+            <div className={workspaceCompact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
+                <div>
+                    <div className="mb-1 text-sm text-stone-600">{startLocationLabel}</div>
+                    <input
+                        type="number"
+                        min={1}
+                        value={sessionStartPage}
+                        onChange={(e) => setSessionStartPage(e.target.value)}
+                        placeholder="e.g. 45"
+                        className="w-full rounded-xl border px-3 py-2 text-sm"
+                    />
+                </div>
+
+                <div>
+                    <div className="mb-1 text-sm text-stone-600">{endLocationLabel}</div>
+                    <input
+                        type="number"
+                        min={1}
+                        value={sessionEndPage}
+                        onChange={(e) => setSessionEndPage(e.target.value)}
+                        placeholder="e.g. 52"
+                        className="w-full rounded-xl border px-3 py-2 text-sm"
+                    />
+                </div>
+            </div>
+
+            <div className="mt-3 space-y-1 text-sm text-stone-500">
+                <div>Time: {formatTimer(elapsed)}</div>
+                <div className="text-xs">
+                    {sessionLocationNote}
+                </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    onClick={async () => {
+                        setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
+                        await saveTimedSession();
+                    }}
+                    className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                >
+                    Save Timed Session
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setShowTimedSessionForm(false);
+                        setElapsed(0);
+                        setAccumulatedElapsedMs(0);
+                        setStartTime(null);
+                        setIsPaused(false);
+                        setIsRunning(false);
+                        clearPersistedTimedSession(sessionMode, userBookId);
+                    }}
+                    className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    ) : null;
+
+    const content = workspaceCompact ? (
+        <>
+            <button
+                type="button"
+                onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+                className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-800"
+            >
+                ← {backLabel}
+            </button>
+
+            {errorMessage ? (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {errorMessage}
+                </div>
+            ) : null}
+
+            {showFinishedNav && userBookId && bookTitle ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            router.push(`/books/${encodeURIComponent(userBookId)}`);
+                        }}
+                        className="flex min-w-0 items-center gap-3 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                        title={`Go to ${bookTitle} Book Hub`}
+                    >
+                        {bookCover ? (
+                            <img
+                                src={bookCover}
+                                alt={`Go to ${bookTitle} Book Hub`}
+                                className="h-16 w-11 shrink-0 rounded-md object-cover shadow-sm"
+                            />
+                        ) : null}
+
+                        <div className="min-w-0">
+                            <p className="text-xs uppercase tracking-wide text-stone-500">
+                                For book
+                            </p>
+                            <div className="truncate text-sm font-semibold text-stone-900 hover:text-stone-700">
+                                {bookTitle}
+                            </div>
+                        </div>
+                    </button>
+
+                    <div className="flex flex-wrap gap-2">
+                        {hasSavedWords ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    router.push(`/books/${encodeURIComponent(userBookId)}/words`);
+                                }}
+                                className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+                            >
+                                Vocabulary Archive
+                            </button>
+                        ) : null}
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                router.push(`/books/${encodeURIComponent(userBookId)}`);
+                            }}
+                            className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+                        >
+                            Book Hub
+                        </button>
+                    </div>
+                </div>
+            ) : null}
+
+            <section className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-4 xl:grid-cols-[9.5rem_minmax(0,1fr)]">
+                    <div className="space-y-3">
+                        <div className="flex justify-center">
+                            {bookCover ? (
+                                <img
+                                    src={bookCover}
+                                    alt={`${bookTitle} cover`}
+                                    className="h-56 w-36 rounded-2xl object-cover shadow-lg"
+                                />
+                            ) : (
+                                <div className="flex h-56 w-36 items-center justify-center rounded-2xl bg-stone-100 text-sm text-stone-400">
+                                    No cover
+                                </div>
+                            )}
+                        </div>
+                        {timerPanel}
+                        {saveSessionForm}
+                    </div>
+
+                    <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+                            {eyebrow}
+                        </p>
+
+                        <h1 className="mt-2 text-2xl font-bold tracking-tight text-stone-900">
+                            {title}
+                        </h1>
+
+                        <p className="mt-2 text-base font-semibold text-stone-700">
+                            {subtitle}
+                        </p>
+
+                        <p className="mt-3 text-sm leading-7 text-stone-600">
+                            {description}
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </>
+    ) : (
         <>
                 <button
                     type="button"
@@ -639,144 +892,9 @@ export default function SimpleTimedSessionPage({
                                 {description}
                             </p>
 
-                            <div className="mt-6 rounded-3xl border border-stone-200 bg-stone-50 p-5 text-center">
-                                <div className="text-sm font-medium text-stone-500">Timer</div>
-                                <div className="mt-2 text-6xl font-black tracking-tight text-stone-900">
-                                    {formatTimer(elapsed)}
-                                </div>
+                            {timerPanel}
 
-                                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                                    {!isRunning && !isPaused ? (
-                                        <button
-                                            type="button"
-                                            onClick={startTimer}
-                                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
-                                        >
-                                            Start Timer
-                                        </button>
-                                    ) : null}
-
-                                    {isRunning ? (
-                                        <>
-                                            <button
-                                                type="button"
-                                                onClick={pauseTimer}
-                                                className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
-                                            >
-                                                Pause
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={finishTimer}
-                                                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-                                            >
-                                                Finish
-                                            </button>
-                                        </>
-                                    ) : null}
-
-                                    {isPaused ? (
-                                        <>
-                                            <button
-                                                type="button"
-                                                onClick={resumeTimer}
-                                                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
-                                            >
-                                                Resume
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={finishTimer}
-                                                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-                                            >
-                                                Finish
-                                            </button>
-                                        </>
-                                    ) : null}
-                                </div>
-
-                                {(isRunning || isPaused) ? (
-                                    <p className="mt-3 text-xs text-amber-600">
-                                        Timer is active. If you leave this page or refresh, you may lose your session.
-                                    </p>
-                                ) : null}
-
-                                {timerSaveMessage ? (
-                                    <p className="mt-3 text-xs text-emerald-600">{timerSaveMessage}</p>
-                                ) : null}
-                            </div>
-
-                            {showTimedSessionForm && !isRunning ? (
-                                <div className="mt-5 rounded-3xl border border-stone-300 bg-white p-5">
-                                    <div className="mb-3 text-sm font-semibold text-stone-800">
-                                        Save this session
-                                    </div>
-
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        <div>
-                                            <div className="mb-1 text-sm text-stone-600">{startLocationLabel}</div>
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                value={sessionStartPage}
-                                                onChange={(e) => setSessionStartPage(e.target.value)}
-                                                placeholder="e.g. 45"
-                                                className="w-full rounded-xl border px-3 py-2 text-sm"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <div className="mb-1 text-sm text-stone-600">{endLocationLabel}</div>
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                value={sessionEndPage}
-                                                onChange={(e) => setSessionEndPage(e.target.value)}
-                                                placeholder="e.g. 52"
-                                                className="w-full rounded-xl border px-3 py-2 text-sm"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3 space-y-1 text-sm text-stone-500">
-                                        <div>Time: {formatTimer(elapsed)}</div>
-                                        <div className="text-xs">
-                                            {sessionLocationNote}
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={async () => {
-                                                setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
-                                                await saveTimedSession();
-                                            }}
-                                            className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
-                                        >
-                                            Save Timed Session
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setShowTimedSessionForm(false);
-                                                setElapsed(0);
-                                                setAccumulatedElapsedMs(0);
-                                                setStartTime(null);
-                                                setIsPaused(false);
-                                                setIsRunning(false);
-                                                clearPersistedTimedSession(sessionMode, userBookId);
-                                            }}
-                                            className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : null}
+                            {saveSessionForm}
                         </div>
                     </div>
                 </section>

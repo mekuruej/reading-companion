@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import KanjiComponentLookup from "@/components/KanjiComponentLookup";
@@ -309,9 +310,11 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 export function CuriosityReadingExperience({
   experienceMode = "curiosity",
   embedded = false,
+  workspaceCompact = false,
 }: {
   experienceMode?: WordTimerExperienceMode;
   embedded?: boolean;
+  workspaceCompact?: boolean;
 }) {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
@@ -1755,98 +1758,166 @@ export function CuriosityReadingExperience({
     window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
   }
 
+  const timerPanel = (
+    <CuriosityTimerPanel
+      title={timerTitle}
+      description={timerDescription}
+      saveTitle={saveSessionTitle}
+      startPageLabel={isListeningMode ? "Start page optional" : "Start page"}
+      endPageLabel={isListeningMode ? "End page optional" : "End page"}
+      isRunning={isRunning}
+      isPaused={isPaused}
+      elapsed={elapsed}
+      showTimedSessionForm={showTimedSessionForm}
+      sessionStartPage={sessionStartPage}
+      sessionEndPage={sessionEndPage}
+      timerSaveMessage={timerSaveMessage}
+      formatTimer={formatTimer}
+      compact={workspaceCompact}
+      onStart={() => {
+        setSessionDate(todayYmdAppTimeZone());
+        setStartTime(Date.now());
+        setAccumulatedElapsedMs(0);
+        setElapsed(0);
+        setIsRunning(true);
+        setIsPaused(false);
+        setHasFinishedTimer(false);
+      }}
+      onPause={() => {
+        const nextElapsedMs =
+          accumulatedElapsedMs + (startTime ? Math.max(0, Date.now() - startTime) : 0);
+
+        if (startTime) {
+          setElapsed(Math.floor(nextElapsedMs / 1000));
+        }
+        setAccumulatedElapsedMs(nextElapsedMs);
+        setStartTime(null);
+        setIsRunning(false);
+        setIsPaused(true);
+      }}
+      onFinish={() => {
+        const nextElapsedMs =
+          accumulatedElapsedMs + (startTime ? Math.max(0, Date.now() - startTime) : 0);
+
+        setAccumulatedElapsedMs(nextElapsedMs);
+        setElapsed(Math.floor(nextElapsedMs / 1000));
+        setStartTime(null);
+        setIsRunning(false);
+        setIsPaused(false);
+        setHasFinishedTimer(true);
+        void openTimedSessionFormWithDefaults();
+      }}
+      onResume={() => {
+        setStartTime(Date.now());
+        setIsPaused(false);
+        setIsRunning(true);
+      }}
+      onSaveSession={() => void saveReadingSession()}
+      onCancelSession={() => {
+        setShowTimedSessionForm(false);
+        setElapsed(0);
+        setAccumulatedElapsedMs(0);
+        setStartTime(null);
+        setIsPaused(false);
+        setIsRunning(false);
+        if (userBookId) {
+          clearPersistedTimedSession(timedSessionMode, userBookId);
+        }
+      }}
+      onSessionStartPageChange={setSessionStartPage}
+      onSessionEndPageChange={setSessionEndPage}
+    />
+  );
+
   const content = (
       <>
-        <CuriosityPageHeader title={pageTitle} description={pageDescription} />
-        {userBookId ? (
-          bookTitle ? (
-            <CuriosityBookContextCard
-              bookTitle={bookTitle}
-              bookCover={bookCover}
-              contextLine={
-                isListeningMode
-                  ? curiosityProgressLine || "Listening timer + heard words"
-                  : curiosityProgressLine
-              }
-              bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
-              vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
-            />
-          ) : null
+        {workspaceCompact ? (
+          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-4 xl:grid-cols-[9.5rem_minmax(0,1fr)]">
+              <div className="space-y-3">
+                {bookTitle ? (
+                  <Link
+                    href={`/books/${encodeURIComponent(userBookId)}`}
+                    className="block rounded-2xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                    title={`Go to ${bookTitle} Book Hub`}
+                  >
+                    {bookCover ? (
+                      <img
+                        src={bookCover}
+                        alt={`Go to ${bookTitle} Book Hub`}
+                        className="mx-auto h-56 w-36 rounded-2xl object-cover shadow-lg"
+                      />
+                    ) : (
+                      <div className="mx-auto flex h-56 w-36 items-center justify-center rounded-2xl bg-stone-100 text-sm text-stone-400">
+                        No cover
+                      </div>
+                    )}
+                  </Link>
+                ) : null}
+                {timerPanel}
+              </div>
+
+              <div className="min-w-0">
+                <CuriosityPageHeader title={pageTitle} description={pageDescription} />
+                {bookTitle ? (
+                  <div className="mt-3 min-w-0">
+                    <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
+                    <div className="truncate text-base font-semibold text-stone-900">
+                      {bookTitle}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        href={`/books/${encodeURIComponent(userBookId)}/words`}
+                        className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+                      >
+                        Vocab List
+                      </Link>
+                      <Link
+                        href={`/books/${encodeURIComponent(userBookId)}`}
+                        className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+                      >
+                        Book Hub
+                      </Link>
+                    </div>
+                    {curiosityProgressLine ? (
+                      <p className="mt-3 text-sm font-medium text-stone-500">
+                        {curiosityProgressLine}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <CuriosityStatusMessage message={message} />
+              </div>
+            </div>
+          </section>
         ) : (
-          <p className="mb-6 text-sm text-gray-500">
-            Open with <code className="rounded bg-gray-100 px-1 py-0.5">?userBookId=...</code>
-          </p>
+          <>
+            <CuriosityPageHeader title={pageTitle} description={pageDescription} />
+            {userBookId ? (
+              bookTitle ? (
+                <CuriosityBookContextCard
+                  bookTitle={bookTitle}
+                  bookCover={bookCover}
+                  contextLine={
+                    isListeningMode
+                      ? curiosityProgressLine || "Listening timer + heard words"
+                      : curiosityProgressLine
+                  }
+                  bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+                  vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
+                />
+              ) : null
+            ) : (
+              <p className="mb-6 text-sm text-gray-500">
+                Open with <code className="rounded bg-gray-100 px-1 py-0.5">?userBookId=...</code>
+              </p>
+            )}
+
+            <CuriosityStatusMessage message={message} />
+
+            {timerPanel}
+          </>
         )}
-
-        <CuriosityStatusMessage message={message} />
-
-        <CuriosityTimerPanel
-          title={timerTitle}
-          description={timerDescription}
-          saveTitle={saveSessionTitle}
-          startPageLabel={isListeningMode ? "Start page optional" : "Start page"}
-          endPageLabel={isListeningMode ? "End page optional" : "End page"}
-          isRunning={isRunning}
-          isPaused={isPaused}
-          elapsed={elapsed}
-          showTimedSessionForm={showTimedSessionForm}
-          sessionStartPage={sessionStartPage}
-          sessionEndPage={sessionEndPage}
-          timerSaveMessage={timerSaveMessage}
-          formatTimer={formatTimer}
-          onStart={() => {
-            setSessionDate(todayYmdAppTimeZone());
-            setStartTime(Date.now());
-            setAccumulatedElapsedMs(0);
-            setElapsed(0);
-            setIsRunning(true);
-            setIsPaused(false);
-            setHasFinishedTimer(false);
-          }}
-          onPause={() => {
-            const nextElapsedMs =
-              accumulatedElapsedMs + (startTime ? Math.max(0, Date.now() - startTime) : 0);
-
-            if (startTime) {
-              setElapsed(Math.floor(nextElapsedMs / 1000));
-            }
-            setAccumulatedElapsedMs(nextElapsedMs);
-            setStartTime(null);
-            setIsRunning(false);
-            setIsPaused(true);
-          }}
-          onFinish={() => {
-            const nextElapsedMs =
-              accumulatedElapsedMs + (startTime ? Math.max(0, Date.now() - startTime) : 0);
-
-            setAccumulatedElapsedMs(nextElapsedMs);
-            setElapsed(Math.floor(nextElapsedMs / 1000));
-            setStartTime(null);
-            setIsRunning(false);
-            setIsPaused(false);
-            setHasFinishedTimer(true);
-            void openTimedSessionFormWithDefaults();
-          }}
-          onResume={() => {
-            setStartTime(Date.now());
-            setIsPaused(false);
-            setIsRunning(true);
-          }}
-          onSaveSession={() => void saveReadingSession()}
-          onCancelSession={() => {
-            setShowTimedSessionForm(false);
-            setElapsed(0);
-            setAccumulatedElapsedMs(0);
-            setStartTime(null);
-            setIsPaused(false);
-            setIsRunning(false);
-            if (userBookId) {
-              clearPersistedTimedSession(timedSessionMode, userBookId);
-            }
-          }}
-          onSessionStartPageChange={setSessionStartPage}
-          onSessionEndPageChange={setSessionEndPage}
-        />
 
         <div className="md:hidden">
           {isEnglishBook ? (
