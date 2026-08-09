@@ -683,7 +683,8 @@ export default function StoryTab({
                             onChange={(e) =>
                               updateChapterSummary(chapter.id, "chapter_number", e.target.value)
                             }
-                            placeholder="Chapter number"
+                            inputMode="decimal"
+                            placeholder="Chapter number, e.g. 5.2"
                             className="w-full rounded border px-3 py-2 text-sm"
                           />
 

@@ -120,6 +120,15 @@ function nextChapterSummaryNumber(items: ChapterSummary[]) {
   return chapterNumbers.length > 0 ? Math.max(...chapterNumbers) + 1 : 1;
 }
 
+function parseChapterSummaryNumber(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 const targetLanguageTabOrder: StoryTabMode[] = [
   "characters",
   "plot",
@@ -500,7 +509,9 @@ export default function ReadingJournalPanel({
                 field === "chapter_number" || field === "sort_order"
                   ? value === ""
                     ? null
-                    : Number(value)
+                    : field === "chapter_number"
+                      ? parseChapterSummaryNumber(value)
+                      : Number(value)
                   : value,
             }
           : item

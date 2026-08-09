@@ -583,6 +583,15 @@ function parseListeningProgressInput(value: string) {
   };
 }
 
+function parseChapterSummaryNumber(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function genreLabel(value: string | null | undefined) {
   if (!value) return "—";
   return (
@@ -1323,7 +1332,9 @@ export default function BookHubPage() {
               field === "chapter_number" || field === "sort_order"
                 ? value === ""
                   ? null
-                  : Number(value)
+                  : field === "chapter_number"
+                    ? parseChapterSummaryNumber(value)
+                    : Number(value)
                 : value,
           }
           : item
