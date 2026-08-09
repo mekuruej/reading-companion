@@ -411,66 +411,6 @@ function clampRating5(n: number | null) {
   return Number((Math.round(clamped * 2) / 2).toFixed(1));
 }
 
-function formatRating(value: number | null | undefined) {
-  if (value == null || Number.isNaN(Number(value))) return "—";
-
-  return Number(value)
-    .toFixed(2)
-    .replace(/\.00$/, "")
-    .replace(/0$/, "");
-}
-
-function stars5(value: number | null) {
-  if (!value) return "☆☆☆☆☆";
-
-  const v = Math.max(1, Math.min(5, value));
-  const rounded = Math.round(v);
-
-  return "★".repeat(rounded) + "☆".repeat(5 - rounded);
-}
-
-function ratingDescription(
-  descriptions: Record<number, string>,
-  value: number | null
-) {
-  if (!value) return "—";
-
-  return descriptions[value] ?? descriptions[Math.round(value)] ?? "—";
-}
-
-function entertainmentRatingText(value: number | null) {
-  switch (value) {
-    case 5:
-      return "Loved it. Highly recommend."
-    case 4.75:
-      return "Good, solid book. Definitely recommend."
-    case 4.5:
-      return "Good, solid book. Would most likely recommend."
-    case 4.25:
-      return "Good, solid book. May recommend."
-    case 4:
-      return "Good, solid book. Probably wouldn't recommend for certain reasons."
-    case 3.75:
-      return "Some parts worked; others didn't. Would recommend to specific people."
-    case 3.5:
-      return "Some parts worked; others didn't. May recommend."
-    case 3.25:
-      return "Some parts worked; others didn't. Would only recommend with reservations."
-    case 3:
-      return "Some parts worked; some parts didn't. Definitely wouldn't recommend."
-    case 2.5:
-      return "Some parts were okay, but overall, not for me."
-    case 2:
-      return "Definitely not for me, but the author tried."
-    case 1.5:
-      return "Definitely not for me. You should steer clear too."
-    case 1:
-      return "Hated it."
-    default:
-      return "—"
-  }
-}
-
 function languageLearningRatingText(value: number | null) {
   switch (value) {
     case 5:
@@ -1078,9 +1018,15 @@ export default function BookHubPage() {
     isSuperTeacher ||
     isAdmin;
   const canCompleteReadingReflection = !!finishedAt && !dnfAt && !isEnglishNativeTrackerBook;
+  const hasCompletedReadingReflection =
+    row?.rating_difficulty != null &&
+    row?.rating_overall != null &&
+    Boolean(row?.reader_advice?.trim());
+  const shouldShowReadingReflectionNudge =
+    canCompleteReadingReflection && !hasCompletedReadingReflection;
 
   useEffect(() => {
-    if (!canCompleteReadingReflection) {
+    if (!shouldShowReadingReflectionNudge) {
       setHighlightReadingReflection(false);
       return;
     }
@@ -1091,7 +1037,7 @@ export default function BookHubPage() {
     }, 10000);
 
     return () => window.clearTimeout(timeout);
-  }, [canCompleteReadingReflection]);
+  }, [shouldShowReadingReflectionNudge]);
 
   const visualReadingSessions = useMemo(() => {
     return realReadingSessions.filter(
@@ -5407,7 +5353,7 @@ export default function BookHubPage() {
                 wouldRetry={wouldRetry}
                 showStartButton={showBookHubStartButton}
                 showFinishDnfButtons={showBookHubFinishDnfButtons}
-                showReflectionLink={canCompleteReadingReflection}
+                showReflectionLink={shouldShowReadingReflectionNudge}
                 showReviewLink={!isEnglishNativeTrackerBook && canUseMyReviewNotes}
                 reviewLinkLabel={isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review"}
                 shouldNudgeStartBook={shouldNudgeStartBook}
@@ -5450,29 +5396,23 @@ export default function BookHubPage() {
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
                 showVocabularyStats={!isEnglishNativeTrackerBook}
+                summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
               />
 
               {isEnglishNativeTrackerBook ? (
                 <section className="overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 px-5 py-4 shadow-sm shadow-violet-100/70">
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                    <div>
-                      <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
-                        Native-Language Tracker
-                      </p>
-                      <h2 className="mt-2 text-2xl font-black text-stone-950 sm:text-3xl">
-                        This book is in your
-                        <span className="block">native language.</span>
-                      </h2>
-                      <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
-                        MEKURU keeps this Book Hub focused on current progress, reading time,
-                        Reading History, pace stats, Reading Journal, and your private review.
-                        Language-learning actions stay hidden here.
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
-                      Use Reading Journal for story details, notes, and your private Review & Ratings.
-                    </div>
+                  <div>
+                    <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
+                      Native-Language Tracker
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black text-stone-950 sm:text-3xl">
+                      This book is in your native language.
+                    </h2>
+                    <p className="mt-2 max-w-none text-sm leading-6 text-stone-700 sm:text-base">
+                      MEKURU keeps this Book Hub focused on current progress, reading time,
+                      Reading History, pace stats, Reading Journal, notes, and your private
+                      Review & Ratings. Language-learning actions stay hidden here.
+                    </p>
                   </div>
                 </section>
               ) : null}

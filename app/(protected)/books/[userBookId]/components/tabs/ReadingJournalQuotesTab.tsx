@@ -74,13 +74,9 @@ export default function ReadingJournalQuotesTab({
         {visibleQuoteRows.map(({ quote, index }) => {
           const quotePage = quote.page.trim();
           const quotePercent = quote.percent.trim();
+          const hasQuoteLocation = !!quotePage || !!quotePercent;
           const showPageLocation = !quotePercent;
           const showPercentLocation = !quotePage || !!quotePercent;
-          const savedLocationLabel = quotePercent
-            ? `${quotePercent}%`
-            : quotePage
-              ? `Page ${quotePage}`
-              : "";
           const quoteIsSaved =
             normalizeSavedQuote(quote).length > 0 &&
             normalizedSavedQuotes.includes(normalizeSavedQuote(quote));
@@ -91,7 +87,7 @@ export default function ReadingJournalQuotesTab({
               className={[
                 "rounded-2xl p-3 transition",
                 quoteIsSaved
-                  ? "bg-white"
+                  ? "bg-emerald-50"
                   : "border border-amber-100 bg-white",
               ].join(" ")}
             >
@@ -100,62 +96,73 @@ export default function ReadingJournalQuotesTab({
                   <span className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
                     Quote {index + 1}
                   </span>
-                  {quoteIsSaved ? (
-                    <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">
-                      Saved
-                    </span>
-                  ) : null}
-                  {quoteIsSaved && savedLocationLabel ? (
-                    <span className="text-xs font-semibold text-stone-500">
-                      {savedLocationLabel}
-                    </span>
-                  ) : null}
-                </div>
-                {favoriteQuoteInputs.length > 1 ? (
-                  <button
+	                  {quoteIsSaved ? (
+	                    <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">
+	                      Saved
+	                    </span>
+	                  ) : null}
+	                </div>
+	                {favoriteQuoteInputs.length > 1 ? (
+	                  <button
                     type="button"
                     onClick={() => removeFavoriteQuote(index)}
                     className="text-xs font-semibold text-stone-500 hover:text-rose-700"
                   >
                     Remove
                   </button>
-                ) : null}
-              </div>
-              <textarea
-                value={quote.text}
-                onChange={(event) => updateFavoriteQuote(index, "text", event.target.value)}
-                className={[
-                  "min-h-[96px] w-full rounded-xl border bg-white p-3 text-sm leading-6 outline-none focus:ring-2",
-                  quoteIsSaved
-                    ? "border-transparent bg-emerald-50/60 focus:ring-emerald-200"
-                    : "border-amber-100 focus:ring-amber-200",
-                ].join(" ")}
-                placeholder="Add one quote you want to remember."
-              />
-              <div className={showPageLocation && showPercentLocation ? "mt-2 grid gap-2 sm:grid-cols-2" : "mt-2"}>
-                {showPageLocation ? (
-                <label className="block">
-                  <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
-                    Page
-                  </span>
-                  <input
-                    value={quote.page}
-                    onChange={(event) => updateFavoriteQuote(index, "page", event.target.value)}
-                    inputMode="numeric"
-                    className="mt-1 w-full rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
-                    placeholder="123"
-                  />
-                </label>
-                ) : null}
-                {showPercentLocation ? (
-                <label className="block">
-                  <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
-                    Percent
-                  </span>
-                  <div className="mt-1 flex rounded-xl border border-amber-100 bg-white focus-within:ring-2 focus-within:ring-amber-200">
-                    <input
-                      value={quote.percent}
-                      onChange={(event) =>
+		                ) : null}
+		              </div>
+		              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_15rem]">
+		              <textarea
+		                value={quote.text}
+		                onChange={(event) => updateFavoriteQuote(index, "text", event.target.value)}
+		                rows={Math.max(2, Math.min(8, quote.text.split(/\n/).length + Math.ceil(quote.text.length / 90)))}
+		                className={[
+		                  "w-full resize-y rounded-xl border bg-white p-3 text-sm leading-6 outline-none focus:ring-2",
+		                  quoteIsSaved
+		                    ? "border-emerald-100 focus:ring-emerald-200"
+		                    : "border-amber-100 focus:ring-amber-200",
+		                ].join(" ")}
+		                placeholder="Add one quote you want to remember."
+		              />
+		              <div
+		                className={[
+		                  "flex items-center gap-2 rounded-xl px-3 py-2",
+		                  quoteIsSaved ? "bg-emerald-100/70" : "bg-amber-50",
+		                ].join(" ")}
+		              >
+		                <div className="shrink-0 text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+		                  Location
+		                </div>
+		                {showPageLocation ? (
+		                <label className="min-w-0 flex-1">
+	                  <input
+	                    value={quote.page}
+			                    onChange={(event) => updateFavoriteQuote(index, "page", event.target.value)}
+			                    inputMode="numeric"
+			                    className={[
+			                      "w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:ring-2",
+			                      quoteIsSaved
+			                        ? "border-emerald-100 focus:ring-emerald-200"
+			                        : "border-amber-100 focus:ring-amber-200",
+			                    ].join(" ")}
+			                    placeholder="Page"
+			                  />
+			                </label>
+			                ) : null}
+			                {showPercentLocation ? (
+			                <label className="min-w-0 flex-1">
+			                  <div
+			                    className={[
+			                      "flex rounded-xl border bg-white focus-within:ring-2",
+			                      quoteIsSaved
+			                        ? "border-emerald-100 focus-within:ring-emerald-200"
+			                        : "border-amber-100 focus-within:ring-amber-200",
+		                    ].join(" ")}
+		                  >
+		                    <input
+		                      value={quote.percent}
+		                      onChange={(event) =>
                         updateFavoriteQuote(index, "percent", event.target.value)
                       }
                       inputMode="decimal"
@@ -166,12 +173,13 @@ export default function ReadingJournalQuotesTab({
                       %
                     </span>
                   </div>
-                </label>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
+			                </label>
+			                ) : null}
+			              </div>
+		              </div>
+		            </div>
+	          );
+	        })}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">

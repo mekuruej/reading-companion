@@ -11,15 +11,17 @@ import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  emptyFavoriteQuoteInput,
-  favoriteQuoteInputsToText,
-  favoriteQuoteTextToInputs,
-  normalizeSavedQuote,
-  type FavoriteQuoteInput,
-} from "../components/tabs/quoteLocationHelpers";
 
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
+const REVIEW_RATING_VALUES = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
+function formatReviewRating(value: number | string | null | undefined) {
+  if (value == null || value === "" || Number.isNaN(Number(value))) return "";
+
+  return Number(value)
+    .toFixed(1)
+    .replace(/\.0$/, "");
+}
 
 type BookRow = {
   title: string | null;
@@ -36,8 +38,8 @@ type UserBookRow = {
   user_id: string;
   notes: string | null;
   my_review: string | null;
-  favorite_quotes: string | null;
-  memorable_words: string | null;
+  my_review_en: string | null;
+  my_review_ja: string | null;
   rating_overall: number | null;
   books: BookRow | null;
 };
@@ -56,10 +58,6 @@ export default function ReviewNotesPage() {
   const [row, setRow] = useState<UserBookRow | null>(null);
   const [notes, setNotes] = useState("");
   const [myReview, setMyReview] = useState("");
-  const [favoriteQuoteInputs, setFavoriteQuoteInputs] = useState<FavoriteQuoteInput[]>([
-    emptyFavoriteQuoteInput(),
-  ]);
-  const [memorableWords, setMemorableWords] = useState("");
   const [ratingOverall, setRatingOverall] = useState("");
   const [isEnglishNativeTrackerBook, setIsEnglishNativeTrackerBook] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -137,8 +135,8 @@ export default function ReviewNotesPage() {
           user_id,
           notes,
           my_review,
-          favorite_quotes,
-          memorable_words,
+          my_review_en,
+          my_review_ja,
           rating_overall,
           books (
             title,
@@ -202,10 +200,8 @@ export default function ReviewNotesPage() {
       }
 
       setRow(loadedRow);
-      setNotes(loadedRow.notes ?? "");
-      setMyReview(loadedRow.my_review ?? "");
-      setFavoriteQuoteInputs(favoriteQuoteTextToInputs(loadedRow.favorite_quotes));
-      setMemorableWords(loadedRow.memorable_words ?? "");
+      setNotes(nativeLanguageBook ? loadedRow.notes ?? "" : loadedRow.my_review_ja ?? loadedRow.notes ?? "");
+      setMyReview(nativeLanguageBook ? loadedRow.my_review ?? "" : loadedRow.my_review_en ?? loadedRow.my_review ?? "");
       setRatingOverall(loadedRow.rating_overall == null ? "" : String(loadedRow.rating_overall));
       setIsEnglishNativeTrackerBook(nativeLanguageBook);
       setLoading(false);
@@ -224,17 +220,20 @@ export default function ReviewNotesPage() {
     setSaving(true);
     setSaveMessage("");
 
-    const nextFavoriteQuotes = favoriteQuoteInputsToText(favoriteQuoteInputs);
+    const reviewPatch = isEnglishNativeTrackerBook
+      ? {
+          notes: notes.trim() || null,
+          my_review: myReview.trim() || null,
+          rating_overall: ratingOverall ? Number(ratingOverall) : null,
+        }
+      : {
+          my_review_en: myReview.trim() || null,
+          my_review_ja: notes.trim() || null,
+        };
 
     const { error } = await supabase
       .from("user_books")
-      .update({
-        notes: notes.trim() || null,
-        my_review: myReview.trim() || null,
-        favorite_quotes: nextFavoriteQuotes || null,
-        memorable_words: memorableWords.trim() || null,
-        ...(isEnglishNativeTrackerBook ? { rating_overall: ratingOverall ? Number(ratingOverall) : null } : {}),
-      })
+      .update(reviewPatch)
       .eq("id", row.id);
 
     setSaving(false);
@@ -249,10 +248,15 @@ export default function ReviewNotesPage() {
       prev
         ? {
             ...prev,
-            notes: notes.trim() || null,
-            my_review: myReview.trim() || null,
-            favorite_quotes: nextFavoriteQuotes || null,
-            memorable_words: memorableWords.trim() || null,
+            ...(isEnglishNativeTrackerBook
+              ? {
+                  notes: notes.trim() || null,
+                  my_review: myReview.trim() || null,
+                }
+              : {
+                  my_review_en: myReview.trim() || null,
+                  my_review_ja: notes.trim() || null,
+                }),
             rating_overall: isEnglishNativeTrackerBook
               ? ratingOverall
                 ? Number(ratingOverall)
@@ -288,31 +292,8 @@ export default function ReviewNotesPage() {
   const bookIdentity = getBookIdentity(book);
   const reviewDestinationLabel = isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review";
   const reviewDescription = isEnglishNativeTrackerBook
-    ? "Keep your rating, private review, memorable quotes, and the thoughts you want to remember."
-    : "Keep your private review, memorable quotes, and the thoughts you want to remember.";
-  const updateFavoriteQuote = (
-    index: number,
-    field: keyof FavoriteQuoteInput,
-    value: string
-  ) => {
-    setFavoriteQuoteInputs((prev) =>
-      prev.map((quote, quoteIndex) =>
-        quoteIndex === index ? { ...quote, [field]: value } : quote
-      )
-    );
-  };
-  const addFavoriteQuote = () => {
-    setFavoriteQuoteInputs((prev) => [...prev, emptyFavoriteQuoteInput()]);
-  };
-  const removeFavoriteQuote = (index: number) => {
-    setFavoriteQuoteInputs((prev) => {
-      const next = prev.filter((_, quoteIndex) => quoteIndex !== index);
-      return next.length > 0 ? next : [emptyFavoriteQuoteInput()];
-    });
-  };
-  const savedFavoriteQuotes = favoriteQuoteTextToInputs(row.favorite_quotes)
-    .map(normalizeSavedQuote)
-    .filter(Boolean);
+    ? "Keep your rating and private review."
+    : "Keep your personal reviews in English and Japanese.";
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -360,19 +341,19 @@ export default function ReviewNotesPage() {
             <div>
               <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {[1, 2, 3, 4, 5].map((value) => (
+                {REVIEW_RATING_VALUES.map((value) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setRatingOverall(String(value))}
                     className={[
-                      "rounded-full border px-4 py-2 text-sm font-black transition",
+                      "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-black transition",
                       ratingOverall === String(value)
                         ? "border-amber-400 bg-amber-100 text-amber-950"
                         : "border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100",
                     ].join(" ")}
                   >
-                    {value}
+                    {formatReviewRating(value)}
                   </button>
                 ))}
                 <button
@@ -386,137 +367,39 @@ export default function ReviewNotesPage() {
             </div>
           ) : null}
 
-          <label className="block">
-            <span className="text-sm font-semibold text-stone-900">My Review</span>
-            <textarea
-              value={myReview}
-              onChange={(event) => setMyReview(event.target.value)}
-              className="mt-2 min-h-[150px] w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
-              placeholder="Write your private review here..."
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-semibold text-stone-900">Private Notes</span>
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              className="mt-2 min-h-[120px] w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
-              placeholder="Add thoughts you want to remember..."
-            />
-          </label>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="block">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-stone-900">Memorable Quotes</span>
-                <button
-                  type="button"
-                  onClick={addFavoriteQuote}
-                  className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-800 transition hover:bg-violet-100"
-                >
-                  Add quote
-                </button>
-              </div>
-              <div className="mt-2 space-y-2">
-                {favoriteQuoteInputs.map((quote, index) => {
-                  const normalizedQuote = normalizeSavedQuote(quote);
-                  const quoteIsSaved =
-                    normalizedQuote.length > 0 && savedFavoriteQuotes.includes(normalizedQuote);
-
-                  return (
-                  <div
-                    key={index}
-                    className={[
-                      "rounded-2xl border p-3 transition",
-                      quoteIsSaved
-                        ? "border-emerald-200 bg-emerald-50 shadow-sm shadow-emerald-100"
-                        : "border-stone-200 bg-stone-50",
-                    ].join(" ")}
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
-                          Quote {index + 1}
-                        </span>
-                        {quoteIsSaved ? (
-                          <span className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-                            Saved
-                          </span>
-                        ) : null}
-                      </div>
-                      {favoriteQuoteInputs.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() => removeFavoriteQuote(index)}
-                          className="text-xs font-semibold text-stone-500 hover:text-rose-700"
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
-                    <textarea
-                      value={quote.text}
-                      onChange={(event) => updateFavoriteQuote(index, "text", event.target.value)}
-                      className={[
-                        "min-h-[92px] w-full rounded-xl border bg-white p-3 text-sm leading-6 outline-none focus:ring-2",
-                        quoteIsSaved
-                          ? "border-emerald-200 focus:ring-emerald-200"
-                          : "border-stone-200 focus:ring-stone-300",
-                      ].join(" ")}
-                      placeholder="Add one quote you want to remember."
-                    />
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
-                          Page
-                        </span>
-                        <input
-                          value={quote.page}
-                          onChange={(event) =>
-                            updateFavoriteQuote(index, "page", event.target.value)
-                          }
-                          inputMode="numeric"
-                          className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                          placeholder="123"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
-                          Percent
-                        </span>
-                        <div className="mt-1 flex rounded-xl border border-stone-200 bg-white focus-within:ring-2 focus-within:ring-stone-300">
-                          <input
-                            value={quote.percent}
-                            onChange={(event) =>
-                              updateFavoriteQuote(index, "percent", event.target.value)
-                            }
-                            inputMode="decimal"
-                            className="min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2 text-sm outline-none"
-                            placeholder="45"
-                          />
-                          <span className="flex items-center px-3 text-sm font-semibold text-stone-500">
-                            %
-                          </span>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-
+          {isEnglishNativeTrackerBook ? (
             <label className="block">
-              <span className="text-sm font-semibold text-stone-900">Memorable Words</span>
+              <span className="text-sm font-semibold text-stone-900">My Review</span>
               <textarea
-                value={memorableWords}
-                onChange={(event) => setMemorableWords(event.target.value)}
-                className="mt-2 min-h-[140px] w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
-                placeholder="List words or phrases you want to remember."
+                value={myReview}
+                onChange={(event) => setMyReview(event.target.value)}
+                className="mt-2 min-h-[180px] w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+                placeholder="Write your private review here..."
               />
             </label>
-          </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-semibold text-stone-900">English Review</span>
+                <textarea
+                  value={myReview}
+                  onChange={(event) => setMyReview(event.target.value)}
+                  className="mt-2 min-h-[220px] w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+                  placeholder="Write your personal review in English..."
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-semibold text-stone-900">Japanese Review</span>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  className="mt-2 min-h-[220px] w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+                  placeholder="日本語で感想を書いてください..."
+                />
+              </label>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-3">
             <button

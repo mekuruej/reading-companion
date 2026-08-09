@@ -50,7 +50,7 @@ function ActionButton({
         size === "primary"
             ? "min-h-[156px] px-5 py-5"
             : size === "secondary"
-                ? "min-h-[112px] px-3 py-3"
+                ? "min-h-[96px] px-3 py-2.5"
                 : "px-3.5 py-3";
 
     return (
@@ -144,7 +144,7 @@ export default function BookHubActionGrid({
     if (isEnglishNativeTrackerBook) {
         return (
             <div className="pb-2">
-                <div className="mt-6 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)]">
+                <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 [&>button]:h-[104px]">
                     <ActionButton
                         title="Read / Listen"
                         description="Start a timed reading or listening session and update your progress."
@@ -162,15 +162,13 @@ export default function BookHubActionGrid({
                             size="secondary"
                         />
                     ) : null}
-                </div>
-
-                <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)]">
                     {onBookStats ? (
                         <ActionButton
                             title="Book Stats"
                             description="Open time, pages, sessions, and progress for this book."
                             className="bg-yellow-50 hover:bg-yellow-100"
                             onClick={onBookStats}
+                            size="secondary"
                         />
                     ) : null}
 
@@ -180,6 +178,7 @@ export default function BookHubActionGrid({
                             description="Edit session records, dates, and reading history for this book."
                             className="bg-purple-50 hover:bg-purple-100"
                             onClick={onReadingSessions}
+                            size="secondary"
                         />
                     ) : null}
 

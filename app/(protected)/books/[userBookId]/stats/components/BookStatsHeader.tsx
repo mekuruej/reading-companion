@@ -7,6 +7,7 @@ type BookStatsHeaderProps = {
   canOpenVocabList?: boolean;
   bookHubHref: string;
   vocabListHref: string;
+  description?: string;
 };
 
 export default function BookStatsHeader({
@@ -16,6 +17,7 @@ export default function BookStatsHeader({
   canOpenVocabList = false,
   bookHubHref,
   vocabListHref,
+  description = "Reading history, time, pace, and difficulty.",
 }: BookStatsHeaderProps) {
   const displayTitle = bookTitle ?? "Untitled book";
 
@@ -55,7 +57,7 @@ export default function BookStatsHeader({
             ) : null}
 
             <p className="mt-2 hidden text-sm text-stone-600 sm:block">
-              Reading history, time, pace, and difficulty.
+              {description}
             </p>
           </div>
         </Link>

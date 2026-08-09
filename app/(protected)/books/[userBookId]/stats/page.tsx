@@ -33,6 +33,7 @@ type UserBook = {
     started_at: string | null;
     finished_at: string | null;
     dnf_at: string | null;
+    current_location: string | null;
     rating_difficulty: number | null;
     books: Book | null;
 };
@@ -203,6 +204,7 @@ export default function BookStatsPage() {
           started_at,
           finished_at,
           dnf_at,
+          current_location,
           rating_difficulty,
           books (
             id,
@@ -439,6 +441,92 @@ export default function BookStatsPage() {
         return pages > 0 ? minutes / pages : null;
     }, [fluidSessions]);
 
+    const nativeActivitySessions = useMemo(() => {
+        return realSessions.filter((s) => s.session_mode === "fluid" || s.session_mode === "listening");
+    }, [realSessions]);
+
+    const nativeTimedReadingSessions = useMemo(() => {
+        return fluidSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
+    }, [fluidSessions]);
+
+    const nativeTimedReadingPageSessions = useMemo(() => {
+        return nativeTimedReadingSessions.filter((s) => s.start_page != null && s.end_page != null);
+    }, [nativeTimedReadingSessions]);
+
+    const nativeTimedReadingMinutes = useMemo(() => {
+        return nativeTimedReadingSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+    }, [nativeTimedReadingSessions]);
+
+    const nativeTimedReadingPages = useMemo(() => {
+        return nativeTimedReadingPageSessions.reduce((sum, s) => {
+            if (s.start_page == null || s.end_page == null) return sum;
+            return sum + (s.end_page - s.start_page + 1);
+        }, 0);
+    }, [nativeTimedReadingPageSessions]);
+
+    const nativeAverageMinPerPage =
+        nativeTimedReadingPages > 0 && nativeTimedReadingMinutes > 0
+            ? nativeTimedReadingMinutes / nativeTimedReadingPages
+            : null;
+    const nativePagesPerHour = nativeAverageMinPerPage ? 60 / nativeAverageMinPerPage : null;
+
+    const nativeTimedListeningSessions = useMemo(() => {
+        return listeningSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
+    }, [listeningSessions]);
+
+    const nativeTimedListeningMinutes = useMemo(() => {
+        return nativeTimedListeningSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+    }, [nativeTimedListeningSessions]);
+
+    const nativeDaysActive = useMemo(() => {
+        if (nativeActivitySessions.length === 0) return null;
+        return new Set(nativeActivitySessions.map((s) => s.read_on)).size;
+    }, [nativeActivitySessions]);
+
+    const nativeLastActivity = nativeActivitySessions[0]?.read_on ?? row?.finished_at ?? row?.dnf_at ?? row?.started_at ?? null;
+    const nativeLastActivityMode =
+        nativeActivitySessions[0]?.session_mode === "listening"
+            ? "listening"
+            : nativeActivitySessions[0]?.session_mode === "fluid"
+                ? "reading"
+                : null;
+
+    const nativeCurrentReadingPage = useMemo(() => {
+        const endPages = fluidSessions
+            .map((s) => s.end_page)
+            .filter((page): page is number => page != null && Number.isFinite(page));
+        if (endPages.length === 0) return null;
+        return Math.max(...endPages);
+    }, [fluidSessions]);
+
+    const nativeListeningLocation = row?.current_location?.trim() || "";
+    const nativeCurrentProgress = (() => {
+        if (row?.finished_at) {
+            return book?.page_count ? `${book.page_count} / ${book.page_count}` : "Finished";
+        }
+
+        if (nativeListeningLocation && (nativeLastActivityMode === "listening" || nativeCurrentReadingPage == null)) {
+            return nativeListeningLocation;
+        }
+
+        if (nativeCurrentReadingPage != null) {
+            return book?.page_count ? `${nativeCurrentReadingPage} / ${book.page_count}` : `Page ${nativeCurrentReadingPage}`;
+        }
+
+        if (nativeListeningLocation) return nativeListeningLocation;
+        if (row?.started_at) return "In progress";
+        return "—";
+    })();
+
+    const nativeCurrentProgressNote =
+        nativeListeningLocation && nativeCurrentReadingPage != null && nativeLastActivityMode !== "listening"
+            ? `Listening position: ${nativeListeningLocation}`
+            : nativeLastActivityMode === "listening"
+                ? "Latest activity was listening"
+                : nativeCurrentReadingPage != null
+                    ? "From reading progress updates"
+                    : undefined;
+
     if (loading) {
         return <BookStatsLoadingState />;
     }
@@ -475,18 +563,85 @@ export default function BookStatsPage() {
                     canOpenVocabList={canSeeVocabularyStats}
                     bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
                     vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
+                    description={
+                        isEnglishNativeTrackerBook
+                            ? "Progress, timed reading, listening, and pace."
+                            : undefined
+                    }
                 />
 
-                {canSeeVocabularyStats ? (
-                    <WordHistoryCard
-                        wordCount={wordCount}
-                        onOpen={() =>
-                            router.push(
-                                `/vocab/explore?userBookId=${encodeURIComponent(userBookId)}`
-                            )
-                        }
-                    />
-                ) : null}
+                {isEnglishNativeTrackerBook ? (
+                    <>
+                        <StatsSection title="Progress">
+                            <StatCard label="Status" value={statusLabel(row)} />
+                            <StatCard
+                                label="Current Progress"
+                                value={nativeCurrentProgress}
+                                note={nativeCurrentProgressNote}
+                            />
+                            <StatCard
+                                label="Days Active"
+                                value={nativeDaysActive ?? "—"}
+                                note="Reading or listening activity"
+                            />
+                            <StatCard label="Last Activity" value={nativeLastActivity ?? "—"} />
+                        </StatsSection>
+
+                        {nativeTimedReadingMinutes > 0 || nativeAverageMinPerPage != null || nativePagesPerHour != null ? (
+                            <StatsSection title="Reading">
+                                {nativeTimedReadingMinutes > 0 ? (
+                                    <StatCard
+                                        label="Total Timed Reading"
+                                        value={formatMinutes(nativeTimedReadingMinutes)}
+                                        note="Timed reading sessions only"
+                                    />
+                                ) : null}
+
+                                {nativeAverageMinPerPage != null ? (
+                                    <StatCard
+                                        label="Average Min/Page"
+                                        value={nativeAverageMinPerPage.toFixed(2)}
+                                        note="Timed reading with page ranges"
+                                    />
+                                ) : null}
+
+                                {nativePagesPerHour != null ? (
+                                    <StatCard
+                                        label="Pages/Hour"
+                                        value={nativePagesPerHour.toFixed(1)}
+                                        note="Timed reading with page ranges"
+                                    />
+                                ) : null}
+                            </StatsSection>
+                        ) : null}
+
+                        {nativeTimedListeningMinutes > 0 ? (
+                            <StatsSection title="Listening">
+                                <StatCard
+                                    label="Total Listening Time"
+                                    value={formatMinutes(nativeTimedListeningMinutes)}
+                                    note="Timed listening sessions only"
+                                />
+                                <StatCard
+                                    label="Listening Sessions"
+                                    value={nativeTimedListeningSessions.length}
+                                    note="Timed listening sessions"
+                                />
+                            </StatsSection>
+                        ) : null}
+                    </>
+                ) : (
+                    <>
+                        {canSeeVocabularyStats ? (
+                            <WordHistoryCard
+                                wordCount={wordCount}
+                                onOpen={() =>
+                                    router.push(
+                                        `/vocab/explore?userBookId=${encodeURIComponent(userBookId)}`
+                                    )
+                                }
+                            />
+                        ) : null}
 
                 <StatsSection title="Progress Snapshot">
                     <StatCard label="Status" value={statusLabel(row)} />
@@ -498,7 +653,7 @@ export default function BookStatsPage() {
                     <StatCard
                         label="Days Engaged"
                         value={daysEngaged ?? "—"}
-                        note={isEnglishNativeTrackerBook ? "Reading dates" : "Reading or listening dates"}
+                        note="Reading or listening dates"
                     />
                     <StatCard label="Last Engaged" value={lastEngaged ?? "—"} />
                 </StatsSection>
@@ -515,9 +670,9 @@ export default function BookStatsPage() {
 
                         {fluidMinutes > 0 && (
                             <StatCard
-                                label={isEnglishNativeTrackerBook ? "Reading" : "Fluid Reading"}
+                                label="Fluid Reading"
                                 value={formatMinutes(fluidMinutes)}
-                                note={isEnglishNativeTrackerBook ? "Timed reading sessions" : "Saved support + just reading"}
+                                note="Saved support + just reading"
                             />
                         )}
 
@@ -532,14 +687,14 @@ export default function BookStatsPage() {
                         <StatCard
                             label="Total Logged Time"
                             value={formatMinutes(totalTrackedMinutes)}
-                            note={isEnglishNativeTrackerBook ? "Reading only" : "Reading and listening only"}
+                            note="Reading and listening only"
                         />
                     </StatsSection>
                 )}
 
                 {(overallMinPerPage != null ||
                     pagesPerHour != null ||
-                    (!isEnglishNativeTrackerBook && curiosityPageStats != null) ||
+                    curiosityPageStats != null ||
                     fluidPageStats != null) && (
                         <StatsSection title="Pace">
                             {overallMinPerPage != null && (
@@ -558,7 +713,7 @@ export default function BookStatsPage() {
                                 />
                             )}
 
-                            {!isEnglishNativeTrackerBook && curiosityPageStats != null && (
+                            {curiosityPageStats != null && (
                                 <StatCard
                                     label="Curiosity Min/Page"
                                     value={curiosityPageStats.toFixed(2)}
@@ -593,6 +748,8 @@ export default function BookStatsPage() {
                         )}
                     </StatsSection>
                 ) : null}
+                    </>
+                )}
             </div>
         </main>
     );

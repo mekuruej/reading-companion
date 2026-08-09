@@ -50,8 +50,15 @@ export default function DifficultyField({
     typeLabel === "—" ? "this kind of book" : `a ${typeLabel.toLowerCase()}`;
 
   return (
-    <div className="rounded border bg-white p-3 text-sm">
-      <div className="text-stone-600">{difficultyLabel}</div>
+    <div className={editing ? "rounded border bg-white p-3 text-sm" : "rounded-xl bg-emerald-50 p-3 text-sm"}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-stone-600">{difficultyLabel}</div>
+        {!editing && value ? (
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-800">
+            Saved
+          </span>
+        ) : null}
+      </div>
       <div className="mt-1 text-xs text-stone-500">1 = easiest · 5 = hardest</div>
 
       {!editing ? (
@@ -65,10 +72,10 @@ export default function DifficultyField({
                 <span
                   key={option.value}
                   className={[
-                    "flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-black",
+                    "flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black",
                     value === option.value
-                      ? "border-amber-400 bg-amber-100 text-amber-950"
-                      : "border-stone-200 bg-stone-50 text-stone-400",
+                      ? "bg-amber-200 text-amber-950"
+                      : "bg-white/70 text-stone-400",
                   ].join(" ")}
                 >
                   {formatRating(option.value)}

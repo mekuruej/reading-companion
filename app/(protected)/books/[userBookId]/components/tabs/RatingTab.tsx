@@ -196,7 +196,7 @@ export default function RatingTab({
             />
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
             <div className="mb-3 text-sm font-semibold text-stone-900">
               Reader Difficulty
             </div>
@@ -210,7 +210,7 @@ export default function RatingTab({
             />
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
             <div className="mb-3 text-sm font-semibold text-stone-900">
               Entertainment Rating
             </div>
@@ -237,13 +237,20 @@ export default function RatingTab({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-            <div className="mb-3 text-sm font-semibold text-stone-900">
-              Advice to a Reader
+          <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-stone-900">
+                Advice to a Reader
+              </div>
+              {!isEditingReflection && row.reader_advice?.trim() ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-800">
+                  Saved
+                </span>
+              ) : null}
             </div>
 
             {!isEditingReflection ? (
-              <div className="min-h-[64px] whitespace-pre-wrap rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-700">
+              <div className="min-h-[64px] whitespace-pre-wrap rounded-xl bg-white/70 p-3 text-sm leading-6 text-stone-700">
                 {row.reader_advice?.trim() ? row.reader_advice : "—"}
               </div>
             ) : (
@@ -287,11 +294,18 @@ export default function RatingTab({
             />
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-            <div className="mb-3 text-sm font-semibold text-stone-900">My Review</div>
+          <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-stone-900">My Review</div>
+              {!isEditingReflection && row.my_review?.trim() ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-800">
+                  Saved
+                </span>
+              ) : null}
+            </div>
 
             {!isEditingReflection ? (
-              <div className="min-h-[140px] whitespace-pre-wrap text-sm text-stone-700">
+              <div className="min-h-[140px] whitespace-pre-wrap rounded-xl bg-white/70 p-3 text-sm leading-6 text-stone-700">
                 {row.my_review?.trim() ? row.my_review : "—"}
               </div>
             ) : (
@@ -304,21 +318,28 @@ export default function RatingTab({
             )}
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-            <div className="mb-3 text-sm font-semibold text-stone-900">
-              Reading Memory
+          <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-stone-900">
+                Reading Memory
+              </div>
+              {!isEditingReflection && (favoriteQuotes.trim() || memorableWords.trim()) ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-800">
+                  Saved
+                </span>
+              ) : null}
             </div>
 
             {!isEditingReflection ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded border bg-white p-3 text-sm">
+                <div className="rounded-xl bg-white/70 p-3 text-sm">
                   <div className="text-stone-600">Memorable Quotes</div>
                   <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
                     {favoriteQuotes.trim() ? favoriteQuotes : "—"}
                   </div>
                 </div>
 
-                <div className="rounded border bg-white p-3 text-sm">
+                <div className="rounded-xl bg-white/70 p-3 text-sm">
                   <div className="text-stone-600">Memorable Words</div>
                   <div className="mt-1 min-h-[100px] whitespace-pre-wrap text-stone-700">
                     {memorableWords.trim() ? memorableWords : "—"}
@@ -376,7 +397,7 @@ export default function RatingTab({
             />
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
             <div className="mb-4 text-sm font-semibold text-stone-900">
               Help Mekuru
             </div>
