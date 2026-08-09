@@ -14,7 +14,6 @@ type BookHubActionGridProps = {
     canUseStoryNotes?: boolean;
     hasSavedWords: boolean;
     isEnglishNativeTrackerBook?: boolean;
-    isNativeAudiobook?: boolean;
 
     onCuriosityReading: () => void;
     onFluidReadingExtensive: () => void;
@@ -131,7 +130,6 @@ export default function BookHubActionGrid({
     canUseStoryNotes = false,
     hasSavedWords,
     isEnglishNativeTrackerBook = false,
-    isNativeAudiobook = false,
     onCuriosityReading,
     onFluidReadingExtensive,
     onFluidReadingJustReading,
@@ -146,38 +144,27 @@ export default function BookHubActionGrid({
     if (isEnglishNativeTrackerBook) {
         return (
             <div className="pb-2">
-                <div className="mt-6 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(25%-0.375rem)]">
-                    {isNativeAudiobook ? (
-                        <ActionButton
-                            title="Update Listening Progress"
-                            description={["Save your audiobook position", "without adding reading time."]}
-                            className="bg-emerald-50 hover:bg-emerald-100"
-                            onClick={onListening}
-                            size="secondary"
-                        />
-                    ) : (
-                        <ActionButton
-                            title="Reading Timer"
-                            subtitle="Reading Timer"
-                            description={["Read normally and log", "your time and page progress."]}
-                            className="bg-emerald-50 hover:bg-emerald-100"
-                            onClick={onFluidReadingJustReading}
-                            size="secondary"
-                        />
-                    )}
+                <div className="mt-6 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)]">
+                    <ActionButton
+                        title="Read / Listen"
+                        description="Start a timed reading or listening session and update your progress."
+                        className="bg-emerald-50 hover:bg-emerald-100"
+                        onClick={onFluidReadingJustReading}
+                        size="secondary"
+                    />
 
-                    {onReadingSessions ? (
+                    {canUseStoryNotes && onStoryNotes ? (
                         <ActionButton
-                            title="Reading History"
-                            description="Edit session records, dates, and reading history for this book."
-                            className="bg-emerald-50 hover:bg-emerald-100"
-                            onClick={onReadingSessions}
+                            title="Reading Journal"
+                            description="Track characters, plot, quotes, notes, and reviews."
+                            className="bg-sky-50 hover:bg-sky-100"
+                            onClick={onStoryNotes}
                             size="secondary"
                         />
                     ) : null}
                 </div>
 
-                <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(33.333%-0.375rem)]">
+                <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)]">
                     {onBookStats ? (
                         <ActionButton
                             title="Book Stats"
@@ -187,12 +174,12 @@ export default function BookHubActionGrid({
                         />
                     ) : null}
 
-                    {canUseStoryNotes && onStoryNotes ? (
+                    {onReadingSessions ? (
                         <ActionButton
-                            title="Reading Journal"
-                            description="Track characters, plot, quotes, settings, and cultural notes."
-                            className="bg-sky-50 hover:bg-sky-100"
-                            onClick={onStoryNotes}
+                            title="Reading History"
+                            description="Edit session records, dates, and reading history for this book."
+                            className="bg-purple-50 hover:bg-purple-100"
+                            onClick={onReadingSessions}
                         />
                     ) : null}
 

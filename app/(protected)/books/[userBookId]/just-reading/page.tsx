@@ -13,6 +13,7 @@ import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 
 type JustReadingViewMode = "just-reading" | "workspace";
+type NativeSessionMode = "fluid" | "listening";
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
 
 function isSuperTeacherFlag(value: unknown) {
@@ -27,6 +28,8 @@ export default function JustReadingPage() {
     const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
     const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
     const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+    const [isNativeBook, setIsNativeBook] = useState(false);
+    const [nativeSessionMode, setNativeSessionMode] = useState<NativeSessionMode>("fluid");
     const [viewMode, setViewMode] = useState<JustReadingViewMode>("just-reading");
 
     useEffect(() => {
@@ -62,6 +65,7 @@ export default function JustReadingPage() {
                 setJournalOwnerUserId(null);
                 setFavoriteQuotes(null);
                 setBookLanguageCode(null);
+                setIsNativeBook(false);
                 setCheckingAccess(false);
                 return;
             }
@@ -129,6 +133,7 @@ export default function JustReadingPage() {
                 bookLanguageCode: book?.language_code ?? null,
                 ownerNativeLanguage: ownerProfile?.native_language ?? null,
             });
+            setIsNativeBook(nativeLanguageBook);
 
             if (!profileError && profile) {
                 const appAccessStatus = getAppAccessStatus({
@@ -153,6 +158,7 @@ export default function JustReadingPage() {
                 setJournalOwnerUserId(null);
                 setFavoriteQuotes(null);
                 setBookLanguageCode(null);
+                setIsNativeBook(false);
             }
 
             setCheckingAccess(false);
@@ -174,6 +180,8 @@ export default function JustReadingPage() {
     const standaloneTimer = (
         <SimpleTimedSessionPage
             sessionMode="fluid"
+            allowNativeReadListenToggle={isNativeBook}
+            onActiveSessionModeChange={setNativeSessionMode}
             eyebrow="Fluid Reading"
             title="Extensive · Just Reading"
             subtitle="Timer-only fluid reading"
@@ -190,6 +198,8 @@ export default function JustReadingPage() {
     const timedSession = (
         <SimpleTimedSessionPage
             sessionMode="fluid"
+            allowNativeReadListenToggle={isNativeBook}
+            onActiveSessionModeChange={setNativeSessionMode}
             eyebrow="Fluid Reading"
             title="Extensive · Just Reading"
             subtitle="Timer-only fluid reading"
@@ -215,19 +225,33 @@ export default function JustReadingPage() {
                             onClick={() => setViewMode("just-reading")}
                             className={`rounded-xl px-4 py-2 text-sm font-black transition ${
                                 viewMode === "just-reading"
-                                    ? "bg-stone-900 text-white"
+                                    ? isNativeBook && nativeSessionMode === "listening"
+                                        ? "bg-violet-700 text-white"
+                                        : isNativeBook
+                                            ? "bg-emerald-700 text-white"
+                                            : "bg-stone-900 text-white"
                                     : "text-stone-600 hover:bg-stone-50"
                             }`}
                         >
-                            Just Reading
+                            {isNativeBook
+                                ? nativeSessionMode === "listening"
+                                    ? "Listening"
+                                    : "Reading"
+                                : "Just Reading"}
                         </button>
                         <button
                             type="button"
                             onClick={() => setViewMode("workspace")}
                             className={`rounded-xl px-4 py-2 text-sm font-black transition ${
                                 viewMode === "workspace"
-                                    ? "bg-violet-700 text-white"
-                                    : "text-stone-600 hover:bg-violet-50"
+                                    ? isNativeBook && nativeSessionMode === "listening"
+                                        ? "bg-violet-700 text-white"
+                                        : isNativeBook
+                                            ? "bg-emerald-700 text-white"
+                                            : "bg-violet-700 text-white"
+                                    : isNativeBook && nativeSessionMode !== "listening"
+                                        ? "text-stone-600 hover:bg-emerald-50"
+                                        : "text-stone-600 hover:bg-violet-50"
                             }`}
                         >
                             Reading Workspace

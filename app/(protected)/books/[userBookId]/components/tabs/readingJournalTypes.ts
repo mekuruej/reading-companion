@@ -1,4 +1,12 @@
-export type StoryTabMode = "detective" | "characters" | "plot" | "setting" | "cultural" | "quotes";
+export type StoryTabMode =
+  | "detective"
+  | "characters"
+  | "plot"
+  | "setting"
+  | "cultural"
+  | "quotes"
+  | "notes"
+  | "review";
 
 export type DetectiveEntry = {
   id: string;

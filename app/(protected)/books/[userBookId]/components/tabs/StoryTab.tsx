@@ -6,6 +6,16 @@ import ReadingJournalQuotesTab from "./ReadingJournalQuotesTab";
 import type { FavoriteQuoteInput } from "./quoteLocationHelpers";
 import type { DetectiveEntry, StoryTabMode } from "./readingJournalTypes";
 
+const SIMPLE_RATING_VALUES = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
+function formatSimpleRating(value: number | string | null | undefined) {
+  if (value == null || value === "" || Number.isNaN(Number(value))) return "";
+
+  return Number(value)
+    .toFixed(1)
+    .replace(/\.0$/, "");
+}
+
 type Character = {
   id: string;
   user_book_id: string;
@@ -23,7 +33,7 @@ type Character = {
 type ChapterSummary = {
   id: string;
   user_book_id: string;
-  chapter_number: number | null;
+  chapter_number: number | string | null;
   chapter_title: string | null;
   summary: string;
   sort_order: number;
@@ -170,6 +180,23 @@ type StoryTabProps = {
   updateFavoriteQuote: (index: number, field: keyof FavoriteQuoteInput, value: string) => void;
   removeFavoriteQuote: (index: number) => void;
   saveFavoriteQuotes: () => Promise<void>;
+
+  notes: string;
+  savedNotes: string | null;
+  setNotes: (value: string) => void;
+  savingNotes: boolean;
+  notesSaveMessage: string;
+  saveNotes: () => Promise<void>;
+
+  ratingOverall: string;
+  savedRatingOverall: number | null;
+  setRatingOverall: (value: string) => void;
+  myReview: string;
+  savedMyReview: string | null;
+  setMyReview: (value: string) => void;
+  savingReview: boolean;
+  reviewSaveMessage: string;
+  saveReviewRatings: () => Promise<void>;
 };
 
 function StorySubTab({
@@ -315,6 +342,23 @@ export default function StoryTab({
   updateFavoriteQuote,
   removeFavoriteQuote,
   saveFavoriteQuotes,
+
+  notes,
+  savedNotes,
+  setNotes,
+  savingNotes,
+  notesSaveMessage,
+  saveNotes,
+
+  ratingOverall,
+  savedRatingOverall,
+  setRatingOverall,
+  myReview,
+  savedMyReview,
+  setMyReview,
+  savingReview,
+  reviewSaveMessage,
+  saveReviewRatings,
 }: StoryTabProps) {
   const cleanCharacterSearch = characterSearch.trim().toLowerCase();
   const filteredVisibleCharacters = cleanCharacterSearch
@@ -366,6 +410,8 @@ export default function StoryTab({
     setting: "Setting",
     cultural: "Cultural",
     quotes: "Quotes",
+    notes: "Notes",
+    review: "Review & Ratings",
   };
 
   return (
@@ -1032,6 +1078,107 @@ export default function StoryTab({
           removeFavoriteQuote={removeFavoriteQuote}
           saveFavoriteQuotes={saveFavoriteQuotes}
         />
+      )}
+
+      {storyTab === "notes" && (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-stone-900">Notes</div>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                A private place for anything you want to remember.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void saveNotes()}
+              disabled={savingNotes}
+              className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-50"
+            >
+              {savingNotes ? "Saving..." : "Save Notes"}
+            </button>
+          </div>
+
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            className="min-h-[220px] w-full rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+            placeholder="Add thoughts, questions, or anything else you want to remember."
+          />
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
+            <span>{savedNotes?.trim() ? "Saved notes are private." : "No notes saved yet."}</span>
+            {notesSaveMessage ? <span className="font-semibold">{notesSaveMessage}</span> : null}
+          </div>
+        </div>
+      )}
+
+      {storyTab === "review" && (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-stone-900">Review & Ratings</div>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Your private response to this book.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void saveReviewRatings()}
+              disabled={savingReview}
+              className="rounded-xl bg-purple-700 px-3 py-2 text-sm font-medium text-white hover:bg-purple-800 disabled:opacity-50"
+            >
+              {savingReview ? "Saving..." : "Save Review"}
+            </button>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SIMPLE_RATING_VALUES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRatingOverall(String(value))}
+                  className={[
+                    "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-black transition",
+                    ratingOverall === String(value)
+                      ? "border-amber-400 bg-amber-100 text-amber-950"
+                      : "border-stone-200 bg-white text-stone-600 hover:bg-stone-100",
+                  ].join(" ")}
+                >
+                  {formatSimpleRating(value)}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setRatingOverall("")}
+                className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-500 hover:bg-stone-50"
+              >
+                Clear
+              </button>
+            </div>
+            {savedRatingOverall != null ? (
+              <p className="mt-2 text-xs text-stone-500">Saved rating: {formatSimpleRating(savedRatingOverall)}/5</p>
+            ) : null}
+          </div>
+
+          <label className="mt-5 block">
+            <span className="text-sm font-semibold text-stone-900">My Review</span>
+            <span className="mt-1 block text-xs text-stone-500">What did you think of the book?</span>
+            <textarea
+              value={myReview}
+              onChange={(event) => setMyReview(event.target.value)}
+              className="mt-2 min-h-[180px] w-full rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+              placeholder="Write your private review here..."
+            />
+          </label>
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
+            <span>{savedMyReview?.trim() ? "Saved review is private." : "No review saved yet."}</span>
+            {reviewSaveMessage ? <span className="font-semibold">{reviewSaveMessage}</span> : null}
+          </div>
+        </div>
       )}
     </div>
   );

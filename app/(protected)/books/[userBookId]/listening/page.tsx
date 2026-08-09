@@ -4,147 +4,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
-import { displayBookTitle } from "@/lib/books/bookIdentity";
 import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
-import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
 
 type ListeningViewMode = "listening" | "workspace";
+type NativeSessionMode = "fluid" | "listening";
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
-
-type ListeningBook = {
-  title: string | null;
-  language_code: string | null;
-  edition_format: string | null;
-  cover_url: string | null;
-};
 
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
-}
-
-function isAudiobookFormat(formatType: string | null | undefined, editionFormat: string | null | undefined) {
-  return formatType === "audiobook" || editionFormat === "audiobook";
-}
-
-function NativeAudiobookProgressPanel({
-  userBookId,
-  book,
-  currentLocation,
-  startedAt,
-  onSaved,
-}: {
-  userBookId: string;
-  book: ListeningBook | null;
-  currentLocation: string;
-  startedAt: string | null;
-  onSaved: (nextLocation: string, nextStartedAt: string | null) => void;
-}) {
-  const [location, setLocation] = useState(currentLocation);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const bookTitle = displayBookTitle(book);
-
-  async function saveProgress() {
-    const nextLocation = location.trim();
-    if (!nextLocation) {
-      setMessage("Add a timestamp, chapter, or percent before saving.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const nextStartedAt = startedAt || todayYmdAppTimeZone();
-    const { error } = await supabase
-      .from("user_books")
-      .update({
-        current_location: nextLocation,
-        status: "reading",
-        started_at: nextStartedAt,
-      })
-      .eq("id", userBookId);
-
-    setSaving(false);
-
-    if (error) {
-      console.error("Error saving native audiobook progress:", error);
-      setMessage("Could not save listening progress.");
-      return;
-    }
-
-    onSaved(nextLocation, nextStartedAt);
-    setMessage("Listening progress saved.");
-  }
-
-  return (
-    <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-      <Link
-        href={`/books/${encodeURIComponent(userBookId)}`}
-        className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
-      >
-        &larr; Back to Book Hub
-      </Link>
-
-      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center">
-        {book?.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={`${bookTitle} cover`}
-            className="h-32 w-24 shrink-0 rounded-2xl border border-stone-200 object-cover shadow-sm"
-          />
-        ) : null}
-
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
-            Update Listening Progress
-          </p>
-          <h1 className="mt-2 text-3xl font-black text-stone-950">{bookTitle}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-            Save where you are in the audiobook without starting a timer or adding to reading pace.
-          </p>
-        </div>
-      </div>
-
-      <label className="mt-6 block">
-        <span className="text-sm font-semibold text-stone-900">Listening progress</span>
-        <input
-          value={location}
-          onChange={(event) => setLocation(event.target.value)}
-          placeholder="e.g. 37%, chapter 8, or 3:12:45"
-          className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-        />
-      </label>
-
-      {currentLocation ? (
-        <p className="mt-2 text-sm text-stone-500">
-          Current saved progress: <span className="font-semibold text-stone-700">{currentLocation}</span>
-        </p>
-      ) : null}
-
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void saveProgress()}
-          disabled={saving}
-          className="rounded-2xl bg-stone-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save Listening Progress"}
-        </button>
-        {message ? (
-          <span className="text-sm font-semibold text-stone-600">{message}</span>
-        ) : null}
-      </div>
-    </section>
-  );
 }
 
 export default function ListeningPage() {
@@ -156,10 +31,8 @@ export default function ListeningPage() {
   const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
   const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
   const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
-  const [book, setBook] = useState<ListeningBook | null>(null);
-  const [currentLocation, setCurrentLocation] = useState("");
-  const [startedAt, setStartedAt] = useState<string | null>(null);
-  const [isNativeAudiobook, setIsNativeAudiobook] = useState(false);
+  const [isNativeListeningWorkspace, setIsNativeListeningWorkspace] = useState(false);
+  const [nativeSessionMode, setNativeSessionMode] = useState<NativeSessionMode>("listening");
   const [accessMessage, setAccessMessage] = useState("");
   const [viewMode, setViewMode] = useState<ListeningViewMode>("listening");
 
@@ -187,14 +60,8 @@ export default function ListeningPage() {
           id,
           user_id,
           favorite_quotes,
-          current_location,
-          started_at,
-          format_type,
           books (
-            title,
-            language_code,
-            edition_format,
-            cover_url
+            language_code
           )
         `
         )
@@ -211,10 +78,7 @@ export default function ListeningPage() {
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
         setBookLanguageCode(null);
-        setBook(null);
-        setCurrentLocation("");
-        setStartedAt(null);
-        setIsNativeAudiobook(false);
+        setIsNativeListeningWorkspace(false);
         setAccessMessage("You do not have access to this book.");
         setCheckingAccess(false);
         return;
@@ -224,16 +88,11 @@ export default function ListeningPage() {
         ? (userBook as any).books[0]
         : (userBook as any).books;
       setBookLanguageCode(book?.language_code ?? null);
-      setBook(book ?? null);
-      setCurrentLocation((userBook as any).current_location ?? "");
-      setStartedAt((userBook as any).started_at ?? null);
 
       const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
 
       if (cancelled) return;
-      const nativeAudiobook =
-        trackerMode.isEnglishNativeTrackerBook &&
-        isAudiobookFormat((userBook as any).format_type ?? null, book?.edition_format ?? null);
+      const nativeListeningWorkspace = trackerMode.isEnglishNativeTrackerBook;
 
       const profileResult = await supabase
         .from("profiles")
@@ -298,7 +157,7 @@ export default function ListeningPage() {
         );
         setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
         setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
-        setIsNativeAudiobook(Boolean(canAccessBook && nativeAudiobook));
+        setIsNativeListeningWorkspace(Boolean(canAccessBook && nativeListeningWorkspace));
         setAccessMessage(canAccessBook ? "" : "You do not have access to this book.");
       } else {
         setCanSaveWordsWhileListening(false);
@@ -306,10 +165,7 @@ export default function ListeningPage() {
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
         setBookLanguageCode(null);
-        setBook(null);
-        setCurrentLocation("");
-        setStartedAt(null);
-        setIsNativeAudiobook(false);
+        setIsNativeListeningWorkspace(false);
         setAccessMessage("Could not verify listening access.");
       }
 
@@ -339,7 +195,7 @@ export default function ListeningPage() {
     );
   }
 
-  if (accessMessage && !isNativeAudiobook && !canSaveWordsWhileListening) {
+  if (accessMessage && !isNativeListeningWorkspace && !canSaveWordsWhileListening) {
     return (
       <AccessDeniedMessage
         message={accessMessage}
@@ -350,16 +206,22 @@ export default function ListeningPage() {
   }
 
   const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal && journalOwnerUserId;
-  const listeningExperience = isNativeAudiobook ? (
-    <NativeAudiobookProgressPanel
-      userBookId={userBookId}
-      book={book}
-      currentLocation={currentLocation}
-      startedAt={startedAt}
-      onSaved={(nextLocation, nextStartedAt) => {
-        setCurrentLocation(nextLocation);
-        setStartedAt(nextStartedAt);
-      }}
+  const listeningExperience = isNativeListeningWorkspace ? (
+    <SimpleTimedSessionPage
+      sessionMode="listening"
+      allowNativeReadListenToggle
+      onActiveSessionModeChange={setNativeSessionMode}
+      eyebrow="Listening"
+      title="Read / Listen"
+      subtitle="Timed listening"
+      description="Listen to your audiobook and log the time separately from reading pace."
+      saveSuccessMessage="Your listening session has been saved in Reading History."
+      startLocationLabel="Start page optional"
+      endLocationLabel="End page optional"
+      sessionLocationNote="Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers."
+      listeningLocationNote="Optional. Add an audiobook position like Chapter 8, 37%, or 3:12:45. Listening time stays separate from reading pace."
+      embedded
+      workspaceCompact={Boolean(showReadingWorkspace)}
     />
   ) : canSaveWordsWhileListening ? (
     <CuriosityReadingExperience
@@ -410,19 +272,29 @@ export default function ListeningPage() {
                 onClick={() => setViewMode("listening")}
                 className={`rounded-xl px-4 py-2 text-sm font-black transition ${
                   viewMode === "listening"
-                    ? "bg-stone-900 text-white"
+                    ? nativeSessionMode === "listening"
+                      ? "bg-violet-700 text-white"
+                      : "bg-emerald-700 text-white"
                     : "text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                Listening
+                {isNativeListeningWorkspace
+                  ? nativeSessionMode === "listening"
+                    ? "Listening"
+                    : "Reading"
+                  : "Listening"}
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("workspace")}
                 className={`rounded-xl px-4 py-2 text-sm font-black transition ${
                   viewMode === "workspace"
-                    ? "bg-violet-700 text-white"
-                    : "text-stone-600 hover:bg-violet-50"
+                    ? isNativeListeningWorkspace && nativeSessionMode !== "listening"
+                      ? "bg-emerald-700 text-white"
+                      : "bg-violet-700 text-white"
+                    : isNativeListeningWorkspace && nativeSessionMode !== "listening"
+                      ? "text-stone-600 hover:bg-emerald-50"
+                      : "text-stone-600 hover:bg-violet-50"
                 }`}
               >
                 Reading Workspace

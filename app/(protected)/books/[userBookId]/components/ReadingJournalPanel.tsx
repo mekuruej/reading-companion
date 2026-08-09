@@ -29,7 +29,7 @@ type Character = {
 type ChapterSummary = {
   id: string;
   user_book_id: string;
-  chapter_number: number | null;
+  chapter_number: number | string | null;
   chapter_title: string | null;
   summary: string;
   sort_order: number;
@@ -123,10 +123,22 @@ function nextChapterSummaryNumber(items: ChapterSummary[]) {
 function parseChapterSummaryNumber(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
+  if (!/^(?:\d+|\d+\.\d*|\.\d+)$/.test(trimmed)) return null;
 
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isChapterSummaryNumberDraft(value: string) {
+  return /^\d*(?:\.\d*)?$/.test(value);
+}
+
+function chapterSummarySaveErrorMessage(chapterNumber: number | null) {
+  if (chapterNumber != null && !Number.isInteger(chapterNumber)) {
+    return "Could not save this decimal chapter number. The database needs the decimal chapter-number migration applied.";
+  }
+
+  return "Could not save chapter summary.";
 }
 
 const targetLanguageTabOrder: StoryTabMode[] = [
@@ -142,10 +154,14 @@ const nativeLanguageTabOrder: StoryTabMode[] = [
   "characters",
   "plot",
   "quotes",
-  "setting",
-  "cultural",
-  "detective",
+  "notes",
+  "review",
 ];
+
+function clampRating5(value: number) {
+  if (!Number.isFinite(value)) return null;
+  return Math.min(5, Math.max(1, Math.round(value)));
+}
 
 export default function ReadingJournalPanel({
   userBookId,
@@ -203,6 +219,16 @@ export default function ReadingJournalPanel({
   const [quoteSearch, setQuoteSearch] = useState("");
   const [savingQuotes, setSavingQuotes] = useState(false);
   const [quotesSaveMessage, setQuotesSaveMessage] = useState("");
+  const [notes, setNotes] = useState("");
+  const [savedNotes, setSavedNotes] = useState<string | null>(null);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesSaveMessage, setNotesSaveMessage] = useState("");
+  const [myReview, setMyReview] = useState("");
+  const [savedMyReview, setSavedMyReview] = useState<string | null>(null);
+  const [ratingOverall, setRatingOverall] = useState("");
+  const [savedRatingOverall, setSavedRatingOverall] = useState<number | null>(null);
+  const [savingReview, setSavingReview] = useState(false);
+  const [reviewSaveMessage, setReviewSaveMessage] = useState("");
 
   const visibleCharacters = useMemo(() => {
     const copy = [...characters];
@@ -243,6 +269,49 @@ export default function ReadingJournalPanel({
       cancelled = true;
     };
   }, [userBookId, ownerUserId]);
+
+  useEffect(() => {
+    if (!tabOrder.includes(storyTab)) {
+      setStoryTab(tabOrder[0] ?? "characters");
+    }
+  }, [storyTab, tabOrder]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadNativeReviewFields() {
+      if (bookLanguageCode !== "en") return;
+
+      const { data, error } = await supabase
+        .from("user_books")
+        .select("notes, my_review, rating_overall")
+        .eq("id", userBookId)
+        .eq("user_id", ownerUserId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Error loading native Reading Journal review fields:", error);
+        return;
+      }
+
+      setNotes(data?.notes ?? "");
+      setSavedNotes(data?.notes ?? null);
+      setMyReview(data?.my_review ?? "");
+      setSavedMyReview(data?.my_review ?? null);
+      setRatingOverall(data?.rating_overall == null ? "" : String(data.rating_overall));
+      setSavedRatingOverall(data?.rating_overall ?? null);
+      setNotesSaveMessage("");
+      setReviewSaveMessage("");
+    }
+
+    void loadNativeReviewFields();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookLanguageCode, ownerUserId, userBookId]);
 
   useEffect(() => {
     setFavoriteQuoteInputs(favoriteQuoteTextToInputs(favoriteQuotes));
@@ -548,7 +617,9 @@ export default function ReadingJournalPanel({
                   ? value === ""
                     ? null
                     : field === "chapter_number"
-                      ? parseChapterSummaryNumber(value)
+                      ? isChapterSummaryNumberDraft(value)
+                        ? value
+                        : item.chapter_number
                       : Number(value)
                   : value,
             }
@@ -560,7 +631,7 @@ export default function ReadingJournalPanel({
   async function saveChapterSummary(item: ChapterSummary) {
     const payload = {
       user_book_id: userBookId,
-      chapter_number: item.chapter_number,
+      chapter_number: parseChapterSummaryNumber(String(item.chapter_number ?? "")),
       chapter_title: item.chapter_title?.trim() || null,
       summary: item.summary.trim(),
       sort_order: item.sort_order ?? 0,
@@ -584,8 +655,11 @@ export default function ReadingJournalPanel({
       setSavingChapterIds((prev) => prev.filter((x) => x !== oldId));
 
       if (error) {
-        console.error("Error creating chapter summary:", error);
-        alert("Could not save chapter summary.");
+        console.error("Error creating chapter summary:", {
+          error,
+          chapterNumber: payload.chapter_number,
+        });
+        alert(chapterSummarySaveErrorMessage(payload.chapter_number));
         return;
       }
 
@@ -608,8 +682,11 @@ export default function ReadingJournalPanel({
     setSavingChapterIds((prev) => prev.filter((x) => x !== item.id));
 
     if (error) {
-      console.error("Error updating chapter summary:", error);
-      alert("Could not update chapter summary.");
+      console.error("Error updating chapter summary:", {
+        error,
+        chapterNumber: payload.chapter_number,
+      });
+      alert(chapterSummarySaveErrorMessage(payload.chapter_number));
       return;
     }
 
@@ -879,6 +956,61 @@ export default function ReadingJournalPanel({
     onFavoriteQuotesChange?.(nextFavoriteQuotes || null);
   }
 
+  async function saveNativeNotes() {
+    setSavingNotes(true);
+    setNotesSaveMessage("");
+
+    const nextNotes = notes.trim() || null;
+    const { error } = await supabase
+      .from("user_books")
+      .update({ notes: nextNotes })
+      .eq("id", userBookId)
+      .eq("user_id", ownerUserId);
+
+    setSavingNotes(false);
+
+    if (error) {
+      console.error("Error saving native Reading Journal notes:", error);
+      setNotesSaveMessage("Could not save notes.");
+      return;
+    }
+
+    setSavedNotes(nextNotes);
+    setNotesSaveMessage("Saved.");
+  }
+
+  async function saveNativeReviewRatings() {
+    setSavingReview(true);
+    setReviewSaveMessage("");
+
+    const nextRating = ratingOverall.trim()
+      ? clampRating5(Number(ratingOverall.trim()))
+      : null;
+    const nextReview = myReview.trim() || null;
+
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        rating_overall: nextRating,
+        my_review: nextReview,
+      })
+      .eq("id", userBookId)
+      .eq("user_id", ownerUserId);
+
+    setSavingReview(false);
+
+    if (error) {
+      console.error("Error saving native Reading Journal review:", error);
+      setReviewSaveMessage("Could not save review.");
+      return;
+    }
+
+    setSavedRatingOverall(nextRating);
+    setSavedMyReview(nextReview);
+    setRatingOverall(nextRating == null ? "" : String(nextRating));
+    setReviewSaveMessage("Saved.");
+  }
+
   const panel = (
     <StoryTab
       storyTab={storyTab}
@@ -1032,6 +1164,30 @@ export default function ReadingJournalPanel({
         setQuotesSaveMessage("");
       }}
       saveFavoriteQuotes={saveFavoriteQuotes}
+      notes={notes}
+      savedNotes={savedNotes}
+      setNotes={(value) => {
+        setNotes(value);
+        setNotesSaveMessage("");
+      }}
+      savingNotes={savingNotes}
+      notesSaveMessage={notesSaveMessage}
+      saveNotes={saveNativeNotes}
+      ratingOverall={ratingOverall}
+      savedRatingOverall={savedRatingOverall}
+      setRatingOverall={(value) => {
+        setRatingOverall(value);
+        setReviewSaveMessage("");
+      }}
+      myReview={myReview}
+      savedMyReview={savedMyReview}
+      setMyReview={(value) => {
+        setMyReview(value);
+        setReviewSaveMessage("");
+      }}
+      savingReview={savingReview}
+      reviewSaveMessage={reviewSaveMessage}
+      saveReviewRatings={saveNativeReviewRatings}
     />
   );
 

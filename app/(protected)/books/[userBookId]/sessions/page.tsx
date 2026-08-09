@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
+import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 
@@ -156,6 +157,7 @@ export default function ReadingSessionsPage() {
   const [sessionEndPage, setSessionEndPage] = useState("");
   const [sessionMinutesRead, setSessionMinutesRead] = useState("");
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [isNativeBook, setIsNativeBook] = useState(false);
 
   const book = row?.books ?? null;
   const usePercentMode = row?.progress_mode === "percent" && !!book?.page_count && book.page_count > 0;
@@ -262,6 +264,23 @@ export default function ReadingSessionsPage() {
         setLoading(false);
         return;
       }
+
+      const { data: ownerProfile, error: ownerProfileError } = await supabase
+        .from("profiles")
+        .select("native_language")
+        .eq("id", loadedRow.user_id)
+        .maybeSingle();
+
+      if (ownerProfileError) {
+        console.error("Error loading Reading History owner profile:", ownerProfileError);
+      }
+
+      setIsNativeBook(
+        isNativeLanguageBook({
+          bookLanguageCode: loadedRow.books?.language_code ?? null,
+          ownerNativeLanguage: ownerProfile?.native_language ?? null,
+        })
+      );
 
       setRow(loadedRow);
       setStartedAt(formatYmd(loadedRow.started_at));
@@ -505,10 +524,25 @@ export default function ReadingSessionsPage() {
       return percent != null ? `Listening · up to ${percent}%` : `Listening · up to p. ${session.end_page}`;
     }
 
+    if (isNativeBook && session.session_mode === "curiosity") {
+      if (session.start_page == null || session.end_page == null) return "Reading session";
+      return usePercentMode
+        ? `Reading · ${pageToPercent(session.start_page, book?.page_count ?? null)}% -> ${pageToPercent(session.end_page, book?.page_count ?? null)}%`
+        : `Reading · p. ${session.start_page} -> ${session.end_page}`;
+    }
+
+    if (session.start_page == null && session.end_page != null) {
+      const progress = usePercentMode
+        ? `${pageToPercent(session.end_page, book?.page_count ?? null)}%`
+        : `p. ${session.end_page}`;
+      return isNativeBook ? `Reading · up to ${progress}` : `Up to ${progress}`;
+    }
+
     if (session.start_page == null || session.end_page == null) return "Pages not recorded";
-    return usePercentMode
+    const progress = usePercentMode
       ? `${pageToPercent(session.start_page, book?.page_count ?? null)}% -> ${pageToPercent(session.end_page, book?.page_count ?? null)}%`
       : `p. ${session.start_page} -> ${session.end_page}`;
+    return isNativeBook ? `Reading · ${progress}` : progress;
   }
 
   if (loading) {
@@ -656,7 +690,7 @@ export default function ReadingSessionsPage() {
 
         <section className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
           <div className="mb-3 text-sm font-semibold text-stone-900">
-            {editingSessionId ? "Edit Reading Session" : "Log Reading Session"}
+            {editingSessionId ? "Edit Session" : "Log Session"}
           </div>
           <p className="mb-4 text-sm leading-6 text-stone-500">
             Timers are still the best way to track new reading and listening. Use this page to edit session records or add a missed session when needed.
@@ -670,9 +704,12 @@ export default function ReadingSessionsPage() {
                 onChange={(event) => setSessionMode(event.target.value as "fluid" | "curiosity" | "listening")}
                 className="mt-1 w-full rounded border px-2 py-1"
               >
-                <option value="fluid">Fluid Reading</option>
-                <option value="curiosity">Curiosity Reading</option>
-                <option value="listening">{useListeningPercentMode ? "Listening (%)" : "Listening"}</option>
+                <option value="fluid">{isNativeBook ? "Reading" : "Fluid Reading"}</option>
+                {isNativeBook && sessionMode === "curiosity" ? (
+                  <option value="curiosity">Reading (historical)</option>
+                ) : null}
+                {!isNativeBook ? <option value="curiosity">Curiosity Reading</option> : null}
+                <option value="listening">{useListeningPercentMode && !isNativeBook ? "Listening (%)" : "Listening"}</option>
               </select>
             </label>
 

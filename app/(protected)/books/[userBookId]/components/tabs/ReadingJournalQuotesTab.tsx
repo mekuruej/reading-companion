@@ -72,6 +72,15 @@ export default function ReadingJournalQuotesTab({
           </div>
         ) : null}
         {visibleQuoteRows.map(({ quote, index }) => {
+          const quotePage = quote.page.trim();
+          const quotePercent = quote.percent.trim();
+          const showPageLocation = !quotePercent;
+          const showPercentLocation = !quotePage || !!quotePercent;
+          const savedLocationLabel = quotePercent
+            ? `${quotePercent}%`
+            : quotePage
+              ? `Page ${quotePage}`
+              : "";
           const quoteIsSaved =
             normalizeSavedQuote(quote).length > 0 &&
             normalizedSavedQuotes.includes(normalizeSavedQuote(quote));
@@ -80,10 +89,10 @@ export default function ReadingJournalQuotesTab({
             <div
               key={index}
               className={[
-                "rounded-2xl border p-3 transition",
+                "rounded-2xl p-3 transition",
                 quoteIsSaved
-                  ? "border-emerald-200 bg-emerald-50 shadow-sm shadow-emerald-100"
-                  : "border-amber-100 bg-white",
+                  ? "bg-white"
+                  : "border border-amber-100 bg-white",
               ].join(" ")}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -92,8 +101,13 @@ export default function ReadingJournalQuotesTab({
                     Quote {index + 1}
                   </span>
                   {quoteIsSaved ? (
-                    <span className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                    <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">
                       Saved
+                    </span>
+                  ) : null}
+                  {quoteIsSaved && savedLocationLabel ? (
+                    <span className="text-xs font-semibold text-stone-500">
+                      {savedLocationLabel}
                     </span>
                   ) : null}
                 </div>
@@ -113,12 +127,13 @@ export default function ReadingJournalQuotesTab({
                 className={[
                   "min-h-[96px] w-full rounded-xl border bg-white p-3 text-sm leading-6 outline-none focus:ring-2",
                   quoteIsSaved
-                    ? "border-emerald-200 focus:ring-emerald-200"
+                    ? "border-transparent bg-emerald-50/60 focus:ring-emerald-200"
                     : "border-amber-100 focus:ring-amber-200",
                 ].join(" ")}
                 placeholder="Add one quote you want to remember."
               />
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div className={showPageLocation && showPercentLocation ? "mt-2 grid gap-2 sm:grid-cols-2" : "mt-2"}>
+                {showPageLocation ? (
                 <label className="block">
                   <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
                     Page
@@ -131,6 +146,8 @@ export default function ReadingJournalQuotesTab({
                     placeholder="123"
                   />
                 </label>
+                ) : null}
+                {showPercentLocation ? (
                 <label className="block">
                   <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
                     Percent
@@ -150,6 +167,7 @@ export default function ReadingJournalQuotesTab({
                     </span>
                   </div>
                 </label>
+                ) : null}
               </div>
             </div>
           );

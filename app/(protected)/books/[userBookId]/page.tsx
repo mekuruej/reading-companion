@@ -173,7 +173,7 @@ type Character = {
 type ChapterSummary = {
   id: string;
   user_book_id: string;
-  chapter_number: number | null;
+  chapter_number: number | string | null;
   chapter_title: string | null;
   summary: string;
   sort_order: number;
@@ -407,8 +407,8 @@ function clampRating5(n: number | null) {
 
   const clamped = Math.max(1, Math.min(5, n));
 
-  // Supports quarter-star ratings while keeping values tidy for the DB.
-  return Number((Math.round(clamped * 4) / 4).toFixed(2));
+  // Supports half-step ratings while keeping values tidy for the DB.
+  return Number((Math.round(clamped * 2) / 2).toFixed(1));
 }
 
 function formatRating(value: number | null | undefined) {
@@ -595,10 +595,22 @@ function percentFromProgressLocation(value: string | null | undefined) {
 function parseChapterSummaryNumber(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
+  if (!/^(?:\d+|\d+\.\d*|\.\d+)$/.test(trimmed)) return null;
 
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isChapterSummaryNumberDraft(value: string) {
+  return /^\d*(?:\.\d*)?$/.test(value);
+}
+
+function chapterSummarySaveErrorMessage(chapterNumber: number | null) {
+  if (chapterNumber != null && !Number.isInteger(chapterNumber)) {
+    return "Could not save this decimal chapter number. The database needs the decimal chapter-number migration applied.";
+  }
+
+  return "Could not save chapter summary.";
 }
 
 function genreLabel(value: string | null | undefined) {
@@ -1236,8 +1248,8 @@ export default function BookHubPage() {
       const bSort = b.sort_order ?? 0;
       if (aSort !== bSort) return aSort - bSort;
 
-      const aChapter = a.chapter_number ?? 0;
-      const bChapter = b.chapter_number ?? 0;
+      const aChapter = parseChapterSummaryNumber(String(a.chapter_number ?? "")) ?? 0;
+      const bChapter = parseChapterSummaryNumber(String(b.chapter_number ?? "")) ?? 0;
       if (aChapter !== bChapter) return aChapter - bChapter;
 
       return a.created_at.localeCompare(b.created_at);
@@ -1359,7 +1371,9 @@ export default function BookHubPage() {
                 ? value === ""
                   ? null
                   : field === "chapter_number"
-                    ? parseChapterSummaryNumber(value)
+                    ? isChapterSummaryNumberDraft(value)
+                      ? value
+                      : item.chapter_number
                     : Number(value)
                 : value,
           }
@@ -2670,7 +2684,7 @@ export default function BookHubPage() {
 
     const payload = {
       user_book_id: row.id,
-      chapter_number: item.chapter_number,
+      chapter_number: parseChapterSummaryNumber(String(item.chapter_number ?? "")),
       chapter_title: item.chapter_title?.trim() || null,
       summary: item.summary.trim(),
       sort_order: item.sort_order ?? 0,
@@ -2697,8 +2711,11 @@ export default function BookHubPage() {
       setSavingChapterIds((prev) => prev.filter((x) => x !== oldId));
 
       if (error) {
-        console.error("Error creating chapter summary:", error);
-        alert("Could not save chapter summary.");
+        console.error("Error creating chapter summary:", {
+          error,
+          chapterNumber: payload.chapter_number,
+        });
+        alert(chapterSummarySaveErrorMessage(payload.chapter_number));
         return;
       }
 
@@ -2726,8 +2743,11 @@ export default function BookHubPage() {
     setSavingChapterIds((prev) => prev.filter((x) => x !== item.id));
 
     if (error) {
-      console.error("Error updating chapter summary:", error);
-      alert("Could not update chapter summary.");
+      console.error("Error updating chapter summary:", {
+        error,
+        chapterNumber: payload.chapter_number,
+      });
+      alert(chapterSummarySaveErrorMessage(payload.chapter_number));
       return;
     }
 
@@ -5369,7 +5389,7 @@ export default function BookHubPage() {
                 displayedCoverUrl={isEditingThisTab ? coverUrl : book.cover_url}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
-                canOpenTeacherSnapshot={canOpenTeacherSnapshot}
+                canOpenTeacherSnapshot={canOpenTeacherSnapshot && !isEnglishNativeTrackerBook}
                 teacherSnapshotHref={`/books/${userBookId}/teacher-snapshot`}
                 onAboutBook={() => {
                   if (!confirmLeaveIfTimerActive()) return;
@@ -5388,7 +5408,7 @@ export default function BookHubPage() {
                 showStartButton={showBookHubStartButton}
                 showFinishDnfButtons={showBookHubFinishDnfButtons}
                 showReflectionLink={canCompleteReadingReflection}
-                showReviewLink={canUseMyReviewNotes}
+                showReviewLink={!isEnglishNativeTrackerBook && canUseMyReviewNotes}
                 reviewLinkLabel={isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review"}
                 shouldNudgeStartBook={shouldNudgeStartBook}
                 shouldNudgeFinishBook={shouldNudgeFinishBook}
@@ -5451,7 +5471,7 @@ export default function BookHubPage() {
                     </div>
 
                     <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
-                      Use Reading Journal for story details and Review & Ratings for your private response.
+                      Use Reading Journal for story details, notes, and your private Review & Ratings.
                     </div>
                   </div>
                 </section>
@@ -5476,7 +5496,6 @@ export default function BookHubPage() {
                 canUseStoryNotes={isEnglishNativeTrackerBook || canUseStoryNotes}
                 hasSavedWords={(uniqueLookupCount ?? 0) > 0}
                 isEnglishNativeTrackerBook={isEnglishNativeTrackerBook}
-                isNativeAudiobook={isNativeAudiobook}
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/curiosity-reading`);

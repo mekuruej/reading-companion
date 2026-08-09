@@ -7,15 +7,6 @@ function formatRating(value: number | null | undefined) {
     .replace(/0$/, "");
 }
 
-function stars5(value: number | null) {
-  if (!value) return "☆☆☆☆☆";
-
-  const safeValue = Math.max(1, Math.min(5, value));
-  const rounded = Math.round(safeValue);
-
-  return "★".repeat(rounded) + "☆".repeat(5 - rounded);
-}
-
 function ratingDescription(
   descriptions: Record<number, string>,
   value: number | null
@@ -26,19 +17,15 @@ function ratingDescription(
 }
 
 const ENTERTAINMENT_RATING_VALUES = [
-  5,
-  4.75,
-  4.5,
-  4.25,
-  4,
-  3.75,
-  3.5,
-  3.25,
-  3,
-  2.5,
-  2,
-  1.5,
   1,
+  1.5,
+  2,
+  2.5,
+  3,
+  3.5,
+  4,
+  4.5,
+  5,
 ];
 
 type StarRatingFieldProps = {
@@ -59,6 +46,7 @@ export default function StarRatingField({
   descriptions,
 }: StarRatingFieldProps) {
   const selected = inputValue ? Number(inputValue) : null;
+  const displayedValue = selected ?? value;
 
   return (
     <div className="rounded border bg-white p-3 text-sm">
@@ -69,7 +57,23 @@ export default function StarRatingField({
           <div className="mt-1 font-medium">
             {value ? `${formatRating(value)}/5` : "—"}
           </div>
-          <div className="text-amber-600">{stars5(value)}</div>
+          {value ? (
+            <div className="mt-2 flex flex-wrap gap-1.5" aria-label={`${formatRating(value)} out of 5`}>
+              {ENTERTAINMENT_RATING_VALUES.map((rating) => (
+                <span
+                  key={rating}
+                  className={[
+                    "flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-black",
+                    value === rating
+                      ? "border-amber-400 bg-amber-100 text-amber-950"
+                      : "border-stone-200 bg-stone-50 text-stone-400",
+                  ].join(" ")}
+                >
+                  {formatRating(rating)}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="mt-1 text-xs text-stone-500">
             {ratingDescription(descriptions, value)}
           </div>
@@ -95,7 +99,7 @@ export default function StarRatingField({
             </button>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="flex flex-wrap gap-2">
             {ENTERTAINMENT_RATING_VALUES.map((rating) => {
               const isSelected = selected === rating;
 
@@ -104,19 +108,19 @@ export default function StarRatingField({
                   key={rating}
                   type="button"
                   onClick={() => setInputValue(String(rating))}
-                  className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-full border text-sm font-black transition ${
                     isSelected
                       ? "border-amber-400 bg-amber-100 text-amber-950 shadow-sm"
                       : "border-stone-200 bg-white text-stone-700 hover:bg-amber-50"
                   }`}
                 >
-                  <span className="font-black">{formatRating(rating)}</span>
-                  <span className="ml-2 text-xs leading-5">
-                    {ratingDescription(descriptions, rating)}
-                  </span>
+                  {formatRating(rating)}
                 </button>
               );
             })}
+          </div>
+          <div className="text-xs text-stone-500">
+            {ratingDescription(descriptions, displayedValue)}
           </div>
         </div>
       )}

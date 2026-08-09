@@ -20,6 +20,8 @@ type SessionMode = "fluid" | "listening";
 
 type SimpleTimedSessionPageProps = {
     sessionMode: SessionMode;
+    allowNativeReadListenToggle?: boolean;
+    onActiveSessionModeChange?: (mode: SessionMode) => void;
     eyebrow: string;
     title: string;
     subtitle: string;
@@ -29,6 +31,7 @@ type SimpleTimedSessionPageProps = {
     startLocationLabel?: string;
     endLocationLabel?: string;
     sessionLocationNote?: string;
+    listeningLocationNote?: string;
     embedded?: boolean;
     workspaceCompact?: boolean;
 };
@@ -87,8 +90,15 @@ function parseListeningEndpoint(value: string, pageCount: number | null) {
     return { value: Math.round(numeric), error: null };
 }
 
+function parseFlexibleListeningEndpoint(value: string, pageCount: number | null) {
+    const parsed = parseListeningEndpoint(value, pageCount);
+    return parsed.error ? { value: null, error: null } : parsed;
+}
+
 export default function SimpleTimedSessionPage({
     sessionMode,
+    allowNativeReadListenToggle = false,
+    onActiveSessionModeChange,
     eyebrow,
     title,
     subtitle,
@@ -98,6 +108,7 @@ export default function SimpleTimedSessionPage({
     startLocationLabel = "Start page optional",
     endLocationLabel = "End page optional",
     sessionLocationNote = "Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers.",
+    listeningLocationNote = "Optional. Add an audiobook position like Chapter 8, 37%, or 3:12:45. Listening time stays separate from reading pace.",
     embedded = false,
     workspaceCompact = false,
 }: SimpleTimedSessionPageProps) {
@@ -109,6 +120,7 @@ export default function SimpleTimedSessionPage({
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
     const [bookPageCount, setBookPageCount] = useState<number | null>(null);
+    const [bookStartedAt, setBookStartedAt] = useState<string | null>(null);
     const [showFinishedNav, setShowFinishedNav] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [accessChecked, setAccessChecked] = useState(false);
@@ -130,7 +142,51 @@ export default function SimpleTimedSessionPage({
     const [timerSaveMessage, setTimerSaveMessage] = useState("");
     const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
     const [timerPersistenceReady, setTimerPersistenceReady] = useState(false);
+    const [activeSessionMode, setActiveSessionMode] = useState<SessionMode>(sessionMode);
+    const [showProgressUpdateForm, setShowProgressUpdateForm] = useState(false);
+    const [progressUpdateLocation, setProgressUpdateLocation] = useState("");
+    const [progressUpdateMessage, setProgressUpdateMessage] = useState("");
+    const [savingProgressUpdate, setSavingProgressUpdate] = useState(false);
     const skippedInitialPersistenceWriteRef = useRef(false);
+    const isNativeListeningMode = allowNativeReadListenToggle && activeSessionMode === "listening";
+    const activeEyebrow = allowNativeReadListenToggle
+        ? activeSessionMode === "listening"
+            ? "Listening"
+            : "Reading"
+        : eyebrow;
+    const activeTitle = allowNativeReadListenToggle
+        ? activeSessionMode === "listening"
+            ? "Listen"
+            : "Read"
+        : title;
+    const activeModeColor = activeSessionMode === "listening" ? "violet" : "emerald";
+    const activeSubtitle = allowNativeReadListenToggle
+        ? activeSessionMode === "listening"
+            ? "Timed listening"
+            : "Timed reading"
+        : subtitle;
+    const activeDescription = allowNativeReadListenToggle
+        ? activeSessionMode === "listening"
+            ? "Listen to your audiobook and log the time separately from reading pace."
+            : "Time your reading, update your progress, and see your reading pace."
+        : description;
+    const activeSaveSuccessMessage = allowNativeReadListenToggle
+        ? activeSessionMode === "listening"
+            ? "Your listening session has been saved in Reading History."
+            : "Your reading session has been saved in Reading History."
+        : saveSuccessMessage;
+    const activeSessionLocationNote =
+        activeSessionMode === "listening" ? listeningLocationNote : sessionLocationNote;
+
+    useEffect(() => {
+        setActiveSessionMode(sessionMode);
+    }, [sessionMode]);
+
+    useEffect(() => {
+        if (allowNativeReadListenToggle) {
+            onActiveSessionModeChange?.(activeSessionMode);
+        }
+    }, [activeSessionMode, allowNativeReadListenToggle, onActiveSessionModeChange]);
 
     useEffect(() => {
         let cancelled = false;
@@ -174,6 +230,7 @@ export default function SimpleTimedSessionPage({
                 .select(`
           id,
           user_id,
+          started_at,
           books (
             title,
             language_code,
@@ -234,6 +291,7 @@ export default function SimpleTimedSessionPage({
             setBookTitle(displayBookTitle(book));
             setBookCover(book?.cover_url ?? "");
             setBookPageCount(book?.page_count ?? null);
+            setBookStartedAt((data as any).started_at ?? null);
 
             const { data: savedWordRows, error: savedWordError } = await supabase
                 .from("user_book_words")
@@ -262,7 +320,7 @@ export default function SimpleTimedSessionPage({
         if (!userBookId) return;
 
         skippedInitialPersistenceWriteRef.current = false;
-        const persisted = readPersistedTimedSession(sessionMode, userBookId);
+        const persisted = readPersistedTimedSession(activeSessionMode, userBookId);
         if (persisted) {
             const restoredElapsedMs = elapsedMsForPersistedTimedSession(persisted);
             const restoredRunning =
@@ -283,7 +341,7 @@ export default function SimpleTimedSessionPage({
         }
 
         setTimerPersistenceReady(true);
-    }, [sessionMode, userBookId]);
+    }, [activeSessionMode, userBookId]);
 
     useEffect(() => {
         if (isRunning && startTime) {
@@ -317,13 +375,13 @@ export default function SimpleTimedSessionPage({
         }
 
         if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) {
-            clearPersistedTimedSession(sessionMode, userBookId);
+            clearPersistedTimedSession(activeSessionMode, userBookId);
             return;
         }
 
         writePersistedTimedSession({
             version: 1,
-            sessionMode,
+            sessionMode: activeSessionMode,
             userBookId,
             startedAt: isRunning ? startTime : null,
             accumulatedElapsedMs,
@@ -340,7 +398,7 @@ export default function SimpleTimedSessionPage({
         isRunning,
         sessionDate,
         sessionEndPage,
-        sessionMode,
+        activeSessionMode,
         sessionStartPage,
         showTimedSessionForm,
         startTime,
@@ -356,7 +414,7 @@ export default function SimpleTimedSessionPage({
 
             writePersistedTimedSession({
                 version: 1,
-                sessionMode,
+                sessionMode: activeSessionMode,
                 userBookId,
                 startedAt: isRunning ? startTime : null,
                 accumulatedElapsedMs,
@@ -386,7 +444,7 @@ export default function SimpleTimedSessionPage({
         isRunning,
         sessionDate,
         sessionEndPage,
-        sessionMode,
+        activeSessionMode,
         sessionStartPage,
         showTimedSessionForm,
         startTime,
@@ -424,9 +482,9 @@ export default function SimpleTimedSessionPage({
         const latestPercent = pageToPercent(latestEndPage, bookPageCount);
         const nextStart = latestEndPage != null ? String(latestEndPage + 1) : "";
 
-        setSessionStartPage(sessionMode === "listening" ? "" : nextStart);
+        setSessionStartPage(activeSessionMode === "listening" ? "" : nextStart);
         setSessionEndPage(
-            sessionMode === "listening"
+            activeSessionMode === "listening"
                 ? latestPercent != null
                     ? `${latestPercent}%`
                     : latestEndPage != null
@@ -452,8 +510,10 @@ export default function SimpleTimedSessionPage({
         let startPageNum: number | null = null;
         let endPageNum: number | null = null;
 
-        if (sessionMode === "listening") {
-            const parsedEndpoint = parseListeningEndpoint(trimmedEndPage, bookPageCount);
+        if (activeSessionMode === "listening") {
+            const parsedEndpoint = isNativeListeningMode
+                ? parseFlexibleListeningEndpoint(trimmedEndPage, bookPageCount)
+                : parseListeningEndpoint(trimmedEndPage, bookPageCount);
             if (parsedEndpoint.error) {
                 alert(parsedEndpoint.error);
                 return;
@@ -489,7 +549,7 @@ export default function SimpleTimedSessionPage({
             start_page: startPageNum,
             end_page: endPageNum,
             minutes_read: minutesNum,
-            session_mode: sessionMode,
+            session_mode: activeSessionMode,
         });
 
         if (error) {
@@ -505,9 +565,40 @@ export default function SimpleTimedSessionPage({
         setIsRunning(false);
         setIsPaused(false);
         setSessionMinutesRead("");
-        clearPersistedTimedSession(sessionMode, userBookId);
-        setTimerSaveMessage(saveSuccessMessage);
+        clearPersistedTimedSession(activeSessionMode, userBookId);
+        setTimerSaveMessage(activeSaveSuccessMessage);
         setShowFinishedNav(true);
+
+        const bookPatch: {
+            status: "reading";
+            started_at?: string;
+            current_location?: string | null;
+        } = {
+            status: "reading",
+        };
+
+        if (!bookStartedAt) {
+            bookPatch.started_at = readOn;
+        }
+
+        if (isNativeListeningMode) {
+            bookPatch.current_location = trimmedEndPage || null;
+        }
+
+        if (!bookStartedAt || isNativeListeningMode) {
+            const { data: updatedBook, error: updateError } = await supabase
+                .from("user_books")
+                .update(bookPatch)
+                .eq("id", userBookId)
+                .select("started_at")
+                .maybeSingle();
+
+            if (updateError) {
+                console.error("Error updating book after timed session:", updateError);
+            } else {
+                setBookStartedAt((updatedBook as any)?.started_at ?? bookPatch.started_at ?? bookStartedAt);
+            }
+        }
 
         setTimeout(() => {
             setTimerSaveMessage("");
@@ -562,6 +653,148 @@ export default function SimpleTimedSessionPage({
         setShowFinishedNav(false);
         void openTimedSessionFormWithDefaults();
     }
+
+    function switchNativeSessionMode(nextMode: SessionMode) {
+        if (activeSessionMode === nextMode) return;
+
+        if (isRunning || isPaused || showTimedSessionForm) {
+            const ok = window.confirm("Cancel the current timer before switching modes?");
+            if (!ok) return;
+
+            clearPersistedTimedSession(activeSessionMode, userBookId);
+            setShowTimedSessionForm(false);
+            setElapsed(0);
+            setAccumulatedElapsedMs(0);
+            setStartTime(null);
+            setIsPaused(false);
+            setIsRunning(false);
+            setHasFinishedTimer(false);
+        }
+
+        setActiveSessionMode(nextMode);
+        setSessionStartPage("");
+        setSessionEndPage("");
+        setSessionMinutesRead("");
+        setTimerSaveMessage("");
+        setProgressUpdateLocation("");
+        setProgressUpdateMessage("");
+        setShowFinishedNav(false);
+    }
+
+    async function saveProgressUpdateWithoutTiming() {
+        if (!userBookId || !canAccessBook || savingProgressUpdate) return;
+
+        const trimmedLocation = progressUpdateLocation.trim();
+        if (!trimmedLocation) {
+            setProgressUpdateMessage("Add your current progress before saving.");
+            return;
+        }
+
+        let endPageNum: number | null = null;
+
+        if (activeSessionMode === "listening") {
+            const parsedEndpoint = parseFlexibleListeningEndpoint(trimmedLocation, bookPageCount);
+            endPageNum = parsedEndpoint.value;
+        } else {
+            const parsedPage = Number(trimmedLocation);
+
+            if (!Number.isFinite(parsedPage) || parsedPage <= 0) {
+                setProgressUpdateMessage("Enter a valid current page.");
+                return;
+            }
+
+            endPageNum = Math.round(parsedPage);
+        }
+
+        setSavingProgressUpdate(true);
+        setProgressUpdateMessage("");
+
+        const readOn = todayYmdAppTimeZone();
+        const { error: sessionError } = await supabase.from("user_book_reading_sessions").insert({
+            user_book_id: userBookId,
+            read_on: readOn,
+            start_page: null,
+            end_page: endPageNum,
+            minutes_read: null,
+            session_mode: activeSessionMode,
+        });
+
+        if (sessionError) {
+            console.error("Error saving progress update:", sessionError);
+            setProgressUpdateMessage("Could not update progress.");
+            setSavingProgressUpdate(false);
+            return;
+        }
+
+        const bookPatch: {
+            status: "reading";
+            started_at?: string;
+            current_location?: string | null;
+        } = {
+            status: "reading",
+        };
+
+        if (!bookStartedAt) {
+            bookPatch.started_at = readOn;
+        }
+
+        if (activeSessionMode === "listening") {
+            bookPatch.current_location = trimmedLocation;
+        }
+
+        const { data: updatedBook, error: updateError } = await supabase
+            .from("user_books")
+            .update(bookPatch)
+            .eq("id", userBookId)
+            .select("started_at")
+            .maybeSingle();
+
+        setSavingProgressUpdate(false);
+
+        if (updateError) {
+            console.error("Error updating book progress:", updateError);
+            setProgressUpdateMessage("Progress was saved to history, but the book status could not be updated.");
+            return;
+        }
+
+        setBookStartedAt((updatedBook as any)?.started_at ?? bookPatch.started_at ?? bookStartedAt);
+        setProgressUpdateLocation("");
+        setProgressUpdateMessage(
+            activeSessionMode === "listening"
+                ? "Listening progress updated. Pace was not changed."
+                : "Reading progress updated. Pace needs a timed reading session."
+        );
+        setShowFinishedNav(true);
+    }
+
+    const nativeModeToggle = allowNativeReadListenToggle ? (
+        <div className="mt-4 inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
+            {(["fluid", "listening"] as SessionMode[]).map((mode) => {
+                const active = activeSessionMode === mode;
+                const activeClass =
+                    mode === "listening"
+                        ? "bg-violet-700 text-white"
+                        : "bg-emerald-700 text-white";
+                const inactiveClass =
+                    mode === "listening"
+                        ? "text-stone-600 hover:bg-violet-50"
+                        : "text-stone-600 hover:bg-emerald-50";
+                return (
+                    <button
+                        key={mode}
+                        type="button"
+                        onClick={() => switchNativeSessionMode(mode)}
+                        className={[
+                            "rounded-xl px-4 py-2 text-sm font-black transition",
+                            active ? activeClass : inactiveClass,
+                        ].join(" ")}
+                    >
+                        {mode === "listening" ? "Listening" : "Reading"}
+                    </button>
+                );
+            })}
+        </div>
+    ) : null;
 
     if (loading) {
         const loadingState = (
@@ -678,19 +911,23 @@ export default function SimpleTimedSessionPage({
                 Save this session
             </div>
 
-            {sessionMode === "listening" ? (
+            {activeSessionMode === "listening" ? (
                 <div>
-                    <div className="mb-1 text-sm text-stone-600">Up to page or percent</div>
+                    <div className="mb-1 text-sm text-stone-600">
+                        {isNativeListeningMode ? "Listening position" : "Up to page or percent"}
+                    </div>
                     <input
                         type="text"
                         inputMode="decimal"
                         value={sessionEndPage}
                         onChange={(e) => setSessionEndPage(e.target.value)}
-                        placeholder="e.g. p. 42 or 18%"
+                        placeholder={isNativeListeningMode ? "e.g. Chapter 8, 37%, or 3:12:45" : "e.g. p. 42 or 18%"}
                         className="w-full rounded-xl border px-3 py-2 text-sm"
                     />
                     <div className="mt-1 text-xs text-stone-500">
-                        Optional. Use a page if you have the book open, or a percent for audiobook progress.
+                        {isNativeListeningMode
+                            ? "Optional. This updates your audiobook position without adding page data."
+                            : "Optional. Use a page if you have the book open, or a percent for audiobook progress."}
                     </div>
                 </div>
             ) : (
@@ -724,7 +961,7 @@ export default function SimpleTimedSessionPage({
             <div className="mt-3 space-y-1 text-sm text-stone-500">
                 <div>Time: {formatTimer(elapsed)}</div>
                 <div className="text-xs">
-                    {sessionLocationNote}
+                    {activeSessionLocationNote}
                 </div>
             </div>
 
@@ -749,13 +986,81 @@ export default function SimpleTimedSessionPage({
                         setStartTime(null);
                         setIsPaused(false);
                         setIsRunning(false);
-                        clearPersistedTimedSession(sessionMode, userBookId);
+                        clearPersistedTimedSession(activeSessionMode, userBookId);
                     }}
                     className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
                 >
                     Cancel
                 </button>
             </div>
+        </div>
+    ) : null;
+
+    const progressUpdatePanel = allowNativeReadListenToggle ? (
+        <div className={workspaceCompact ? "mt-3 rounded-2xl bg-stone-50 p-4" : "mt-4 rounded-3xl bg-stone-50 p-5"}>
+            {!showProgressUpdateForm ? (
+                <button
+                    type="button"
+                    onClick={() => {
+                        setShowProgressUpdateForm(true);
+                        setProgressUpdateMessage("");
+                    }}
+                    className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:bg-stone-100"
+                >
+                    Just update my book without timing
+                </button>
+            ) : (
+                <div className="space-y-3">
+                    <div>
+                        <div className="text-sm font-semibold text-stone-900">
+                            Just update my book
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-stone-500">
+                            This updates your progress without timing. Pace can only be calculated from timed reading sessions.
+                        </p>
+                    </div>
+
+                    <label className="block">
+                        <span className="text-xs font-semibold text-stone-600">
+                            {activeSessionMode === "listening" ? "Listening position" : "Current page"}
+                        </span>
+                        <input
+                            type="text"
+                            inputMode={activeSessionMode === "listening" ? "text" : "numeric"}
+                            value={progressUpdateLocation}
+                            onChange={(event) => setProgressUpdateLocation(event.target.value)}
+                            placeholder={activeSessionMode === "listening" ? "e.g. Chapter 8, 37%, or 3:12:45" : "e.g. 84"}
+                            className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                        />
+                    </label>
+
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => void saveProgressUpdateWithoutTiming()}
+                            disabled={savingProgressUpdate}
+                            className="rounded-2xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black disabled:opacity-50"
+                        >
+                            {savingProgressUpdate ? "Saving..." : "Save Progress"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowProgressUpdateForm(false);
+                                setProgressUpdateLocation("");
+                                setProgressUpdateMessage("");
+                            }}
+                            className="rounded-2xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-300"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+
+                    {progressUpdateMessage ? (
+                        <p className="text-xs font-semibold text-stone-600">{progressUpdateMessage}</p>
+                    ) : null}
+                </div>
+            )}
         </div>
     ) : null;
 
@@ -839,24 +1144,30 @@ export default function SimpleTimedSessionPage({
                         </div>
                         {timerPanel}
                         {saveSessionForm}
+                        {progressUpdatePanel}
                     </div>
 
                     <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-                            {eyebrow}
-                        </p>
+                        {!allowNativeReadListenToggle ? (
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+                                {activeEyebrow}
+                            </p>
+                        ) : null}
 
                         <h1 className="mt-2 text-2xl font-bold tracking-tight text-stone-900">
-                            {title}
+                            <span className={activeModeColor === "violet" ? "text-violet-800" : "text-emerald-800"}>
+                                {activeTitle}
+                            </span>
                         </h1>
 
                         <p className="mt-2 text-base font-semibold text-stone-700">
-                            {subtitle}
+                            {activeSubtitle}
                         </p>
 
                         <p className="mt-3 text-sm leading-7 text-stone-600">
-                            {description}
+                            {activeDescription}
                         </p>
+                        {nativeModeToggle}
                     </div>
                 </div>
             </section>
@@ -948,25 +1259,31 @@ export default function SimpleTimedSessionPage({
                         </div>
 
                         <div className="flex flex-col justify-center">
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-                                {eyebrow}
-                            </p>
+                            {!allowNativeReadListenToggle ? (
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+                                    {activeEyebrow}
+                                </p>
+                            ) : null}
 
                             <h1 className="mt-2 text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
-                                {title}
+                                <span className={activeModeColor === "violet" ? "text-violet-800" : "text-emerald-800"}>
+                                    {activeTitle}
+                                </span>
                             </h1>
 
                             <p className="mt-2 text-lg font-semibold text-stone-700">
-                                {subtitle}
+                                {activeSubtitle}
                             </p>
 
                             <p className="mt-4 text-sm leading-7 text-stone-600">
-                                {description}
+                                {activeDescription}
                             </p>
+                            {nativeModeToggle}
 
                             {timerPanel}
 
                             {saveSessionForm}
+                            {progressUpdatePanel}
                         </div>
                     </div>
                 </section>

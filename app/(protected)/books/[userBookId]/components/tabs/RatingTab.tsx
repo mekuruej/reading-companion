@@ -222,21 +222,17 @@ export default function RatingTab({
                 editing={isEditingReflection}
                 inputValue={ratingOverall}
                 setInputValue={setRatingOverall}
-                descriptions={{
-                  5: "Loved it. Highly recommend.",
-                  4.75: "Good, solid book. Definitely recommend.",
-                  4.5: "Good, solid book. Would most likely recommend.",
-                  4.25: "Good, solid book. May recommend.",
-                  4: "Good, solid book. Probably wouldn't recommend for certain reasons.",
-                  3.75: "Some parts worked; others didn't. Would recommend to specific people.",
-                  3.5: "Some parts worked; others didn't. May recommend.",
-                  3.25: "Some parts worked; others didn't. Would only recommend with reservations.",
-                  3: "Some parts worked; some parts didn't. Definitely wouldn't recommend.",
-                  2.5: "Some parts were okay, but overall, not for me.",
-                  2: "Definitely not for me, but the author tried.",
-                  1.5: "Definitely not for me. You should steer clear too.",
-                  1: "Hated it.",
-                }}
+	                descriptions={{
+	                  5: "Loved it. Highly recommend.",
+	                  4.5: "Really enjoyed it.",
+	                  4: "Good, solid book.",
+	                  3.5: "Some parts worked; others didn't.",
+	                  3: "Mixed feelings.",
+	                  2.5: "Some parts were okay, but overall, not for me.",
+	                  2: "Definitely not for me, but the author tried.",
+	                  1.5: "Really not for me.",
+	                  1: "Hated it.",
+	                }}
               />
             </div>
           </div>

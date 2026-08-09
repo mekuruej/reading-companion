@@ -506,6 +506,10 @@ export default function ReadingTab({
                         <div className="mt-1">
                           {session.session_mode === "listening" ? (
                             listeningProgressLabel(session.end_page)
+                          ) : session.start_page == null && session.end_page != null ? (
+                            usePercentMode
+                              ? `Up to ${pageToPercent(session.end_page)}%`
+                              : `Up to p. ${session.end_page}`
                           ) : session.start_page != null && session.end_page != null ? (
                             usePercentMode
                               ? `${pageToPercent(session.start_page)}% → ${pageToPercent(session.end_page)}%`
