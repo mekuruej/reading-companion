@@ -370,9 +370,15 @@ export default function BookStatsPage() {
         return listeningSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
     }, [listeningSessions]);
 
+    const engagementSessions = useMemo(() => {
+        return isEnglishNativeTrackerBook ? visualReadingSessions : realSessions;
+    }, [isEnglishNativeTrackerBook, realSessions, visualReadingSessions]);
+
     const totalTrackedMinutes = useMemo(() => {
-        return curiosityMinutes + fluidMinutes + listeningMinutes;
-    }, [curiosityMinutes, fluidMinutes, listeningMinutes]);
+        return isEnglishNativeTrackerBook
+            ? fluidMinutes
+            : curiosityMinutes + fluidMinutes + listeningMinutes;
+    }, [curiosityMinutes, fluidMinutes, isEnglishNativeTrackerBook, listeningMinutes]);
 
     const pagesRead = useMemo(() => {
         return pageTrackedSessions.reduce((sum, s) => {
@@ -393,11 +399,11 @@ export default function BookStatsPage() {
     }, [timedPageTrackedSessions]);
 
     const daysEngaged = useMemo(() => {
-        if (realSessions.length === 0) return null;
-        return new Set(realSessions.map((s) => s.read_on)).size;
-    }, [realSessions]);
+        if (engagementSessions.length === 0) return null;
+        return new Set(engagementSessions.map((s) => s.read_on)).size;
+    }, [engagementSessions]);
 
-    const lastEngaged = realSessions[0]?.read_on ?? null;
+    const lastEngaged = engagementSessions[0]?.read_on ?? null;
 
     const overallMinPerPage = timedPages > 0 ? timedPageMinutes / timedPages : null;
     const pagesPerHour = overallMinPerPage ? 60 / overallMinPerPage : null;
@@ -489,7 +495,7 @@ export default function BookStatsPage() {
                     <StatCard
                         label="Days Engaged"
                         value={daysEngaged ?? "—"}
-                        note="Reading or listening dates"
+                        note={isEnglishNativeTrackerBook ? "Reading dates" : "Reading or listening dates"}
                     />
                     <StatCard label="Last Engaged" value={lastEngaged ?? "—"} />
                 </StatsSection>
@@ -512,18 +518,18 @@ export default function BookStatsPage() {
                             />
                         )}
 
-                        {listeningMinutes > 0 && (
+                        {!isEnglishNativeTrackerBook && listeningMinutes > 0 && (
                             <StatCard
                                 label="Listening"
                                 value={formatMinutes(listeningMinutes)}
-                                note={isEnglishNativeTrackerBook ? "Timed listening sessions" : "Ear training"}
+                                note="Ear training"
                             />
                         )}
 
                         <StatCard
                             label="Total Logged Time"
                             value={formatMinutes(totalTrackedMinutes)}
-                            note="Reading and listening only"
+                            note={isEnglishNativeTrackerBook ? "Reading only" : "Reading and listening only"}
                         />
                     </StatsSection>
                 )}

@@ -124,6 +124,7 @@ export default function BookInfoDetailsSection({
     [...japaneseEditionFormatOptions, ...genericEditionFormatOptions].find(
       (option) => option.value === book.edition_format
     )?.label ?? "—";
+  const usesEnglishReadingTerminology = book.language_code === "en";
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -169,12 +170,16 @@ export default function BookInfoDetailsSection({
 
       <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
         <Detail
-          label="Title Reading"
+          label={usesEnglishReadingTerminology ? "Title Pronunciation" : "Title Reading"}
           value={book.title_reading}
           editing={isEditingBookInfo}
           inputValue={titleReading}
           setInputValue={setTitleReading}
-          placeholder="かな reading for the title"
+          placeholder={
+            usesEnglishReadingTerminology
+              ? "Optional pronunciation note"
+              : "かな reading for the title"
+          }
         />
 
         <div className="rounded border bg-white p-3 text-sm">

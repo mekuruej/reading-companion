@@ -232,6 +232,8 @@ export default function ReadingJournalPanel({
         detective.loadDetectiveEntries({ userBookId, ownerUserId }),
         loadCharacters(userBookId, cancelled),
         loadChapterSummaries(userBookId, cancelled),
+        loadSettingItems(userBookId, cancelled),
+        loadCulturalItems(userBookId, cancelled),
       ]);
     }
 
@@ -339,6 +341,42 @@ export default function ReadingJournalPanel({
       const latestId = latestChapterSummaryId((data as ChapterSummary[]) ?? []);
       setExpandedChapterIds(latestId ? [latestId] : []);
     }
+  }
+
+  async function loadSettingItems(id: string, cancelled: boolean) {
+    const { data, error } = await supabase
+      .from("user_book_setting_items")
+      .select("id, user_book_id, title, details, sort_order, created_at, updated_at")
+      .eq("user_book_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (cancelled) return;
+    if (error) {
+      console.error("Error loading setting notes:", error);
+      setSettingItems([]);
+      return;
+    }
+
+    setSettingItems((data as SettingItem[]) ?? []);
+  }
+
+  async function loadCulturalItems(id: string, cancelled: boolean) {
+    const { data, error } = await supabase
+      .from("user_book_cultural_items")
+      .select("id, user_book_id, title, details, sort_order, created_at, updated_at")
+      .eq("user_book_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (cancelled) return;
+    if (error) {
+      console.error("Error loading cultural notes:", error);
+      setCulturalItems([]);
+      return;
+    }
+
+    setCulturalItems((data as CulturalItem[]) ?? []);
   }
 
   function startEditingCharacter(id: string) {
@@ -604,7 +642,7 @@ export default function ReadingJournalPanel({
   }
 
   function addSettingItem() {
-    const id = crypto.randomUUID();
+    const id = `new-setting-${Date.now()}`;
     setSettingItems((prev) => [
       ...prev,
       {
@@ -620,8 +658,99 @@ export default function ReadingJournalPanel({
     setEditingSettingIds((prev) => [...prev, id]);
   }
 
+  function markSettingSaved(id: string) {
+    setSavedSettingIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    window.setTimeout(() => {
+      setSavedSettingIds((prev) => prev.filter((x) => x !== id));
+    }, 1800);
+  }
+
+  async function saveSettingItem(item: SettingItem) {
+    const payload = {
+      user_book_id: userBookId,
+      title: item.title?.trim() || null,
+      details: item.details.trim(),
+      sort_order: item.sort_order ?? 0,
+    };
+
+    if (!payload.title && !payload.details) {
+      alert("Please add a title or details before saving this setting note.");
+      return;
+    }
+
+    setSavingSettingIds((prev) => [...prev, item.id]);
+
+    if (item.id.startsWith("new-setting-")) {
+      const oldId = item.id;
+      const { data, error } = await supabase
+        .from("user_book_setting_items")
+        .insert(payload)
+        .select("id, user_book_id, title, details, sort_order, created_at, updated_at")
+        .single();
+
+      setSavingSettingIds((prev) => prev.filter((x) => x !== oldId));
+
+      if (error) {
+        console.error("Error creating setting note:", error);
+        alert("Could not save setting note.");
+        return;
+      }
+
+      const saved = data as SettingItem;
+      setSettingItems((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
+      setEditingSettingIds((prev) => prev.map((x) => (x === oldId ? saved.id : x)));
+      setEditingSettingIds((prev) => prev.filter((x) => x !== saved.id));
+      markSettingSaved(saved.id);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_setting_items")
+      .update(payload)
+      .eq("id", item.id)
+      .select("id, user_book_id, title, details, sort_order, created_at, updated_at")
+      .single();
+
+    setSavingSettingIds((prev) => prev.filter((x) => x !== item.id));
+
+    if (error) {
+      console.error("Error updating setting note:", error);
+      alert("Could not update setting note.");
+      return;
+    }
+
+    const saved = data as SettingItem;
+    setSettingItems((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
+    setEditingSettingIds((prev) => prev.filter((x) => x !== saved.id));
+    markSettingSaved(saved.id);
+  }
+
+  async function deleteSettingItem(id: string) {
+    if (id.startsWith("new-setting-")) {
+      setSettingItems((prev) => prev.filter((x) => x.id !== id));
+      setEditingSettingIds((prev) => prev.filter((x) => x !== id));
+      setSavingSettingIds((prev) => prev.filter((x) => x !== id));
+      setSavedSettingIds((prev) => prev.filter((x) => x !== id));
+      return;
+    }
+
+    if (!window.confirm("Delete this setting note?")) return;
+
+    const { error } = await supabase.from("user_book_setting_items").delete().eq("id", id);
+    if (error) {
+      console.error("Error deleting setting note:", error);
+      alert("Could not delete setting note.");
+      return;
+    }
+
+    setSettingItems((prev) => prev.filter((x) => x.id !== id));
+    setEditingSettingIds((prev) => prev.filter((x) => x !== id));
+    setSavingSettingIds((prev) => prev.filter((x) => x !== id));
+    setSavedSettingIds((prev) => prev.filter((x) => x !== id));
+  }
+
   function addCulturalItem() {
-    const id = crypto.randomUUID();
+    const id = `new-cultural-${Date.now()}`;
     setCulturalItems((prev) => [
       ...prev,
       {
@@ -635,6 +764,97 @@ export default function ReadingJournalPanel({
       },
     ]);
     setEditingCulturalIds((prev) => [...prev, id]);
+  }
+
+  function markCulturalSaved(id: string) {
+    setSavedCulturalIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    window.setTimeout(() => {
+      setSavedCulturalIds((prev) => prev.filter((x) => x !== id));
+    }, 1800);
+  }
+
+  async function saveCulturalItem(item: CulturalItem) {
+    const payload = {
+      user_book_id: userBookId,
+      title: item.title?.trim() || null,
+      details: item.details.trim(),
+      sort_order: item.sort_order ?? 0,
+    };
+
+    if (!payload.title && !payload.details) {
+      alert("Please add a title or details before saving this cultural note.");
+      return;
+    }
+
+    setSavingCulturalIds((prev) => [...prev, item.id]);
+
+    if (item.id.startsWith("new-cultural-")) {
+      const oldId = item.id;
+      const { data, error } = await supabase
+        .from("user_book_cultural_items")
+        .insert(payload)
+        .select("id, user_book_id, title, details, sort_order, created_at, updated_at")
+        .single();
+
+      setSavingCulturalIds((prev) => prev.filter((x) => x !== oldId));
+
+      if (error) {
+        console.error("Error creating cultural note:", error);
+        alert("Could not save cultural note.");
+        return;
+      }
+
+      const saved = data as CulturalItem;
+      setCulturalItems((prev) => prev.map((x) => (x.id === oldId ? saved : x)));
+      setEditingCulturalIds((prev) => prev.map((x) => (x === oldId ? saved.id : x)));
+      setEditingCulturalIds((prev) => prev.filter((x) => x !== saved.id));
+      markCulturalSaved(saved.id);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_cultural_items")
+      .update(payload)
+      .eq("id", item.id)
+      .select("id, user_book_id, title, details, sort_order, created_at, updated_at")
+      .single();
+
+    setSavingCulturalIds((prev) => prev.filter((x) => x !== item.id));
+
+    if (error) {
+      console.error("Error updating cultural note:", error);
+      alert("Could not update cultural note.");
+      return;
+    }
+
+    const saved = data as CulturalItem;
+    setCulturalItems((prev) => prev.map((x) => (x.id === item.id ? saved : x)));
+    setEditingCulturalIds((prev) => prev.filter((x) => x !== saved.id));
+    markCulturalSaved(saved.id);
+  }
+
+  async function deleteCulturalItem(id: string) {
+    if (id.startsWith("new-cultural-")) {
+      setCulturalItems((prev) => prev.filter((x) => x.id !== id));
+      setEditingCulturalIds((prev) => prev.filter((x) => x !== id));
+      setSavingCulturalIds((prev) => prev.filter((x) => x !== id));
+      setSavedCulturalIds((prev) => prev.filter((x) => x !== id));
+      return;
+    }
+
+    if (!window.confirm("Delete this cultural note?")) return;
+
+    const { error } = await supabase.from("user_book_cultural_items").delete().eq("id", id);
+    if (error) {
+      console.error("Error deleting cultural note:", error);
+      alert("Could not delete cultural note.");
+      return;
+    }
+
+    setCulturalItems((prev) => prev.filter((x) => x.id !== id));
+    setEditingCulturalIds((prev) => prev.filter((x) => x !== id));
+    setSavingCulturalIds((prev) => prev.filter((x) => x !== id));
+    setSavedCulturalIds((prev) => prev.filter((x) => x !== id));
   }
 
   async function saveFavoriteQuotes() {
@@ -759,16 +979,8 @@ export default function ReadingJournalPanel({
       stopEditingSettingItem={(id) =>
         setEditingSettingIds((prev) => prev.filter((x) => x !== id))
       }
-      saveSettingItem={async (item) => {
-        setSavingSettingIds((prev) => [...prev, item.id]);
-        setSavingSettingIds((prev) => prev.filter((x) => x !== item.id));
-        setEditingSettingIds((prev) => prev.filter((x) => x !== item.id));
-        setSavedSettingIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
-        window.setTimeout(() => {
-          setSavedSettingIds((prev) => prev.filter((x) => x !== item.id));
-        }, 1800);
-      }}
-      deleteSettingItem={async (id) => setSettingItems((prev) => prev.filter((x) => x.id !== id))}
+      saveSettingItem={saveSettingItem}
+      deleteSettingItem={deleteSettingItem}
       culturalItems={culturalItems}
       visibleCulturalItems={visibleCulturalItems}
       culturalSearch={culturalSearch}
@@ -792,16 +1004,8 @@ export default function ReadingJournalPanel({
       stopEditingCulturalItem={(id) =>
         setEditingCulturalIds((prev) => prev.filter((x) => x !== id))
       }
-      saveCulturalItem={async (item) => {
-        setSavingCulturalIds((prev) => [...prev, item.id]);
-        setSavingCulturalIds((prev) => prev.filter((x) => x !== item.id));
-        setEditingCulturalIds((prev) => prev.filter((x) => x !== item.id));
-        setSavedCulturalIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
-        window.setTimeout(() => {
-          setSavedCulturalIds((prev) => prev.filter((x) => x !== item.id));
-        }, 1800);
-      }}
-      deleteCulturalItem={async (id) => setCulturalItems((prev) => prev.filter((x) => x.id !== id))}
+      saveCulturalItem={saveCulturalItem}
+      deleteCulturalItem={deleteCulturalItem}
       favoriteQuoteInputs={favoriteQuoteInputs}
       quoteSearch={quoteSearch}
       setQuoteSearch={setQuoteSearch}

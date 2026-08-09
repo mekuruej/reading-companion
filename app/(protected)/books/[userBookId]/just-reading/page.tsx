@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
@@ -112,6 +113,23 @@ export default function JustReadingPage() {
                 canAccessBook = !!teacherStudentLink;
             }
 
+            const { data: ownerProfile, error: ownerProfileError } = ownerUserId
+                ? await supabase
+                    .from("profiles")
+                    .select("native_language")
+                    .eq("id", ownerUserId)
+                    .maybeSingle()
+                : { data: null, error: null };
+
+            if (ownerProfileError) {
+                console.error("Error loading Just Reading owner profile:", ownerProfileError);
+            }
+
+            const nativeLanguageBook = isNativeLanguageBook({
+                bookLanguageCode: book?.language_code ?? null,
+                ownerNativeLanguage: ownerProfile?.native_language ?? null,
+            });
+
             if (!profileError && profile) {
                 const appAccessStatus = getAppAccessStatus({
                     role: isSuperTeacher ? "super_teacher" : role,
@@ -125,7 +143,9 @@ export default function JustReadingPage() {
                     isTrialActive: appAccessStatus.reason === "trial",
                 });
 
-                setCanUseReadingJournal(Boolean(canAccessBook && ownerUserId && featureAccess.canUseStoryNotes));
+                setCanUseReadingJournal(
+                    Boolean(canAccessBook && ownerUserId && (nativeLanguageBook || featureAccess.canUseStoryNotes))
+                );
                 setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
                 setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
             } else {
@@ -158,7 +178,7 @@ export default function JustReadingPage() {
             title="Extensive · Just Reading"
             subtitle="Timer-only fluid reading"
             description="Read without saved-word support or new lookups. Let the timer keep you company and stay with the story."
-            saveSuccessMessage="Your fluid reading session has been saved in Reading Sessions."
+            saveSuccessMessage="Your fluid reading session has been saved in Reading History."
         />
     );
 
@@ -174,7 +194,7 @@ export default function JustReadingPage() {
             title="Extensive · Just Reading"
             subtitle="Timer-only fluid reading"
             description="Read without saved-word support or new lookups. Let the timer keep you company and stay with the story."
-            saveSuccessMessage="Your fluid reading session has been saved in Reading Sessions."
+            saveSuccessMessage="Your fluid reading session has been saved in Reading History."
             embedded
             workspaceCompact={showReadingWorkspace}
         />

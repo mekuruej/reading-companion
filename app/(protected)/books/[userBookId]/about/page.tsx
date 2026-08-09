@@ -635,6 +635,7 @@ export default function AboutBookPage() {
     return <AccessDeniedMessage message={error ?? "This book could not be found."} />;
   }
 
+  const usesEnglishReadingTerminology = book.language_code === "en";
   const bookFormat = formatBookFormat(book, row);
   const isbn = book.isbn13 || book.isbn;
   const synopsis = book.synopsis_en?.trim() || null;
@@ -656,7 +657,7 @@ export default function AboutBookPage() {
           href={`/books/${row.id}`}
           className="inline-flex text-sm font-black text-stone-600 transition hover:text-stone-950"
         >
-          &larr; Back to Reader Book Hub
+          &larr; Back to {usesEnglishReadingTerminology ? "Book Hub" : "Reader Book Hub"}
         </Link>
 
         <section className="mt-5 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
@@ -687,7 +688,7 @@ export default function AboutBookPage() {
                   {book.title ?? "Untitled book"}
                 </h1>
 
-                {book.title_reading ? (
+                {!usesEnglishReadingTerminology && book.title_reading ? (
                   <p className="mt-2 text-sm font-semibold text-stone-500">
                     {book.title_reading}
                   </p>
@@ -797,7 +798,7 @@ export default function AboutBookPage() {
           <CreatorCard
             eyebrow="Author"
             name={book.author || book.author_english_name || "Author not listed yet"}
-            reading={book.author_reading}
+            reading={usesEnglishReadingTerminology ? null : book.author_reading}
             imageUrl={authorImageUrl}
             fallbackInitial={cleanInitial(book.author || book.author_english_name)}
             imageAlt={book.author ? `${book.author} photo` : "Author photo"}
@@ -807,7 +808,7 @@ export default function AboutBookPage() {
           <CreatorCard
             eyebrow="Publisher"
             name={book.publisher || "Publisher not listed yet"}
-            reading={book.publisher_reading}
+            reading={usesEnglishReadingTerminology ? null : book.publisher_reading}
             imageUrl={publisherImageUrl}
             fallbackInitial={cleanInitial(book.publisher)}
             imageAlt={book.publisher ? `${book.publisher} logo` : "Publisher logo"}
@@ -818,8 +819,8 @@ export default function AboutBookPage() {
 
         {learnerReadingNotes.length > 0 ? (
           <ProfileSection
-            eyebrow="Reading Notes"
-            title="Learner-Facing Notes"
+            eyebrow={usesEnglishReadingTerminology ? "Reader Notes" : "Reading Notes"}
+            title={usesEnglishReadingTerminology ? "Reader Notes" : "Learner-Facing Notes"}
             description="Notes for readers can live here later without mixing them into the private Reading Journal."
             className="mt-6"
           >

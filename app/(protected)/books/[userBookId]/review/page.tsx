@@ -8,7 +8,7 @@ import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
-import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
+import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import {
   emptyFavoriteQuoteInput,
@@ -126,14 +126,6 @@ export default function ReviewNotesPage() {
         isTrialActive: appAccessStatus.reason === "trial",
       });
 
-      if (!featureAccess.hasFullAccess) {
-        setAccessMessage(
-          "Review & Notes is part of Reading Access. Your Reading Reflection is still available after you finish a book."
-        );
-        setLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase
         .from("user_books")
         .select(
@@ -191,18 +183,26 @@ export default function ReviewNotesPage() {
         console.error("Error loading Review & Notes owner profile:", ownerProfileError);
       }
 
+      const nativeLanguageBook = isNativeLanguageBook({
+        bookLanguageCode: loadedRow.books?.language_code ?? null,
+        ownerNativeLanguage: ownerProfile?.native_language ?? null,
+      });
+
+      if (!nativeLanguageBook && !featureAccess.hasFullAccess) {
+        setAccessMessage(
+          "Review & Notes is part of Reading Access. Your Reading Reflection is still available after you finish a book."
+        );
+        setLoading(false);
+        return;
+      }
+
       setRow(loadedRow);
       setNotes(loadedRow.notes ?? "");
       setMyReview(loadedRow.my_review ?? "");
       setFavoriteQuoteInputs(favoriteQuoteTextToInputs(loadedRow.favorite_quotes));
       setMemorableWords(loadedRow.memorable_words ?? "");
       setRatingOverall(loadedRow.rating_overall == null ? "" : String(loadedRow.rating_overall));
-      setIsEnglishNativeTrackerBook(
-        getIsEnglishNativeTrackerBook({
-          bookLanguageCode: loadedRow.books?.language_code ?? null,
-          ownerNativeLanguage: ownerProfile?.native_language ?? null,
-        })
-      );
+      setIsEnglishNativeTrackerBook(nativeLanguageBook);
       setLoading(false);
     }
 

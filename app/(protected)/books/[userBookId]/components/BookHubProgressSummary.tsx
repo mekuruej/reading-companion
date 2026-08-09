@@ -10,6 +10,7 @@ type BookHubProgressSummaryProps = {
   lastChapterLabel?: string;
   lastPageLabel?: string;
   daysEngagedLabel: string;
+  daysEngagedCaption?: string;
   savedWordsPerPageLabel: string;
   averageMinutesPerPageLabel: string;
   showVocabularyStats?: boolean;
@@ -24,6 +25,7 @@ export default function BookHubProgressSummary({
   lastChapterLabel,
   lastPageLabel,
   daysEngagedLabel,
+  daysEngagedCaption = "Reading or listening",
   savedWordsPerPageLabel,
   averageMinutesPerPageLabel,
   showVocabularyStats = true,
@@ -91,7 +93,7 @@ export default function BookHubProgressSummary({
         <BookHubStatCard
           label="Days Engaged"
           value={daysEngagedLabel}
-          caption="Reading or listening"
+          caption={daysEngagedCaption}
         />
 
         {showVocabularyStats ? (

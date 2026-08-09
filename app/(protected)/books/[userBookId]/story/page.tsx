@@ -9,6 +9,7 @@ import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getFullAccessRequiredCopy } from "@/lib/access/requireFullAccess";
+import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 
@@ -102,13 +103,6 @@ export default function StoryNotesPage() {
         isTrialActive: appAccessStatus.reason === "trial",
       });
 
-      if (!featureAccess.canUseStoryNotes) {
-        const copy = getFullAccessRequiredCopy("story_notes");
-        setAccessMessage(copy.message);
-        setLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase
         .from("user_books")
         .select(
@@ -164,6 +158,28 @@ export default function StoryNotesPage() {
 
       if (!canAccessBook) {
         setAccessMessage("You do not have access to this book.");
+        setLoading(false);
+        return;
+      }
+
+      const { data: ownerProfile, error: ownerProfileError } = await supabase
+        .from("profiles")
+        .select("native_language")
+        .eq("id", loadedRow.user_id)
+        .maybeSingle();
+
+      if (ownerProfileError) {
+        console.error("Error loading Reading Journal owner profile:", ownerProfileError);
+      }
+
+      const nativeLanguageBook = isNativeLanguageBook({
+        bookLanguageCode: loadedRow.books?.language_code ?? null,
+        ownerNativeLanguage: ownerProfile?.native_language ?? null,
+      });
+
+      if (!nativeLanguageBook && !featureAccess.canUseStoryNotes) {
+        const copy = getFullAccessRequiredCopy("story_notes");
+        setAccessMessage(copy.message);
         setLoading(false);
         return;
       }

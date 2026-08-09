@@ -17,6 +17,22 @@ export function isEnglishLanguage(value: string | null | undefined) {
   return normalizeLanguageCode(value) === "en";
 }
 
+export function isNativeLanguageBook({
+  bookLanguageCode,
+  ownerNativeLanguage,
+}: {
+  bookLanguageCode: string | null | undefined;
+  ownerNativeLanguage: string | null | undefined;
+}) {
+  const normalizedBookLanguage = normalizeLanguageCode(bookLanguageCode);
+  const normalizedNativeLanguage = normalizeLanguageCode(ownerNativeLanguage);
+  return Boolean(
+    normalizedBookLanguage &&
+      normalizedNativeLanguage &&
+      normalizedBookLanguage === normalizedNativeLanguage
+  );
+}
+
 export function isEnglishNativeTrackerBook({
   bookLanguageCode,
   ownerNativeLanguage,
@@ -24,10 +40,10 @@ export function isEnglishNativeTrackerBook({
   bookLanguageCode: string | null | undefined;
   ownerNativeLanguage: string | null | undefined;
 }) {
-  return isEnglishLanguage(bookLanguageCode) && isEnglishLanguage(ownerNativeLanguage);
+  return isNativeLanguageBook({ bookLanguageCode, ownerNativeLanguage });
 }
 
-export async function getEnglishNativeTrackerBookMode({
+export async function getNativeLanguageBookMode({
   supabase,
   userBookId,
 }: {
@@ -51,6 +67,7 @@ export async function getEnglishNativeTrackerBookMode({
   if (userBookError || !userBook) {
     return {
       isEnglishNativeTrackerBook: false,
+      isNativeLanguageBook: false,
       error: userBookError ?? null,
       ownerUserId: null,
       bookLanguageCode: null,
@@ -62,9 +79,10 @@ export async function getEnglishNativeTrackerBookMode({
   const book = Array.isArray(userBook.books) ? userBook.books[0] : userBook.books;
   const bookLanguageCode = book?.language_code ?? null;
 
-  if (!ownerUserId || !isEnglishLanguage(bookLanguageCode)) {
+  if (!ownerUserId || !normalizeLanguageCode(bookLanguageCode)) {
     return {
       isEnglishNativeTrackerBook: false,
+      isNativeLanguageBook: false,
       error: null,
       ownerUserId,
       bookLanguageCode,
@@ -80,7 +98,12 @@ export async function getEnglishNativeTrackerBookMode({
 
   return {
     isEnglishNativeTrackerBook: !ownerProfileError &&
-      isEnglishNativeTrackerBook({
+      isNativeLanguageBook({
+        bookLanguageCode,
+        ownerNativeLanguage: ownerProfile?.native_language ?? null,
+      }),
+    isNativeLanguageBook: !ownerProfileError &&
+      isNativeLanguageBook({
         bookLanguageCode,
         ownerNativeLanguage: ownerProfile?.native_language ?? null,
       }),
@@ -89,4 +112,14 @@ export async function getEnglishNativeTrackerBookMode({
     bookLanguageCode,
     ownerNativeLanguage: ownerProfile?.native_language ?? null,
   };
+}
+
+export async function getEnglishNativeTrackerBookMode({
+  supabase,
+  userBookId,
+}: {
+  supabase: any;
+  userBookId: string;
+}) {
+  return getNativeLanguageBookMode({ supabase, userBookId });
 }

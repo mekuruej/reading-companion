@@ -30,7 +30,7 @@ export default function ReadingHabitsMetricGrid({
       />
 
       <StatCard
-        label="Reading Sessions"
+        label="Reading History"
         value={readingSessions}
         hint="Fluid + curiosity sessions"
         tone={tone.statTwo}

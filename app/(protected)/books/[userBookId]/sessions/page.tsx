@@ -173,7 +173,7 @@ export default function ReadingSessionsPage() {
       if (cancelled) return;
 
       if (authError || !user || !userBookId) {
-        setAccessMessage("Please sign in to view reading sessions.");
+        setAccessMessage("Please sign in to view Reading History.");
         setLoading(false);
         return;
       }
@@ -508,7 +508,7 @@ export default function ReadingSessionsPage() {
     return (
       <main className="min-h-screen bg-stone-50 px-6 py-10">
         <div className="mx-auto max-w-5xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm font-semibold text-stone-600">Loading reading sessions...</p>
+          <p className="text-sm font-semibold text-stone-600">Loading Reading History...</p>
         </div>
       </main>
     );
@@ -517,7 +517,7 @@ export default function ReadingSessionsPage() {
   if (!row) {
     return (
       <AccessDeniedMessage
-        message={accessMessage || "You do not have access to these reading sessions."}
+        message={accessMessage || "You do not have access to this Reading History."}
         backHref={userBookId ? `/books/${userBookId}` : "/books"}
         backLabel="Back to Book Hub"
       />
@@ -536,7 +536,7 @@ export default function ReadingSessionsPage() {
 
         <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
-            Reading Sessions
+            Reading History
           </p>
           <h1 className="mt-1 text-3xl font-black text-stone-950">
             {book?.title ?? "Untitled book"}
@@ -758,7 +758,7 @@ export default function ReadingSessionsPage() {
         </section>
 
         <section className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          <div className="mb-3 text-sm font-semibold text-stone-900">Reading Session History</div>
+          <div className="mb-3 text-sm font-semibold text-stone-900">Reading History</div>
 
           {realSessions.length === 0 ? (
             <p className="text-sm text-stone-500">No sessions yet.</p>

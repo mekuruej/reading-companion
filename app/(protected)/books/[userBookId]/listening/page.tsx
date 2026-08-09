@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
@@ -22,6 +22,7 @@ function isSuperTeacherFlag(value: unknown) {
 
 export default function ListeningPage() {
   const params = useParams<{ userBookId: string }>();
+  const router = useRouter();
   const userBookId = params.userBookId;
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [canSaveWordsWhileListening, setCanSaveWordsWhileListening] = useState(false);
@@ -84,6 +85,11 @@ export default function ListeningPage() {
       const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
 
       if (cancelled) return;
+
+      if (trackerMode.isEnglishNativeTrackerBook) {
+        router.replace(`/books/${encodeURIComponent(userBookId)}/just-reading`);
+        return;
+      }
 
       const profileResult = await supabase
         .from("profiles")
@@ -162,7 +168,7 @@ export default function ListeningPage() {
     return () => {
       cancelled = true;
     };
-  }, [userBookId]);
+  }, [router, userBookId]);
 
   useEffect(() => {
     if (!canUseReadingJournal && viewMode === "workspace") {
@@ -194,7 +200,7 @@ export default function ListeningPage() {
       title="Listening Timer"
       subtitle="Timer-only listening"
       description="Listen to this book or audiobook without word capture. Let the timer keep you company and log your listening time."
-      saveSuccessMessage="Your listening session has been saved in Reading Sessions."
+      saveSuccessMessage="Your listening session has been saved in Reading History."
       startLocationLabel="Start page optional"
       endLocationLabel="End page optional"
       sessionLocationNote="Progress is optional. If you leave it blank, only listening time will be saved."

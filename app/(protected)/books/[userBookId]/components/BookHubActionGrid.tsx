@@ -20,7 +20,6 @@ type BookHubActionGridProps = {
     onFluidReadingExtensive: () => void;
     onFluidReadingJustReading: () => void;
     onListening: () => void;
-    onAboutBook: () => void;
     onStudyFlashcards: () => void;
     onVocabularyList: () => void;
     onBulkAdd?: () => void;
@@ -138,7 +137,6 @@ export default function BookHubActionGrid({
     onFluidReadingExtensive,
     onFluidReadingJustReading,
     onListening,
-    onAboutBook,
     onStudyFlashcards,
     onVocabularyList,
     onBulkAdd,
@@ -152,39 +150,23 @@ export default function BookHubActionGrid({
             <div className="pb-2">
                 <div className="mt-6 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(25%-0.375rem)]">
                     <ActionButton
-                        title="Just Reading"
+                        title="Reading Timer"
                         subtitle="Reading Timer"
-                        description={["Fluid Reading: read without support", "or lookups, and log your time."]}
+                        description={["Read normally and log", "your time and page progress."]}
                         className="bg-emerald-50 hover:bg-emerald-100"
                         onClick={onFluidReadingJustReading}
                         size="secondary"
                     />
 
-                    <ActionButton
-                        title="Listening"
-                        description={["Listen to this book", "and log listening time."]}
-                        className="bg-sky-50 hover:bg-sky-100"
-                        onClick={onListening}
-                        size="secondary"
-                    />
-
                     {onReadingSessions ? (
                         <ActionButton
-                            title="Reading Sessions"
+                            title="Reading History"
                             description="Edit session records, dates, and reading history for this book."
                             className="bg-emerald-50 hover:bg-emerald-100"
                             onClick={onReadingSessions}
                             size="secondary"
                         />
                     ) : null}
-
-                    <ActionButton
-                        title="About This Book"
-                        description="See the author, publisher, format, level, and book details."
-                        className="bg-sky-50 hover:bg-sky-100"
-                        onClick={onAboutBook}
-                        size="secondary"
-                    />
                 </div>
 
                 <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(33.333%-0.375rem)]">
@@ -200,7 +182,7 @@ export default function BookHubActionGrid({
                     {canUseStoryNotes && onStoryNotes ? (
                         <ActionButton
                             title="Reading Journal"
-                            description="Track detective notes, characters, plot, setting, cultural details, and quotes."
+                            description="Track characters, plot, quotes, settings, and cultural notes."
                             className="bg-sky-50 hover:bg-sky-100"
                             onClick={onStoryNotes}
                         />
@@ -237,13 +219,6 @@ export default function BookHubActionGrid({
                         description={["Listen to the audiobook", "and log your listening time."]}
                         className="bg-violet-50 hover:bg-violet-100"
                         onClick={onListening}
-                    />
-
-                    <ActionButton
-                        title="About This Book"
-                        description="See the author, publisher, format, level, and book details."
-                        className="bg-violet-50 hover:bg-violet-100"
-                        onClick={onAboutBook}
                     />
 
                     {hasSavedWords ? (
@@ -316,21 +291,13 @@ export default function BookHubActionGrid({
 
                     {onReadingSessions ? (
                         <ActionButton
-                            title="Reading Sessions"
+                            title="Reading History"
                             description="Edit session records, dates, and reading history for this book."
                             className="bg-emerald-50 hover:bg-emerald-100"
                             onClick={onReadingSessions}
                             size="secondary"
                         />
                     ) : null}
-
-                    <ActionButton
-                        title="About This Book"
-                        description="See the author, publisher, format, level, and book details."
-                        className="bg-sky-50 hover:bg-sky-100"
-                        onClick={onAboutBook}
-                        size="secondary"
-                    />
                 </div>
             </div>
         );
@@ -412,16 +379,9 @@ export default function BookHubActionGrid({
             </div>
 
             <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(25%-0.375rem)] xl:[&>button]:w-[calc(20%-0.4rem)]">
-                <ActionButton
-                    title="About This Book"
-                    description="See the author, publisher, format, level, and book details."
-                    className="bg-yellow-50 hover:bg-yellow-100"
-                    onClick={onAboutBook}
-                />
-
                 {onReadingSessions ? (
                     <ActionButton
-                        title="Reading Sessions"
+                        title="Reading History"
                         description="Edit session records, dates, and reading history for this book."
                         className="bg-orange-50 hover:bg-orange-100"
                         onClick={onReadingSessions}

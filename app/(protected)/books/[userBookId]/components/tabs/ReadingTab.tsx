@@ -470,7 +470,7 @@ export default function ReadingTab({
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-stone-900">Reading Sessions</div>
+          <div className="text-sm font-semibold text-stone-900">Reading History</div>
           {onOpenListeningSession ? (
             <button
               type="button"

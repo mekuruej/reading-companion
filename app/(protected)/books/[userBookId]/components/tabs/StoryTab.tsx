@@ -747,7 +747,6 @@ export default function StoryTab({
 
       {storyTab === "setting" && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          {/* Setting notes currently preserve the existing local-only behavior. */}
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-stone-900">Setting</div>
 
@@ -851,7 +850,7 @@ export default function StoryTab({
                               disabled={isSaving}
                               className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                             >
-                              {isSaving ? "Updating..." : isSaved ? "Updated for this session" : "Update"}
+                              {isSaving ? "Saving..." : isSaved ? "Saved" : "Save"}
                             </button>
 
                             <button
@@ -885,7 +884,6 @@ export default function StoryTab({
 
       {storyTab === "cultural" && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          {/* Cultural notes currently preserve the existing local-only behavior. */}
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-stone-900">Cultural</div>
 
@@ -989,7 +987,7 @@ export default function StoryTab({
                               disabled={isSaving}
                               className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                             >
-                              {isSaving ? "Updating..." : isSaved ? "Updated for this session" : "Update"}
+                              {isSaving ? "Saving..." : isSaved ? "Saved" : "Save"}
                             </button>
 
                             <button

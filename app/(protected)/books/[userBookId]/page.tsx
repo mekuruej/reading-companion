@@ -663,7 +663,7 @@ function FullAccessBookHubTabPanel({
       <p className="mt-3 text-sm leading-6 text-stone-600">{message}</p>
 
       <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 text-stone-600">
-        You can still use this Book Hub for Book Info, Reading Sessions, and
+        You can still use this Book Hub for Book Info, Reading History, and
         Reading Reflection.
       </div>
     </div>
@@ -1045,7 +1045,12 @@ export default function BookHubPage() {
   });
   const isOwnBookHub = !!row?.user_id && !!userId && row.user_id === userId;
   const canUseMyReviewNotes =
-    (isOwnBookHub && (hasFullLearningAccess || isTrialLearningAccess || isTeacherContext || isAdmin)) ||
+    (isOwnBookHub &&
+      (isEnglishNativeTrackerBook ||
+        hasFullLearningAccess ||
+        isTrialLearningAccess ||
+        isTeacherContext ||
+        isAdmin)) ||
     isSuperTeacher ||
     isAdmin;
   const canCompleteReadingReflection = !!finishedAt && !dnfAt && !isEnglishNativeTrackerBook;
@@ -3439,7 +3444,7 @@ export default function BookHubPage() {
     setTimerSaveMessage(
       editingReadingSessionId
         ? "Your session has been updated."
-        : "Your session has been saved in Reading Sessions."
+        : "Your session has been saved in Reading History."
     );
     setTimeout(() => setTimerSaveMessage(""), 4000);
 
@@ -5353,6 +5358,10 @@ export default function BookHubPage() {
                 isViewingStudentBookHub={isViewingStudentBookHub}
                 canOpenTeacherSnapshot={canOpenTeacherSnapshot}
                 teacherSnapshotHref={`/books/${userBookId}/teacher-snapshot`}
+                onAboutBook={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/about`);
+                }}
               />
 
               <BookHubStatusPanel
@@ -5398,6 +5407,7 @@ export default function BookHubPage() {
                 lastChapterLabel={bookHubLastChapterLabel}
                 lastPageLabel={bookHubLastPageLabel}
                 daysEngagedLabel={bookHubDaysEngagedLabel}
+                daysEngagedCaption={isEnglishNativeTrackerBook ? "Reading dates" : undefined}
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
                 showVocabularyStats={!isEnglishNativeTrackerBook}
@@ -5415,9 +5425,9 @@ export default function BookHubPage() {
                         <span className="block">native language.</span>
                       </h2>
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700 sm:text-base">
-                        MEKURU keeps this Book Hub focused on reading time, listening time, sessions,
-                        stats, Reading Journal, and your private review. Language-learning actions are
-                        hidden here, and Reading Reflection will not appear for native-language books.
+                        MEKURU keeps this Book Hub focused on current progress, reading time,
+                        Reading History, pace stats, Reading Journal, and your private review.
+                        Language-learning actions stay hidden here.
                       </p>
                     </div>
 
@@ -5444,7 +5454,7 @@ export default function BookHubPage() {
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
                 canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
-                canUseStoryNotes={canUseStoryNotes}
+                canUseStoryNotes={isEnglishNativeTrackerBook || canUseStoryNotes}
                 hasSavedWords={(uniqueLookupCount ?? 0) > 0}
                 isEnglishNativeTrackerBook={isEnglishNativeTrackerBook}
                 showReflectionPrompt={showBookHubReflectionPrompt}
@@ -5463,10 +5473,6 @@ export default function BookHubPage() {
                 onListening={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/listening`);
-                }}
-                onAboutBook={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/about`);
                 }}
                 onStudyFlashcards={() => {
                   if (!confirmLeaveIfTimerActive()) return;

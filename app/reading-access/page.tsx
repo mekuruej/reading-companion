@@ -9,7 +9,7 @@ const readingAccessFeatures = [
   "Use Follow-Along supported reading",
   "Use Curiosity Reading / Save Words",
   "View vocabulary lists",
-  "View reading sessions",
+  "View Reading History",
   "See book stats",
   "Keep using personal reading tools after trial",
 ];
