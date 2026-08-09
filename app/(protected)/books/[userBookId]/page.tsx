@@ -5499,11 +5499,11 @@ export default function BookHubPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
-                      {canCompleteReadingReflection
-                        ? "Tell future-you and future readers what this book was like."
-                        : "After the book is marked finished, the reflection will appear here."}
-                    </div>
+	                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
+	                      {canCompleteReadingReflection
+	                        ? "Give future readers quick advice about this book."
+	                        : "After the book is marked finished, the reflection will appear here."}
+	                    </div>
                   </div>
 
                   {canCompleteReadingReflection ? (

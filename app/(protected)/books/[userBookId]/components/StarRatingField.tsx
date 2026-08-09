@@ -50,16 +50,17 @@ export default function StarRatingField({
 
   return (
     <div className={editing ? "rounded border bg-white p-3 text-sm" : "rounded-xl bg-emerald-50 p-3 text-sm"}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-stone-600">{label}</div>
-        {!editing && value ? (
+	      <div className="flex items-center justify-between gap-2">
+	        <div className="text-stone-600">{label}</div>
+	        {!editing && value ? (
           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-800">
             Saved
           </span>
-        ) : null}
-      </div>
+	        ) : null}
+	      </div>
+	      <div className="mt-1 text-xs text-stone-500">1 = hated it · 5 = loved it</div>
 
-      {!editing ? (
+	      {!editing ? (
         <>
           <div className="mt-1 font-medium">
             {value ? `${formatRating(value)}/5` : "—"}

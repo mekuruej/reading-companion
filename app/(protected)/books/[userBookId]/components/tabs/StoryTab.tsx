@@ -1132,9 +1132,10 @@ export default function StoryTab({
             </button>
           </div>
 
-          <div>
-            <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+	          <div>
+	            <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
+	            <p className="mt-1 text-xs text-stone-500">1 = hated it · 5 = loved it</p>
+	            <div className="mt-2 flex flex-wrap gap-2">
               {SIMPLE_RATING_VALUES.map((value) => (
                 <button
                   key={value}

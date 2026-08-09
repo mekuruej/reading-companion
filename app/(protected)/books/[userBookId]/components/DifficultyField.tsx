@@ -58,10 +58,13 @@ export default function DifficultyField({
             Saved
           </span>
         ) : null}
-      </div>
-      <div className="mt-1 text-xs text-stone-500">1 = easiest · 5 = hardest</div>
+	      </div>
+	      <div className="mt-1 text-xs text-stone-500">1 = easiest · 5 = hardest</div>
+	      <div className="mt-1 text-xs text-stone-500">
+	        Rate it compared with other books in this book type, not all book types.
+	      </div>
 
-      {!editing ? (
+	      {!editing ? (
         <>
           <div className="mt-2 font-medium">
             {value ? `${formatRating(value)}/5` : "—"}
@@ -87,9 +90,9 @@ export default function DifficultyField({
         </>
       ) : (
         <div className="mt-3 space-y-2">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-stone-700">
-            Thinking of this as {promptLabel}, how difficult was it for you?
-          </div>
+	          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-stone-700">
+	            Thinking of this as {promptLabel}, how difficult was it for you?
+	          </div>
 
           <div className="flex flex-wrap gap-2">
             {DIFFICULTY_OPTIONS.map((option) => {

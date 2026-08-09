@@ -337,10 +337,11 @@ export default function ReviewNotesPage() {
         </section>
 
         <section className="space-y-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-          {isEnglishNativeTrackerBook ? (
-            <div>
-              <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
-              <div className="mt-2 flex flex-wrap gap-2">
+	          {isEnglishNativeTrackerBook ? (
+	            <div>
+	              <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
+	              <p className="mt-1 text-xs text-stone-500">1 = hated it · 5 = loved it</p>
+	              <div className="mt-2 flex flex-wrap gap-2">
                 {REVIEW_RATING_VALUES.map((value) => (
                   <button
                     key={value}
