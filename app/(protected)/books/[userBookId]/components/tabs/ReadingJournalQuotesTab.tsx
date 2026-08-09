@@ -1,19 +1,20 @@
+import {
+  normalizeSavedQuote,
+  type FavoriteQuoteInput,
+} from "./quoteLocationHelpers";
+
 type ReadingJournalQuotesTabProps = {
-  favoriteQuoteInputs: string[];
+  favoriteQuoteInputs: FavoriteQuoteInput[];
   quoteSearch: string;
   setQuoteSearch: (value: string) => void;
-  savedFavoriteQuotes: string[];
+  savedFavoriteQuotes: FavoriteQuoteInput[];
   savingQuotes: boolean;
   quotesSaveMessage: string;
   addFavoriteQuote: () => void;
-  updateFavoriteQuote: (index: number, value: string) => void;
+  updateFavoriteQuote: (index: number, field: keyof FavoriteQuoteInput, value: string) => void;
   removeFavoriteQuote: (index: number) => void;
   saveFavoriteQuotes: () => Promise<void>;
 };
-
-function normalizeSavedQuote(value: string) {
-  return value.trim().replace(/\s+/g, " ");
-}
 
 export default function ReadingJournalQuotesTab({
   favoriteQuoteInputs,
@@ -31,7 +32,13 @@ export default function ReadingJournalQuotesTab({
   const cleanQuoteSearch = quoteSearch.trim().toLowerCase();
   const visibleQuoteRows = favoriteQuoteInputs
     .map((quote, index) => ({ quote, index }))
-    .filter((item) => !cleanQuoteSearch || item.quote.toLowerCase().includes(cleanQuoteSearch));
+    .filter((item) => {
+      if (!cleanQuoteSearch) return true;
+      return [item.quote.text, item.quote.page, item.quote.percent]
+        .join(" ")
+        .toLowerCase()
+        .includes(cleanQuoteSearch);
+    });
 
   return (
     <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
@@ -101,8 +108,8 @@ export default function ReadingJournalQuotesTab({
                 ) : null}
               </div>
               <textarea
-                value={quote}
-                onChange={(event) => updateFavoriteQuote(index, event.target.value)}
+                value={quote.text}
+                onChange={(event) => updateFavoriteQuote(index, "text", event.target.value)}
                 className={[
                   "min-h-[96px] w-full rounded-xl border bg-white p-3 text-sm leading-6 outline-none focus:ring-2",
                   quoteIsSaved
@@ -111,6 +118,39 @@ export default function ReadingJournalQuotesTab({
                 ].join(" ")}
                 placeholder="Add one quote you want to remember."
               />
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+                    Page
+                  </span>
+                  <input
+                    value={quote.page}
+                    onChange={(event) => updateFavoriteQuote(index, "page", event.target.value)}
+                    inputMode="numeric"
+                    className="mt-1 w-full rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                    placeholder="123"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+                    Percent
+                  </span>
+                  <div className="mt-1 flex rounded-xl border border-amber-100 bg-white focus-within:ring-2 focus-within:ring-amber-200">
+                    <input
+                      value={quote.percent}
+                      onChange={(event) =>
+                        updateFavoriteQuote(index, "percent", event.target.value)
+                      }
+                      inputMode="decimal"
+                      className="min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2 text-sm outline-none"
+                      placeholder="45"
+                    />
+                    <span className="flex items-center px-3 text-sm font-semibold text-stone-500">
+                      %
+                    </span>
+                  </div>
+                </label>
+              </div>
             </div>
           );
         })}

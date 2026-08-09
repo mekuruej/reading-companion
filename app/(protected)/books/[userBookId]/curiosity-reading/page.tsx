@@ -254,6 +254,7 @@ export default function CuriosityReadingPage() {
                 userBookId={userBookId}
                 ownerUserId={journalOwnerUserId}
                 favoriteQuotes={favoriteQuotes}
+                bookLanguageCode={bookLanguageCode}
                 currentPageNumber={journalContext.currentPageNumber}
                 selectedChapterLabel={journalContext.selectedChapterLabel}
                 selectedChapterNumber={journalContext.selectedChapterNumber}

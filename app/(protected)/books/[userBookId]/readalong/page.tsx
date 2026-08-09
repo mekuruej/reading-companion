@@ -334,6 +334,7 @@ export default function ReadAlongPage() {
 
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
+    const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
     const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
     const [username, setUsername] = useState("");
     const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
@@ -486,6 +487,7 @@ export default function ReadAlongPage() {
             setAccessChecked(true);
             setBookTitle(book?.title ?? "");
             setBookCover(book?.cover_url ?? "");
+            setBookLanguageCode(book?.language_code ?? null);
             setFavoriteQuotes((userBook as any)?.favorite_quotes ?? null);
 
             const appAccessStatus = profile
@@ -1148,18 +1150,20 @@ export default function ReadAlongPage() {
                 console.error("Error loading user book info:", userBookError);
                 setBookTitle("");
                 setBookCover("");
+                setBookLanguageCode(null);
                 return;
             }
 
             if (!userBook) {
                 setBookTitle("");
                 setBookCover("");
+                setBookLanguageCode(null);
                 return;
             }
 
             const { data: book, error: bookError } = await supabase
                 .from("books")
-                .select("title, cover_url")
+                .select("title, cover_url, language_code")
                 .eq("id", userBook.book_id)
                 .maybeSingle();
 
@@ -1167,11 +1171,13 @@ export default function ReadAlongPage() {
                 console.error("Error loading book details:", bookError);
                 setBookTitle("");
                 setBookCover("");
+                setBookLanguageCode(null);
                 return;
             }
 
             setBookTitle(book?.title ?? "");
             setBookCover(book?.cover_url ?? "");
+            setBookLanguageCode(book?.language_code ?? null);
         }
 
         loadBookInfo();
@@ -2003,6 +2009,7 @@ export default function ReadAlongPage() {
                                 userBookId={userBookId}
                                 ownerUserId={learnerUserId}
                                 favoriteQuotes={favoriteQuotes}
+                                bookLanguageCode={bookLanguageCode}
                                 currentPageNumber={currentPageNumber}
                                 selectedChapterLabel={currentPageChapterLabel}
                                 selectedChapterNumber={currentPageChapterNumber}

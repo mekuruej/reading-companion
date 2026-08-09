@@ -35,7 +35,9 @@ export default function BookHubProgressSummary({
       <div>
         <div className="mb-3 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700 shadow-sm sm:px-5">
           <div className="font-semibold text-stone-900">Your Progress</div>
-          <div className="mt-1 text-stone-600">{progressSummaryLabel}</div>
+          {progressSummaryLabel ? (
+            <div className="mt-1 text-stone-600">{progressSummaryLabel}</div>
+          ) : null}
           {showLastDetailLine ? (
             <div className="mt-1 text-stone-600">
               {lastSavedWordLabel ? (

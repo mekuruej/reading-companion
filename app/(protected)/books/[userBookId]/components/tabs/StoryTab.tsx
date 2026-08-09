@@ -3,6 +3,7 @@
 
 import ReadingJournalDetectiveTab from "./ReadingJournalDetectiveTab";
 import ReadingJournalQuotesTab from "./ReadingJournalQuotesTab";
+import type { FavoriteQuoteInput } from "./quoteLocationHelpers";
 import type { DetectiveEntry, StoryTabMode } from "./readingJournalTypes";
 
 type Character = {
@@ -53,6 +54,7 @@ type CulturalItem = {
 type StoryTabProps = {
   storyTab: StoryTabMode;
   setStoryTab: (value: StoryTabMode) => void;
+  tabOrder: StoryTabMode[];
 
   detectiveEntries: DetectiveEntry[];
   detectiveSearch: string;
@@ -158,14 +160,14 @@ type StoryTabProps = {
   saveCulturalItem: (item: CulturalItem) => Promise<void>;
   deleteCulturalItem: (id: string) => Promise<void>;
 
-  favoriteQuoteInputs: string[];
+  favoriteQuoteInputs: FavoriteQuoteInput[];
   quoteSearch: string;
   setQuoteSearch: (value: string) => void;
-  savedFavoriteQuotes: string[];
+  savedFavoriteQuotes: FavoriteQuoteInput[];
   savingQuotes: boolean;
   quotesSaveMessage: string;
   addFavoriteQuote: () => void;
-  updateFavoriteQuote: (index: number, value: string) => void;
+  updateFavoriteQuote: (index: number, field: keyof FavoriteQuoteInput, value: string) => void;
   removeFavoriteQuote: (index: number) => void;
   saveFavoriteQuotes: () => Promise<void>;
 };
@@ -210,6 +212,7 @@ function pageNumberFromFlexibleLocation(value: string) {
 export default function StoryTab({
   storyTab,
   setStoryTab,
+  tabOrder,
 
   detectiveEntries,
   detectiveSearch,
@@ -356,28 +359,23 @@ export default function StoryTab({
         [item.title, item.details].join(" ").toLowerCase().includes(cleanCulturalSearch)
       )
     : visibleCulturalItems;
+  const tabLabels: Record<StoryTabMode, string> = {
+    characters: "Characters",
+    plot: "Plot",
+    detective: "Detective",
+    setting: "Setting",
+    cultural: "Cultural",
+    quotes: "Quotes",
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 pl-2">
-        <StorySubTab active={storyTab === "detective"} onClick={() => setStoryTab("detective")}>
-          Detective
-        </StorySubTab>
-        <StorySubTab active={storyTab === "characters"} onClick={() => setStoryTab("characters")}>
-          Characters
-        </StorySubTab>
-        <StorySubTab active={storyTab === "plot"} onClick={() => setStoryTab("plot")}>
-          Plot
-        </StorySubTab>
-        <StorySubTab active={storyTab === "setting"} onClick={() => setStoryTab("setting")}>
-          Setting
-        </StorySubTab>
-        <StorySubTab active={storyTab === "cultural"} onClick={() => setStoryTab("cultural")}>
-          Cultural
-        </StorySubTab>
-        <StorySubTab active={storyTab === "quotes"} onClick={() => setStoryTab("quotes")}>
-          Quotes
-        </StorySubTab>
+        {tabOrder.map((tab) => (
+          <StorySubTab key={tab} active={storyTab === tab} onClick={() => setStoryTab(tab)}>
+            {tabLabels[tab]}
+          </StorySubTab>
+        ))}
       </div>
 
       {storyTab === "detective" && (

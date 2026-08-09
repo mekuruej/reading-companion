@@ -215,6 +215,11 @@ const DAILY_CHECK_LEVELS = [...DAILY_CHECK_JLPT_LEVELS, "NON-JLPT"] as const;
 const ABILITY_CHECK_MIN_DUE_CARDS = 10;
 const ABILITY_CHECK_DAILY_CARD_TARGET = 10;
 const ABILITY_CHECK_OVERWHELMED_QUEUE_COUNT = 50;
+const DAILY_CHECK_COLOR_TARGETS = [
+  ["yellow", 2],
+  ["green", 4],
+  ["blue", 4],
+] as const;
 const MEANING_LANGUAGE_WARNING =
   "This is a MEANING question. Please type your answers in English.";
 
@@ -741,6 +746,41 @@ function dedupeCardsByStudyIdentity(cards: StudyCard[]) {
   });
 }
 
+function buildBalancedDailyCheckDeck(cards: StudyCard[]) {
+  const rankedCards = rankDailyCheckCards(dedupeCardsByStudyIdentity(cards));
+  const selected: StudyCard[] = [];
+  const selectedKeys = new Set<string>();
+
+  function addCard(card: StudyCard) {
+    const key = card.studyIdentityKey || card.id;
+    if (selectedKeys.has(key)) return false;
+    selected.push(card);
+    selectedKeys.add(key);
+    return true;
+  }
+
+  for (const [color, target] of DAILY_CHECK_COLOR_TARGETS) {
+    const colorCards = rankedCards.filter((card) => card.colorStatus.color === color);
+
+    for (const card of colorCards) {
+      if (selected.length >= ABILITY_CHECK_DAILY_CARD_TARGET) break;
+      const selectedColorCount = selected.filter(
+        (selectedCard) => selectedCard.colorStatus.color === color
+      ).length;
+
+      if (selectedColorCount >= target) break;
+      addCard(card);
+    }
+  }
+
+  for (const card of rankedCards) {
+    if (selected.length >= ABILITY_CHECK_DAILY_CARD_TARGET) break;
+    addCard(card);
+  }
+
+  return selected;
+}
+
 function isMissedGateLimboDue(card: StudyCard, now = new Date()) {
   if (card.colorStatus.color !== "grey") return true;
 
@@ -844,9 +884,7 @@ function buildDailyCheckDeckSource(
     ? dueCards
     : dueCards.filter((card) => !isKatakanaOnly(card.surface));
 
-  const rotatedDue = rankDailyCheckCards(dedupeCardsByStudyIdentity(sessionCards));
-
-  return rotatedDue.slice(0, ABILITY_CHECK_DAILY_CARD_TARGET);
+  return buildBalancedDailyCheckDeck(sessionCards);
 }
 
 function checkSessionSummary(deck: StudyCard[]) {

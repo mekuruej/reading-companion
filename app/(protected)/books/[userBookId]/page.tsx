@@ -1176,14 +1176,18 @@ export default function BookHubPage() {
     return visualReadingSessions[0]?.read_on ?? null;
   }, [visualReadingSessions]);
 
-  const bookHubProgressSummaryLabel = [
-    formatMinutes(totalTimedMinutes),
-    canSeeVocabularySummary
-      ? `${savedWordsProgressCount} saved word${savedWordsProgressCount === 1 ? "" : "s"}`
-      : null,
-    `Last read ${lastReadDate ?? "—"}`,
-  ]
-    .filter((item) => item && item !== "—")
+  const bookHubProgressSummaryLabel = (
+    isEnglishNativeTrackerBook
+      ? [formatMinutes(totalTimedMinutes)]
+      : [
+          formatMinutes(totalTimedMinutes),
+          canSeeVocabularySummary
+            ? `${savedWordsProgressCount} saved word${savedWordsProgressCount === 1 ? "" : "s"}`
+            : null,
+          `Last read ${lastReadDate ?? "—"}`,
+        ]
+  )
+    .filter((item) => item && item !== "—" && item !== "Last read —")
     .join(" · ");
 
 

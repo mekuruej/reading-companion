@@ -10,6 +10,13 @@ import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  emptyFavoriteQuoteInput,
+  favoriteQuoteInputsToText,
+  favoriteQuoteTextToInputs,
+  normalizeSavedQuote,
+  type FavoriteQuoteInput,
+} from "../components/tabs/quoteLocationHelpers";
 
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
 
@@ -32,26 +39,6 @@ type UserBookRow = {
   books: BookRow | null;
 };
 
-function favoriteQuoteTextToInputs(value: string | null | undefined) {
-  const text = value?.trim() ?? "";
-  if (!text) return [""];
-
-  const pieces = text.includes("\n\n")
-    ? text.split(/\n{2,}/)
-    : text.split(/\n/);
-
-  const quotes = pieces.map((piece) => piece.trim()).filter(Boolean);
-  return quotes.length > 0 ? quotes : [""];
-}
-
-function favoriteQuoteInputsToText(values: string[]) {
-  return values.map((value) => value.trim()).filter(Boolean).join("\n\n");
-}
-
-function normalizeSavedQuote(value: string) {
-  return value.trim().replace(/\s+/g, " ");
-}
-
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
@@ -66,7 +53,9 @@ export default function ReviewNotesPage() {
   const [row, setRow] = useState<UserBookRow | null>(null);
   const [notes, setNotes] = useState("");
   const [myReview, setMyReview] = useState("");
-  const [favoriteQuoteInputs, setFavoriteQuoteInputs] = useState<string[]>([""]);
+  const [favoriteQuoteInputs, setFavoriteQuoteInputs] = useState<FavoriteQuoteInput[]>([
+    emptyFavoriteQuoteInput(),
+  ]);
   const [memorableWords, setMemorableWords] = useState("");
   const [ratingOverall, setRatingOverall] = useState("");
   const [isEnglishNativeTrackerBook, setIsEnglishNativeTrackerBook] = useState(false);
@@ -291,18 +280,24 @@ export default function ReviewNotesPage() {
   }
 
   const book = row.books;
-  const updateFavoriteQuote = (index: number, value: string) => {
+  const updateFavoriteQuote = (
+    index: number,
+    field: keyof FavoriteQuoteInput,
+    value: string
+  ) => {
     setFavoriteQuoteInputs((prev) =>
-      prev.map((quote, quoteIndex) => (quoteIndex === index ? value : quote))
+      prev.map((quote, quoteIndex) =>
+        quoteIndex === index ? { ...quote, [field]: value } : quote
+      )
     );
   };
   const addFavoriteQuote = () => {
-    setFavoriteQuoteInputs((prev) => [...prev, ""]);
+    setFavoriteQuoteInputs((prev) => [...prev, emptyFavoriteQuoteInput()]);
   };
   const removeFavoriteQuote = (index: number) => {
     setFavoriteQuoteInputs((prev) => {
       const next = prev.filter((_, quoteIndex) => quoteIndex !== index);
-      return next.length > 0 ? next : [""];
+      return next.length > 0 ? next : [emptyFavoriteQuoteInput()];
     });
   };
   const savedFavoriteQuotes = favoriteQuoteTextToInputs(row.favorite_quotes)
@@ -451,8 +446,8 @@ export default function ReviewNotesPage() {
                       ) : null}
                     </div>
                     <textarea
-                      value={quote}
-                      onChange={(event) => updateFavoriteQuote(index, event.target.value)}
+                      value={quote.text}
+                      onChange={(event) => updateFavoriteQuote(index, "text", event.target.value)}
                       className={[
                         "min-h-[92px] w-full rounded-xl border bg-white p-3 text-sm leading-6 outline-none focus:ring-2",
                         quoteIsSaved
@@ -461,6 +456,41 @@ export default function ReviewNotesPage() {
                       ].join(" ")}
                       placeholder="Add one quote you want to remember."
                     />
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+                          Page
+                        </span>
+                        <input
+                          value={quote.page}
+                          onChange={(event) =>
+                            updateFavoriteQuote(index, "page", event.target.value)
+                          }
+                          inputMode="numeric"
+                          className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                          placeholder="123"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+                          Percent
+                        </span>
+                        <div className="mt-1 flex rounded-xl border border-stone-200 bg-white focus-within:ring-2 focus-within:ring-stone-300">
+                          <input
+                            value={quote.percent}
+                            onChange={(event) =>
+                              updateFavoriteQuote(index, "percent", event.target.value)
+                            }
+                            inputMode="decimal"
+                            className="min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2 text-sm outline-none"
+                            placeholder="45"
+                          />
+                          <span className="flex items-center px-3 text-sm font-semibold text-stone-500">
+                            %
+                          </span>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                   );
                 })}

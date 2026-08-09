@@ -229,6 +229,7 @@ export default function JustReadingPage() {
                                 userBookId={userBookId}
                                 ownerUserId={journalOwnerUserId}
                                 favoriteQuotes={favoriteQuotes}
+                                bookLanguageCode={bookLanguageCode}
                                 compact
                                 vocabListHref={bookLanguageCode === "en" ? undefined : `/books/${encodeURIComponent(userBookId)}/words`}
                                 onFavoriteQuotesChange={setFavoriteQuotes}

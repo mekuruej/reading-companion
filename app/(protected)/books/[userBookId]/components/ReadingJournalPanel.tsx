@@ -5,6 +5,11 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import StoryTab from "./tabs/StoryTab";
 import type { StoryTabMode } from "./tabs/readingJournalTypes";
+import {
+  emptyFavoriteQuoteInput,
+  favoriteQuoteInputsToText,
+  favoriteQuoteTextToInputs,
+} from "./tabs/quoteLocationHelpers";
 import { useDetectiveEntries } from "../story/useDetectiveEntries";
 
 type Character = {
@@ -56,6 +61,7 @@ type ReadingJournalPanelProps = {
   userBookId: string;
   ownerUserId: string;
   favoriteQuotes?: string | null;
+  bookLanguageCode?: string | null;
   currentPageNumber?: number | null;
   selectedChapterLabel?: string | null;
   selectedChapterNumber?: number | null;
@@ -63,19 +69,6 @@ type ReadingJournalPanelProps = {
   vocabListHref?: string;
   onFavoriteQuotesChange?: (value: string | null) => void;
 };
-
-function favoriteQuoteTextToInputs(value: string | null | undefined) {
-  const text = value?.trim() ?? "";
-  if (!text) return [""];
-
-  const pieces = text.includes("\n\n") ? text.split(/\n{2,}/) : text.split(/\n/);
-  const quotes = pieces.map((piece) => piece.trim()).filter(Boolean);
-  return quotes.length > 0 ? quotes : [""];
-}
-
-function favoriteQuoteInputsToText(values: string[]) {
-  return values.map((value) => value.trim()).filter(Boolean).join("\n\n");
-}
 
 const characterSelectWithFlexibleLocation =
   "id, user_book_id, name, reading, role, first_seen_location, first_seen_page_number, notes, sort_order, created_at, updated_at";
@@ -127,10 +120,29 @@ function nextChapterSummaryNumber(items: ChapterSummary[]) {
   return chapterNumbers.length > 0 ? Math.max(...chapterNumbers) + 1 : 1;
 }
 
+const targetLanguageTabOrder: StoryTabMode[] = [
+  "characters",
+  "plot",
+  "detective",
+  "setting",
+  "cultural",
+  "quotes",
+];
+
+const nativeLanguageTabOrder: StoryTabMode[] = [
+  "characters",
+  "plot",
+  "quotes",
+  "setting",
+  "cultural",
+  "detective",
+];
+
 export default function ReadingJournalPanel({
   userBookId,
   ownerUserId,
   favoriteQuotes,
+  bookLanguageCode,
   currentPageNumber,
   selectedChapterLabel,
   selectedChapterNumber,
@@ -138,7 +150,8 @@ export default function ReadingJournalPanel({
   vocabListHref,
   onFavoriteQuotesChange,
 }: ReadingJournalPanelProps) {
-  const [storyTab, setStoryTab] = useState<StoryTabMode>("detective");
+  const [storyTab, setStoryTab] = useState<StoryTabMode>("characters");
+  const tabOrder = bookLanguageCode === "en" ? nativeLanguageTabOrder : targetLanguageTabOrder;
   const detective = useDetectiveEntries();
 
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -175,7 +188,7 @@ export default function ReadingJournalPanel({
   const [savingCulturalIds, setSavingCulturalIds] = useState<string[]>([]);
   const [savedCulturalIds, setSavedCulturalIds] = useState<string[]>([]);
 
-  const [favoriteQuoteInputs, setFavoriteQuoteInputs] = useState<string[]>(() =>
+  const [favoriteQuoteInputs, setFavoriteQuoteInputs] = useState(() =>
     favoriteQuoteTextToInputs(favoriteQuotes)
   );
   const [quoteSearch, setQuoteSearch] = useState("");
@@ -639,6 +652,7 @@ export default function ReadingJournalPanel({
     <StoryTab
       storyTab={storyTab}
       setStoryTab={setStoryTab}
+      tabOrder={tabOrder}
       detectiveEntries={detective.detectiveEntries}
       detectiveSearch={detective.detectiveSearch}
       setDetectiveSearch={detective.setDetectiveSearch}
@@ -784,19 +798,21 @@ export default function ReadingJournalPanel({
       savingQuotes={savingQuotes}
       quotesSaveMessage={quotesSaveMessage}
       addFavoriteQuote={() => {
-        setFavoriteQuoteInputs((prev) => [...prev, ""]);
+        setFavoriteQuoteInputs((prev) => [...prev, emptyFavoriteQuoteInput()]);
         setQuotesSaveMessage("");
       }}
-      updateFavoriteQuote={(index, value) => {
+      updateFavoriteQuote={(index, field, value) => {
         setFavoriteQuoteInputs((prev) =>
-          prev.map((quote, quoteIndex) => (quoteIndex === index ? value : quote))
+          prev.map((quote, quoteIndex) =>
+            quoteIndex === index ? { ...quote, [field]: value } : quote
+          )
         );
         setQuotesSaveMessage("");
       }}
       removeFavoriteQuote={(index) => {
         setFavoriteQuoteInputs((prev) => {
           const next = prev.filter((_, quoteIndex) => quoteIndex !== index);
-          return next.length > 0 ? next : [""];
+          return next.length > 0 ? next : [emptyFavoriteQuoteInput()];
         });
         setQuotesSaveMessage("");
       }}
