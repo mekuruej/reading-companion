@@ -1,5 +1,8 @@
+import { displayBookTitle } from "@/lib/books/bookIdentity";
+
 type LibraryBookRowBook = {
   title: string;
+  language_code?: string | null;
   cover_url: string | null;
 };
 
@@ -25,6 +28,7 @@ export default function LibraryBookRow({
 }: LibraryBookRowProps) {
   const book = row.books;
   if (!book) return null;
+  const displayTitle = displayBookTitle(book);
 
   return (
     <li
@@ -43,7 +47,7 @@ export default function LibraryBookRow({
 
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-stone-900">
-          {book.title}
+          {displayTitle}
         </div>
         <div className="mt-1 text-xs text-stone-500">{status}</div>
       </div>

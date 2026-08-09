@@ -114,6 +114,7 @@ type UserBook = {
   format_type: string | null;
   progress_mode: string | null;
   show_page_numbers: boolean | null;
+  current_location: string | null;
   is_teacher_prep?: boolean | null;
   teacher_prep_kind?: string | null;
   prepared_by?: string | null;
@@ -583,6 +584,14 @@ function parseListeningProgressInput(value: string) {
   };
 }
 
+function percentFromProgressLocation(value: string | null | undefined) {
+  const match = value?.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.min(100, Math.round(parsed)));
+}
+
 function parseChapterSummaryNumber(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -1043,6 +1052,9 @@ export default function BookHubPage() {
     bookLanguageCode: book?.language_code ?? null,
     ownerNativeLanguage: bookHubOwnerNativeLanguage,
   });
+  const isNativeAudiobook =
+    isEnglishNativeTrackerBook &&
+    (row?.format_type === "audiobook" || book?.edition_format === "audiobook");
   const isOwnBookHub = !!row?.user_id && !!userId && row.user_id === userId;
   const canUseMyReviewNotes =
     (isOwnBookHub &&
@@ -1132,10 +1144,11 @@ export default function BookHubPage() {
   }, [finished, book?.page_count, coverageReadingSessions.length, furthestTrackedPage]);
 
   const progressPercent = useMemo(() => {
+    if (isNativeAudiobook) return percentFromProgressLocation(row?.current_location);
     if (finished) return 100;
     if (!book?.page_count || !furthestPage) return null;
     return Math.min(100, Math.round((furthestPage / book.page_count) * 100));
-  }, [book?.page_count, furthestPage, finished]);
+  }, [book?.page_count, furthestPage, finished, isNativeAudiobook, row?.current_location]);
 
   const savedWordsProgressCount =
     canSeeVocabularySummary && uniqueLookupCount != null ? uniqueLookupCount : 0;
@@ -1146,13 +1159,19 @@ export default function BookHubPage() {
       : "";
 
   const currentProgressPage = furthestPage ?? (finished && book?.page_count ? book.page_count : null);
-  const bookHubProgressLabel = currentProgressPage != null
-    ? book?.page_count
-      ? `${currentProgressPage} / ${book.page_count}`
-      : `Page ${currentProgressPage}`
-    : started
-      ? "In progress"
-      : "Not started";
+  const bookHubProgressLabel = isNativeAudiobook
+    ? row?.current_location?.trim()
+      ? `Listening: ${row.current_location.trim()}`
+      : started
+        ? "Listening in progress"
+        : "Not started"
+    : currentProgressPage != null
+      ? book?.page_count
+        ? `${currentProgressPage} / ${book.page_count}`
+        : `Page ${currentProgressPage}`
+      : started
+        ? "In progress"
+        : "Not started";
 
   const bookHubProgressBarWidth =
     progressPercent != null
@@ -1170,7 +1189,7 @@ export default function BookHubPage() {
     canSeeVocabularySummary && lastSavedChapter.trim() ? lastSavedChapter.trim() : "";
   const bookHubLastPage = furthestPage ?? (canSeeVocabularySummary ? lastSavedWordPage : null);
   const bookHubLastPageLabel =
-    bookHubLastPage != null ? `Page ${bookHubLastPage}` : "";
+    isNativeAudiobook ? "" : bookHubLastPage != null ? `Page ${bookHubLastPage}` : "";
 
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
   const savedWordsPerPage =
@@ -1191,7 +1210,9 @@ export default function BookHubPage() {
   }, [visualReadingSessions]);
 
   const bookHubProgressSummaryLabel = (
-    isEnglishNativeTrackerBook
+    isNativeAudiobook
+      ? [row?.current_location?.trim() ? `Listening progress ${row.current_location.trim()}` : null]
+      : isEnglishNativeTrackerBook
       ? [formatMinutes(totalTimedMinutes)]
       : [
           formatMinutes(totalTimedMinutes),
@@ -3627,6 +3648,7 @@ export default function BookHubPage() {
         format_type,
         progress_mode,
         show_page_numbers,
+        current_location,
         is_teacher_prep,
         teacher_prep_kind,
         prepared_by,
@@ -5297,15 +5319,6 @@ export default function BookHubPage() {
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   const showBookHubFinishDnfButtons = !finishedAt && !dnfAt;
-  const hasReadingReflection =
-    !!myReview.trim() ||
-    !!readerAdvice.trim() ||
-    !!ratingOverall.trim() ||
-    !!ratingDifficulty.trim() ||
-    !!favoriteQuotes.trim() ||
-    !!memorableWords.trim();
-  const showBookHubReflectionPrompt = canCompleteReadingReflection && !hasReadingReflection;
-
   return (
     <main className="min-h-screen bg-stone-50 p-6">
       {showBookFlagModal ? (
@@ -5375,6 +5388,8 @@ export default function BookHubPage() {
                 showStartButton={showBookHubStartButton}
                 showFinishDnfButtons={showBookHubFinishDnfButtons}
                 showReflectionLink={canCompleteReadingReflection}
+                showReviewLink={canUseMyReviewNotes}
+                reviewLinkLabel={isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review"}
                 shouldNudgeStartBook={shouldNudgeStartBook}
                 shouldNudgeFinishBook={shouldNudgeFinishBook}
                 canFillBeginningPages={canFillBeginningPages}
@@ -5385,6 +5400,10 @@ export default function BookHubPage() {
                 onStartToday={() => void markStartedToday()}
                 onMarkFinished={() => void markFinishedToday()}
                 onMarkDnf={() => void markDnfToday()}
+                onOpenReview={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/review`);
+                }}
                 onOpenReflection={openReadingReflection}
                 onFillBeginningPages={fillBeginningPages}
                 onFillEndingPages={fillEndingPages}
@@ -5432,7 +5451,7 @@ export default function BookHubPage() {
                     </div>
 
                     <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
-                      Use Reading Journal for story details and Review & Notes for your private response.
+                      Use Reading Journal for story details and Review & Ratings for your private response.
                     </div>
                   </div>
                 </section>
@@ -5457,7 +5476,7 @@ export default function BookHubPage() {
                 canUseStoryNotes={isEnglishNativeTrackerBook || canUseStoryNotes}
                 hasSavedWords={(uniqueLookupCount ?? 0) > 0}
                 isEnglishNativeTrackerBook={isEnglishNativeTrackerBook}
-                showReflectionPrompt={showBookHubReflectionPrompt}
+                isNativeAudiobook={isNativeAudiobook}
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/curiosity-reading`);
@@ -5498,10 +5517,6 @@ export default function BookHubPage() {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/stats`);
                 }}
-                onReadingReflection={canUseMyReviewNotes ? () => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/review`);
-                } : undefined}
               />
 
               {!isEnglishNativeTrackerBook && (!isTrialLearningAccess || canCompleteReadingReflection) ? (

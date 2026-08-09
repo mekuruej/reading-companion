@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { supabase } from "@/lib/supabaseClient";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 
@@ -15,6 +16,9 @@ type BookRow = {
   title: string | null;
   title_reading: string | null;
   author: string | null;
+  author_english_name: string | null;
+  author_reading: string | null;
+  language_code: string | null;
   cover_url: string | null;
   page_count: number | null;
 };
@@ -208,6 +212,9 @@ export default function ReadingSessionsPage() {
             title,
             title_reading,
             author,
+            author_english_name,
+            author_reading,
+            language_code,
             cover_url,
             page_count
           )
@@ -523,6 +530,7 @@ export default function ReadingSessionsPage() {
       />
     );
   }
+  const bookIdentity = getBookIdentity(book);
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -539,10 +547,10 @@ export default function ReadingSessionsPage() {
             Reading History
           </p>
           <h1 className="mt-1 text-3xl font-black text-stone-950">
-            {book?.title ?? "Untitled book"}
+            {bookIdentity.title}
           </h1>
-          {book?.author ? (
-            <p className="mt-1 text-sm font-semibold text-stone-600">{book.author}</p>
+          {bookIdentity.author ? (
+            <p className="mt-1 text-sm font-semibold text-stone-600">{bookIdentity.author}</p>
           ) : null}
         </section>
 

@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { getBookIdentity } from "@/lib/books/bookIdentity";
 
 type BookHubHeroBook = {
   title: string;
   title_reading: string | null;
   author: string | null;
+  author_english_name?: string | null;
   author_reading: string | null;
   cover_url: string | null;
+  language_code?: string | null;
 };
 
 type BookHubHeroProps = {
@@ -27,13 +30,15 @@ export default function BookHubHero({
   teacherSnapshotHref,
   onAboutBook,
 }: BookHubHeroProps) {
+  const bookIdentity = getBookIdentity(book);
+
   return (
     <>
       <div className="w-[140px] shrink-0 md:w-[150px]">
         {displayedCoverUrl ? (
           <img
             src={displayedCoverUrl}
-            alt={`${book.title} cover`}
+            alt={`${bookIdentity.title} cover`}
             className="w-full rounded-2xl border border-stone-200 object-cover shadow-sm"
           />
         ) : (
@@ -57,25 +62,25 @@ export default function BookHubHero({
         <div className="space-y-3">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
-              {book.title}
+              {bookIdentity.title}
             </h1>
 
-            {book.title_reading ? (
+            {bookIdentity.titleReading ? (
               <div className="mt-1 text-sm font-medium text-stone-500">
-                {book.title_reading}
+                {bookIdentity.titleReading}
               </div>
             ) : null}
           </div>
 
-          {book.author ? (
+          {bookIdentity.author ? (
             <div>
               <div className="text-xl font-semibold text-stone-900 md:text-2xl">
-                {book.author}
+                {bookIdentity.author}
               </div>
 
-              {book.author_reading ? (
+              {bookIdentity.authorReading ? (
                 <div className="mt-1 text-sm font-medium text-stone-500">
-                  {book.author_reading}
+                  {bookIdentity.authorReading}
                 </div>
               ) : null}
             </div>

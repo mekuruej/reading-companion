@@ -4,11 +4,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { displayBookTitle } from "@/lib/books/bookIdentity";
 import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
+import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
@@ -16,13 +20,135 @@ import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperi
 type ListeningViewMode = "listening" | "workspace";
 type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
 
+type ListeningBook = {
+  title: string | null;
+  language_code: string | null;
+  edition_format: string | null;
+  cover_url: string | null;
+};
+
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
+function isAudiobookFormat(formatType: string | null | undefined, editionFormat: string | null | undefined) {
+  return formatType === "audiobook" || editionFormat === "audiobook";
+}
+
+function NativeAudiobookProgressPanel({
+  userBookId,
+  book,
+  currentLocation,
+  startedAt,
+  onSaved,
+}: {
+  userBookId: string;
+  book: ListeningBook | null;
+  currentLocation: string;
+  startedAt: string | null;
+  onSaved: (nextLocation: string, nextStartedAt: string | null) => void;
+}) {
+  const [location, setLocation] = useState(currentLocation);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const bookTitle = displayBookTitle(book);
+
+  async function saveProgress() {
+    const nextLocation = location.trim();
+    if (!nextLocation) {
+      setMessage("Add a timestamp, chapter, or percent before saving.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    const nextStartedAt = startedAt || todayYmdAppTimeZone();
+    const { error } = await supabase
+      .from("user_books")
+      .update({
+        current_location: nextLocation,
+        status: "reading",
+        started_at: nextStartedAt,
+      })
+      .eq("id", userBookId);
+
+    setSaving(false);
+
+    if (error) {
+      console.error("Error saving native audiobook progress:", error);
+      setMessage("Could not save listening progress.");
+      return;
+    }
+
+    onSaved(nextLocation, nextStartedAt);
+    setMessage("Listening progress saved.");
+  }
+
+  return (
+    <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+      <Link
+        href={`/books/${encodeURIComponent(userBookId)}`}
+        className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+      >
+        &larr; Back to Book Hub
+      </Link>
+
+      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center">
+        {book?.cover_url ? (
+          <img
+            src={book.cover_url}
+            alt={`${bookTitle} cover`}
+            className="h-32 w-24 shrink-0 rounded-2xl border border-stone-200 object-cover shadow-sm"
+          />
+        ) : null}
+
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
+            Update Listening Progress
+          </p>
+          <h1 className="mt-2 text-3xl font-black text-stone-950">{bookTitle}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
+            Save where you are in the audiobook without starting a timer or adding to reading pace.
+          </p>
+        </div>
+      </div>
+
+      <label className="mt-6 block">
+        <span className="text-sm font-semibold text-stone-900">Listening progress</span>
+        <input
+          value={location}
+          onChange={(event) => setLocation(event.target.value)}
+          placeholder="e.g. 37%, chapter 8, or 3:12:45"
+          className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+        />
+      </label>
+
+      {currentLocation ? (
+        <p className="mt-2 text-sm text-stone-500">
+          Current saved progress: <span className="font-semibold text-stone-700">{currentLocation}</span>
+        </p>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void saveProgress()}
+          disabled={saving}
+          className="rounded-2xl bg-stone-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Listening Progress"}
+        </button>
+        {message ? (
+          <span className="text-sm font-semibold text-stone-600">{message}</span>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export default function ListeningPage() {
   const params = useParams<{ userBookId: string }>();
-  const router = useRouter();
   const userBookId = params.userBookId;
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [canSaveWordsWhileListening, setCanSaveWordsWhileListening] = useState(false);
@@ -30,6 +156,11 @@ export default function ListeningPage() {
   const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
   const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
   const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+  const [book, setBook] = useState<ListeningBook | null>(null);
+  const [currentLocation, setCurrentLocation] = useState("");
+  const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [isNativeAudiobook, setIsNativeAudiobook] = useState(false);
+  const [accessMessage, setAccessMessage] = useState("");
   const [viewMode, setViewMode] = useState<ListeningViewMode>("listening");
 
   useEffect(() => {
@@ -44,6 +175,7 @@ export default function ListeningPage() {
       if (cancelled) return;
 
       if (userError || !user || !userBookId) {
+        setAccessMessage("Please sign in to use listening progress.");
         setCheckingAccess(false);
         return;
       }
@@ -55,8 +187,14 @@ export default function ListeningPage() {
           id,
           user_id,
           favorite_quotes,
+          current_location,
+          started_at,
+          format_type,
           books (
-            language_code
+            title,
+            language_code,
+            edition_format,
+            cover_url
           )
         `
         )
@@ -73,6 +211,11 @@ export default function ListeningPage() {
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
         setBookLanguageCode(null);
+        setBook(null);
+        setCurrentLocation("");
+        setStartedAt(null);
+        setIsNativeAudiobook(false);
+        setAccessMessage("You do not have access to this book.");
         setCheckingAccess(false);
         return;
       }
@@ -81,15 +224,16 @@ export default function ListeningPage() {
         ? (userBook as any).books[0]
         : (userBook as any).books;
       setBookLanguageCode(book?.language_code ?? null);
+      setBook(book ?? null);
+      setCurrentLocation((userBook as any).current_location ?? "");
+      setStartedAt((userBook as any).started_at ?? null);
 
       const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
 
       if (cancelled) return;
-
-      if (trackerMode.isEnglishNativeTrackerBook) {
-        router.replace(`/books/${encodeURIComponent(userBookId)}/just-reading`);
-        return;
-      }
+      const nativeAudiobook =
+        trackerMode.isEnglishNativeTrackerBook &&
+        isAudiobookFormat((userBook as any).format_type ?? null, book?.edition_format ?? null);
 
       const profileResult = await supabase
         .from("profiles")
@@ -149,15 +293,24 @@ export default function ListeningPage() {
         setCanSaveWordsWhileListening(
           !trackerMode.isEnglishNativeTrackerBook && featureAccess.canUseListeningWordCapture
         );
-        setCanUseReadingJournal(Boolean(canAccessBook && ownerUserId && featureAccess.canUseStoryNotes));
+        setCanUseReadingJournal(
+          Boolean(canAccessBook && ownerUserId && (trackerMode.isEnglishNativeTrackerBook || featureAccess.canUseStoryNotes))
+        );
         setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
         setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
+        setIsNativeAudiobook(Boolean(canAccessBook && nativeAudiobook));
+        setAccessMessage(canAccessBook ? "" : "You do not have access to this book.");
       } else {
         setCanSaveWordsWhileListening(false);
         setCanUseReadingJournal(false);
         setJournalOwnerUserId(null);
         setFavoriteQuotes(null);
         setBookLanguageCode(null);
+        setBook(null);
+        setCurrentLocation("");
+        setStartedAt(null);
+        setIsNativeAudiobook(false);
+        setAccessMessage("Could not verify listening access.");
       }
 
       setCheckingAccess(false);
@@ -168,7 +321,7 @@ export default function ListeningPage() {
     return () => {
       cancelled = true;
     };
-  }, [router, userBookId]);
+  }, [userBookId]);
 
   useEffect(() => {
     if (!canUseReadingJournal && viewMode === "workspace") {
@@ -186,8 +339,29 @@ export default function ListeningPage() {
     );
   }
 
+  if (accessMessage && !isNativeAudiobook && !canSaveWordsWhileListening) {
+    return (
+      <AccessDeniedMessage
+        message={accessMessage}
+        backHref={userBookId ? `/books/${encodeURIComponent(userBookId)}` : "/books"}
+        backLabel="Back to Book Hub"
+      />
+    );
+  }
+
   const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal && journalOwnerUserId;
-  const listeningExperience = canSaveWordsWhileListening ? (
+  const listeningExperience = isNativeAudiobook ? (
+    <NativeAudiobookProgressPanel
+      userBookId={userBookId}
+      book={book}
+      currentLocation={currentLocation}
+      startedAt={startedAt}
+      onSaved={(nextLocation, nextStartedAt) => {
+        setCurrentLocation(nextLocation);
+        setStartedAt(nextStartedAt);
+      }}
+    />
+  ) : canSaveWordsWhileListening ? (
     <CuriosityReadingExperience
       experienceMode="listening"
       embedded

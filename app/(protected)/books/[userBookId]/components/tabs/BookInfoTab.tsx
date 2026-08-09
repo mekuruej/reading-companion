@@ -220,6 +220,11 @@ type BookInfoTabProps = {
     setImgValue: (v: string) => void;
     readingValue: string;
     setReadingValue: (v: string) => void;
+    nameInputLabel?: string;
+    englishNameInputLabel?: string;
+    readingInputLabel?: string;
+    showEnglishName?: boolean;
+    showReading?: boolean;
   }>;
 };
 
@@ -336,6 +341,21 @@ export default function BookInfoTab({
   Detail,
   PersonRow,
 }: BookInfoTabProps) {
+  const usesEnglishBookTerminology = book.language_code === "en";
+  const personSearchPlaceholder = usesEnglishBookTerminology
+    ? "Stephen King"
+    : "宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ";
+  const translatorSearchPlaceholder = usesEnglishBookTerminology
+    ? "Ann Goldstein"
+    : "村上 春樹 / Haruki Murakami / むらかみ はるき";
+  const illustratorSearchPlaceholder = usesEnglishBookTerminology
+    ? "Quentin Blake"
+    : "安野 光雅 / Mitsumasa Anno / あんの みつまさ";
+  const publisherSearchPlaceholder = usesEnglishBookTerminology
+    ? "Penguin Random House"
+    : "講談社 / Kodansha / こうだんしゃ";
+  const personNameInputLabel = usesEnglishBookTerminology ? "Name" : undefined;
+  const publisherNameInputLabel = usesEnglishBookTerminology ? "Publisher" : undefined;
   const [authorSearch, setAuthorSearch] = useState("");
   const [authorResults, setAuthorResults] = useState<PersonRecord[]>([]);
   const [authorContributorMatches, setAuthorContributorMatches] = useState<PersonRecord[]>([]);
@@ -1112,7 +1132,7 @@ export default function BookInfoTab({
                   setSelectedAuthorId(null);
                   setAuthorSearchError(null);
                 }}
-                placeholder="宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ"
+                placeholder={personSearchPlaceholder}
                 descriptionContent={
                   <>
                     Pick an existing author when you can. If no match exists, keep the author typed
@@ -1187,13 +1207,19 @@ export default function BookInfoTab({
               />
             ) : null}
 
-            <PersonRow
-              label="Author"
-              name={isEditingPeople ? authorName : book.author}
+              <PersonRow
+                label="Author"
+              name={
+                isEditingPeople
+                  ? authorName
+                  : usesEnglishBookTerminology
+                    ? book.author_english_name || book.author
+                    : book.author
+              }
               reading={isEditingPeople ? authorReading : book.author_reading}
-              img={isEditingPeople ? authorImg : book.author_image_url}
-              editing={isEditingPeople}
-              nameValue={authorName}
+                img={isEditingPeople ? authorImg : book.author_image_url}
+                editing={isEditingPeople}
+                nameValue={authorName}
               setNameValue={(value) => {
                 setAuthorName(value);
                 setSelectedAuthorId(null);
@@ -1207,6 +1233,9 @@ export default function BookInfoTab({
               setImgValue={setAuthorImg}
               readingValue={authorReading}
               setReadingValue={setAuthorReading}
+              nameInputLabel={personNameInputLabel}
+              showEnglishName={!usesEnglishBookTerminology}
+              showReading={!usesEnglishBookTerminology}
             />
           </div>
 
@@ -1221,7 +1250,7 @@ export default function BookInfoTab({
                     setSelectedTranslatorId(null);
                     setTranslatorSearchError(null);
                   }}
-                  placeholder="村上 春樹 / Haruki Murakami / むらかみ はるき"
+                  placeholder={translatorSearchPlaceholder}
                   loading={translatorSearchLoading}
                   error={translatorSearchError}
                   results={translatorResults}
@@ -1239,9 +1268,15 @@ export default function BookInfoTab({
                 />
               ) : null}
 
-              <PersonRow
-                label="Translator"
-                name={isEditingPeople ? translatorName : book.translator}
+                <PersonRow
+                  label="Translator"
+                name={
+                  isEditingPeople
+                    ? translatorName
+                    : usesEnglishBookTerminology
+                      ? book.translator_english_name || book.translator
+                      : book.translator
+                }
                 reading={isEditingPeople ? translatorReading : book.translator_reading}
                 img={isEditingPeople ? translatorImg : book.translator_image_url}
                 editing={isEditingPeople}
@@ -1259,6 +1294,9 @@ export default function BookInfoTab({
                 setImgValue={setTranslatorImg}
                 readingValue={translatorReading}
                 setReadingValue={setTranslatorReading}
+                nameInputLabel={personNameInputLabel}
+                showEnglishName={!usesEnglishBookTerminology}
+                showReading={!usesEnglishBookTerminology}
               />
             </div>
           )}
@@ -1274,7 +1312,7 @@ export default function BookInfoTab({
                     setSelectedIllustratorId(null);
                     setIllustratorSearchError(null);
                   }}
-                  placeholder="安野 光雅 / Mitsumasa Anno / あんの みつまさ"
+                  placeholder={illustratorSearchPlaceholder}
                   loading={illustratorSearchLoading}
                   error={illustratorSearchError}
                   results={illustratorResults}
@@ -1292,9 +1330,15 @@ export default function BookInfoTab({
                 />
               ) : null}
 
-              <PersonRow
-                label="Illustrator"
-                name={isEditingPeople ? illustratorName : book.illustrator}
+                <PersonRow
+                  label="Illustrator"
+                name={
+                  isEditingPeople
+                    ? illustratorName
+                    : usesEnglishBookTerminology
+                      ? book.illustrator_english_name || book.illustrator
+                      : book.illustrator
+                }
                 reading={isEditingPeople ? illustratorReading : book.illustrator_reading}
                 img={isEditingPeople ? illustratorImg : book.illustrator_image_url}
                 editing={isEditingPeople}
@@ -1312,6 +1356,9 @@ export default function BookInfoTab({
                 setImgValue={setIllustratorImg}
                 readingValue={illustratorReading}
                 setReadingValue={setIllustratorReading}
+                nameInputLabel={personNameInputLabel}
+                showEnglishName={!usesEnglishBookTerminology}
+                showReading={!usesEnglishBookTerminology}
               />
             </div>
           )}
@@ -1327,7 +1374,7 @@ export default function BookInfoTab({
                     setSelectedPublisherId(null);
                     setPublisherSearchError(null);
                   }}
-                  placeholder="講談社 / Kodansha / こうだんしゃ"
+                  placeholder={publisherSearchPlaceholder}
                   loading={publisherSearchLoading}
                   error={publisherSearchError}
                   results={publisherResults}
@@ -1343,6 +1390,7 @@ export default function BookInfoTab({
                   createNewButtonLabel="Create New Publisher"
                   onCreateFromSearch={startNewPublisherFromSearch}
                   footerContent={
+                    usesEnglishBookTerminology ? null :
                     <div className="mt-3">
                       <label className="mb-1 block text-sm font-medium text-stone-700">
                         Publisher name (English)
@@ -1360,7 +1408,13 @@ export default function BookInfoTab({
 
               <PersonRow
                 label="Publisher"
-                name={isEditingPeople ? publisherName : book.publisher}
+                name={
+                  isEditingPeople
+                    ? publisherName
+                    : usesEnglishBookTerminology
+                      ? publisherEnglishName || book.publisher
+                      : book.publisher
+                }
                 reading={isEditingPeople ? publisherReading : book.publisher_reading}
                 img={isEditingPeople ? publisherImg : book.publisher_image_url}
                 editing={isEditingPeople}
@@ -1375,6 +1429,9 @@ export default function BookInfoTab({
                 setImgValue={setPublisherImg}
                 readingValue={publisherReading}
                 setReadingValue={setPublisherReading}
+                nameInputLabel={publisherNameInputLabel}
+                showEnglishName={!usesEnglishBookTerminology}
+                showReading={!usesEnglishBookTerminology}
               />
             </div>
           )}

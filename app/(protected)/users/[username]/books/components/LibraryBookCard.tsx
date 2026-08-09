@@ -1,5 +1,8 @@
+import { displayBookTitle } from "@/lib/books/bookIdentity";
+
 type LibraryBookCardBook = {
   title: string;
+  language_code?: string | null;
   cover_url: string | null;
 };
 
@@ -36,6 +39,7 @@ export default function LibraryBookCard({
 }: LibraryBookCardProps) {
   const book = row.books;
   if (!book) return null;
+  const displayTitle = displayBookTitle(book);
 
   return (
     <li className="flex flex-col items-center rounded-lg p-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-200/40">
@@ -47,7 +51,7 @@ export default function LibraryBookCard({
         {book.cover_url ? (
           <img
             src={book.cover_url}
-            alt={`${book.title} cover`}
+            alt={`${displayTitle} cover`}
             className="h-48 w-32 rounded-md object-cover shadow-md"
           />
         ) : (
@@ -62,7 +66,7 @@ export default function LibraryBookCard({
         onClick={(event) => event.stopPropagation()}
         className="mt-2 text-center text-sm font-medium underline hover:text-blue-700"
       >
-        {book.title}
+        {displayTitle}
       </a>
 
       <div className="mt-2 w-full text-center">

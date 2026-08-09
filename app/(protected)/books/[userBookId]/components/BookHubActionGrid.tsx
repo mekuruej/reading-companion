@@ -14,7 +14,7 @@ type BookHubActionGridProps = {
     canUseStoryNotes?: boolean;
     hasSavedWords: boolean;
     isEnglishNativeTrackerBook?: boolean;
-    showReflectionPrompt?: boolean;
+    isNativeAudiobook?: boolean;
 
     onCuriosityReading: () => void;
     onFluidReadingExtensive: () => void;
@@ -26,7 +26,6 @@ type BookHubActionGridProps = {
     onStoryNotes?: () => void;
     onReadingSessions?: () => void;
     onBookStats?: () => void;
-    onReadingReflection?: () => void;
 };
 
 function ActionButton({
@@ -132,7 +131,7 @@ export default function BookHubActionGrid({
     canUseStoryNotes = false,
     hasSavedWords,
     isEnglishNativeTrackerBook = false,
-    showReflectionPrompt = false,
+    isNativeAudiobook = false,
     onCuriosityReading,
     onFluidReadingExtensive,
     onFluidReadingJustReading,
@@ -143,20 +142,29 @@ export default function BookHubActionGrid({
     onStoryNotes,
     onReadingSessions,
     onBookStats,
-    onReadingReflection,
 }: BookHubActionGridProps) {
     if (isEnglishNativeTrackerBook) {
         return (
             <div className="pb-2">
                 <div className="mt-6 flex flex-wrap justify-center gap-2 text-sm [&>button]:w-full sm:[&>button]:w-[calc(50%-0.25rem)] lg:[&>button]:w-[calc(25%-0.375rem)]">
-                    <ActionButton
-                        title="Reading Timer"
-                        subtitle="Reading Timer"
-                        description={["Read normally and log", "your time and page progress."]}
-                        className="bg-emerald-50 hover:bg-emerald-100"
-                        onClick={onFluidReadingJustReading}
-                        size="secondary"
-                    />
+                    {isNativeAudiobook ? (
+                        <ActionButton
+                            title="Update Listening Progress"
+                            description={["Save your audiobook position", "without adding reading time."]}
+                            className="bg-emerald-50 hover:bg-emerald-100"
+                            onClick={onListening}
+                            size="secondary"
+                        />
+                    ) : (
+                        <ActionButton
+                            title="Reading Timer"
+                            subtitle="Reading Timer"
+                            description={["Read normally and log", "your time and page progress."]}
+                            className="bg-emerald-50 hover:bg-emerald-100"
+                            onClick={onFluidReadingJustReading}
+                            size="secondary"
+                        />
+                    )}
 
                     {onReadingSessions ? (
                         <ActionButton
@@ -188,14 +196,6 @@ export default function BookHubActionGrid({
                         />
                     ) : null}
 
-                    {onReadingReflection ? (
-                        <ActionButton
-                            title="Review & Notes"
-                            description="Keep a private review, memorable quotes, and thoughts you want to remember."
-                            className="bg-orange-50 hover:bg-orange-100"
-                            onClick={onReadingReflection}
-                        />
-                    ) : null}
                 </div>
             </div>
         );
@@ -394,15 +394,6 @@ export default function BookHubActionGrid({
                         description="Add several words to this book at once."
                         className="bg-yellow-50 hover:bg-yellow-100"
                         onClick={onBulkAdd}
-                    />
-                ) : null}
-
-                {onReadingReflection ? (
-                    <ActionButton
-                        title="Review & Notes"
-                        description="Keep a private review, memorable quotes, and thoughts you want to remember."
-                        className="bg-orange-50 hover:bg-orange-100"
-                        onClick={onReadingReflection}
                     />
                 ) : null}
 

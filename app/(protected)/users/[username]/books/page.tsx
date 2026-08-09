@@ -528,6 +528,7 @@ export default function BooksPage() {
         books (
           id,
           title,
+          language_code,
           author,
           cover_url,
           page_count,

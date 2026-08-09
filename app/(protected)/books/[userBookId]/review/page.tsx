@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -24,6 +25,8 @@ type BookRow = {
   title: string | null;
   title_reading: string | null;
   author: string | null;
+  author_english_name: string | null;
+  author_reading: string | null;
   cover_url: string | null;
   language_code: string | null;
 };
@@ -78,7 +81,7 @@ export default function ReviewNotesPage() {
       if (cancelled) return;
 
       if (authError || !user || !userBookId) {
-        setAccessMessage("Please sign in to use Review & Notes.");
+        setAccessMessage("Please sign in to use this review page.");
         setLoading(false);
         return;
       }
@@ -141,6 +144,8 @@ export default function ReviewNotesPage() {
             title,
             title_reading,
             author,
+            author_english_name,
+            author_reading,
             cover_url,
             language_code
           )
@@ -190,7 +195,7 @@ export default function ReviewNotesPage() {
 
       if (!nativeLanguageBook && !featureAccess.hasFullAccess) {
         setAccessMessage(
-          "Review & Notes is part of Reading Access. Your Reading Reflection is still available after you finish a book."
+          "My Review is part of Reading Access. Your Reading Reflection is still available after you finish a book."
         );
         setLoading(false);
         return;
@@ -236,7 +241,7 @@ export default function ReviewNotesPage() {
 
     if (error) {
       console.error("Error saving Review & Notes:", error);
-      setSaveMessage("Could not save Review & Notes.");
+      setSaveMessage("Could not save your review.");
       return;
     }
 
@@ -263,7 +268,7 @@ export default function ReviewNotesPage() {
     return (
       <main className="min-h-screen bg-stone-50 px-6 py-10">
         <div className="mx-auto max-w-4xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm font-semibold text-stone-600">Loading Review & Notes...</p>
+          <p className="text-sm font-semibold text-stone-600">Loading review...</p>
         </div>
       </main>
     );
@@ -272,7 +277,7 @@ export default function ReviewNotesPage() {
   if (!row) {
     return (
       <AccessDeniedMessage
-        message={accessMessage || "You do not have access to Review & Notes."}
+        message={accessMessage || "You do not have access to this review page."}
         backHref={userBookId ? `/books/${userBookId}` : "/books"}
         backLabel="Back to Book Hub"
       />
@@ -280,6 +285,11 @@ export default function ReviewNotesPage() {
   }
 
   const book = row.books;
+  const bookIdentity = getBookIdentity(book);
+  const reviewDestinationLabel = isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review";
+  const reviewDescription = isEnglishNativeTrackerBook
+    ? "Keep your rating, private review, memorable quotes, and the thoughts you want to remember."
+    : "Keep your private review, memorable quotes, and the thoughts you want to remember.";
   const updateFavoriteQuote = (
     index: number,
     field: keyof FavoriteQuoteInput,
@@ -330,16 +340,16 @@ export default function ReviewNotesPage() {
 
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
-                Review & Notes
+                {reviewDestinationLabel}
               </p>
               <h1 className="mt-2 text-3xl font-black text-stone-950">
-                {book?.title ?? "Untitled book"}
+                {bookIdentity.title}
               </h1>
-              {book?.author ? (
-                <p className="mt-2 text-sm font-semibold text-stone-600">{book.author}</p>
+              {bookIdentity.author ? (
+                <p className="mt-2 text-sm font-semibold text-stone-600">{bookIdentity.author}</p>
               ) : null}
               <p className="mt-4 max-w-2xl text-sm leading-6 text-stone-600">
-                Keep a private review, memorable quotes, and the thoughts you want to remember.
+                {reviewDescription}
               </p>
             </div>
           </div>
@@ -515,7 +525,7 @@ export default function ReviewNotesPage() {
               disabled={saving}
               className="rounded-2xl bg-stone-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save Review & Notes"}
+              {saving ? "Saving..." : `Save ${reviewDestinationLabel}`}
             </button>
             {saveMessage ? (
               <span className="text-sm font-semibold text-stone-600">{saveMessage}</span>

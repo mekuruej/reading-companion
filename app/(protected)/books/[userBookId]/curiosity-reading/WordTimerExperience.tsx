@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { displayBookTitle } from "@/lib/books/bookIdentity";
 import KanjiComponentLookup from "@/components/KanjiComponentLookup";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -619,7 +620,7 @@ export function CuriosityReadingExperience({
         return;
       }
 
-      setBookTitle(book.title ?? "");
+      setBookTitle(displayBookTitle(book, ""));
       setBookCover(book.cover_url ?? "");
       setBookLanguageCode(book.language_code ?? null);
       setBookPageCount(book.page_count ?? null);

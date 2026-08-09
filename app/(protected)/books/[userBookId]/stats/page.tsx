@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
@@ -462,12 +463,14 @@ export default function BookStatsPage() {
         );
     }
 
+    const bookIdentity = getBookIdentity(book);
+
     return (
         <main className="min-h-screen bg-stone-50 p-6">
             <div className="mx-auto max-w-6xl space-y-5">
                 <BookStatsHeader
-                    bookTitle={book?.title ?? null}
-                    bookTitleReading={book?.title_reading ?? null}
+                    bookTitle={bookIdentity.title}
+                    bookTitleReading={bookIdentity.titleReading}
                     coverUrl={book?.cover_url ?? null}
                     canOpenVocabList={canSeeVocabularyStats}
                     bookHubHref={`/books/${encodeURIComponent(userBookId)}`}

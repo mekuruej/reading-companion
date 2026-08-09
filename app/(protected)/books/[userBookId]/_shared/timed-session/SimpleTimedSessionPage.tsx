@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { displayBookTitle } from "@/lib/books/bookIdentity";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import {
@@ -175,6 +176,7 @@ export default function SimpleTimedSessionPage({
           user_id,
           books (
             title,
+            language_code,
             cover_url,
             page_count
           )
@@ -229,7 +231,7 @@ export default function SimpleTimedSessionPage({
 
             setCanAccessBook(true);
             setAccessChecked(true);
-            setBookTitle(book?.title ?? "Untitled book");
+            setBookTitle(displayBookTitle(book));
             setBookCover(book?.cover_url ?? "");
             setBookPageCount(book?.page_count ?? null);
 

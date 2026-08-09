@@ -9,6 +9,7 @@ import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getFullAccessRequiredCopy } from "@/lib/access/requireFullAccess";
+import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
@@ -19,6 +20,8 @@ type BookRow = {
   title: string | null;
   title_reading: string | null;
   author: string | null;
+  author_english_name: string | null;
+  author_reading: string | null;
   cover_url: string | null;
   language_code: string | null;
 };
@@ -113,6 +116,8 @@ export default function StoryNotesPage() {
             title,
             title_reading,
             author,
+            author_english_name,
+            author_reading,
             cover_url,
             language_code
           ),
@@ -216,6 +221,7 @@ export default function StoryNotesPage() {
   }
 
   const book = row.books;
+  const bookIdentity = getBookIdentity(book);
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -232,7 +238,7 @@ export default function StoryNotesPage() {
             {book?.cover_url ? (
               <img
                 src={book.cover_url}
-                alt={`${book.title ?? "Book"} cover`}
+                alt={`${bookIdentity.title} cover`}
                 className="h-28 w-20 shrink-0 rounded-2xl border border-stone-200 object-cover shadow-sm"
               />
             ) : null}
@@ -242,16 +248,16 @@ export default function StoryNotesPage() {
                 Reading Journal
               </p>
               <h1 className="mt-1 text-3xl font-black text-stone-950">
-                {book?.title ?? "Untitled book"}
+                {bookIdentity.title}
               </h1>
-              {book?.title_reading ? (
+              {bookIdentity.titleReading ? (
                 <p className="mt-1 text-sm font-semibold text-stone-500">
-                  {book.title_reading}
+                  {bookIdentity.titleReading}
                 </p>
               ) : null}
-              {book?.author ? (
+              {bookIdentity.author ? (
                 <p className="mt-2 text-sm font-semibold text-stone-700">
-                  {book.author}
+                  {bookIdentity.author}
                 </p>
               ) : null}
               <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">

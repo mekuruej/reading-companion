@@ -10,6 +10,8 @@ type BookHubStatusPanelProps = {
   showStartButton: boolean;
   showFinishDnfButtons: boolean;
   showReflectionLink: boolean;
+  showReviewLink: boolean;
+  reviewLinkLabel: string;
 
   shouldNudgeStartBook: boolean;
   shouldNudgeFinishBook: boolean;
@@ -24,6 +26,7 @@ type BookHubStatusPanelProps = {
   onStartToday: () => void;
   onMarkFinished: () => void;
   onMarkDnf: () => void;
+  onOpenReview: () => void;
   onOpenReflection: () => void;
   onFillBeginningPages: () => void;
   onFillEndingPages: () => void;
@@ -74,6 +77,8 @@ export default function BookHubStatusPanel({
   showStartButton,
   showFinishDnfButtons,
   showReflectionLink,
+  showReviewLink,
+  reviewLinkLabel,
   shouldNudgeStartBook,
   shouldNudgeFinishBook,
   canFillBeginningPages,
@@ -84,6 +89,7 @@ export default function BookHubStatusPanel({
   onStartToday,
   onMarkFinished,
   onMarkDnf,
+  onOpenReview,
   onOpenReflection,
   onFillBeginningPages,
   onFillEndingPages,
@@ -166,6 +172,16 @@ export default function BookHubStatusPanel({
             className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
           >
             Mark DNF
+          </button>
+        ) : null}
+
+        {showReviewLink ? (
+          <button
+            type="button"
+            onClick={onOpenReview}
+            className="rounded-2xl border border-stone-400 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
+          >
+            {reviewLinkLabel}
           </button>
         ) : null}
 

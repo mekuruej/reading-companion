@@ -8,6 +8,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { displayBookTitle } from "@/lib/books/bookIdentity";
 import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import {
     canUseFullAccessFeature,
@@ -485,7 +486,7 @@ export default function ReadAlongPage() {
             setCanAccessBook(true);
             setLearnerUserId(ownerUserId);
             setAccessChecked(true);
-            setBookTitle(book?.title ?? "");
+            setBookTitle(displayBookTitle(book, ""));
             setBookCover(book?.cover_url ?? "");
             setBookLanguageCode(book?.language_code ?? null);
             setFavoriteQuotes((userBook as any)?.favorite_quotes ?? null);
@@ -1175,7 +1176,7 @@ export default function ReadAlongPage() {
                 return;
             }
 
-            setBookTitle(book?.title ?? "");
+            setBookTitle(displayBookTitle(book, ""));
             setBookCover(book?.cover_url ?? "");
             setBookLanguageCode(book?.language_code ?? null);
         }

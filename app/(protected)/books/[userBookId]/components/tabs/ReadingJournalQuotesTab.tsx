@@ -46,7 +46,7 @@ export default function ReadingJournalQuotesTab({
         <div>
           <div className="text-sm font-semibold text-stone-900">Quotes</div>
           <p className="mt-1 text-sm leading-6 text-stone-600">
-            Save memorable lines from this book. These reuse the same quote data as Review & Notes.
+            Save memorable lines from this book. These reuse the same quote data as your review page.
           </p>
         </div>
         <button

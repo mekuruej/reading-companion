@@ -12,6 +12,11 @@ type PersonRowProps = {
   setImgValue: (value: string) => void;
   readingValue: string;
   setReadingValue: (value: string) => void;
+  nameInputLabel?: string;
+  englishNameInputLabel?: string;
+  readingInputLabel?: string;
+  showEnglishName?: boolean;
+  showReading?: boolean;
 };
 
 export default function PersonRow({
@@ -28,7 +33,15 @@ export default function PersonRow({
   setImgValue,
   readingValue,
   setReadingValue,
+  nameInputLabel,
+  englishNameInputLabel,
+  readingInputLabel,
+  showEnglishName = true,
+  showReading = true,
 }: PersonRowProps) {
+  const displayEnglishName = showEnglishName && englishNameValue;
+  const displayReading = showReading && reading;
+
   return (
     <div className="flex items-start gap-3">
       <div className="mt-0.5 h-20 w-20 shrink-0 overflow-hidden rounded-full border bg-stone-100">
@@ -55,11 +68,13 @@ export default function PersonRow({
               {name || "—"}
             </div>
 
-            {englishNameValue ? (
-              <div className="text-sm text-stone-700">{englishNameValue}</div>
+            {displayEnglishName ? (
+              <div className="text-sm text-stone-700">{displayEnglishName}</div>
             ) : null}
 
-            <div className="text-sm text-stone-500">{reading || "—"}</div>
+            {showReading ? (
+              <div className="text-sm text-stone-500">{reading || "—"}</div>
+            ) : null}
           </>
         ) : (
           <div className="space-y-2">
@@ -70,23 +85,27 @@ export default function PersonRow({
             <input
               value={nameValue}
               onChange={(event) => setNameValue(event.target.value)}
-              placeholder={`${label} name`}
+              placeholder={nameInputLabel ?? `${label} name`}
               className="w-full rounded border px-3 py-2 text-sm"
             />
 
-            <input
-              value={englishNameValue}
-              onChange={(event) => setEnglishNameValue(event.target.value)}
-              placeholder={`${label} English name`}
-              className="w-full rounded border px-3 py-2 text-sm"
-            />
+            {showEnglishName ? (
+              <input
+                value={englishNameValue}
+                onChange={(event) => setEnglishNameValue(event.target.value)}
+                placeholder={englishNameInputLabel ?? `${label} English name`}
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+            ) : null}
 
-            <input
-              value={readingValue}
-              onChange={(event) => setReadingValue(event.target.value)}
-              placeholder={`${label} reading`}
-              className="w-full rounded border px-3 py-2 text-sm"
-            />
+            {showReading ? (
+              <input
+                value={readingValue}
+                onChange={(event) => setReadingValue(event.target.value)}
+                placeholder={readingInputLabel ?? `${label} reading`}
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+            ) : null}
 
             <input
               value={imgValue}

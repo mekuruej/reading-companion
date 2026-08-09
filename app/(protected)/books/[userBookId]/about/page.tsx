@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeLabel } from "@/lib/books/bookTypes";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -397,6 +398,7 @@ export default function AboutBookPage() {
   const [row, setRow] = useState<UserBook | null>(null);
   const [authorImageUrl, setAuthorImageUrl] = useState<string | null>(null);
   const [publisherImageUrl, setPublisherImageUrl] = useState<string | null>(null);
+  const [publisherEnglishName, setPublisherEnglishName] = useState<string | null>(null);
   const [ratingAverages, setRatingAverages] = useState<BookRatingAverages | null>(null);
 
   useEffect(() => {
@@ -539,6 +541,7 @@ export default function AboutBookPage() {
         const book = loadedRow.books;
         let nextAuthorImage = book?.author_image_url ?? null;
         let nextPublisherImage = book?.publisher_image_url ?? null;
+        let nextPublisherEnglishName: string | null = null;
 
         if (book?.id) {
           const { data: contributors } = await supabase
@@ -555,11 +558,12 @@ export default function AboutBookPage() {
         if (book?.publisher_id) {
           const { data: publisher } = await supabase
             .from("publishers")
-            .select("logo_url")
+            .select("logo_url, name_en")
             .eq("id", book.publisher_id)
-            .maybeSingle<{ logo_url: string | null }>();
+            .maybeSingle<{ logo_url: string | null; name_en: string | null }>();
 
           nextPublisherImage = publisher?.logo_url ?? nextPublisherImage;
+          nextPublisherEnglishName = publisher?.name_en ?? null;
         }
 
         let nextRatingAverages: BookRatingAverages | null = null;
@@ -597,6 +601,7 @@ export default function AboutBookPage() {
           setRow(loadedRow);
           setAuthorImageUrl(nextAuthorImage);
           setPublisherImageUrl(nextPublisherImage);
+          setPublisherEnglishName(nextPublisherEnglishName);
           setRatingAverages(nextRatingAverages);
           setLoading(false);
         }
@@ -636,7 +641,11 @@ export default function AboutBookPage() {
   }
 
   const usesEnglishReadingTerminology = book.language_code === "en";
+  const bookIdentity = getBookIdentity(book);
   const bookFormat = formatBookFormat(book, row);
+  const publisherDisplayName = usesEnglishReadingTerminology
+    ? publisherEnglishName || book.publisher
+    : book.publisher;
   const isbn = book.isbn13 || book.isbn;
   const synopsis = book.synopsis_en?.trim() || null;
   const authorBio = book.author_bio_en?.trim() || null;
@@ -666,7 +675,7 @@ export default function AboutBookPage() {
               {book.cover_url ? (
                 <img
                   src={book.cover_url}
-                  alt={`${book.title ?? "Book"} cover`}
+                  alt={`${bookIdentity.title} cover`}
                   className="h-full min-h-[190px] w-full object-cover"
                 />
               ) : (
@@ -685,17 +694,17 @@ export default function AboutBookPage() {
                 </div>
 
                 <h1 className="mt-2 text-3xl font-black leading-tight text-stone-950 sm:text-4xl">
-                  {book.title ?? "Untitled book"}
+                  {bookIdentity.title}
                 </h1>
 
-                {!usesEnglishReadingTerminology && book.title_reading ? (
+                {bookIdentity.titleReading ? (
                   <p className="mt-2 text-sm font-semibold text-stone-500">
-                    {book.title_reading}
+                    {bookIdentity.titleReading}
                   </p>
                 ) : null}
 
                 <p className="mt-3 text-base font-semibold text-stone-700">
-                  {book.author || book.author_english_name || "Author not listed yet"}
+                  {bookIdentity.author || book.author_english_name || "Author not listed yet"}
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -797,21 +806,21 @@ export default function AboutBookPage() {
         <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_1fr]">
           <CreatorCard
             eyebrow="Author"
-            name={book.author || book.author_english_name || "Author not listed yet"}
-            reading={usesEnglishReadingTerminology ? null : book.author_reading}
+            name={bookIdentity.author || book.author_english_name || "Author not listed yet"}
+            reading={bookIdentity.authorReading}
             imageUrl={authorImageUrl}
-            fallbackInitial={cleanInitial(book.author || book.author_english_name)}
-            imageAlt={book.author ? `${book.author} photo` : "Author photo"}
+            fallbackInitial={cleanInitial(bookIdentity.author || book.author_english_name)}
+            imageAlt={bookIdentity.author ? `${bookIdentity.author} photo` : "Author photo"}
             note={authorBio ?? "Author information can be added later."}
           />
 
           <CreatorCard
             eyebrow="Publisher"
-            name={book.publisher || "Publisher not listed yet"}
+            name={publisherDisplayName || "Publisher not listed yet"}
             reading={usesEnglishReadingTerminology ? null : book.publisher_reading}
             imageUrl={publisherImageUrl}
-            fallbackInitial={cleanInitial(book.publisher)}
-            imageAlt={book.publisher ? `${book.publisher} logo` : "Publisher logo"}
+            fallbackInitial={cleanInitial(publisherDisplayName)}
+            imageAlt={publisherDisplayName ? `${publisherDisplayName} logo` : "Publisher logo"}
             imageClassName="object-contain bg-white p-2"
             note={publisherNote ?? "Publisher or imprint information can be added later."}
           />
